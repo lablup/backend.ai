@@ -19,7 +19,10 @@ Changes
 ## 26.7.0 (2026-07-02)
 
 ### Features
-* Extend the bssh import workflow to also download and commit the `bssh-server` binary, and mount it into session containers at `/opt/kernel/bssh-server` so that it can be evaluated as an alternative SSH server next to the default dropbear. ([#11136](https://github.com/lablup/backend.ai/issues/11136))
+
+#### Scoped App Config (BEP-1052)
+Continued the scoped app-config redesign (BEP-1052), adding the app-config definition API surface and the allow-list / fragment layers across the DB, repository, service, REST v2, GraphQL, SDK, and CLI.
+
 * Add the REST v2 `app-config-definitions` API (create / get / search / purge) for managing registered app config names (BEP-1052). ([#12266](https://github.com/lablup/backend.ai/issues/12266))
 * Add the AppConfigDefinition GraphQL API (create / get / search / purge) over the shared adapter (BEP-1052). ([#12267](https://github.com/lablup/backend.ai/issues/12267))
 * Add the AppConfigDefinition client SDK v2 and `admin app-config-definition` CLI v2 commands (create / get / search / purge) targeting the REST v2 endpoints (BEP-1052). ([#12268](https://github.com/lablup/backend.ai/issues/12268))
@@ -31,20 +34,34 @@ Changes
 * Add the app_config_allow_list client SDK v2 and CLI v2 commands. ([#12298](https://github.com/lablup/backend.ai/issues/12298))
 * Add the app_config_fragments DB model and Alembic migration (BEP-1052). ([#12306](https://github.com/lablup/backend.ai/issues/12306))
 * Add the app_config_fragments repository layer (create / get / update / admin_search / scoped_search / purge, with race-free rank assignment). ([#12307](https://github.com/lablup/backend.ai/issues/12307))
-* Make the TUI installer setup log selectable and copyable (drag to select, `Ctrl+C` to copy the selection or the whole log). ([#12345](https://github.com/lablup/backend.ai/issues/12345))
-* Add the persistence foundation for first-class idle checkers (idle_checkers / idle_checker_bindings tables) and a reusable ABCColumn polymorphic JSONB column type (BEP-1054) ([#12346](https://github.com/lablup/backend.ai/issues/12346))
-* Enable Relay node(id:) Global Object Identification for v2 GraphQL types (e.g. ModelDeployment), unblocking @refetchable / useRefetchableFragment refetch ([#12350](https://github.com/lablup/backend.ai/issues/12350))
 * Add the app_config_fragment service layer (admin create / update / purge with the allow-list write-gate). ([#12358](https://github.com/lablup/backend.ai/issues/12358))
-* Support the `PROMETHEUS` metric source and a Prometheus query preset option in the auto-scaling rule CLI. ([#12361](https://github.com/lablup/backend.ai/issues/12361))
-* Add an unauthenticated public GraphQL endpoint (`POST /admin/gql/strawberry/public`). It serves a separate `PublicQueries` schema that exposes only fields explicitly registered as public; every other field, mutation, and subscription is physically absent and cannot be queried. Existing authenticated GraphQL endpoints are unchanged. ([#12366](https://github.com/lablup/backend.ai/issues/12366))
+
+#### Reconciler-Based Idle Checking (BEP-1054)
+Laid the persistence and reconciler foundation for first-class, scope-bound idle checkers (BEP-1054).
+
+* Add the persistence foundation for first-class idle checkers (idle_checkers / idle_checker_bindings tables) and a reusable ABCColumn polymorphic JSONB column type (BEP-1054) ([#12346](https://github.com/lablup/backend.ai/issues/12346))
 * Scaffold a no-op idle-check reconciler stage and the idle_checkers.spec payload base as a foundation for reconciler-based idle checking ([#12369](https://github.com/lablup/backend.ai/issues/12369))
+
+#### v2 GraphQL API
+Extended the v2 GraphQL surface with Relay Global Object Identification, an unauthenticated public-schema endpoint, and boolean filter combinators.
+
+* Enable Relay node(id:) Global Object Identification for v2 GraphQL types (e.g. ModelDeployment), unblocking @refetchable / useRefetchableFragment refetch ([#12350](https://github.com/lablup/backend.ai/issues/12350))
+* Add an unauthenticated public GraphQL endpoint (`POST /admin/gql/strawberry/public`). It serves a separate `PublicQueries` schema that exposes only fields explicitly registered as public; every other field, mutation, and subscription is physically absent and cannot be queried. Existing authenticated GraphQL endpoints are unchanged. ([#12366](https://github.com/lablup/backend.ai/issues/12366))
+* Add AND/OR/NOT boolean combinators to v2 GraphQL search filters that were missing them (resource policies, container registry, runtime variants, app config, and more). ([#12446](https://github.com/lablup/backend.ai/issues/12446))
+
+#### Other Features
+* Extend the bssh import workflow to also download and commit the `bssh-server` binary, and mount it into session containers at `/opt/kernel/bssh-server` so that it can be evaluated as an alternative SSH server next to the default dropbear. ([#11136](https://github.com/lablup/backend.ai/issues/11136))
+* Make the TUI installer setup log selectable and copyable (drag to select, `Ctrl+C` to copy the selection or the whole log). ([#12345](https://github.com/lablup/backend.ai/issues/12345))
+* Support the `PROMETHEUS` metric source and a Prometheus query preset option in the auto-scaling rule CLI. ([#12361](https://github.com/lablup/backend.ai/issues/12361))
 * Add a single-string `command` field to the v2 model service config API and deprecate the `start_command` list ([#12418](https://github.com/lablup/backend.ai/issues/12418))
 * Add Virtual Scope domain types for the generalized RBAC ownership layer (scope → virtual_scope → entity), with per-edge permission caps. ([#12419](https://github.com/lablup/backend.ai/issues/12419))
-* Add AND/OR/NOT boolean combinators to v2 GraphQL search filters that were missing them (resource policies, container registry, runtime variants, app config, and more). ([#12446](https://github.com/lablup/backend.ai/issues/12446))
 * Make compute session scaling group names non-nullable by backfilling them from kernel scaling group data. ([#12459](https://github.com/lablup/backend.ai/issues/12459))
 
 ### Improvements
-* Serve the Grafana MCP as a halfstack observability-profile service and add local-dev Grafana dashboards (Dev Health & Errors, scheduler/reconciler panels); remove the unused session/kernel sweep metrics. ([#12316](https://github.com/lablup/backend.ai/issues/12316))
+
+#### Manager Layer Dependency Cleanup
+Removed upward layer-inversion imports across the manager (models→repositories, repositories→services/api, data→repositories), narrowing the test and typecheck re-run scope.
+
 * Move the QueryCondition/QueryOrder query type aliases to the models layer so that entity condition/order modules no longer import the repositories layer, removing the models→repositories layer-inversion imports. ([#12396](https://github.com/lablup/backend.ai/issues/12396))
 * Reduce the manager test/typecheck re-run scope by moving api-layer primitives (`Undefined`/`undefined`, `ManagerStatus`, `BaseFilterAdapter`) down to the data layer, removing `services`→`api` cross-layer import violations. ([#12417](https://github.com/lablup/backend.ai/issues/12417))
 * Introduce pure data-layer bulk failure types so the manager data layer no longer imports upward from the repositories layer ([#12420](https://github.com/lablup/backend.ai/issues/12420))
@@ -56,29 +73,46 @@ Changes
 * Move container-registry image scanning out of `models/image/row.py` into the image repository layer (scan/rescan on the DB source, the registry untag on the repository) so the models layer no longer imports the `container_registry` package. ([#12439](https://github.com/lablup/backend.ai/issues/12439))
 * Relocate the sokovan scheduler value-object package to the data layer (data.sokovan) so the scheduler repository no longer imports the sokovan package. ([#12441](https://github.com/lablup/backend.ai/issues/12441))
 * Move the remaining scheduler and fair-share value types into the data layer, removing all repository imports of the sokovan package. ([#12444](https://github.com/lablup/backend.ai/issues/12444))
+
+#### Other Improvements
+* Serve the Grafana MCP as a halfstack observability-profile service and add local-dev Grafana dashboards (Dev Health & Errors, scheduler/reconciler panels); remove the unused session/kernel sweep metrics. ([#12316](https://github.com/lablup/backend.ai/issues/12316))
 * Evaluate every kernel requirement during agent selection and report each placement failure with a structured remediation suggestion, instead of aborting at the first unplaceable kernel. ([#12448](https://github.com/lablup/backend.ai/issues/12448))
 
 ### Fixes
+
+#### Model Serving & Inference Deployment
+Fixed legacy service creation, scale-in replica selection, an auto-scaling deadlock, the custom runtime-variant baseline, and health-check activation.
+
 * Fix legacy `POST /services` raising `RuntimeVariantNotFound` after the deployment is already created, by reading the create response through the full (legacy) endpoint getter that eagerly loads the revision data. ([#12253](https://github.com/lablup/backend.ai/issues/12253))
-* Enforce per-circuit client IP allowlists (`allowed_client_ips`) at the app proxy layer for both Python and Traefik proxy modes, so externally published apps with IP restrictions are no longer reachable from disallowed addresses. ([#12321](https://github.com/lablup/backend.ai/issues/12321))
-* Fix session stuck in TERMINATING state when a kernel ends in CANCELLED or ERROR status ([#12322](https://github.com/lablup/backend.ai/issues/12322))
 * Terminate not-yet-serving and unhealthy model-service replicas first on scale-in, instead of ordering removal solely by creation time. ([#12323](https://github.com/lablup/backend.ai/issues/12323))
-* Measure the session lifetime limit (`max_session_lifetime`) from when the session starts running (`starts_at`) instead of when it was created, so scheduling wait time is no longer counted against the user's allowed lifetime. ([#12325](https://github.com/lablup/backend.ai/issues/12325))
-* Return a 4xx error instead of a 500 when the session enqueue API receives an unparseable resource quantity, and accept human-readable sizes such as `4g` for memory slots like the legacy path. ([#12344](https://github.com/lablup/backend.ai/issues/12344))
-* Populate the RBAC roles fixture (`example-roles.json`) during install so installer-created users get their default roles and permissions, instead of landing with no roles and hitting 403/500 on first use. ([#12347](https://github.com/lablup/backend.ai/issues/12347))
-* Fixed a compute session's mounted-folder list (`vfolder_nodes`) showing the same folder multiple times when it is mounted at more than one subpath. ([#12349](https://github.com/lablup/backend.ai/issues/12349))
 * Fix a deployment auto-scaling deadlock where scale-down (and other replica-count changes) were never applied while replicas stayed pending due to resource limits. ([#12370](https://github.com/lablup/backend.ai/issues/12370))
 * Backfill a default service block (with port) for the `custom` runtime variant baseline when it was seeded without one, so model-service deployments no longer fail with `port: Field required`. ([#12373](https://github.com/lablup/backend.ai/issues/12373))
+* Start the model service health check only when health_check.enable is true, instead of whenever a health_check block is present ([#12412](https://github.com/lablup/backend.ai/issues/12412))
+
+#### Session Lifecycle & API
+Fixed session termination and lifetime accounting, enqueue-time resource validation, and legacy session API regressions.
+
+* Fix session stuck in TERMINATING state when a kernel ends in CANCELLED or ERROR status ([#12322](https://github.com/lablup/backend.ai/issues/12322))
+* Measure the session lifetime limit (`max_session_lifetime`) from when the session starts running (`starts_at`) instead of when it was created, so scheduling wait time is no longer counted against the user's allowed lifetime. ([#12325](https://github.com/lablup/backend.ai/issues/12325))
+* Return a 4xx error instead of a 500 when the session enqueue API receives an unparseable resource quantity, and accept human-readable sizes such as `4g` for memory slots like the legacy path. ([#12344](https://github.com/lablup/backend.ai/issues/12344))
+* Fixed a compute session's mounted-folder list (`vfolder_nodes`) showing the same folder multiple times when it is mounted at more than one subpath. ([#12349](https://github.com/lablup/backend.ai/issues/12349))
+* Fix `400 Malformed body` errors when shutting down a session service (e.g. Tensorboard), downloading files, or imagifying a session by restoring the request parameter placement the WebUI expects on the legacy `/session/` endpoints. ([#12411](https://github.com/lablup/backend.ai/issues/12411))
+
+#### Container Registry
+Fixed rescan serialization failures, preserved API failure categories in action metrics, and secured the Harbor webhook endpoint.
+
 * Preserve the container registry API failure category (e.g. forbidden) in action metrics instead of collapsing it into a generic internal error ([#12397](https://github.com/lablup/backend.ai/issues/12397))
+* Fix container registry rescan task failing with SerializationError (SQLSTATE 40001) by running the rescan upsert under READ COMMITTED instead of SERIALIZABLE isolation ([#12464](https://github.com/lablup/backend.ai/issues/12464))
+* Reject Harbor container registry webhook requests that omit or mismatch a configured authorization secret ([#12480](https://github.com/lablup/backend.ai/issues/12480))
+
+#### Other Fixes
+* Enforce per-circuit client IP allowlists (`allowed_client_ips`) at the app proxy layer for both Python and Traefik proxy modes, so externally published apps with IP restrictions are no longer reachable from disallowed addresses. ([#12321](https://github.com/lablup/backend.ai/issues/12321))
+* Populate the RBAC roles fixture (`example-roles.json`) during install so installer-created users get their default roles and permissions, instead of landing with no roles and hitting 403/500 on first use. ([#12347](https://github.com/lablup/backend.ai/issues/12347))
 * Set the appproxy-coordinator's `announce_addr` during install so its Prometheus metric service-discovery target uses the node's public address instead of `127.0.0.1`. ([#12407](https://github.com/lablup/backend.ai/issues/12407))
 * Fix container creation failing with a bind-mount error when an optional runner binary (e.g. bssh-server) is absent from the agent's runner directory ([#12409](https://github.com/lablup/backend.ai/issues/12409))
-* Fix `400 Malformed body` errors when shutting down a session service (e.g. Tensorboard), downloading files, or imagifying a session by restoring the request parameter placement the WebUI expects on the legacy `/session/` endpoints. ([#12411](https://github.com/lablup/backend.ai/issues/12411))
-* Start the model service health check only when health_check.enable is true, instead of whenever a health_check block is present ([#12412](https://github.com/lablup/backend.ai/issues/12412))
 * Fix the Read the Docs build failing with a dependency conflict by bumping the docs `pygments` pin to `~=2.17`, satisfying Sphinx 7.4's `Pygments>=2.17` requirement. ([#12422](https://github.com/lablup/backend.ai/issues/12422))
-* Fix container registry rescan task failing with SerializationError (SQLSTATE 40001) by running the rescan upsert under READ COMMITTED instead of SERIALIZABLE isolation ([#12464](https://github.com/lablup/backend.ai/issues/12464))
 * Restore OpenAPI spec generation for the manager REST API reference docs, which had regressed to an empty spec ([#12467](https://github.com/lablup/backend.ai/issues/12467))
 * Register the ORM cluster the image CLI needs so its commands (`list`, `inspect`, `forget`, `purge`, `set-resource-limit`, `rescan`, `alias`, `dealias`, `validate-*`) no longer fail with a SQLAlchemy mapper initialization error. ([#12468](https://github.com/lablup/backend.ai/issues/12468))
-* Reject Harbor container registry webhook requests that omit or mismatch a configured authorization secret ([#12480](https://github.com/lablup/backend.ai/issues/12480))
 
 ### Documentation Updates
 * Add BEP-1054 proposing reconciler-based idle checking with first-class, scope-bound idle checkers ([#12314](https://github.com/lablup/backend.ai/issues/12314))
