@@ -99,6 +99,26 @@ is clean. `--network none` keeps nerdctl out of networking, so CNI ownership sta
 the BEP-1055 layer. This validates the runtime↔network separation and the orchestrator
 handoff against live containerd. ✅
 
+## 7. Real code end-to-end (the actual classes, not shell mimics)
+
+The actual Python classes were run on the Linux host driving live containerd + CNI (only
+`ai.backend.logging` was stubbed; runtime/network modules are the real source):
+
+```python
+rt = NerdctlRuntimeClient(subprocess_runner, namespace="backend-ai")
+await rt.pull_image(IMAGE)
+await rt.create_container(C, image_ref=IMAGE, command=["sleep","600"], oci_spec={})
+handle = await rt.start_container(C)                     # -> pid
+attacher = CniAttacher(CniPluginRunner(cni_path="/usr/local/libexec/cni"))
+await attacher.attach(plan, container_id=C, netns=netns_path_for_pid(handle.pid))
+```
+
+Result: `NerdctlRuntimeClient.{image_exists,pull_image,create_container,start_container}`
+and `CniAttacher.attach`/`CniPluginRunner` (real `bridge` plugin exec) ran unmodified; the
+real container received overlay IP `10.128.5.5/24`; `detach`/`kill_container`/
+`remove_container` cleaned up. This validates the actual runtime + CNI code paths, not
+just equivalent shell commands. ✅
+
 ## Notes
 
 - These are manual smoke tests requiring a privileged Linux host (NET_ADMIN),
