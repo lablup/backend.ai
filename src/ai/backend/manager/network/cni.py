@@ -5,20 +5,26 @@ runtimes. This plugin owns the *control plane*: it allocates a per-session subne
 (and a VNI for the vxlan backend), selects the data-plane backend from agent
 capabilities, and writes the session network descriptor to etcd. The data plane
 itself is realized by the agent-side v2 plugins (see BEP-1055/agent-plugin-v2.md).
-
-NOTE: This is a P1 skeleton. Allocation and etcd writes are implemented in P2.
 """
 
 from __future__ import annotations
 
+import json
+import uuid
 from collections.abc import Mapping
 from typing import Any
 
 from ai.backend.common.configs.etcd import EtcdConfig
-from ai.backend.common.etcd import AsyncEtcd
+from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.network.types import NetworkBackendKind
 from ai.backend.manager.network.ipam import SubnetAllocator, VNIAllocator
 from ai.backend.manager.plugin.network import AbstractNetworkManagerPlugin, NetworkInfo
+
+_DEFAULT_MTU = 1500
+
+
+def _session_meta_key(session_id: str) -> str:
+    return f"network/session/{session_id}/meta"
 
 
 class CNINetworkPlugin(AbstractNetworkManagerPlugin):
@@ -54,22 +60,67 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
     async def update_plugin_config(self, plugin_config: Mapping[str, Any]) -> None:
         return await super().update_plugin_config(plugin_config)
 
+    def _require_etcd(self) -> AsyncEtcd:
+        if self._etcd is None:
+            raise RuntimeError("CNINetworkPlugin is not initialized (call init() first)")
+        return self._etcd
+
     async def create_network(
         self, *, identifier: str | None = None, options: dict[str, Any] | None = None
     ) -> NetworkInfo:
-        # P2: options["member_agents"] -> select backend from caps -> allocate subnet
-        # (+VNI) via CAS -> write network/session/{identifier}/meta -> return NetworkInfo
-        # carrying {backend, subnet, vni, mtu}.
-        raise NotImplementedError("BEP-1055 P2")
+        etcd = self._require_etcd()
+        session_id = identifier or str(uuid.uuid4())
+        options = options or {}
+        member_agents = list(options.get("member_agents", []))
+        forced_raw = options.get("forced_backend")
+        forced_backend = NetworkBackendKind(forced_raw) if forced_raw else None
+
+        backend = await self._select_backend(member_agents, forced_backend)
+        subnet = await self._subnet_allocator.acquire(session_id)
+        vni = (
+            await self._vni_allocator.acquire(session_id)
+            if backend is NetworkBackendKind.VXLAN
+            else None
+        )
+        mtu = int(self.plugin_config.get("mtu") or _DEFAULT_MTU)
+
+        meta: dict[str, Any] = {
+            "subnet": subnet,
+            "vni": vni,
+            "backend": str(backend),
+            "mtu": mtu,
+        }
+        await etcd.put(
+            _session_meta_key(session_id), json.dumps(meta), scope=ConfigScopes.GLOBAL
+        )
+        return NetworkInfo(network_id=session_id, options=meta)
 
     async def destroy_network(self, network_id: str) -> None:
-        # P2: delete network/session/{network_id} prefix and release subnet/VNI.
-        raise NotImplementedError("BEP-1055 P2")
+        etcd = self._require_etcd()
+        raw = await etcd.get(_session_meta_key(network_id), scope=ConfigScopes.GLOBAL)
+        if raw is not None:
+            meta = json.loads(raw)
+            if subnet := meta.get("subnet"):
+                await self._subnet_allocator.release(subnet)
+            if (vni := meta.get("vni")) is not None:
+                await self._vni_allocator.release(int(vni))
+        await etcd.delete_prefix(f"network/session/{network_id}", scope=ConfigScopes.GLOBAL)
 
     async def _select_backend(
         self, member_agents: list[str], forced_backend: NetworkBackendKind | None
     ) -> NetworkBackendKind:
-        # P2: forced_backend (from create_network options, set by the launcher from typed
-        # config) wins; otherwise capability-based (host-gw if all members support native
-        # routing per network/agent/{id}/caps, else vxlan).
-        raise NotImplementedError("BEP-1055 P2")
+        """Operator override wins; otherwise host-gw only if every member advertises
+        native-routing capability, else the portable vxlan default."""
+        if forced_backend is not None:
+            return forced_backend
+        if not member_agents:
+            return NetworkBackendKind.VXLAN
+        etcd = self._require_etcd()
+        for agent_id in member_agents:
+            raw = await etcd.get(f"network/agent/{agent_id}/caps", scope=ConfigScopes.GLOBAL)
+            if raw is None:
+                return NetworkBackendKind.VXLAN
+            caps = json.loads(raw)
+            if not caps.get("native_routing_ok", False):
+                return NetworkBackendKind.VXLAN
+        return NetworkBackendKind.HOST_GW
