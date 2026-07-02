@@ -11,7 +11,6 @@ from ai.backend.common.dto.manager.v2.app_config_allow_list.request import (
     SearchAppConfigAllowListInput,
 )
 from ai.backend.common.identifier.app_config_allow_list import AppConfigAllowListID
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -36,7 +35,7 @@ from .types import (
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.7.0",
         description="Get a single app config allow-list entry by id (super admin only).",
     )
 )  # type: ignore[misc]
@@ -51,7 +50,7 @@ async def admin_app_config_allow_list(
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.7.0",
         description=(
             "Search app config allow-list entries with filtering, ordering, and pagination "
             "(super admin only)."
@@ -105,7 +104,7 @@ async def admin_app_config_allow_lists(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.7.0",
         description="Register a new app config allow-list entry (super admin only).",
     )
 )
@@ -120,7 +119,7 @@ async def admin_create_app_config_allow_list(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.7.0",
         description="Purge an app config allow-list entry by id (super admin only).",
     )
 )

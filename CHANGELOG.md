@@ -16,6 +16,88 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 26.7.0 (2026-07-02)
+
+### Features
+* Extend the bssh import workflow to also download and commit the `bssh-server` binary, and mount it into session containers at `/opt/kernel/bssh-server` so that it can be evaluated as an alternative SSH server next to the default dropbear. ([#11136](https://github.com/lablup/backend.ai/issues/11136))
+* Add the REST v2 `app-config-definitions` API (create / get / search / purge) for managing registered app config names (BEP-1052). ([#12266](https://github.com/lablup/backend.ai/issues/12266))
+* Add the AppConfigDefinition GraphQL API (create / get / search / purge) over the shared adapter (BEP-1052). ([#12267](https://github.com/lablup/backend.ai/issues/12267))
+* Add the AppConfigDefinition client SDK v2 and `admin app-config-definition` CLI v2 commands (create / get / search / purge) targeting the REST v2 endpoints (BEP-1052). ([#12268](https://github.com/lablup/backend.ai/issues/12268))
+* Add the `app_config_allow_list` DB model and Alembic migration (BEP-1052). ([#12289](https://github.com/lablup/backend.ai/issues/12289))
+* Add the app_config_allow_list repository layer (create / get / search / purge). ([#12290](https://github.com/lablup/backend.ai/issues/12290))
+* Add the app_config_allow_list service layer (actions and processors). ([#12292](https://github.com/lablup/backend.ai/issues/12292))
+* Add the app_config_allow_list REST v2 API (create / get / search / purge). ([#12293](https://github.com/lablup/backend.ai/issues/12293))
+* Add the app_config_allow_list GraphQL API. ([#12296](https://github.com/lablup/backend.ai/issues/12296))
+* Add the app_config_allow_list client SDK v2 and CLI v2 commands. ([#12298](https://github.com/lablup/backend.ai/issues/12298))
+* Add the app_config_fragments DB model and Alembic migration (BEP-1052). ([#12306](https://github.com/lablup/backend.ai/issues/12306))
+* Add the app_config_fragments repository layer (create / get / update / admin_search / scoped_search / purge, with race-free rank assignment). ([#12307](https://github.com/lablup/backend.ai/issues/12307))
+* Make the TUI installer setup log selectable and copyable (drag to select, `Ctrl+C` to copy the selection or the whole log). ([#12345](https://github.com/lablup/backend.ai/issues/12345))
+* Add the persistence foundation for first-class idle checkers (idle_checkers / idle_checker_bindings tables) and a reusable ABCColumn polymorphic JSONB column type (BEP-1054) ([#12346](https://github.com/lablup/backend.ai/issues/12346))
+* Enable Relay node(id:) Global Object Identification for v2 GraphQL types (e.g. ModelDeployment), unblocking @refetchable / useRefetchableFragment refetch ([#12350](https://github.com/lablup/backend.ai/issues/12350))
+* Add the app_config_fragment service layer (admin create / update / purge with the allow-list write-gate). ([#12358](https://github.com/lablup/backend.ai/issues/12358))
+* Support the `PROMETHEUS` metric source and a Prometheus query preset option in the auto-scaling rule CLI. ([#12361](https://github.com/lablup/backend.ai/issues/12361))
+* Add an unauthenticated public GraphQL endpoint (`POST /admin/gql/strawberry/public`). It serves a separate `PublicQueries` schema that exposes only fields explicitly registered as public; every other field, mutation, and subscription is physically absent and cannot be queried. Existing authenticated GraphQL endpoints are unchanged. ([#12366](https://github.com/lablup/backend.ai/issues/12366))
+* Scaffold a no-op idle-check reconciler stage and the idle_checkers.spec payload base as a foundation for reconciler-based idle checking ([#12369](https://github.com/lablup/backend.ai/issues/12369))
+* Add a single-string `command` field to the v2 model service config API and deprecate the `start_command` list ([#12418](https://github.com/lablup/backend.ai/issues/12418))
+* Add Virtual Scope domain types for the generalized RBAC ownership layer (scope → virtual_scope → entity), with per-edge permission caps. ([#12419](https://github.com/lablup/backend.ai/issues/12419))
+* Add AND/OR/NOT boolean combinators to v2 GraphQL search filters that were missing them (resource policies, container registry, runtime variants, app config, and more). ([#12446](https://github.com/lablup/backend.ai/issues/12446))
+* Make compute session scaling group names non-nullable by backfilling them from kernel scaling group data. ([#12459](https://github.com/lablup/backend.ai/issues/12459))
+
+### Improvements
+* Serve the Grafana MCP as a halfstack observability-profile service and add local-dev Grafana dashboards (Dev Health & Errors, scheduler/reconciler panels); remove the unused session/kernel sweep metrics. ([#12316](https://github.com/lablup/backend.ai/issues/12316))
+* Move the QueryCondition/QueryOrder query type aliases to the models layer so that entity condition/order modules no longer import the repositories layer, removing the models→repositories layer-inversion imports. ([#12396](https://github.com/lablup/backend.ai/issues/12396))
+* Reduce the manager test/typecheck re-run scope by moving api-layer primitives (`Undefined`/`undefined`, `ManagerStatus`, `BaseFilterAdapter`) down to the data layer, removing `services`→`api` cross-layer import violations. ([#12417](https://github.com/lablup/backend.ai/issues/12417))
+* Introduce pure data-layer bulk failure types so the manager data layer no longer imports upward from the repositories layer ([#12420](https://github.com/lablup/backend.ai/issues/12420))
+* Remove manager repository-to-service import violations so the data and repository layers no longer depend upward, narrowing the test and typecheck re-run scope. ([#12424](https://github.com/lablup/backend.ai/issues/12424))
+* Stop manager repositories from importing the api layer (move Valkey statistics loaders into a client module and drop unused filter/order wrappers) so editing api modules no longer expands the repository test/typecheck scope. ([#12427](https://github.com/lablup/backend.ai/issues/12427))
+* Move `initiate_vfolder_deletion` from the models layer to the repository layer to remove a reverse layer dependency. ([#12433](https://github.com/lablup/backend.ai/issues/12433))
+* Stop the `endpoint` model row from importing the manager `registry` layer (move the scaling-group check down to its repository) so editing it no longer expands the repository test/typecheck scope. ([#12436](https://github.com/lablup/backend.ai/issues/12436))
+* Move session-creation value types into the data layer so the scheduling-controller rule modules no longer import the scheduler repository. ([#12438](https://github.com/lablup/backend.ai/issues/12438))
+* Move container-registry image scanning out of `models/image/row.py` into the image repository layer (scan/rescan on the DB source, the registry untag on the repository) so the models layer no longer imports the `container_registry` package. ([#12439](https://github.com/lablup/backend.ai/issues/12439))
+* Relocate the sokovan scheduler value-object package to the data layer (data.sokovan) so the scheduler repository no longer imports the sokovan package. ([#12441](https://github.com/lablup/backend.ai/issues/12441))
+* Move the remaining scheduler and fair-share value types into the data layer, removing all repository imports of the sokovan package. ([#12444](https://github.com/lablup/backend.ai/issues/12444))
+* Evaluate every kernel requirement during agent selection and report each placement failure with a structured remediation suggestion, instead of aborting at the first unplaceable kernel. ([#12448](https://github.com/lablup/backend.ai/issues/12448))
+
+### Fixes
+* Fix legacy `POST /services` raising `RuntimeVariantNotFound` after the deployment is already created, by reading the create response through the full (legacy) endpoint getter that eagerly loads the revision data. ([#12253](https://github.com/lablup/backend.ai/issues/12253))
+* Enforce per-circuit client IP allowlists (`allowed_client_ips`) at the app proxy layer for both Python and Traefik proxy modes, so externally published apps with IP restrictions are no longer reachable from disallowed addresses. ([#12321](https://github.com/lablup/backend.ai/issues/12321))
+* Fix session stuck in TERMINATING state when a kernel ends in CANCELLED or ERROR status ([#12322](https://github.com/lablup/backend.ai/issues/12322))
+* Terminate not-yet-serving and unhealthy model-service replicas first on scale-in, instead of ordering removal solely by creation time. ([#12323](https://github.com/lablup/backend.ai/issues/12323))
+* Measure the session lifetime limit (`max_session_lifetime`) from when the session starts running (`starts_at`) instead of when it was created, so scheduling wait time is no longer counted against the user's allowed lifetime. ([#12325](https://github.com/lablup/backend.ai/issues/12325))
+* Return a 4xx error instead of a 500 when the session enqueue API receives an unparseable resource quantity, and accept human-readable sizes such as `4g` for memory slots like the legacy path. ([#12344](https://github.com/lablup/backend.ai/issues/12344))
+* Populate the RBAC roles fixture (`example-roles.json`) during install so installer-created users get their default roles and permissions, instead of landing with no roles and hitting 403/500 on first use. ([#12347](https://github.com/lablup/backend.ai/issues/12347))
+* Fixed a compute session's mounted-folder list (`vfolder_nodes`) showing the same folder multiple times when it is mounted at more than one subpath. ([#12349](https://github.com/lablup/backend.ai/issues/12349))
+* Fix a deployment auto-scaling deadlock where scale-down (and other replica-count changes) were never applied while replicas stayed pending due to resource limits. ([#12370](https://github.com/lablup/backend.ai/issues/12370))
+* Backfill a default service block (with port) for the `custom` runtime variant baseline when it was seeded without one, so model-service deployments no longer fail with `port: Field required`. ([#12373](https://github.com/lablup/backend.ai/issues/12373))
+* Preserve the container registry API failure category (e.g. forbidden) in action metrics instead of collapsing it into a generic internal error ([#12397](https://github.com/lablup/backend.ai/issues/12397))
+* Set the appproxy-coordinator's `announce_addr` during install so its Prometheus metric service-discovery target uses the node's public address instead of `127.0.0.1`. ([#12407](https://github.com/lablup/backend.ai/issues/12407))
+* Fix container creation failing with a bind-mount error when an optional runner binary (e.g. bssh-server) is absent from the agent's runner directory ([#12409](https://github.com/lablup/backend.ai/issues/12409))
+* Fix `400 Malformed body` errors when shutting down a session service (e.g. Tensorboard), downloading files, or imagifying a session by restoring the request parameter placement the WebUI expects on the legacy `/session/` endpoints. ([#12411](https://github.com/lablup/backend.ai/issues/12411))
+* Start the model service health check only when health_check.enable is true, instead of whenever a health_check block is present ([#12412](https://github.com/lablup/backend.ai/issues/12412))
+* Fix the Read the Docs build failing with a dependency conflict by bumping the docs `pygments` pin to `~=2.17`, satisfying Sphinx 7.4's `Pygments>=2.17` requirement. ([#12422](https://github.com/lablup/backend.ai/issues/12422))
+* Fix container registry rescan task failing with SerializationError (SQLSTATE 40001) by running the rescan upsert under READ COMMITTED instead of SERIALIZABLE isolation ([#12464](https://github.com/lablup/backend.ai/issues/12464))
+* Restore OpenAPI spec generation for the manager REST API reference docs, which had regressed to an empty spec ([#12467](https://github.com/lablup/backend.ai/issues/12467))
+* Register the ORM cluster the image CLI needs so its commands (`list`, `inspect`, `forget`, `purge`, `set-resource-limit`, `rescan`, `alias`, `dealias`, `validate-*`) no longer fail with a SQLAlchemy mapper initialization error. ([#12468](https://github.com/lablup/backend.ai/issues/12468))
+* Reject Harbor container registry webhook requests that omit or mismatch a configured authorization secret ([#12480](https://github.com/lablup/backend.ai/issues/12480))
+
+### Documentation Updates
+* Add BEP-1054 proposing reconciler-based idle checking with first-class, scope-bound idle checkers ([#12314](https://github.com/lablup/backend.ai/issues/12314))
+* Reorganize Claude Code agent skill guides (add code-trace/test-guide, merge db-status into db-migrate, remove cli-executor) and add component-level AGENTS.md guardrails. ([#12357](https://github.com/lablup/backend.ai/issues/12357))
+* Regenerate the manager OpenAPI reference spec (`docs/manager/rest-reference/openapi.json`), which had been an empty stub, now that OpenAPI generation is restored (#12467). ([#12491](https://github.com/lablup/backend.ai/issues/12491))
+
+### Miscellaneous
+* Pin `graphql-hive/graphql-inspector` GitHub Action to `v4.0.0`, which includes the `createRequire(import.meta.url)` fix for the `rules:` file resolution regression introduced in `release-1781692943029` (action@5.0.21). See graphql-hive/graphql-inspector#2962. ([#12291](https://github.com/lablup/backend.ai/issues/12291))
+* Increase a batch size of stale pr action to 200 ([#12315](https://github.com/lablup/backend.ai/issues/12315))
+* Automatically advance `NEXT_RELEASE_VERSION` to the next sprint version when `scripts/release.sh` cuts a sprint release, overridable via the `NEXT_DEV_VERSION` environment variable. ([#12332](https://github.com/lablup/backend.ai/issues/12332))
+* Consolidate the duplicated `AppConfigScopeType` enum into a single definition in `ai.backend.common.data.app_config` (imported directly by every layer). ([#12403](https://github.com/lablup/backend.ai/issues/12403))
+* Add a generic `ExistsQuerier` ops primitive (`SELECT EXISTS(...)`) and `AppConfigAllowListRepository.exists` built on it. ([#12405](https://github.com/lablup/backend.ai/issues/12405))
+* Enable mypy's `explicit-override` error code and add the missing `@typing.override` decorators across the codebase, so every method overriding a base-class method is explicitly marked. `ai.backend.client.cli.pretty` is exempted per-module because mypy cannot recognise `@override` on a property overriding a base instance attribute. ([#12451](https://github.com/lablup/backend.ai/issues/12451))
+* Pin the GraphQL federation versions so `docs/manager/graphql-reference/supergraph.graphql` no longer drifts on CI regeneration: set `federation_version: "=2.14.0"` in `configs/graphql/supergraph.yaml` (rover's latest floating plugin `v2.15.0` reformats the SDL) and pin the graphene subgraph to `FederationVersion.VERSION_2_7` instead of `LATEST_VERSION`. ([#12462](https://github.com/lablup/backend.ai/issues/12462))
+
+### Test Updates
+* Import the ORM relationship cluster in the manager unit tests that register it so they configure SQLAlchemy mappers when run as isolated targets. ([#12453](https://github.com/lablup/backend.ai/issues/12453))
+
+
 ## 26.4.4 (2026-06-18)
 
 ### Breaking Changes

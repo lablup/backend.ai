@@ -19,14 +19,13 @@ from typing import override
 
 from strawberry import ID, Info, relay
 
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import resolve_global_id
 from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_federation_type
 
 
 @gql_federation_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.7.0",
         description="Federation stub for legacy AgentNode.",
     ),
     name="AgentNode",
@@ -50,7 +49,7 @@ class AgentNodeStub(relay.Node):
 
 @gql_federation_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.7.0",
         description="Federation stub for legacy NetworkNode.",
     ),
     name="NetworkNode",
@@ -74,7 +73,7 @@ class NetworkNodeStub(relay.Node):
 
 @gql_federation_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.7.0",
         description="Federation stub for legacy ModelCard.",
     ),
     name="ModelCard",
@@ -98,7 +97,7 @@ class ModelCardStub(relay.Node):
 
 @gql_federation_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.7.0",
         description="Federation stub for legacy ContainerRegistryNode.",
     ),
     name="ContainerRegistryNode",
