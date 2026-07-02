@@ -453,10 +453,10 @@ class SessionRow(Base):  # type: ignore[misc]
     kernels: Mapped[list[KernelRow]] = relationship("KernelRow", back_populates="session")
 
     # Resource ownership
-    scaling_group_name: Mapped[str | None] = mapped_column(
-        "scaling_group_name", sa.ForeignKey("scaling_groups.name"), index=True, nullable=True
+    scaling_group_name: Mapped[str] = mapped_column(
+        "scaling_group_name", sa.ForeignKey("scaling_groups.name"), index=True, nullable=False
     )
-    scaling_group: Mapped[ScalingGroupRow | None] = relationship(
+    scaling_group: Mapped[ScalingGroupRow] = relationship(
         "ScalingGroupRow", back_populates="sessions"
     )
     target_sgroup_names: Mapped[list[str] | None] = mapped_column(
