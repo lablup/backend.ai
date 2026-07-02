@@ -24,9 +24,8 @@ msgid "Backend.AI Documentation"
 msgstr "Backend.AI 레퍼런스 문서"
 
 #: ../../index.rst:4 46ce303188ef4054a0d1690f4f5adb03
-#, fuzzy
-msgid "**Latest API version: v6.20220615**"
-msgstr "**최근 API 버전: v5.20191215**"
+msgid "**Latest API version:** |api_version|"
+msgstr "**최근 API 버전:** |api_version|"
 
 #: ../../index.rst:6 b8e94703b6e741c2bb5b33d76b5949ba
 msgid ""

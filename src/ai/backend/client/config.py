@@ -28,6 +28,10 @@ class Undefined(enum.Enum):
 _config = None
 _undefined = Undefined.token
 
+# NOTE: `docs/conf.py` parses this `API_VERSION` literal with `ast` to expose
+# the `|api_version|` Sphinx substitution. Keep this as a plain `Assign` of a
+# 2-tuple `(int, str)` — changing the form (annotated assignment, different
+# arity, etc.) requires updating `docs/conf.py:_read_api_version()`.
 API_VERSION = (9, "20250722")
 MIN_API_VERSION = (7, "20230615")
 
