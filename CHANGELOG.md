@@ -16,6 +16,18 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 26.4.7 (2026-07-02)
+
+### Fixes
+* Fix legacy `POST /services` raising `RuntimeVariantNotFound` after the deployment is already created, by reading the create response through the full (legacy) endpoint getter that eagerly loads the revision data. ([#12253](https://github.com/lablup/backend.ai/issues/12253))
+* Preserve the container registry API failure category (e.g. forbidden) in action metrics instead of collapsing it into a generic internal error ([#12397](https://github.com/lablup/backend.ai/issues/12397))
+* Fix container creation failing with a bind-mount error when an optional runner binary (e.g. bssh-server) is absent from the agent's runner directory ([#12409](https://github.com/lablup/backend.ai/issues/12409))
+* Fix `400 Malformed body` errors when shutting down a session service (e.g. Tensorboard), downloading files, or imagifying a session by restoring the request parameter placement the WebUI expects on the legacy `/session/` endpoints. ([#12411](https://github.com/lablup/backend.ai/issues/12411))
+* Start the model service health check only when health_check.enable is true, instead of whenever a health_check block is present ([#12412](https://github.com/lablup/backend.ai/issues/12412))
+* Fix container registry rescan task failing with SerializationError (SQLSTATE 40001) by running the rescan upsert under READ COMMITTED instead of SERIALIZABLE isolation ([#12464](https://github.com/lablup/backend.ai/issues/12464))
+* Reject Harbor container registry webhook requests that omit or mismatch a configured authorization secret ([#12480](https://github.com/lablup/backend.ai/issues/12480))
+
+
 ## 26.4.6 (2026-06-23)
 
 ### Fixes
