@@ -67,10 +67,9 @@ class CheckPreconditionLifecycleHandler(SessionLifecycleHandler):
     def target_kernel_statuses(cls) -> list[KernelStatus] | None:
         """Include sessions with kernels in SCHEDULED or PULLING status.
 
-        PULLING is included so that a session stuck in PREPARING whose
-        kernels have already advanced to PULLING (but whose pull-completion
-        event was lost) is still picked up and has its image pull
-        re-triggered.
+        PULLING covers kernels whose pull already finished on the agent but
+        were never updated to PREPARED because the ImagePullFinished event
+        was lost; re-triggering makes the agent re-emit the completion event.
         """
         return [KernelStatus.SCHEDULED, KernelStatus.PULLING]
 
