@@ -145,17 +145,22 @@ class CheckPreconditionLifecycleHandler(SessionLifecycleHandler):
             sessions_for_pull_data.image_configs,
         )
 
-        # Mark all sessions as success for status transition
+        # Report re-triggered PREPARING sessions as skipped so the coordinator
+        # does not re-apply the PREPARING transition (avoids racing against
+        # concurrent promotions and re-broadcasting the same status event).
         for session in sessions:
             session_info = session.session_info
-            result.successes.append(
-                SessionTransitionInfo(
-                    session_id=session_info.identity.id,
-                    from_status=session_info.lifecycle.status,
-                    reason="passed-preconditions",
-                    creation_id=session_info.identity.creation_id,
-                    access_key=AccessKey(session_info.metadata.access_key),
-                )
+            from_status = session_info.lifecycle.status
+            transition_info = SessionTransitionInfo(
+                session_id=session_info.identity.id,
+                from_status=from_status,
+                reason="passed-preconditions",
+                creation_id=session_info.identity.creation_id,
+                access_key=AccessKey(session_info.metadata.access_key),
             )
+            if from_status == SessionStatus.PREPARING:
+                result.skipped.append(transition_info)
+            else:
+                result.successes.append(transition_info)
 
         return result
