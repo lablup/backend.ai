@@ -28,7 +28,7 @@ from ai.backend.manager.models.resource_policy import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.scaling_group import ScalingGroupRow
+from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow, SessionStatus, SessionTypes
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.repositories.base.purger import BatchPurger, execute_batch_purger
@@ -181,7 +181,19 @@ class TestDomainPurgersIntegration:
     ) -> list[SessionRow]:
         """Create test sessions belonging to the domain."""
         sessions: list[SessionRow] = []
+        sgroup_name = f"default-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as session:
+            sgroup = ScalingGroupRow(
+                name=sgroup_name,
+                description="Test scaling group",
+                is_active=True,
+                driver="static",
+                driver_opts={},
+                scheduler="fifo",
+                scheduler_opts=ScalingGroupOpts(),
+            )
+            session.add(sgroup)
+            await session.flush()
             for i in range(3):
                 sess = SessionRow(
                     name=f"test-session-{i}-{uuid.uuid4().hex[:8]}",
@@ -190,6 +202,7 @@ class TestDomainPurgersIntegration:
                     cluster_size=1,
                     domain_name=sample_domain.domain_name,
                     group_id=sample_group.id,
+                    scaling_group_name=sgroup_name,
                     user_uuid=sample_user.uuid,
                     occupying_slots=ResourceSlot({}),
                     requested_slots=ResourceSlot({}),
