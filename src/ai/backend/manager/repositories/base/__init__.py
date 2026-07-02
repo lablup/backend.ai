@@ -4,10 +4,12 @@ Re-exports all public APIs for backward compatibility.
 """
 
 from .creator import (
+    BulkConditionalCreator,
     BulkCreator,
     BulkCreatorError,
     BulkCreatorResult,
     BulkCreatorResultWithFailures,
+    ConditionalCreator,
     Creator,
     CreatorResult,
     CreatorSpec,
@@ -47,8 +49,10 @@ from .purger import (
     BatchPurger,
     BatchPurgerResult,
     BatchPurgerSpec,
+    BulkConditionalPurger,
     BulkPurgerError,
     BulkPurgerResultWithFailures,
+    ConditionalPurger,
     Purger,
     PurgerResult,
     execute_batch_purger,
@@ -72,8 +76,10 @@ from .updater import (
     BatchUpdater,
     BatchUpdaterResult,
     BatchUpdaterSpec,
+    BulkConditionalUpdater,
     BulkUpdaterError,
     BulkUpdaterResult,
+    ConditionalUpdater,
     Updater,
     UpdaterResult,
     UpdaterSpec,
@@ -148,11 +154,17 @@ __all__ = [
     "BulkCreatorResultWithFailures",
     "execute_bulk_creator",
     "execute_bulk_creator_partial",
+    # ConditionalCreator
+    "ConditionalCreator",
+    "BulkConditionalCreator",
     # Updater
     "UpdaterSpec",
     "Updater",
     "UpdaterResult",
     "execute_updater",
+    # ConditionalUpdater
+    "ConditionalUpdater",
+    "BulkConditionalUpdater",
     # BatchUpdater
     "BatchUpdaterSpec",
     "BatchUpdater",
@@ -175,6 +187,9 @@ __all__ = [
     "Purger",
     "PurgerResult",
     "execute_purger",
+    # ConditionalPurger
+    "ConditionalPurger",
+    "BulkConditionalPurger",
     # BulkPurger
     "BulkPurgerError",
     "BulkPurgerResultWithFailures",

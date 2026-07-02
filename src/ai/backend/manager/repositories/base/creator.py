@@ -13,6 +13,7 @@ from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.clauses import QueryCondition
 
 from .integrity import match_integrity_error, parse_integrity_error
+from .querier import ExistsQuerier
 from .types import IntegrityErrorCheck
 
 if TYPE_CHECKING:
@@ -317,6 +318,38 @@ async def execute_bulk_creator_partial[TRow: Base](
                 )
 
     return BulkCreatorResultWithFailures(successes=successes, errors=errors)
+
+
+@dataclass
+class ConditionalCreator[TRow: Base, TGateRow: Base]:
+    """A creator spec paired with the existence gate (``only_if``) that authorizes it.
+
+    The gate is checked (``SELECT EXISTS``) inside the same write transaction as the insert,
+    so the authorization and the write commit atomically — no check-then-write race. One item
+    of a :class:`BulkConditionalCreator`.
+
+    Attributes:
+        spec: What to insert.
+        only_if: Existence check that must hold for the insert to proceed.
+    """
+
+    spec: CreatorSpec[TRow]
+    only_if: ExistsQuerier[TGateRow]
+
+
+@dataclass
+class BulkConditionalCreator[TRow: Base, TGateRow: Base]:
+    """Bundles gated creator specs for a partial-success conditional bulk insert.
+
+    Each item carries its own ``only_if`` gate and runs in its own savepoint: a rejected gate
+    (or a failed insert) is reported as a per-item failure and skips only that item, while the
+    rest proceed. See ``WriteOps.bulk_conditional_create_partial``.
+
+    Attributes:
+        specs: Gated creator specs to insert, each independently.
+    """
+
+    specs: Sequence[ConditionalCreator[TRow, TGateRow]]
 
 
 async def execute_dependent_creator[TDependency, TRow: Base](

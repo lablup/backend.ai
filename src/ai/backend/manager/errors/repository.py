@@ -15,6 +15,7 @@ from ai.backend.common.exception import (
     ErrorDomain,
     ErrorOperation,
 )
+from ai.backend.manager.errors.common import GenericForbidden
 
 
 class RepositoryError(BackendAIError):
@@ -192,3 +193,14 @@ class ExclusionViolationError(RepositoryIntegrityError):
             operation=ErrorOperation.GENERIC,
             error_detail=ErrorDetail.CONFLICT,
         )
+
+
+class ConditionalMutationForbidden(GenericForbidden):
+    """A gated bulk write item was rejected because its ``only_if`` gate did not pass.
+
+    Recorded as a per-item failure by the partial ``WriteOps.bulk_conditional_*_partial``
+    methods (the item is recorded in ``errors``, the rest proceed).
+    """
+
+    error_type = "https://api.backend.ai/probs/conditional-mutation-forbidden"
+    error_title = "Conditional mutation is forbidden (gate not satisfied)."
