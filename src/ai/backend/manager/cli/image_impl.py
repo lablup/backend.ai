@@ -27,7 +27,19 @@ from .context import CLIContext, redis_ctx
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
+def _register_image_cli_orm_cluster() -> None:
+    """Register ORM rows reachable only via string relationships so the CLI can configure mappers (kept minimal, not all models)."""
+    from ai.backend.manager.models.agent.row import AgentRow
+    from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+        AssociationScopesEntitiesRow,
+    )
+    from ai.backend.manager.models.scaling_group.row import ScalingGroupForProjectRow
+
+    _ = (AgentRow, AssociationScopesEntitiesRow, ScalingGroupForProjectRow)
+
+
 async def list_images(cli_ctx: CLIContext, short: bool, installed_only: bool) -> None:
+    _register_image_cli_orm_cluster()
     # Connect to postgreSQL DB
     bootstrap_config = await cli_ctx.get_bootstrap_config()
     async with (
@@ -80,6 +92,7 @@ async def list_images(cli_ctx: CLIContext, short: bool, installed_only: bool) ->
 
 
 async def inspect_image(cli_ctx: CLIContext, canonical_or_alias: str, architecture: str) -> None:
+    _register_image_cli_orm_cluster()
     bootstrap_config = await cli_ctx.get_bootstrap_config()
     async with (
         connect_database(bootstrap_config.db) as db,
@@ -101,6 +114,7 @@ async def inspect_image(cli_ctx: CLIContext, canonical_or_alias: str, architectu
 
 
 async def forget_image(cli_ctx: CLIContext, canonical_or_alias: str, architecture: str) -> None:
+    _register_image_cli_orm_cluster()
     bootstrap_config = await cli_ctx.get_bootstrap_config()
     async with (
         connect_database(bootstrap_config.db) as db,
@@ -124,6 +138,7 @@ async def forget_image(cli_ctx: CLIContext, canonical_or_alias: str, architectur
 async def purge_image(
     cli_ctx: CLIContext, canonical_or_alias: str, architecture: str, remove_from_registry: bool
 ) -> None:
+    _register_image_cli_orm_cluster()
     bootstrap_config = await cli_ctx.get_bootstrap_config()
     async with (
         connect_database(bootstrap_config.db) as db,
@@ -164,6 +179,7 @@ async def set_image_resource_limit(
     range_value: tuple[Decimal | None, Decimal | None],
     architecture: str,
 ) -> None:
+    _register_image_cli_orm_cluster()
     bootstrap_config = await cli_ctx.get_bootstrap_config()
     async with (
         connect_database(bootstrap_config.db) as db,
@@ -189,14 +205,7 @@ async def rescan_images(
 ) -> None:
     if not registry_or_image:
         raise click.BadArgumentUsage("Please specify a valid registry or full image name.")
-    # Import AssociationScopesEntitiesRow to register it with the ORM metadata.
-    # Without this, the CLI rescan path doesn't load this table via the normal
-    # server bootstrap, causing SA to skip it during ORM queries.
-    from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-        AssociationScopesEntitiesRow,
-    )
-
-    _ = AssociationScopesEntitiesRow
+    _register_image_cli_orm_cluster()
     bootstrap_config = await cli_ctx.get_bootstrap_config()
     async with (
         connect_database(bootstrap_config.db) as db,
@@ -210,6 +219,7 @@ async def rescan_images(
 
 
 async def alias(cli_ctx: CLIContext, alias: str, target: str, architecture: str) -> None:
+    _register_image_cli_orm_cluster()
     bootstrap_config = await cli_ctx.get_bootstrap_config()
     async with (
         connect_database(bootstrap_config.db) as db,
@@ -230,6 +240,7 @@ async def alias(cli_ctx: CLIContext, alias: str, target: str, architecture: str)
 
 
 async def dealias(cli_ctx: CLIContext, alias: str) -> None:
+    _register_image_cli_orm_cluster()
     bootstrap_config = await cli_ctx.get_bootstrap_config()
     async with (
         connect_database(bootstrap_config.db) as db,
@@ -245,6 +256,7 @@ async def dealias(cli_ctx: CLIContext, alias: str) -> None:
 
 
 async def validate_image_alias(cli_ctx: CLIContext, alias: str) -> None:
+    _register_image_cli_orm_cluster()
     bootstrap_config = await cli_ctx.get_bootstrap_config()
     async with (
         connect_database(bootstrap_config.db) as db,
@@ -273,6 +285,7 @@ def _resolve_architecture(current: bool, architecture: str | None) -> str:
 async def validate_image_canonical(
     cli_ctx: CLIContext, canonical: str, current: bool, architecture: str | None = None
 ) -> None:
+    _register_image_cli_orm_cluster()
     bootstrap_config = await cli_ctx.get_bootstrap_config()
     async with (
         connect_database(bootstrap_config.db) as db,
