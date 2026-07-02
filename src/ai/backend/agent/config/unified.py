@@ -2320,6 +2320,10 @@ class AgentSpecificConfig(BaseConfigSchema):
                 self.container.validate_kubernetes_nfs()
             case AgentBackend.DOCKER:
                 DockerExtraConfig.model_validate(self.container.model_dump())
+            case AgentBackend.CONTAINERD:
+                # containerd runs the same Linux containers as Docker; reuse its
+                # container-config validation. See BEP-1055.
+                DockerExtraConfig.model_validate(self.container.model_dump())
             case AgentBackend.DUMMY:
                 pass
 
