@@ -21,7 +21,7 @@ from contextvars import ContextVar
 from datetime import datetime
 from functools import partial
 from pathlib import Path
-from typing import Any, Final
+from typing import Any, Final, TypedDict
 
 import aiofiles
 import aiotools
@@ -53,7 +53,6 @@ from .docker import (
     get_preferred_pants_local_exec_root,
 )
 from .http import wget
-from .python import check_python
 from .types import (
     Accelerator,
     DistInfo,
@@ -79,6 +78,21 @@ PASSPHRASE_CHARACTER_POOL: Final[list[str]] = (
     + [chr(x) for x in range(ord("0"), ord("9") + 1)]
     + ["*$./"]
 )
+
+
+class _ExtraServiceKwargs(TypedDict, total=False):
+    """Optional ServiceConfig fields that only DEVELOP installs populate
+    (harbor + dedicated SFTP agent). PACKAGE installs pass an empty dict."""
+
+    harbor_enabled: bool
+    harbor_hostname: str
+    harbor_http_port: int
+    harbor_admin_password: str
+    sftp_agent_enabled: bool
+    sftp_agent_rpc_addr: ServerAddr
+    sftp_agent_watcher_addr: ServerAddr
+    sftp_agent_var_base_path: str
+    sftp_agent_scaling_group: str
 
 
 class PostGuide(enum.Enum):
@@ -114,9 +128,105 @@ class Context(metaclass=ABCMeta):
     def hydrate_install_info(self) -> InstallInfo:
         raise NotImplementedError
 
-    @abstractmethod
+    def _build_install_info(
+        self,
+        *,
+        install_type: InstallType,
+        base_path: Path,
+        local_proxy_port: int,
+        loopback_aliases: tuple[str, ...],
+        extra_service_kwargs: _ExtraServiceKwargs,
+    ) -> InstallInfo:
+        # TODO: customize addr/user/password options
+        # TODO: multi-node setup
+        public_facing_address = self.install_variable.public_facing_address
+        if public_facing_address in loopback_aliases:
+            public_component_bind_address = "127.0.0.1"
+        else:
+            public_component_bind_address = "0.0.0.0"
+        halfstack_config = HalfstackConfig(
+            ha_setup=False,
+            postgres_addr=ServerAddr(HostPortPair("127.0.0.1", 8100)),
+            postgres_user="postgres",
+            postgres_password="develove",
+            redis_addr=ServerAddr(HostPortPair("127.0.0.1", 8110)),
+            redis_sentinel_addrs=[],
+            redis_password=None,
+            etcd_addr=[ServerAddr(HostPortPair("127.0.0.1", 8120))],
+            etcd_user=None,
+            etcd_password=None,
+        )
+        service_config = ServiceConfig(
+            webserver_addr=ServerAddr(
+                bind=HostPortPair(public_component_bind_address, 8090),
+                face=HostPortPair(public_facing_address, 8090),
+            ),
+            webserver_ipc_base_path="ipc/webserver",
+            webserver_var_base_path="var/webserver",
+            webui_menu_blocklist=["pipeline"],
+            webui_menu_inactivelist=["statistics"],
+            manager_addr=ServerAddr(HostPortPair("127.0.0.1", 8091)),
+            storage_proxy_manager_auth_key=secrets.token_hex(32),
+            manager_ipc_base_path="ipc/manager",
+            manager_var_base_path="var/manager",
+            local_proxy_addr=ServerAddr(
+                bind=HostPortPair(public_component_bind_address, local_proxy_port),
+                face=HostPortPair(public_facing_address, local_proxy_port),
+            ),
+            scaling_group="default",
+            agent_rpc_addr=ServerAddr(HostPortPair("127.0.0.1", 6011)),
+            agent_watcher_addr=ServerAddr(HostPortPair("127.0.0.1", 6019)),
+            agent_sock_port=6007,
+            agent_ipc_base_path="ipc/agent",
+            agent_var_base_path="var/agent",
+            storage_proxy_client_facing_addr=ServerAddr(
+                bind=HostPortPair(public_component_bind_address, 6021),
+                face=HostPortPair(public_facing_address, 6021),
+            ),
+            storage_proxy_manager_facing_addr=ServerAddr(HostPortPair("127.0.0.1", 6022)),
+            storage_proxy_ipc_base_path="ipc/storage-proxy",
+            storage_proxy_var_base_path="var/storage-proxy",
+            storage_proxy_random=secrets.token_hex(32),
+            storage_watcher_addr=ServerAddr(HostPortPair("127.0.0.1", 6029)),
+            storage_agent_rpc_addr=ServerAddr(HostPortPair("127.0.0.1", 6012)),
+            storage_agent_ipc_base_path="ipc/storage-agent",
+            storage_agent_var_base_path="var/storage-agent",
+            vfolder_relpath="vfolder/local/volume1",
+            appproxy_api_secret=secrets.token_hex(32),
+            appproxy_jwt_secret=secrets.token_hex(32),
+            appproxy_permit_hash_secret=secrets.token_hex(32),
+            appproxy_coordinator_addr=ServerAddr(HostPortPair(public_facing_address, 10200)),
+            appproxy_worker_addr=ServerAddr(HostPortPair(public_facing_address, 10201)),
+            appproxy_tcp_worker_addr=ServerAddr(HostPortPair(public_facing_address, 10202)),
+            **extra_service_kwargs,
+        )
+        return InstallInfo(
+            version=self.dist_info.version,
+            base_path=base_path,
+            type=install_type,
+            last_updated=datetime.now(tzutc()),
+            halfstack_config=halfstack_config,
+            service_config=service_config,
+            accelerator=self.install_variable.accelerator,
+        )
+
     async def _configure_mock_accelerator(self, accelerator: Accelerator) -> None:
-        raise NotImplementedError
+        """
+        cp "configs/accelerator/mock-accelerator.toml" mock-accelerator.toml
+        """
+        mapping = {
+            Accelerator.CUDA_MOCK: "configs/accelerator/mock-accelerator.toml",
+            Accelerator.CUDA_MIG_MOCK: "configs/accelerator/cuda-mock-mig.toml",
+            Accelerator.ROCM_MOCK: "configs/accelerator/rocm-mock.toml",
+        }
+
+        src = mapping.get(accelerator)
+        if not src:
+            return
+
+        dst = Path("mock-accelerator.toml")
+        print(f"[Installer] Copying accelerator config: {src} -> {dst}")
+        shutil.copy(src, dst)
 
     def add_post_guide(self, guide: PostGuide) -> None:
         self._post_guides.append(guide)
@@ -192,12 +302,17 @@ class Context(metaclass=ABCMeta):
                 tg.create_task(read_stderr(p.stderr))
                 exit_code = await p.wait()
         except asyncio.CancelledError:
+            # Cancellation here is always a global abort (Ctrl-C / app shutdown /
+            # parent-task cancel) -- no caller wraps run_exec in a timeout. Reap
+            # the child, then re-raise so the abort propagates instead of silently
+            # continuing to the next install step.
             p.terminate()
             try:
-                exit_code = await asyncio.wait_for(p.wait(), timeout=5.0)
+                await asyncio.wait_for(p.wait(), timeout=5.0)
             except TimeoutError:
                 p.kill()
-                exit_code = await p.wait()
+                await p.wait()
+            raise
         return exit_code
 
     async def run_shell(self, script: str, **kwargs: Any) -> int:
@@ -890,7 +1005,7 @@ class Context(metaclass=ABCMeta):
         self.log.write(Text.from_markup(f"Created SSL cert/key under {ssl_dir}"))
 
         with toml_path.open("r") as fp:
-            data = tomlkit.load(fp)
+            data: Any = tomlkit.load(fp)
             etcd_table = tomlkit.table()
             etcd_addr_table = tomlkit.inline_table()
             etcd_addr_table["host"] = halfstack.etcd_addr[0].face.host
@@ -906,26 +1021,26 @@ class Context(metaclass=ABCMeta):
             else:
                 etcd_table.pop("password", None)
             data["etcd"] = etcd_table
-            data["storage-proxy"]["secret"] = service.storage_proxy_random  # type: ignore
-            data["storage-proxy"]["ipc-base-path"] = service.storage_proxy_ipc_base_path  # type: ignore
+            data["storage-proxy"]["secret"] = service.storage_proxy_random
+            data["storage-proxy"]["ipc-base-path"] = service.storage_proxy_ipc_base_path
             client_facing_addr_table = tomlkit.inline_table()
             client_facing_addr_table["host"] = service.storage_proxy_client_facing_addr.bind.host
             client_facing_addr_table["port"] = service.storage_proxy_client_facing_addr.bind.port
-            data["api"]["client"]["service-addr"] = client_facing_addr_table  # type: ignore
+            data["api"]["client"]["service-addr"] = client_facing_addr_table
             manager_facing_addr_table = tomlkit.inline_table()
             manager_facing_addr_table["host"] = service.storage_proxy_manager_facing_addr.bind.host
             manager_facing_addr_table["port"] = service.storage_proxy_manager_facing_addr.bind.port
-            data["api"]["manager"]["service-addr"] = manager_facing_addr_table  # type: ignore
-            data["api"]["manager"]["secret"] = service.storage_proxy_manager_auth_key  # type: ignore
+            data["api"]["manager"]["service-addr"] = manager_facing_addr_table
+            data["api"]["manager"]["secret"] = service.storage_proxy_manager_auth_key
             announce_addr_table = tomlkit.inline_table()
             announce_addr_table["host"] = self.install_variable.public_facing_address
             announce_addr_table["port"] = service.storage_proxy_manager_facing_addr.bind.port
-            data["api"]["manager"]["announce-addr"] = announce_addr_table  # type: ignore
+            data["api"]["manager"]["announce-addr"] = announce_addr_table
             announce_internal_table = tomlkit.inline_table()
             announce_internal_table["host"] = self.install_variable.public_facing_address
             announce_internal_table["port"] = 16023
-            data["api"]["manager"]["announce-internal-addr"] = announce_internal_table  # type: ignore
-            data["volume"]["volume1"]["path"] = service.vfolder_relpath  # type: ignore
+            data["api"]["manager"]["announce-internal-addr"] = announce_internal_table
+            data["volume"]["volume1"]["path"] = service.vfolder_relpath
         with toml_path.open("w") as fp:
             tomlkit.dump(data, fp)
         if self.install_variable.otel_endpoint:
@@ -962,12 +1077,12 @@ class Context(metaclass=ABCMeta):
         )
 
         with conf_path.open("r") as fp:
-            data = tomlkit.load(fp)
+            data: Any = tomlkit.load(fp)
             if endpoint_protocol is not None:
-                data["service"]["force_endpoint_protocol"] = endpoint_protocol.value  # type: ignore
-            data["api"][  # type: ignore
-                "endpoint"
-            ] = f"http://{service.manager_addr.face.host}:{service.manager_addr.face.port}"
+                data["service"]["force_endpoint_protocol"] = endpoint_protocol.value
+            data["api"]["endpoint"] = (
+                f"http://{service.manager_addr.face.host}:{service.manager_addr.face.port}"
+            )
             helper_table = tomlkit.table()
             helper_table["socket_timeout"] = 5.0
             helper_table["socket_connect_timeout"] = 2.0
@@ -993,9 +1108,9 @@ class Context(metaclass=ABCMeta):
                 redis_table["redis_helper_config"] = helper_table
                 if halfstack.redis_password:
                     redis_table["password"] = halfstack.redis_password
-            data["session"]["redis"] = redis_table  # type: ignore
-            data["ui"]["menu_blocklist"] = ",".join(service.webui_menu_blocklist)  # type: ignore
-            data["ui"]["menu_inactivelist"] = ",".join(service.webui_menu_inactivelist)  # type: ignore
+            data["session"]["redis"] = redis_table
+            data["ui"]["menu_blocklist"] = ",".join(service.webui_menu_blocklist)
+            data["ui"]["menu_inactivelist"] = ",".join(service.webui_menu_inactivelist)
         with conf_path.open("w") as fp:
             tomlkit.dump(data, fp)
         if self.install_variable.otel_endpoint:
@@ -1111,34 +1226,34 @@ class Context(metaclass=ABCMeta):
         frontend_mode = self.install_variable.frontend_mode
 
         with coord_conf.open("r") as fp:
-            data = tomlkit.load(fp)
-            data["db"]["type"] = "postgresql"  # type: ignore[index]
-            data["db"]["name"] = "appproxy"  # type: ignore[index]
-            data["db"]["user"] = "appproxy"  # type: ignore[index]
-            data["db"]["password"] = "develove"  # type: ignore[index]
-            data["db"]["pool_size"] = 8  # type: ignore[index]
-            data["db"]["max_overflow"] = 64  # type: ignore[index]
-            data["db"]["addr"]["host"] = halfstack.postgres_addr.face.host  # type: ignore[index]
-            data["db"]["addr"]["port"] = halfstack.postgres_addr.face.port  # type: ignore[index]
+            data: Any = tomlkit.load(fp)
+            data["db"]["type"] = "postgresql"
+            data["db"]["name"] = "appproxy"
+            data["db"]["user"] = "appproxy"
+            data["db"]["password"] = "develove"
+            data["db"]["pool_size"] = 8
+            data["db"]["max_overflow"] = 64
+            data["db"]["addr"]["host"] = halfstack.postgres_addr.face.host
+            data["db"]["addr"]["port"] = halfstack.postgres_addr.face.port
             redis_addr_table = tomlkit.inline_table()
             redis_addr_table["host"] = halfstack.redis_addr.face.host
             redis_addr_table["port"] = halfstack.redis_addr.face.port
-            data["redis"]["addr"] = redis_addr_table  # type: ignore[index]
-            data["secrets"]["api_secret"] = service.appproxy_api_secret  # type: ignore[index]
-            data["secrets"]["jwt_secret"] = service.appproxy_jwt_secret  # type: ignore[index]
-            data["permit_hash"]["secret"] = service.appproxy_permit_hash_secret  # type: ignore[index]
-            data["proxy_coordinator"]["bind_addr"]["host"] = "0.0.0.0"  # type: ignore[index]
-            data["proxy_coordinator"]["bind_addr"]["port"] = (  # type: ignore[index]
+            data["redis"]["addr"] = redis_addr_table
+            data["secrets"]["api_secret"] = service.appproxy_api_secret
+            data["secrets"]["jwt_secret"] = service.appproxy_jwt_secret
+            data["permit_hash"]["secret"] = service.appproxy_permit_hash_secret
+            data["proxy_coordinator"]["bind_addr"]["host"] = "0.0.0.0"
+            data["proxy_coordinator"]["bind_addr"]["port"] = (
                 service.appproxy_coordinator_addr.bind.port
             )
-            data["proxy_coordinator"]["advertised_addr"]["host"] = apphub_address  # type: ignore[index]
-            data["proxy_coordinator"]["advertised_addr"]["port"] = (  # type: ignore[index]
+            data["proxy_coordinator"]["advertised_addr"]["host"] = apphub_address
+            data["proxy_coordinator"]["advertised_addr"]["port"] = (
                 service.appproxy_coordinator_addr.bind.port
             )
             if tls_advertised:
-                data["proxy_coordinator"]["tls_advertised"] = True  # type: ignore[index]
-                data["proxy_coordinator"]["advertised_addr"]["port"] = advertised_port  # type: ignore[index]
-            data["proxy_coordinator"]["metric_access_allowed_hosts"] = (  # type: ignore[index]
+                data["proxy_coordinator"]["tls_advertised"] = True
+                data["proxy_coordinator"]["advertised_addr"]["port"] = advertised_port
+            data["proxy_coordinator"]["metric_access_allowed_hosts"] = (
                 self.install_variable.metric_access_cidr
             )
             announce_addr_table = tomlkit.inline_table()
@@ -1156,9 +1271,9 @@ class Context(metaclass=ABCMeta):
             redis_addr_table = tomlkit.inline_table()
             redis_addr_table["host"] = halfstack.redis_addr.face.host
             redis_addr_table["port"] = halfstack.redis_addr.face.port
-            data["redis"]["addr"] = redis_addr_table  # type: ignore[index]
+            data["redis"]["addr"] = redis_addr_table
 
-            data["proxy_worker"]["coordinator_endpoint"] = (  # type: ignore[index]
+            data["proxy_worker"]["coordinator_endpoint"] = (
                 f"http://{service.appproxy_coordinator_addr.bind.host}:{service.appproxy_coordinator_addr.bind.port}"
             )
 
@@ -1166,36 +1281,36 @@ class Context(metaclass=ABCMeta):
             api_bind_addr_table = tomlkit.inline_table()
             api_bind_addr_table["host"] = service.appproxy_worker_addr.bind.host
             api_bind_addr_table["port"] = service.appproxy_worker_addr.bind.port
-            data["proxy_worker"]["api_bind_addr"] = api_bind_addr_table  # type: ignore[index]
+            data["proxy_worker"]["api_bind_addr"] = api_bind_addr_table
 
             # api_advertised_addr as inline table
             api_advertised_addr_table = tomlkit.inline_table()
             api_advertised_addr_table["host"] = public_facing_address
             api_advertised_addr_table["port"] = service.appproxy_worker_addr.bind.port
-            data["proxy_worker"]["api_advertised_addr"] = api_advertised_addr_table  # type: ignore[index]
+            data["proxy_worker"]["api_advertised_addr"] = api_advertised_addr_table
 
-            data["secrets"]["api_secret"] = service.appproxy_api_secret  # type: ignore[index]
-            data["secrets"]["jwt_secret"] = service.appproxy_jwt_secret  # type: ignore[index]
-            data["permit_hash"]["secret"] = service.appproxy_permit_hash_secret  # type: ignore[index]
+            data["secrets"]["api_secret"] = service.appproxy_api_secret
+            data["secrets"]["jwt_secret"] = service.appproxy_jwt_secret
+            data["permit_hash"]["secret"] = service.appproxy_permit_hash_secret
 
             # advertise TLS to external clients
             if tls_advertised:
-                data["proxy_worker"]["tls_advertised"] = True  # type: ignore[index]
+                data["proxy_worker"]["tls_advertised"] = True
 
             # set frontend mode (port or wildcard)
-            data["proxy_worker"]["frontend_mode"] = frontend_mode.value  # type: ignore[index]
+            data["proxy_worker"]["frontend_mode"] = frontend_mode.value
 
             # configure based on frontend_mode
             if frontend_mode == FrontendMode.WILDCARD:
                 # Remove port_proxy section for wildcard mode
-                if "port_proxy" in data["proxy_worker"]:  # type: ignore[operator]
+                if "port_proxy" in data["proxy_worker"]:
                     del data["proxy_worker"]["port_proxy"]
 
                 # Override api_advertised_addr with app_address and advertised_port
                 api_advertised_addr_table = tomlkit.inline_table()
                 api_advertised_addr_table["host"] = app_address
                 api_advertised_addr_table["port"] = advertised_port
-                data["proxy_worker"]["api_advertised_addr"] = api_advertised_addr_table  # type: ignore[index]
+                data["proxy_worker"]["api_advertised_addr"] = api_advertised_addr_table
 
                 # Add wildcard_domain section
                 if wildcard_domain:
@@ -1207,11 +1322,11 @@ class Context(metaclass=ABCMeta):
                     wildcard_table["bind_addr"] = bind_addr_table
                     wildcard_table["advertised_port"] = advertised_port
                     wildcard_table.add(tomlkit.nl())  # Add newline before next section
-                    data["proxy_worker"]["wildcard_domain"] = wildcard_table  # type: ignore[index]
+                    data["proxy_worker"]["wildcard_domain"] = wildcard_table
             else:
                 # update port_proxy.advertised_host
-                data["proxy_worker"]["port_proxy"]["advertised_host"] = public_facing_address  # type: ignore[index]
-            data["proxy_worker"]["metric_access_allowed_hosts"] = (  # type: ignore[index]
+                data["proxy_worker"]["port_proxy"]["advertised_host"] = public_facing_address
+            data["proxy_worker"]["metric_access_allowed_hosts"] = (
                 self.install_variable.metric_access_cidr
             )
         with worker_conf.open("w") as fp:
@@ -1224,38 +1339,38 @@ class Context(metaclass=ABCMeta):
             redis_addr_table = tomlkit.inline_table()
             redis_addr_table["host"] = halfstack.redis_addr.face.host
             redis_addr_table["port"] = halfstack.redis_addr.face.port
-            data["redis"]["addr"] = redis_addr_table  # type: ignore[index]
+            data["redis"]["addr"] = redis_addr_table
 
-            data["proxy_worker"]["coordinator_endpoint"] = (  # type: ignore[index]
+            data["proxy_worker"]["coordinator_endpoint"] = (
                 f"http://{service.appproxy_coordinator_addr.bind.host}:{service.appproxy_coordinator_addr.bind.port}"
             )
 
             api_bind_addr_table = tomlkit.inline_table()
             api_bind_addr_table["host"] = service.appproxy_tcp_worker_addr.bind.host
             api_bind_addr_table["port"] = service.appproxy_tcp_worker_addr.bind.port
-            data["proxy_worker"]["api_bind_addr"] = api_bind_addr_table  # type: ignore[index]
+            data["proxy_worker"]["api_bind_addr"] = api_bind_addr_table
 
             api_advertised_addr_table = tomlkit.inline_table()
             api_advertised_addr_table["host"] = public_facing_address
             api_advertised_addr_table["port"] = service.appproxy_tcp_worker_addr.bind.port
-            data["proxy_worker"]["api_advertised_addr"] = api_advertised_addr_table  # type: ignore[index]
+            data["proxy_worker"]["api_advertised_addr"] = api_advertised_addr_table
 
-            data["secrets"]["api_secret"] = service.appproxy_api_secret  # type: ignore[index]
-            data["secrets"]["jwt_secret"] = service.appproxy_jwt_secret  # type: ignore[index]
-            data["permit_hash"]["secret"] = service.appproxy_permit_hash_secret  # type: ignore[index]
+            data["secrets"]["api_secret"] = service.appproxy_api_secret
+            data["secrets"]["jwt_secret"] = service.appproxy_jwt_secret
+            data["permit_hash"]["secret"] = service.appproxy_permit_hash_secret
 
             if tls_advertised:
-                data["proxy_worker"]["tls_advertised"] = True  # type: ignore[index]
+                data["proxy_worker"]["tls_advertised"] = True
 
-            data["proxy_worker"]["frontend_mode"] = frontend_mode.value  # type: ignore[index]
+            data["proxy_worker"]["frontend_mode"] = frontend_mode.value
 
             if frontend_mode == FrontendMode.WILDCARD:
-                if "port_proxy" in data["proxy_worker"]:  # type: ignore[operator]
+                if "port_proxy" in data["proxy_worker"]:
                     del data["proxy_worker"]["port_proxy"]
                 api_advertised_addr_table = tomlkit.inline_table()
                 api_advertised_addr_table["host"] = app_address
                 api_advertised_addr_table["port"] = advertised_port
-                data["proxy_worker"]["api_advertised_addr"] = api_advertised_addr_table  # type: ignore[index]
+                data["proxy_worker"]["api_advertised_addr"] = api_advertised_addr_table
                 if wildcard_domain:
                     wildcard_table = tomlkit.table()
                     wildcard_table["domain"] = wildcard_domain
@@ -1265,9 +1380,9 @@ class Context(metaclass=ABCMeta):
                     wildcard_table["bind_addr"] = bind_addr_table
                     wildcard_table["advertised_port"] = advertised_port
                     wildcard_table.add(tomlkit.nl())
-                    data["proxy_worker"]["wildcard_domain"] = wildcard_table  # type: ignore[index]
+                    data["proxy_worker"]["wildcard_domain"] = wildcard_table
             else:
-                data["proxy_worker"]["port_proxy"]["advertised_host"] = public_facing_address  # type: ignore[index]
+                data["proxy_worker"]["port_proxy"]["advertised_host"] = public_facing_address
         with tcp_worker_conf.open("w") as fp:
             tomlkit.dump(data, fp)
 
@@ -1856,86 +1971,23 @@ class Context(metaclass=ABCMeta):
 
 class DevContext(Context):
     def hydrate_install_info(self) -> InstallInfo:
-        # TODO: customize addr/user/password options
-        # TODO: multi-node setup
         public_facing_address = self.install_variable.public_facing_address
-        if public_facing_address in ("127.0.0.1", "localhost"):
-            public_component_bind_address = "127.0.0.1"
-        else:
-            public_component_bind_address = "0.0.0.0"
-        halfstack_config = HalfstackConfig(
-            ha_setup=False,
-            postgres_addr=ServerAddr(HostPortPair("127.0.0.1", 8100)),
-            postgres_user="postgres",
-            postgres_password="develove",
-            redis_addr=ServerAddr(HostPortPair("127.0.0.1", 8110)),
-            redis_sentinel_addrs=[],
-            redis_password=None,
-            etcd_addr=[ServerAddr(HostPortPair("127.0.0.1", 8120))],
-            etcd_user=None,
-            etcd_password=None,
-        )
-        service_config = ServiceConfig(
-            webserver_addr=ServerAddr(
-                bind=HostPortPair(public_component_bind_address, 8090),
-                face=HostPortPair(public_facing_address, 8090),
-            ),
-            webserver_ipc_base_path="ipc/webserver",
-            webserver_var_base_path="var/webserver",
-            webui_menu_blocklist=["pipeline"],
-            webui_menu_inactivelist=["statistics"],
-            manager_addr=ServerAddr(HostPortPair("127.0.0.1", 8091)),
-            storage_proxy_manager_auth_key=secrets.token_hex(32),
-            manager_ipc_base_path="ipc/manager",
-            manager_var_base_path="var/manager",
-            local_proxy_addr=ServerAddr(
-                bind=HostPortPair(public_component_bind_address, 5050),
-                face=HostPortPair(public_facing_address, 5050),
-            ),
-            scaling_group="default",
-            agent_rpc_addr=ServerAddr(HostPortPair("127.0.0.1", 6011)),
-            agent_watcher_addr=ServerAddr(HostPortPair("127.0.0.1", 6019)),
-            agent_sock_port=6007,
-            agent_ipc_base_path="ipc/agent",
-            agent_var_base_path="var/agent",
-            storage_proxy_client_facing_addr=ServerAddr(
-                bind=HostPortPair(public_component_bind_address, 6021),
-                face=HostPortPair(public_facing_address, 6021),
-            ),
-            storage_proxy_manager_facing_addr=ServerAddr(HostPortPair("127.0.0.1", 6022)),
-            storage_proxy_ipc_base_path="ipc/storage-proxy",
-            storage_proxy_var_base_path="var/storage-proxy",
-            storage_proxy_random=secrets.token_hex(32),
-            storage_watcher_addr=ServerAddr(HostPortPair("127.0.0.1", 6029)),
-            storage_agent_rpc_addr=ServerAddr(HostPortPair("127.0.0.1", 6012)),
-            storage_agent_ipc_base_path="ipc/storage-agent",
-            storage_agent_var_base_path="var/storage-agent",
-            vfolder_relpath="vfolder/local/volume1",
-            appproxy_api_secret=secrets.token_hex(32),
-            appproxy_jwt_secret=secrets.token_hex(32),
-            appproxy_permit_hash_secret=secrets.token_hex(32),
-            appproxy_coordinator_addr=ServerAddr(HostPortPair(public_facing_address, 10200)),
-            appproxy_worker_addr=ServerAddr(HostPortPair(public_facing_address, 10201)),
-            appproxy_tcp_worker_addr=ServerAddr(HostPortPair(public_facing_address, 10202)),
-            harbor_enabled=self.install_variable.with_harbor,
-            harbor_hostname=self._resolve_harbor_hostname(public_facing_address),
-            harbor_http_port=self.install_variable.harbor_http_port,
-            harbor_admin_password=self.install_variable.harbor_admin_password,
-            sftp_agent_enabled=self.install_variable.with_sftp_agent,
-            sftp_agent_rpc_addr=ServerAddr(HostPortPair("127.0.0.1", 6013)),
-            sftp_agent_watcher_addr=ServerAddr(HostPortPair("127.0.0.1", 6015)),
-            sftp_agent_var_base_path="var/agent-sftp",
-            sftp_agent_scaling_group="upload",
-        )
-
-        return InstallInfo(
-            version=self.dist_info.version,
+        return self._build_install_info(
+            install_type=InstallType.SOURCE,
             base_path=Path.cwd(),
-            type=InstallType.SOURCE,
-            last_updated=datetime.now(tzutc()),
-            halfstack_config=halfstack_config,
-            service_config=service_config,
-            accelerator=self.install_variable.accelerator,
+            local_proxy_port=5050,
+            loopback_aliases=("127.0.0.1", "localhost"),
+            extra_service_kwargs={
+                "harbor_enabled": self.install_variable.with_harbor,
+                "harbor_hostname": self._resolve_harbor_hostname(public_facing_address),
+                "harbor_http_port": self.install_variable.harbor_http_port,
+                "harbor_admin_password": self.install_variable.harbor_admin_password,
+                "sftp_agent_enabled": self.install_variable.with_sftp_agent,
+                "sftp_agent_rpc_addr": ServerAddr(HostPortPair("127.0.0.1", 6013)),
+                "sftp_agent_watcher_addr": ServerAddr(HostPortPair("127.0.0.1", 6015)),
+                "sftp_agent_var_base_path": "var/agent-sftp",
+                "sftp_agent_scaling_group": "upload",
+            },
         )
 
     def copy_config(self, template_name: str) -> Path:
@@ -1952,7 +2004,6 @@ class DevContext(Context):
         await super().check_prerequisites()
         await install_git_lfs(self)
         await install_git_hooks(self)
-        await check_python(self)
         local_execution_root_dir = await get_preferred_pants_local_exec_root(self)
         await bootstrap_pants(self, local_execution_root_dir)
 
@@ -1960,24 +2011,6 @@ class DevContext(Context):
         await pants_export(self)
         await install_editable_webui(self)
         await self.install_halfstack()
-
-    async def _configure_mock_accelerator(self, accelerator: Accelerator) -> None:
-        """
-        cp "configs/accelerator/mock-accelerator.toml" mock-accelerator.toml
-        """
-        mapping = {
-            Accelerator.CUDA_MOCK: "configs/accelerator/mock-accelerator.toml",
-            Accelerator.CUDA_MIG_MOCK: "configs/accelerator/cuda-mock-mig.toml",
-            Accelerator.ROCM_MOCK: "configs/accelerator/rocm-mock.toml",
-        }
-
-        src = mapping.get(accelerator)
-        if not src:
-            return
-
-        dst = Path("mock-accelerator.toml")
-        print(f"[Installer] Copying accelerator config: {src} -> {dst}")
-        shutil.copy(src, dst)
 
     async def configure(self) -> None:
         self.log_header("Configuring manager...")
@@ -2027,76 +2060,12 @@ class DevContext(Context):
 
 class PackageContext(Context):
     def hydrate_install_info(self) -> InstallInfo:
-        # TODO: customize addr/user/password options
-        # TODO: multi-node setup
-        public_facing_address = self.install_variable.public_facing_address
-        if public_facing_address in ("127.0.0.1", "0.0.0.0"):
-            public_component_bind_address = "127.0.0.1"
-        else:
-            public_component_bind_address = "0.0.0.0"
-        halfstack_config = HalfstackConfig(
-            ha_setup=False,
-            postgres_addr=ServerAddr(HostPortPair("127.0.0.1", 8100)),
-            postgres_user="postgres",
-            postgres_password="develove",
-            redis_addr=ServerAddr(HostPortPair("127.0.0.1", 8110)),
-            redis_sentinel_addrs=[],
-            redis_password=None,
-            etcd_addr=[ServerAddr(HostPortPair("127.0.0.1", 8120))],
-            etcd_user=None,
-            etcd_password=None,
-        )
-        service_config = ServiceConfig(
-            webserver_addr=ServerAddr(
-                bind=HostPortPair(public_component_bind_address, 8090),
-                face=HostPortPair(public_facing_address, 8090),
-            ),
-            webserver_ipc_base_path="ipc/webserver",
-            webserver_var_base_path="var/webserver",
-            webui_menu_blocklist=["pipeline"],
-            webui_menu_inactivelist=["statistics"],
-            manager_addr=ServerAddr(HostPortPair("127.0.0.1", 8091)),
-            storage_proxy_manager_auth_key=secrets.token_urlsafe(32),
-            manager_ipc_base_path="ipc/manager",
-            manager_var_base_path="var/manager",
-            local_proxy_addr=ServerAddr(
-                bind=HostPortPair(public_component_bind_address, 15050),
-                face=HostPortPair(public_facing_address, 15050),
-            ),
-            scaling_group="default",
-            agent_rpc_addr=ServerAddr(HostPortPair("127.0.0.1", 6011)),
-            agent_watcher_addr=ServerAddr(HostPortPair("127.0.0.1", 6019)),
-            agent_sock_port=6007,
-            agent_ipc_base_path="ipc/agent",
-            agent_var_base_path="var/agent",
-            storage_proxy_client_facing_addr=ServerAddr(
-                bind=HostPortPair(public_component_bind_address, 6021),
-                face=HostPortPair(public_facing_address, 6021),
-            ),
-            storage_proxy_manager_facing_addr=ServerAddr(HostPortPair("127.0.0.1", 6022)),
-            storage_proxy_ipc_base_path="ipc/storage-proxy",
-            storage_proxy_var_base_path="var/storage-proxy",
-            storage_proxy_random=secrets.token_urlsafe(32),
-            storage_watcher_addr=ServerAddr(HostPortPair("127.0.0.1", 6029)),
-            storage_agent_rpc_addr=ServerAddr(HostPortPair("127.0.0.1", 6012)),
-            storage_agent_ipc_base_path="ipc/storage-agent",
-            storage_agent_var_base_path="var/storage-agent",
-            vfolder_relpath="vfolder/local/volume1",
-            appproxy_api_secret=secrets.token_hex(32),
-            appproxy_jwt_secret=secrets.token_hex(32),
-            appproxy_permit_hash_secret=secrets.token_hex(32),
-            appproxy_coordinator_addr=ServerAddr(HostPortPair(public_facing_address, 10200)),
-            appproxy_worker_addr=ServerAddr(HostPortPair(public_facing_address, 10201)),
-            appproxy_tcp_worker_addr=ServerAddr(HostPortPair(public_facing_address, 10202)),
-        )
-        return InstallInfo(
-            version=self.dist_info.version,
+        return self._build_install_info(
+            install_type=InstallType.PACKAGE,
             base_path=self.dist_info.target_path,
-            type=InstallType.PACKAGE,
-            last_updated=datetime.now(tzutc()),
-            halfstack_config=halfstack_config,
-            service_config=service_config,
-            accelerator=self.install_variable.accelerator,
+            local_proxy_port=15050,
+            loopback_aliases=("127.0.0.1", "0.0.0.0"),
+            extra_service_kwargs={},
         )
 
     def copy_config(self, template_name: str) -> Path:
@@ -2274,24 +2243,6 @@ class PackageContext(Context):
             vpane.remove()
         self.log_header("Installing databases (halfstack)...")
         await self.install_halfstack()
-
-    async def _configure_mock_accelerator(self, accelerator: Accelerator) -> None:
-        """
-        cp "configs/accelerator/mock-accelerator.toml" mock-accelerator.toml
-        """
-        mapping = {
-            Accelerator.CUDA_MOCK: "configs/accelerator/mock-accelerator.toml",
-            Accelerator.CUDA_MIG_MOCK: "configs/accelerator/cuda-mock-mig.toml",
-            Accelerator.ROCM_MOCK: "configs/accelerator/rocm-mock.toml",
-        }
-
-        src = mapping.get(accelerator)
-        if not src:
-            return
-
-        dst = Path("mock-accelerator.toml")
-        print(f"[Installer] Copying accelerator config: {src} -> {dst}")
-        shutil.copy(src, dst)
 
     async def configure(self) -> None:
         self.log_header("Configuring manager...")
