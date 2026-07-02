@@ -26,6 +26,7 @@ from typing import (
     TypedDict,
     cast,
     overload,
+    override,
 )
 
 import zmq
@@ -254,6 +255,7 @@ class AbstractKernel(UserDict[str, Any], aobject, metaclass=ABCMeta):
             self.runner = None
             raise
 
+    @override
     def __getstate__(self) -> Mapping[str, Any]:
         props = self.__dict__.copy()
         del props["agent_config"]
@@ -482,20 +484,25 @@ class KernelRegistryAgentMapping(MutableMapping[KernelId, AbstractKernel]):
         self._registry = kernel_registry
         self._agent_id = agent_id
 
+    @override
     def __getitem__(self, key: KernelId) -> AbstractKernel:
         return self._registry[AgentKernelRegistryKey(self._agent_id, key)]
 
+    @override
     def __setitem__(self, key: KernelId, value: AbstractKernel) -> None:
         self._registry[AgentKernelRegistryKey(self._agent_id, key)] = value
 
+    @override
     def __delitem__(self, key: KernelId) -> None:
         del self._registry[AgentKernelRegistryKey(self._agent_id, key)]
 
+    @override
     def __iter__(self) -> Iterator[KernelId]:
         for registry_key in self._registry:
             if registry_key.agent_id == self._agent_id:
                 yield registry_key.kernel_id
 
+    @override
     def __len__(self) -> int:
         return sum(1 for key in self._registry if key.agent_id == self._agent_id)
 
@@ -508,13 +515,16 @@ class KernelRegistryGlobalView(Mapping[KernelId, AbstractKernel]):
 
         self._registry = kernel_registry
 
+    @override
     def __getitem__(self, key: KernelId) -> AbstractKernel:
         return self._registry[key]
 
+    @override
     def __iter__(self) -> Iterator[KernelId]:
         for registry_key in self._registry:
             yield registry_key.kernel_id
 
+    @override
     def __len__(self) -> int:
         return len(self._registry)
 
@@ -541,22 +551,27 @@ class KernelRegistry(MutableMapping[AgentKernelRegistryKey, AbstractKernel]):
     @overload
     def __getitem__(self, key: AgentKernelRegistryKey) -> AbstractKernel: ...
 
+    @override
     def __getitem__(self, key: KernelId | AgentKernelRegistryKey) -> AbstractKernel:
         if isinstance(key, AgentKernelRegistryKey):
             return self._registry[key]
         return self._global_registry[key]
 
+    @override
     def __setitem__(self, key: AgentKernelRegistryKey, value: AbstractKernel) -> None:
         self._registry[key] = value
         self._global_registry[key.kernel_id] = value
 
+    @override
     def __delitem__(self, key: AgentKernelRegistryKey) -> None:
         del self._registry[key]
         del self._global_registry[key.kernel_id]
 
+    @override
     def __iter__(self) -> Iterator[AgentKernelRegistryKey]:
         return iter(self._registry)
 
+    @override
     def __len__(self) -> int:
         return len(self._registry)
 
@@ -722,6 +737,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         self.watchdog_task = None
         self._closed = False
 
+    @override
     async def __ainit__(self) -> None:
         await self._get_socket_pair()
         await self._create_tasks()
@@ -743,6 +759,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         loop = current_loop()
         self.read_task = loop.create_task(self.read_output())
 
+    @override
     def __getstate__(self) -> Mapping[str, Any]:
         props = self.__dict__.copy()
         del props["zctx"]

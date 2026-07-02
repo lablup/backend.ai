@@ -4,7 +4,7 @@ import asyncio
 import contextlib
 import logging
 import re
-from typing import Any
+from typing import Any, override
 
 from ai.backend.common.types import HardwareMetadata
 from ai.backend.logging import BraceStyleAdapter
@@ -42,6 +42,7 @@ class FlashBladeVolume(BaseVolume):
 
         self._toolkit_version = None
 
+    @override
     async def create_fsop_model(self) -> AbstractFSOpModel:
         if (await self.get_toolkit_version()) == 2:
             return RapidFileToolsv2FSOpModel(
@@ -87,6 +88,7 @@ class FlashBladeVolume(BaseVolume):
                 raise VolumeNotInitializedError("Failed to detect FlashBlade Toolkit version")
             return self._toolkit_version
 
+    @override
     async def init(self) -> None:
         toolkit_version = await self.get_toolkit_version()
         if toolkit_version == -1:
@@ -101,9 +103,11 @@ class FlashBladeVolume(BaseVolume):
         )
         await super().init()
 
+    @override
     async def shutdown(self) -> None:
         await self.purity_client.aclose()
 
+    @override
     async def get_capabilities(self) -> frozenset[str]:
         return frozenset(
             [
@@ -114,6 +118,7 @@ class FlashBladeVolume(BaseVolume):
             ],
         )
 
+    @override
     async def get_hwinfo(self) -> HardwareMetadata:
         async with self.purity_client as client:
             metadata = await client.get_metadata()
@@ -125,6 +130,7 @@ class FlashBladeVolume(BaseVolume):
             },
         }
 
+    @override
     async def get_fs_usage(self) -> CapacityUsage:
         async with self.purity_client as client:
             usage = await client.get_usage(self.config["purity_fs_name"])
@@ -133,6 +139,7 @@ class FlashBladeVolume(BaseVolume):
             used_bytes=usage["used_bytes"],
         )
 
+    @override
     async def get_performance_metric(self) -> FSPerfMetric:
         async with (
             self.purity_client as client,

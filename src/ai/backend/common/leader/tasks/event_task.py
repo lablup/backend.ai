@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Final
+from typing import Final, override
 
 from ai.backend.common.cron.base import PeriodicTask
 from ai.backend.common.events.dispatcher import EventProducer
@@ -46,6 +46,7 @@ class EventProducerTask(PeriodicTask):
         self._spec = spec
         self._event_producer = event_producer
 
+    @override
     async def run(self) -> None:
         """Execute the task - produce an event."""
         try:
@@ -56,16 +57,19 @@ class EventProducerTask(PeriodicTask):
             log.exception("Failed to produce event for task {}", self._spec.name)
 
     @property
+    @override
     def name(self) -> str:
         """Task name."""
         return self._spec.name
 
     @property
+    @override
     def interval(self) -> float:
         """Interval between task executions."""
         return self._spec.interval
 
     @property
+    @override
     def initial_delay(self) -> float:
         """Initial delay before first execution."""
         return self._spec.initial_delay

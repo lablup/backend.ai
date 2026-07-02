@@ -4,6 +4,7 @@ import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
+from typing import override
 
 from ai.backend.common.clients.http_client.client_pool import (
     ClientPool,
@@ -97,10 +98,12 @@ class SokovanOrchestratorDependency(
     """
 
     @property
+    @override
     def stage_name(self) -> str:
         return "sokovan-orchestrator"
 
     @asynccontextmanager
+    @override
     async def provide(
         self, setup_input: SokovanOrchestratorInput
     ) -> AsyncIterator[SokovanOrchestrator]:

@@ -4,7 +4,7 @@ import asyncio
 import uuid
 from collections.abc import Mapping
 from http import HTTPStatus
-from typing import Any
+from typing import Any, override
 
 import aiodocker
 import trafaret as t
@@ -29,6 +29,7 @@ class OverlayNetworkPlugin(AbstractNetworkManagerPlugin):
 
         self.plugin_config = plugin_config_iv.check(plugin_config)
 
+    @override
     async def init(self, context: Any = None) -> None:
         self.docker = aiodocker.Docker()
 
@@ -40,12 +41,15 @@ class OverlayNetworkPlugin(AbstractNetworkManagerPlugin):
                 "'docker swarm init' or 'docker swarm init --advertise-addr <IP_ADDRESS>'"
             )
 
+    @override
     async def cleanup(self) -> None:
         await self.docker.close()
 
+    @override
     async def update_plugin_config(self, plugin_config: Mapping[str, Any]) -> None:
         return await super().update_plugin_config(plugin_config)
 
+    @override
     async def create_network(
         self, *, identifier: str | None = None, options: dict[str, Any] | None = None
     ) -> NetworkInfo:
@@ -96,6 +100,7 @@ class OverlayNetworkPlugin(AbstractNetworkManagerPlugin):
             },
         )
 
+    @override
     async def destroy_network(self, network_id: str) -> None:
         try:
             await asyncio.sleep(2.0)

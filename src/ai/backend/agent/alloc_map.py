@@ -15,6 +15,7 @@ from typing import (
     Any,
     TypeVar,
     final,
+    override,
 )
 
 import attr
@@ -299,6 +300,7 @@ class DiscretePropertyAllocMap(AbstractAllocMap):
         }
         super().__init__(*args, **kwargs)
 
+    @override
     def allocate(
         self,
         slots: Mapping[SlotName, Decimal],
@@ -479,6 +481,7 @@ class DiscretePropertyAllocMap(AbstractAllocMap):
 
         return allocation
 
+    @override
     def apply_allocation(
         self,
         existing_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
@@ -487,6 +490,7 @@ class DiscretePropertyAllocMap(AbstractAllocMap):
             for device_id, alloc in per_device_alloc.items():
                 self.allocations[slot_name][device_id] += alloc
 
+    @override
     def free(
         self,
         existing_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
@@ -516,6 +520,7 @@ class FractionAllocMap(AbstractAllocMap):
         self.digits = Decimal(10) ** -2  # decimal points that is supported by agent
         self.powers = Decimal(100)  # reciprocal of self.digits
 
+    @override
     def allocate(
         self,
         slots: Mapping[SlotName, Decimal],
@@ -917,6 +922,7 @@ class FractionAllocMap(AbstractAllocMap):
             self.update_affinity_hint(slot_allocation, affinity_hint)
         return allocation
 
+    @override
     def apply_allocation(
         self,
         existing_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
@@ -925,6 +931,7 @@ class FractionAllocMap(AbstractAllocMap):
             for device_id, alloc in per_device_alloc.items():
                 self.allocations[slot_name][device_id] += alloc
 
+    @override
     def free(
         self,
         existing_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],

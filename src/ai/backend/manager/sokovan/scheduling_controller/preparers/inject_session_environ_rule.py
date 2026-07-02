@@ -14,6 +14,8 @@ the overlay only ever adds one deterministic key.
 
 from __future__ import annotations
 
+from typing import override
+
 from ai.backend.manager.data.session.draft import SessionSpecDraft
 from ai.backend.manager.sokovan.scheduling_controller.preparers.draft_rule import (
     SessionSpecDraftRule,
@@ -27,9 +29,11 @@ _SUDO_ENABLED_ENV_VALUE = "1"
 class InjectSessionEnvironRule(SessionSpecDraftRule):
     """Overlay ``SUDO_SESSION_ENABLED=1`` on every kernel when sudo is enabled."""
 
+    @override
     def name(self) -> str:
         return "inject_session_environ"
 
+    @override
     async def prepare(
         self,
         draft: SessionSpecDraft,

@@ -6,6 +6,7 @@ a simple round-robin index.
 """
 
 from collections.abc import Sequence
+from typing import override
 
 from .selector import (
     AbstractAgentSelector,
@@ -33,18 +34,21 @@ class RoundRobinAgentSelector(AbstractAgentSelector):
         """
         self.next_index = next_index
 
+    @override
     def name(self) -> str:
         """
         Return the selector name for predicates.
         """
         return "RoundRobinAgentSelector"
 
+    @override
     def success_message(self) -> str:
         """
         Return a message describing successful agent selection.
         """
         return "Agent selected using round-robin strategy for even workload distribution"
 
+    @override
     def select_tracker_by_strategy(
         self,
         trackers: Sequence[AgentStateTracker],

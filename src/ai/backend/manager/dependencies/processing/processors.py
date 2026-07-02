@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
+from typing import override
 
 from ai.backend.common.dependencies import NonMonitorableDependencyProvider
 from ai.backend.common.events.fetcher import EventFetcher
@@ -32,10 +33,12 @@ class ProcessorsDependency(NonMonitorableDependencyProvider[ProcessorsProviderIn
     """
 
     @property
+    @override
     def stage_name(self) -> str:
         return "processors"
 
     @asynccontextmanager
+    @override
     async def provide(self, setup_input: ProcessorsProviderInput) -> AsyncIterator[Processors]:
         processors = create_processors(
             ProcessorArgs(

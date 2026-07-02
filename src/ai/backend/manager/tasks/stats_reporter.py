@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import TYPE_CHECKING, Final
+from typing import TYPE_CHECKING, Final, override
 
 import sqlalchemy as sa
 import sqlalchemy.exc
@@ -48,17 +48,21 @@ class StatsReporterTask(PeriodicTask):
         self._db = db
 
     @property
+    @override
     def name(self) -> str:
         return "stats_task"
 
     @property
+    @override
     def interval(self) -> float:
         return _REPORT_INTERVAL
 
     @property
+    @override
     def initial_delay(self) -> float:
         return 0.0
 
+    @override
     async def run(self) -> None:
         try:
             await self._stats_monitor.report_metric(

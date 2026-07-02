@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Final
+from typing import TYPE_CHECKING, Final, override
 
 from ai.backend.common.cron import PeriodicTask
 
@@ -21,16 +21,20 @@ class BgtaskRetryTask(PeriodicTask):
         self._manager = manager
 
     @property
+    @override
     def name(self) -> str:
         return "bgtask_retry"
 
     @property
+    @override
     def interval(self) -> float:
         return _RETRY_CHECK_INTERVAL
 
     @property
+    @override
     def initial_delay(self) -> float:
         return 0.0
 
+    @override
     async def run(self) -> None:
         await self._manager.do_retry_check()

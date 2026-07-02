@@ -8,6 +8,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
+from typing import override
 
 import sqlalchemy as sa
 
@@ -52,6 +53,7 @@ class DomainFairShareSearchScope(SearchScope):
     resource_group: str
     """Required. The scaling group to search within."""
 
+    @override
     def to_condition(self) -> QueryCondition:
         """Convert scope to a query condition for DomainRow.
 
@@ -65,6 +67,7 @@ class DomainFairShareSearchScope(SearchScope):
         return inner
 
     @property
+    @override
     def existence_checks(self) -> Sequence[ExistenceCheck[str]]:
         """Return existence checks for scope validation."""
         return [
@@ -89,6 +92,7 @@ class ProjectFairShareSearchScope(SearchScope):
     domain_name: str
     """Required. The domain to search within."""
 
+    @override
     def to_condition(self) -> QueryCondition:
         """Convert scope to a query condition for GroupRow filtered by domain.
 
@@ -103,6 +107,7 @@ class ProjectFairShareSearchScope(SearchScope):
         return inner
 
     @property
+    @override
     def existence_checks(self) -> Sequence[ExistenceCheck[str]]:
         """Return existence checks for scope validation."""
         return [
@@ -135,6 +140,7 @@ class UserFairShareSearchScope(SearchScope):
     project_id: uuid.UUID
     """Required. The project to search within."""
 
+    @override
     def to_condition(self) -> QueryCondition:
         """Convert scope to a query condition for GroupRow filtered by domain and project.
 
@@ -153,6 +159,7 @@ class UserFairShareSearchScope(SearchScope):
         return inner
 
     @property
+    @override
     def existence_checks(
         self,
     ) -> Sequence[ExistenceCheck[str] | ExistenceCheck[uuid.UUID]]:

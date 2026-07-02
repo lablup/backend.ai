@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
+from typing import override
 
 from ai.backend.common.dependencies import NonMonitorableDependencyProvider
 from ai.backend.common.events.dispatcher import EventDispatcher, EventObserver
@@ -28,10 +29,12 @@ class EventDispatcherDependency(
     """
 
     @property
+    @override
     def stage_name(self) -> str:
         return "event-dispatcher"
 
     @asynccontextmanager
+    @override
     async def provide(self, setup_input: EventDispatcherInput) -> AsyncIterator[EventDispatcher]:
         dispatcher = EventDispatcher(
             setup_input.message_queue,

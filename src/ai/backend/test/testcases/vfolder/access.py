@@ -1,3 +1,5 @@
+from typing import override
+
 from ai.backend.client.exceptions import BackendAPIError
 from ai.backend.test.contexts.client_session import ClientSessionContext
 from ai.backend.test.contexts.vfolder import (
@@ -13,6 +15,7 @@ class VFolderAccessSuccess(TestCode):
     Test whether logged-in user can access the vfolder properly.
     """
 
+    @override
     async def test(self) -> None:
         vfolder_meta = CreatedVFolderMetaContext.current()
         client_session = ClientSessionContext.current()
@@ -35,6 +38,7 @@ class VFolderAccessSuccess(TestCode):
 
 
 class VFolderAccessFailure(TestCode):
+    @override
     async def test(self) -> None:
         vfolder_meta = CreatedVFolderMetaContext.current()
         client_session = ClientSessionContext.current()

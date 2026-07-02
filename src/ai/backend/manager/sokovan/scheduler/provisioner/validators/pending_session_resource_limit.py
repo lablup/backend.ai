@@ -1,5 +1,7 @@
 """Validator for pending session resource limits."""
 
+from typing import override
+
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.sokovan import SessionWorkload, SystemSnapshot
 
@@ -13,14 +15,17 @@ class PendingSessionResourceLimitValidator(ValidatorRule):
     This corresponds to check_pending_session_resource_limit predicate.
     """
 
+    @override
     def name(self) -> str:
         """Return the validator name for predicates."""
         return "PendingSessionResourceLimitValidator"
 
+    @override
     def success_message(self) -> str:
         """Return a message describing successful validation."""
         return "Pending session resource usage is within the allowed limit for the access key"
 
+    @override
     def validate(self, snapshot: SystemSnapshot, workload: SessionWorkload) -> None:
         # Get the keypair's resource policy
         policy = snapshot.resource_policy.keypair_policies.get(workload.access_key)

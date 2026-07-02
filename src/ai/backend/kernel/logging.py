@@ -4,13 +4,14 @@ import logging
 from contextlib import closing
 from io import StringIO
 from logging.handlers import QueueHandler
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, override
 
 if TYPE_CHECKING:
     from janus import _SyncQueueProxy
 
 
 class RelativeCreatedFormatter(logging.Formatter):
+    @override
     def format(self, record: logging.LogRecord) -> str:
         record.relative_seconds = record.relativeCreated / 1000
         return super().format(record)
@@ -23,11 +24,13 @@ class BraceMessage:
         self.fmt = fmt
         self.args = args
 
+    @override
     def __str__(self) -> str:
         return self.fmt.format(*self.args)
 
 
 class BraceStyleAdapter(logging.LoggerAdapter[logging.Logger]):
+    @override
     def log(self, level: int, msg: object, *args: object, **kwargs: object) -> None:
         if self.isEnabledFor(level):
             _msg, _kwargs = self.process(msg, kwargs)
@@ -50,6 +53,7 @@ def setup_logger_basic(log_prefix: str, debug: bool) -> None:
 
 
 class LogQHandler(QueueHandler):
+    @override
     def enqueue(self, record: logging.LogRecord) -> None:
         if self.formatter is None:
             raise RuntimeError("Formatter is not initialized")

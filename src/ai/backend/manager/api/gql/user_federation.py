@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from typing import override
 
 from strawberry import ID, Info, relay
 
@@ -21,6 +22,7 @@ class User(relay.Node):
     id: relay.NodeID[str]
 
     @classmethod
+    @override
     def resolve_nodes(
         cls,
         *,

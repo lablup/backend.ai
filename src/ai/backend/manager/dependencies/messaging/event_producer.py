@@ -4,6 +4,7 @@ import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
+from typing import override
 
 from ai.backend.common.dependencies import NonMonitorableDependencyProvider
 from ai.backend.common.events.dispatcher import EventProducer
@@ -27,10 +28,12 @@ class EventProducerDependency(NonMonitorableDependencyProvider[EventProducerInpu
     """Provides EventProducer lifecycle management."""
 
     @property
+    @override
     def stage_name(self) -> str:
         return "event-producer"
 
     @asynccontextmanager
+    @override
     async def provide(self, setup_input: EventProducerInput) -> AsyncIterator[EventProducer]:
         """Initialize and provide the event producer.
 

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
-from typing import Self, cast
+from typing import Self, cast, override
 from uuid import UUID
 
 import strawberry
@@ -81,6 +81,7 @@ class ObjectStorage(PydanticNodeMixin[ObjectStorageNode]):
     region: str
 
     @classmethod
+    @override
     async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
         cls,
         *,

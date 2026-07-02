@@ -391,6 +391,7 @@ class ProjectModel(RBACModel[ProjectPermission]):
     _permissions: frozenset[ProjectPermission] = field(default_factory=frozenset)
 
     @property
+    @override
     def permissions(self) -> Container[ProjectPermission]:
         return self._permissions
 
@@ -605,12 +606,14 @@ class ProjectPermissionContext(AbstractPermissionContext[ProjectPermission, Grou
             )
         return cond
 
+    @override
     async def build_query(self) -> sa.sql.Select[Any] | None:
         cond = self.query_condition
         if cond is None:
             return None
         return sa.select(GroupRow).where(cond)
 
+    @override
     async def calculate_final_permission(self, rbac_obj: GroupRow) -> frozenset[ProjectPermission]:
         project_row = rbac_obj
         project_id = project_row.id

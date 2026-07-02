@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, override
 
 from ai.backend.common.artifact_storage import AbstractStorage, AbstractStoragePool
 from ai.backend.common.contexts.request_id import current_request_id
@@ -88,6 +88,7 @@ class StorageTarget:
             raise InvalidStorageTargetError("StorageTarget has no storage_name or storage")
         return storage_pool.get_storage(self._storage_name)
 
+    @override
     def __eq__(self, other: object) -> bool:
         if isinstance(other, StorageTarget):
             if self._storage_name is not None and other._storage_name is not None:
@@ -97,6 +98,7 @@ class StorageTarget:
             return False
         return False
 
+    @override
     def __hash__(self) -> int:
         if self._storage_name is not None:
             return hash(self._storage_name)

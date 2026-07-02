@@ -1,5 +1,7 @@
 """Validator for group resource limits."""
 
+from typing import override
+
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.sokovan import SessionWorkload, SystemSnapshot
 
@@ -13,14 +15,17 @@ class GroupResourceLimitValidator(ValidatorRule):
     This corresponds to check_group_resource_limit predicate.
     """
 
+    @override
     def name(self) -> str:
         """Return the validator name for predicates."""
         return "GroupResourceLimitValidator"
 
+    @override
     def success_message(self) -> str:
         """Return a message describing successful validation."""
         return "Group has sufficient resource quota for the requested session"
 
+    @override
     def validate(self, snapshot: SystemSnapshot, workload: SessionWorkload) -> None:
         # Get the group's resource limit
         group_limit = snapshot.resource_policy.group_limits.get(workload.group_id)

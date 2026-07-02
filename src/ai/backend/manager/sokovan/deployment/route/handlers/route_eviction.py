@@ -2,6 +2,7 @@
 
 import logging
 from collections.abc import Sequence
+from typing import override
 
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.logging import BraceStyleAdapter
@@ -47,20 +48,24 @@ class RouteEvictionHandler(RouteHandler):
         self._event_producer = event_producer
 
     @classmethod
+    @override
     def name(cls) -> str:
         """Get the name of the handler."""
         return "evict-routes"
 
     @property
+    @override
     def lock_id(self) -> LockID | None:
         """No lock needed for eviction."""
         return None
 
     @classmethod
+    @override
     def category(cls) -> RouteHandlerCategory:
         return RouteHandlerCategory.HEALTH
 
     @classmethod
+    @override
     def target_statuses(cls) -> RouteTargetStatuses:
         # The handler runs over every active route (PROVISIONING / RUNNING)
         # regardless of health, because the orphan-revision check applies
@@ -72,6 +77,7 @@ class RouteEvictionHandler(RouteHandler):
         )
 
     @classmethod
+    @override
     def status_transitions(cls) -> RouteStatusTransitions:
         """Eviction: success → TERMINATING (draining stage), failure → no change."""
         return RouteStatusTransitions(
@@ -83,6 +89,7 @@ class RouteEvictionHandler(RouteHandler):
             stale=None,
         )
 
+    @override
     async def execute(self, routes: Sequence[RouteData]) -> RouteExecutionResult:
         """
         Execute eviction for routes flagged by either eviction reason.
@@ -95,6 +102,7 @@ class RouteEvictionHandler(RouteHandler):
         # Use executor logic to filter routes by scaling group config
         return await self._route_executor.cleanup_routes_by_config(routes)
 
+    @override
     async def post_process(self, result: RouteExecutionResult) -> None:
         """Handle post-processing after eviction check."""
         if result.successes:

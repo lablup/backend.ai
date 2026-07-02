@@ -30,6 +30,7 @@ from typing import (
     ClassVar,
     Literal,
     cast,
+    override,
 )
 from uuid import UUID
 
@@ -304,6 +305,7 @@ class AgentRPCServer(aobject):
         self.local_config = local_config
         self.skip_detect_manager = skip_detect_manager
 
+    @override
     async def __ainit__(self) -> None:
         if not self.skip_detect_manager:
             await self.detect_manager()

@@ -4,6 +4,8 @@ Configuration-related exceptions for the worker.
 
 from __future__ import annotations
 
+from typing import override
+
 from ai.backend.common.exception import (
     BackendAIError,
     ErrorCode,
@@ -19,6 +21,7 @@ class MissingTraefikConfigError(BackendAIError):
     error_type = "https://api.backend.ai/probs/appproxy-worker/missing-traefik-config"
     error_title = "Traefik configuration is missing."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,
@@ -33,6 +36,7 @@ class MissingAnnounceAddressError(BackendAIError):
     error_type = "https://api.backend.ai/probs/appproxy-worker/missing-announce-address"
     error_title = "Announce address is missing."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,
@@ -47,6 +51,7 @@ class MissingProfilingConfigError(BackendAIError):
     error_type = "https://api.backend.ai/probs/appproxy-worker/missing-profiling-config"
     error_title = "Profiling configuration is missing."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,
@@ -61,6 +66,7 @@ class MissingPortConfigError(BackendAIError):
     error_type = "https://api.backend.ai/probs/appproxy-worker/missing-port-config"
     error_title = "Port configuration is missing."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,
@@ -75,6 +81,7 @@ class MissingPortProxyConfigError(BackendAIError):
     error_type = "https://api.backend.ai/probs/appproxy-worker/missing-port-proxy-config"
     error_title = "Port proxy configuration is missing."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,
@@ -89,6 +96,7 @@ class CleanupContextNotInitializedError(BackendAIError):
     error_type = "https://api.backend.ai/probs/appproxy-worker/cleanup-context-not-initialized"
     error_title = "Cleanup context is not initialized."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,

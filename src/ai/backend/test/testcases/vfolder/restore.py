@@ -1,9 +1,12 @@
+from typing import override
+
 from ai.backend.test.contexts.client_session import ClientSessionContext
 from ai.backend.test.contexts.vfolder import CreatedVFolderMetaContext
 from ai.backend.test.templates.template import TestCode
 
 
 class VFolderDeleteAndRestoreSuccess(TestCode):
+    @override
     async def test(self) -> None:
         client_session = ClientSessionContext.current()
         vfolder_meta = CreatedVFolderMetaContext.current()

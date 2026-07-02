@@ -12,7 +12,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from typing import final
+from typing import final, override
 
 import sqlalchemy as sa
 
@@ -70,6 +70,7 @@ class SokovanOpsProvider(RBACOpsProvider):
     """Hands out :class:`SokovanWriteOps` for the read-write surface."""
 
     @asynccontextmanager
+    @override
     async def write_ops(self) -> AsyncIterator[SokovanWriteOps]:
         async with self._db.begin_session_read_committed() as sess:
             yield SokovanWriteOps(sess)

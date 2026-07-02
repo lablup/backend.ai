@@ -2,7 +2,7 @@ import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import TypeVar
+from typing import TypeVar, override
 
 from ai.backend.common.data.permission.types import EntityType
 from ai.backend.common.exception import ErrorCode
@@ -52,6 +52,7 @@ class BaseActionResult(ABC):
 class SearchActionResult[T](BaseActionResult):
     result: SearchResult[T]
 
+    @override
     def entity_id(self) -> str | None:
         return None
 

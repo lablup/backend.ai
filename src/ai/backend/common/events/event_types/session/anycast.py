@@ -57,6 +57,7 @@ class BaseSessionEvent(AbstractAnycastEvent):
 class DoTerminateSessionEvent(BaseSessionEvent):
     reason: KernelLifecycleEventReason
 
+    @override
     def serialize(self) -> tuple[Any, ...]:
         return (
             str(self.session_id),
@@ -181,6 +182,7 @@ class SessionResultEvent(BaseSessionEvent):
     reason: KernelLifecycleEventReason = KernelLifecycleEventReason.UNKNOWN
     exit_code: int = -1
 
+    @override
     def serialize(self) -> tuple[Any, ...]:
         return (
             str(self.session_id),
@@ -189,6 +191,7 @@ class SessionResultEvent(BaseSessionEvent):
         )
 
     @classmethod
+    @override
     def deserialize(cls, value: tuple[Any, ...]) -> Self:
         return cls(
             SessionId(uuid.UUID(value[0])),
@@ -248,6 +251,7 @@ class ExecutionStartedAnycastEvent(BaseSessionExecutionEvent):
         return "execution_started"
 
     @classmethod
+    @override
     def execution_status(cls) -> SessionExecutionStatus:
         return SessionExecutionStatus.STARTED
 
@@ -260,6 +264,7 @@ class ExecutionFinishedAnycastEvent(BaseSessionExecutionEvent):
         return "execution_finished"
 
     @classmethod
+    @override
     def execution_status(cls) -> SessionExecutionStatus:
         return SessionExecutionStatus.FINISHED
 
@@ -272,6 +277,7 @@ class ExecutionTimeoutAnycastEvent(BaseSessionExecutionEvent):
         return "execution_timeout"
 
     @classmethod
+    @override
     def execution_status(cls) -> SessionExecutionStatus:
         return SessionExecutionStatus.TIMEOUT
 
@@ -284,5 +290,6 @@ class ExecutionCancelledAnycastEvent(BaseSessionExecutionEvent):
         return "execution_cancelled"
 
     @classmethod
+    @override
     def execution_status(cls) -> SessionExecutionStatus:
         return SessionExecutionStatus.CANCELED

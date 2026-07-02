@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import override
+
 from aiohttp import web
 
 from ai.backend.common.exception import (
@@ -28,6 +30,7 @@ class HttpHealthCheckError(HealthCheckError, web.HTTPServiceUnavailable):
     error_type = "https://api.backend.ai/probs/http-health-check-failed"
     error_title = "HTTP health check failed"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.HEALTH_CHECK,
@@ -42,6 +45,7 @@ class ValkeyHealthCheckError(HealthCheckError, web.HTTPServiceUnavailable):
     error_type = "https://api.backend.ai/probs/valkey-health-check-failed"
     error_title = "Valkey health check failed"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.HEALTH_CHECK,
@@ -56,6 +60,7 @@ class EtcdHealthCheckError(HealthCheckError, web.HTTPServiceUnavailable):
     error_type = "https://api.backend.ai/probs/etcd-health-check-failed"
     error_title = "Etcd health check failed"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.HEALTH_CHECK,
@@ -70,6 +75,7 @@ class DatabaseHealthCheckError(HealthCheckError, web.HTTPServiceUnavailable):
     error_type = "https://api.backend.ai/probs/database-health-check-failed"
     error_title = "Database health check failed"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.HEALTH_CHECK,
@@ -84,6 +90,7 @@ class DockerHealthCheckError(HealthCheckError, web.HTTPServiceUnavailable):
     error_type = "https://api.backend.ai/probs/docker-health-check-failed"
     error_title = "Docker health check failed"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.HEALTH_CHECK,
@@ -100,6 +107,7 @@ class HealthCheckerAlreadyRegistered(BackendAIError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/health-checker-already-registered"
     error_title = "Health checker already registered."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.HEALTH_CHECK,
@@ -116,6 +124,7 @@ class HealthCheckerNotFound(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/health-checker-not-found"
     error_title = "Health checker not found."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.HEALTH_CHECK,

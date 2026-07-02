@@ -42,6 +42,7 @@ from typing import (
     Literal,
     ParamSpec,
     cast,
+    override,
 )
 from uuid import UUID
 
@@ -950,6 +951,7 @@ class AbstractAgent[
         self._sync_container_lifecycle_observer = SyncContainerLifecycleObserver.instance()
         self._clean_kernel_registry_task = asyncio.create_task(self._clean_kernel_registry_loop())
 
+    @override
     async def __ainit__(self) -> None:
         """
         An implementation of AbstractAgent would define its own ``__ainit__()`` method.

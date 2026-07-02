@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, override
 from uuid import UUID
 
 from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec
@@ -42,6 +42,7 @@ class SessionSchedulingHistorySearchScope(SearchScope):
     session_id: UUID
     """Required. The session to search history for."""
 
+    @override
     def to_condition(self) -> QueryCondition:
         """Convert scope to a query condition for SessionSchedulingHistoryRow."""
         return SessionSchedulingHistoryConditions.by_session_id_filter(
@@ -49,6 +50,7 @@ class SessionSchedulingHistorySearchScope(SearchScope):
         )
 
     @property
+    @override
     def existence_checks(self) -> list[ExistenceCheck[Any]]:
         """Check that the session exists."""
         return [
@@ -73,6 +75,7 @@ class DeploymentHistorySearchScope(SearchScope):
     deployment_id: UUID
     """Required. The deployment to search history for."""
 
+    @override
     def to_condition(self) -> QueryCondition:
         """Convert scope to a query condition for DeploymentHistoryRow."""
         return DeploymentHistoryConditions.by_deployment_id_filter(
@@ -80,6 +83,7 @@ class DeploymentHistorySearchScope(SearchScope):
         )
 
     @property
+    @override
     def existence_checks(self) -> list[ExistenceCheck[Any]]:
         """Check that the deployment (endpoint) exists."""
         return [
@@ -104,6 +108,7 @@ class RouteHistorySearchScope(SearchScope):
     route_id: ReplicaID
     """Required. The route to search history for."""
 
+    @override
     def to_condition(self) -> QueryCondition:
         """Convert scope to a query condition for RouteHistoryRow."""
         return RouteHistoryConditions.by_route_id_filter(
@@ -111,6 +116,7 @@ class RouteHistorySearchScope(SearchScope):
         )
 
     @property
+    @override
     def existence_checks(self) -> list[ExistenceCheck[Any]]:
         """Check that the route exists."""
         return [

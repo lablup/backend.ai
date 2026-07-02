@@ -68,6 +68,7 @@ class BaseQuotaModel(AbstractQuotaModel):
     def __init__(self, mount_path: Path) -> None:
         self.mount_path = mount_path
 
+    @override
     def mangle_qspath(self, ref: VFolderID | QuotaScopeID | str | None) -> Path:
         try:
             match ref:
@@ -89,6 +90,7 @@ class BaseQuotaModel(AbstractQuotaModel):
         except t.DataError as e:
             raise InvalidQuotaScopeError(f"Invalid value format for quota scope ID: {ref!r}") from e
 
+    @override
     async def create_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
@@ -105,6 +107,7 @@ class BaseQuotaModel(AbstractQuotaModel):
         except FileExistsError as e:
             raise QuotaScopeAlreadyExists(f"Quota scope '{quota_scope_id}' already exists") from e
 
+    @override
     async def describe_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
@@ -114,6 +117,7 @@ class BaseQuotaModel(AbstractQuotaModel):
 
         return QuotaUsage(-1, -1)
 
+    @override
     async def update_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
@@ -122,6 +126,7 @@ class BaseQuotaModel(AbstractQuotaModel):
         # This is a no-op.
         pass
 
+    @override
     async def unset_quota(
         self,
         quota_scope_id: QuotaScopeID,
@@ -129,6 +134,7 @@ class BaseQuotaModel(AbstractQuotaModel):
         # This is a no-op.
         pass
 
+    @override
     async def delete_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
@@ -152,6 +158,7 @@ class SetGIDQuotaModel(BaseQuotaModel):
     or each project.
     """
 
+    @override
     async def create_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
@@ -169,6 +176,7 @@ class SetGIDQuotaModel(BaseQuotaModel):
             raise QuotaScopeAlreadyExists(f"Quota scope '{quota_scope_id}' already exists") from e
         # TODO: setgid impl.
 
+    @override
     async def describe_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
@@ -178,6 +186,7 @@ class SetGIDQuotaModel(BaseQuotaModel):
         # TODO: setgid impl.
         return QuotaUsage(-1, -1)
 
+    @override
     async def update_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
@@ -186,6 +195,7 @@ class SetGIDQuotaModel(BaseQuotaModel):
         # TODO: setgid impl.
         raise NotImplementedError
 
+    @override
     async def unset_quota(
         self,
         quota_scope_id: QuotaScopeID,
@@ -193,6 +203,7 @@ class SetGIDQuotaModel(BaseQuotaModel):
         # TODO: setgid impl.
         raise NotImplementedError
 
+    @override
     async def delete_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
@@ -218,6 +229,7 @@ class BaseFSOpModel(AbstractFSOpModel):
         self.scandir_limit = scandir_limit
         self.watcher = watcher
 
+    @override
     async def copy_tree(
         self,
         src_path: Path,
@@ -234,6 +246,7 @@ class BaseFSOpModel(AbstractFSOpModel):
             ),
         )
 
+    @override
     async def move_tree(
         self,
         src_path: Path,
@@ -245,6 +258,7 @@ class BaseFSOpModel(AbstractFSOpModel):
             lambda: shutil.move(str(src_path), str(dst_path)),
         )
 
+    @override
     async def delete_tree(
         self,
         path: Path,
@@ -255,6 +269,7 @@ class BaseFSOpModel(AbstractFSOpModel):
         except FileNotFoundError:
             pass
 
+    @override
     def scan_tree(
         self,
         path: Path,
@@ -337,6 +352,7 @@ class BaseFSOpModel(AbstractFSOpModel):
 
         return _aiter()
 
+    @override
     async def scan_tree_usage(
         self,
         path: Path,
@@ -377,6 +393,7 @@ class BaseFSOpModel(AbstractFSOpModel):
             total_count = -1
         return TreeUsage(file_count=total_count, used_bytes=total_size)
 
+    @override
     async def scan_tree_size(
         self,
         path: Path,
@@ -398,9 +415,11 @@ class BaseVolume(AbstractVolume):
             options=self.config,
         )
 
+    @override
     async def create_quota_model(self) -> AbstractQuotaModel:
         return BaseQuotaModel(self.mount_path)
 
+    @override
     async def create_fsop_model(self) -> AbstractFSOpModel:
         return BaseFSOpModel(
             self.mount_path,
@@ -408,9 +427,11 @@ class BaseVolume(AbstractVolume):
             self.watcher,
         )
 
+    @override
     async def get_capabilities(self) -> frozenset[str]:
         return frozenset([CAP_VFOLDER])
 
+    @override
     async def get_hwinfo(self) -> HardwareMetadata:
         return {
             "status": "healthy",
@@ -419,6 +440,7 @@ class BaseVolume(AbstractVolume):
         }
 
     @final
+    @override
     async def create_vfolder(
         self,
         vfid: VFolderID,
@@ -436,6 +458,7 @@ class BaseVolume(AbstractVolume):
             vfpath.chmod(mode)
 
     @final
+    @override
     async def delete_vfolder(self, vfid: VFolderID) -> None:
         vfpath = self.mangle_vfpath(vfid)
         await self.fsop_model.delete_tree(vfpath)
@@ -452,6 +475,7 @@ class BaseVolume(AbstractVolume):
                         raise
 
     @final
+    @override
     async def clone_vfolder(
         self,
         src_vfid: VFolderID,
@@ -489,16 +513,19 @@ class BaseVolume(AbstractVolume):
             raise ProcessExecutionError("Copying files from source directories failed.") from e
 
     @final
+    @override
     async def get_vfolder_mount(self, vfid: VFolderID, subpath: str) -> Path:
         self.sanitize_vfpath(vfid, PurePosixPath(subpath))
         return self.mangle_vfpath(vfid).resolve()
 
+    @override
     async def put_metadata(self, vfid: VFolderID, payload: bytes) -> None:
         vfpath = self.mangle_vfpath(vfid)
         metadata_path = vfpath / "metadata.json"
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(None, metadata_path.write_bytes, payload)
 
+    @override
     async def get_metadata(self, vfid: VFolderID) -> bytes:
         vfpath = self.mangle_vfpath(vfid)
         metadata_path = vfpath / "metadata.json"
@@ -512,9 +539,11 @@ class BaseVolume(AbstractVolume):
             return b""
         # Other IO errors should be bubbled up.
 
+    @override
     async def get_performance_metric(self) -> FSPerfMetric:
         raise NotImplementedError
 
+    @override
     async def get_fs_usage(self) -> CapacityUsage:
         loop = asyncio.get_running_loop()
         stat = await loop.run_in_executor(None, os.statvfs, self.mount_path)
@@ -524,6 +553,7 @@ class BaseVolume(AbstractVolume):
         )
 
     @final
+    @override
     async def get_usage(
         self,
         vfid: VFolderID,
@@ -533,6 +563,7 @@ class BaseVolume(AbstractVolume):
         return await self.fsop_model.scan_tree_usage(target_path)
 
     @final
+    @override
     async def get_used_bytes(self, vfid: VFolderID) -> BinarySize:
         vfpath = self.mangle_vfpath(vfid)
         return await self.fsop_model.scan_tree_size(vfpath)
@@ -540,6 +571,7 @@ class BaseVolume(AbstractVolume):
     # ------ vfolder internal operations -------
 
     @final
+    @override
     def scandir(
         self,
         vfid: VFolderID,
@@ -550,6 +582,7 @@ class BaseVolume(AbstractVolume):
         target_path = self.sanitize_vfpath(vfid, relpath)
         return self.fsop_model.scan_tree(target_path, recursive=recursive)
 
+    @override
     async def mkdir(
         self,
         vfid: VFolderID,
@@ -565,6 +598,7 @@ class BaseVolume(AbstractVolume):
             lambda: target_path.mkdir(0o755, parents=parents, exist_ok=exist_ok),
         )
 
+    @override
     async def rmdir(
         self,
         vfid: VFolderID,
@@ -576,6 +610,7 @@ class BaseVolume(AbstractVolume):
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(None, target_path.rmdir)
 
+    @override
     async def move_file(
         self,
         vfid: VFolderID,
@@ -586,6 +621,7 @@ class BaseVolume(AbstractVolume):
         dst_path = self.sanitize_vfpath(vfid, dst)
         await self.fsop_model.move_tree(src_path, dst_path)
 
+    @override
     async def move_tree(
         self,
         vfid: VFolderID,
@@ -600,6 +636,7 @@ class BaseVolume(AbstractVolume):
         dst_path = self.sanitize_vfpath(vfid, dst)
         await self.fsop_model.move_tree(src_path, dst_path)
 
+    @override
     async def copy_file(
         self,
         vfid: VFolderID,
@@ -617,6 +654,7 @@ class BaseVolume(AbstractVolume):
         )
         await self.fsop_model.copy_tree(src_path, dst_path)
 
+    @override
     async def prepare_upload(self, vfid: VFolderID) -> str:
         vfpath = self.mangle_vfpath(vfid)
         session_id = secrets.token_hex(16)
@@ -631,6 +669,7 @@ class BaseVolume(AbstractVolume):
         await loop.run_in_executor(None, _create_target)
         return session_id
 
+    @override
     async def add_file(
         self,
         vfid: VFolderID,
@@ -661,6 +700,7 @@ class BaseVolume(AbstractVolume):
         finally:
             await write_fut
 
+    @override
     def read_file(
         self,
         vfid: VFolderID,
@@ -714,6 +754,7 @@ class BaseVolume(AbstractVolume):
 
         return _aiter()
 
+    @override
     async def delete_files(
         self,
         vfid: VFolderID,

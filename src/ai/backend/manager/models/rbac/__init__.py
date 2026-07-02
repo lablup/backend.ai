@@ -5,7 +5,7 @@ import uuid
 from abc import ABCMeta, abstractmethod
 from collections.abc import Callable, Container, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Any, Self, TypeVar, cast
+from typing import Any, Self, TypeVar, cast, override
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -267,6 +267,7 @@ async def _calculate_role_in_scope_for_user(
 
 class BaseScope(metaclass=ABCMeta):
     @abstractmethod
+    @override
     def __str__(self) -> str:
         pass
 
@@ -282,13 +283,16 @@ class BaseScope(metaclass=ABCMeta):
 
 @dataclass(frozen=True)
 class SystemScope(BaseScope):
+    @override
     def __str__(self) -> str:
         return "system scope()"
 
+    @override
     def serialize(self) -> str:
         return "system:"
 
     @classmethod
+    @override
     def deserialize(cls, val: str) -> Self:
         type_, _, _ = val.partition(":")
         if type_ != "system":
@@ -300,13 +304,16 @@ class SystemScope(BaseScope):
 class DomainScope(BaseScope):
     domain_name: str
 
+    @override
     def __str__(self) -> str:
         return f"Domain(name: {self.domain_name})"
 
+    @override
     def serialize(self) -> str:
         return f"domain:{self.domain_name}"
 
     @classmethod
+    @override
     def deserialize(cls, val: str) -> Self:
         type_, _, domain_name = val.partition(":")
         if type_ != "domain":
@@ -319,15 +326,18 @@ class ProjectScope(BaseScope):
     project_id: uuid.UUID
     domain_name: str | None = None
 
+    @override
     def __str__(self) -> str:
         return f"Project(id: {self.project_id}, domain: {self.domain_name}])"
 
+    @override
     def serialize(self) -> str:
         if self.domain_name is not None:
             return f"project:{self.project_id}:{self.domain_name}"
         return f"project:{self.project_id}"
 
     @classmethod
+    @override
     def deserialize(cls, val: str) -> Self:
         type_, _, values = val.partition(":")
         if type_ != "project":
@@ -343,15 +353,18 @@ class UserScope(BaseScope):
     user_id: uuid.UUID
     domain_name: str | None = None
 
+    @override
     def __str__(self) -> str:
         return f"User(id: {self.user_id}, domain: {self.domain_name})"
 
+    @override
     def serialize(self) -> str:
         if self.domain_name is not None:
             return f"user:{self.user_id}:{self.domain_name}"
         return f"user:{self.user_id}"
 
     @classmethod
+    @override
     def deserialize(cls, val: str) -> Self:
         type_, _, values = val.partition(":")
         if type_ != "user":
@@ -438,9 +451,11 @@ class ScalingGroup(ExtraScope):
 class ContainerRegistryScope(ExtraScope):
     registry_id: uuid.UUID
 
+    @override
     def __str__(self) -> str:
         return f"container_registry:{self.registry_id!s}"
 
+    @override
     def __repr__(self) -> str:
         return self.__str__()
 

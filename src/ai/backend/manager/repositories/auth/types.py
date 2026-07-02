@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
+from typing import override
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -21,6 +22,7 @@ class MyLoginSessionSearchScope(SearchScope):
 
     user_id: UUID
 
+    @override
     def to_condition(self) -> QueryCondition:
         user_id = self.user_id
 
@@ -30,6 +32,7 @@ class MyLoginSessionSearchScope(SearchScope):
         return inner
 
     @property
+    @override
     def existence_checks(self) -> Sequence[ExistenceCheck[UUID]]:
         return [
             ExistenceCheck(
@@ -46,6 +49,7 @@ class MyLoginHistorySearchScope(SearchScope):
 
     user_id: UUID
 
+    @override
     def to_condition(self) -> QueryCondition:
         user_id = self.user_id
 
@@ -55,6 +59,7 @@ class MyLoginHistorySearchScope(SearchScope):
         return inner
 
     @property
+    @override
     def existence_checks(self) -> Sequence[ExistenceCheck[UUID]]:
         return [
             ExistenceCheck(

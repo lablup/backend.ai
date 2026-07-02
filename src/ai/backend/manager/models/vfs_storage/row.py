@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import uuid
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, override
 
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
@@ -58,6 +58,7 @@ class VFSStorageRow(Base):  # type: ignore[misc]
         )
     )
 
+    @override
     def __str__(self) -> str:
         return (
             f"VFSStorageRow("
@@ -67,6 +68,7 @@ class VFSStorageRow(Base):  # type: ignore[misc]
             f"base_path={self.base_path})"
         )
 
+    @override
     def __repr__(self) -> str:
         return self.__str__()
 

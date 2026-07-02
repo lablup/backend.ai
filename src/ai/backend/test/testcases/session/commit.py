@@ -1,4 +1,5 @@
 import asyncio
+from typing import override
 
 from ai.backend.common.bgtask.types import BgtaskStatus
 from ai.backend.test.contexts.client_session import ClientSessionContext
@@ -9,6 +10,7 @@ from ai.backend.test.templates.template import TestCode
 
 
 class InteractiveSessionImagifySuccess(TestCode):
+    @override
     async def test(self) -> None:
         client_session = ClientSessionContext.current()
         session_meta = CreatedSessionMetaContext.current()
@@ -36,6 +38,7 @@ class InteractiveSessionImagifySuccess(TestCode):
 
 
 class InteractiveSessionCommitSuccess(TestCode):
+    @override
     async def test(self) -> None:
         client_session = ClientSessionContext.current()
         session_meta = CreatedSessionMetaContext.current()
