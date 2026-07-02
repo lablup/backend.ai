@@ -3456,5 +3456,7 @@ graphene_schema = graphene_federation.build_schema(
     query=Query,
     mutation=Mutation,
     auto_camelcase=False,
-    federation_version=graphene_federation.LATEST_VERSION,
+    # Pin the federation version so the emitted subgraph SDL (and thus the composed
+    # supergraph) stays stable; LATEST_VERSION floats as graphene_federation upgrades.
+    federation_version=graphene_federation.FederationVersion.VERSION_2_7,
 )
