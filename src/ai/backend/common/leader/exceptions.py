@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import override
+
 from ai.backend.common.exception import (
     BackendAIError,
     ErrorCode,
@@ -17,6 +19,7 @@ class LeaderElectionError(BackendAIError):
     error_type = "https://api.backend.ai/probs/leader-election-error"
     error_title = "Leader Election Error"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.LEADER_ELECTION,
@@ -31,6 +34,7 @@ class AlreadyStartedError(LeaderElectionError):
     error_type = "https://api.backend.ai/probs/leader-already-started"
     error_title = "Leader Election Already Started"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.LEADER_ELECTION,

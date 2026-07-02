@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncGenerator
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, override
 from uuid import UUID
 
 import pytest
@@ -237,6 +237,7 @@ class SimpleBatchPurgerSpec(BatchPurgerSpec[Base]):
         self._row_class = row_class
         self._conditions = conditions or []
 
+    @override
     def build_subquery(self) -> sa.sql.Select[tuple[Base]]:
         query = sa.select(self._row_class)
         for cond in self._conditions:
@@ -536,6 +537,7 @@ class ORMBatchPurgerSpec(BatchPurgerSpec[Base]):
         self._row_class = row_class
         self._conditions = conditions or []
 
+    @override
     def build_subquery(self) -> sa.sql.Select[tuple[Base]]:
         query = sa.select(self._row_class)
         for cond in self._conditions:
@@ -648,6 +650,7 @@ class CompositePKBatchPurgerSpec(BatchPurgerSpec[BatchPurgerCompositePKRow]):
     ) -> None:
         self._conditions = conditions or []
 
+    @override
     def build_subquery(self) -> sa.sql.Select[tuple[BatchPurgerCompositePKRow]]:
         query = sa.select(BatchPurgerCompositePKRow)
         for cond in self._conditions:

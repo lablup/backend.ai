@@ -452,6 +452,7 @@ class ScalingGroupModel(RBACModel[ScalingGroupPermission]):
     _permissions: frozenset[ScalingGroupPermission] = field(default_factory=frozenset)
 
     @property
+    @override
     def permissions(self) -> Container[ScalingGroupPermission]:
         return self._permissions
 
@@ -623,12 +624,14 @@ class ScalingGroupPermissionContext(AbstractPermissionContext[ScalingGroupPermis
             )
         return cond
 
+    @override
     async def build_query(self) -> sa.sql.Select[Any] | None:
         cond = self.query_condition
         if cond is None:
             return None
         return sa.select(ScalingGroupRow).where(cond)
 
+    @override
     async def calculate_final_permission(self, rbac_obj: str) -> frozenset[ScalingGroupPermission]:
         host_name = rbac_obj
         return self.object_id_to_additional_permission_map.get(host_name, frozenset())

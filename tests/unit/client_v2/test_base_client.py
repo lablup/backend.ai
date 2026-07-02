@@ -1,5 +1,6 @@
 from collections.abc import AsyncIterator, Mapping
 from datetime import datetime
+from typing import override
 from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 
 import aiohttp
@@ -62,6 +63,7 @@ class _RecordingAuth(MockAuth):
     def __init__(self) -> None:
         self.signed_rel_urls: list[str] = []
 
+    @override
     def sign(
         self,
         method: str,

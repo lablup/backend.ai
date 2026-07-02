@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncGenerator, Callable, Sequence
 from contextlib import asynccontextmanager
-from typing import Any, Protocol, cast
+from typing import Any, Protocol, cast, override
 
 from sqlalchemy import Table, text
 from sqlalchemy.ext.asyncio import AsyncEngine
@@ -37,6 +37,7 @@ def _make_subset_schema_generator(table_names: frozenset[str]) -> type[SchemaGen
     """
 
     class _SubsetSchemaGenerator(SchemaGenerator):
+        @override
         def visit_foreign_key_constraint(self, constraint: ForeignKeyConstraint) -> None:
             elements = constraint.elements
             if elements:

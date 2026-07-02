@@ -2,6 +2,7 @@
 
 import logging
 from collections.abc import Sequence
+from typing import override
 
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.logging import BraceStyleAdapter
@@ -35,20 +36,24 @@ class HealthCheckRouteHandler(RouteHandler):
         self._event_producer = event_producer
 
     @classmethod
+    @override
     def name(cls) -> str:
         """Get the name of the handler."""
         return "health-check-routes"
 
     @property
+    @override
     def lock_id(self) -> LockID | None:
         """Lock for health check routes."""
         return LockID.LOCKID_DEPLOYMENT_HEALTH_CHECK_ROUTES
 
     @classmethod
+    @override
     def category(cls) -> RouteHandlerCategory:
         return RouteHandlerCategory.HEALTH
 
     @classmethod
+    @override
     def target_statuses(cls) -> RouteTargetStatuses:
         return RouteTargetStatuses(
             lifecycle=[RouteStatus.RUNNING],
@@ -61,6 +66,7 @@ class HealthCheckRouteHandler(RouteHandler):
         )
 
     @classmethod
+    @override
     def status_transitions(cls) -> RouteStatusTransitions:
         """Health check only changes health_status, not lifecycle status."""
         return RouteStatusTransitions(
@@ -69,6 +75,7 @@ class HealthCheckRouteHandler(RouteHandler):
             stale=RouteTransitionTarget(health_status=RouteHealthStatus.DEGRADED),
         )
 
+    @override
     async def execute(self, routes: Sequence[RouteData]) -> RouteExecutionResult:
         """Execute health check for routes."""
         log.debug("Checking health for {} routes", len(routes))
@@ -76,6 +83,7 @@ class HealthCheckRouteHandler(RouteHandler):
         # Execute route health check logic via executor
         return await self._route_executor.check_route_health(routes)
 
+    @override
     async def post_process(self, result: RouteExecutionResult) -> None:
         """Log health-check results.
 

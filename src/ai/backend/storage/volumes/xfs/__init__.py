@@ -4,7 +4,7 @@ import os
 from collections.abc import Mapping
 from pathlib import Path
 from tempfile import NamedTemporaryFile
-from typing import Any
+from typing import Any, override
 
 import aiofiles
 import aiofiles.os
@@ -158,6 +158,7 @@ class XFSProjectQuotaModel(BaseQuotaModel):
         self.block_size = stat_vfs.f_bsize
         self._lock_path = lock_path
 
+    @override
     async def create_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
@@ -189,6 +190,7 @@ class XFSProjectQuotaModel(BaseQuotaModel):
         if options is not None:
             await self.update_quota_scope(quota_scope_id, options)
 
+    @override
     async def describe_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
@@ -224,6 +226,7 @@ class XFSProjectQuotaModel(BaseQuotaModel):
             )
         return QuotaUsage(used_bytes, hard_limit_bytes)
 
+    @override
     async def update_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
@@ -257,11 +260,13 @@ class XFSProjectQuotaModel(BaseQuotaModel):
             ],
         )
 
+    @override
     async def unset_quota(self, quota_scope_id: QuotaScopeID) -> None:
         raise InvalidQuotaScopeError(
             "Unsetting folder limit without removing quota scope is not possible for this backend"
         )
 
+    @override
     async def delete_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
@@ -325,11 +330,13 @@ class XfsVolume(BaseVolume):
                 f"Cannot create XFS backend lock file at {self._lock_path}"
             ) from e
 
+    @override
     async def init(self) -> None:
         self.project_registry = XfsProjectRegistry()
         await self.project_registry.init(self)
         await super().init()
 
+    @override
     async def create_quota_model(self) -> AbstractQuotaModel:
         return XFSProjectQuotaModel(
             self.mount_path,
@@ -337,5 +344,6 @@ class XfsVolume(BaseVolume):
             self._lock_path,
         )
 
+    @override
     async def get_capabilities(self) -> frozenset[str]:
         return frozenset([CAP_VFOLDER, CAP_QUOTA])

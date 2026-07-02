@@ -9,7 +9,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Callable, Iterator
 from datetime import UTC, datetime
-from typing import cast
+from typing import cast, override
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -635,6 +635,7 @@ class TestCreateAccessToken(DeploymentServiceBaseFixtures):
         return mock_deployment_repository
 
     @pytest.fixture
+    @override
     def mock_appproxy_client_pool(self, sample_coordinator_jwt: str) -> MagicMock:
         client = MagicMock(spec=AppProxyClient)
         client.mint_endpoint_token = AsyncMock(
@@ -645,6 +646,7 @@ class TestCreateAccessToken(DeploymentServiceBaseFixtures):
         return pool
 
     @pytest.fixture
+    @override
     def deployment_service(
         self,
         mock_deployment_controller: MagicMock,

@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Iterable
 from datetime import datetime
-from typing import Any, Self, cast
+from typing import Any, Self, cast, override
 
 import strawberry
 from strawberry import ID, UNSET, Info
@@ -747,6 +747,7 @@ class ArtifactRevision(PydanticNodeMixin[ArtifactRevisionNode]):
     )
 
     @classmethod
+    @override
     async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
         cls,
         *,

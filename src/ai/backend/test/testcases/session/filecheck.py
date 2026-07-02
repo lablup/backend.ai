@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import override
 
 from ai.backend.common.json import load_json
 from ai.backend.test.contexts.client_session import ClientSessionContext
@@ -15,6 +16,7 @@ class FileExistenceCheck(TestCode):
         self._path = path
         self._checklist = checklist
 
+    @override
     async def test(self) -> None:
         client_session = ClientSessionContext.current()
         session_meta = CreatedSessionMetaContext.current()

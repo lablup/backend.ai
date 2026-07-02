@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import uuid
 from datetime import datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, override
 
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
@@ -102,6 +102,7 @@ class ArtifactRow(Base):  # type: ignore[misc]
         primaryjoin=_get_artifact_revision_join_cond,
     )
 
+    @override
     def __str__(self) -> str:
         return (
             f"ArtifactRow("
@@ -120,6 +121,7 @@ class ArtifactRow(Base):  # type: ignore[misc]
             f"extra={self.extra})"
         )
 
+    @override
     def __repr__(self) -> str:
         return self.__str__()
 

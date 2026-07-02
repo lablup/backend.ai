@@ -5,7 +5,7 @@ import uuid
 import warnings
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
-from typing import Any, Final, Self
+from typing import Any, Final, Self, override
 
 from pydantic import Field
 
@@ -102,6 +102,7 @@ class HealthStatus(BackendAISchema):
         """
         self.last_heartbeat = time.time()
 
+    @override
     def __eq__(self, value: object) -> bool:
         if not isinstance(value, HealthStatus):
             return False

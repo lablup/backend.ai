@@ -12,6 +12,7 @@ from typing import (
     Any,
     Literal,
     TypeVar,
+    override,
 )
 
 import aiohttp
@@ -148,6 +149,7 @@ class _SyncWorkerThread(threading.Thread):
         self.stream_block = threading.Event()
         self.agen_shutdown = False
 
+    @override
     def run(self) -> None:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
@@ -444,6 +446,7 @@ class Session(BaseSession):
 
         self.aiohttp_session = self.worker_thread.execute(_create_aiohttp_session())
 
+    @override
     def open(self) -> None:
         self._context_token = api_session.set(self)
         if not self._proxy_mode:
@@ -451,6 +454,7 @@ class Session(BaseSession):
                 _negotiate_api_version(self.aiohttp_session, self.config)
             )
 
+    @override
     def close(self) -> None:
         """
         Terminates the session.  It schedules the ``close()`` coroutine
@@ -475,6 +479,7 @@ class Session(BaseSession):
         """
         return self._worker_thread
 
+    @override
     def __enter__(self) -> Session:
         if self.closed:
             raise RuntimeError("Cannot reuse closed session")
@@ -489,6 +494,7 @@ class Session(BaseSession):
                 pass
         return self
 
+    @override
     def __exit__(self, *exc_info: Any) -> Literal[False]:
         self.close()
         return False  # raise up the inner exception
@@ -535,6 +541,7 @@ class AsyncSession(BaseSession):
         if not self._proxy_mode:
             self.api_version = await _negotiate_api_version(self.aiohttp_session, self.config)
 
+    @override
     def open(self) -> Awaitable[None]:
         return self._aopen()
 
@@ -546,9 +553,11 @@ class AsyncSession(BaseSession):
             await _close_aiohttp_session(self.aiohttp_session)
         api_session.reset(self._context_token)
 
+    @override
     def close(self) -> Awaitable[None]:
         return self._aclose()
 
+    @override
     async def __aenter__(self) -> AsyncSession:
         if self.closed:
             raise RuntimeError("Cannot reuse closed session")
@@ -563,6 +572,7 @@ class AsyncSession(BaseSession):
                 pass
         return self
 
+    @override
     async def __aexit__(self, *exc_info: Any) -> Literal[False]:
         await self.close()
         return False  # raise up the inner exception

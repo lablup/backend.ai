@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
+from typing import override
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -46,6 +47,7 @@ class DomainProjectSearchScope(SearchScope):
     domain_name: str
     """Required. The domain to search within."""
 
+    @override
     def to_condition(self) -> QueryCondition:
         """Convert scope to a query condition for GroupRow."""
         domain_name = self.domain_name
@@ -56,6 +58,7 @@ class DomainProjectSearchScope(SearchScope):
         return inner
 
     @property
+    @override
     def existence_checks(self) -> Sequence[ExistenceCheck[str]]:
         """Return existence checks for scope validation."""
         return [
@@ -79,6 +82,7 @@ class UserProjectSearchScope(SearchScope):
     user_uuid: UUID
     """Required. The user UUID to search projects for."""
 
+    @override
     def to_condition(self) -> QueryCondition:
         """Convert scope to a query condition on AssociationScopesEntitiesRow.
 
@@ -99,6 +103,7 @@ class UserProjectSearchScope(SearchScope):
         return inner
 
     @property
+    @override
     def existence_checks(self) -> Sequence[ExistenceCheck[UUID]]:
         """Return existence checks for scope validation.
 

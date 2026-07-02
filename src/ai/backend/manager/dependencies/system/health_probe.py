@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
+from typing import override
 
 from ai.backend.common.dependencies import DependencyProvider
 from ai.backend.common.etcd import AsyncEtcd
@@ -39,10 +40,12 @@ class HealthProbeDependency(DependencyProvider[HealthProbeInput, HealthProbe]):
     """Provides HealthProbe with health checker registration and lifecycle management."""
 
     @property
+    @override
     def stage_name(self) -> str:
         return "health-probe"
 
     @asynccontextmanager
+    @override
     async def provide(self, setup_input: HealthProbeInput) -> AsyncIterator[HealthProbe]:
         probe = HealthProbe(options=HealthProbeOptions(check_interval=60))
 

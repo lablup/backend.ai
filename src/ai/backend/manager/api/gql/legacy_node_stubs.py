@@ -15,6 +15,7 @@ legacy Node types that have no V2 cross-reference but are still reachable via ``
 from __future__ import annotations
 
 from collections.abc import Iterable
+from typing import override
 
 from strawberry import ID, Info, relay
 
@@ -36,6 +37,7 @@ class AgentNodeStub(relay.Node):
     id: relay.NodeID[str]
 
     @classmethod
+    @override
     def resolve_nodes(
         cls, *, info: Info, node_ids: Iterable[str], required: bool = False
     ) -> list[AgentNodeStub]:
@@ -59,6 +61,7 @@ class NetworkNodeStub(relay.Node):
     id: relay.NodeID[str]
 
     @classmethod
+    @override
     def resolve_nodes(
         cls, *, info: Info, node_ids: Iterable[str], required: bool = False
     ) -> list[NetworkNodeStub]:
@@ -82,6 +85,7 @@ class ModelCardStub(relay.Node):
     id: relay.NodeID[str]
 
     @classmethod
+    @override
     def resolve_nodes(
         cls, *, info: Info, node_ids: Iterable[str], required: bool = False
     ) -> list[ModelCardStub]:
@@ -105,6 +109,7 @@ class ContainerRegistryNodeStub(relay.Node):
     id: relay.NodeID[str]
 
     @classmethod
+    @override
     def resolve_nodes(
         cls, *, info: Info, node_ids: Iterable[str], required: bool = False
     ) -> list[ContainerRegistryNodeStub]:

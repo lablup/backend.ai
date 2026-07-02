@@ -5,6 +5,8 @@ This allocator delegates allocation operations to the schedule repository
 to ensure transactional consistency.
 """
 
+from typing import override
+
 from ai.backend.common.types import SessionId
 from ai.backend.manager.data.sokovan import AllocationBatch
 from ai.backend.manager.repositories.scheduler import SchedulerRepository
@@ -22,12 +24,14 @@ class RepositoryAllocator(SchedulingAllocator):
 
     _repository: SchedulerRepository
 
+    @override
     def name(self) -> str:
         """
         Return the allocator name for predicates.
         """
         return "RepositoryAllocator"
 
+    @override
     def success_message(self) -> str:
         """
         Return a message describing successful allocation.
@@ -43,6 +47,7 @@ class RepositoryAllocator(SchedulingAllocator):
         """
         self._repository = schedule_repository
 
+    @override
     async def allocate(self, batch: AllocationBatch) -> list[SessionId]:
         """
         Reserve and assign the batch's sessions to agents by delegating to the

@@ -39,6 +39,7 @@ class LoaderChain(AbstractConfigLoader):
         return merged
 
     @property
+    @override
     def source_name(self) -> str:
         names = [loader.source_name for loader in self._loaders]
         return f"chain:[{', '.join(names)}]"

@@ -4,7 +4,7 @@ import asyncio
 import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from typing import ParamSpec, TypeVar
+from typing import ParamSpec, TypeVar, override
 
 from ai.backend.common.exception import (
     BackendAIError,
@@ -28,6 +28,7 @@ class ResilienceTimeoutError(BackendAIError):
     error_type = "https://api.backend.ai/probs/resilience-timeout"
     error_title = "Resilience timeout exceeded."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.BACKENDAI,
@@ -61,6 +62,7 @@ class TimeoutPolicy(Policy):
         """
         self._timeout = args.timeout
 
+    @override
     async def execute(
         self,
         next_call: Callable[P, Awaitable[R]],

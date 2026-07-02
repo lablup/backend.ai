@@ -36,6 +36,7 @@ class BaseSessionEvent(AbstractBroadcastEvent):
 class DoTerminateSessionEvent(BaseSessionEvent):
     reason: KernelLifecycleEventReason
 
+    @override
     def serialize(self) -> tuple[Any, ...]:
         return (
             str(self.session_id),
@@ -152,6 +153,7 @@ class SessionResultEvent(BaseSessionEvent):
     reason: KernelLifecycleEventReason = KernelLifecycleEventReason.UNKNOWN
     exit_code: int = -1
 
+    @override
     def serialize(self) -> tuple[Any, ...]:
         return (
             str(self.session_id),
@@ -160,6 +162,7 @@ class SessionResultEvent(BaseSessionEvent):
         )
 
     @classmethod
+    @override
     def deserialize(cls, value: tuple[Any, ...]) -> Self:
         return cls(
             SessionId(uuid.UUID(value[0])),

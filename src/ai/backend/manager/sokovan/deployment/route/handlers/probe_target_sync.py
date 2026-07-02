@@ -2,6 +2,7 @@
 
 import logging
 from collections.abc import Sequence
+from typing import override
 
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import (
@@ -37,18 +38,22 @@ class ReplicaProbeTargetSyncHandler(RouteHandler):
         self._route_executor = route_executor
 
     @classmethod
+    @override
     def name(cls) -> str:
         return "replica-probe-target-sync"
 
     @property
+    @override
     def lock_id(self) -> LockID | None:
         return None
 
     @classmethod
+    @override
     def category(cls) -> RouteHandlerCategory:
         return RouteHandlerCategory.SYNC
 
     @classmethod
+    @override
     def target_statuses(cls) -> RouteTargetStatuses:
         return RouteTargetStatuses(
             lifecycle=[RouteStatus.RUNNING],
@@ -60,6 +65,7 @@ class ReplicaProbeTargetSyncHandler(RouteHandler):
         )
 
     @classmethod
+    @override
     def status_transitions(cls) -> RouteStatusTransitions:
         return RouteStatusTransitions(
             success=None,
@@ -67,10 +73,12 @@ class ReplicaProbeTargetSyncHandler(RouteHandler):
             stale=None,
         )
 
+    @override
     async def execute(self, routes: Sequence[RouteData]) -> RouteExecutionResult:
         """Sync probe targets for routes that have health_check and replica info."""
         return await self._route_executor.sync_route_probe_targets(routes)
 
+    @override
     async def post_process(self, result: RouteExecutionResult) -> None:
         if result.errors:
             log.warning(

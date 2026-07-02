@@ -18,6 +18,7 @@ class _UserInfo:
 
 class AddGroupToKeypairTemplate(WrapperTestTemplate):
     @property
+    @override
     def name(self) -> str:
         return "add_group"
 

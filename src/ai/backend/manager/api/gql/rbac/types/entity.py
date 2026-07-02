@@ -6,7 +6,7 @@ import uuid
 from collections.abc import Iterable
 from datetime import datetime
 from enum import StrEnum
-from typing import Any, Self, cast
+from typing import Any, Self, cast, override
 
 from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
@@ -128,6 +128,7 @@ class EntityRefGQL(PydanticNodeMixin[AssociationScopesEntitiesNode]):
         return await _load_rbac_element(info, element_type, self.scope_id)
 
     @classmethod
+    @override
     async def resolve_nodes(  # type: ignore[override]
         cls,
         *,

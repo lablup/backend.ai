@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Final
+from typing import Final, override
 
 from ai.backend.common.cron.base import Cron, PeriodicTask
 from ai.backend.logging import BraceStyleAdapter
@@ -54,6 +54,7 @@ class LocalCron(Cron):
             log.debug("Task {} cancelled", task.name)
             raise
 
+    @override
     async def start(self) -> None:
         """Start the local cron."""
         self._stopped = False
@@ -62,6 +63,7 @@ class LocalCron(Cron):
             runner.set_name(f"local-cron-task-{task.name}")
             self._task_runners.append(runner)
 
+    @override
     async def stop(self) -> None:
         """Stop the local cron and cancel all of its task runners."""
         self._stopped = True

@@ -18,6 +18,7 @@ class AppProxyCircuitEvent(AbstractBroadcastEvent):
     target_worker_authority: str
     circuits: list[Circuit]
 
+    @override
     def serialize(self) -> tuple[Any, ...]:
         return (
             self.target_worker_authority,
@@ -25,6 +26,7 @@ class AppProxyCircuitEvent(AbstractBroadcastEvent):
         )
 
     @classmethod
+    @override
     def deserialize(cls, value: tuple[Any, ...]) -> Self:
         return cls(
             target_worker_authority=value[0],
@@ -51,6 +53,7 @@ class AppProxyCircuitRouteUpdatedEvent(AbstractBroadcastEvent):
     circuit: Circuit
     routes: list[RouteInfo]
 
+    @override
     def serialize(self) -> tuple[Any, ...]:
         return (
             self.target_worker_authority,
@@ -59,6 +62,7 @@ class AppProxyCircuitRouteUpdatedEvent(AbstractBroadcastEvent):
         )
 
     @classmethod
+    @override
     def deserialize(cls, value: tuple[Any, ...]) -> Self:
         return cls(
             target_worker_authority=value[0],
@@ -90,6 +94,7 @@ class GenericWorkerEvent(AbstractAnycastEvent):
     worker_id: str
     reason: str
 
+    @override
     def serialize(self) -> tuple[Any, ...]:
         return (
             self.worker_id,
@@ -97,6 +102,7 @@ class GenericWorkerEvent(AbstractAnycastEvent):
         )
 
     @classmethod
+    @override
     def deserialize(cls, value: tuple[Any, ...]) -> Self:
         return cls(value[0], value[1])
 
@@ -150,11 +156,13 @@ class WorkerTerminatedEvent(GenericWorkerEvent):
 
 
 class DoCheckWorkerLostEvent(AbstractAnycastEvent):
+    @override
     def serialize(self) -> tuple[Any, ...]:
         return tuple()
 
     @classmethod
-    def deserialize(cls, value: tuple[Any, ...]) -> Self:  # noqa: ARG003
+    @override
+    def deserialize(cls, value: tuple[Any, ...]) -> Self:
         return cls()
 
     @classmethod
@@ -177,11 +185,13 @@ class DoCheckWorkerLostEvent(AbstractAnycastEvent):
 
 
 class DoCheckUnusedPortEvent(AbstractAnycastEvent):
+    @override
     def serialize(self) -> tuple[Any, ...]:
         return tuple()
 
     @classmethod
-    def deserialize(cls, value: tuple[Any, ...]) -> Self:  # noqa: ARG003
+    @override
+    def deserialize(cls, value: tuple[Any, ...]) -> Self:
         return cls()
 
     @classmethod
@@ -211,11 +221,13 @@ class DoReconcileTraefikRoutesEvent(AbstractAnycastEvent):
     source of truth.
     """
 
+    @override
     def serialize(self) -> tuple[Any, ...]:
         return tuple()
 
     @classmethod
-    def deserialize(cls, value: tuple[Any, ...]) -> Self:  # noqa: ARG003
+    @override
+    def deserialize(cls, value: tuple[Any, ...]) -> Self:
         return cls()
 
     @classmethod

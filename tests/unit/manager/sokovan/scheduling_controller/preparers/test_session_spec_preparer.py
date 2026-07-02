@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Callable
+from typing import override
 
 import pytest
 
@@ -69,9 +70,11 @@ class _TransformRule(SessionSpecDraftRule):
         self._log = log
         self._transform = transform
 
+    @override
     def name(self) -> str:
         return self._tag
 
+    @override
     async def prepare(
         self,
         draft: SessionSpecDraft,

@@ -4,6 +4,7 @@ import asyncio
 from collections.abc import Sequence
 from datetime import UTC, datetime
 from http import HTTPMethod
+from typing import override
 
 import aiohttp
 
@@ -60,10 +61,12 @@ class HttpHealthChecker(StaticServiceHealthChecker):
         self._method = method
 
     @property
+    @override
     def target_service_group(self) -> ServiceGroup:
         """The service group this checker monitors."""
         return API
 
+    @override
     async def check_service(self) -> ServiceHealth:
         """
         Check HTTP endpoint health by performing an HTTP request.
@@ -110,6 +113,7 @@ class HttpHealthChecker(StaticServiceHealthChecker):
         return ServiceHealth(results={self._component_id: status})
 
     @property
+    @override
     def timeout(self) -> float:
         """The timeout for the health check in seconds."""
         return self._timeout

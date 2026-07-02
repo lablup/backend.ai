@@ -1555,12 +1555,14 @@ class VFolderPermissionContext(
     def apply_host_permission_ctx(self, host_permission_ctx: StorageHostPermissionContext) -> None:
         self.host_permission_ctx = host_permission_ctx
 
+    @override
     async def build_query(self) -> sa.sql.Select[Any] | None:
         cond = self.query_condition
         if cond is None:
             return None
         return sa.select(VFolderRow).where(cond)
 
+    @override
     async def calculate_final_permission(
         self, rbac_obj: VFolderRow
     ) -> frozenset[VFolderRBACPermission]:

@@ -12,7 +12,7 @@ import uuid as _uuid
 from collections.abc import Iterable
 from decimal import Decimal
 from enum import StrEnum
-from typing import Any, Self
+from typing import Any, Self, override
 
 from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
@@ -155,6 +155,7 @@ class ResourceSlotTypeGQL(PydanticNodeMixin[Any]):
     rank: int = gql_field(description="Display ordering rank. Lower values appear first.")
 
     @classmethod
+    @override
     async def resolve_nodes(  # type: ignore[override]
         cls,
         *,
@@ -266,6 +267,7 @@ class AgentResourceSlotGQL(PydanticNodeMixin[AgentResourceNodeDTO]):
     )
 
     @classmethod
+    @override
     async def resolve_nodes(  # type: ignore[override]
         cls,
         *,
@@ -378,6 +380,7 @@ class KernelResourceAllocationGQL(PydanticNodeMixin[Any]):
     )
 
     @classmethod
+    @override
     async def resolve_nodes(  # type: ignore[override]
         cls,
         *,

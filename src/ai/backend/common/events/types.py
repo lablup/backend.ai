@@ -132,6 +132,7 @@ class AbstractBroadcastEvent(AbstractEvent):
 
     _register_dict: dict[str, type["AbstractBroadcastEvent"]] = {}
 
+    @override
     def __init_subclass__(cls) -> None:
         try:
             name = cls.event_name()

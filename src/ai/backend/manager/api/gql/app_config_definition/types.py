@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from datetime import datetime
 from enum import StrEnum
-from typing import Any, Self, cast
+from typing import Any, Self, cast, override
 from uuid import UUID
 
 from strawberry import Info
@@ -84,6 +84,7 @@ class AppConfigDefinitionGQL(PydanticNodeMixin[AppConfigDefinitionNode]):
     updated_at: datetime = gql_field(description="Last update timestamp (UTC).")
 
     @classmethod
+    @override
     async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
         cls,
         *,

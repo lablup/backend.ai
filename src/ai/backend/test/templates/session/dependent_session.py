@@ -22,6 +22,7 @@ from ai.backend.test.templates.template import WrapperTestTemplate
 
 class DependentSessionTemplate(WrapperTestTemplate):
     @property
+    @override
     def name(self) -> str:
         return "dependent_session"
 

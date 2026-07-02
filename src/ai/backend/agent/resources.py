@@ -25,6 +25,7 @@ from typing import (
     Self,
     TextIO,
     cast,
+    override,
 )
 
 import aiodocker
@@ -331,9 +332,11 @@ class AbstractComputeDevice:
             return self._device_name
         return DeviceName(self.__class__.__name__.removesuffix("Device").lower())
 
+    @override
     def __hash__(self) -> int:
         return hash(f"{self.device_name}-{self.device_id}")
 
+    @override
     def __eq__(self, __o: object) -> bool:
         return hash(self) == hash(__o)
 
@@ -542,6 +545,7 @@ class ResourceAllocator(aobject):
         self.etcd = etcd
         self.agent_configs = local_config.get_agent_configs()
 
+    @override
     async def __ainit__(self) -> None:
         alloc_map_mod.log_alloc_map = self.local_config.debug.log_alloc_map
         computers = await self._load_resources()
@@ -818,6 +822,7 @@ class ComputePluginContext(BasePluginContext[AbstractComputePlugin]):
     plugin_group = "backendai_accelerator_v21"
 
     @classmethod
+    @override
     def discover_plugins(
         cls,
         plugin_group: str,
@@ -847,6 +852,7 @@ class Mount:
     permission: MountPermission = MountPermission.READ_ONLY
     opts: Mapping[str, Any] | None = None
 
+    @override
     def __str__(self) -> str:
         return f"{self.source}:{self.target}:{self.permission.value}"
 

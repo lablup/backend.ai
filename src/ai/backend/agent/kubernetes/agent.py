@@ -885,6 +885,7 @@ class KubernetesAgent(
             )
         )
 
+    @override
     async def __ainit__(self) -> None:
         await super().__ainit__()
         ipc_base_path = self.local_config.agent.ipc_base_path
@@ -996,6 +997,7 @@ class KubernetesAgent(
                 if addr.type == "ExternalIP":
                     self.workers[node.metadata.name]["ExternalIP"] = addr.address
 
+    @override
     async def shutdown(self, stop_signal: signal.Signals) -> None:
         # Stop agent socket handler task
 

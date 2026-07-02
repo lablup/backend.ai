@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from typing import override
 
 from ai.backend.manager.notification.notification_center import NotificationCenter
 
@@ -16,10 +17,12 @@ class NotificationCenterDependency(DomainDependency[None, NotificationCenter]):
     """
 
     @property
+    @override
     def stage_name(self) -> str:
         return "notification-center"
 
     @asynccontextmanager
+    @override
     async def provide(self, setup_input: None) -> AsyncIterator[NotificationCenter]:
         """Initialize and provide a NotificationCenter.
 

@@ -7,7 +7,7 @@ import logging
 from collections.abc import Mapping
 from io import IOBase
 from pathlib import Path
-from typing import Any, ClassVar
+from typing import Any, ClassVar, override
 
 import trafaret as t
 from etcd_client import Client as EtcdClient
@@ -131,10 +131,12 @@ class FileLock(AbstractDistributedLock):
                 pass
         self._file = None
 
+    @override
     async def __aenter__(self) -> FileLock:
         await self.acquire()
         return self
 
+    @override
     async def __aexit__(self, *exc_info: Any) -> bool | None:
         self.release()
         return None
@@ -180,6 +182,7 @@ class EtcdLock(AbstractDistributedLock):
         self._debug = debug
         self._etcd_client = None
 
+    @override
     async def __aenter__(self) -> EtcdCommunicator:
         self._etcd_client = self.etcd.etcd.with_lock(
             EtcdLockOption(
@@ -196,6 +199,7 @@ class EtcdLock(AbstractDistributedLock):
 
         return etcd_communicator
 
+    @override
     async def __aexit__(self, *exc_info: Any) -> bool | None:
         if self._etcd_client is None:
             raise RuntimeError("Etcd client is not initialized")
@@ -245,6 +249,7 @@ class RedisLock(AbstractDistributedLock):
             else self.default_lock_retry_interval
         )
 
+    @override
     async def __aenter__(self) -> None:
         self._lock = AsyncRedisLock(
             self._redis,
@@ -261,6 +266,7 @@ class RedisLock(AbstractDistributedLock):
         if self._debug:
             log.debug("RedisLock.__aenter__(): lock acquired")
 
+    @override
     async def __aexit__(self, *exc_info: Any) -> bool | None:
         if self._lock is None:
             raise RuntimeError("Lock is not initialized")

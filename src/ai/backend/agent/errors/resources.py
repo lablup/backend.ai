@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from decimal import Decimal
-from typing import Any
+from typing import Any, override
 
 from aiohttp import web
 
@@ -26,6 +26,7 @@ class ResourceError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/agent/resource-error"
     error_title = "Resource error."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,
@@ -85,6 +86,7 @@ class InsufficientResource(ResourceError):
         self.context_tag = context_tag
         super().__init__(extra_msg=str(self))
 
+    @override
     def __str__(self) -> str:
         return (
             f"InsufficientResource: {self.msg} ({self.slot_name}"
@@ -92,6 +94,7 @@ class InsufficientResource(ResourceError):
             + f"allocating {self.requested_alloc} out of {self.total_allocatable})"
         )
 
+    @override
     def __reduce__(self) -> tuple[type[BackendAIError], tuple[Any, ...], dict[str, Any]]:
         return (
             self.__class__,
@@ -128,6 +131,7 @@ class FractionalResourceFragmented(ResourceError):
         self.context_tag = context_tag
         super().__init__(extra_msg=str(self))
 
+    @override
     def __str__(self) -> str:
         return (
             f"FractionalResourceFragmented: {self.msg} ({self.slot_name}"
@@ -135,6 +139,7 @@ class FractionalResourceFragmented(ResourceError):
             + f"allocating {self.requested_alloc} from {self.dev_allocs})"
         )
 
+    @override
     def __reduce__(self) -> tuple[type[BackendAIError], tuple[Any, ...], dict[str, Any]]:
         return (
             self.__class__,
@@ -155,6 +160,7 @@ class InvalidResourceConfigError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/agent/invalid-resource-config"
     error_title = "Invalid resource configuration."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,
@@ -169,6 +175,7 @@ class AgentIdNotFoundError(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/agent/agent-id-not-found"
     error_title = "Agent ID not found."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,
@@ -183,6 +190,7 @@ class ResourceOverAllocatedError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/agent/resource-over-allocated"
     error_title = "Resources are over-allocated."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,
@@ -197,6 +205,7 @@ class ResourceAllocationError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/agent/resource-allocation-error"
     error_title = "Resource allocation error."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,
@@ -211,6 +220,7 @@ class InvalidOvercommitFactorError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/agent/invalid-overcommit-factor"
     error_title = "Invalid overcommit factor."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,
@@ -225,6 +235,7 @@ class InvalidAllocMapTypeError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/agent/invalid-alloc-map-type"
     error_title = "Invalid allocation map type."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,
@@ -239,6 +250,7 @@ class InvalidMeasurementError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/agent/invalid-measurement"
     error_title = "Invalid measurement data."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,
@@ -253,6 +265,7 @@ class InvalidConfigFormatError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/agent/invalid-config-format"
     error_title = "Invalid configuration format."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,
@@ -267,6 +280,7 @@ class InvalidContainerMeasurementError(BackendAIError, web.HTTPInternalServerErr
     error_type = "https://api.backend.ai/probs/agent/invalid-container-measurement"
     error_title = "Invalid container measurement type."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,
@@ -285,6 +299,7 @@ class PortPoolExhaustedError(BackendAIError, web.HTTPServiceUnavailable):
     error_type = "https://api.backend.ai/probs/agent/port-pool-exhausted"
     error_title = "Host port pool exhausted."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,

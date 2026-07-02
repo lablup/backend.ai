@@ -173,6 +173,7 @@ class VFSStorage(AbstractStorage):
             log.warning("Failed to clean temporary storage {}: {}", self._base_path, e)
 
     @property
+    @override
     def name(self) -> str:
         return self._name
 

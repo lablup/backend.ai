@@ -1,4 +1,4 @@
-from typing import Any, Self
+from typing import Any, Self, override
 
 from ai.backend.common.types import CIStrEnum
 
@@ -41,6 +41,7 @@ class ModelDeploymentStatus(CIStrEnum):
     STOPPED = "STOPPED"
 
     @classmethod
+    @override
     def _missing_(cls, value: Any) -> Self | None:
         if isinstance(value, str):
             alias = _LIFECYCLE_TO_DEPLOYMENT_STATUS_ALIASES.get(value.lower())

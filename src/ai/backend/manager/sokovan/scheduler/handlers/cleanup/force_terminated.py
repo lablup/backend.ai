@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Sequence
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, override
 
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
 from ai.backend.common.types import SessionId
@@ -41,12 +41,15 @@ class CleanupForceTerminatedHandler(CleanupHandler):
         self._valkey_schedule = valkey_schedule
 
     @classmethod
+    @override
     def name(cls) -> str:
         return "cleanup-force-terminated"
 
+    @override
     async def fetch_session_ids(self) -> Sequence[SessionId]:
         return await self._valkey_schedule.get_force_terminated_sessions()
 
+    @override
     async def execute(self, session_ids: Sequence[SessionId]) -> None:
         log.info("Processing {} force-terminated sessions for container cleanup", len(session_ids))
 

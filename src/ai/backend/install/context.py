@@ -21,7 +21,7 @@ from contextvars import ContextVar
 from datetime import datetime
 from functools import partial
 from pathlib import Path
-from typing import Any, Final
+from typing import Any, Final, override
 
 import aiofiles
 import aiotools
@@ -1855,6 +1855,7 @@ class Context(metaclass=ABCMeta):
 
 
 class DevContext(Context):
+    @override
     def hydrate_install_info(self) -> InstallInfo:
         # TODO: customize addr/user/password options
         # TODO: multi-node setup
@@ -1938,6 +1939,7 @@ class DevContext(Context):
             accelerator=self.install_variable.accelerator,
         )
 
+    @override
     def copy_config(self, template_name: str) -> Path:
         with self.resource_path("ai.backend.install.configs", template_name) as src_path:
             dst_path = Path.cwd() / template_name
@@ -1948,6 +1950,7 @@ class DevContext(Context):
                 shutil.copy(src_path, dst_path)
         return dst_path
 
+    @override
     async def check_prerequisites(self) -> None:
         await super().check_prerequisites()
         await install_git_lfs(self)
@@ -1961,6 +1964,7 @@ class DevContext(Context):
         await install_editable_webui(self)
         await self.install_halfstack()
 
+    @override
     async def _configure_mock_accelerator(self, accelerator: Accelerator) -> None:
         """
         cp "configs/accelerator/mock-accelerator.toml" mock-accelerator.toml
@@ -2026,6 +2030,7 @@ class DevContext(Context):
 
 
 class PackageContext(Context):
+    @override
     def hydrate_install_info(self) -> InstallInfo:
         # TODO: customize addr/user/password options
         # TODO: multi-node setup
@@ -2099,6 +2104,7 @@ class PackageContext(Context):
             accelerator=self.install_variable.accelerator,
         )
 
+    @override
     def copy_config(self, template_name: str) -> Path:
         with self.resource_path("ai.backend.install.configs", template_name) as src_path:
             dst_path = self.dist_info.target_path / template_name
@@ -2109,6 +2115,7 @@ class PackageContext(Context):
                 shutil.copy(src_path, dst_path)
         return dst_path
 
+    @override
     async def check_prerequisites(self) -> None:
         await super().check_prerequisites()
         if self.install_variable.with_harbor:
@@ -2275,6 +2282,7 @@ class PackageContext(Context):
         self.log_header("Installing databases (halfstack)...")
         await self.install_halfstack()
 
+    @override
     async def _configure_mock_accelerator(self, accelerator: Accelerator) -> None:
         """
         cp "configs/accelerator/mock-accelerator.toml" mock-accelerator.toml

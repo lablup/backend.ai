@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator, Collection, Sequence
 from contextlib import asynccontextmanager
+from typing import override
 
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
@@ -76,6 +77,7 @@ class RBACOpsProvider(DBOpsProvider):
     """Hands out :class:`RBACWriteOps` for the read-write surface."""
 
     @asynccontextmanager
+    @override
     async def write_ops(self) -> AsyncIterator[RBACWriteOps]:
         async with self._db.begin_session_read_committed() as sess:
             yield RBACWriteOps(sess)
