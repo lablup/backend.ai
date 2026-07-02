@@ -27,7 +27,7 @@ from ai.backend.manager.sokovan.scheduler.provisioner.selectors.concentrated imp
     ConcentratedAgentSelector,
 )
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.exceptions import (
-    ArchitectureIncompatibleError,
+    BatchAgentSelectionFailedError,
     ContainerLimitExceededError,
     InsufficientResourcesError,
     NoAgentsInResourceGroupError,
@@ -39,6 +39,9 @@ from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import 
     AgentSelector,
     KernelResourceSpec,
     SessionMetadata,
+)
+from ai.backend.manager.sokovan.scheduler.provisioner.selectors.types import (
+    ResourceRequirements,
 )
 from ai.backend.manager.sokovan.scheduler.provisioner.validators.exceptions import (
     ConcurrencyLimitExceeded,
@@ -129,17 +132,20 @@ class TestNoAvailableAgentErrorAggregationFormat:
             ConcentratedAgentSelector(agent_selection_resource_priority=["cpu", "mem"]),
         )
 
-        with pytest.raises(NoAvailableAgentError) as exc_info:
+        with pytest.raises(BatchAgentSelectionFailedError) as exc_info:
             await selector.select_agents_for_batch_requirements(
                 heterogeneous_failing_agents,
                 criteria,
                 config,
             )
+        assert len(exc_info.value.errors) == 1
+        error = exc_info.value.errors[0]
+        assert isinstance(error, NoAvailableAgentError)
 
         # Inspect the raw payload we constructed (not the aiohttp title wrapper),
         # since SchedulingFailure.msg is derived from str(e) but the format
         # contract lives in extra_msg.
-        message = exc_info.value.extra_msg or ""
+        message = error.extra_msg or ""
         lines = message.splitlines()
         assert lines[0].startswith("no available agents for kernels [")
         assert "arch=x86_64" in lines[0]
@@ -159,12 +165,14 @@ class TestNoAvailableAgentHeaderFormat:
 
     def test_header_humanizes_byte_slots(self) -> None:
         error = NoAvailableAgentError(
-            kernel_ids=[KernelId(uuid.uuid4())],
-            required_architecture="aarch64",
-            requested_slots=ResourceSlot({
-                "cpu": Decimal("1000"),
-                "mem": Decimal("1073741824"),
-            }),
+            resource_requirement=ResourceRequirements(
+                requested_slots=ResourceSlot({
+                    "cpu": Decimal("1000"),
+                    "mem": Decimal("1073741824"),
+                }),
+                required_architecture="aarch64",
+                kernel_ids=[KernelId(uuid.uuid4())],
+            ),
             agent_errors={},
         )
 
@@ -248,7 +256,7 @@ class TestDesignatedAgentFailureFormat:
             ConcentratedAgentSelector(agent_selection_resource_priority=["cpu", "mem"]),
         )
 
-        with pytest.raises(NoAvailableAgentError) as exc_info:
+        with pytest.raises(BatchAgentSelectionFailedError) as exc_info:
             await selector.select_agents_for_batch_requirements(
                 two_designated_candidates,
                 criteria,
@@ -258,8 +266,11 @@ class TestDesignatedAgentFailureFormat:
                     AgentId("designated-b"),
                 ],
             )
+        assert len(exc_info.value.errors) == 1
+        error = exc_info.value.errors[0]
+        assert isinstance(error, NoAvailableAgentError)
 
-        message = exc_info.value.extra_msg or ""
+        message = error.extra_msg or ""
         assert message.startswith("no designated agent is compatible for kernels [")
         assert "designated agent 'designated-a'" in message
         assert "designated agent 'designated-b'" in message
@@ -307,21 +318,6 @@ class TestSchedulingFailureMsgRoundTripsAsJson:
         decoded = json.loads(encoded)
         assert decoded["msg"] == original
         assert "\n" in decoded["msg"]
-
-
-class TestArchitectureMessageStaysSinglePhrase:
-    """Short single-phrase joins (', '-separated) should not be touched."""
-
-    def test_architecture_incompatible_still_uses_comma_join(self) -> None:
-        err = ArchitectureIncompatibleError(
-            agent_id=AgentId("agent-a"),
-            agent_arch="aarch64",
-            required_arch="x86_64",
-        )
-        # The message is a single phrase; ", " join (if present in upstream
-        # listings) is appropriate. The exception itself should not contain
-        # any "; " aggregator.
-        assert "; " not in (err.extra_msg or "")
 
 
 class TestContainerLimitMessageIsSinglePhrase:
@@ -385,18 +381,6 @@ class TestGoldenContainerLimitExceededError:
             max_count=10,
         )
         assert err.extra_msg == "Agent agent-b container limit exceeded: current=10, max=10"
-
-
-class TestGoldenArchitectureIncompatibleError:
-    def test_full_message(self) -> None:
-        err = ArchitectureIncompatibleError(
-            agent_id=AgentId("agent-a"),
-            agent_arch="aarch64",
-            required_arch="x86_64",
-        )
-        assert err.extra_msg == (
-            "Agent agent-a architecture 'aarch64' does not match required architecture 'x86_64'"
-        )
 
 
 class TestGoldenMultipleValidationErrors:
@@ -464,12 +448,15 @@ class TestGoldenNoAvailableAgentError:
             ConcentratedAgentSelector(agent_selection_resource_priority=["cpu"]),
         )
 
-        with pytest.raises(NoAvailableAgentError) as exc_info:
+        with pytest.raises(BatchAgentSelectionFailedError) as exc_info:
             await selector.select_agents_for_batch_requirements(
                 agents_with_two_failure_modes,
                 criteria,
                 config,
             )
+        assert len(exc_info.value.errors) == 1
+        error = exc_info.value.errors[0]
+        assert isinstance(error, NoAvailableAgentError)
 
         expected = (
             f"no available agents for kernels [{_GOLDEN_KERNEL_ID}]"
@@ -478,7 +465,7 @@ class TestGoldenNoAvailableAgentError:
             "    - cpu: requested=4, available=1\n"
             "- Agent agent-b container limit exceeded: current=10, max=10"
         )
-        assert exc_info.value.extra_msg == expected
+        assert error.extra_msg == expected
 
 
 class TestGoldenNoDesignatedAgentCompatible:
@@ -542,7 +529,7 @@ class TestGoldenNoDesignatedAgentCompatible:
             ConcentratedAgentSelector(agent_selection_resource_priority=["cpu"]),
         )
 
-        with pytest.raises(NoAvailableAgentError) as exc_info:
+        with pytest.raises(BatchAgentSelectionFailedError) as exc_info:
             await selector.select_agents_for_batch_requirements(
                 designated_agents_plus_fallback,
                 criteria,
@@ -552,6 +539,9 @@ class TestGoldenNoDesignatedAgentCompatible:
                     AgentId("designated-b"),
                 ],
             )
+        assert len(exc_info.value.errors) == 1
+        error = exc_info.value.errors[0]
+        assert isinstance(error, NoAvailableAgentError)
 
         expected = (
             f"no designated agent is compatible for kernels [{_GOLDEN_KERNEL_ID}]"
@@ -562,7 +552,7 @@ class TestGoldenNoDesignatedAgentCompatible:
             "- designated agent 'designated-b': Agent designated-b"
             " container limit exceeded: current=10, max=10"
         )
-        assert exc_info.value.extra_msg == expected
+        assert error.extra_msg == expected
 
 
 class TestGoldenNoAvailableAgentDirectConstruction:
@@ -575,9 +565,11 @@ class TestGoldenNoAvailableAgentDirectConstruction:
     def test_compat_failures_with_mixed_inner_errors(self) -> None:
         kernel_id = KernelId(UUID("00000000-0000-0000-0000-000000000002"))
         err = NoAvailableAgentError(
-            kernel_ids=[kernel_id],
-            required_architecture="x86_64",
-            requested_slots=ResourceSlot({"cpu": Decimal("4")}),
+            resource_requirement=ResourceRequirements(
+                requested_slots=ResourceSlot({"cpu": Decimal("4")}),
+                required_architecture="x86_64",
+                kernel_ids=[kernel_id],
+            ),
             agent_errors={
                 AgentId("agent-a"): InsufficientResourcesError(
                     agent_id=AgentId("agent-a"),
@@ -608,9 +600,11 @@ class TestGoldenNoAvailableAgentDirectConstruction:
         # even considered (e.g. filtered out by arch). The constructor must
         # synthesize the 'not found in compatible agents' message for it.
         err = NoAvailableAgentError(
-            kernel_ids=[kernel_id],
-            required_architecture="x86_64",
-            requested_slots=ResourceSlot({"cpu": Decimal("2")}),
+            resource_requirement=ResourceRequirements(
+                requested_slots=ResourceSlot({"cpu": Decimal("2")}),
+                required_architecture="x86_64",
+                kernel_ids=[kernel_id],
+            ),
             agent_errors={
                 AgentId("designated-a"): ContainerLimitExceededError(
                     agent_id=AgentId("designated-a"),

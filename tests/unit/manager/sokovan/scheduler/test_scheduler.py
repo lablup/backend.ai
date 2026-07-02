@@ -26,7 +26,7 @@ from ai.backend.manager.sokovan.scheduler.provisioner.provisioner import (
     SessionProvisionerArgs,
 )
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.exceptions import (
-    AgentSelectionError,
+    BatchAgentSelectionFailedError,
     NoCompatibleAgentError,
 )
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import (
@@ -34,8 +34,8 @@ from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import 
     AgentSelectionConfig,
     AgentSelectionCriteria,
     AgentSelector,
-    ResourceRequirements,
 )
+from ai.backend.manager.sokovan.scheduler.provisioner.selectors.types import ResourceRequirements
 
 
 def create_session_workload(
@@ -194,7 +194,10 @@ class TestProvisionerAllocation:
                     max_available = available_cpu
 
             if not best_agent:
-                raise NoCompatibleAgentError("No suitable agent found")
+                raise NoCompatibleAgentError(
+                    resource_requirement=resource_req,
+                    available_architectures=sorted({a.architecture for a in agents}),
+                )
 
             return best_agent
 
@@ -208,11 +211,16 @@ class TestProvisionerAllocation:
             # Extract resource requirements from criteria
             resource_requirements = criteria.get_resource_requirements()
             selections = []
+            errors = []
             for resource_req in resource_requirements:
-                # Use the single selection logic
-                agent = await select_agent_side_effect(
-                    agents, resource_req, criteria, config, designated_agent
-                )
+                # Mirror the real batch method: record failures, keep going.
+                try:
+                    agent = await select_agent_side_effect(
+                        agents, resource_req, criteria, config, designated_agent
+                    )
+                except NoCompatibleAgentError as e:
+                    errors.append(e)
+                    continue
                 # Update agent state
                 agent.occupied_slots = agent.occupied_slots + resource_req.requested_slots
                 agent.container_count = agent.container_count + len(resource_req.kernel_ids)
@@ -223,6 +231,8 @@ class TestProvisionerAllocation:
                         selected_agent=agent,
                     )
                 )
+            if errors:
+                raise BatchAgentSelectionFailedError(errors)
             return selections
 
         # Make call_history accessible as an attribute
@@ -428,8 +438,8 @@ class TestProvisionerAllocation:
             max_container_count=100, enforce_spreading_endpoint_replica=False
         )
 
-        # Execute allocation - should raise NoCompatibleAgentError
-        with pytest.raises(NoCompatibleAgentError):
+        # Execute allocation - failures are aggregated into one error
+        with pytest.raises(BatchAgentSelectionFailedError):
             await provisioner._allocate_workload(
                 workload,
                 agents,
@@ -493,7 +503,10 @@ class TestProvisionerAllocation:
             resource_requirements = criteria.get_resource_requirements()
             selections = []
             if not designated_agent_ids:
-                raise AgentSelectionError("No designated agent provided")
+                raise NoCompatibleAgentError(
+                    resource_requirement=resource_requirements[0],
+                    available_architectures=[],
+                )
             for resource_req in resource_requirements:
                 for agent in agents:
                     if agent.agent_id in designated_agent_ids:
@@ -505,7 +518,10 @@ class TestProvisionerAllocation:
                         )
                         break
                 else:
-                    raise AgentSelectionError("Designated agent not found")
+                    raise NoCompatibleAgentError(
+                        resource_requirement=resource_req,
+                        available_architectures=[],
+                    )
             return selections
 
         mock_selector = cast(Mock, provisioner._default_agent_selector)
@@ -577,8 +593,8 @@ class TestProvisionerAllocation:
             max_container_count=100, enforce_spreading_endpoint_replica=False
         )
 
-        # Execute allocation - should raise NoCompatibleAgentError
-        with pytest.raises(NoCompatibleAgentError):
+        # Execute allocation - failures are aggregated into one error
+        with pytest.raises(BatchAgentSelectionFailedError):
             await provisioner._allocate_workload(
                 workload,
                 agents,

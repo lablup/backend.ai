@@ -12,8 +12,8 @@ from .selector import (
     AgentSelectionConfig,
     AgentSelectionCriteria,
     AgentStateTracker,
-    ResourceRequirements,
 )
+from .types import ResourceRequirements
 
 
 class RoundRobinAgentSelector(AbstractAgentSelector):

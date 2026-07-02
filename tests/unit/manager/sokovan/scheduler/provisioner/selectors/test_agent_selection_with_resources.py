@@ -16,7 +16,7 @@ from ai.backend.manager.sokovan.scheduler.provisioner.selectors.dispersed import
     DispersedAgentSelector,
 )
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.exceptions import (
-    NoAvailableAgentError,
+    BatchAgentSelectionFailedError,
 )
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import (
     AgentSelectionConfig,
@@ -189,7 +189,7 @@ class TestAgentSelectionWithResources:
         selector = AgentSelector(strategy)
 
         # Try to select designated agent
-        with pytest.raises(NoAvailableAgentError) as exc_info:
+        with pytest.raises(BatchAgentSelectionFailedError) as exc_info:
             await selector.select_agents_for_batch_requirements(
                 agents_for_designated_agent_test,
                 criteria,
@@ -197,8 +197,9 @@ class TestAgentSelectionWithResources:
                 designated_agent_ids=[AgentId("designated")],
             )
 
-        # Should raise error because designated agent lacks resources
-        message = str(exc_info.value)
+        # Should report a failure because designated agent lacks resources
+        assert len(exc_info.value.errors) == 1
+        message = exc_info.value.errors[0].extra_msg or ""
         assert "no designated agent is compatible" in message
         assert "designated agent 'designated'" in message
         assert "insufficient resources" in message

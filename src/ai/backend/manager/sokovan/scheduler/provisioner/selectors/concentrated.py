@@ -18,8 +18,8 @@ from .selector import (
     AgentSelectionConfig,
     AgentSelectionCriteria,
     AgentStateTracker,
-    ResourceRequirements,
 )
+from .types import ResourceRequirements
 from .utils import count_unutilized_capabilities, order_slots_by_priority
 
 

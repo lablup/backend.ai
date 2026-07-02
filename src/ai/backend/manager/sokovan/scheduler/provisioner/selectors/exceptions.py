@@ -4,8 +4,10 @@ Exceptions for agent selection in sokovan scheduler.
 
 from __future__ import annotations
 
-from abc import ABC
+from abc import ABC, abstractmethod
 from collections.abc import Iterable, Mapping, Sequence
+from decimal import Decimal
+from typing import override
 
 from ai.backend.common.exception import (
     BackendAIError,
@@ -14,9 +16,11 @@ from ai.backend.common.exception import (
     ErrorDomain,
     ErrorOperation,
 )
-from ai.backend.common.types import AgentId, KernelId, ResourceSlot
+from ai.backend.common.types import AgentId, ResourceSlot
 from ai.backend.manager.data.sokovan import SchedulingPredicate
 from ai.backend.manager.sokovan.scheduler.exceptions import SchedulingError
+
+from .types import RemediationHint, ResourceRequirements
 
 
 class AgentSelectionError(SchedulingError):
@@ -25,6 +29,7 @@ class AgentSelectionError(SchedulingError):
     error_type = "https://api.backend.ai/probs/agent-selection-failed"
     error_title = "Agent selection failed."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,
@@ -32,9 +37,33 @@ class AgentSelectionError(SchedulingError):
             error_detail=ErrorDetail.INTERNAL_ERROR,
         )
 
+    @override
     def failed_predicates(self) -> list[SchedulingPredicate]:
         """Return list of failed predicates for this error."""
         return [SchedulingPredicate(name=type(self).__name__, msg=str(self))]
+
+    @abstractmethod
+    def build_remediation_hint(self) -> RemediationHint:
+        """Return a structured remediation hint for this selection failure.
+
+        Every selection error must describe what the caller could change
+        (reduce resources / change architecture / revise designated agents),
+        so a dry-run can surface it without parsing the human-readable message.
+        """
+        raise NotImplementedError
+
+
+class RequirementSelectionError(AgentSelectionError):
+    """A per-requirement selection failure that knows its requirement.
+
+    Exposing the whole requirement (slots, architecture, kernel ids) lets a
+    dry-run report rich per-kernel feedback by catching the aggregated error.
+    """
+
+    @property
+    @abstractmethod
+    def resource_requirement(self) -> ResourceRequirements:
+        raise NotImplementedError
 
 
 class NoAgentsInResourceGroupError(AgentSelectionError):
@@ -53,6 +82,7 @@ class NoAgentsInResourceGroupError(AgentSelectionError):
         self._resource_group = resource_group
         super().__init__(f"No agents available in resource group '{resource_group}'")
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,
@@ -60,8 +90,14 @@ class NoAgentsInResourceGroupError(AgentSelectionError):
             error_detail=ErrorDetail.UNAVAILABLE,
         )
 
+    @override
+    def build_remediation_hint(self) -> RemediationHint:
+        # The resource group has no candidate agents at all; nothing the caller
+        # can adjust on the request itself fixes this.
+        return RemediationHint()
 
-class NoAvailableAgentError(AgentSelectionError):
+
+class NoAvailableAgentError(RequirementSelectionError):
     """Raised when no agents can satisfy a kernel-group's resource requirement.
 
     The constructor accepts the structured inputs that describe *which*
@@ -72,33 +108,59 @@ class NoAvailableAgentError(AgentSelectionError):
     error_type = "https://api.backend.ai/probs/no-available-agents"
     error_title = "Unavailable : No agents can be allocated at this time."
 
-    _kernel_ids: Sequence[KernelId]
-    _required_architecture: str
-    _requested_slots: ResourceSlot
+    _resource_requirement: ResourceRequirements
     _agent_errors: Mapping[AgentId, TrackerCompatibilityError]
+    _available_agent_ids: Sequence[AgentId]
     _designated_agent_ids: Sequence[AgentId] | None
 
     def __init__(
         self,
         *,
-        kernel_ids: Sequence[KernelId],
-        required_architecture: str,
-        requested_slots: ResourceSlot,
+        resource_requirement: ResourceRequirements,
         agent_errors: Mapping[AgentId, TrackerCompatibilityError],
+        available_agent_ids: Sequence[AgentId] = (),
         designated_agent_ids: Sequence[AgentId] | None = None,
     ) -> None:
-        self._kernel_ids = kernel_ids
-        self._required_architecture = required_architecture
-        self._requested_slots = requested_slots
+        self._resource_requirement = resource_requirement
         self._agent_errors = agent_errors
+        self._available_agent_ids = available_agent_ids
         self._designated_agent_ids = designated_agent_ids
         super().__init__(self._build_message())
 
+    @property
+    @override
+    def resource_requirement(self) -> ResourceRequirements:
+        return self._resource_requirement
+
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,
             operation=ErrorOperation.SCHEDULE,
             error_detail=ErrorDetail.UNAVAILABLE,
+        )
+
+    @override
+    def build_remediation_hint(self) -> RemediationHint:
+        # Merge each candidate node's own remediation. No isinstance branching:
+        # every TrackerCompatibilityError contributes its partial RemediationHint.
+        partials = [err.remediation_hint_contribution() for err in self._agent_errors.values()]
+        reductions = [p.required_reduction for p in partials if p.required_reduction is not None]
+        container_reductions = [
+            p.required_container_reduction
+            for p in partials
+            if p.required_container_reduction is not None
+        ]
+        return RemediationHint(
+            # The compatible agents the caller could use (e.g. to compare against
+            # the designated agents that failed).
+            available_agent_ids=list(self._available_agent_ids) or None,
+            required_reduction=(
+                min(reductions, key=lambda slot: sum(slot.values())) if reductions else None
+            ),
+            required_container_reduction=(
+                min(container_reductions) if container_reductions else None
+            ),
         )
 
     def _build_message(self) -> str:
@@ -115,12 +177,13 @@ class NoAvailableAgentError(AgentSelectionError):
         return f"{prefix} for {header}:\n{details}"
 
     def _format_header(self) -> str:
-        kernel_id_list = ", ".join(str(k) for k in self._kernel_ids)
-        humanized_slots = self._requested_slots.to_humanized({})
+        req = self._resource_requirement
+        kernel_id_list = ", ".join(str(k) for k in req.kernel_ids)
+        humanized_slots = req.requested_slots.to_humanized({})
         slot_str = " ".join(
-            f"{k}={humanized_slots[k]}" for k, v in self._requested_slots.items() if v
+            f"{k}={humanized_slots[k]}" for k, v in req.requested_slots.items() if v
         )
-        return f"kernels [{kernel_id_list}] (arch={self._required_architecture}, slots={slot_str})"
+        return f"kernels [{kernel_id_list}] (arch={req.required_architecture}, slots={slot_str})"
 
     def _designated_reasons(self) -> list[str]:
         reasons: list[str] = []
@@ -146,18 +209,87 @@ class NoAvailableAgentError(AgentSelectionError):
         return "\n".join(lines)
 
 
-class NoCompatibleAgentError(AgentSelectionError):
-    """Raised when no compatible agents are found."""
+class NoCompatibleAgentError(RequirementSelectionError):
+    """Raised when no agent matches the required architecture.
+
+    Carries the structured architecture context so a dry-run can suggest which
+    architectures the request could target instead.
+    """
 
     error_type = "https://api.backend.ai/probs/no-compatible-agents"
     error_title = "No agents meet the resource requirements."
 
+    _resource_requirement: ResourceRequirements
+    _available_architectures: Sequence[str]
+
+    def __init__(
+        self,
+        *,
+        resource_requirement: ResourceRequirements,
+        available_architectures: Sequence[str],
+    ) -> None:
+        self._resource_requirement = resource_requirement
+        self._available_architectures = available_architectures
+        super().__init__(
+            f"No agents with required architecture "
+            f"'{resource_requirement.required_architecture}'. "
+            f"Available architectures: {', '.join(available_architectures)}"
+        )
+
+    @property
+    @override
+    def resource_requirement(self) -> ResourceRequirements:
+        return self._resource_requirement
+
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,
             operation=ErrorOperation.SCHEDULE,
             error_detail=ErrorDetail.UNAVAILABLE,
         )
+
+    @override
+    def build_remediation_hint(self) -> RemediationHint:
+        return RemediationHint(available_archs=list(self._available_architectures))
+
+
+class BatchAgentSelectionFailedError(SchedulingError):
+    """Aggregates per-requirement placement failures of a single batch selection.
+
+    Carries the structured ``errors`` so a dry-run can read each kernel group's
+    kernels + remediation hint by catching this error, instead of inspecting
+    selections.
+    """
+
+    error_type = "https://api.backend.ai/probs/batch-agent-selection-failed"
+    error_title = "Some kernels could not be placed on any agent."
+
+    errors: Sequence[RequirementSelectionError]
+
+    def __init__(self, errors: Sequence[RequirementSelectionError]) -> None:
+        self.errors = errors
+        super().__init__(self._build_message())
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AGENT,
+            operation=ErrorOperation.SCHEDULE,
+            error_detail=ErrorDetail.UNAVAILABLE,
+        )
+
+    @override
+    def failed_predicates(self) -> list[SchedulingPredicate]:
+        predicates: list[SchedulingPredicate] = []
+        for err in self.errors:
+            predicates.extend(err.failed_predicates())
+        return predicates
+
+    def _build_message(self) -> str:
+        header = f"{len(self.errors)} requirement(s) could not be placed"
+        body = "\n".join((err.extra_msg or str(err)) for err in self.errors)
+        return f"{header}:\n{body}"
 
 
 # Per-agent compatibility check exceptions. These inherit from BackendAIError so
@@ -169,32 +301,14 @@ class TrackerCompatibilityError(BackendAIError, ABC):
     error_type = "https://api.backend.ai/probs/agent-compatibility-failed"
     error_title = "Agent compatibility check failed."
 
+    @abstractmethod
+    def remediation_hint_contribution(self) -> RemediationHint:
+        """Return this single node's remediation contribution.
 
-class ArchitectureIncompatibleError(TrackerCompatibilityError):
-    """Raised when agent architecture does not match the required architecture."""
-
-    error_type = "https://api.backend.ai/probs/agent-architecture-mismatch"
-    error_title = "Agent architecture does not match the requirement."
-
-    _agent_id: AgentId
-    _agent_arch: str
-    _required_arch: str
-
-    def __init__(self, agent_id: AgentId, agent_arch: str, required_arch: str) -> None:
-        self._agent_id = agent_id
-        self._agent_arch = agent_arch
-        self._required_arch = required_arch
-        super().__init__(
-            f"Agent {agent_id} architecture '{agent_arch}'"
-            f" does not match required architecture '{required_arch}'"
-        )
-
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.AGENT,
-            operation=ErrorOperation.SCHEDULE,
-            error_detail=ErrorDetail.MISMATCH,
-        )
+        ``NoAvailableAgentError`` merges these partials across all candidate
+        nodes, so each compatibility error decides only its own remediation.
+        """
+        raise NotImplementedError
 
 
 class InsufficientResourcesError(TrackerCompatibilityError):
@@ -233,12 +347,22 @@ class InsufficientResourcesError(TrackerCompatibilityError):
 
         super().__init__(f"Agent {agent_id} has insufficient resources:\n{details_msg}")
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,
             operation=ErrorOperation.SCHEDULE,
             error_detail=ErrorDetail.UNAVAILABLE,
         )
+
+    @override
+    def remediation_hint_contribution(self) -> RemediationHint:
+        # Per-slot shortage on this agent: max(0, requested - available).
+        diff = self._requested_slots - self._available_slots
+        reduction = ResourceSlot({
+            slot_name: amount for slot_name, amount in diff.items() if amount > Decimal(0)
+        })
+        return RemediationHint(required_reduction=reduction)
 
 
 class ContainerLimitExceededError(TrackerCompatibilityError):
@@ -264,9 +388,17 @@ class ContainerLimitExceededError(TrackerCompatibilityError):
             f"Agent {agent_id} container limit exceeded: current={current_count}, max={max_count}"
         )
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,
             operation=ErrorOperation.SCHEDULE,
             error_detail=ErrorDetail.UNAVAILABLE,
+        )
+
+    @override
+    def remediation_hint_contribution(self) -> RemediationHint:
+        # Containers to free so one more can be admitted (current is at/over max).
+        return RemediationHint(
+            required_container_reduction=self._current_count - self._max_count + 1
         )

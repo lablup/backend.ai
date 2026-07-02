@@ -27,9 +27,9 @@ from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import 
     AgentSelectionConfig,
     AgentSelectionCriteria,
     AgentStateTracker,
-    ResourceRequirements,
     SessionMetadata,
 )
+from ai.backend.manager.sokovan.scheduler.provisioner.selectors.types import ResourceRequirements
 
 
 class TestLegacyAgentSelector:
