@@ -130,6 +130,7 @@ Fixed rescan serialization failures, preserved API failure categories in action 
 
 ### Test Updates
 * Import the ORM relationship cluster in the manager unit tests that register it so they configure SQLAlchemy mappers when run as isolated targets. ([#12453](https://github.com/lablup/backend.ai/issues/12453))
+* Set scaling_group_name in session inserts across tests to satisfy the non-null scaling_group_name constraint ([#12502](https://github.com/lablup/backend.ai/issues/12502))
 
 
 ## 26.4.4 (2026-06-18)
