@@ -50,30 +50,24 @@ class FakeRuntime(ContainerdRuntimeClient):
         self.calls.append("remove_image")
 
     async def create_container(
-        self, container_id: str, *, image_ref: str, oci_spec: Mapping[str, Any]
+        self, container_id: str, *, image_ref: str, command: Sequence[str], oci_spec: Mapping[str, Any]
     ) -> None:
         self.calls.append("create_container")
 
-    async def create_task(self, container_id: str) -> TaskHandle:
-        self.calls.append("create_task")
+    async def start_container(self, container_id: str) -> TaskHandle:
+        self.calls.append("start_container")
         return TaskHandle(container_id=container_id, pid=self._pid)
 
-    async def start_task(self, container_id: str) -> None:
-        self.calls.append("start_task")
+    async def kill_container(self, container_id: str, *, signal: int) -> None:
+        self.calls.append("kill_container")
 
-    async def kill_task(self, container_id: str, *, signal: int) -> None:
-        self.calls.append("kill_task")
-
-    async def delete_task(self, container_id: str) -> None:
-        self.calls.append("delete_task")
-
-    async def delete_container(self, container_id: str) -> None:
-        self.calls.append("delete_container")
+    async def remove_container(self, container_id: str) -> None:
+        self.calls.append("remove_container")
 
     async def list_containers(self) -> Sequence[str]:
         return []
 
-    async def task_pid(self, container_id: str) -> int | None:
+    async def container_pid(self, container_id: str) -> int | None:
         return self._pid
 
 
@@ -103,12 +97,12 @@ class TestLaunch:
         runner = RecordingNetworkRunner()
         orch = _orchestrator(runtime, runner)
         result = await orch.launch(
-            "c1", image_ref="img", oci_spec={},
+            "c1", image_ref="img", command=["sleep", "600"], oci_spec={},
             meta=_META, kernel_config=cast(KernelCreationConfig, {}), cluster_info=cast(ClusterInfo, {}),
         )
-        # runtime creates container+task BEFORE network attaches, and starts AFTER
-        assert runtime.calls == ["create_container", "create_task", "start_task"]
-        # network attach happened against the task's PID netns, between create_task and start_task
+        # runtime creates + starts the container BEFORE the network attaches
+        assert runtime.calls == ["create_container", "start_container"]
+        # network attach happened against the task's PID netns
         assert runner.calls == [("ADD", "/proc/4242/ns/net")]
         assert result.handle.pid == 4242
 
@@ -118,4 +112,4 @@ class TestLaunch:
         orch = _orchestrator(runtime, runner)
         await orch.terminate("c1", plan=_plan(), task_pid=4242)
         assert runner.calls == [("DEL", "/proc/4242/ns/net")]
-        assert runtime.calls == ["kill_task", "delete_task", "delete_container"]
+        assert runtime.calls == ["kill_container", "remove_container"]

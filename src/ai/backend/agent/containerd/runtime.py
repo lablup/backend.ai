@@ -1,19 +1,21 @@
 """Low-level containerd runtime client contract (BEP-1055).
 
-This is the **containerd-only** management surface: image and container/task
-lifecycle over containerd's native API (NOT CRI — CRI's RunPodSandbox couples the
-runtime to CNI, which BEP-1055 owns separately). It imports nothing from the network
-layer and knows nothing about CNI, vxlan, or sessions.
+This is the **containerd-only** management surface: image and container/task lifecycle
+over containerd's native tooling/API (NOT CRI — CRI's RunPodSandbox couples the runtime
+to CNI, which BEP-1055 owns separately). It imports nothing from the network layer and
+knows nothing about CNI, vxlan, or sessions.
 
 The single value that crosses the runtime↔network boundary is a task's network
 namespace, exposed here as ``TaskHandle.pid`` (the network layer derives
-``/proc/{pid}/ns/net`` via ``agent.network.cni_runner.netns_path_for_pid``). The
-`ContainerdAgent` is the sole place that composes this client with the network
-subsystem; neither side references the other.
+``/proc/{pid}/ns/net``). The ``ContainerdKernelOrchestrator`` is the sole place that
+composes this client with the network subsystem; neither side references the other.
 
-Concrete implementations (containerd gRPC services, or a subprocess-based client) live
-behind this interface so the transport can be chosen/replaced without touching the
-agent or the network stack.
+Lifecycle model: a container is created with an **isolated, empty network namespace**
+(only loopback) and then started; the running task's PID is returned so the network
+layer can attach CNI into its netns. (A future containerd-gRPC implementation may attach
+in the pre-start "created" state; the tooling-based client cannot expose a PID before
+start, so networking attaches immediately after start — validated to work in
+BEP-1055/verification.md §5.)
 """
 
 from __future__ import annotations
@@ -26,7 +28,7 @@ from typing import Any
 
 @dataclass(frozen=True)
 class TaskHandle:
-    """A created containerd task. ``pid`` is the boundary contract to the network layer."""
+    """A started containerd task. ``pid`` is the boundary contract to the network layer."""
 
     container_id: str
     pid: int
@@ -51,38 +53,25 @@ class ContainerdRuntimeClient(ABC):
     # --- container/task lifecycle ---
     @abstractmethod
     async def create_container(
-        self, container_id: str, *, image_ref: str, oci_spec: Mapping[str, Any]
+        self, container_id: str, *, image_ref: str, command: Sequence[str], oci_spec: Mapping[str, Any]
     ) -> None:
-        """Create a container from an image and an OCI runtime spec.
-
-        The spec MUST request an isolated (empty) network namespace so the task starts
-        with only loopback; the network layer attaches interfaces afterward.
-        """
+        """Create a container (not started) with an isolated, empty network namespace."""
 
     @abstractmethod
-    async def create_task(self, container_id: str) -> TaskHandle:
-        """Create the task (runc process) for a container and return its PID.
-
-        The task is created but not started, so the network layer can attach CNI to the
-        task's netns before the workload process runs.
-        """
+    async def start_container(self, container_id: str) -> TaskHandle:
+        """Start the container's task and return its handle (incl. PID)."""
 
     @abstractmethod
-    async def start_task(self, container_id: str) -> None: ...
+    async def kill_container(self, container_id: str, *, signal: int) -> None: ...
 
     @abstractmethod
-    async def kill_task(self, container_id: str, *, signal: int) -> None: ...
-
-    @abstractmethod
-    async def delete_task(self, container_id: str) -> None: ...
-
-    @abstractmethod
-    async def delete_container(self, container_id: str) -> None: ...
+    async def remove_container(self, container_id: str) -> None:
+        """Remove the task + container (force)."""
 
     # --- introspection ---
     @abstractmethod
     async def list_containers(self) -> Sequence[str]: ...
 
     @abstractmethod
-    async def task_pid(self, container_id: str) -> int | None:
+    async def container_pid(self, container_id: str) -> int | None:
         """Return the running task's PID, or None if the container has no live task."""

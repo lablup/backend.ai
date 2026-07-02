@@ -11,6 +11,7 @@ SessionNetworkCoordinator's job and happens once before any container launch.
 from __future__ import annotations
 
 import signal as signal_module
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
@@ -51,17 +52,18 @@ class ContainerdKernelOrchestrator:
         container_id: str,
         *,
         image_ref: str,
+        command: Sequence[str],
         oci_spec: dict[str, Any],
         meta: SessionNetMeta,
         kernel_config: KernelCreationConfig,
         cluster_info: ClusterInfo,
     ) -> LaunchResult:
-        # 1) runtime: create container + task (task not started, owns an empty netns)
+        # 1) runtime: create the container with an empty netns, then start its task
         await self._runtime.create_container(
-            container_id, image_ref=image_ref, oci_spec=oci_spec
+            container_id, image_ref=image_ref, command=command, oci_spec=oci_spec
         )
-        handle = await self._runtime.create_task(container_id)
-        # 2) hand the netns/PID to the network layer to attach CNI
+        handle = await self._runtime.start_container(container_id)
+        # 2) hand the task's netns/PID to the network layer to attach CNI
         plan = await self._network.attach(
             kernel_config,
             cluster_info,
@@ -69,8 +71,6 @@ class ContainerdKernelOrchestrator:
             container_id=container_id,
             task_pid=handle.pid,
         )
-        # 3) runtime: start the workload now that networking is in place
-        await self._runtime.start_task(container_id)
         return LaunchResult(handle=handle, plan=plan)
 
     async def terminate(
@@ -83,6 +83,5 @@ class ContainerdKernelOrchestrator:
     ) -> None:
         # reverse order: detach network first, then tear down the runtime
         await self._network.detach(plan, container_id=container_id, task_pid=task_pid)
-        await self._runtime.kill_task(container_id, signal=signal)
-        await self._runtime.delete_task(container_id)
-        await self._runtime.delete_container(container_id)
+        await self._runtime.kill_container(container_id, signal=signal)
+        await self._runtime.remove_container(container_id)

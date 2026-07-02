@@ -80,6 +80,25 @@ Result: `baimulti0` appears inside the container's netns with session-subnet IP
 the exact `ContainerNetworkProvisioner.attach(task_pid=...)` path against live
 containerd. ✅
 
+## 6. Orchestrator flow with real containerd (NerdctlRuntimeClient + provisioner)
+
+The `ContainerdKernelOrchestrator` sequence run against live containerd via nerdctl,
+using the exact commands `NerdctlRuntimeClient` emits:
+
+```sh
+nerdctl --namespace backend-ai create --name c --network none alpine:3.20 sleep 600  # pid=0
+nerdctl --namespace backend-ai start c                                               # -> pid
+# hand /proc/<pid>/ns/net to the network layer:
+echo "$OVERLAY_CONF" | env CNI_COMMAND=ADD CNI_NETNS=/proc/<pid>/ns/net CNI_IFNAME=baimulti0 ... bridge
+# terminate: CNI DEL -> nerdctl kill -> nerdctl rm
+```
+
+Result: created container has pid 0 (not started); after start the netns has only `lo`;
+CNI attach adds `baimulti0` + session IP `10.128.5.4` inside the real container; teardown
+is clean. `--network none` keeps nerdctl out of networking, so CNI ownership stays with
+the BEP-1055 layer. This validates the runtime↔network separation and the orchestrator
+handoff against live containerd. ✅
+
 ## Notes
 
 - These are manual smoke tests requiring a privileged Linux host (NET_ADMIN),
