@@ -206,7 +206,7 @@ class TestResolveHealthCheck:
                         name="m",
                         model_path="/models/m",
                         service=ModelServiceConfig(
-                            start_command=["run"],
+                            start_command="run",
                             port=8000,
                             health_check=ModelHealthCheck(
                                 enable=True,
@@ -242,7 +242,7 @@ class TestResolveHealthCheck:
                     ModelConfig(
                         name="m",
                         model_path="/models/m",
-                        service=ModelServiceConfig(start_command=["run"], port=8000),
+                        service=ModelServiceConfig(start_command="run", port=8000),
                     )
                 ]
             )

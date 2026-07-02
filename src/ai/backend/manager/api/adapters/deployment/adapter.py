@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.sokovan.deployment.coordinator import DeploymentCoordinator
 
 from ai.backend.common.api_handlers import Sentinel
+from ai.backend.common.config import ModelDefinition
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.model_deployment.types import (
@@ -139,6 +140,9 @@ from ai.backend.common.dto.manager.v2.resource_slot.types import (
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.identifier.runtime_variant_preset import RuntimeVariantPresetID
+from ai.backend.common.model_service_start_command_compat import (
+    normalize_model_service_command_response,
+)
 from ai.backend.manager.api.adapter_options.deployment.options import (
     deployment_options_from_input,
     deployment_options_to_info,
@@ -336,6 +340,15 @@ def _tristate_from_input[T](value: T | Sentinel | None) -> TriState[T]:
     if value is None:
         return TriState[T].nullify()
     return TriState[T].update(value)
+
+
+def _model_definition_to_dto(model_definition: ModelDefinition) -> ModelDefinitionInfoDTO:
+    data = model_definition.model_dump(by_alias=False)
+    for model in data.get("models") or []:
+        service = model.get("service")
+        if service is not None:
+            model["service"] = normalize_model_service_command_response(service)
+    return ModelDefinitionInfoDTO.model_validate(data)
 
 
 @lru_cache(maxsize=1)
@@ -2355,9 +2368,7 @@ class DeploymentAdapter(BaseAdapter):
             ),
             model_mount_config=model_mount_config_dto,
             model_definition=(
-                ModelDefinitionInfoDTO.model_validate(
-                    data.model_definition.model_dump(by_alias=False)
-                )
+                _model_definition_to_dto(data.model_definition)
                 if data.model_definition is not None
                 else None
             ),

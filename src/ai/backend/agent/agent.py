@@ -6,6 +6,7 @@ import errno
 import logging
 import pickle
 import re
+import shlex
 import signal
 import sys
 import time
@@ -2503,7 +2504,7 @@ class AbstractAgent[
                 image_command_loaded = True
             if not image_command:
                 continue
-            model.service.start_command = list(image_command)
+            model.service.start_command = shlex.join(image_command)
         return models
 
     def _append_legacy_inference_env_args(
@@ -2519,7 +2520,7 @@ class AbstractAgent[
             service = model.service
             if service is None or not service.start_command:
                 continue
-            service.start_command = [*service.start_command, *extra_args]
+            service.start_command = f"{service.start_command} {shlex.join(extra_args)}"
         return models
 
     async def create_kernel(

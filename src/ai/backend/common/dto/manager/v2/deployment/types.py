@@ -317,7 +317,10 @@ class ModelServiceConfigInfoDTO(BaseResponseModel):
     )
     shell: str | None = Field(
         default="/bin/bash",
-        description="Shell configured for the model service.",
+        description=(
+            "Shell used to run the command. If set, the kernel runs "
+            "`[shell, '-c', command]`; null or empty disables shell wrapping."
+        ),
     )
     port: int = Field(description="Port number for the model service.")
     health_check: ModelHealthCheckInfoDTO | None = Field(
