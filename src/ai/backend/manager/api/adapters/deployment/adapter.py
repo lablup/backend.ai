@@ -16,7 +16,14 @@ if TYPE_CHECKING:
     from ai.backend.manager.sokovan.deployment.coordinator import DeploymentCoordinator
 
 from ai.backend.common.api_handlers import Sentinel
-from ai.backend.common.config import ModelDefinition
+from ai.backend.common.config import (
+    ModelConfig,
+    ModelDefinition,
+    ModelHealthCheck,
+    ModelMetadata,
+    ModelServiceConfig,
+    PreStartAction,
+)
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.model_deployment.types import (
@@ -112,10 +119,15 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
     EnvironmentVariableEntryInfoDTO,
     EnvironmentVariablesInfoDTO,
     ExtraVFolderMountGQLDTO,
+    ModelConfigInfoDTO,
     ModelDefinitionInfoDTO,
+    ModelHealthCheckInfoDTO,
+    ModelMetadataInfoDTO,
     ModelMountConfigInfoDTO,
     ModelRuntimeConfigInfoDTO,
+    ModelServiceConfigInfoDTO,
     OrderDirection,
+    PreStartActionInfoDTO,
     ReplicaOrderField,
     ReplicaStateInfo,
     ResourceConfigInfoDTO,
@@ -140,9 +152,7 @@ from ai.backend.common.dto.manager.v2.resource_slot.types import (
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.identifier.runtime_variant_preset import RuntimeVariantPresetID
-from ai.backend.common.model_service_start_command_compat import (
-    normalize_model_service_command_response,
-)
+from ai.backend.common.model_service_start_command_compat import to_legacy_start_command
 from ai.backend.manager.api.adapter_options.deployment.options import (
     deployment_options_from_input,
     deployment_options_to_info,
@@ -342,13 +352,74 @@ def _tristate_from_input[T](value: T | Sentinel | None) -> TriState[T]:
     return TriState[T].update(value)
 
 
-def _model_definition_to_dto(model_definition: ModelDefinition) -> ModelDefinitionInfoDTO:
-    data = model_definition.model_dump(by_alias=False)
-    for model in data.get("models") or []:
-        service = model.get("service")
-        if service is not None:
-            model["service"] = normalize_model_service_command_response(service)
-    return ModelDefinitionInfoDTO.model_validate(data)
+def _pre_start_action_to_dto(action: PreStartAction) -> PreStartActionInfoDTO:
+    return PreStartActionInfoDTO(action=action.action, args=action.args)
+
+
+def _model_health_check_to_dto(check: ModelHealthCheck) -> ModelHealthCheckInfoDTO:
+    return ModelHealthCheckInfoDTO(
+        enable=check.enable,
+        interval=check.interval,
+        path=check.path,
+        max_retries=check.max_retries,
+        max_wait_time=check.max_wait_time,
+        expected_status_code=check.expected_status_code,
+        initial_delay=check.initial_delay,
+    )
+
+
+def _model_service_config_to_dto(service: ModelServiceConfig) -> ModelServiceConfigInfoDTO:
+    return ModelServiceConfigInfoDTO(
+        pre_start_actions=[_pre_start_action_to_dto(a) for a in service.pre_start_actions],
+        command=service.start_command,
+        start_command=to_legacy_start_command(service.start_command),
+        shell=service.shell,
+        port=service.port,
+        health_check=(
+            _model_health_check_to_dto(service.health_check)
+            if service.health_check is not None
+            else None
+        ),
+    )
+
+
+def _model_metadata_to_dto(metadata: ModelMetadata) -> ModelMetadataInfoDTO:
+    return ModelMetadataInfoDTO(
+        author=metadata.author,
+        title=metadata.title,
+        version=metadata.version,
+        created=metadata.created,
+        last_modified=metadata.last_modified,
+        description=metadata.description,
+        task=metadata.task,
+        category=metadata.category,
+        architecture=metadata.architecture,
+        framework=metadata.framework,
+        label=metadata.label,
+        license=metadata.license,
+        min_resource=metadata.min_resource,
+    )
+
+
+def _model_config_to_dto(config: ModelConfig) -> ModelConfigInfoDTO:
+    return ModelConfigInfoDTO(
+        name=config.name,
+        model_path=config.model_path,
+        service=(
+            _model_service_config_to_dto(config.service) if config.service is not None else None
+        ),
+        metadata=(_model_metadata_to_dto(config.metadata) if config.metadata is not None else None),
+    )
+
+
+def _model_definition_to_dto(
+    definition: ModelDefinition | None,
+) -> ModelDefinitionInfoDTO | None:
+    if definition is None:
+        return None
+    return ModelDefinitionInfoDTO(
+        models=[_model_config_to_dto(m) for m in definition.models],
+    )
 
 
 @lru_cache(maxsize=1)
@@ -2367,11 +2438,7 @@ class DeploymentAdapter(BaseAdapter):
                 ],
             ),
             model_mount_config=model_mount_config_dto,
-            model_definition=(
-                _model_definition_to_dto(data.model_definition)
-                if data.model_definition is not None
-                else None
-            ),
+            model_definition=_model_definition_to_dto(data.model_definition),
             created_at=data.created_at,
             extra_mounts=[
                 ExtraVFolderMountGQLDTO(

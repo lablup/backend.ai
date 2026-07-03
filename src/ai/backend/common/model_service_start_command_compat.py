@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import shlex
 from collections.abc import Mapping
-from typing import Any, cast
+from typing import Any
 
 MODEL_SERVICE_COMMAND_KEYS = frozenset(("command", "start_command", "start-command"))
 
@@ -25,20 +25,13 @@ def _normalize_model_service_command_input(service: Mapping[str, Any]) -> dict[s
     return result
 
 
-def normalize_model_service_command_response(service: Mapping[str, Any]) -> dict[str, Any]:
-    result = dict(service)
-    command = result.get("command")
+def to_legacy_start_command(command: str | None) -> list[str] | None:
+    """Best-effort argv form of the internal command string for the deprecated
+    ``start_command`` response field."""
     if command is None:
-        command = result.get("start_command")
-        if isinstance(command, list) and all(isinstance(item, str) for item in command):
-            command = shlex.join(command)
-
-    if command is None:
-        result["start_command"] = None
-    else:
-        try:
-            result["start_command"] = shlex.split(cast(str, command))
-        except ValueError:
-            result["start_command"] = [command]
-    result["command"] = command
-    return result
+        return None
+    try:
+        return shlex.split(command)
+    except ValueError:
+        # Unparseable shell string (e.g. unclosed quote); keep it as a single argv item.
+        return [command]

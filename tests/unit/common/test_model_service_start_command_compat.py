@@ -5,8 +5,8 @@ from typing import Any
 import pytest
 
 from ai.backend.common.model_service_start_command_compat import (
-    normalize_model_service_command_response,
     resolve_model_service_start_command,
+    to_legacy_start_command,
 )
 
 
@@ -56,51 +56,30 @@ class TestNormalizeModelServiceCommandInput:
         assert resolve_model_service_start_command(payload) is payload
 
 
-class TestNormalizeModelServiceCommandResponse:
+class TestToLegacyStartCommand:
     @pytest.mark.parametrize(
-        ("payload", "expected"),
+        ("command", "expected"),
         [
             pytest.param(
-                {
-                    "start_command": "python serve.py --name 'a b'",
-                    "port": 8080,
-                },
-                {
-                    "command": "python serve.py --name 'a b'",
-                    "start_command": ["python", "serve.py", "--name", "a b"],
-                    "port": 8080,
-                },
+                "python serve.py --name 'a b'",
+                ["python", "serve.py", "--name", "a b"],
                 id="internal-string",
             ),
             pytest.param(
-                {
-                    "start_command": ["python", "serve.py"],
-                    "port": 8080,
-                },
-                {
-                    "command": "python serve.py",
-                    "start_command": ["python", "serve.py"],
-                    "port": 8080,
-                },
-                id="legacy-list",
+                "python 'unterminated",
+                ["python 'unterminated"],
+                id="unparseable-string",
             ),
             pytest.param(
-                {
-                    "start_command": "python 'unterminated",
-                },
-                {
-                    "command": "python 'unterminated",
-                    "start_command": ["python 'unterminated"],
-                },
-                id="unparseable-string",
+                None,
+                None,
+                id="none",
             ),
         ],
     )
-    def test_normalizes_response_fields(
+    def test_derives_argv_form(
         self,
-        payload: dict[str, Any],
-        expected: dict[str, Any],
+        command: str | None,
+        expected: list[str] | None,
     ) -> None:
-        result = normalize_model_service_command_response(payload)
-
-        assert result == expected
+        assert to_legacy_start_command(command) == expected
