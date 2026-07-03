@@ -223,6 +223,29 @@ Two **separate Linux VMs** on a shared L2 (lima socket_vmnet, `192.168.105.20` a
 This upgrades §4 (single-host netns simulation) to two genuine hosts and confirms both
 cross-node connectivity and per-session VNI isolation on real infrastructure.
 
+## 12. Full agent-side stack run (the real facade end-to-end)
+
+The top-level agent-side integration was run unmodified on the Linux host: the real
+`ContainerdSessionNetwork` facade composing the real `VxlanNetworkPlugin` (ip/bridge/fdb),
+`SessionNetworkCoordinator`, `ContainerdKernelOrchestrator`, `NerdctlRuntimeClient`, and
+`CniPluginRunner` against live containerd + CNI + vxlan. (Only the etcd membership store
+was a single-node in-memory fake and the heavy import-only deps — `AbstractKernel`,
+`common.types`, etc. — were stubbed; all networking/runtime code is the real source.)
+
+```
+facade.ensure_session("sess1", {backend:vxlan, subnet:10.128.5.0/24, vni:4097, mtu:1450})
+    -> VxlanNetworkPlugin creates baivx4097(dev lima0)+baibr4097, publishes membership
+facade.launch_container("sess1", "bai-facade-run", image=alpine, ...)
+    -> NerdctlRuntimeClient create --network none + start -> pid
+    -> ContainerNetworkProvisioner attaches CNI chain [eth0 LOCAL, baimulti0 OVERLAY]
+```
+
+Result: the real container came up with overlay `baimulti0` = `10.128.5.2/24`, LOCAL
+`eth0` = `172.30.0.2/24`, default route via `172.30.0.1`; `terminate_container` +
+`teardown_session` cleaned up. The entire agent-side stack (facade → coordinator →
+orchestrator → vxlan backend → runtime → CNI) composes and runs as real code against live
+containerd. ✅
+
 ## Notes
 
 - These are manual smoke tests requiring a privileged Linux host (NET_ADMIN),
