@@ -15,8 +15,10 @@ from ai.backend.manager.models.base import (
 
 
 class VirtualScopeRow(Base):  # type: ignore[misc]
-    __tablename__ = "virtual_scope"
-    __table_args__ = (sa.UniqueConstraint("scope_type", "scope_id", name="uq_virtual_scope_scope"),)
+    __tablename__ = "virtual_scopes"
+    __table_args__ = (
+        sa.UniqueConstraint("scope_type", "scope_id", name="uq_virtual_scopes_scope"),
+    )
 
     id: Mapped[VirtualScopeID] = mapped_column(
         "id",
@@ -24,6 +26,7 @@ class VirtualScopeRow(Base):  # type: ignore[misc]
         primary_key=True,
         server_default=sa.text("uuid_generate_v4()"),
     )
+    # Identifies the origin scope this virtual scope represents.
     scope_type: Mapped[ScopeType] = mapped_column(
         "scope_type", sa.String(length=32), nullable=False
     )

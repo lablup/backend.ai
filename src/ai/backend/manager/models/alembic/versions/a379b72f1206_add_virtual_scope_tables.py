@@ -21,7 +21,7 @@ depends_on = None
 
 def upgrade() -> None:
     op.create_table(
-        "virtual_scope",
+        "virtual_scopes",
         sa.Column(
             "id",
             GUID(),
@@ -36,11 +36,11 @@ def upgrade() -> None:
             server_default=sa.func.now(),
             nullable=False,
         ),
-        sa.PrimaryKeyConstraint("id", name=op.f("pk_virtual_scope")),
-        sa.UniqueConstraint("scope_type", "scope_id", name="uq_virtual_scope_scope"),
+        sa.PrimaryKeyConstraint("id", name=op.f("pk_virtual_scopes")),
+        sa.UniqueConstraint("scope_type", "scope_id", name="uq_virtual_scopes_scope"),
     )
     op.create_table(
-        "association_virtual",
+        "scope_bindings",
         sa.Column("id", GUID(), server_default=sa.text("uuid_generate_v4()"), nullable=False),
         sa.Column("virtual_scope_id", GUID(), nullable=False),
         sa.Column("scope_type", sa.String(length=32), nullable=False),
@@ -54,23 +54,23 @@ def upgrade() -> None:
         ),
         sa.ForeignKeyConstraint(
             ["virtual_scope_id"],
-            ["virtual_scope.id"],
-            name=op.f("fk_association_virtual_virtual_scope_id_virtual_scope"),
+            ["virtual_scopes.id"],
+            name=op.f("fk_scope_bindings_virtual_scope_id_virtual_scopes"),
             ondelete="CASCADE",
         ),
-        sa.PrimaryKeyConstraint("id", name=op.f("pk_association_virtual")),
+        sa.PrimaryKeyConstraint("id", name=op.f("pk_scope_bindings")),
         sa.UniqueConstraint(
-            "virtual_scope_id", "scope_type", "scope_id", name="uq_association_virtual_vs_scope"
+            "virtual_scope_id", "scope_type", "scope_id", name="uq_scope_bindings_vs_scope"
         ),
     )
     op.create_index(
-        "ix_association_virtual_scope",
-        "association_virtual",
+        "ix_scope_bindings_scope",
+        "scope_bindings",
         ["scope_type", "scope_id"],
         unique=False,
     )
     op.create_table(
-        "association_entity",
+        "entity_memberships",
         sa.Column("id", GUID(), server_default=sa.text("uuid_generate_v4()"), nullable=False),
         sa.Column("virtual_scope_id", GUID(), nullable=False),
         sa.Column("entity_type", sa.String(length=32), nullable=False),
@@ -84,26 +84,26 @@ def upgrade() -> None:
         ),
         sa.ForeignKeyConstraint(
             ["virtual_scope_id"],
-            ["virtual_scope.id"],
-            name=op.f("fk_association_entity_virtual_scope_id_virtual_scope"),
+            ["virtual_scopes.id"],
+            name=op.f("fk_entity_memberships_virtual_scope_id_virtual_scopes"),
             ondelete="CASCADE",
         ),
-        sa.PrimaryKeyConstraint("id", name=op.f("pk_association_entity")),
+        sa.PrimaryKeyConstraint("id", name=op.f("pk_entity_memberships")),
         sa.UniqueConstraint(
-            "virtual_scope_id", "entity_type", "entity_id", name="uq_association_entity_vs_entity"
+            "virtual_scope_id", "entity_type", "entity_id", name="uq_entity_memberships_vs_entity"
         ),
     )
     op.create_index(
-        "ix_association_entity_entity",
-        "association_entity",
+        "ix_entity_memberships_entity",
+        "entity_memberships",
         ["entity_type", "entity_id"],
         unique=False,
     )
 
 
 def downgrade() -> None:
-    op.drop_index("ix_association_entity_entity", table_name="association_entity")
-    op.drop_table("association_entity")
-    op.drop_index("ix_association_virtual_scope", table_name="association_virtual")
-    op.drop_table("association_virtual")
-    op.drop_table("virtual_scope")
+    op.drop_index("ix_entity_memberships_entity", table_name="entity_memberships")
+    op.drop_table("entity_memberships")
+    op.drop_index("ix_scope_bindings_scope", table_name="scope_bindings")
+    op.drop_table("scope_bindings")
+    op.drop_table("virtual_scopes")

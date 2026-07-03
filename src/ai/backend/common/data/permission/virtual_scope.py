@@ -8,8 +8,8 @@ from ai.backend.common.identifier.virtual_scope import VirtualScopeID
 
 __all__ = (
     "VirtualScopeData",
-    "AssociationScopeData",
-    "AssociationEntityData",
+    "ScopeBindingData",
+    "EntityMembershipData",
 )
 
 
@@ -21,7 +21,7 @@ class VirtualScopeData:
 
 
 @dataclass(frozen=True)
-class AssociationScopeData:
+class ScopeBindingData:
     """Inbound edge ``real scope -> virtual_scope``: a traditional scope
     (domain/project/user/...) bound to a virtual scope so it can reach
     everything the VS owns. Many scopes may bind to the same VS.
@@ -37,10 +37,10 @@ class AssociationScopeData:
 
 
 @dataclass(frozen=True)
-class AssociationEntityData:
-    """Outbound edge ``virtual_scope -> entity``: an entity owned by a virtual
-    scope. Attaching one entity here exposes it to every scope bound to the
-    same VS.
+class EntityMembershipData:
+    """Outbound edge ``virtual_scope -> entity``: an entity that is a member of
+    a virtual scope. Attaching one entity here exposes it to every scope bound
+    to the same VS.
 
     ``permission_cap`` is the ceiling this hop grants (``None`` = no ceiling);
     effective permission is clipped by a bitwise AND with the cap.

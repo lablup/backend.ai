@@ -7,7 +7,7 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common.data.permission.types import Permission
-from ai.backend.common.data.permission.virtual_scope import AssociationScopeData
+from ai.backend.common.data.permission.virtual_scope import ScopeBindingData
 from ai.backend.common.entity.types import ScopeType
 from ai.backend.common.identifier.virtual_scope import VirtualScopeID
 from ai.backend.manager.models.base import (
@@ -17,12 +17,12 @@ from ai.backend.manager.models.base import (
 )
 
 
-class AssociationVirtualRow(Base):  # type: ignore[misc]
-    __tablename__ = "association_virtual"
+class ScopeBindingRow(Base):  # type: ignore[misc]
+    __tablename__ = "scope_bindings"
     __table_args__ = (
-        sa.Index("ix_association_virtual_scope", "scope_type", "scope_id"),
+        sa.Index("ix_scope_bindings_scope", "scope_type", "scope_id"),
         sa.UniqueConstraint(
-            "virtual_scope_id", "scope_type", "scope_id", name="uq_association_virtual_vs_scope"
+            "virtual_scope_id", "scope_type", "scope_id", name="uq_scope_bindings_vs_scope"
         ),
     )
 
@@ -32,7 +32,7 @@ class AssociationVirtualRow(Base):  # type: ignore[misc]
     virtual_scope_id: Mapped[VirtualScopeID] = mapped_column(
         "virtual_scope_id",
         GUID(VirtualScopeID),
-        sa.ForeignKey("virtual_scope.id", ondelete="CASCADE"),
+        sa.ForeignKey("virtual_scopes.id", ondelete="CASCADE"),
         nullable=False,
     )
     scope_type: Mapped[ScopeType] = mapped_column(
@@ -46,8 +46,8 @@ class AssociationVirtualRow(Base):  # type: ignore[misc]
         "created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
     )
 
-    def to_data(self) -> AssociationScopeData:
-        return AssociationScopeData(
+    def to_data(self) -> ScopeBindingData:
+        return ScopeBindingData(
             virtual_scope_id=self.virtual_scope_id,
             scope_type=self.scope_type,
             scope_id=self.scope_id,

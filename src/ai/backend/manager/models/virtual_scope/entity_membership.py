@@ -7,7 +7,7 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common.data.permission.types import Permission
-from ai.backend.common.data.permission.virtual_scope import AssociationEntityData
+from ai.backend.common.data.permission.virtual_scope import EntityMembershipData
 from ai.backend.common.entity.types import EntityType
 from ai.backend.common.identifier.virtual_scope import VirtualScopeID
 from ai.backend.manager.models.base import (
@@ -17,12 +17,12 @@ from ai.backend.manager.models.base import (
 )
 
 
-class AssociationEntityRow(Base):  # type: ignore[misc]
-    __tablename__ = "association_entity"
+class EntityMembershipRow(Base):  # type: ignore[misc]
+    __tablename__ = "entity_memberships"
     __table_args__ = (
-        sa.Index("ix_association_entity_entity", "entity_type", "entity_id"),
+        sa.Index("ix_entity_memberships_entity", "entity_type", "entity_id"),
         sa.UniqueConstraint(
-            "virtual_scope_id", "entity_type", "entity_id", name="uq_association_entity_vs_entity"
+            "virtual_scope_id", "entity_type", "entity_id", name="uq_entity_memberships_vs_entity"
         ),
     )
 
@@ -32,7 +32,7 @@ class AssociationEntityRow(Base):  # type: ignore[misc]
     virtual_scope_id: Mapped[VirtualScopeID] = mapped_column(
         "virtual_scope_id",
         GUID(VirtualScopeID),
-        sa.ForeignKey("virtual_scope.id", ondelete="CASCADE"),
+        sa.ForeignKey("virtual_scopes.id", ondelete="CASCADE"),
         nullable=False,
     )
     entity_type: Mapped[EntityType] = mapped_column(
@@ -46,8 +46,8 @@ class AssociationEntityRow(Base):  # type: ignore[misc]
         "created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
     )
 
-    def to_data(self) -> AssociationEntityData:
-        return AssociationEntityData(
+    def to_data(self) -> EntityMembershipData:
+        return EntityMembershipData(
             virtual_scope_id=self.virtual_scope_id,
             entity_type=self.entity_type,
             entity_id=self.entity_id,
