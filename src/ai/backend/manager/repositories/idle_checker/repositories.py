@@ -18,7 +18,7 @@ class IdleCheckerRepositories:
 
     @classmethod
     def create(cls, args: RepositoryArgs) -> Self:
-        repository = IdleCheckerRepository(args.db)
+        repository = IdleCheckerRepository(args.ops_provider)
 
         return cls(
             repository=repository,

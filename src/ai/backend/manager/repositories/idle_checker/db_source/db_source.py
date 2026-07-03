@@ -13,20 +13,21 @@ from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.idle_checker.row import IdleCheckerBindingRow, IdleCheckerRow
 from ai.backend.manager.models.scaling_group.row import ScalingGroupRow
 from ai.backend.manager.models.session.row import SessionRow
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.base import BatchQuerier, NoPagination
 from ai.backend.manager.repositories.idle_checker.types import (
     BoundCheckerData,
     IdleCheckBatchData,
     IdleCheckerDefinitionData,
     IdleCheckTargetData,
 )
+from ai.backend.manager.repositories.ops import DBOpsProvider
 
 
 class IdleCheckerDBSource:
-    _db: ExtendedAsyncSAEngine
+    _ops: DBOpsProvider
 
-    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
-        self._db = db
+    def __init__(self, ops_provider: DBOpsProvider) -> None:
+        self._ops = ops_provider
 
     async def fetch_idle_check_batch(
         self, session_statuses: Collection[SessionStatus]
@@ -76,11 +77,12 @@ class IdleCheckerDBSource:
             .order_by(SessionRow.created_at, SessionRow.id)
         )
 
-        async with self._db.begin_readonly_session() as db_sess:
-            binding_rows = (await db_sess.execute(binding_query)).fetchall()
+        querier = BatchQuerier(pagination=NoPagination())
+        async with self._ops.read_ops() as r:
+            binding_rows = (await r.batch_query_in_global(binding_query, querier)).rows
             if not binding_rows:
                 return IdleCheckBatchData(targets=())
-            session_rows = (await db_sess.execute(session_query)).fetchall()
+            session_rows = (await r.batch_query_in_global(session_query, querier)).rows
 
         checkers_by_scope: dict[ScopeRef, list[BoundCheckerData]] = {}
         for binding_row in binding_rows:
