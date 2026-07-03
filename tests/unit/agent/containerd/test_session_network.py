@@ -8,6 +8,7 @@ from ai.backend.agent.containerd.runtime import ContainerdRuntimeClient, TaskHan
 from ai.backend.agent.containerd.session_network import (
     ContainerdSessionNetwork,
     UnknownNetworkBackend,
+    build_containerd_session_network,
     session_net_meta_from_network_config,
 )
 from ai.backend.common.etcd import AbstractKVStore
@@ -208,6 +209,31 @@ class TestBackendResolution:
         facade = _facade(etcd, backend, runner, backends={"vxlan": cast(Any, backend)})
         with pytest.raises(UnknownNetworkBackend):
             await facade.ensure_session("s1", _HOSTGW_NC)  # host-gw not registered
+
+
+class TestFactory:
+    def test_builds_facade_with_defaults(self) -> None:
+        # default path registers the real vxlan backend + a NerdctlRuntimeClient
+        facade = build_containerd_session_network(
+            cast(AbstractKVStore, FakeEtcd()),
+            agent_id="agent-1",
+            host_ip="192.168.0.10",
+            uplink="lima0",
+        )
+        assert isinstance(facade, ContainerdSessionNetwork)
+        assert "vxlan" in facade._backends
+
+    def test_injected_collaborators_are_used(self) -> None:
+        backend, runner = RecordingBackend(), RecordingRunner()
+        facade = build_containerd_session_network(
+            cast(AbstractKVStore, FakeEtcd()),
+            agent_id="agent-1",
+            host_ip="192.168.0.10",
+            runtime=FakeRuntime(),
+            cni_runner=runner,
+            backends={"vxlan": cast(Any, backend)},
+        )
+        assert facade._backends["vxlan"] is backend
 
 
 @pytest.mark.parametrize("nc", [_VXLAN_NC, _HOSTGW_NC])

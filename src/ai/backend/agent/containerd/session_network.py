@@ -153,3 +153,45 @@ class ContainerdSessionNetwork:
         await self._orchestrators[session_id].terminate(
             container_id, plan=plan, task_pid=task_pid
         )
+
+
+def build_containerd_session_network(
+    etcd: AbstractKVStore,
+    *,
+    agent_id: str,
+    host_ip: str,
+    uplink: str = "eth0",
+    cni_path: str = "/opt/cni/bin",
+    runtime: ContainerdRuntimeClient | None = None,
+    cni_runner: CniRunner | None = None,
+    backends: Mapping[str, AbstractNetworkAgentPluginV2[Any]] | None = None,
+) -> ContainerdSessionNetwork:
+    """Assemble a ContainerdSessionNetwork with default real collaborators.
+
+    Defaults: NerdctlRuntimeClient over a subprocess runner, CniPluginRunner exec'ing
+    CNI plugins under ``cni_path``, and the vxlan backend on ``uplink``. Any collaborator
+    can be overridden (used by ContainerdAgent, and injectable in tests). Additional
+    backends (host-gw / wireguard) are registered here as they land.
+    """
+    # Lazy imports: keep this facade module decoupled from the concrete runtime/backend.
+    from ai.backend.agent.containerd.nerdctl_runtime import (
+        NerdctlRuntimeClient,
+        default_command_runner,
+    )
+    from ai.backend.agent.network.backends.vxlan import VxlanNetworkPlugin
+    from ai.backend.agent.network.cni_runner import CniPluginRunner
+
+    runtime = runtime or NerdctlRuntimeClient(default_command_runner)
+    cni_runner = cni_runner or CniPluginRunner(cni_path=cni_path)
+    if backends is None:
+        backends = {
+            str(NetworkBackendKind.VXLAN): VxlanNetworkPlugin({}, {}, uplink=uplink),
+        }
+    return ContainerdSessionNetwork(
+        etcd,
+        agent_id=agent_id,
+        host_ip=host_ip,
+        runtime=runtime,
+        cni_runner=cni_runner,
+        backends=backends,
+    )

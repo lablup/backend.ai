@@ -61,6 +61,10 @@ from ai.backend.common.types import (
 )
 
 from .kernel import ContainerdKernel
+from .session_network import (
+    ContainerdSessionNetwork,
+    build_containerd_session_network,
+)
 
 _TODO = "containerd backend: not yet implemented (requires containerd gRPC client)"
 
@@ -212,6 +216,21 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
 class ContainerdAgent(
     AbstractAgent[ContainerdKernel, ContainerdKernelCreationContext],
 ):
+    _session_network: ContainerdSessionNetwork
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        # Cluster networking is delegated to the BEP-1055 agent.network stack via a
+        # (verified) facade; the kernel-creation lifecycle will drive it. The uplink /
+        # cni_path defaults should later be sourced from a containerd network config.
+        container_cfg = self.local_config.container
+        host_ip = str(container_cfg.advertised_host or container_cfg.bind_host)
+        self._session_network = build_containerd_session_network(
+            self.etcd,
+            agent_id=str(self.id),
+            host_ip=host_ip,
+        )
+
     @override
     async def execute(
         self,

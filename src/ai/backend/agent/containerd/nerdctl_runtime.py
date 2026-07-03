@@ -12,6 +12,7 @@ parsing are unit-testable without a live containerd.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from collections.abc import Awaitable, Callable, Mapping, Sequence
@@ -24,6 +25,17 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 # runner(argv) -> (returncode, stdout, stderr)
 CommandRunner = Callable[[Sequence[str]], Awaitable[tuple[int, str, str]]]
+
+
+async def default_command_runner(argv: Sequence[str]) -> tuple[int, str, str]:
+    """Run a command via a subprocess and return (returncode, stdout, stderr)."""
+    proc = await asyncio.create_subprocess_exec(
+        *argv,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    stdout, stderr = await proc.communicate()
+    return proc.returncode or 0, stdout.decode(errors="replace"), stderr.decode(errors="replace")
 
 
 class NerdctlError(RuntimeError):
