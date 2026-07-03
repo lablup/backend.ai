@@ -81,6 +81,7 @@ class AppConfigAllowListAdapter(BaseAdapter):
             spec=AppConfigAllowListCreatorSpec(
                 config_name=input.config_name,
                 scope_type=AppConfigScopeType(input.scope_type.value),
+                rank=input.rank,
             )
         )
         action_result = await self._processors.app_config_allow_list.create.wait_for_complete(
@@ -158,6 +159,7 @@ class AppConfigAllowListAdapter(BaseAdapter):
             id=data.id,
             config_name=data.config_name,
             scope_type=AppConfigScopeTypeDTO(data.scope_type.value),
+            rank=data.rank,
             created_at=data.created_at,
             updated_at=data.updated_at,
         )
@@ -248,6 +250,8 @@ class AppConfigAllowListAdapter(BaseAdapter):
                     result.append(AppConfigAllowListOrders.config_name(ascending))
                 case AppConfigAllowListOrderField.SCOPE_TYPE:
                     result.append(AppConfigAllowListOrders.scope_type(ascending))
+                case AppConfigAllowListOrderField.RANK:
+                    result.append(AppConfigAllowListOrders.rank(ascending))
                 case AppConfigAllowListOrderField.CREATED_AT:
                     result.append(AppConfigAllowListOrders.created_at(ascending))
                 case AppConfigAllowListOrderField.UPDATED_AT:

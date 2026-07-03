@@ -39,11 +39,12 @@ def _make_client(mock_session: MagicMock) -> V2AppConfigAllowListClient:
     return V2AppConfigAllowListClient(auth_client)
 
 
-def _node_payload(entry_id: str, config_name: str) -> dict[str, str]:
+def _node_payload(entry_id: str, config_name: str) -> dict[str, str | int]:
     return {
         "id": entry_id,
         "config_name": config_name,
         "scope_type": "domain",
+        "rank": 200,
         "created_at": "2026-01-01T00:00:00+00:00",
         "updated_at": "2026-01-02T00:00:00+00:00",
     }
@@ -73,6 +74,7 @@ class TestAdminCreate:
         assert isinstance(result, CreateAppConfigAllowListPayload)
         assert result.app_config_allow_list.config_name == "theme"
         assert result.app_config_allow_list.scope_type == AppConfigScopeType.DOMAIN
+        assert result.app_config_allow_list.rank == 200
 
 
 class TestAdminSearch:

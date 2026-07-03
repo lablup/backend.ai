@@ -622,6 +622,11 @@ type AppConfigAllowList implements Node {
   """Scope type the entry permits writes at (public | domain | user)."""
   scopeType: AppConfigScopeType!
 
+  """
+  Added in 26.8.0. Merge rank applied to fragments under this entry (low to high; higher wins).
+  """
+  rank: Int!
+
   """Creation timestamp (UTC)."""
   createdAt: DateTime!
 
@@ -695,6 +700,7 @@ Added in 26.7.0. Fields available for ordering app config allow-list results.
 enum AppConfigAllowListOrderField {
   CONFIG_NAME
   SCOPE_TYPE
+  RANK
   CREATED_AT
   UPDATED_AT
 }
@@ -2277,6 +2283,11 @@ input CreateAppConfigAllowListInput {
 
   """Scope at which fragments may be written (public | domain | user)."""
   scopeType: AppConfigScopeType!
+
+  """
+  Added in 26.8.0. Merge rank applied to fragments under this entry (low to high; higher wins). Defaults to the scope type's default rank (public=100, domain=200, user=300).
+  """
+  rank: Int = null
 }
 
 """Added in 26.7.0. Payload for app config allow-list entry creation."""

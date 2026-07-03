@@ -36,6 +36,13 @@ class CreateAppConfigAllowListInput(BaseRequestModel):
     scope_type: AppConfigScopeType = Field(
         description="Scope at which fragments may be written (public | domain | user)."
     )
+    rank: int | None = Field(
+        default=None,
+        description=(
+            "Merge rank applied to fragments under this entry (low to high; higher wins). "
+            "Defaults to the scope type's default rank (public=100, domain=200, user=300)."
+        ),
+    )
 
 
 class PurgeAppConfigAllowListInput(BaseRequestModel):

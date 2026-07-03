@@ -24,6 +24,9 @@ class AppConfigAllowListNode(BaseResponseModel):
     id: UUID = Field(description="App config allow-list entry UUID.")
     config_name: str = Field(description="Gated config name.")
     scope_type: AppConfigScopeType = Field(description="Scope type the entry permits writes at.")
+    rank: int = Field(
+        description=("Merge rank applied to fragments under this entry (low to high; higher wins).")
+    )
     created_at: datetime = Field(description="Creation timestamp (UTC).")
     updated_at: datetime = Field(description="Last update timestamp (UTC).")
 

@@ -29,7 +29,16 @@ def app_config_allow_list() -> None:
     type=click.Choice([scope_type.value for scope_type in AppConfigScopeType]),
     help="Scope type the entry permits writes at.",
 )
-def create(config_name: str, scope_type: str) -> None:
+@click.option(
+    "--rank",
+    default=None,
+    type=int,
+    help=(
+        "Merge rank applied to fragments under this entry (low to high; higher wins). "
+        "Defaults to the scope type's default rank (public=100, domain=200, user=300)."
+    ),
+)
+def create(config_name: str, scope_type: str, rank: int | None) -> None:
     """Register a new app config allow-list entry."""
     from ai.backend.common.dto.manager.v2.app_config_allow_list.request import (
         CreateAppConfigAllowListInput,
@@ -42,6 +51,7 @@ def create(config_name: str, scope_type: str) -> None:
                 CreateAppConfigAllowListInput(
                     config_name=config_name,
                     scope_type=AppConfigScopeType(scope_type),
+                    rank=rank,
                 )
             )
             print_result(result)

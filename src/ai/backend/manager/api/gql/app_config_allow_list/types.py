@@ -37,6 +37,7 @@ from ai.backend.common.dto.manager.v2.app_config_allow_list.types import (
     AppConfigScopeTypeFilter as AppConfigScopeTypeFilterDTO,
 )
 from ai.backend.common.identifier.app_config_allow_list import AppConfigAllowListID
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection, StringFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -86,6 +87,14 @@ class AppConfigAllowListGQL(PydanticNodeMixin[AppConfigAllowListNode]):
     config_name: str = gql_field(description="The config name this entry permits writes for.")
     scope_type: AppConfigScopeType = gql_field(
         description="Scope type the entry permits writes at (public | domain | user)."
+    )
+    rank: int = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Merge rank applied to fragments under this entry (low to high; higher wins)."
+            ),
+        ),
     )
     created_at: datetime = gql_field(description="Creation timestamp (UTC).")
     updated_at: datetime = gql_field(description="Last update timestamp (UTC).")
@@ -193,6 +202,7 @@ class AppConfigAllowListFilterGQL(PydanticInputMixin[AppConfigAllowListFilterDTO
 class AppConfigAllowListOrderFieldGQL(StrEnum):
     CONFIG_NAME = "config_name"
     SCOPE_TYPE = "scope_type"
+    RANK = "rank"
     CREATED_AT = "created_at"
     UPDATED_AT = "updated_at"
 
@@ -225,6 +235,16 @@ class CreateAppConfigAllowListInputGQL(PydanticInputMixin[CreateAppConfigAllowLi
     config_name: str = gql_field(description="Registered config name to gate.")
     scope_type: AppConfigScopeType = gql_field(
         description="Scope at which fragments may be written (public | domain | user)."
+    )
+    rank: int | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Merge rank applied to fragments under this entry (low to high; higher wins). "
+                "Defaults to the scope type's default rank (public=100, domain=200, user=300)."
+            ),
+        ),
+        default=None,
     )
 
 
