@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import enum
 import uuid
 from collections.abc import Mapping
 from datetime import datetime
@@ -12,6 +11,7 @@ from sqlalchemy.exc import NoResultFound
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship, selectinload
 
+from ai.backend.manager.data.network.types import NetworkType
 from ai.backend.manager.models.base import (
     GUID,
     Base,
@@ -26,12 +26,6 @@ __all__: Final[tuple[str, ...]] = (
     "NetworkRow",
     "NetworkType",
 )
-
-
-class NetworkType(enum.StrEnum):
-    VOLATILE = "volatile"
-    PERSISTENT = "persistent"
-    HOST = "host"
 
 
 def _get_project_join_condition() -> sa.ColumnElement[bool]:
