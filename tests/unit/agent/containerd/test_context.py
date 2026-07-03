@@ -4,11 +4,15 @@ The heavy AbstractKernelCreationContext.__init__ is bypassed via __new__ + manua
 injection so the lifecycle methods can be tested in isolation against a fake facade.
 """
 
+from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, cast
 
 import pytest
 
 from ai.backend.agent.containerd.agent import ContainerdKernelCreationContext
+from ai.backend.agent.resources import Mount
+from ai.backend.common.types import MountPermission, MountTypes
 from ai.backend.agent.containerd.orchestrator import LaunchResult
 from ai.backend.agent.containerd.runtime import TaskHandle
 from ai.backend.common.network.types import (
@@ -59,6 +63,8 @@ def _context(facade: FakeFacade) -> ContainerdKernelCreationContext:
     ctx._session_id = "sess-abc"
     ctx._container_id = "kern-123"
     ctx._net_meta = None
+    ctx._oci_mounts = []
+    ctx._scratch_dir = None
     ctx.kernel_config = cast(Any, {})
     return ctx
 
@@ -84,6 +90,34 @@ class TestApplyNetwork:
         ctx = _context(facade)
         await ctx.apply_network(cast(Any, {}))
         assert facade.ensured == []
+
+
+class TestScratchAndMounts:
+    async def test_prepare_scratch_creates_config_and_work(self, tmp_path: Path) -> None:
+        ctx = _context(FakeFacade())
+        ctx.local_config = cast(Any, SimpleNamespace(container=SimpleNamespace(scratch_root=tmp_path)))
+        await ctx.prepare_scratch()
+        assert (tmp_path / "kern-123" / "config").is_dir()
+        assert (tmp_path / "kern-123" / "work").is_dir()
+        assert ctx._scratch_dir == (tmp_path / "kern-123").resolve()
+
+    async def test_process_mounts_accumulates(self) -> None:
+        ctx = _context(FakeFacade())
+        m = Mount(MountTypes.BIND, Path("/host/x"), Path("/opt/x"), MountPermission.READ_ONLY)
+        await ctx.process_mounts([m])
+        assert ctx._oci_mounts == [m]
+
+    def test_get_runner_mount_builds_mount(self) -> None:
+        ctx = _context(FakeFacade())
+        m = ctx.get_runner_mount(MountTypes.BIND, "/host/su-exec", "/opt/kernel/su-exec")
+        assert m.type is MountTypes.BIND
+        assert str(m.target) == "/opt/kernel/su-exec"
+        assert m.permission is MountPermission.READ_ONLY
+
+    def test_resolve_krunner_filepath_ends_with_name(self) -> None:
+        ctx = _context(FakeFacade())
+        p = ctx.resolve_krunner_filepath("runner/su-exec.x86_64.bin")
+        assert p.name == "su-exec.x86_64.bin"
 
 
 class TestStartContainer:

@@ -16,6 +16,7 @@ from __future__ import annotations
 import asyncio
 import signal
 from collections.abc import Mapping, Sequence
+from importlib.resources import files
 from decimal import Decimal
 from pathlib import Path
 from typing import Any, Literal, override
@@ -81,6 +82,8 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
     _net_meta: SessionNetMeta | None
     _container_id: str
     _session_id: str
+    _oci_mounts: list[Mount]
+    _scratch_dir: Path | None
 
     def __init__(
         self,
@@ -109,6 +112,8 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         self._net_meta = None
         self._container_id = str(kernel_config["kernel_id"])
         self._session_id = str(kernel_config["session_id"])
+        self._oci_mounts = []
+        self._scratch_dir = None
 
     @override
     async def get_extra_envs(self) -> Mapping[str, str]:
@@ -139,7 +144,20 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
 
     @override
     async def prepare_scratch(self) -> None:
-        raise NotImplementedError(_TODO)
+        # Create the per-kernel scratch dirs (config/ + work/). Full parity (tmpfs/loop
+        # scratch types, dotfile cloning) is a follow-up.
+        scratch_dir = (
+            self.local_config.container.scratch_root / str(self._container_id)
+        ).resolve()
+        config_dir = scratch_dir / "config"
+        work_dir = scratch_dir / "work"
+
+        def _mkdirs() -> None:
+            config_dir.mkdir(parents=True, exist_ok=True)
+            work_dir.mkdir(parents=True, exist_ok=True)
+
+        await asyncio.to_thread(_mkdirs)
+        self._scratch_dir = scratch_dir
 
     @override
     async def get_intrinsic_mounts(self) -> Sequence[Mount]:
@@ -170,11 +188,17 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
 
     @override
     async def prepare_ssh(self, cluster_info: ClusterInfo) -> None:
-        raise NotImplementedError(_TODO)
+        # Minimal: ensure the ssh config dir exists. Dropbear host-key generation + cluster
+        # keypair writing (needs the dropbearmulti krunner binary) is a follow-up.
+        if self._scratch_dir is None:
+            return
+        ssh_dir = self._scratch_dir / "config" / "ssh"
+        await asyncio.to_thread(lambda: ssh_dir.mkdir(parents=True, exist_ok=True))
 
     @override
     async def process_mounts(self, mounts: Sequence[Mount]) -> None:
-        raise NotImplementedError(_TODO)
+        # Accumulate mounts to inject into the OCI spec at prepare_container time.
+        self._oci_mounts.extend(mounts)
 
     @override
     async def apply_accelerator_allocation(
@@ -182,7 +206,9 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         computer: AbstractComputePlugin,
         device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
     ) -> None:
-        raise NotImplementedError(_TODO)
+        # No-op for CPU/mem. GPU/accelerator device injection into the OCI spec (the
+        # containerd analogue of generate_docker_args) is a follow-up.
+        return
 
     @override
     async def generate_accelerator_mounts(
@@ -194,7 +220,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
 
     @override
     def resolve_krunner_filepath(self, filename: str) -> Path:
-        raise NotImplementedError(_TODO)
+        return Path(str(files("ai.backend.runner").joinpath("../" + filename))).resolve()
 
     @override
     def get_runner_mount(
@@ -205,7 +231,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         perm: MountPermission = MountPermission.READ_ONLY,
         opts: Mapping[str, Any] | None = None,
     ) -> Mount:
-        raise NotImplementedError(_TODO)
+        return Mount(type, Path(src), Path(target), MountPermission(perm), opts=opts)
 
     @override
     async def prepare_container(
