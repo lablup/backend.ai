@@ -13,7 +13,11 @@ import os
 from collections.abc import Mapping
 from typing import Any, override
 
-from ai.backend.agent.kernel import AbstractCodeRunner, AbstractKernel
+from ai.backend.agent.kernel import (
+    AbstractCodeRunner,
+    AbstractKernel,
+    KernelRunnerNotInitializedError,
+)
 from ai.backend.agent.types import AgentEventData, KernelOwnershipData
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.dto.agent.response import CodeCompletionResp
@@ -72,33 +76,55 @@ class ContainerdKernel(AbstractKernel):
             client_features=client_features,
         )
 
+    def _require_runner(self) -> AbstractCodeRunner:
+        if self.runner is None:
+            raise KernelRunnerNotInitializedError("Kernel runner is not initialized")
+        return self.runner
+
     @override
     async def check_status(self) -> dict[str, Any]:
-        raise NotImplementedError(_TODO)
+        return await self._require_runner().feed_and_get_status()
 
     @override
     async def get_completions(self, text: str, opts: Mapping[str, Any]) -> CodeCompletionResp:
-        raise NotImplementedError(_TODO)
+        result = await self._require_runner().feed_and_get_completion(text, opts)
+        return CodeCompletionResp(result=result)
 
     @override
     async def get_logs(self) -> dict[str, Any]:
+        # TODO: fetch task logs via the runtime client (nerdctl logs); needs runtime access.
         raise NotImplementedError(_TODO)
 
     @override
     async def interrupt_kernel(self) -> dict[str, Any]:
-        raise NotImplementedError(_TODO)
+        await self._require_runner().feed_interrupt()
+        return {"status": "finished"}
 
     @override
     async def start_service(self, service: str, opts: Mapping[str, Any]) -> dict[str, Any]:
-        raise NotImplementedError(_TODO)
+        runner = self._require_runner()
+        if self.data.get("block_service_ports", False):
+            return {"status": "failed", "error": "operation blocked"}
+        for sport in self.service_ports:
+            if sport["name"] == service:
+                break
+        else:
+            return {"status": "failed", "error": "invalid service name"}
+        return await runner.feed_start_service({
+            "name": service,
+            "port": sport["container_ports"][0],
+            "ports": sport["container_ports"],
+            "protocol": sport["protocol"],
+            "options": opts,
+        })
 
     @override
     async def start_model_service(self, model_service: Mapping[str, Any]) -> dict[str, Any]:
-        raise NotImplementedError(_TODO)
+        return await self._require_runner().feed_start_model_service(model_service)
 
     @override
     async def shutdown_service(self, service: str) -> None:
-        raise NotImplementedError(_TODO)
+        await self._require_runner().feed_shutdown_service(service)
 
     @override
     async def check_duplicate_commit(self, kernel_id: KernelId, subdir: str) -> CommitStatus:
@@ -118,7 +144,7 @@ class ContainerdKernel(AbstractKernel):
 
     @override
     async def get_service_apps(self) -> dict[str, Any]:
-        raise NotImplementedError(_TODO)
+        return await self._require_runner().feed_service_apps()
 
     @override
     async def accept_file(self, container_path: os.PathLike[str] | str, filedata: bytes) -> None:
