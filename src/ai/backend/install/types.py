@@ -177,14 +177,14 @@ class HalfstackConfig:
     etcd_password: str | None
 
 
-@dataclasses.dataclass()
+@dataclasses.dataclass(frozen=True)
 class HarborOptions:
     hostname: str = "127.0.0.1"
     http_port: int = 8084
     admin_password: str = "Harbor12345"
 
 
-@dataclasses.dataclass()
+@dataclasses.dataclass(frozen=True)
 class SftpAgentOptions:
     rpc_addr: ServerAddr = dataclasses.field(
         default_factory=lambda: ServerAddr(HostPortPair("127.0.0.1", 6013))
