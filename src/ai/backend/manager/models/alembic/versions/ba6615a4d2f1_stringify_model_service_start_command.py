@@ -6,7 +6,7 @@ aligned with the internal model representation while accepting rows already
 converted by the previous compatibility migrations.
 
 Revision ID: ba6615a4d2f1
-Revises: e3b8d2a1c5f7
+Revises: ada41cb881bb
 Create Date: 2026-06-29
 
 """
@@ -20,7 +20,7 @@ from sqlalchemy.engine import Connection
 
 # revision identifiers, used by Alembic.
 revision = "ba6615a4d2f1"
-down_revision = "e3b8d2a1c5f7"
+down_revision = "ada41cb881bb"
 # Part of: 26.7.0 (main)
 branch_labels = None
 depends_on = None
