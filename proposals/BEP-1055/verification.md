@@ -205,6 +205,24 @@ Per-session LOCAL bridges give egress + cross-session isolation on both the over
 the egress path, with no ICC-off firewall and no stretched-L2 gateway conflict —
 confirming option B end to end. ✅
 
+## 11. Real two-host cross-node overlay + VNI isolation (separate VMs)
+
+Two **separate Linux VMs** on a shared L2 (lima socket_vmnet, `192.168.105.20` and
+`.10`), each running the backend's vxlan setup with the FDB pointing at the other host:
+
+- **Cross-node overlay (same session):** an endpoint on host A (`10.128.5.10`, VNI 4097)
+  pings an endpoint on host B (`10.128.5.20`, VNI 4097): 3/3, 0% loss; `tcpdump` on the
+  underlay shows `192.168.105.10 → .20:4789 VXLAN vni 4097`. Real encap/decap between two
+  actual hosts. ✅
+- **Cross-node VNI isolation (rigorous):** host B also runs session B on a **different
+  VNI (5000) but the same subnet** `10.128.5.0/24`, endpoint `10.128.5.30`. From host A's
+  session-A endpoint (`10.128.5.10`), pinging `10.128.5.30` is **BLOCKED** despite being
+  on-link (same /24), while `10.128.5.20` (same VNI) is REACHABLE. Different VNI ⇒
+  different L2 segment ⇒ isolated even with an overlapping subnet, across real hosts. ✅
+
+This upgrades §4 (single-host netns simulation) to two genuine hosts and confirms both
+cross-node connectivity and per-session VNI isolation on real infrastructure.
+
 ## Notes
 
 - These are manual smoke tests requiring a privileged Linux host (NET_ADMIN),
