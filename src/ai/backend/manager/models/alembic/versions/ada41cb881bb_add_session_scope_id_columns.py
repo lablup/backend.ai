@@ -1,7 +1,7 @@
 """add session scope id columns
 
 Revision ID: ada41cb881bb
-Revises: b4c5d6e7f8a9
+Revises: a379b72f1206
 Create Date: 2026-06-30
 
 """
@@ -13,7 +13,7 @@ from ai.backend.manager.models.base import GUID
 
 # revision identifiers, used by Alembic.
 revision = "ada41cb881bb"
-down_revision = "b4c5d6e7f8a9"
+down_revision = "a379b72f1206"
 # Part of: 26.7.0
 branch_labels = None
 depends_on = None
