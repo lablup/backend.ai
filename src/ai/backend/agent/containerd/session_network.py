@@ -182,6 +182,15 @@ class ContainerdSessionNetwork:
             container_id, plan=plan, task_pid=task_pid
         )
 
+    async def image_entrypoint(self, image_ref: str) -> list[str] | None:
+        return await self._runtime.image_entrypoint(image_ref)
+
+    async def pull_image(self, image_ref: str) -> None:
+        await self._runtime.pull_image(image_ref)
+
+    async def image_exists(self, image_ref: str) -> bool:
+        return await self._runtime.image_exists(image_ref)
+
     async def kill_container(self, container_id: str, *, signal: int) -> None:
         await self._runtime.kill_container(container_id, signal=signal)
 

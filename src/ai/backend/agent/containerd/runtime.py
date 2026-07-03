@@ -50,6 +50,10 @@ class ContainerdRuntimeClient(ABC):
     @abstractmethod
     async def remove_image(self, image_ref: str) -> None: ...
 
+    @abstractmethod
+    async def image_entrypoint(self, image_ref: str) -> list[str] | None:
+        """Return the image's Entrypoint (or Cmd if no entrypoint), or None if unknown."""
+
     # --- container/task lifecycle ---
     @abstractmethod
     async def create_container(

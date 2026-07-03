@@ -61,6 +61,8 @@ from ai.backend.common.types import (
     current_resource_slots,
 )
 
+from ai.backend.common.docker import LabelName
+from ai.backend.common.exception import ImageNotAvailable
 from ai.backend.common.network.types import SessionNetMeta
 
 from .kernel import ContainerdKernel
@@ -345,7 +347,15 @@ class ContainerdAgent(
 
     @override
     async def resolve_image_distro(self, image: ImageConfig) -> str:
-        raise NotImplementedError(_TODO)
+        # Backend.AI kernel images carry the base-distro label; use it. (DockerAgent falls
+        # back to an ldd probe for unlabeled images — a follow-up here.)
+        distro = image["labels"].get(LabelName.BASE_DISTRO)
+        if distro:
+            return distro
+        raise NotImplementedError(
+            f"image {image['canonical']} lacks the {LabelName.BASE_DISTRO} label; "
+            "ldd-based distro detection is not yet implemented for the containerd backend"
+        )
 
     @override
     def get_cgroup_path(self, controller: str, container_id: str) -> Path:
@@ -358,7 +368,7 @@ class ContainerdAgent(
 
     @override
     async def extract_image_command(self, image: str) -> list[str] | None:
-        raise NotImplementedError(_TODO)
+        return await self._session_network.image_entrypoint(image)
 
     @override
     async def scan_images(self) -> ScanImagesResult:
@@ -372,7 +382,8 @@ class ContainerdAgent(
         *,
         timeout_seconds: float | None,
     ) -> None:
-        raise NotImplementedError(_TODO)
+        # TODO: honor registry_conf auth + timeout_seconds; nerdctl uses its own config.
+        await self._session_network.pull_image(image_ref.canonical)
 
     @override
     async def push_image(
@@ -392,7 +403,14 @@ class ContainerdAgent(
     async def check_image(
         self, image_ref: ImageRef, image_id: str, auto_pull: AutoPullBehavior
     ) -> bool:
-        raise NotImplementedError(_TODO)
+        # Returns True if a pull is needed. (TODO: DIGEST freshness check needs the local
+        # image id; treated as up-to-date when present for now.)
+        exists = await self._session_network.image_exists(image_ref.canonical)
+        if exists:
+            return False
+        if auto_pull in (AutoPullBehavior.DIGEST, AutoPullBehavior.TAG):
+            return True
+        raise ImageNotAvailable(image_ref)
 
     @override
     async def init_kernel_context(

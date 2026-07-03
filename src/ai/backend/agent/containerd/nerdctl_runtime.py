@@ -87,6 +87,24 @@ class NerdctlRuntimeClient(ContainerdRuntimeClient):
     async def remove_image(self, image_ref: str) -> None:
         await self._run(["rmi", image_ref])
 
+    async def image_entrypoint(self, image_ref: str) -> list[str] | None:
+        rc, out, _ = await self._runner([
+            *self._base(), "image", "inspect", "--format",
+            "{{json .Config.Entrypoint}}\t{{json .Config.Cmd}}", image_ref,
+        ])
+        if rc != 0:
+            return None
+        entrypoint_raw, _, cmd_raw = out.strip().partition("\t")
+
+        def _parse(text: str) -> list[str] | None:
+            try:
+                value = json.loads(text)
+            except (ValueError, TypeError):
+                return None
+            return [str(v) for v in value] if isinstance(value, list) and value else None
+
+        return _parse(entrypoint_raw) or _parse(cmd_raw)
+
     # --- container/task lifecycle ---
     async def create_container(
         self,
