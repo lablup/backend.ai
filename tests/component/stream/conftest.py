@@ -14,6 +14,7 @@ from dateutil.tz import tzutc
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.common.etcd import AsyncEtcd
+from ai.backend.common.identifier.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.plugin.monitor import ErrorPluginContext
 from ai.backend.common.types import ResourceSlot, SessionId, SessionTypes
 from ai.backend.manager.actions.processor import ActionProcessor
@@ -138,7 +139,8 @@ async def session_seed(
     domain_fixture: DomainFixtureData,
     group_fixture: uuid.UUID,
     admin_user_fixture: UserFixtureData,
-    scaling_group_fixture: str,
+    scaling_group_name: ResourceGroupName,
+    scaling_group_id: ResourceGroupID,
 ) -> AsyncIterator[SessionSeedData]:
     """Seed a RUNNING session + kernel with service_ports in the database."""
     unique = secrets.token_hex(4)
@@ -162,10 +164,12 @@ async def session_seed(
                 cluster_size=1,
                 cluster_mode="single-node",
                 domain_name=domain_fixture.domain_name,
+                domain_id=domain_fixture.domain_id,
                 group_id=group_fixture,
                 user_uuid=admin_user_fixture.user_uuid,
                 access_key=admin_user_fixture.keypair.access_key,
-                scaling_group_name=scaling_group_fixture,
+                scaling_group_name=scaling_group_name,
+                resource_group_id=scaling_group_id,
                 status=SessionStatus.RUNNING,
                 status_info="",
                 status_history=status_history,
@@ -190,7 +194,7 @@ async def session_seed(
                 group_id=group_fixture,
                 user_uuid=admin_user_fixture.user_uuid,
                 access_key=admin_user_fixture.keypair.access_key,
-                scaling_group=scaling_group_fixture,
+                scaling_group=scaling_group_name,
                 status=KernelStatus.RUNNING,
                 status_info="",
                 occupied_slots=ResourceSlot(),

@@ -37,10 +37,10 @@ from uuid import UUID
 import yarl
 from pydantic import ConfigDict, Field
 
-from ai.backend.common.identifier.domain import DomainName
+from ai.backend.common.identifier.domain import DomainID, DomainName
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.project import ProjectID
-from ai.backend.common.identifier.resource_group import ResourceGroupName
+from ai.backend.common.identifier.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.identifier.session import SessionID
 from ai.backend.common.types import (
     AccessKey,
@@ -179,8 +179,10 @@ class SessionNetworkDraft(_DraftBaseModel):
 class SessionScopeDraft(_DraftBaseModel):
     """Optional-heavy mirror of ``SessionScope``."""
 
+    domain_id: DomainID | None = None
     domain_name: DomainName | None = None
     project_id: ProjectID | None = None
+    resource_group_id: ResourceGroupID | None = None
     resource_group_name: ResourceGroupName | None = None
 
 

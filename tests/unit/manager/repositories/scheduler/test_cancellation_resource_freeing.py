@@ -13,6 +13,8 @@ import sqlalchemy as sa
 from dateutil.tz import tzutc
 
 from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
@@ -94,14 +96,24 @@ class TestCancelFreesResourceAllocations:
             yield database_connection
 
     @pytest.fixture
+    def test_domain_id(self) -> DomainID:
+        return DomainID(uuid.uuid4())
+
+    @pytest.fixture
+    def test_scaling_group_id(self) -> ResourceGroupID:
+        return ResourceGroupID(uuid.uuid4())
+
+    @pytest.fixture
     async def test_domain_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_id: DomainID,
     ) -> AsyncGenerator[str, None]:
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 DomainRow(
+                    id=test_domain_id,
                     name=domain_name,
                     total_resource_slots=ResourceSlot({
                         "cpu": Decimal("1000"),
@@ -116,11 +128,13 @@ class TestCancelFreesResourceAllocations:
     async def test_scaling_group_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        test_scaling_group_id: ResourceGroupID,
     ) -> AsyncGenerator[str, None]:
         sg_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 ScalingGroupRow(
+                    id=test_scaling_group_id,
                     name=sg_name,
                     driver="static",
                     scheduler="fifo",
@@ -311,7 +325,9 @@ class TestCancelFreesResourceAllocations:
         *,
         kernel_status: KernelStatus,
         domain_name: str,
+        domain_id: DomainID,
         scaling_group_name: str,
+        resource_group_id: ResourceGroupID,
         group_id: uuid.UUID,
         user_uuid: uuid.UUID,
         access_key: AccessKey,
@@ -335,8 +351,10 @@ class TestCancelFreesResourceAllocations:
                     name=f"test-session-{uuid.uuid4().hex[:8]}",
                     session_type=SessionTypes.INTERACTIVE,
                     domain_name=domain_name,
+                    domain_id=domain_id,
                     group_id=group_id,
                     scaling_group_name=scaling_group_name,
+                    resource_group_id=resource_group_id,
                     status=session_status,
                     status_info="test",
                     cluster_mode=ClusterMode.SINGLE_NODE,
@@ -403,7 +421,9 @@ class TestCancelFreesResourceAllocations:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_name: str,
+        test_domain_id: DomainID,
         test_scaling_group_name: str,
+        test_scaling_group_id: ResourceGroupID,
         test_group_id: uuid.UUID,
         test_user_uuid: uuid.UUID,
         test_access_key: AccessKey,
@@ -413,7 +433,9 @@ class TestCancelFreesResourceAllocations:
             db_with_cleanup,
             kernel_status=KernelStatus.PENDING,
             domain_name=test_domain_name,
+            domain_id=test_domain_id,
             scaling_group_name=test_scaling_group_name,
+            resource_group_id=test_scaling_group_id,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
             access_key=test_access_key,
@@ -425,7 +447,9 @@ class TestCancelFreesResourceAllocations:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_name: str,
+        test_domain_id: DomainID,
         test_scaling_group_name: str,
+        test_scaling_group_id: ResourceGroupID,
         test_group_id: uuid.UUID,
         test_user_uuid: uuid.UUID,
         test_access_key: AccessKey,
@@ -436,7 +460,9 @@ class TestCancelFreesResourceAllocations:
             db_with_cleanup,
             kernel_status=KernelStatus.PULLING,
             domain_name=test_domain_name,
+            domain_id=test_domain_id,
             scaling_group_name=test_scaling_group_name,
+            resource_group_id=test_scaling_group_id,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
             access_key=test_access_key,

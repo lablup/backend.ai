@@ -7,13 +7,14 @@ import pytest
 from ai.backend.client.v2.exceptions import NotFoundError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.dto.manager.scaling_group import ListScalingGroupsResponse
+from ai.backend.common.identifier.resource_group import ResourceGroupName
 
 
 class TestScalingGroupList:
     async def test_admin_lists_scaling_groups(
         self,
         admin_registry: BackendAIClientRegistry,
-        scaling_group_fixture: str,
+        scaling_group_name: ResourceGroupName,
         group_fixture: uuid.UUID,
     ) -> None:
         """Admin can list scaling groups; the fixture sgroup is visible via domain association."""
@@ -22,12 +23,12 @@ class TestScalingGroupList:
         )
         assert isinstance(result, ListScalingGroupsResponse)
         names = [sg.name for sg in result.scaling_groups]
-        assert scaling_group_fixture in names
+        assert scaling_group_name in names
 
     async def test_list_scaling_groups_with_group_filter(
         self,
         admin_registry: BackendAIClientRegistry,
-        scaling_group_fixture: str,
+        scaling_group_name: ResourceGroupName,
         group_fixture: uuid.UUID,
     ) -> None:
         """Filtering by group UUID returns the domain-associated scaling group."""
@@ -35,12 +36,12 @@ class TestScalingGroupList:
             group=str(group_fixture),
         )
         assert isinstance(result, ListScalingGroupsResponse)
-        assert any(sg.name == scaling_group_fixture for sg in result.scaling_groups)
+        assert any(sg.name == scaling_group_name for sg in result.scaling_groups)
 
     async def test_regular_user_lists_public_scaling_groups(
         self,
         user_registry: BackendAIClientRegistry,
-        scaling_group_fixture: str,
+        scaling_group_name: ResourceGroupName,
         group_fixture: uuid.UUID,
     ) -> None:
         """Regular users can list scaling groups; only public ones are returned.
@@ -56,12 +57,12 @@ class TestScalingGroupList:
         assert isinstance(result, ListScalingGroupsResponse)
         # The fixture sgroup defaults to is_public=True, so it is visible.
         names = [sg.name for sg in result.scaling_groups]
-        assert scaling_group_fixture in names
+        assert scaling_group_name in names
 
     async def test_list_scaling_groups_with_uuid_string_parameter(
         self,
         admin_registry: BackendAIClientRegistry,
-        scaling_group_fixture: str,
+        scaling_group_name: ResourceGroupName,
         group_fixture: uuid.UUID,
     ) -> None:
         """BA-5411: Passing group UUID as a string correctly resolves the group."""
@@ -70,14 +71,14 @@ class TestScalingGroupList:
             group=str(group_fixture),
         )
         assert isinstance(result, ListScalingGroupsResponse)
-        assert any(sg.name == scaling_group_fixture for sg in result.scaling_groups)
+        assert any(sg.name == scaling_group_name for sg in result.scaling_groups)
 
 
 class TestScalingGroupWsproxyVersion:
     async def test_admin_gets_wsproxy_version(
         self,
         admin_registry: BackendAIClientRegistry,
-        scaling_group_fixture: str,
+        scaling_group_name: ResourceGroupName,
     ) -> None:
         """Admin requests wsproxy version for a scaling group without wsproxy_addr configured.
 
@@ -87,7 +88,7 @@ class TestScalingGroupWsproxyVersion:
         """
         with pytest.raises(NotFoundError):
             await admin_registry.scaling_group.get_wsproxy_version(
-                scaling_group=scaling_group_fixture,
+                scaling_group=scaling_group_name,
             )
 
     async def test_get_wsproxy_version_nonexistent(
@@ -103,7 +104,7 @@ class TestScalingGroupWsproxyVersion:
     async def test_regular_user_gets_wsproxy_version_not_found(
         self,
         user_registry: BackendAIClientRegistry,
-        scaling_group_fixture: str,
+        scaling_group_name: ResourceGroupName,
     ) -> None:
         """Regular users are not blocked from querying wsproxy version.
 
@@ -113,5 +114,5 @@ class TestScalingGroupWsproxyVersion:
         """
         with pytest.raises(NotFoundError):
             await user_registry.scaling_group.get_wsproxy_version(
-                scaling_group=scaling_group_fixture,
+                scaling_group=scaling_group_name,
             )

@@ -19,6 +19,8 @@ import sqlalchemy as sa
 from dateutil.tz import tzutc
 
 from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
@@ -107,13 +109,25 @@ async def db_with_cleanup(
 
 
 @pytest.fixture
+def test_domain_id() -> DomainID:
+    return DomainID(uuid.uuid4())
+
+
+@pytest.fixture
+def test_scaling_group_id() -> ResourceGroupID:
+    return ResourceGroupID(uuid.uuid4())
+
+
+@pytest.fixture
 async def test_domain_name(
     db_with_cleanup: ExtendedAsyncSAEngine,
+    test_domain_id: DomainID,
 ) -> AsyncGenerator[str, None]:
     domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
     async with db_with_cleanup.begin_session() as db_sess:
         db_sess.add(
             DomainRow(
+                id=test_domain_id,
                 name=domain_name,
                 total_resource_slots=ResourceSlot({
                     "cpu": Decimal("1000"),
@@ -128,11 +142,13 @@ async def test_domain_name(
 @pytest.fixture
 async def test_scaling_group_name(
     db_with_cleanup: ExtendedAsyncSAEngine,
+    test_scaling_group_id: ResourceGroupID,
 ) -> AsyncGenerator[str, None]:
     sg_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
     async with db_with_cleanup.begin_session() as db_sess:
         db_sess.add(
             ScalingGroupRow(
+                id=test_scaling_group_id,
                 name=sg_name,
                 driver="static",
                 scheduler="fifo",
@@ -371,7 +387,9 @@ async def seed_agent_resources(
 async def create_pending_session_with_kernels(
     db: ExtendedAsyncSAEngine,
     *,
+    domain_id: DomainID,
     domain_name: str,
+    resource_group_id: ResourceGroupID,
     scaling_group_name: str,
     group_id: uuid.UUID,
     user_uuid: uuid.UUID,
@@ -397,10 +415,12 @@ async def create_pending_session_with_kernels(
                 id=session_id,
                 name=f"test-session-{uuid.uuid4().hex[:8]}",
                 session_type=SessionTypes.INTERACTIVE,
+                domain_id=domain_id,
                 domain_name=domain_name,
                 group_id=group_id,
                 user_uuid=user_uuid,
                 access_key=access_key,
+                resource_group_id=resource_group_id,
                 scaling_group_name=scaling_group_name,
                 status=SessionStatus.PENDING,
                 status_info="test",

@@ -15,6 +15,7 @@ if TYPE_CHECKING:
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.exception import BackendAIError
+from ai.backend.common.identifier.domain import DomainID, DomainName
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.identifier.resource_group import ResourceGroupID, ResourceGroupName
@@ -284,10 +285,18 @@ class SchedulerRepository:
         )
 
     @scheduler_repository_resilience.apply()
+    async def get_resource_group_id_by_name(self, name: ResourceGroupName) -> ResourceGroupID:
+        return await self._db_source.get_resource_group_id_by_name(name)
+
+    @scheduler_repository_resilience.apply()
     async def get_resource_group_name_by_id(
         self, resource_group_id: ResourceGroupID
     ) -> ResourceGroupName:
         return await self._db_source.get_resource_group_name_by_id(resource_group_id)
+
+    @scheduler_repository_resilience.apply()
+    async def get_domain_id_by_name(self, name: DomainName) -> DomainID:
+        return await self._db_source.get_domain_id_by_name(name)
 
     @scheduler_repository_resilience.apply()
     async def prepare_vfolder_mounts(

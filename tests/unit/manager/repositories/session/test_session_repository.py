@@ -16,6 +16,8 @@ import sqlalchemy as sa
 from dateutil.tz import tzutc
 from sqlalchemy.orm import selectinload
 
+from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.identifier.session import SessionID
 from ai.backend.common.types import (
     AccessKey,
@@ -56,12 +58,24 @@ from ai.backend.testutils.db import with_tables
 
 @dataclass
 class SessionTestData:
+    domain_id: DomainID
     domain_name: str
+    scaling_group_id: ResourceGroupID
     user_id: uuid.UUID
     group_id: uuid.UUID
     session_id: SessionId
     kernel_id: KernelId
     access_key: AccessKey
+
+
+@pytest.fixture
+def test_domain_id() -> DomainID:
+    return DomainID(uuid.uuid4())
+
+
+@pytest.fixture
+def test_scaling_group_id() -> ResourceGroupID:
+    return ResourceGroupID(uuid.uuid4())
 
 
 class TestSessionRepository:
@@ -99,7 +113,12 @@ class TestSessionRepository:
         return SessionRepository(db_with_cleanup)
 
     @pytest.fixture
-    async def session_with_kernel(self, db_with_cleanup: ExtendedAsyncSAEngine) -> SessionTestData:
+    async def session_with_kernel(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_id: DomainID,
+        test_scaling_group_id: ResourceGroupID,
+    ) -> SessionTestData:
         """Create a session with kernel for testing search operations."""
         domain_name = "test-domain"
         user_id = uuid.uuid4()
@@ -111,6 +130,7 @@ class TestSessionRepository:
         async with db_with_cleanup.begin_session() as db_sess:
             # Create domain
             domain = DomainRow(
+                id=test_domain_id,
                 name=domain_name,
                 description="Test domain",
                 is_active=True,
@@ -123,6 +143,7 @@ class TestSessionRepository:
 
             # Create scaling group
             scaling_group = ScalingGroupRow(
+                id=test_scaling_group_id,
                 name="default",
                 is_active=True,
                 is_public=True,
@@ -225,6 +246,7 @@ class TestSessionRepository:
                 session_type=SessionTypes.INTERACTIVE,
                 cluster_mode=ClusterMode.SINGLE_NODE,
                 cluster_size=1,
+                domain_id=test_domain_id,
                 domain_name=domain_name,
                 group_id=group_id,
                 user_uuid=user_id,
@@ -246,6 +268,7 @@ class TestSessionRepository:
                 environ=None,
                 bootstrap_script=None,
                 use_host_network=False,
+                resource_group_id=test_scaling_group_id,
                 scaling_group_name="default",
             )
             db_sess.add(session)
@@ -303,7 +326,9 @@ class TestSessionRepository:
             await db_sess.commit()
 
         return SessionTestData(
+            domain_id=test_domain_id,
             domain_name=domain_name,
+            scaling_group_id=test_scaling_group_id,
             user_id=user_id,
             group_id=group_id,
             session_id=session_id,
@@ -425,6 +450,7 @@ class TestSessionRepository:
                     session_type=SessionTypes.INTERACTIVE,
                     cluster_mode=ClusterMode.SINGLE_NODE,
                     cluster_size=1,
+                    domain_id=base.domain_id,
                     domain_name=base.domain_name,
                     group_id=base.group_id,
                     user_uuid=base.user_id,
@@ -446,6 +472,7 @@ class TestSessionRepository:
                     environ=None,
                     bootstrap_script=None,
                     use_host_network=False,
+                    resource_group_id=base.scaling_group_id,
                     scaling_group_name="default",
                 )
             )
@@ -590,7 +617,10 @@ class TestBatchPopulateSessionOccupiedSlots:
 
     @pytest.fixture
     async def session_with_allocations(
-        self, db_with_resource_tables: ExtendedAsyncSAEngine
+        self,
+        db_with_resource_tables: ExtendedAsyncSAEngine,
+        test_domain_id: DomainID,
+        test_scaling_group_id: ResourceGroupID,
     ) -> SessionTestData:
         """Create a session with resource_allocations (but empty JSONB occupying_slots)."""
         domain_name = "test-domain"
@@ -602,6 +632,7 @@ class TestBatchPopulateSessionOccupiedSlots:
 
         async with db_with_resource_tables.begin_session() as db_sess:
             domain = DomainRow(
+                id=test_domain_id,
                 name=domain_name,
                 description="Test domain",
                 is_active=True,
@@ -613,6 +644,7 @@ class TestBatchPopulateSessionOccupiedSlots:
             db_sess.add(domain)
 
             scaling_group = ScalingGroupRow(
+                id=test_scaling_group_id,
                 name="default",
                 is_active=True,
                 is_public=True,
@@ -708,6 +740,7 @@ class TestBatchPopulateSessionOccupiedSlots:
                 session_type=SessionTypes.INTERACTIVE,
                 cluster_mode=ClusterMode.SINGLE_NODE,
                 cluster_size=1,
+                domain_id=test_domain_id,
                 domain_name=domain_name,
                 group_id=group_id,
                 user_uuid=user_id,
@@ -729,6 +762,7 @@ class TestBatchPopulateSessionOccupiedSlots:
                 environ=None,
                 bootstrap_script=None,
                 use_host_network=False,
+                resource_group_id=test_scaling_group_id,
                 scaling_group_name="default",
             )
             db_sess.add(session)
@@ -807,7 +841,9 @@ class TestBatchPopulateSessionOccupiedSlots:
             await db_sess.commit()
 
         return SessionTestData(
+            domain_id=test_domain_id,
             domain_name=domain_name,
+            scaling_group_id=test_scaling_group_id,
             user_id=user_id,
             group_id=group_id,
             session_id=session_id,

@@ -26,6 +26,7 @@ from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.user.types import UserStatus
+from ai.backend.manager.models.domain import domains
 from ai.backend.manager.models.group import groups
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.kernel import kernels
@@ -138,27 +139,38 @@ class TestDomainPurgeValidation:
                 sa.select(groups.c.id).where(groups.c.domain_name == domain_name).limit(1)
             )
             group_id = group_result.scalar_one()
+            domain_id = (
+                await conn.execute(sa.select(domains.c.id).where(domains.c.name == domain_name))
+            ).scalar_one()
 
         sgroup_name = f"test-sg-{secrets.token_hex(4)}"
         async with db_engine.begin() as conn:
-            await conn.execute(
-                sa.insert(scaling_groups).values(
-                    name=sgroup_name,
-                    description="Test scaling group",
-                    is_active=True,
-                    driver="static",
-                    driver_opts={},
-                    scheduler="fifo",
-                    scheduler_opts=ScalingGroupOpts(),
+            sgroup_id = (
+                await conn.execute(
+                    sa.insert(scaling_groups)
+                    .values(
+                        name=sgroup_name,
+                        description="Test scaling group",
+                        is_active=True,
+                        driver="static",
+                        driver_opts={},
+                        scheduler="fifo",
+                        scheduler_opts=ScalingGroupOpts(),
+                    )
+                    .returning(scaling_groups.c.id)
                 )
-            )
+            ).scalar_one()
             await conn.execute(
                 sa.insert(SessionRow.__table__).values(
                     id=session_id,
                     domain_name=domain_name,
+                    # domain_id/resource_group_id only satisfy NOT NULL FKs;
+                    # the purge check reads kernels.domain_name.
+                    domain_id=domain_id,
                     group_id=group_id,
                     user_uuid=user_uuid,
                     scaling_group_name=sgroup_name,
+                    resource_group_id=sgroup_id,
                     occupying_slots=ResourceSlot(),
                     requested_slots=ResourceSlot(),
                     priority=10,
@@ -230,27 +242,38 @@ class TestDomainPurgeValidation:
                 sa.select(groups.c.id).where(groups.c.domain_name == domain_name).limit(1)
             )
             group_id = group_result.scalar_one()
+            domain_id = (
+                await conn.execute(sa.select(domains.c.id).where(domains.c.name == domain_name))
+            ).scalar_one()
 
         sgroup_name = f"test-sg-{secrets.token_hex(4)}"
         async with db_engine.begin() as conn:
-            await conn.execute(
-                sa.insert(scaling_groups).values(
-                    name=sgroup_name,
-                    description="Test scaling group",
-                    is_active=True,
-                    driver="static",
-                    driver_opts={},
-                    scheduler="fifo",
-                    scheduler_opts=ScalingGroupOpts(),
+            sgroup_id = (
+                await conn.execute(
+                    sa.insert(scaling_groups)
+                    .values(
+                        name=sgroup_name,
+                        description="Test scaling group",
+                        is_active=True,
+                        driver="static",
+                        driver_opts={},
+                        scheduler="fifo",
+                        scheduler_opts=ScalingGroupOpts(),
+                    )
+                    .returning(scaling_groups.c.id)
                 )
-            )
+            ).scalar_one()
             await conn.execute(
                 sa.insert(SessionRow.__table__).values(
                     id=session_id,
                     domain_name=domain_name,
+                    # domain_id/resource_group_id only satisfy NOT NULL FKs;
+                    # the purge check reads kernels.domain_name.
+                    domain_id=domain_id,
                     group_id=group_id,
                     user_uuid=user_uuid,
                     scaling_group_name=sgroup_name,
+                    resource_group_id=sgroup_id,
                     occupying_slots=ResourceSlot(),
                     requested_slots=ResourceSlot(),
                     priority=10,

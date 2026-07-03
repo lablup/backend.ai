@@ -18,6 +18,7 @@ from ai.backend.common.dto.manager.fair_share import (
     UpsertUserFairShareWeightResponse,
     UserWeightEntryInput,
 )
+from ai.backend.common.identifier.resource_group import ResourceGroupName
 from ai.backend.testutils.fixtures import DomainFixtureData
 
 
@@ -27,20 +28,20 @@ class TestUserFairShareWeights:
     async def test_get_user_fair_share(
         self,
         admin_registry: BackendAIClientRegistry,
-        scaling_group_fixture: str,
+        scaling_group_name: ResourceGroupName,
         group_fixture: uuid.UUID,
         admin_user_fixture: Any,
     ) -> None:
         """Get user fair share → returns weight data."""
         result = await admin_registry.fair_share.get_user_fair_share(
-            resource_group=scaling_group_fixture,
+            resource_group=scaling_group_name,
             project_id=group_fixture,
             user_uuid=admin_user_fixture.user_uuid,
         )
         assert isinstance(result, GetUserFairShareResponse)
         assert result.item is not None
         assert result.item.user_uuid == admin_user_fixture.user_uuid
-        assert result.item.resource_group == scaling_group_fixture
+        assert result.item.resource_group == scaling_group_name
 
     async def test_search_user_fair_shares(
         self,
@@ -56,7 +57,7 @@ class TestUserFairShareWeights:
     async def test_upsert_user_fair_share(
         self,
         admin_registry: BackendAIClientRegistry,
-        scaling_group_fixture: str,
+        scaling_group_name: ResourceGroupName,
         group_fixture: uuid.UUID,
         domain_fixture: DomainFixtureData,
         admin_user_fixture: Any,
@@ -64,7 +65,7 @@ class TestUserFairShareWeights:
         """Upsert user fair share → weight created/updated."""
         weight = Decimal("4.5")
         result = await admin_registry.fair_share.upsert_user_fair_share_weight(
-            resource_group=scaling_group_fixture,
+            resource_group=scaling_group_name,
             project_id=group_fixture,
             user_uuid=admin_user_fixture.user_uuid,
             request=UpsertUserFairShareWeightRequest(
@@ -74,12 +75,12 @@ class TestUserFairShareWeights:
         )
         assert isinstance(result, UpsertUserFairShareWeightResponse)
         assert result.item.user_uuid == admin_user_fixture.user_uuid
-        assert result.item.resource_group == scaling_group_fixture
+        assert result.item.resource_group == scaling_group_name
         assert result.item.spec.weight == weight
 
         # Verify the weight persists
         get_result = await admin_registry.fair_share.get_user_fair_share(
-            resource_group=scaling_group_fixture,
+            resource_group=scaling_group_name,
             project_id=group_fixture,
             user_uuid=admin_user_fixture.user_uuid,
         )
@@ -93,7 +94,7 @@ class TestBulkUpsertUserWeights:
     async def test_bulk_upsert_success(
         self,
         admin_registry: BackendAIClientRegistry,
-        scaling_group_fixture: str,
+        scaling_group_name: ResourceGroupName,
         group_fixture: uuid.UUID,
         domain_fixture: DomainFixtureData,
         admin_user_fixture: Any,
@@ -101,7 +102,7 @@ class TestBulkUpsertUserWeights:
         """Bulk upsert success → all weights updated."""
         result = await admin_registry.fair_share.bulk_upsert_user_fair_share_weight(
             BulkUpsertUserFairShareWeightRequest(
-                resource_group=scaling_group_fixture,
+                resource_group=scaling_group_name,
                 inputs=[
                     UserWeightEntryInput(
                         user_uuid=admin_user_fixture.user_uuid,
@@ -118,12 +119,12 @@ class TestBulkUpsertUserWeights:
     async def test_bulk_upsert_empty_input(
         self,
         admin_registry: BackendAIClientRegistry,
-        scaling_group_fixture: str,
+        scaling_group_name: ResourceGroupName,
     ) -> None:
         """Bulk upsert empty input → empty result (no error)."""
         result = await admin_registry.fair_share.bulk_upsert_user_fair_share_weight(
             BulkUpsertUserFairShareWeightRequest(
-                resource_group=scaling_group_fixture,
+                resource_group=scaling_group_name,
                 inputs=[],
             ),
         )
@@ -133,14 +134,14 @@ class TestBulkUpsertUserWeights:
     async def test_bulk_upsert_overwrite(
         self,
         admin_registry: BackendAIClientRegistry,
-        scaling_group_fixture: str,
+        scaling_group_name: ResourceGroupName,
         group_fixture: uuid.UUID,
         domain_fixture: DomainFixtureData,
         admin_user_fixture: Any,
     ) -> None:
         """Bulk upsert overwrites existing weight."""
         await admin_registry.fair_share.upsert_user_fair_share_weight(
-            resource_group=scaling_group_fixture,
+            resource_group=scaling_group_name,
             project_id=group_fixture,
             user_uuid=admin_user_fixture.user_uuid,
             request=UpsertUserFairShareWeightRequest(
@@ -152,7 +153,7 @@ class TestBulkUpsertUserWeights:
         new_weight = Decimal("3.0")
         result = await admin_registry.fair_share.bulk_upsert_user_fair_share_weight(
             BulkUpsertUserFairShareWeightRequest(
-                resource_group=scaling_group_fixture,
+                resource_group=scaling_group_name,
                 inputs=[
                     UserWeightEntryInput(
                         user_uuid=admin_user_fixture.user_uuid,
@@ -167,7 +168,7 @@ class TestBulkUpsertUserWeights:
         assert result.upserted_count == 1
 
         get_result = await admin_registry.fair_share.get_user_fair_share(
-            resource_group=scaling_group_fixture,
+            resource_group=scaling_group_name,
             project_id=group_fixture,
             user_uuid=admin_user_fixture.user_uuid,
         )
@@ -181,14 +182,14 @@ class TestUserScopeAccessControl:
     async def test_global_scope_regular_user_denied(
         self,
         user_registry: BackendAIClientRegistry,
-        scaling_group_fixture: str,
+        scaling_group_name: ResourceGroupName,
         group_fixture: uuid.UUID,
         admin_user_fixture: Any,
     ) -> None:
         """Global-scoped user access as regular user → 403 (denied)."""
         with pytest.raises(PermissionDeniedError):
             await user_registry.fair_share.get_user_fair_share(
-                resource_group=scaling_group_fixture,
+                resource_group=scaling_group_name,
                 project_id=group_fixture,
                 user_uuid=admin_user_fixture.user_uuid,
             )
@@ -201,14 +202,14 @@ class TestUserScopeAccessControl:
     async def test_rg_scope_regular_user_allowed(
         self,
         user_registry: BackendAIClientRegistry,
-        scaling_group_fixture: str,
+        scaling_group_name: ResourceGroupName,
         domain_fixture: DomainFixtureData,
         group_fixture: uuid.UUID,
         admin_user_fixture: Any,
     ) -> None:
         """RG-scoped user access as regular user → 200 (allowed)."""
         get_result = await user_registry.fair_share.rg_get_user_fair_share(
-            resource_group=scaling_group_fixture,
+            resource_group=scaling_group_name,
             domain_name=domain_fixture.domain_name,
             project_id=group_fixture,
             user_uuid=admin_user_fixture.user_uuid,
@@ -216,7 +217,7 @@ class TestUserScopeAccessControl:
         assert isinstance(get_result, GetUserFairShareResponse)
 
         search_result = await user_registry.fair_share.rg_search_user_fair_shares(
-            resource_group=scaling_group_fixture,
+            resource_group=scaling_group_name,
             domain_name=domain_fixture.domain_name,
             project_id=group_fixture,
             request=SearchUserFairSharesRequest(),
@@ -230,13 +231,13 @@ class TestUserDefaultValueFallback:
     async def test_get_user_without_fair_share_default_value(
         self,
         admin_registry: BackendAIClientRegistry,
-        scaling_group_fixture: str,
+        scaling_group_name: ResourceGroupName,
         group_fixture: uuid.UUID,
         admin_user_fixture: Any,
     ) -> None:
         """Get existing user with no fair-share row → default value returned."""
         result = await admin_registry.fair_share.get_user_fair_share(
-            resource_group=scaling_group_fixture,
+            resource_group=scaling_group_name,
             project_id=group_fixture,
             user_uuid=admin_user_fixture.user_uuid,
         )

@@ -23,6 +23,8 @@ from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiv
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.data.agent.types import AgentInfo
 from ai.backend.common.exception import AgentNotFound
+from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import (
     AgentId,
     ClusterMode,
@@ -649,14 +651,24 @@ class TestAgentDBSourceKernelFiltering:
             yield database_connection
 
     @pytest.fixture
+    def test_domain_id(self) -> DomainID:
+        return DomainID(uuid4())
+
+    @pytest.fixture
+    def test_scaling_group_id(self) -> ResourceGroupID:
+        return ResourceGroupID(uuid4())
+
+    @pytest.fixture
     async def test_domain(
         self,
         db_with_tables: ExtendedAsyncSAEngine,
+        test_domain_id: DomainID,
     ) -> AsyncGenerator[str, None]:
         """Create default domain"""
         domain_name = str(uuid4())
         async with db_with_tables.begin_session() as db_sess:
             domain = DomainRow(
+                id=test_domain_id,
                 name=domain_name,
                 description="Test domain",
                 is_active=True,
@@ -707,11 +719,13 @@ class TestAgentDBSourceKernelFiltering:
     async def scaling_group(
         self,
         db_with_tables: ExtendedAsyncSAEngine,
+        test_scaling_group_id: ResourceGroupID,
     ) -> AsyncGenerator[str, None]:
         """Create default scaling group"""
         name = str(uuid4())
         async with db_with_tables.begin_session() as db_sess:
             scaling_group = ScalingGroupRow(
+                id=test_scaling_group_id,
                 name=name,
                 description="Test scaling group",
                 is_active=True,
@@ -731,7 +745,9 @@ class TestAgentDBSourceKernelFiltering:
         request: pytest.FixtureRequest,
         db_with_tables: ExtendedAsyncSAEngine,
         test_group: tuple[str, str],
+        test_domain_id: DomainID,
         scaling_group: str,
+        test_scaling_group_id: ResourceGroupID,
     ) -> AsyncGenerator[KernelFilteringTestCase, None]:
         """Create ONE agent with kernels based on the test case from indirect parametrization"""
         test_case: KernelFilteringTestCase = request.param
@@ -786,8 +802,10 @@ class TestAgentDBSourceKernelFiltering:
                 id=session_id,
                 name=session_name,
                 session_type=SessionTypes.INTERACTIVE,
+                domain_id=test_domain_id,
                 domain_name=domain_name,
                 group_id=UUID(group_id_str),
+                resource_group_id=test_scaling_group_id,
                 scaling_group_name=scaling_group,
                 status=SessionStatus.RUNNING,
                 status_info="test",

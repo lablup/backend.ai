@@ -1578,11 +1578,15 @@ class SessionService:
         callback_url = yarl.URL(action.callback_url) if action.callback_url else None
 
         if action.resource.resource_group_id is not None:
+            resource_group_id = action.resource.resource_group_id
             resource_group_name = await self._scheduler_repository.get_resource_group_name_by_id(
-                action.resource.resource_group_id
+                resource_group_id
             )
         elif action.resource.resource_group:
             resource_group_name = ResourceGroupName(action.resource.resource_group)
+            resource_group_id = await self._scheduler_repository.get_resource_group_id_by_name(
+                resource_group_name
+            )
         else:
             resource_group_id = await self._scheduler_repository.pick_default_resource_group(
                 access_key=access_key,
@@ -1592,6 +1596,7 @@ class SessionService:
             resource_group_name = await self._scheduler_repository.get_resource_group_name_by_id(
                 resource_group_id
             )
+        domain_id = await self._scheduler_repository.get_domain_id_by_name(DomainName(domain_name))
         kernel_groups = await self._resolve_kernel_groups(
             cluster_size=action.resource.cluster_size,
             preopen_ports=preopen_ports,
@@ -1617,8 +1622,10 @@ class SessionService:
                 user_uuid=user_id,
             ),
             scope=SessionScopeDraft(
+                domain_id=domain_id,
                 domain_name=DomainName(domain_name),
                 project_id=ProjectID(action.group_id),
+                resource_group_id=resource_group_id,
                 resource_group_name=resource_group_name,
             ),
             classification=SessionClassificationDraft(

@@ -12,7 +12,8 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.exception import DomainNotFound, InvalidAPIParameters
-from ai.backend.common.identifier.domain import DomainName
+from ai.backend.common.identifier.domain import DomainID, DomainName
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import (
     DefaultForUnspecified,
     ResourceSlot,
@@ -333,13 +334,16 @@ class TestDomainRepository:
     ) -> str:
         """Create an inactive domain with an active kernel for purge testing."""
         domain_name = f"domain-with-kernel-{uuid.uuid4().hex[:8]}"
+        domain_id = DomainID(uuid.uuid4())
         user_uuid = uuid.uuid4()
         group_id = uuid.uuid4()
         session_id = uuid.uuid4()
         sgroup_name = f"default-{uuid.uuid4().hex[:8]}"
+        sgroup_id = ResourceGroupID(uuid.uuid4())
 
         async with db_with_default_resource_policies.begin_session() as session:
             domain = DomainRow(
+                id=domain_id,
                 name=domain_name,
                 description="Test domain with active kernels",
                 is_active=False,
@@ -352,6 +356,7 @@ class TestDomainRepository:
             session.add(domain)
 
             sgroup = ScalingGroupRow(
+                id=sgroup_id,
                 name=sgroup_name,
                 description="Test scaling group",
                 is_active=True,
@@ -403,8 +408,10 @@ class TestDomainRepository:
                 creation_id=str(uuid.uuid4()).replace("-", ""),
                 cluster_size=1,
                 domain_name=domain_name,
+                domain_id=domain_id,
                 group_id=group_id,
                 scaling_group_name=sgroup_name,
+                resource_group_id=sgroup_id,
                 user_uuid=user_uuid,
                 occupying_slots=ResourceSlot(),
                 requested_slots=ResourceSlot(),

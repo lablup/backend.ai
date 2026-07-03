@@ -57,7 +57,7 @@ from ai.backend.common.defs import (
 )
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.events.dispatcher import EventProducer
-from ai.backend.common.identifier.resource_group import ResourceGroupName
+from ai.backend.common.identifier.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.message_queue.redis_queue.queue import RedisMQArgs, RedisQueue
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
@@ -673,11 +673,11 @@ async def resource_policy_fixture(
 
 
 @pytest.fixture()
-async def scaling_group_fixture(
+async def scaling_group_name(
     db_engine: SAEngine,
     domain_fixture: DomainFixtureData,
 ) -> AsyncIterator[ResourceGroupName]:
-    """Insert a scaling group and its domain association; yield the name."""
+    """Insert a scaling group and its domain association; yield its name."""
     sgroup_name = ResourceGroupName(f"sgroup-{secrets.token_hex(6)}")
     async with db_engine.begin() as conn:
         await conn.execute(
@@ -703,6 +703,19 @@ async def scaling_group_fixture(
             sgroups_for_domains.delete().where(sgroups_for_domains.c.scaling_group == sgroup_name)
         )
         await conn.execute(scaling_groups.delete().where(scaling_groups.c.name == sgroup_name))
+
+
+@pytest.fixture()
+async def scaling_group_id(
+    db_engine: SAEngine,
+    scaling_group_name: ResourceGroupName,
+) -> ResourceGroupID:
+    """Return the inserted scaling group's ID."""
+    async with db_engine.begin() as conn:
+        result = await conn.execute(
+            sa.select(scaling_groups.c.id).where(scaling_groups.c.name == scaling_group_name)
+        )
+        return ResourceGroupID(result.scalar_one())
 
 
 @pytest.fixture()
@@ -933,7 +946,7 @@ async def regular_user_fixture(
 async def database_fixture(
     admin_user_fixture: UserFixtureData,
     regular_user_fixture: UserFixtureData,
-    scaling_group_fixture: str,
+    scaling_group_name: ResourceGroupName,
 ) -> AsyncIterator[None]:
     """Backward-compatible aggregate: requests all seed data fixtures."""
     yield

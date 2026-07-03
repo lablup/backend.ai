@@ -26,6 +26,7 @@ from ai.backend.common.dto.manager.agent.types import (
     OrderDirection,
 )
 from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.identifier.resource_group import ResourceGroupName
 
 
 class TestSearchAgents:
@@ -83,13 +84,14 @@ class TestSearchAgents:
         self,
         admin_registry: BackendAIClientRegistry,
         agent_fixture: str,
-        scaling_group_fixture: str,
+        scaling_group_name: ResourceGroupName,
     ) -> None:
         """Filtering by resource_group returns agents in that scaling group."""
+        sgroup_name = scaling_group_name
         result = await admin_registry.agent.search_agents(
             SearchAgentsRequest(
                 filter=AgentFilter(
-                    resource_group=StringFilter(equals=scaling_group_fixture),
+                    resource_group=StringFilter(equals=sgroup_name),
                 ),
             ),
         )
@@ -97,7 +99,7 @@ class TestSearchAgents:
         agent_ids = [item.id for item in result.items]
         assert agent_fixture in agent_ids
         for item in result.items:
-            assert item.resource_group == scaling_group_fixture
+            assert item.resource_group == sgroup_name
 
     async def test_admin_searches_agents_with_ordering(
         self,
@@ -138,15 +140,16 @@ class TestSearchAgents:
         self,
         admin_registry: BackendAIClientRegistry,
         agent_fixture: str,
-        scaling_group_fixture: str,
+        scaling_group_name: ResourceGroupName,
     ) -> None:
         """Compound filters (status + resource_group) return intersection of conditions."""
         # Search with both status=ALIVE and resource_group filters
+        sgroup_name = scaling_group_name
         result = await admin_registry.agent.search_agents(
             SearchAgentsRequest(
                 filter=AgentFilter(
                     status=AgentStatusEnumFilter(equals=AgentStatusEnum.ALIVE),
-                    resource_group=StringFilter(equals=scaling_group_fixture),
+                    resource_group=StringFilter(equals=sgroup_name),
                 ),
             ),
         )
@@ -154,7 +157,7 @@ class TestSearchAgents:
         # All results should match both filters
         for item in result.items:
             assert item.status == AgentStatusEnum.ALIVE
-            assert item.resource_group == scaling_group_fixture
+            assert item.resource_group == sgroup_name
 
         # Our fixture agent should be in the results
         agent_ids = [item.id for item in result.items]

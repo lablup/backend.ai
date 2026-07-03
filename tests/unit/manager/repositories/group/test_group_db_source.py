@@ -10,6 +10,8 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.group.types import ProjectType
@@ -112,15 +114,21 @@ class TestGroupDBSourceDeleteEndpoints:
             yield database_connection
 
     @pytest.fixture
+    def test_domain_id(self) -> DomainID:
+        return DomainID(uuid.uuid4())
+
+    @pytest.fixture
     async def test_domain(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_id: DomainID,
     ) -> str:
         """Create test domain"""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as session:
             domain = DomainRow(
+                id=test_domain_id,
                 name=domain_name,
                 description="Test domain",
                 is_active=True,
@@ -290,17 +298,20 @@ class TestGroupDBSourceDeleteEndpoints:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain: str,
+        test_domain_id: DomainID,
         test_user: uuid.UUID,
         test_group: uuid.UUID,
     ) -> EndpointWithSessionFixtureData:
         """Create one inactive endpoint with a session and routing entry"""
         endpoint_id = DeploymentID(uuid.uuid4())
         session_id = uuid.uuid4()
+        sgroup_id = ResourceGroupID(uuid.uuid4())
         sgroup_name = f"default-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as session:
             # Create scaling group
             sgroup = ScalingGroupRow(
+                id=sgroup_id,
                 name=sgroup_name,
                 description="Test scaling group",
                 is_active=True,
@@ -332,8 +343,10 @@ class TestGroupDBSourceDeleteEndpoints:
                 id=session_id,
                 creation_id=f"test-session-{uuid.uuid4().hex[:8]}",
                 domain_name=test_domain,
+                domain_id=test_domain_id,
                 group_id=test_group,
                 scaling_group_name=sgroup_name,
+                resource_group_id=sgroup_id,
                 user_uuid=test_user,
                 access_key="test-access-key",
                 cluster_mode="single-node",
@@ -413,17 +426,20 @@ class TestGroupDBSourceDeleteEndpoints:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain: str,
+        test_domain_id: DomainID,
         test_user: uuid.UUID,
         test_group: uuid.UUID,
     ) -> MultipleEndpointsWithSessionsFixtureData:
         """Create 3 inactive endpoints, each with a session and routing entry"""
         endpoint_ids = []
         session_ids = []
+        sgroup_id = ResourceGroupID(uuid.uuid4())
         sgroup_name = f"default-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as session:
             # Create scaling group
             sgroup = ScalingGroupRow(
+                id=sgroup_id,
                 name=sgroup_name,
                 description="Test scaling group",
                 is_active=True,
@@ -459,8 +475,10 @@ class TestGroupDBSourceDeleteEndpoints:
                     id=session_id,
                     creation_id=f"test-session-{i}-{uuid.uuid4().hex[:8]}",
                     domain_name=test_domain,
+                    domain_id=test_domain_id,
                     group_id=test_group,
                     scaling_group_name=sgroup_name,
+                    resource_group_id=sgroup_id,
                     user_uuid=test_user,
                     access_key=f"test-access-key-{i}",
                     cluster_mode="single-node",

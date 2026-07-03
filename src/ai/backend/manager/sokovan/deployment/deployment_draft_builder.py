@@ -102,8 +102,10 @@ class DeploymentSessionDraftBuilder:
                 user_uuid=context.session_owner.uuid,
             ),
             scope=SessionScopeDraft(
+                domain_id=context.domain_id,
                 domain_name=DomainName(deployment_info.metadata.domain),
                 project_id=ProjectID(context.group_id),
+                resource_group_id=context.resource_group_id,
                 resource_group_name=ResourceGroupName(deployment_info.metadata.resource_group),
             ),
             classification=SessionClassificationDraft(

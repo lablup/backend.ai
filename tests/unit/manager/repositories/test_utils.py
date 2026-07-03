@@ -10,6 +10,8 @@ import sqlalchemy as sa
 from dateutil.tz import tzutc
 from sqlalchemy.engine import Row
 
+from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.defs import DEFAULT_ROLE
@@ -112,9 +114,12 @@ async def session_info(
     session_id = str(uuid.uuid4()).replace("-", "")
     session_creation_id = str(uuid.uuid4()).replace("-", "")
     resource_policy_name = str(uuid.uuid4()).replace("-", "")
+    resource_group_id = ResourceGroupID(uuid.uuid4())
+    domain_id = DomainID(uuid.uuid4())
 
     async with db_with_cleanup.begin_session() as db_sess:
         scaling_group = ScalingGroupRow(
+            id=resource_group_id,
             name=sgroup_name,
             driver="test",
             scheduler="test",
@@ -122,7 +127,7 @@ async def session_info(
         )
         db_sess.add(scaling_group)
 
-        domain = DomainRow(name=domain_name, total_resource_slots=ResourceSlot())
+        domain = DomainRow(id=domain_id, name=domain_name, total_resource_slots=ResourceSlot())
         db_sess.add(domain)
 
         user_resource_policy = UserResourcePolicyRow(
@@ -165,7 +170,9 @@ async def session_info(
             id=session_id,
             creation_id=session_creation_id,
             cluster_size=1,
+            domain_id=domain_id,
             domain_name=domain_name,
+            resource_group_id=resource_group_id,
             scaling_group_name=sgroup_name,
             group_id=group_id,
             user_uuid=user_uuid,
