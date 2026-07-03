@@ -179,6 +179,32 @@ at its local node's gateway. Option B keeps egress on a node-local (non-stretche
 sidestepping the conflict entirely; the one extra bridge per session is the price for a
 conflict-free, firewall-free egress. B chosen.
 
+## 10. Option B end-to-end (overlay + per-session LOCAL) on real containerd
+
+Real containers (nerdctl `--network none`) each attached to their session's overlay
+bridge AND a per-session LOCAL bridge on a node-local subnet (session A:
+`baibr4097`/`10.128.5.0/24` + `bailo4097`/`172.30.0.0/24`; session B: `baibr5000` +
+`bailo5000`/`172.30.1.0/24`):
+
+- **Dual interface + routing:** each container gets `baimulti0` (overlay) + `eth0`
+  (LOCAL) with `default via 172.30.0.1` (its LOCAL gateway). ✅
+- **Egress path:** `ipMasq` installs per-container SNAT rules; the container reaches its
+  LOCAL gateway (host) and the host's real interface (`192.168.5.15`). ✅ (Full
+  public-internet egress was not confirmed — the lima user-mode network double-NATs
+  container-subnet traffic; on a real host this is the standard Docker-bridge egress
+  path.)
+- **Isolation matrix (same node):**
+
+  | from → to | scope | result |
+  |-----------|-------|--------|
+  | cA1 → cA2 overlay | same session | REACHABLE |
+  | cA1 → cB overlay | cross session | BLOCKED |
+  | cA1 → cB **LOCAL** | cross session | **BLOCKED** |
+
+Per-session LOCAL bridges give egress + cross-session isolation on both the overlay and
+the egress path, with no ICC-off firewall and no stretched-L2 gateway conflict —
+confirming option B end to end. ✅
+
 ## Notes
 
 - These are manual smoke tests requiring a privileged Linux host (NET_ADMIN),
