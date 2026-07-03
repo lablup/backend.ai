@@ -179,23 +179,19 @@ class HalfstackConfig:
 
 @dataclasses.dataclass(frozen=True)
 class HarborOptions:
-    hostname: str = "127.0.0.1"
-    http_port: int = 8084
-    admin_password: str = "Harbor12345"
+    hostname: str
+    http_port: int
+    admin_password: str
 
 
 @dataclasses.dataclass(frozen=True)
 class SftpAgentOptions:
-    rpc_addr: ServerAddr = dataclasses.field(
-        default_factory=lambda: ServerAddr(HostPortPair("127.0.0.1", 6013))
-    )
-    watcher_addr: ServerAddr = dataclasses.field(
-        default_factory=lambda: ServerAddr(HostPortPair("127.0.0.1", 6015))
-    )
-    sock_port: int = 6017
-    ipc_base_path: str = "ipc/agent-sftp"
-    var_base_path: str = "var/agent-sftp"
-    scaling_group: str = "upload"
+    rpc_addr: ServerAddr
+    watcher_addr: ServerAddr
+    sock_port: int
+    ipc_base_path: str
+    var_base_path: str
+    scaling_group: str
 
 
 @dataclasses.dataclass()

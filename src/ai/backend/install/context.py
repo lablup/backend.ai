@@ -1976,7 +1976,18 @@ class DevContext(Context):
                 if self.install_variable.with_harbor
                 else None
             ),
-            sftp_agent=SftpAgentOptions() if self.install_variable.with_sftp_agent else None,
+            sftp_agent=(
+                SftpAgentOptions(
+                    rpc_addr=ServerAddr(HostPortPair("127.0.0.1", 6013)),
+                    watcher_addr=ServerAddr(HostPortPair("127.0.0.1", 6015)),
+                    sock_port=6017,
+                    ipc_base_path="ipc/agent-sftp",
+                    var_base_path="var/agent-sftp",
+                    scaling_group="upload",
+                )
+                if self.install_variable.with_sftp_agent
+                else None
+            ),
         )
 
     @override
