@@ -175,21 +175,13 @@ class TestOwnerOnlyResourceGroupForDelegation:
         ) as mock_query:
             if case.owner_has_access:
                 with pytest.raises(Exception) as exc_info:
-                    await db_source.fetch_session_spec_contexts(
-                        draft,
-                        storage_manager=AsyncMock(),
-                        allowed_vfolder_types=[],
-                    )
+                    await db_source.fetch_session_spec_contexts(draft)
                 assert not isinstance(exc_info.value, InvalidAPIParameters), (
                     f"RG access check must not raise when owner has access; got {exc_info.value!r}"
                 )
             else:
                 with pytest.raises(InvalidAPIParameters, match=RG_NAME):
-                    await db_source.fetch_session_spec_contexts(
-                        draft,
-                        storage_manager=AsyncMock(),
-                        allowed_vfolder_types=[],
-                    )
+                    await db_source.fetch_session_spec_contexts(draft)
 
         # Lookup MUST be scoped to the spec identity's access key — not
         # the requester's. This is the core invariant.
