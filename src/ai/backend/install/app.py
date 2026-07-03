@@ -442,8 +442,9 @@ class InstallReport(Static):
                 """
                     )
                 )
-            if service.harbor_enabled:
-                harbor_url = f"http://{service.harbor_hostname}:{service.harbor_http_port}"
+            if service.harbor is not None:
+                harbor = service.harbor
+                harbor_url = f"http://{harbor.hostname}:{harbor.http_port}"
                 with TabPane("Harbor", id="harbor"):
                     yield Markdown(
                         textwrap.dedent(
@@ -462,7 +463,7 @@ class InstallReport(Static):
 
                 Admin credentials:
                 - Username: `admin`
-                - Password: `{service.harbor_admin_password}`
+                - Password: `{harbor.admin_password}`
 
                 The Harbor instance is also pre-registered as a Backend.AI
                 container registry named `local-harbor` (project `library`)
@@ -474,14 +475,15 @@ class InstallReport(Static):
                 """
                         )
                     )
-            if service.sftp_agent_enabled:
+            if service.sftp_agent is not None:
+                sftp = service.sftp_agent
                 with TabPane("SFTP Agent", id="sftp-agent"):
                     yield Markdown(
                         textwrap.dedent(
                             f"""
                 A dedicated SFTP agent has been configured alongside the
                 regular compute agent, assigned to the
-                `{service.sftp_agent_scaling_group}` scaling group.
+                `{sftp.scaling_group}` scaling group.
 
                 Start it in a separate shell (or via the `./dev` helper):
                 ```console
@@ -496,8 +498,8 @@ class InstallReport(Static):
                 ```
 
                 The SFTP agent listens on:
-                - RPC:     `{service.sftp_agent_rpc_addr.bind.host}:{service.sftp_agent_rpc_addr.bind.port}`
-                - Watcher: `{service.sftp_agent_watcher_addr.bind.host}:{service.sftp_agent_watcher_addr.bind.port}`
+                - RPC:     `{sftp.rpc_addr.bind.host}:{sftp.rpc_addr.bind.port}`
+                - Watcher: `{sftp.watcher_addr.bind.host}:{sftp.watcher_addr.bind.port}`
 
                 SFTP upload sessions created via the web UI will be routed
                 to this agent; regular compute sessions continue to run on
