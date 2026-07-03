@@ -19,10 +19,7 @@ from ai.backend.common.api_handlers import Sentinel
 from ai.backend.common.config import (
     ModelConfig,
     ModelDefinition,
-    ModelHealthCheck,
-    ModelMetadata,
     ModelServiceConfig,
-    PreStartAction,
 )
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
@@ -352,63 +349,55 @@ def _tristate_from_input[T](value: T | Sentinel | None) -> TriState[T]:
     return TriState[T].update(value)
 
 
-def _pre_start_action_to_dto(action: PreStartAction) -> PreStartActionInfoDTO:
-    return PreStartActionInfoDTO(action=action.action, args=action.args)
-
-
-def _model_health_check_to_dto(check: ModelHealthCheck) -> ModelHealthCheckInfoDTO:
-    return ModelHealthCheckInfoDTO(
-        enable=check.enable,
-        interval=check.interval,
-        path=check.path,
-        max_retries=check.max_retries,
-        max_wait_time=check.max_wait_time,
-        expected_status_code=check.expected_status_code,
-        initial_delay=check.initial_delay,
-    )
-
-
 def _model_service_config_to_dto(service: ModelServiceConfig) -> ModelServiceConfigInfoDTO:
+    health_check = None
+    if service.health_check is not None:
+        health_check = ModelHealthCheckInfoDTO(
+            enable=service.health_check.enable,
+            interval=service.health_check.interval,
+            path=service.health_check.path,
+            max_retries=service.health_check.max_retries,
+            max_wait_time=service.health_check.max_wait_time,
+            expected_status_code=service.health_check.expected_status_code,
+            initial_delay=service.health_check.initial_delay,
+        )
     return ModelServiceConfigInfoDTO(
-        pre_start_actions=[_pre_start_action_to_dto(a) for a in service.pre_start_actions],
+        pre_start_actions=[
+            PreStartActionInfoDTO(action=a.action, args=a.args) for a in service.pre_start_actions
+        ],
         command=service.start_command,
         start_command=to_legacy_start_command(service.start_command),
         shell=service.shell,
         port=service.port,
-        health_check=(
-            _model_health_check_to_dto(service.health_check)
-            if service.health_check is not None
-            else None
-        ),
-    )
-
-
-def _model_metadata_to_dto(metadata: ModelMetadata) -> ModelMetadataInfoDTO:
-    return ModelMetadataInfoDTO(
-        author=metadata.author,
-        title=metadata.title,
-        version=metadata.version,
-        created=metadata.created,
-        last_modified=metadata.last_modified,
-        description=metadata.description,
-        task=metadata.task,
-        category=metadata.category,
-        architecture=metadata.architecture,
-        framework=metadata.framework,
-        label=metadata.label,
-        license=metadata.license,
-        min_resource=metadata.min_resource,
+        health_check=health_check,
     )
 
 
 def _model_config_to_dto(config: ModelConfig) -> ModelConfigInfoDTO:
+    metadata = None
+    if config.metadata is not None:
+        metadata = ModelMetadataInfoDTO(
+            author=config.metadata.author,
+            title=config.metadata.title,
+            version=config.metadata.version,
+            created=config.metadata.created,
+            last_modified=config.metadata.last_modified,
+            description=config.metadata.description,
+            task=config.metadata.task,
+            category=config.metadata.category,
+            architecture=config.metadata.architecture,
+            framework=config.metadata.framework,
+            label=config.metadata.label,
+            license=config.metadata.license,
+            min_resource=config.metadata.min_resource,
+        )
     return ModelConfigInfoDTO(
         name=config.name,
         model_path=config.model_path,
         service=(
             _model_service_config_to_dto(config.service) if config.service is not None else None
         ),
-        metadata=(_model_metadata_to_dto(config.metadata) if config.metadata is not None else None),
+        metadata=metadata,
     )
 
 
