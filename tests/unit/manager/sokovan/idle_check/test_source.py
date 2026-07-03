@@ -9,7 +9,10 @@ import pytest
 from ai.backend.common.types import SessionId
 from ai.backend.manager.data.idle_checker.types import IdleCheckSession
 from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.repositories.idle_checker.types import IdleCheckBatch, IdleCheckTarget
+from ai.backend.manager.repositories.idle_checker.types import (
+    IdleCheckBatchData,
+    IdleCheckTargetData,
+)
 from ai.backend.manager.sokovan.idle_check.source import IdleCheckSource
 from ai.backend.manager.sokovan.idle_check.types import IdleCheckCategory, IdleCheckTargetStatuses
 
@@ -23,11 +26,11 @@ class TestIdleCheckSource:
     def batch(
         self,
         session_ids: tuple[SessionId, SessionId],
-    ) -> IdleCheckBatch:
+    ) -> IdleCheckBatchData:
         first_session_id, second_session_id = session_ids
-        return IdleCheckBatch(
+        return IdleCheckBatchData(
             targets=(
-                IdleCheckTarget(
+                IdleCheckTargetData(
                     session=IdleCheckSession(
                         session_id=first_session_id,
                         created_at=datetime(2026, 1, 1, tzinfo=UTC),
@@ -35,7 +38,7 @@ class TestIdleCheckSource:
                     ),
                     checkers=(),
                 ),
-                IdleCheckTarget(
+                IdleCheckTargetData(
                     session=IdleCheckSession(
                         session_id=second_session_id,
                         created_at=datetime(2026, 1, 2, tzinfo=UTC),
@@ -47,7 +50,7 @@ class TestIdleCheckSource:
         )
 
     @pytest.fixture()
-    def repository(self, batch: IdleCheckBatch) -> MagicMock:
+    def repository(self, batch: IdleCheckBatchData) -> MagicMock:
         repository = MagicMock()
         repository.fetch_idle_check_batch = AsyncMock(return_value=batch)
         return repository
@@ -64,7 +67,7 @@ class TestIdleCheckSource:
         self,
         source: IdleCheckSource,
         repository: MagicMock,
-        batch: IdleCheckBatch,
+        batch: IdleCheckBatchData,
         session_ids: tuple[SessionId, SessionId],
         target_statuses: IdleCheckTargetStatuses,
     ) -> None:

@@ -16,7 +16,7 @@ from ai.backend.manager.data.reconciler.types import (
 )
 from ai.backend.manager.data.session.options import HandlerPolicyResolver
 from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.repositories.idle_checker.types import IdleCheckBatch
+from ai.backend.manager.repositories.idle_checker.types import IdleCheckBatchData
 from ai.backend.manager.sokovan.reconciler.base import (
     BaseReconcilerInfo,
     BaseReconcilerKind,
@@ -41,7 +41,7 @@ class IdleCheckTargetStatuses(BaseReconcilerTargetStatuses):
 
 @dataclass
 class IdleCheckReconcileInfo(BaseReconcilerInfo):
-    batch: IdleCheckBatch
+    batch: IdleCheckBatchData
     current_time: datetime
 
     @override

@@ -12,7 +12,7 @@ from ai.backend.manager.data.idle_checker.types import IdleCheckSession, ScopeRe
 
 
 @dataclass(frozen=True)
-class IdleCheckerDefinition:
+class IdleCheckerDefinitionData:
     """An idle checker definition with its typed, loaded spec."""
 
     checker_id: IdleCheckerID
@@ -21,7 +21,7 @@ class IdleCheckerDefinition:
 
 
 @dataclass(frozen=True)
-class BoundChecker:
+class BoundCheckerData:
     """A checker applied through a concrete scope binding.
 
     ``binding_created_at`` is the stable tiebreak within the same scope.
@@ -29,19 +29,19 @@ class BoundChecker:
 
     scope: ScopeRef
     binding_created_at: datetime
-    checker: IdleCheckerDefinition
+    checker: IdleCheckerDefinitionData
 
 
 @dataclass(frozen=True)
-class IdleCheckTarget:
+class IdleCheckTargetData:
     """One session and the checkers applicable to it in this batch."""
 
     session: IdleCheckSession
-    checkers: Sequence[BoundChecker]
+    checkers: Sequence[BoundCheckerData]
 
 
 @dataclass(frozen=True)
-class IdleCheckBatch:
+class IdleCheckBatchData:
     """Handler-oriented idle-check input for one reconciler tick."""
 
-    targets: Sequence[IdleCheckTarget]
+    targets: Sequence[IdleCheckTargetData]
