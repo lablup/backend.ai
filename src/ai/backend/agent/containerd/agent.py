@@ -343,7 +343,10 @@ class ContainerdAgent(
         self,
         status_filter: frozenset[ContainerStatus] = frozenset(),
     ) -> Sequence[tuple[KernelId, Container]]:
-        raise NotImplementedError(_TODO)
+        # Boot-safe: no live-container reconciliation yet. Enumerating kernels from
+        # containerd (list_containers + the ai.backend.kernel-id label -> Container) is a
+        # follow-up; returning empty keeps startup/lifecycle sync working.
+        return []
 
     @override
     async def resolve_image_distro(self, image: ImageConfig) -> str:
@@ -372,7 +375,10 @@ class ContainerdAgent(
 
     @override
     async def scan_images(self) -> ScanImagesResult:
-        raise NotImplementedError(_TODO)
+        # Boot-safe: startup calls this to populate self.images. Building InstalledImageInfo
+        # from `nerdctl images` + Backend.AI image labels is a follow-up; empty lets the
+        # agent boot and pull-on-demand via check_image/pull_image.
+        return ScanImagesResult(scanned_images={}, removed_images={})
 
     @override
     async def pull_image(

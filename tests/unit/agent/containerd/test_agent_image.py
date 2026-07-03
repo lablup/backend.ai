@@ -63,6 +63,21 @@ class TestPullImage:
         assert facade.pulled == ["cr.example/img:1"]
 
 
+class TestBootSafe:
+    async def test_scan_images_returns_empty(self) -> None:
+        agent = _agent(FakeFacade())
+        result = await agent.scan_images()
+        assert result.scanned_images == {}
+        assert result.removed_images == {}
+
+    async def test_enumerate_containers_empty(self) -> None:
+        agent = _agent(FakeFacade())
+        assert await agent.enumerate_containers() == []
+
+    def test_cgroup_version_is_v2(self) -> None:
+        assert _agent(FakeFacade()).get_cgroup_version() == "2"
+
+
 class TestCheckImage:
     async def test_present_needs_no_pull(self) -> None:
         agent = _agent(FakeFacade(exists=True))
