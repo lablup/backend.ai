@@ -54,6 +54,7 @@ from ai.backend.common.dto.manager.v2.resource_slot.response import (
     AllocatedResourceSlotNode,
     SearchAllocatedResourceSlotsPayload,
 )
+from ai.backend.common.model_service_start_command_compat import to_legacy_start_command
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.deployment_revision_preset.types import (
@@ -150,7 +151,8 @@ def _model_health_check_to_dto(check: ModelHealthCheck) -> ModelHealthCheckInfoD
 def _model_service_config_to_dto(service: ModelServiceConfig) -> ModelServiceConfigInfoDTO:
     return ModelServiceConfigInfoDTO(
         pre_start_actions=[_pre_start_action_to_dto(a) for a in service.pre_start_actions],
-        start_command=service.start_command,
+        command=service.start_command,
+        start_command=to_legacy_start_command(service.start_command),
         shell=service.shell,
         port=service.port,
         health_check=(

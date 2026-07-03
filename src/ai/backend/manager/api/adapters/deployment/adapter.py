@@ -16,6 +16,11 @@ if TYPE_CHECKING:
     from ai.backend.manager.sokovan.deployment.coordinator import DeploymentCoordinator
 
 from ai.backend.common.api_handlers import Sentinel
+from ai.backend.common.config import (
+    ModelConfig,
+    ModelDefinition,
+    ModelServiceConfig,
+)
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.model_deployment.types import (
@@ -111,10 +116,15 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
     EnvironmentVariableEntryInfoDTO,
     EnvironmentVariablesInfoDTO,
     ExtraVFolderMountGQLDTO,
+    ModelConfigInfoDTO,
     ModelDefinitionInfoDTO,
+    ModelHealthCheckInfoDTO,
+    ModelMetadataInfoDTO,
     ModelMountConfigInfoDTO,
     ModelRuntimeConfigInfoDTO,
+    ModelServiceConfigInfoDTO,
     OrderDirection,
+    PreStartActionInfoDTO,
     ReplicaOrderField,
     ReplicaStateInfo,
     ResourceConfigInfoDTO,
@@ -139,6 +149,7 @@ from ai.backend.common.dto.manager.v2.resource_slot.types import (
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.identifier.runtime_variant_preset import RuntimeVariantPresetID
+from ai.backend.common.model_service_start_command_compat import to_legacy_start_command
 from ai.backend.manager.api.adapter_options.deployment.options import (
     deployment_options_from_input,
     deployment_options_to_info,
@@ -336,6 +347,68 @@ def _tristate_from_input[T](value: T | Sentinel | None) -> TriState[T]:
     if value is None:
         return TriState[T].nullify()
     return TriState[T].update(value)
+
+
+def _model_service_config_to_dto(service: ModelServiceConfig) -> ModelServiceConfigInfoDTO:
+    health_check = None
+    if service.health_check is not None:
+        health_check = ModelHealthCheckInfoDTO(
+            enable=service.health_check.enable,
+            interval=service.health_check.interval,
+            path=service.health_check.path,
+            max_retries=service.health_check.max_retries,
+            max_wait_time=service.health_check.max_wait_time,
+            expected_status_code=service.health_check.expected_status_code,
+            initial_delay=service.health_check.initial_delay,
+        )
+    return ModelServiceConfigInfoDTO(
+        pre_start_actions=[
+            PreStartActionInfoDTO(action=a.action, args=a.args) for a in service.pre_start_actions
+        ],
+        command=service.start_command,
+        start_command=to_legacy_start_command(service.start_command),
+        shell=service.shell,
+        port=service.port,
+        health_check=health_check,
+    )
+
+
+def _model_config_to_dto(config: ModelConfig) -> ModelConfigInfoDTO:
+    metadata = None
+    if config.metadata is not None:
+        metadata = ModelMetadataInfoDTO(
+            author=config.metadata.author,
+            title=config.metadata.title,
+            version=config.metadata.version,
+            created=config.metadata.created,
+            last_modified=config.metadata.last_modified,
+            description=config.metadata.description,
+            task=config.metadata.task,
+            category=config.metadata.category,
+            architecture=config.metadata.architecture,
+            framework=config.metadata.framework,
+            label=config.metadata.label,
+            license=config.metadata.license,
+            min_resource=config.metadata.min_resource,
+        )
+    return ModelConfigInfoDTO(
+        name=config.name,
+        model_path=config.model_path,
+        service=(
+            _model_service_config_to_dto(config.service) if config.service is not None else None
+        ),
+        metadata=metadata,
+    )
+
+
+def _model_definition_to_dto(
+    definition: ModelDefinition | None,
+) -> ModelDefinitionInfoDTO | None:
+    if definition is None:
+        return None
+    return ModelDefinitionInfoDTO(
+        models=[_model_config_to_dto(m) for m in definition.models],
+    )
 
 
 @lru_cache(maxsize=1)
@@ -2354,13 +2427,7 @@ class DeploymentAdapter(BaseAdapter):
                 ],
             ),
             model_mount_config=model_mount_config_dto,
-            model_definition=(
-                ModelDefinitionInfoDTO.model_validate(
-                    data.model_definition.model_dump(by_alias=False)
-                )
-                if data.model_definition is not None
-                else None
-            ),
+            model_definition=_model_definition_to_dto(data.model_definition),
             created_at=data.created_at,
             extra_mounts=[
                 ExtraVFolderMountGQLDTO(

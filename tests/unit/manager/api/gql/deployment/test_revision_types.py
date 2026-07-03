@@ -67,7 +67,7 @@ class TestModelDefinitionInputGQL:
         service = resolved.models[0].service
         assert service is not None
         assert service.port == 8000
-        assert service.start_command == ["/models/start.sh"]
+        assert service.start_command == "/models/start.sh"
         assert service.health_check is not None
         assert service.health_check.path == "1"
         assert service.health_check.expected_status_code == 101

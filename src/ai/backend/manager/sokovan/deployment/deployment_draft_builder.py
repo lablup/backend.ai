@@ -214,7 +214,7 @@ class DeploymentSessionDraftBuilder:
         ``service.start_command`` is taken as-is from the revision snapshot
         (the controller has already resolved any ``{model_path}`` placeholder
         against ``models[0].model_path`` at revision creation time). Preset
-        ARGS are appended as separate argv tokens via
+        ARGS are shell-quoted and appended to the command string via
         :meth:`ModelDefinition.with_args_appended` so the merge stays on
         typed objects up to the final ``model_dump``.
         """

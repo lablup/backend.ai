@@ -3462,6 +3462,7 @@
               }
             ],
             "default": null,
+            "description": "Shell used to run the command. If set, the kernel runs `[shell, '-c', command]`; null or empty disables shell wrapping.",
             "title": "Shell"
           },
           "port": {
@@ -7113,10 +7114,17 @@
             "title": "Start Command"
           },
           "shell": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "default": "/bin/bash",
-            "description": "Shell configured for the model service.",
-            "title": "Shell",
-            "type": "string"
+            "description": "Shell used to run the command. If set, the kernel runs `[shell, '-c', command]`; null or empty disables shell wrapping.",
+            "title": "Shell"
           },
           "port": {
             "description": "Port number for the model service. Must be greater than 1.",
@@ -7670,38 +7678,35 @@
           "start-command": {
             "anyOf": [
               {
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
+                "type": "string"
               },
               {
                 "type": "null"
               }
             ],
             "default": null,
-            "description": "Argv list to start the model service. ``{model_path}`` in any token is replaced per-token with the resolved ``model_path`` before launch. ``None`` falls back to the image's default CMD.",
+            "description": "Command string to start the model service. ``{model_path}`` is replaced with the resolved ``model_path`` before launch. ``None`` falls back to the image's default CMD.",
             "examples": [
-              [
-                "python",
-                "service.py"
-              ],
-              [
-                "vllm",
-                "serve",
-                "{model_path}"
-              ]
+              "python service.py",
+              "vllm serve {model_path}"
             ],
             "title": "Start-Command"
           },
           "shell": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "default": "/bin/bash",
-            "description": "Shell configured for the model service.",
+            "description": "Shell used to run the command. If set, the kernel runs `[shell, '-c', command]`; null or empty disables shell wrapping.",
             "examples": [
               "/bin/bash"
             ],
-            "title": "Shell",
-            "type": "string"
+            "title": "Shell"
           },
           "port": {
             "description": "Port number for the model service. Must be greater than 1.",
@@ -36424,10 +36429,7 @@
           "start-command": {
             "anyOf": [
               {
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
+                "type": "string"
               },
               {
                 "type": "null"

@@ -152,7 +152,13 @@ class ModelServiceConfigInput(BaseRequestModel):
     pre_start_actions: list[PreStartAction] | None = None
     command: str | None = None
     start_command: list[str] | None = None
-    shell: str | None = None
+    shell: str | None = Field(
+        default=None,
+        description=(
+            "Shell used to run the command. If set, the kernel runs "
+            "`[shell, '-c', command]`; null or empty disables shell wrapping."
+        ),
+    )
     port: int | None = None
     health_check: ModelHealthCheckInput | None = None
 

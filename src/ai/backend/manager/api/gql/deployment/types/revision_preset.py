@@ -550,8 +550,12 @@ class PresetModelServiceConfigInputGQL(PydanticInputMixin[PresetModelServiceConf
         default=None,
         deprecation_reason="Use `command` instead.",
     )
-    shell: str = gql_field(
-        description="Shell configured for the model service.", default=DEFAULT_SHELL
+    shell: str | None = gql_field(
+        description=(
+            "Shell used to run the command. If set, the kernel runs "
+            "`[shell, '-c', command]`; null or empty disables shell wrapping."
+        ),
+        default=DEFAULT_SHELL,
     )
     port: int = gql_field(
         description="Port number for the model service. Must be greater than 1.",

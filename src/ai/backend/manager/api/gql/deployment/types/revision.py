@@ -437,7 +437,11 @@ class ModelServiceConfigGQL:
         deprecation_reason="Use `command` instead.",
     )
     shell: str | None = gql_field(
-        description="Shell configured for the model service.", default="/bin/bash"
+        description=(
+            "Shell used to run the command. If set, the kernel runs "
+            "`[shell, '-c', command]`; null or empty disables shell wrapping."
+        ),
+        default="/bin/bash",
     )
     port: int = gql_field(description="Port number for the model service.")
     health_check: ModelHealthCheckGQL | None = gql_field(
@@ -998,7 +1002,11 @@ class ModelServiceConfigInputGQL(PydanticInputMixin[ModelServiceConfigInputDTO])
         deprecation_reason="Use `command` instead.",
     )
     shell: str | None = gql_field(
-        description="Shell configured for the model service.", default=None
+        description=(
+            "Shell used to run the command. If set, the kernel runs "
+            "`[shell, '-c', command]`; null or empty disables shell wrapping."
+        ),
+        default=None,
     )
     port: int | None = gql_field(description="Port number for the model service.", default=None)
     health_check: ModelHealthCheckInputGQL | None = gql_field(

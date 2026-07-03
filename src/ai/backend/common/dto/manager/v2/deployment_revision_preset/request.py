@@ -75,7 +75,13 @@ class PresetModelServiceConfigInput(BaseRequestModel):
         default=None,
         description="Deprecated. Command to start the model service. Use `command` instead.",
     )
-    shell: str = Field(default=DEFAULT_SHELL, description="Shell configured for the model service.")
+    shell: str | None = Field(
+        default=DEFAULT_SHELL,
+        description=(
+            "Shell used to run the command. If set, the kernel runs "
+            "`[shell, '-c', command]`; null or empty disables shell wrapping."
+        ),
+    )
     port: int = Field(
         gt=1, description="Port number for the model service. Must be greater than 1."
     )

@@ -119,7 +119,7 @@ class TestLegacyInferenceEnvTranslatorToCliArgs:
         assert LegacyInferenceEnvTranslator.to_cli_args(scenario.environ) == scenario.expected
 
 
-def _model(name: str, start_command: list[str] | None) -> ModelConfig:
+def _model(name: str, start_command: str | None) -> ModelConfig:
     return ModelConfig.model_validate({
         "name": name,
         "model_path": f"/models/{name}",
@@ -133,7 +133,7 @@ def _model(name: str, start_command: list[str] | None) -> ModelConfig:
 
 class TestAppendLegacyInferenceEnvTranslator:
     def test_appends_to_existing_start_command(self) -> None:
-        models = [_model("vllm", ["vllm", "serve", "/models"])]
+        models = [_model("vllm", "vllm serve /models")]
         environ = {"VLLM_EXTRA_ARGS": "--trust-remote-code", "VLLM_TP_SIZE": "4"}
 
         result = AbstractAgent._append_legacy_inference_env_args(
@@ -145,17 +145,29 @@ class TestAppendLegacyInferenceEnvTranslator:
         assert result is models
         service = models[0].service
         assert service is not None
-        assert service.start_command == [
-            "vllm",
-            "serve",
-            "/models",
-            "--tensor-parallel-size",
-            "4",
-            "--trust-remote-code",
-        ]
+        assert service.start_command == (
+            "vllm serve /models --tensor-parallel-size 4 --trust-remote-code"
+        )
+
+    def test_appends_raw_dash_args_to_existing_start_command(self) -> None:
+        models = [_model("vllm", "vllm serve /models")]
+        environ = {"VLLM_EXTRA_ARGS": "--max-model-len 524288 --served-model-name 'llama 3'"}
+
+        result = AbstractAgent._append_legacy_inference_env_args(
+            cast(AbstractAgent[Any, Any], object()),
+            models,
+            environ,
+        )
+
+        assert result is models
+        service = models[0].service
+        assert service is not None
+        assert service.start_command == (
+            "vllm serve /models --max-model-len 524288 --served-model-name 'llama 3'"
+        )
 
     def test_noop_without_legacy_env(self) -> None:
-        models = [_model("vllm", ["vllm", "serve", "/models"])]
+        models = [_model("vllm", "vllm serve /models")]
 
         AbstractAgent._append_legacy_inference_env_args(
             cast(AbstractAgent[Any, Any], object()),
@@ -165,12 +177,12 @@ class TestAppendLegacyInferenceEnvTranslator:
 
         service = models[0].service
         assert service is not None
-        assert service.start_command == ["vllm", "serve", "/models"]
+        assert service.start_command == "vllm serve /models"
 
     def test_skips_model_without_service(self) -> None:
         models = [
             ModelConfig.model_validate({"name": "no-service", "model_path": "/models/x"}),
-            _model("vllm", ["vllm", "serve", "/models"]),
+            _model("vllm", "vllm serve /models"),
         ]
 
         AbstractAgent._append_legacy_inference_env_args(
@@ -182,4 +194,4 @@ class TestAppendLegacyInferenceEnvTranslator:
         assert models[0].service is None
         service = models[1].service
         assert service is not None
-        assert service.start_command == ["vllm", "serve", "/models", "--trust-remote-code"]
+        assert service.start_command == "vllm serve /models --trust-remote-code"
