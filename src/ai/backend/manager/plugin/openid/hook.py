@@ -14,7 +14,7 @@ from aiohttp import web
 
 from ai.backend.common.plugin.hook import HookHandler, HookPlugin, Reject
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.models.login_session.enums import LoginSessionStatus
+from ai.backend.manager.data.auth.login_session_types import LoginSessionStatus
 from ai.backend.manager.models.login_session.row import LoginSessionRow
 from ai.backend.manager.models.user import UserStatus, users
 

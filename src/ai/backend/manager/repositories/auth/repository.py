@@ -9,11 +9,14 @@ from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.common.types import AccessKey
-from ai.backend.manager.data.auth.login_session_types import LoginHistoryData, LoginSessionData
+from ai.backend.manager.data.auth.login_session_types import (
+    LoginAttemptResult,
+    LoginHistoryData,
+    LoginSessionData,
+)
 from ai.backend.manager.data.auth.types import GroupMembershipData, UserData
 from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.login_session.enums import LoginAttemptResult
 from ai.backend.manager.models.scopes import SearchScope
 from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
