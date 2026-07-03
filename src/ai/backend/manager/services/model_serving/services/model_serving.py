@@ -452,8 +452,13 @@ class ModelServingService:
             ),
         )
 
+        domain_name = DomainName(action.domain_name)
+        domain_id = await self._scheduler_repository.get_domain_id_by_name(domain_name)
         if service_prepare_ctx.scaling_group:
             resource_group_name = ResourceGroupName(service_prepare_ctx.scaling_group)
+            resource_group_id = await self._scheduler_repository.get_resource_group_id_by_name(
+                resource_group_name
+            )
         else:
             resource_group_id = await self._scheduler_repository.pick_default_resource_group(
                 access_key=AccessKey(service_prepare_ctx.owner_access_key),
@@ -473,8 +478,10 @@ class ModelServingService:
                 user_uuid=created_user.uuid,
             ),
             scope=SessionScopeDraft(
-                domain_name=DomainName(action.domain_name),
+                domain_id=domain_id,
+                domain_name=domain_name,
                 project_id=ProjectID(service_prepare_ctx.group_id),
+                resource_group_id=resource_group_id,
                 resource_group_name=resource_group_name,
             ),
             classification=SessionClassificationDraft(

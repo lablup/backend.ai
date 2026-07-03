@@ -1119,8 +1119,13 @@ class AgentRegistry:
         if not groups_by_role:
             raise InvalidAPIParameters("No kernel groups resolved from the enqueue request.")
 
+        domain_name = DomainName(user_scope.domain_name)
+        domain_id = await self._scheduler_repository.get_domain_id_by_name(domain_name)
         if scaling_group:
             resource_group_name = ResourceGroupName(scaling_group)
+            resource_group_id = await self._scheduler_repository.get_resource_group_id_by_name(
+                resource_group_name
+            )
         else:
             resource_group_id = await self._scheduler_repository.pick_default_resource_group(
                 access_key=access_key,
@@ -1140,8 +1145,10 @@ class AgentRegistry:
                 user_uuid=user_scope.user_uuid,
             ),
             scope=SessionScopeDraft(
-                domain_name=DomainName(user_scope.domain_name),
+                domain_id=domain_id,
+                domain_name=domain_name,
                 project_id=ProjectID(user_scope.group_id),
+                resource_group_id=resource_group_id,
                 resource_group_name=resource_group_name,
             ),
             classification=SessionClassificationDraft(
