@@ -442,8 +442,9 @@ class InstallReport(Static):
                 """
                     )
                 )
-            if service.harbor_enabled:
-                harbor_url = f"http://{service.harbor_hostname}:{service.harbor_http_port}"
+            if service.harbor is not None:
+                harbor = service.harbor
+                harbor_url = f"http://{harbor.hostname}:{harbor.http_port}"
                 with TabPane("Harbor", id="harbor"):
                     yield Markdown(
                         textwrap.dedent(
@@ -462,7 +463,7 @@ class InstallReport(Static):
 
                 Admin credentials:
                 - Username: `admin`
-                - Password: `{service.harbor_admin_password}`
+                - Password: `{harbor.admin_password}`
 
                 The Harbor instance is also pre-registered as a Backend.AI
                 container registry named `local-harbor` (project `library`)
@@ -474,14 +475,15 @@ class InstallReport(Static):
                 """
                         )
                     )
-            if service.sftp_agent_enabled:
+            if service.sftp_agent is not None:
+                sftp = service.sftp_agent
                 with TabPane("SFTP Agent", id="sftp-agent"):
                     yield Markdown(
                         textwrap.dedent(
                             f"""
                 A dedicated SFTP agent has been configured alongside the
                 regular compute agent, assigned to the
-                `{service.sftp_agent_scaling_group}` scaling group.
+                `{sftp.scaling_group}` scaling group.
 
                 Start it in a separate shell (or via the `./dev` helper):
                 ```console
@@ -496,8 +498,8 @@ class InstallReport(Static):
                 ```
 
                 The SFTP agent listens on:
-                - RPC:     `{service.sftp_agent_rpc_addr.bind.host}:{service.sftp_agent_rpc_addr.bind.port}`
-                - Watcher: `{service.sftp_agent_watcher_addr.bind.host}:{service.sftp_agent_watcher_addr.bind.port}`
+                - RPC:     `{sftp.rpc_addr.bind.host}:{sftp.rpc_addr.bind.port}`
+                - Watcher: `{sftp.watcher_addr.bind.host}:{sftp.watcher_addr.bind.port}`
 
                 SFTP upload sessions created via the web UI will be routed
                 to this agent; regular compute sessions continue to run on
@@ -662,7 +664,14 @@ class ModeMenu(Static):
         pkg_type_menu._dist_info = self._dist_info
         pkg_type_menu._install_variable = self.install_variable
         switcher.current = "pkg-type-menu"
-        self.app.query_one("#pkg-type-list", ListView).focus()
+        lv = self.app.query_one("#pkg-type-list", ListView)
+        lv.focus()
+        if self._non_interactive:
+            # The package-type submenu has no separate non-interactive
+            # auto-select, so a `--non-interactive` run would stall here. Pick
+            # the only option (RELEASE PACKAGE) to actually start the install.
+            li = self.app.query_one("#pkg-type-release", ListItem)
+            lv.post_message(ListView.Selected(lv, li, list(lv.children).index(li)))
 
     @on(ListView.Selected, "#mode-list", item="#mode-maintain")
     def start_maintain_mode(self) -> None:
