@@ -8,7 +8,6 @@ from typing import override
 
 from ai.backend.common.dependencies import DependencyComposer, DependencyStack
 from ai.backend.logging.types import LogLevel
-from ai.backend.manager.plugin.error_monitor import ErrorEventDispatcher
 from ai.backend.manager.plugin.monitor import ManagerErrorPluginContext, ManagerStatsPluginContext
 
 from .agents import AgentsComposer, AgentsInput, AgentsResources
@@ -187,16 +186,10 @@ class ManagerDependencyComposer(DependencyComposer[DependencyInput, DependencyRe
             ),
         )
 
-        # Stage 6.5: Re-initialize ErrorEventDispatcher plugin with repository.
-        # The plugin was disabled during Stage 4 (Plugins) because
-        # error_log_repository was not yet available.
-        for plugin_instance in plugins.event_dispatcher_plugin_ctx.plugins.values():
-            if isinstance(plugin_instance, ErrorEventDispatcher):
-                await plugin_instance.init(
-                    context={
-                        "error_log_repository": domain.repositories.error_log.repository,
-                    },
-                )
+        # Event-dispatcher plugins (disabled since Stage 4 for lack of
+        # dependencies) are re-initialized inside the Processing stage with
+        # the standard manager plugin context, right before the event
+        # dispatcher starts delivering events.
 
         # Stage 6.5: Monitoring (error_monitor, stats_monitor)
         # Must run after Domain so that error_log_repository is available.

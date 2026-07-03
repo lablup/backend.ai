@@ -135,6 +135,7 @@ class SessionEventHandler:
     ) -> None:
         await self._registry.clean_session(event.session_id)
         await self.invoke_session_callback(None, source, event)
+        await self._event_dispatcher_plugin_ctx.handle_event(None, source, event)
 
     async def handle_destroy_session(
         self,
@@ -173,6 +174,7 @@ class SessionEventHandler:
         )
 
         await self.invoke_session_callback(None, source, event)
+        await self._event_dispatcher_plugin_ctx.handle_event(None, source, event)
 
     async def invoke_session_callback(
         self,

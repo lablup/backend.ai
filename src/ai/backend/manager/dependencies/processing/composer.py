@@ -289,6 +289,28 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
             ),
         )
 
+        # Step 2.5: Re-initialize event-dispatcher plugins with the standard
+        # manager plugin context, now that repositories and processors exist
+        # and before the event dispatcher starts delivering events. These
+        # context keys are the contract for `backendai_event_dispatcher_v20`
+        # plugins (in-tree or externally installed); each plugin picks the
+        # keys it needs and must tolerate extra ones.
+        event_dispatcher_plugin_context = {
+            "etcd": setup_input.etcd,
+            "config_provider": setup_input.config_provider,
+            "repositories": setup_input.repositories,
+            "processors": processors,
+            "error_log_repository": setup_input.repositories.error_log.repository,
+            "session_repository": setup_input.repositories.session.repository,
+            "user_repository": setup_input.repositories.user.repository,
+            "keypair_resource_policy_repository": (
+                setup_input.repositories.keypair_resource_policy.repository
+            ),
+            "session_processors": processors.session,
+        }
+        for plugin_instance in setup_input.event_dispatcher_plugin_ctx.plugins.values():
+            await plugin_instance.init(context=event_dispatcher_plugin_context)
+
         # Step 3: Register Dispatchers and start EventDispatcher
         dispatchers = Dispatchers(
             DispatcherArgs(
