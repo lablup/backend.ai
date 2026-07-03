@@ -100,7 +100,7 @@ class SessionEventHandler:
         await self._idle_checker_host.dispatch_session_status_event(
             event.session_id, SessionStatus.RUNNING
         )
-        await self._event_dispatcher_plugin_ctx.handle_event(context, source, event)
+        await self._event_dispatcher_plugin_ctx.handle_event(None, source, event)
 
     async def handle_session_cancelled(
         self,
@@ -114,6 +114,7 @@ class SessionEventHandler:
         """
         log.info("handle_session_cancelled: ev:{} s:{}", event.event_name(), event.session_id)
         await self._handle_started_or_cancelled(None, source, event)
+        await self._event_dispatcher_plugin_ctx.handle_event(None, source, event)
 
     async def handle_session_terminating(
         self,
@@ -126,6 +127,7 @@ class SessionEventHandler:
         published by the manager.
         """
         await self.invoke_session_callback(None, source, event)
+        await self._event_dispatcher_plugin_ctx.handle_event(None, source, event)
 
     async def handle_session_terminated(
         self,

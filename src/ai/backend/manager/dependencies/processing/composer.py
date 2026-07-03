@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
@@ -77,6 +78,8 @@ from .log_cleanup_timer import LogCleanupTimerDependency, LogCleanupTimerInput
 from .manager_status_watcher import ManagerStatusWatcherDependency, ManagerStatusWatcherInput
 from .processors import ProcessorsDependency, ProcessorsProviderInput
 from .stats_reporter import StatsReporterDependency, StatsReporterInput
+
+log = logging.getLogger(__spec__.name)
 
 
 @dataclass
@@ -291,25 +294,32 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
 
         # Step 2.5: Re-initialize event-dispatcher plugins with the standard
         # manager plugin context, now that repositories and processors exist
-        # and before the event dispatcher starts delivering events. These
-        # context keys are the contract for `backendai_event_dispatcher_v20`
-        # plugins (in-tree or externally installed); each plugin picks the
-        # keys it needs and must tolerate extra ones.
+        # and before the event dispatcher starts delivering events. The
+        # context keys are documented as the plugin-facing contract on
+        # `AbstractEventDispatcherPlugin` (ai.backend.common.plugin.event).
         event_dispatcher_plugin_context = {
             "etcd": setup_input.etcd,
             "config_provider": setup_input.config_provider,
             "repositories": setup_input.repositories,
             "processors": processors,
+            # Shortcut kept for backward compatibility with the intrinsic
+            # ErrorEventDispatcher plugin.
             "error_log_repository": setup_input.repositories.error_log.repository,
-            "session_repository": setup_input.repositories.session.repository,
-            "user_repository": setup_input.repositories.user.repository,
-            "keypair_resource_policy_repository": (
-                setup_input.repositories.keypair_resource_policy.repository
-            ),
-            "session_processors": processors.session,
         }
-        for plugin_instance in setup_input.event_dispatcher_plugin_ctx.plugins.values():
-            await plugin_instance.init(context=event_dispatcher_plugin_context)
+        for (
+            plugin_name,
+            plugin_instance,
+        ) in setup_input.event_dispatcher_plugin_ctx.plugins.items():
+            try:
+                await plugin_instance.init(context=event_dispatcher_plugin_context)
+            except Exception:
+                # A plugin that fails to initialize must not abort manager
+                # startup; it is left in whatever (typically disabled) state
+                # its failed init produced.
+                log.exception(
+                    "Failed to re-initialize event-dispatcher plugin %r; skipping it",
+                    plugin_name,
+                )
 
         # Step 3: Register Dispatchers and start EventDispatcher
         dispatchers = Dispatchers(

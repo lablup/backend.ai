@@ -13,9 +13,11 @@ import yarl
 
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.events.event_types.session.anycast import (
+    SessionCancelledAnycastEvent,
     SessionFailureAnycastEvent,
     SessionSuccessAnycastEvent,
     SessionTerminatedAnycastEvent,
+    SessionTerminatingAnycastEvent,
 )
 from ai.backend.common.types import (
     AgentId,
@@ -332,4 +334,33 @@ class TestEventDispatcherPluginForwarding:
             side_effect=SessionNotFound("gone"),
         ):
             await handler.handle_session_terminated(None, AgentId("i-test"), event)
+        plugin_ctx.handle_event.assert_awaited_once_with(None, AgentId("i-test"), event)
+
+    async def test_session_cancelled_is_forwarded_to_plugins(
+        self,
+        handler: SessionEventHandler,
+        plugin_ctx: MagicMock,
+        session_id: SessionId,
+    ) -> None:
+        event = SessionCancelledAnycastEvent(
+            session_id,
+            "test-creation-id",
+            reason=KernelLifecycleEventReason.FAILED_TO_START,
+        )
+        await handler.handle_session_cancelled(None, AgentId("i-test"), event)
+        plugin_ctx.handle_event.assert_awaited_once_with(None, AgentId("i-test"), event)
+
+    async def test_session_terminating_is_forwarded_to_plugins(
+        self,
+        handler: SessionEventHandler,
+        plugin_ctx: MagicMock,
+        session_id: SessionId,
+    ) -> None:
+        event = SessionTerminatingAnycastEvent(session_id, "user-requested")
+        with patch(
+            "ai.backend.manager.event_dispatcher.handlers.session.SessionRow.get_session",
+            new_callable=AsyncMock,
+            side_effect=SessionNotFound("gone"),
+        ):
+            await handler.handle_session_terminating(None, AgentId("i-test"), event)
         plugin_ctx.handle_event.assert_awaited_once_with(None, AgentId("i-test"), event)

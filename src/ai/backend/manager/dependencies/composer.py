@@ -186,9 +186,9 @@ class ManagerDependencyComposer(DependencyComposer[DependencyInput, DependencyRe
             ),
         )
 
-        # Event-dispatcher plugins (disabled since Stage 4 for lack of
-        # dependencies) are re-initialized inside the Processing stage with
-        # the standard manager plugin context, right before the event
+        # Note: event-dispatcher plugins (disabled since Stage 4 for lack of
+        # dependencies) are re-initialized by ProcessingComposer (Stage 10)
+        # with the standard manager plugin context, right before the event
         # dispatcher starts delivering events.
 
         # Stage 6.5: Monitoring (error_monitor, stats_monitor)
