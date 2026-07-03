@@ -6,6 +6,8 @@ from decimal import Decimal
 
 import pytest
 
+from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import BinarySize, ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.models.agent import AgentRow
@@ -68,23 +70,36 @@ async def database_with_resource_slot_tables(
 
 
 @pytest.fixture
+def domain_id() -> DomainID:
+    return DomainID(uuid.uuid4())
+
+
+@pytest.fixture
+def scaling_group_id() -> ResourceGroupID:
+    return ResourceGroupID(uuid.uuid4())
+
+
+@pytest.fixture
 async def domain_name(
     database_with_resource_slot_tables: ExtendedAsyncSAEngine,
+    domain_id: DomainID,
 ) -> AsyncGenerator[str, None]:
     name = "test-domain"
     async with database_with_resource_slot_tables.begin_session() as db_sess:
-        db_sess.add(DomainRow(name=name))
+        db_sess.add(DomainRow(id=domain_id, name=name))
     yield name
 
 
 @pytest.fixture
 async def scaling_group(
     database_with_resource_slot_tables: ExtendedAsyncSAEngine,
+    scaling_group_id: ResourceGroupID,
 ) -> AsyncGenerator[str, None]:
     name = "default"
     async with database_with_resource_slot_tables.begin_session() as db_sess:
         db_sess.add(
             ScalingGroupRow(
+                id=scaling_group_id,
                 name=name,
                 description="Test scaling group",
                 is_active=True,
@@ -208,9 +223,11 @@ async def agent_id(
 @pytest.fixture
 async def kernel_id(
     database_with_resource_slot_tables: ExtendedAsyncSAEngine,
+    domain_id: DomainID,
     domain_name: str,
     project_id: uuid.UUID,
     user_uuid: uuid.UUID,
+    scaling_group_id: ResourceGroupID,
     scaling_group: str,
     agent_id: str,
 ) -> AsyncGenerator[uuid.UUID, None]:
@@ -220,8 +237,10 @@ async def kernel_id(
         db_sess.add(
             SessionRow(
                 id=sid,
+                domain_id=domain_id,
                 domain_name=domain_name,
                 group_id=project_id,
+                resource_group_id=scaling_group_id,
                 scaling_group_name=scaling_group,
                 user_uuid=user_uuid,
                 occupying_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("1073741824")}),

@@ -9,6 +9,8 @@ from decimal import Decimal
 
 import pytest
 
+from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import ResourceSlot, SlotQuantity
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
@@ -153,14 +155,24 @@ class TestResourceInfo:
         )
 
     @pytest.fixture
+    def base_scaling_group_id(self) -> ResourceGroupID:
+        return ResourceGroupID(uuid.uuid4())
+
+    @pytest.fixture
+    def test_domain_id(self) -> DomainID:
+        return DomainID(uuid.uuid4())
+
+    @pytest.fixture
     async def base_scaling_group(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        base_scaling_group_id: ResourceGroupID,
     ) -> AsyncGenerator[str, None]:
         """Create a basic scaling group for testing."""
         sgroup_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as db_sess:
             sgroup = ScalingGroupRow(
+                id=base_scaling_group_id,
                 name=sgroup_name,
                 description="Test scaling group",
                 is_active=True,
@@ -380,6 +392,7 @@ class TestResourceInfo:
     async def test_user_domain_group(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_id: DomainID,
     ) -> AsyncGenerator[tuple[uuid.UUID, str, uuid.UUID], None]:
         """Create test domain, user, and group for kernel tests.
 
@@ -394,6 +407,7 @@ class TestResourceInfo:
         async with db_with_cleanup.begin_session() as db_sess:
             # Create domain
             domain = DomainRow(
+                id=test_domain_id,
                 name=test_domain,
                 description="Test domain",
                 is_active=True,
@@ -461,6 +475,8 @@ class TestResourceInfo:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         base_scaling_group: str,
+        base_scaling_group_id: ResourceGroupID,
+        test_domain_id: DomainID,
         test_user_domain_group: tuple[uuid.UUID, str, uuid.UUID],
     ) -> AsyncGenerator[tuple[str, ResourceSlot, list[ResourceSlot]], None]:
         """Create scaling group with agent and RUNNING/TERMINATING kernels.
@@ -509,9 +525,11 @@ class TestResourceInfo:
                 SessionRow(
                     id=session_id,
                     domain_name=domain_name,
+                    domain_id=test_domain_id,
                     group_id=group_id,
                     user_uuid=user_uuid,
                     scaling_group_name=base_scaling_group,
+                    resource_group_id=base_scaling_group_id,
                     cluster_size=2,
                     vfolder_mounts={},
                 )
@@ -557,6 +575,8 @@ class TestResourceInfo:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         base_scaling_group: str,
+        base_scaling_group_id: ResourceGroupID,
+        test_domain_id: DomainID,
         test_user_domain_group: tuple[uuid.UUID, str, uuid.UUID],
     ) -> AsyncGenerator[tuple[str, ResourceSlot, ResourceSlot], None]:
         """Create scaling group with kernels in various statuses.
@@ -609,9 +629,11 @@ class TestResourceInfo:
                 SessionRow(
                     id=session_id,
                     domain_name=domain_name,
+                    domain_id=test_domain_id,
                     group_id=group_id,
                     user_uuid=user_uuid,
                     scaling_group_name=base_scaling_group,
+                    resource_group_id=base_scaling_group_id,
                     cluster_size=4,
                     vfolder_mounts={},
                 )
