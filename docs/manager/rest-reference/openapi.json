@@ -25245,8 +25245,22 @@
               }
             ],
             "default": null,
-            "description": "Scaling group name. Auto-selected if omitted.",
+            "description": "Deprecated since 26.8.0. Use resource_group_id instead. Resource group name.",
             "title": "Resource Group"
+          },
+          "resource_group_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Resource group UUID. Auto-selected if omitted.",
+            "title": "Resource Group Id"
           },
           "resource_opts": {
             "anyOf": [

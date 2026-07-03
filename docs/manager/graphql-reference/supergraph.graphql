@@ -6950,7 +6950,7 @@ input EnqueueSessionInput
   resourceEntries: [SessionResourceSlotEntryInput!]!
 
   """
-  Deprecated since 26.8.0. Use resource_group_id instead. Scaling group name.
+  Deprecated since 26.8.0. Use resource_group_id instead. Resource group name.
   """
   resourceGroup: String = null @deprecated(reason: "Use resource_group_id instead.")
 
