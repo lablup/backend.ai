@@ -17,7 +17,7 @@ from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeySta
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.project import ProjectID
-from ai.backend.common.identifier.resource_group import ResourceGroupName
+from ai.backend.common.identifier.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
@@ -263,13 +263,19 @@ class SchedulerRepository:
         access_key: AccessKey,
         domain_name: str,
         project_id: ProjectID,
-    ) -> ResourceGroupName:
+    ) -> ResourceGroupID:
         """Return the first resource group from the owner's allowlist."""
         return await self._db_source.pick_default_resource_group(
             access_key=access_key,
             domain_name=domain_name,
             project_id=project_id,
         )
+
+    @scheduler_repository_resilience.apply()
+    async def get_resource_group_name_by_id(
+        self, resource_group_id: ResourceGroupID
+    ) -> ResourceGroupName:
+        return await self._db_source.get_resource_group_name_by_id(resource_group_id)
 
     @scheduler_repository_resilience.apply()
     async def prepare_vfolder_mounts(
