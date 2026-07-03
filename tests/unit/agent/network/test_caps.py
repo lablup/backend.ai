@@ -2,9 +2,11 @@ import json
 from typing import Any, cast
 
 from ai.backend.agent.network.caps import (
+    backend_key,
     caps_key,
     compute_caps,
     parse_tunnel_offload,
+    publish_backend,
     publish_caps,
 )
 from ai.backend.common.etcd import AbstractKVStore
@@ -66,6 +68,16 @@ class TestComputeCaps:
 class TestCapsKey:
     def test_key_format(self) -> None:
         assert caps_key("i-abc123") == "network/agent/i-abc123/caps"
+
+    def test_backend_key_format(self) -> None:
+        assert backend_key("i-abc123") == "network/agent/i-abc123/backend"
+
+
+class TestPublishBackend:
+    async def test_writes_backend_to_expected_key(self) -> None:
+        etcd = _CapturingEtcd()
+        await publish_backend(cast(AbstractKVStore, etcd), "i-abc123", "containerd")
+        assert etcd.puts["network/agent/i-abc123/backend"] == "containerd"
 
 
 class _CapturingEtcd:

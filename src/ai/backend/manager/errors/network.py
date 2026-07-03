@@ -35,3 +35,22 @@ class VNIPoolExhausted(BackendAIError, web.HTTPServiceUnavailable):
             operation=ErrorOperation.CREATE,
             error_detail=ErrorDetail.UNAVAILABLE,
         )
+
+
+class NetworkBackendMismatch(BackendAIError, web.HTTPConflict):
+    """A member agent is not CNI-capable while the network driver is 'cni' (BEP-1055).
+
+    This guards the deployment invariant that the agent backend (docker/containerd) and the
+    global network driver (overlay/cni) must be a matched pair — a multi-node session
+    cannot span nodes on different network fabrics.
+    """
+
+    error_type = "https://api.backend.ai/probs/network-backend-mismatch"
+    error_title = "Agent network backend does not match the cluster network driver."
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.SESSION,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.CONFLICT,
+        )

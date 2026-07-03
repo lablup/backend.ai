@@ -13,7 +13,11 @@ import pytest
 
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.network.types import NetworkBackendKind
-from ai.backend.manager.errors.network import NetworkPoolExhausted, VNIPoolExhausted
+from ai.backend.manager.errors.network import (
+    NetworkBackendMismatch,
+    NetworkPoolExhausted,
+    VNIPoolExhausted,
+)
 from ai.backend.manager.network.cni import CNINetworkPlugin
 from ai.backend.manager.network.ipam import SubnetAllocator, VNIAllocator
 
@@ -170,6 +174,35 @@ class TestCreateNetwork:
         )
         assert info.options["backend"] == "host-gw"
         assert info.options["vni"] is None
+
+
+class TestMemberBackendCompat:
+    async def test_containerd_member_ok(self) -> None:
+        etcd = FakeEtcd()
+        etcd.store["network/agent/a1/backend"] = "containerd"
+        plugin = _plugin_with(etcd)
+        info = await plugin.create_network(
+            identifier="s1", options={"forced_backend": "vxlan", "member_agents": ["a1"]}
+        )
+        assert info.options["backend"] == "vxlan"
+
+    async def test_docker_member_raises_mismatch(self) -> None:
+        etcd = FakeEtcd()
+        etcd.store["network/agent/a1/backend"] = "docker"  # wrong backend under cni driver
+        plugin = _plugin_with(etcd)
+        with pytest.raises(NetworkBackendMismatch):
+            await plugin.create_network(
+                identifier="s1", options={"forced_backend": "vxlan", "member_agents": ["a1"]}
+            )
+
+    async def test_unpublished_backend_is_allowed(self) -> None:
+        # safe before the agent publish path is wired: unknown -> allowed
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        info = await plugin.create_network(
+            identifier="s1", options={"forced_backend": "vxlan", "member_agents": ["a1"]}
+        )
+        assert info.options["backend"] == "vxlan"
 
 
 class TestDestroyNetwork:

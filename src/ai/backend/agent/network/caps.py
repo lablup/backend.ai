@@ -98,6 +98,10 @@ def caps_key(agent_id: str) -> str:
     return f"network/agent/{agent_id}/caps"
 
 
+def backend_key(agent_id: str) -> str:
+    return f"network/agent/{agent_id}/backend"
+
+
 async def publish_caps(etcd: AbstractKVStore, agent_id: str, caps: AgentNetworkCaps) -> None:
     """Publish this agent's capabilities to etcd for the manager's backend selection."""
     await etcd.put(
@@ -105,3 +109,9 @@ async def publish_caps(etcd: AbstractKVStore, agent_id: str, caps: AgentNetworkC
         json.dumps(dataclasses.asdict(caps)),
         scope=ConfigScopes.GLOBAL,
     )
+
+
+async def publish_backend(etcd: AbstractKVStore, agent_id: str, backend: str) -> None:
+    """Publish this agent's runtime backend (e.g. 'containerd') so the manager can enforce
+    the backend<->network-driver pairing invariant. Called at agent startup."""
+    await etcd.put(backend_key(agent_id), backend, scope=ConfigScopes.GLOBAL)

@@ -17,10 +17,14 @@ from typing import Any
 from ai.backend.common.configs.etcd import EtcdConfig
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.network.types import NetworkBackendKind
+from ai.backend.manager.errors.network import NetworkBackendMismatch
 from ai.backend.manager.network.ipam import SubnetAllocator, VNIAllocator
 from ai.backend.manager.plugin.network import AbstractNetworkManagerPlugin, NetworkInfo
 
 _DEFAULT_MTU = 1500
+
+# Agent backends whose network stack can serve the BEP-1055 'cni' driver.
+_CNI_COMPATIBLE_BACKENDS = frozenset({"containerd"})
 
 
 def _session_meta_key(session_id: str) -> str:
@@ -75,6 +79,7 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         forced_raw = options.get("forced_backend")
         forced_backend = NetworkBackendKind(forced_raw) if forced_raw else None
 
+        await self._require_members_cni_capable(member_agents)
         backend = await self._select_backend(member_agents, forced_backend)
         subnet = await self._subnet_allocator.acquire(session_id)
         vni = (
@@ -105,6 +110,28 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
             if (vni := meta.get("vni")) is not None:
                 await self._vni_allocator.release(int(vni))
         await etcd.delete_prefix(f"network/session/{network_id}", scope=ConfigScopes.GLOBAL)
+
+    async def _require_members_cni_capable(self, member_agents: list[str]) -> None:
+        """Enforce the deployment invariant that all member agents can serve the 'cni'
+        network driver (their backend must be one of CNI_COMPATIBLE_BACKENDS).
+
+        Agents publish their backend under network/agent/{id}/backend at startup. We reject
+        only on a *known* incompatible backend (e.g. a docker/overlay agent under the 'cni'
+        driver, which would break the multi-node overlay); an unpublished backend is treated
+        as unknown-but-allowed so the guard stays safe before the publish path is wired.
+        """
+        etcd = self._require_etcd()
+        for agent_id in member_agents:
+            backend = await etcd.get(
+                f"network/agent/{agent_id}/backend", scope=ConfigScopes.GLOBAL
+            )
+            if backend is not None and backend not in _CNI_COMPATIBLE_BACKENDS:
+                raise NetworkBackendMismatch(
+                    f"agent '{agent_id}' runs the '{backend}' backend, which cannot serve the "
+                    "'cni' cluster network driver. Multi-node sessions require a uniform "
+                    "network fabric — pair the containerd backend with default_driver='cni' "
+                    "(or the docker backend with 'overlay')."
+                )
 
     async def _select_backend(
         self, member_agents: list[str], forced_backend: NetworkBackendKind | None
