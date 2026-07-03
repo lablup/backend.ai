@@ -214,7 +214,7 @@ class Context(metaclass=ABCMeta):
             return
 
         dst = Path("mock-accelerator.toml")
-        print(f"[Installer] Copying accelerator config: {src} -> {dst}")
+        self.log_header(f"Copying accelerator config: {src} -> {dst}")
         shutil.copy(src, dst)
 
     def add_post_guide(self, guide: PostGuide) -> None:
