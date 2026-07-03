@@ -13,6 +13,7 @@ ContainerNetworkProvisioner attaches each container's task PID via CNI.
 
 from __future__ import annotations
 
+import asyncio
 import signal
 from collections.abc import Mapping, Sequence
 from decimal import Decimal
@@ -36,7 +37,7 @@ from ai.backend.agent.resources import (
 )
 from ai.backend.agent.types import Container, KernelOwnershipData, MountInfo
 from ai.backend.common.docker import ImageRef
-from ai.backend.common.dto.agent.response import PurgeImagesResp
+from ai.backend.common.dto.agent.response import PurgeImageResp, PurgeImagesResp
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.types import (
@@ -362,8 +363,9 @@ class ContainerdAgent(
 
     @override
     def get_cgroup_path(self, controller: str, container_id: str) -> Path:
-        # containerd uses the systemd/cgroupfs hierarchy; TODO: resolve the task's slice.
-        raise NotImplementedError(_TODO)
+        # cgroup v2 unified hierarchy with the systemd driver (nerdctl/containerd default).
+        # TODO: read the actual driver/slice from containerd instead of assuming systemd v2.
+        return Path("/sys/fs/cgroup") / "system.slice" / f"containerd-{container_id}.scope"
 
     @override
     def get_cgroup_version(self) -> str:
@@ -399,11 +401,21 @@ class ContainerdAgent(
         *,
         timeout_seconds: float | None | Sentinel = Sentinel.TOKEN,
     ) -> None:
-        raise NotImplementedError(_TODO)
+        if image_ref.is_local:
+            return
+        # TODO: honor registry_conf auth (nerdctl --creds) + timeout_seconds.
+        await self._session_network.push_image(image_ref.canonical)
 
     @override
     async def purge_images(self, request: PurgeImagesReq) -> PurgeImagesResp:
-        raise NotImplementedError(_TODO)
+        responses: list[PurgeImageResp] = []
+        for image in request.images:
+            try:
+                await self._session_network.remove_image(image)
+                responses.append(PurgeImageResp.success(image))
+            except Exception as exc:
+                responses.append(PurgeImageResp(image=image, error=str(exc)))
+        return PurgeImagesResp(responses=responses)
 
     @override
     async def check_image(
@@ -463,11 +475,14 @@ class ContainerdAgent(
 
     @override
     async def create_local_network(self, network_name: str) -> None:
-        raise NotImplementedError(_TODO)
+        # Single-node multi-kernel local bridge. In BEP-1055 intra-node connectivity is
+        # covered by the per-session overlay/LOCAL bridges, so this is a no-op for now.
+        # TODO: a dedicated agent-local bridge for single-node cluster sessions.
+        return
 
     @override
     async def destroy_local_network(self, network_name: str) -> None:
-        raise NotImplementedError(_TODO)
+        return
 
     @override
     async def restart_kernel__load_config(
@@ -475,7 +490,8 @@ class ContainerdAgent(
         kernel_id: KernelId,
         name: str,
     ) -> bytes:
-        raise NotImplementedError(_TODO)
+        path = self.local_config.container.scratch_root / str(kernel_id) / "config" / name
+        return await asyncio.to_thread(path.read_bytes)
 
     @override
     async def restart_kernel__store_config(
@@ -484,4 +500,5 @@ class ContainerdAgent(
         name: str,
         data: bytes,
     ) -> None:
-        raise NotImplementedError(_TODO)
+        path = self.local_config.container.scratch_root / str(kernel_id) / "config" / name
+        await asyncio.to_thread(path.write_bytes, data)

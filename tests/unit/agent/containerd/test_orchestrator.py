@@ -49,8 +49,14 @@ class FakeRuntime(ContainerdRuntimeClient):
     async def remove_image(self, image_ref: str) -> None:
         self.calls.append("remove_image")
 
+    async def push_image(self, image_ref: str) -> None:
+        self.calls.append("push_image")
+
     async def image_entrypoint(self, image_ref: str) -> list[str] | None:
         return ["/entry"]
+
+    async def container_status(self, container_id: str) -> str | None:
+        return "running"
 
     async def create_container(
         self, container_id: str, *, image_ref: str, command: Sequence[str], oci_spec: Mapping[str, Any]

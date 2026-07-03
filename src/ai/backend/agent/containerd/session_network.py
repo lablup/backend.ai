@@ -188,6 +188,12 @@ class ContainerdSessionNetwork:
     async def pull_image(self, image_ref: str) -> None:
         await self._runtime.pull_image(image_ref)
 
+    async def push_image(self, image_ref: str) -> None:
+        await self._runtime.push_image(image_ref)
+
+    async def remove_image(self, image_ref: str) -> None:
+        await self._runtime.remove_image(image_ref)
+
     async def image_exists(self, image_ref: str) -> bool:
         return await self._runtime.image_exists(image_ref)
 

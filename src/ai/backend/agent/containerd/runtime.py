@@ -51,6 +51,9 @@ class ContainerdRuntimeClient(ABC):
     async def remove_image(self, image_ref: str) -> None: ...
 
     @abstractmethod
+    async def push_image(self, image_ref: str) -> None: ...
+
+    @abstractmethod
     async def image_entrypoint(self, image_ref: str) -> list[str] | None:
         """Return the image's Entrypoint (or Cmd if no entrypoint), or None if unknown."""
 
@@ -79,3 +82,7 @@ class ContainerdRuntimeClient(ABC):
     @abstractmethod
     async def container_pid(self, container_id: str) -> int | None:
         """Return the running task's PID, or None if the container has no live task."""
+
+    @abstractmethod
+    async def container_status(self, container_id: str) -> str | None:
+        """Return the container's status string (e.g. 'running'), or None if absent."""

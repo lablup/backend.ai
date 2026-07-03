@@ -87,6 +87,9 @@ class NerdctlRuntimeClient(ContainerdRuntimeClient):
     async def remove_image(self, image_ref: str) -> None:
         await self._run(["rmi", image_ref])
 
+    async def push_image(self, image_ref: str) -> None:
+        await self._run(["push", image_ref])
+
     async def image_entrypoint(self, image_ref: str) -> list[str] | None:
         rc, out, _ = await self._runner([
             *self._base(), "image", "inspect", "--format",
@@ -155,3 +158,11 @@ class NerdctlRuntimeClient(ContainerdRuntimeClient):
             except (ValueError, TypeError):
                 return None
         return pid or None
+
+    async def container_status(self, container_id: str) -> str | None:
+        rc, out, _ = await self._runner([
+            *self._base(), "inspect", "--format", "{{.State.Status}}", container_id
+        ])
+        if rc != 0:
+            return None
+        return out.strip() or None
