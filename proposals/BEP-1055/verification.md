@@ -144,6 +144,41 @@ scope (egress firewall is out of scope — see data-plane-backends.md). Cross-*n
 isolation (two VNIs over vxlan on two hosts) uses the same separate-bridge/VNI mechanism
 but is not yet exercised end-to-end.
 
+## 9. Egress (LOCAL) + a finding: ICC-off is NOT free with stock bridge CNI
+
+Attaching the LOCAL/egress interface (isGateway + isDefaultGateway + ipMasq) alongside
+the overlay:
+
+- **Egress works:** the container gets a default route via the LOCAL bridge gateway and
+  reaches the host (bridge gateway IP). (External-internet ICMP is blocked by the lima
+  user-mode network, not our config.)
+- **Finding — a shared per-node LOCAL bridge leaks across sessions:** two different-session
+  containers both attached to one shared `bai-local0` bridge could ping each other
+  (`172.30.0.2 ↔ 172.30.0.3` = REACHABLE). The stock CNI `bridge` plugin does **not**
+  implement ICC-off (`hairpinMode:false` does not block inter-container traffic); Swarm's
+  ICC-off came from Docker's own iptables. So the earlier "LOCAL is egress-only
+  (Swarm-parity ICC-off)" claim is **not** satisfied by a shared bridge alone.
+- **Fix (verified):** make the LOCAL bridge **per-session** (like the overlay bridge).
+  With `bai-localA`/`172.30.5.0/24` for session A and `bai-localB`/`172.30.6.0/24` for
+  session B: each container still reaches its gateway (egress ✅) while cross-session
+  traffic over LOCAL is **BLOCKED** — the same "separate bridge = isolated" mechanism as
+  §8, no ICC-off firewall rules needed.
+
+Consequence: the LOCAL interface is **per session**, not a single node-shared bridge; its
+NAT subnet is a node-local per-session allocation (behind NAT, so no cross-node
+coordination). See the Decision Log entry.
+
+**Rejected alternative — fold egress into the overlay bridge (option C):** instead of a
+separate LOCAL bridge, put the gateway IP + masquerade on the per-session overlay bridge
+(one bridge doing overlay + egress). Tested on two nodes: because the overlay subnet is a
+single L2 stretched across nodes via vxlan, a **shared** gateway IP (`10.128.5.1` on every
+node) is a duplicate IP on that L2 — the container could not stably resolve its gateway.
+Per-node **distinct** gateways avoid the duplicate but must be carved from the overlay
+subnet per node (consuming overlay IPs) and require the container's default route to point
+at its local node's gateway. Option B keeps egress on a node-local (non-stretched) subnet,
+sidestepping the conflict entirely; the one extra bridge per session is the price for a
+conflict-free, firewall-free egress. B chosen.
+
 ## Notes
 
 - These are manual smoke tests requiring a privileged Linux host (NET_ADMIN),

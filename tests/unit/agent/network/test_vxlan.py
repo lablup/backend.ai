@@ -11,6 +11,7 @@ from ai.backend.agent.network.backends.vxlan import (
     bridge_link_add_args,
     fdb_append_args,
     fdb_del_args,
+    local_bridge_dev,
     local_cni_config,
     overlay_cni_config,
     vxlan_dev,
@@ -85,10 +86,18 @@ class TestCNIConfig:
         assert conf["ipMasq"] is False
 
     def test_local_config_is_gateway_with_masq(self) -> None:
-        conf = local_cni_config("s1")
+        conf = local_cni_config("s1", bridge="bailo4097", subnet="172.30.0.0/24")
         assert conf["isDefaultGateway"] is True
         assert conf["ipMasq"] is True
         assert conf["hairpinMode"] is False
+        # per-session LOCAL bridge on a node-local subnet (not the stretched overlay)
+        assert conf["bridge"] == "bailo4097"
+        assert conf["ipam"]["subnet"] == "172.30.0.0/24"
+        assert conf["name"] == "bai-local-s1"
+
+    def test_local_bridge_is_per_session_within_ifname_limit(self) -> None:
+        assert local_bridge_dev(4097) == "bailo4097"
+        assert len(local_bridge_dev(16777215)) <= 15
 
 
 class TestSetupTeardown:
@@ -122,11 +131,39 @@ class TestSetupTeardown:
         assert ["ip", "link", "del", "baibr4097"] in rec.calls
         assert ["ip", "link", "del", "baivx4097"] in rec.calls
 
+    async def test_teardown_also_deletes_local_bridge(self) -> None:
+        rec = Recorder()
+        plugin = _plugin(rec)
+        await plugin.setup_session_network(_META, _SELF)
+        rec.calls.clear()
+        await plugin.teardown_session_network("s1")
+        assert ["ip", "link", "del", local_bridge_dev(4097)] in rec.calls
+
     async def test_teardown_unknown_session_is_noop(self) -> None:
         rec = Recorder()
         plugin = _plugin(rec)
         await plugin.teardown_session_network("nope")
         assert rec.calls == []
+
+
+class TestLocalSubnetAllocation:
+    def test_idempotent_per_session_and_distinct_across_sessions(self) -> None:
+        plugin = _plugin(Recorder())
+        a1 = plugin._alloc_local_subnet("sA")
+        a2 = plugin._alloc_local_subnet("sA")
+        b = plugin._alloc_local_subnet("sB")
+        assert a1 == a2  # idempotent
+        assert a1 != b  # distinct sessions -> distinct node-local subnets
+        assert a1.startswith("172.30.") and b.startswith("172.30.")
+
+    async def test_local_subnet_freed_on_teardown(self) -> None:
+        plugin = _plugin(Recorder())
+        await plugin.setup_session_network(_META, _SELF)
+        first = plugin._alloc_local_subnet("s1")
+        await plugin.teardown_session_network("s1")
+        # after teardown the block is reusable by a new session
+        reused = plugin._alloc_local_subnet("s-new")
+        assert reused == first
 
 
 class TestPeers:
@@ -168,3 +205,7 @@ class TestAttachEndpoint:
         local = plan.local()
         assert local.is_default_route is True
         assert local.role is NetworkRole.LOCAL
+        # per-session LOCAL bridge on a node-local subnet (not the stretched overlay)
+        assert local.cni_config is not None
+        assert local.cni_config["bridge"] == local_bridge_dev(4097)
+        assert local.cni_config["ipam"]["subnet"].startswith("172.30.")
