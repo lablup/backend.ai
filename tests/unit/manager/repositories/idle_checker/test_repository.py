@@ -146,6 +146,8 @@ class TestFetchIdleCheckBatch:
                     cluster_mode=ClusterMode.SINGLE_NODE,
                     cluster_size=1,
                     domain_name=scope.domain_name,
+                    domain_id=scope.domain_id,
+                    resource_group_id=scope.scaling_group_id,
                     group_id=scope.project_id,
                     user_uuid=uuid.uuid4(),
                     access_key=None,
@@ -316,6 +318,8 @@ class TestFetchIdleCheckBatch:
                         cluster_mode=ClusterMode.SINGLE_NODE,
                         cluster_size=1,
                         domain_name=scope.domain_name,
+                        domain_id=scope.domain_id,
+                        resource_group_id=scope.scaling_group_id,
                         group_id=scope.project_id,
                         user_uuid=uuid.uuid4(),
                         access_key=None,
@@ -376,7 +380,10 @@ class TestFetchIdleCheckBatch:
         self,
         repository: IdleCheckerRepository,
     ) -> None:
-        batch = await repository.fetch_idle_check_batch([SessionStatus.RUNNING])
+        batch = await repository.fetch_idle_check_batch(
+            [SessionStatus.RUNNING],
+            [SessionTypes.INTERACTIVE, SessionTypes.BATCH, SessionTypes.SYSTEM],
+        )
 
         assert batch.targets == ()
 
@@ -390,7 +397,10 @@ class TestFetchIdleCheckBatch:
         repository: IdleCheckerRepository,
         seeded_idle_check_data: SeededIdleCheckData,
     ) -> None:
-        batch = await repository.fetch_idle_check_batch([SessionStatus.RUNNING])
+        batch = await repository.fetch_idle_check_batch(
+            [SessionStatus.RUNNING],
+            [SessionTypes.INTERACTIVE, SessionTypes.BATCH, SessionTypes.SYSTEM],
+        )
         targets_by_session_id = {target.session.session_id: target for target in batch.targets}
         resource_group_target = targets_by_session_id[
             seeded_idle_check_data.resource_group_session_id
@@ -411,7 +421,10 @@ class TestFetchIdleCheckBatch:
         repository: IdleCheckerRepository,
         seeded_idle_check_data: SeededIdleCheckData,
     ) -> None:
-        batch = await repository.fetch_idle_check_batch([SessionStatus.RUNNING])
+        batch = await repository.fetch_idle_check_batch(
+            [SessionStatus.RUNNING],
+            [SessionTypes.INTERACTIVE, SessionTypes.BATCH, SessionTypes.SYSTEM],
+        )
         targets_by_session_id = {target.session.session_id: target for target in batch.targets}
         project_target = targets_by_session_id[seeded_idle_check_data.project_session_id]
         checkers = project_target.checkers
@@ -430,7 +443,10 @@ class TestFetchIdleCheckBatch:
         repository: IdleCheckerRepository,
         seeded_idle_check_data: SeededIdleCheckData,
     ) -> None:
-        batch = await repository.fetch_idle_check_batch([SessionStatus.RUNNING])
+        batch = await repository.fetch_idle_check_batch(
+            [SessionStatus.RUNNING],
+            [SessionTypes.INTERACTIVE, SessionTypes.BATCH, SessionTypes.SYSTEM],
+        )
         targets_by_session_id = {target.session.session_id: target for target in batch.targets}
         domain_target = targets_by_session_id[seeded_idle_check_data.domain_session_id]
         checkers = domain_target.checkers
@@ -449,7 +465,10 @@ class TestFetchIdleCheckBatch:
         repository: IdleCheckerRepository,
         seeded_idle_check_data: SeededIdleCheckData,
     ) -> None:
-        batch = await repository.fetch_idle_check_batch([SessionStatus.RUNNING])
+        batch = await repository.fetch_idle_check_batch(
+            [SessionStatus.RUNNING],
+            [SessionTypes.INTERACTIVE, SessionTypes.BATCH, SessionTypes.SYSTEM],
+        )
         targets_by_session_id = {target.session.session_id: target for target in batch.targets}
 
         assert set(targets_by_session_id) == {

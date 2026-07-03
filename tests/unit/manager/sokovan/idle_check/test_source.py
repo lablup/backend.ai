@@ -6,7 +6,7 @@ from uuid import uuid4
 
 import pytest
 
-from ai.backend.common.types import SessionId
+from ai.backend.common.types import SessionId, SessionTypes
 from ai.backend.manager.data.idle_checker.types import IdleCheckSession
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.repositories.idle_checker.types import (
@@ -61,7 +61,14 @@ class TestIdleCheckSource:
 
     @pytest.fixture()
     def target_statuses(self) -> IdleCheckTargetStatuses:
-        return IdleCheckTargetStatuses(session_statuses=frozenset([SessionStatus.RUNNING]))
+        return IdleCheckTargetStatuses(
+            session_statuses=frozenset([SessionStatus.RUNNING]),
+            session_types=frozenset([
+                SessionTypes.INTERACTIVE,
+                SessionTypes.BATCH,
+                SessionTypes.SYSTEM,
+            ]),
+        )
 
     async def test_fetch_reconcile_info_uses_scope_snapshot(
         self,
@@ -73,6 +80,8 @@ class TestIdleCheckSource:
     ) -> None:
         reconcile_info = await source.fetch_reconcile_info(IdleCheckCategory.IDLE, target_statuses)
 
-        repository.fetch_idle_check_batch.assert_awaited_once_with(target_statuses.session_statuses)
+        repository.fetch_idle_check_batch.assert_awaited_once_with(
+            target_statuses.session_statuses, target_statuses.session_types
+        )
         assert reconcile_info.batch is batch
         assert reconcile_info.entity_ids() == list(session_ids)

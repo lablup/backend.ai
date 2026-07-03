@@ -9,9 +9,7 @@ import sqlalchemy as sa
 from ai.backend.common.types import SessionId, SessionTypes
 from ai.backend.manager.data.idle_checker.types import IdleCheckSession, ScopeRef, ScopeType
 from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.idle_checker.row import IdleCheckerBindingRow, IdleCheckerRow
-from ai.backend.manager.models.scaling_group.row import ScalingGroupRow
 from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.repositories.base import BatchQuerier, NoPagination
 from ai.backend.manager.repositories.idle_checker.types import (
@@ -30,7 +28,9 @@ class IdleCheckerDBSource:
         self._ops = ops_provider
 
     async def fetch_idle_check_batch(
-        self, session_statuses: Collection[SessionStatus]
+        self,
+        session_statuses: Collection[SessionStatus],
+        session_types: Collection[SessionTypes],
     ) -> IdleCheckBatchData:
         """Fetch sessions with the scope-bound idle checkers applicable to each session."""
         binding_query = (
@@ -54,23 +54,21 @@ class IdleCheckerDBSource:
         )
         session_query = (
             sa.select(
-                SessionRow.id.label("session_id"),
-                SessionRow.created_at.label("session_created_at"),
-                SessionRow.starts_at.label("session_starts_at"),
-                ScalingGroupRow.id.label("resource_group_id"),
-                SessionRow.group_id.label("project_id"),
-                DomainRow.id.label("domain_id"),
+                SessionRow.id,
+                SessionRow.created_at,
+                SessionRow.starts_at,
+                SessionRow.resource_group_id,
+                SessionRow.group_id,
+                SessionRow.domain_id,
             )
             .select_from(SessionRow)
-            .join(DomainRow, SessionRow.domain_name == DomainRow.name)
-            .join(ScalingGroupRow, SessionRow.scaling_group_name == ScalingGroupRow.name)
             .where(
                 sa.and_(
-                    # The caller (idle-check stage) owns which statuses are idle-check targets;
-                    # today that is RUNNING only. Kept as a parameter so the policy stays in the
-                    # stage's target_statuses rather than baked into this read.
+                    # The caller (idle-check stage) owns which statuses and session types are
+                    # idle-check targets. Kept as parameters so the policy stays in the stage's
+                    # target_statuses rather than baked into this read.
                     SessionRow.status.in_(session_statuses),
-                    SessionRow.session_type != SessionTypes.INFERENCE,
+                    SessionRow.session_type.in_(session_types),
                     self._enabled_binding_exists_query(),
                 )
             )
@@ -104,7 +102,7 @@ class IdleCheckerDBSource:
         for session_row in session_rows:
             scopes = (
                 ScopeRef(ScopeType.RESOURCE_GROUP, session_row.resource_group_id),
-                ScopeRef(ScopeType.PROJECT, session_row.project_id),
+                ScopeRef(ScopeType.PROJECT, session_row.group_id),
                 ScopeRef(ScopeType.DOMAIN, session_row.domain_id),
             )
             checkers = tuple(
@@ -113,9 +111,9 @@ class IdleCheckerDBSource:
             targets.append(
                 IdleCheckTargetData(
                     session=IdleCheckSession(
-                        session_id=SessionId(session_row.session_id),
-                        created_at=session_row.session_created_at,
-                        starts_at=session_row.session_starts_at,
+                        session_id=SessionId(session_row.id),
+                        created_at=session_row.created_at,
+                        starts_at=session_row.starts_at,
                     ),
                     checkers=checkers,
                 )
@@ -130,7 +128,7 @@ class IdleCheckerDBSource:
                 sa.or_(
                     sa.and_(
                         IdleCheckerBindingRow.scope_type == ScopeType.RESOURCE_GROUP.value,
-                        IdleCheckerBindingRow.scope_id == ScalingGroupRow.id,
+                        IdleCheckerBindingRow.scope_id == SessionRow.resource_group_id,
                     ),
                     sa.and_(
                         IdleCheckerBindingRow.scope_type == ScopeType.PROJECT.value,
@@ -138,7 +136,7 @@ class IdleCheckerDBSource:
                     ),
                     sa.and_(
                         IdleCheckerBindingRow.scope_type == ScopeType.DOMAIN.value,
-                        IdleCheckerBindingRow.scope_id == DomainRow.id,
+                        IdleCheckerBindingRow.scope_id == SessionRow.domain_id,
                     ),
                 ),
             )

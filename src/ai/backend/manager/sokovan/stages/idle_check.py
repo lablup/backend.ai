@@ -8,6 +8,7 @@ from ai.backend.common.events.event_types.schedule.anycast import (
     DoReconcileProcessEvent,
     DoReconcileProcessIfNeededEvent,
 )
+from ai.backend.common.types import SessionTypes
 from ai.backend.manager.data.session.types import SchedulingResult, SessionStatus
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.repositories.idle_checker.repository import IdleCheckerRepository
@@ -39,7 +40,13 @@ def build_idle_check_stage(
         category=IdleCheckCategory.IDLE,
         kind=IdleCheckKind.SESSION,
         target_statuses=IdleCheckTargetStatuses(
-            session_statuses=frozenset({SessionStatus.RUNNING})
+            session_statuses=frozenset({SessionStatus.RUNNING}),
+            # Inference sessions follow the deployment/routing lifecycle, not idle termination.
+            session_types=frozenset({
+                SessionTypes.INTERACTIVE,
+                SessionTypes.BATCH,
+                SessionTypes.SYSTEM,
+            }),
         ),
         name="idle_check_reconcile",
         phase="idle_check",
