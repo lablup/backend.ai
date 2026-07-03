@@ -126,7 +126,7 @@ class Request:
         content: RequestContent | None = None,
         *,
         content_type: str | None = None,
-        params: Mapping[str, str | int] | None = None,
+        params: Mapping[str, str | int | list[str]] | None = None,
         reporthook: Callable[..., Any] | None = None,
         override_api_version: str | None = None,
         session_mode: SessionMode = SessionMode.CLIENT,
