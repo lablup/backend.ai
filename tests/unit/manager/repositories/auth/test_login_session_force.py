@@ -11,6 +11,10 @@ import sqlalchemy as sa
 
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
+from ai.backend.manager.data.auth.login_session_types import (
+    LoginAttemptResult,
+    LoginSessionStatus,
+)
 from ai.backend.manager.errors.auth import AuthorizationFailed
 from ai.backend.manager.models.agent import AgentRow
 
@@ -22,10 +26,6 @@ from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.login_client_type.row import LoginClientTypeRow
-from ai.backend.manager.models.login_session.enums import (
-    LoginAttemptResult,
-    LoginSessionStatus,
-)
 from ai.backend.manager.models.login_session.row import LoginHistoryRow, LoginSessionRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,

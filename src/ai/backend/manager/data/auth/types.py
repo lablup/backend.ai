@@ -2,7 +2,8 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime
 
-from ai.backend.manager.models.user import UserRole, UserStatus
+from ai.backend.common.data.user.types import UserRole
+from ai.backend.manager.data.user.types import UserStatus
 
 
 @dataclass
