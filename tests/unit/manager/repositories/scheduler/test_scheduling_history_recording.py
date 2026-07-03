@@ -15,6 +15,8 @@ import sqlalchemy as sa
 from dateutil.tz import tzutc
 
 from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import (
     AccessKey,
     ClusterMode,
@@ -344,15 +346,25 @@ class TestMarkTerminatingSchedulingHistory:
             yield database_connection
 
     @pytest.fixture
+    def test_domain_id(self) -> DomainID:
+        return DomainID(uuid.uuid4())
+
+    @pytest.fixture
+    def test_scaling_group_id(self) -> ResourceGroupID:
+        return ResourceGroupID(uuid.uuid4())
+
+    @pytest.fixture
     async def test_domain_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_id: DomainID,
     ) -> AsyncGenerator[str, None]:
         """Create test domain and return domain name."""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as db_sess:
             domain = DomainRow(
+                id=test_domain_id,
                 name=domain_name,
                 total_resource_slots=ResourceSlot({
                     "cpu": Decimal("1000"),
@@ -368,12 +380,14 @@ class TestMarkTerminatingSchedulingHistory:
     async def test_scaling_group_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        test_scaling_group_id: ResourceGroupID,
     ) -> AsyncGenerator[str, None]:
         """Create test scaling group and return scaling group name."""
         sg_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as db_sess:
             sg = ScalingGroupRow(
+                id=test_scaling_group_id,
                 name=sg_name,
                 driver="static",
                 scheduler="fifo",
@@ -569,7 +583,9 @@ class TestMarkTerminatingSchedulingHistory:
         session_status: SessionStatus,
         kernel_status: KernelStatus,
         domain_name: str,
+        domain_id: DomainID,
         scaling_group_name: str,
+        resource_group_id: ResourceGroupID,
         group_id: uuid.UUID,
         user_uuid: uuid.UUID,
         access_key: AccessKey,
@@ -585,8 +601,10 @@ class TestMarkTerminatingSchedulingHistory:
                 name=f"test-session-{uuid.uuid4().hex[:8]}",
                 session_type=SessionTypes.INTERACTIVE,
                 domain_name=domain_name,
+                domain_id=domain_id,
                 group_id=group_id,
                 scaling_group_name=scaling_group_name,
+                resource_group_id=resource_group_id,
                 status=session_status,
                 status_info="test",
                 cluster_mode=ClusterMode.SINGLE_NODE,
@@ -639,7 +657,9 @@ class TestMarkTerminatingSchedulingHistory:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_name: str,
+        test_domain_id: DomainID,
         test_scaling_group_name: str,
+        test_scaling_group_id: ResourceGroupID,
         test_group_id: uuid.UUID,
         test_user_uuid: uuid.UUID,
         test_access_key: AccessKey,
@@ -653,7 +673,9 @@ class TestMarkTerminatingSchedulingHistory:
             session_status=SessionStatus.RUNNING,
             kernel_status=KernelStatus.RUNNING,
             domain_name=test_domain_name,
+            domain_id=test_domain_id,
             scaling_group_name=test_scaling_group_name,
+            resource_group_id=test_scaling_group_id,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
             access_key=test_access_key,
@@ -680,7 +702,9 @@ class TestMarkTerminatingSchedulingHistory:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_name: str,
+        test_domain_id: DomainID,
         test_scaling_group_name: str,
+        test_scaling_group_id: ResourceGroupID,
         test_group_id: uuid.UUID,
         test_user_uuid: uuid.UUID,
         test_access_key: AccessKey,
@@ -694,7 +718,9 @@ class TestMarkTerminatingSchedulingHistory:
             session_status=SessionStatus.PENDING,
             kernel_status=KernelStatus.PENDING,
             domain_name=test_domain_name,
+            domain_id=test_domain_id,
             scaling_group_name=test_scaling_group_name,
+            resource_group_id=test_scaling_group_id,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
             access_key=test_access_key,
@@ -721,7 +747,9 @@ class TestMarkTerminatingSchedulingHistory:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_name: str,
+        test_domain_id: DomainID,
         test_scaling_group_name: str,
+        test_scaling_group_id: ResourceGroupID,
         test_group_id: uuid.UUID,
         test_user_uuid: uuid.UUID,
         test_access_key: AccessKey,
@@ -735,7 +763,9 @@ class TestMarkTerminatingSchedulingHistory:
             session_status=SessionStatus.RUNNING,
             kernel_status=KernelStatus.RUNNING,
             domain_name=test_domain_name,
+            domain_id=test_domain_id,
             scaling_group_name=test_scaling_group_name,
+            resource_group_id=test_scaling_group_id,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
             access_key=test_access_key,
@@ -761,7 +791,9 @@ class TestMarkTerminatingSchedulingHistory:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_name: str,
+        test_domain_id: DomainID,
         test_scaling_group_name: str,
+        test_scaling_group_id: ResourceGroupID,
         test_group_id: uuid.UUID,
         test_user_uuid: uuid.UUID,
         test_access_key: AccessKey,
@@ -775,7 +807,9 @@ class TestMarkTerminatingSchedulingHistory:
             session_status=SessionStatus.TERMINATING,
             kernel_status=KernelStatus.TERMINATING,
             domain_name=test_domain_name,
+            domain_id=test_domain_id,
             scaling_group_name=test_scaling_group_name,
+            resource_group_id=test_scaling_group_id,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
             access_key=test_access_key,
@@ -801,7 +835,9 @@ class TestMarkTerminatingSchedulingHistory:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_name: str,
+        test_domain_id: DomainID,
         test_scaling_group_name: str,
+        test_scaling_group_id: ResourceGroupID,
         test_group_id: uuid.UUID,
         test_user_uuid: uuid.UUID,
         test_access_key: AccessKey,
@@ -816,7 +852,9 @@ class TestMarkTerminatingSchedulingHistory:
             session_status=SessionStatus.RUNNING,
             kernel_status=KernelStatus.RUNNING,
             domain_name=test_domain_name,
+            domain_id=test_domain_id,
             scaling_group_name=test_scaling_group_name,
+            resource_group_id=test_scaling_group_id,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
             access_key=test_access_key,
@@ -827,7 +865,9 @@ class TestMarkTerminatingSchedulingHistory:
             session_status=SessionStatus.SCHEDULED,
             kernel_status=KernelStatus.SCHEDULED,
             domain_name=test_domain_name,
+            domain_id=test_domain_id,
             scaling_group_name=test_scaling_group_name,
+            resource_group_id=test_scaling_group_id,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
             access_key=test_access_key,

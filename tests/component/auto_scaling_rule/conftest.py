@@ -37,7 +37,7 @@ from ai.backend.manager.repositories.permission_controller.repository import (
 )
 from ai.backend.manager.services.deployment.processors import DeploymentProcessors
 from ai.backend.manager.services.deployment.service import DeploymentService
-from ai.backend.testutils.fixtures import DomainFixtureData
+from ai.backend.testutils.fixtures import DomainFixtureData, ScalingGroupFixtureData
 
 
 @dataclass
@@ -125,7 +125,7 @@ async def model_deployment_fixture(
     db_engine: SAEngine,
     domain_fixture: DomainFixtureData,
     group_fixture: uuid.UUID,
-    scaling_group_fixture: str,
+    scaling_group_fixture: ScalingGroupFixtureData,
     admin_user_fixture: UserFixtureData,
 ) -> AsyncIterator[uuid.UUID]:
     """Insert a minimal EndpointRow (model deployment) and yield its UUID.
@@ -176,7 +176,7 @@ async def model_deployment_fixture(
                 session_owner=str(admin_user_fixture.user_uuid),
                 domain=domain_fixture.domain_name,
                 project=str(group_fixture),
-                resource_group=scaling_group_fixture,
+                resource_group=scaling_group_fixture.scaling_group_name,
                 lifecycle_stage=EndpointLifecycle.CREATED,
                 url=None,
             )

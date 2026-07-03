@@ -10,6 +10,8 @@ import pytest
 from dateutil.tz import tzutc
 
 from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
@@ -80,7 +82,9 @@ class TestPersistentNetworkNotRecreated:
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[dict[str, Any], None]:
         """Seed FK-required rows (domain, sgroup, policies, user, keypair, group, agent)."""
+        domain_id = DomainID(uuid.uuid4())
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
+        sg_id = ResourceGroupID(uuid.uuid4())
         sg_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
         project_policy_name = f"test-project-policy-{uuid.uuid4().hex[:8]}"
         user_policy_name = f"test-user-policy-{uuid.uuid4().hex[:8]}"
@@ -93,6 +97,7 @@ class TestPersistentNetworkNotRecreated:
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 DomainRow(
+                    id=domain_id,
                     name=domain_name,
                     total_resource_slots=ResourceSlot({
                         "cpu": Decimal("1000"),
@@ -102,6 +107,7 @@ class TestPersistentNetworkNotRecreated:
             )
             db_sess.add(
                 ScalingGroupRow(
+                    id=sg_id,
                     name=sg_name,
                     driver="static",
                     scheduler="fifo",
@@ -203,7 +209,9 @@ class TestPersistentNetworkNotRecreated:
             await db_sess.flush()
 
         yield {
+            "domain_id": domain_id,
             "domain_name": domain_name,
+            "sg_id": sg_id,
             "sg_name": sg_name,
             "user_uuid": user_uuid,
             "access_key": access_key,
@@ -228,10 +236,12 @@ class TestPersistentNetworkNotRecreated:
                     id=session_id,
                     name=f"test-session-{uuid.uuid4().hex[:8]}",
                     session_type=SessionTypes.INTERACTIVE,
+                    domain_id=env["domain_id"],
                     domain_name=env["domain_name"],
                     group_id=env["group_id"],
                     user_uuid=env["user_uuid"],
                     access_key=env["access_key"],
+                    resource_group_id=env["sg_id"],
                     scaling_group_name=env["sg_name"],
                     status=SessionStatus.PREPARED,
                     status_info="prepared",

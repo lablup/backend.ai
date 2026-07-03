@@ -28,6 +28,7 @@ from ai.backend.manager.repositories.agent.repository import AgentRepository
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.services.agent.processors import AgentProcessors
 from ai.backend.manager.services.agent.service import AgentService
+from ai.backend.testutils.fixtures import ScalingGroupFixtureData
 
 
 @pytest.fixture()
@@ -105,7 +106,7 @@ def server_module_registries(
 @pytest.fixture()
 async def agent_fixture(
     db_engine: SAEngine,
-    scaling_group_fixture: str,
+    scaling_group_fixture: ScalingGroupFixtureData,
 ) -> AsyncIterator[str]:
     """Insert a test agent row and yield its ID.
 
@@ -119,7 +120,7 @@ async def agent_fixture(
                 id=agent_id,
                 status=AgentStatus.ALIVE,
                 region="local",
-                scaling_group=scaling_group_fixture,
+                scaling_group=scaling_group_fixture.scaling_group_name,
                 schedulable=True,
                 available_slots=ResourceSlot({"cpu": "4", "mem": "8589934592"}),
                 occupied_slots=ResourceSlot(),

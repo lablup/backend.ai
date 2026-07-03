@@ -30,6 +30,7 @@ from ai.backend.manager.services.error_log.processors import ErrorLogProcessors
 from ai.backend.manager.services.error_log.service import ErrorLogService
 from ai.backend.manager.services.manager_admin.processors import ManagerAdminProcessors
 from ai.backend.manager.services.manager_admin.service import ManagerAdminService
+from ai.backend.testutils.fixtures import ScalingGroupFixtureData
 
 
 @pytest.fixture()
@@ -96,7 +97,7 @@ def server_module_registries(
 @pytest.fixture()
 async def agent_fixture(
     db_engine: SAEngine,
-    scaling_group_fixture: str,
+    scaling_group_fixture: ScalingGroupFixtureData,
 ) -> AsyncIterator[str]:
     """Insert a test agent record and yield its ID."""
     agent_id = f"i-test-agent-{secrets.token_hex(4)}"
@@ -105,7 +106,7 @@ async def agent_fixture(
             sa.insert(agents).values(
                 id=agent_id,
                 region="local",
-                scaling_group=scaling_group_fixture,
+                scaling_group=scaling_group_fixture.scaling_group_name,
                 available_slots=ResourceSlot(),
                 occupied_slots=ResourceSlot(),
                 addr="127.0.0.1:6001",

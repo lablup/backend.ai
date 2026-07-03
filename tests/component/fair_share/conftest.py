@@ -28,7 +28,7 @@ from ai.backend.manager.services.resource_usage.processors import ResourceUsageP
 from ai.backend.manager.services.resource_usage.service import ResourceUsageService
 from ai.backend.manager.services.scaling_group.processors import ScalingGroupProcessors
 from ai.backend.manager.services.scaling_group.service import ScalingGroupService
-from ai.backend.testutils.fixtures import DomainFixtureData
+from ai.backend.testutils.fixtures import DomainFixtureData, ScalingGroupFixtureData
 
 
 @pytest.fixture()
@@ -83,7 +83,7 @@ async def group_fixture(
     db_engine: SAEngine,
     domain_fixture: DomainFixtureData,
     resource_policy_fixture: str,
-    scaling_group_fixture: str,
+    scaling_group_fixture: ScalingGroupFixtureData,
 ) -> AsyncIterator[uuid.UUID]:
     """Insert a test group with scaling-group association for fair-share tests."""
     group_id = uuid.uuid4()
@@ -101,7 +101,7 @@ async def group_fixture(
         )
         await conn.execute(
             sa.insert(sgroups_for_groups).values(
-                scaling_group=scaling_group_fixture,
+                scaling_group=scaling_group_fixture.scaling_group_name,
                 group=group_id,
             )
         )

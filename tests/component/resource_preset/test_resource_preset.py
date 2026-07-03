@@ -16,6 +16,7 @@ from ai.backend.common.dto.manager.infra import (
     ListPresetsRequest,
     ListPresetsResponse,
 )
+from ai.backend.testutils.fixtures import ScalingGroupFixtureData
 
 PresetFixtureData = dict[str, Any]
 PresetFactory = Callable[..., Coroutine[Any, Any, PresetFixtureData]]
@@ -53,12 +54,12 @@ class TestResourcePresetList:
     async def test_admin_lists_presets_with_scaling_group_filter(
         self,
         admin_registry: BackendAIClientRegistry,
-        scaling_group_fixture: str,
+        scaling_group_fixture: ScalingGroupFixtureData,
         target_preset: PresetFixtureData,
     ) -> None:
         """Filtering by scaling group still returns system presets."""
         result = await admin_registry.infra.list_presets(
-            ListPresetsRequest(scaling_group=scaling_group_fixture)
+            ListPresetsRequest(scaling_group=scaling_group_fixture.scaling_group_name)
         )
         assert isinstance(result, ListPresetsResponse)
         assert isinstance(result.presets, list)
@@ -93,13 +94,13 @@ class TestResourcePresetCheck:
         admin_registry: BackendAIClientRegistry,
         target_preset: PresetFixtureData,
         group_name_fixture: str,
-        scaling_group_fixture: str,
+        scaling_group_fixture: ScalingGroupFixtureData,
     ) -> None:
         """Admin checks presets filtered by scaling group."""
         result = await admin_registry.infra.check_presets(
             CheckPresetsRequest(
                 group=group_name_fixture,
-                scaling_group=scaling_group_fixture,
+                scaling_group=scaling_group_fixture.scaling_group_name,
             )
         )
         assert isinstance(result, CheckPresetsResponse)

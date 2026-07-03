@@ -16,6 +16,8 @@ from decimal import Decimal
 
 import sqlalchemy as sa
 
+from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import AccessKey, KernelId, SessionId
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
@@ -40,7 +42,9 @@ class TestAllocateSessionsReservation:
     async def test_a1_single_kernel_reserves_and_schedules(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_id: DomainID,
         test_domain_name: str,
+        test_scaling_group_id: ResourceGroupID,
         test_scaling_group_name: str,
         test_group_id: uuid.UUID,
         test_user_uuid: uuid.UUID,
@@ -57,7 +61,9 @@ class TestAllocateSessionsReservation:
         )
         session_id, kernel_ids = await create_pending_session_with_kernels(
             db_with_cleanup,
+            domain_id=test_domain_id,
             domain_name=test_domain_name,
+            resource_group_id=test_scaling_group_id,
             scaling_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
@@ -97,7 +103,9 @@ class TestAllocateSessionsReservation:
     async def test_a2_multi_kernel_reserves_sum(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_id: DomainID,
         test_domain_name: str,
+        test_scaling_group_id: ResourceGroupID,
         test_scaling_group_name: str,
         test_group_id: uuid.UUID,
         test_user_uuid: uuid.UUID,
@@ -114,7 +122,9 @@ class TestAllocateSessionsReservation:
         )
         session_id, kernel_ids = await create_pending_session_with_kernels(
             db_with_cleanup,
+            domain_id=test_domain_id,
             domain_name=test_domain_name,
+            resource_group_id=test_scaling_group_id,
             scaling_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
@@ -152,7 +162,9 @@ class TestAllocateSessionsReservation:
     async def test_a3_idempotent_double_allocate(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_id: DomainID,
         test_domain_name: str,
+        test_scaling_group_id: ResourceGroupID,
         test_scaling_group_name: str,
         test_group_id: uuid.UUID,
         test_user_uuid: uuid.UUID,
@@ -169,7 +181,9 @@ class TestAllocateSessionsReservation:
         )
         session_id, kernel_ids = await create_pending_session_with_kernels(
             db_with_cleanup,
+            domain_id=test_domain_id,
             domain_name=test_domain_name,
+            resource_group_id=test_scaling_group_id,
             scaling_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
@@ -196,7 +210,9 @@ class TestAllocateSessionsReservation:
     async def test_a4_capacity_gate_rolls_back(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_id: DomainID,
         test_domain_name: str,
+        test_scaling_group_id: ResourceGroupID,
         test_scaling_group_name: str,
         test_group_id: uuid.UUID,
         test_user_uuid: uuid.UUID,
@@ -215,7 +231,9 @@ class TestAllocateSessionsReservation:
         )
         session_id, kernel_ids = await create_pending_session_with_kernels(
             db_with_cleanup,
+            domain_id=test_domain_id,
             domain_name=test_domain_name,
+            resource_group_id=test_scaling_group_id,
             scaling_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
@@ -247,7 +265,9 @@ class TestAllocateSessionsReservation:
     async def test_a5_batch_atomicity_second_session_exceeds(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_id: DomainID,
         test_domain_name: str,
+        test_scaling_group_id: ResourceGroupID,
         test_scaling_group_name: str,
         test_group_id: uuid.UUID,
         test_user_uuid: uuid.UUID,
@@ -265,7 +285,9 @@ class TestAllocateSessionsReservation:
         )
         session_a, kernels_a = await create_pending_session_with_kernels(
             db_with_cleanup,
+            domain_id=test_domain_id,
             domain_name=test_domain_name,
+            resource_group_id=test_scaling_group_id,
             scaling_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
@@ -274,7 +296,9 @@ class TestAllocateSessionsReservation:
         )
         session_b, kernels_b = await create_pending_session_with_kernels(
             db_with_cleanup,
+            domain_id=test_domain_id,
             domain_name=test_domain_name,
+            resource_group_id=test_scaling_group_id,
             scaling_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
@@ -320,7 +344,9 @@ class TestReservedOnlyRelease:
         self,
         db: ExtendedAsyncSAEngine,
         *,
+        domain_id: DomainID,
         domain_name: str,
+        resource_group_id: ResourceGroupID,
         scaling_group_name: str,
         group_id: uuid.UUID,
         user_uuid: uuid.UUID,
@@ -332,7 +358,9 @@ class TestReservedOnlyRelease:
         """Create a PENDING session and allocate it (-> SCHEDULED, reserved up)."""
         session_id, kernel_ids = await create_pending_session_with_kernels(
             db,
+            domain_id=domain_id,
             domain_name=domain_name,
+            resource_group_id=resource_group_id,
             scaling_group_name=scaling_group_name,
             group_id=group_id,
             user_uuid=user_uuid,
@@ -352,7 +380,9 @@ class TestReservedOnlyRelease:
     async def test_c2_cancel_releases_reserved(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_id: DomainID,
         test_domain_name: str,
+        test_scaling_group_id: ResourceGroupID,
         test_scaling_group_name: str,
         test_group_id: uuid.UUID,
         test_user_uuid: uuid.UUID,
@@ -370,7 +400,9 @@ class TestReservedOnlyRelease:
         db_source = ScheduleDBSource(db_with_cleanup)
         _, kernel_id = await self._allocate_one(
             db_with_cleanup,
+            domain_id=test_domain_id,
             domain_name=test_domain_name,
+            resource_group_id=test_scaling_group_id,
             scaling_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
@@ -410,7 +442,9 @@ class TestReservedOnlyRelease:
     async def test_c3_bulk_terminate_releases_reserved(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_id: DomainID,
         test_domain_name: str,
+        test_scaling_group_id: ResourceGroupID,
         test_scaling_group_name: str,
         test_group_id: uuid.UUID,
         test_user_uuid: uuid.UUID,
@@ -428,7 +462,9 @@ class TestReservedOnlyRelease:
         db_source = ScheduleDBSource(db_with_cleanup)
         _, kernel_id = await self._allocate_one(
             db_with_cleanup,
+            domain_id=test_domain_id,
             domain_name=test_domain_name,
+            resource_group_id=test_scaling_group_id,
             scaling_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,
@@ -451,7 +487,9 @@ class TestReservedOnlyRelease:
     async def test_full_lifecycle_reserved_to_used_to_zero(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_id: DomainID,
         test_domain_name: str,
+        test_scaling_group_id: ResourceGroupID,
         test_scaling_group_name: str,
         test_group_id: uuid.UUID,
         test_user_uuid: uuid.UUID,
@@ -469,7 +507,9 @@ class TestReservedOnlyRelease:
         db_source = ScheduleDBSource(db_with_cleanup)
         _, kernel_id = await self._allocate_one(
             db_with_cleanup,
+            domain_id=test_domain_id,
             domain_name=test_domain_name,
+            resource_group_id=test_scaling_group_id,
             scaling_group_name=test_scaling_group_name,
             group_id=test_group_id,
             user_uuid=test_user_uuid,

@@ -51,6 +51,7 @@ from ai.backend.manager.services.resource_allocation.processors import (
 from ai.backend.manager.services.resource_allocation.service import (
     ResourceAllocationService,
 )
+from ai.backend.testutils.fixtures import ScalingGroupFixtureData
 
 if TYPE_CHECKING:
     from tests.component.conftest import ServerInfo, UserFixtureData
@@ -204,13 +205,13 @@ class TestHideAgentsVisibility:
         self,
         user_v2_registry: V2ClientRegistry,
         group_fixture: uuid.UUID,
-        scaling_group_fixture: str,
+        scaling_group_fixture: ScalingGroupFixtureData,
     ) -> None:
         """Regular user with hide_agents=True should get resource_group=null."""
         result = await user_v2_registry.resource_allocation.effective(
             EffectiveResourceAllocationInput(
                 project_id=group_fixture,
-                resource_group_name=scaling_group_fixture,
+                resource_group_name=scaling_group_fixture.scaling_group_name,
             ),
         )
         assert isinstance(result, EffectiveResourceAllocationPayload)
@@ -223,13 +224,13 @@ class TestHideAgentsVisibility:
         self,
         admin_v2_registry: V2ClientRegistry,
         group_fixture: uuid.UUID,
-        scaling_group_fixture: str,
+        scaling_group_fixture: ScalingGroupFixtureData,
     ) -> None:
         """Admin should see resource_group even when hide_agents=True."""
         result = await admin_v2_registry.resource_allocation.effective(
             EffectiveResourceAllocationInput(
                 project_id=group_fixture,
-                resource_group_name=scaling_group_fixture,
+                resource_group_name=scaling_group_fixture.scaling_group_name,
             ),
         )
         assert isinstance(result, EffectiveResourceAllocationPayload)
@@ -334,13 +335,13 @@ class TestGroupResourceVisibility:
         self,
         user_v2_registry: V2ClientRegistry,
         group_fixture: uuid.UUID,
-        scaling_group_fixture: str,
+        scaling_group_fixture: ScalingGroupFixtureData,
     ) -> None:
         """Regular user with group_resource_visibility=False should get project=null."""
         result = await user_v2_registry.resource_allocation.effective(
             EffectiveResourceAllocationInput(
                 project_id=group_fixture,
-                resource_group_name=scaling_group_fixture,
+                resource_group_name=scaling_group_fixture.scaling_group_name,
             ),
         )
         assert isinstance(result, EffectiveResourceAllocationPayload)
@@ -353,13 +354,13 @@ class TestGroupResourceVisibility:
         self,
         admin_v2_registry: V2ClientRegistry,
         group_fixture: uuid.UUID,
-        scaling_group_fixture: str,
+        scaling_group_fixture: ScalingGroupFixtureData,
     ) -> None:
         """Admin should see project even when group_resource_visibility=False."""
         result = await admin_v2_registry.resource_allocation.effective(
             EffectiveResourceAllocationInput(
                 project_id=group_fixture,
-                resource_group_name=scaling_group_fixture,
+                resource_group_name=scaling_group_fixture.scaling_group_name,
             ),
         )
         assert isinstance(result, EffectiveResourceAllocationPayload)

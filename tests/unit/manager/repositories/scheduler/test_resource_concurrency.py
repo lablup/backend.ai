@@ -15,6 +15,8 @@ from decimal import Decimal
 
 import sqlalchemy as sa
 
+from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import AccessKey, KernelId, SessionId
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.models.kernel import KernelRow
@@ -49,7 +51,9 @@ class TestReservedConcurrency:
     async def test_e1_concurrent_reservation_no_overcommit(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_id: DomainID,
         test_domain_name: str,
+        test_scaling_group_id: ResourceGroupID,
         test_scaling_group_name: str,
         test_group_id: uuid.UUID,
         test_user_uuid: uuid.UUID,
@@ -86,7 +90,9 @@ class TestReservedConcurrency:
         for spec in session_specs:
             session_id, kernel_ids = await create_pending_session_with_kernels(
                 db_with_cleanup,
+                domain_id=test_domain_id,
                 domain_name=test_domain_name,
+                resource_group_id=test_scaling_group_id,
                 scaling_group_name=test_scaling_group_name,
                 group_id=test_group_id,
                 user_uuid=test_user_uuid,
@@ -137,7 +143,9 @@ class TestReservedConcurrency:
     async def test_e2_repeated_lifecycle_no_leak(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_id: DomainID,
         test_domain_name: str,
+        test_scaling_group_id: ResourceGroupID,
         test_scaling_group_name: str,
         test_group_id: uuid.UUID,
         test_user_uuid: uuid.UUID,
@@ -157,7 +165,9 @@ class TestReservedConcurrency:
         async def one_cycle() -> None:
             session_id, kernel_ids = await create_pending_session_with_kernels(
                 db_with_cleanup,
+                domain_id=test_domain_id,
                 domain_name=test_domain_name,
+                resource_group_id=test_scaling_group_id,
                 scaling_group_name=test_scaling_group_name,
                 group_id=test_group_id,
                 user_uuid=test_user_uuid,
@@ -198,7 +208,9 @@ class TestReservedConcurrency:
     async def test_e3_interleaved_allocate_free_consistency(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_id: DomainID,
         test_domain_name: str,
+        test_scaling_group_id: ResourceGroupID,
         test_scaling_group_name: str,
         test_group_id: uuid.UUID,
         test_user_uuid: uuid.UUID,
@@ -218,7 +230,9 @@ class TestReservedConcurrency:
         async def allocate_session(*, run: bool) -> tuple[SessionId, KernelId]:
             session_id, kernel_ids = await create_pending_session_with_kernels(
                 db_with_cleanup,
+                domain_id=test_domain_id,
                 domain_name=test_domain_name,
+                resource_group_id=test_scaling_group_id,
                 scaling_group_name=test_scaling_group_name,
                 group_id=test_group_id,
                 user_uuid=test_user_uuid,

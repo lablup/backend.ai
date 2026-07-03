@@ -44,7 +44,7 @@ from ai.backend.common.dto.manager.fair_share import (
     UpsertUserFairShareWeightResponse,
     UserWeightEntryInput,
 )
-from ai.backend.testutils.fixtures import DomainFixtureData
+from ai.backend.testutils.fixtures import DomainFixtureData, ScalingGroupFixtureData
 
 # ---- Domain Fair Share (Global-scoped) ----
 
@@ -53,11 +53,11 @@ class TestGetDomainFairShare:
     async def test_admin_get_domain_fair_share(
         self,
         admin_registry: BackendAIClientRegistry,
-        scaling_group_fixture: str,
+        scaling_group_fixture: ScalingGroupFixtureData,
         domain_fixture: DomainFixtureData,
     ) -> None:
         result = await admin_registry.fair_share.get_domain_fair_share(
-            resource_group=scaling_group_fixture,
+            resource_group=scaling_group_fixture.scaling_group_name,
             domain_name=domain_fixture.domain_name,
         )
         assert isinstance(result, GetDomainFairShareResponse)
@@ -65,12 +65,12 @@ class TestGetDomainFairShare:
     async def test_user_get_domain_fair_share_forbidden(
         self,
         user_registry: BackendAIClientRegistry,
-        scaling_group_fixture: str,
+        scaling_group_fixture: ScalingGroupFixtureData,
         domain_fixture: DomainFixtureData,
     ) -> None:
         with pytest.raises(PermissionDeniedError):
             await user_registry.fair_share.get_domain_fair_share(
-                resource_group=scaling_group_fixture,
+                resource_group=scaling_group_fixture.scaling_group_name,
                 domain_name=domain_fixture.domain_name,
             )
 
@@ -103,11 +103,11 @@ class TestGetProjectFairShare:
     async def test_admin_get_project_fair_share(
         self,
         admin_registry: BackendAIClientRegistry,
-        scaling_group_fixture: str,
+        scaling_group_fixture: ScalingGroupFixtureData,
         group_fixture: uuid.UUID,
     ) -> None:
         result = await admin_registry.fair_share.get_project_fair_share(
-            resource_group=scaling_group_fixture,
+            resource_group=scaling_group_fixture.scaling_group_name,
             project_id=group_fixture,
         )
         assert isinstance(result, GetProjectFairShareResponse)
@@ -115,12 +115,12 @@ class TestGetProjectFairShare:
     async def test_user_get_project_fair_share_forbidden(
         self,
         user_registry: BackendAIClientRegistry,
-        scaling_group_fixture: str,
+        scaling_group_fixture: ScalingGroupFixtureData,
         group_fixture: uuid.UUID,
     ) -> None:
         with pytest.raises(PermissionDeniedError):
             await user_registry.fair_share.get_project_fair_share(
-                resource_group=scaling_group_fixture,
+                resource_group=scaling_group_fixture.scaling_group_name,
                 project_id=group_fixture,
             )
 
@@ -144,12 +144,12 @@ class TestGetUserFairShare:
     async def test_admin_get_user_fair_share(
         self,
         admin_registry: BackendAIClientRegistry,
-        scaling_group_fixture: str,
+        scaling_group_fixture: ScalingGroupFixtureData,
         group_fixture: uuid.UUID,
         admin_user_fixture: Any,
     ) -> None:
         result = await admin_registry.fair_share.get_user_fair_share(
-            resource_group=scaling_group_fixture,
+            resource_group=scaling_group_fixture.scaling_group_name,
             project_id=group_fixture,
             user_uuid=admin_user_fixture.user_uuid,
         )
@@ -158,13 +158,13 @@ class TestGetUserFairShare:
     async def test_user_get_user_fair_share_forbidden(
         self,
         user_registry: BackendAIClientRegistry,
-        scaling_group_fixture: str,
+        scaling_group_fixture: ScalingGroupFixtureData,
         group_fixture: uuid.UUID,
         regular_user_fixture: Any,
     ) -> None:
         with pytest.raises(PermissionDeniedError):
             await user_registry.fair_share.get_user_fair_share(
-                resource_group=scaling_group_fixture,
+                resource_group=scaling_group_fixture.scaling_group_name,
                 project_id=group_fixture,
                 user_uuid=regular_user_fixture.user_uuid,
             )
@@ -228,11 +228,11 @@ class TestRGGetDomainFairShare:
     async def test_admin_rg_get_domain_fair_share(
         self,
         admin_registry: BackendAIClientRegistry,
-        scaling_group_fixture: str,
+        scaling_group_fixture: ScalingGroupFixtureData,
         domain_fixture: DomainFixtureData,
     ) -> None:
         result = await admin_registry.fair_share.rg_get_domain_fair_share(
-            resource_group=scaling_group_fixture,
+            resource_group=scaling_group_fixture.scaling_group_name,
             domain_name=domain_fixture.domain_name,
         )
         assert isinstance(result, GetDomainFairShareResponse)
@@ -240,11 +240,11 @@ class TestRGGetDomainFairShare:
     async def test_user_rg_get_domain_fair_share(
         self,
         user_registry: BackendAIClientRegistry,
-        scaling_group_fixture: str,
+        scaling_group_fixture: ScalingGroupFixtureData,
         domain_fixture: DomainFixtureData,
     ) -> None:
         result = await user_registry.fair_share.rg_get_domain_fair_share(
-            resource_group=scaling_group_fixture,
+            resource_group=scaling_group_fixture.scaling_group_name,
             domain_name=domain_fixture.domain_name,
         )
         assert isinstance(result, GetDomainFairShareResponse)
@@ -254,10 +254,10 @@ class TestRGSearchDomainFairShares:
     async def test_admin_rg_search_domain_fair_shares(
         self,
         admin_registry: BackendAIClientRegistry,
-        scaling_group_fixture: str,
+        scaling_group_fixture: ScalingGroupFixtureData,
     ) -> None:
         result = await admin_registry.fair_share.rg_search_domain_fair_shares(
-            resource_group=scaling_group_fixture,
+            resource_group=scaling_group_fixture.scaling_group_name,
             request=SearchDomainFairSharesRequest(),
         )
         assert isinstance(result, SearchDomainFairSharesResponse)
@@ -271,12 +271,12 @@ class TestRGGetProjectFairShare:
     async def test_admin_rg_get_project_fair_share(
         self,
         admin_registry: BackendAIClientRegistry,
-        scaling_group_fixture: str,
+        scaling_group_fixture: ScalingGroupFixtureData,
         domain_fixture: DomainFixtureData,
         group_fixture: uuid.UUID,
     ) -> None:
         result = await admin_registry.fair_share.rg_get_project_fair_share(
-            resource_group=scaling_group_fixture,
+            resource_group=scaling_group_fixture.scaling_group_name,
             domain_name=domain_fixture.domain_name,
             project_id=group_fixture,
         )
@@ -287,11 +287,11 @@ class TestRGSearchProjectFairShares:
     async def test_admin_rg_search_project_fair_shares(
         self,
         admin_registry: BackendAIClientRegistry,
-        scaling_group_fixture: str,
+        scaling_group_fixture: ScalingGroupFixtureData,
         domain_fixture: DomainFixtureData,
     ) -> None:
         result = await admin_registry.fair_share.rg_search_project_fair_shares(
-            resource_group=scaling_group_fixture,
+            resource_group=scaling_group_fixture.scaling_group_name,
             domain_name=domain_fixture.domain_name,
             request=SearchProjectFairSharesRequest(),
         )
@@ -306,13 +306,13 @@ class TestRGGetUserFairShare:
     async def test_admin_rg_get_user_fair_share(
         self,
         admin_registry: BackendAIClientRegistry,
-        scaling_group_fixture: str,
+        scaling_group_fixture: ScalingGroupFixtureData,
         domain_fixture: DomainFixtureData,
         group_fixture: uuid.UUID,
         admin_user_fixture: Any,
     ) -> None:
         result = await admin_registry.fair_share.rg_get_user_fair_share(
-            resource_group=scaling_group_fixture,
+            resource_group=scaling_group_fixture.scaling_group_name,
             domain_name=domain_fixture.domain_name,
             project_id=group_fixture,
             user_uuid=admin_user_fixture.user_uuid,
@@ -324,12 +324,12 @@ class TestRGSearchUserFairShares:
     async def test_admin_rg_search_user_fair_shares(
         self,
         admin_registry: BackendAIClientRegistry,
-        scaling_group_fixture: str,
+        scaling_group_fixture: ScalingGroupFixtureData,
         domain_fixture: DomainFixtureData,
         group_fixture: uuid.UUID,
     ) -> None:
         result = await admin_registry.fair_share.rg_search_user_fair_shares(
-            resource_group=scaling_group_fixture,
+            resource_group=scaling_group_fixture.scaling_group_name,
             domain_name=domain_fixture.domain_name,
             project_id=group_fixture,
             request=SearchUserFairSharesRequest(),
@@ -345,10 +345,10 @@ class TestRGSearchDomainUsageBuckets:
     async def test_admin_rg_search_domain_usage_buckets(
         self,
         admin_registry: BackendAIClientRegistry,
-        scaling_group_fixture: str,
+        scaling_group_fixture: ScalingGroupFixtureData,
     ) -> None:
         result = await admin_registry.fair_share.rg_search_domain_usage_buckets(
-            resource_group=scaling_group_fixture,
+            resource_group=scaling_group_fixture.scaling_group_name,
             request=SearchDomainUsageBucketsRequest(),
         )
         assert isinstance(result, SearchDomainUsageBucketsResponse)
@@ -359,11 +359,11 @@ class TestRGSearchProjectUsageBuckets:
     async def test_admin_rg_search_project_usage_buckets(
         self,
         admin_registry: BackendAIClientRegistry,
-        scaling_group_fixture: str,
+        scaling_group_fixture: ScalingGroupFixtureData,
         domain_fixture: DomainFixtureData,
     ) -> None:
         result = await admin_registry.fair_share.rg_search_project_usage_buckets(
-            resource_group=scaling_group_fixture,
+            resource_group=scaling_group_fixture.scaling_group_name,
             domain_name=domain_fixture.domain_name,
             request=SearchProjectUsageBucketsRequest(),
         )
@@ -375,12 +375,12 @@ class TestRGSearchUserUsageBuckets:
     async def test_admin_rg_search_user_usage_buckets(
         self,
         admin_registry: BackendAIClientRegistry,
-        scaling_group_fixture: str,
+        scaling_group_fixture: ScalingGroupFixtureData,
         domain_fixture: DomainFixtureData,
         group_fixture: uuid.UUID,
     ) -> None:
         result = await admin_registry.fair_share.rg_search_user_usage_buckets(
-            resource_group=scaling_group_fixture,
+            resource_group=scaling_group_fixture.scaling_group_name,
             domain_name=domain_fixture.domain_name,
             project_id=group_fixture,
             request=SearchUserUsageBucketsRequest(),
@@ -396,27 +396,27 @@ class TestUpsertDomainFairShareWeight:
     async def test_admin_upsert_domain_weight(
         self,
         admin_registry: BackendAIClientRegistry,
-        scaling_group_fixture: str,
+        scaling_group_fixture: ScalingGroupFixtureData,
         domain_fixture: DomainFixtureData,
     ) -> None:
         result = await admin_registry.fair_share.upsert_domain_fair_share_weight(
-            resource_group=scaling_group_fixture,
+            resource_group=scaling_group_fixture.scaling_group_name,
             domain_name=domain_fixture.domain_name,
             request=UpsertDomainFairShareWeightRequest(weight=Decimal("1.5")),
         )
         assert isinstance(result, UpsertDomainFairShareWeightResponse)
         assert result.item.domain_name == domain_fixture.domain_name
-        assert result.item.resource_group == scaling_group_fixture
+        assert result.item.resource_group == scaling_group_fixture.scaling_group_name
 
     async def test_user_upsert_domain_weight_forbidden(
         self,
         user_registry: BackendAIClientRegistry,
-        scaling_group_fixture: str,
+        scaling_group_fixture: ScalingGroupFixtureData,
         domain_fixture: DomainFixtureData,
     ) -> None:
         with pytest.raises(PermissionDeniedError):
             await user_registry.fair_share.upsert_domain_fair_share_weight(
-                resource_group=scaling_group_fixture,
+                resource_group=scaling_group_fixture.scaling_group_name,
                 domain_name=domain_fixture.domain_name,
                 request=UpsertDomainFairShareWeightRequest(weight=Decimal("1.0")),
             )
@@ -426,12 +426,12 @@ class TestUpsertProjectFairShareWeight:
     async def test_admin_upsert_project_weight(
         self,
         admin_registry: BackendAIClientRegistry,
-        scaling_group_fixture: str,
+        scaling_group_fixture: ScalingGroupFixtureData,
         group_fixture: uuid.UUID,
         domain_fixture: DomainFixtureData,
     ) -> None:
         result = await admin_registry.fair_share.upsert_project_fair_share_weight(
-            resource_group=scaling_group_fixture,
+            resource_group=scaling_group_fixture.scaling_group_name,
             project_id=group_fixture,
             request=UpsertProjectFairShareWeightRequest(
                 domain_name=domain_fixture.domain_name,
@@ -440,20 +440,20 @@ class TestUpsertProjectFairShareWeight:
         )
         assert isinstance(result, UpsertProjectFairShareWeightResponse)
         assert result.item.project_id == group_fixture
-        assert result.item.resource_group == scaling_group_fixture
+        assert result.item.resource_group == scaling_group_fixture.scaling_group_name
 
 
 class TestUpsertUserFairShareWeight:
     async def test_admin_upsert_user_weight(
         self,
         admin_registry: BackendAIClientRegistry,
-        scaling_group_fixture: str,
+        scaling_group_fixture: ScalingGroupFixtureData,
         group_fixture: uuid.UUID,
         domain_fixture: DomainFixtureData,
         admin_user_fixture: Any,
     ) -> None:
         result = await admin_registry.fair_share.upsert_user_fair_share_weight(
-            resource_group=scaling_group_fixture,
+            resource_group=scaling_group_fixture.scaling_group_name,
             project_id=group_fixture,
             user_uuid=admin_user_fixture.user_uuid,
             request=UpsertUserFairShareWeightRequest(
@@ -463,7 +463,7 @@ class TestUpsertUserFairShareWeight:
         )
         assert isinstance(result, UpsertUserFairShareWeightResponse)
         assert result.item.user_uuid == admin_user_fixture.user_uuid
-        assert result.item.resource_group == scaling_group_fixture
+        assert result.item.resource_group == scaling_group_fixture.scaling_group_name
 
 
 # ---- Bulk Upsert Weights (Global-scoped) ----
@@ -473,12 +473,12 @@ class TestBulkUpsertDomainFairShareWeight:
     async def test_admin_bulk_upsert_domain_weight(
         self,
         admin_registry: BackendAIClientRegistry,
-        scaling_group_fixture: str,
+        scaling_group_fixture: ScalingGroupFixtureData,
         domain_fixture: DomainFixtureData,
     ) -> None:
         result = await admin_registry.fair_share.bulk_upsert_domain_fair_share_weight(
             BulkUpsertDomainFairShareWeightRequest(
-                resource_group=scaling_group_fixture,
+                resource_group=scaling_group_fixture.scaling_group_name,
                 inputs=[
                     DomainWeightEntryInput(
                         domain_name=domain_fixture.domain_name,
@@ -495,13 +495,13 @@ class TestBulkUpsertProjectFairShareWeight:
     async def test_admin_bulk_upsert_project_weight(
         self,
         admin_registry: BackendAIClientRegistry,
-        scaling_group_fixture: str,
+        scaling_group_fixture: ScalingGroupFixtureData,
         group_fixture: uuid.UUID,
         domain_fixture: DomainFixtureData,
     ) -> None:
         result = await admin_registry.fair_share.bulk_upsert_project_fair_share_weight(
             BulkUpsertProjectFairShareWeightRequest(
-                resource_group=scaling_group_fixture,
+                resource_group=scaling_group_fixture.scaling_group_name,
                 inputs=[
                     ProjectWeightEntryInput(
                         project_id=group_fixture,
@@ -519,14 +519,14 @@ class TestBulkUpsertUserFairShareWeight:
     async def test_admin_bulk_upsert_user_weight(
         self,
         admin_registry: BackendAIClientRegistry,
-        scaling_group_fixture: str,
+        scaling_group_fixture: ScalingGroupFixtureData,
         group_fixture: uuid.UUID,
         domain_fixture: DomainFixtureData,
         admin_user_fixture: Any,
     ) -> None:
         result = await admin_registry.fair_share.bulk_upsert_user_fair_share_weight(
             BulkUpsertUserFairShareWeightRequest(
-                resource_group=scaling_group_fixture,
+                resource_group=scaling_group_fixture.scaling_group_name,
                 inputs=[
                     UserWeightEntryInput(
                         user_uuid=admin_user_fixture.user_uuid,
@@ -548,22 +548,22 @@ class TestGetResourceGroupFairShareSpec:
     async def test_admin_get_rg_spec(
         self,
         admin_registry: BackendAIClientRegistry,
-        scaling_group_fixture: str,
+        scaling_group_fixture: ScalingGroupFixtureData,
     ) -> None:
         result = await admin_registry.fair_share.get_resource_group_fair_share_spec(
-            resource_group=scaling_group_fixture,
+            resource_group=scaling_group_fixture.scaling_group_name,
         )
         assert isinstance(result, GetResourceGroupFairShareSpecResponse)
-        assert result.resource_group == scaling_group_fixture
+        assert result.resource_group == scaling_group_fixture.scaling_group_name
 
     async def test_user_get_rg_spec_forbidden(
         self,
         user_registry: BackendAIClientRegistry,
-        scaling_group_fixture: str,
+        scaling_group_fixture: ScalingGroupFixtureData,
     ) -> None:
         with pytest.raises(PermissionDeniedError):
             await user_registry.fair_share.get_resource_group_fair_share_spec(
-                resource_group=scaling_group_fixture,
+                resource_group=scaling_group_fixture.scaling_group_name,
             )
 
 
@@ -581,33 +581,33 @@ class TestUpdateResourceGroupFairShareSpec:
     async def test_admin_update_rg_spec(
         self,
         admin_registry: BackendAIClientRegistry,
-        scaling_group_fixture: str,
+        scaling_group_fixture: ScalingGroupFixtureData,
     ) -> None:
         result = await admin_registry.fair_share.update_resource_group_fair_share_spec(
-            resource_group=scaling_group_fixture,
+            resource_group=scaling_group_fixture.scaling_group_name,
             request=UpdateResourceGroupFairShareSpecRequest(
                 half_life_days=14,
             ),
         )
         assert isinstance(result, UpdateResourceGroupFairShareSpecResponse)
-        assert result.resource_group == scaling_group_fixture
+        assert result.resource_group == scaling_group_fixture.scaling_group_name
         assert result.fair_share_spec.half_life_days == 14
 
     async def test_admin_partial_update_preserves_other_fields(
         self,
         admin_registry: BackendAIClientRegistry,
-        scaling_group_fixture: str,
+        scaling_group_fixture: ScalingGroupFixtureData,
     ) -> None:
         """Partial update (merge logic) changes only the specified field."""
         current = await admin_registry.fair_share.get_resource_group_fair_share_spec(
-            resource_group=scaling_group_fixture,
+            resource_group=scaling_group_fixture.scaling_group_name,
         )
         original_half_life = current.fair_share_spec.half_life_days
         original_lookback = current.fair_share_spec.lookback_days
 
         new_half_life = original_half_life + 1
         result = await admin_registry.fair_share.update_resource_group_fair_share_spec(
-            resource_group=scaling_group_fixture,
+            resource_group=scaling_group_fixture.scaling_group_name,
             request=UpdateResourceGroupFairShareSpecRequest(
                 half_life_days=new_half_life,
             ),
@@ -618,7 +618,7 @@ class TestUpdateResourceGroupFairShareSpec:
 
         # Restore
         await admin_registry.fair_share.update_resource_group_fair_share_spec(
-            resource_group=scaling_group_fixture,
+            resource_group=scaling_group_fixture.scaling_group_name,
             request=UpdateResourceGroupFairShareSpecRequest(
                 half_life_days=original_half_life,
             ),

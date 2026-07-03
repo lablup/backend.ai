@@ -25,7 +25,7 @@ from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.models.kernel import kernels
 from ai.backend.manager.models.session import SessionRow
-from ai.backend.testutils.fixtures import DomainFixtureData
+from ai.backend.testutils.fixtures import DomainFixtureData, ScalingGroupFixtureData
 
 from .conftest import SessionSeedData, UserFixtureData
 
@@ -73,7 +73,7 @@ async def degraded_session_seed(
     domain_fixture: DomainFixtureData,
     group_fixture: uuid.UUID,
     admin_user_fixture: UserFixtureData,
-    scaling_group_fixture: str,
+    scaling_group_fixture: ScalingGroupFixtureData,
 ) -> AsyncIterator[SessionSeedData]:
     """Seed a RUNNING_DEGRADED session with two kernels (one RUNNING, one ERROR)."""
     unique = secrets.token_hex(4)
@@ -96,7 +96,7 @@ async def degraded_session_seed(
         group_id=group_fixture,
         user_uuid=admin_user_fixture.user_uuid,
         access_key=admin_user_fixture.keypair.access_key,
-        scaling_group=scaling_group_fixture,
+        scaling_group=scaling_group_fixture.scaling_group_name,
         now=now,
     )
 
@@ -110,10 +110,12 @@ async def degraded_session_seed(
                 cluster_size=2,
                 cluster_mode="single-node",
                 domain_name=domain_fixture.domain_name,
+                domain_id=domain_fixture.domain_id,
                 group_id=group_fixture,
                 user_uuid=admin_user_fixture.user_uuid,
                 access_key=admin_user_fixture.keypair.access_key,
-                scaling_group_name=scaling_group_fixture,
+                scaling_group_name=scaling_group_fixture.scaling_group_name,
+                resource_group_id=scaling_group_fixture.scaling_group_id,
                 status=SessionStatus.RUNNING_DEGRADED,
                 status_info="",
                 status_history=status_history,
@@ -165,7 +167,7 @@ async def full_lifecycle_session_seed(
     domain_fixture: DomainFixtureData,
     group_fixture: uuid.UUID,
     admin_user_fixture: UserFixtureData,
-    scaling_group_fixture: str,
+    scaling_group_fixture: ScalingGroupFixtureData,
 ) -> AsyncIterator[SessionSeedData]:
     """Seed a RUNNING session with a full lifecycle status_history
     (PENDING → SCHEDULED → PREPARING → PULLING → CREATING → RUNNING).
@@ -194,7 +196,7 @@ async def full_lifecycle_session_seed(
         group_id=group_fixture,
         user_uuid=admin_user_fixture.user_uuid,
         access_key=admin_user_fixture.keypair.access_key,
-        scaling_group=scaling_group_fixture,
+        scaling_group=scaling_group_fixture.scaling_group_name,
         now=now,
     )
 
@@ -208,10 +210,12 @@ async def full_lifecycle_session_seed(
                 cluster_size=1,
                 cluster_mode="single-node",
                 domain_name=domain_fixture.domain_name,
+                domain_id=domain_fixture.domain_id,
                 group_id=group_fixture,
                 user_uuid=admin_user_fixture.user_uuid,
                 access_key=admin_user_fixture.keypair.access_key,
-                scaling_group_name=scaling_group_fixture,
+                scaling_group_name=scaling_group_fixture.scaling_group_name,
+                resource_group_id=scaling_group_fixture.scaling_group_id,
                 status=SessionStatus.RUNNING,
                 status_info="",
                 status_history=status_history,

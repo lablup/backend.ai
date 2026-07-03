@@ -7,6 +7,8 @@ from dataclasses import dataclass
 import pytest
 from sqlalchemy.exc import IntegrityError
 
+from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import BinarySize, ResourceSlot
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.models.agent import AgentRow
@@ -31,7 +33,7 @@ from ai.backend.manager.models.resource_policy import (
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
-from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
+from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -50,7 +52,10 @@ class SessionData:
     name: str
     user_uuid: uuid.UUID
     group_id: uuid.UUID
+    domain_id: DomainID
     domain_name: str
+    resource_group_id: ResourceGroupID
+    scaling_group_name: str
     status: SessionStatus
 
 
@@ -104,13 +109,31 @@ class TestSessionUniqueNamePerUser:
         self, database_with_tables: ExtendedAsyncSAEngine
     ) -> AsyncGenerator[DomainRow, None]:
         """Create test domain."""
-        domain = DomainRow(name=f"test-{uuid.uuid4()}")
+        domain = DomainRow(id=DomainID(uuid.uuid4()), name=f"test-{uuid.uuid4()}")
 
         async with database_with_tables.begin_session() as db_sess:
             db_sess.add(domain)
             await db_sess.flush()
 
         yield domain
+
+    @pytest.fixture
+    async def scaling_group(
+        self, database_with_tables: ExtendedAsyncSAEngine
+    ) -> AsyncGenerator[ScalingGroupRow, None]:
+        """Create test scaling group."""
+        sgroup = ScalingGroupRow(
+            id=ResourceGroupID(uuid.uuid4()),
+            name=f"test-sg-{uuid.uuid4().hex[:8]}",
+            driver="static",
+            scheduler="fifo",
+        )
+
+        async with database_with_tables.begin_session() as db_sess:
+            db_sess.add(sgroup)
+            await db_sess.flush()
+
+        yield sgroup
 
     @pytest.fixture
     async def user_policy(
@@ -212,33 +235,13 @@ class TestSessionUniqueNamePerUser:
         yield group
 
     @pytest.fixture
-    async def scaling_group(
-        self,
-        database_with_tables: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[str, None]:
-        """Create test scaling group and yield its name."""
-        scaling_group = ScalingGroupRow(
-            name="test-sg",
-            driver="static",
-            driver_opts={},
-            scheduler="fifo",
-            scheduler_opts=ScalingGroupOpts(),
-        )
-
-        async with database_with_tables.begin_session() as db_sess:
-            db_sess.add(scaling_group)
-            await db_sess.flush()
-
-        yield scaling_group.name
-
-    @pytest.fixture
     async def prepared_first_session(
         self,
         database_with_tables: ExtendedAsyncSAEngine,
         user_one: UserData,
         group: GroupRow,
         domain: DomainRow,
-        scaling_group: str,
+        scaling_group: ScalingGroupRow,
         test_config: TestConfig,
     ) -> AsyncGenerator[SessionData, None]:
         """Create first session with status from parametrize (indirect fixture)"""
@@ -248,8 +251,10 @@ class TestSessionUniqueNamePerUser:
             name=f"test-{uuid.uuid4()!s}",
             user_uuid=user_a.uuid,
             group_id=group.id,
+            domain_id=domain.id,
             domain_name=domain.name,
-            scaling_group_name=scaling_group,
+            resource_group_id=scaling_group.id,
+            scaling_group_name=scaling_group.name,
             status=status,
             occupying_slots=ResourceSlot(),
             requested_slots=ResourceSlot(),
@@ -265,7 +270,10 @@ class TestSessionUniqueNamePerUser:
             name=session.name,
             user_uuid=user_a.uuid,
             group_id=group.id,
+            domain_id=domain.id,
             domain_name=domain.name,
+            resource_group_id=scaling_group.id,
+            scaling_group_name=scaling_group.name,
             status=status,
         )
 
@@ -287,15 +295,16 @@ class TestSessionUniqueNamePerUser:
         test_config: TestConfig,
         database_with_tables: ExtendedAsyncSAEngine,
         prepared_first_session: SessionData,
-        scaling_group: str,
     ) -> None:
         async with database_with_tables.begin_session() as db_sess:
             duplicate_session = SessionRow(
                 name=prepared_first_session.name,
                 user_uuid=prepared_first_session.user_uuid,
                 group_id=prepared_first_session.group_id,
+                domain_id=prepared_first_session.domain_id,
                 domain_name=prepared_first_session.domain_name,
-                scaling_group_name=scaling_group,
+                resource_group_id=prepared_first_session.resource_group_id,
+                scaling_group_name=prepared_first_session.scaling_group_name,
                 status=test_config.second_session_status,
                 occupying_slots=ResourceSlot(),
                 requested_slots=ResourceSlot(),
@@ -320,14 +329,15 @@ class TestSessionUniqueNamePerUser:
         test_config: TestConfig,
         database_with_tables: ExtendedAsyncSAEngine,
         prepared_first_session: SessionData,
-        scaling_group: str,
     ) -> None:
         duplicate_session = SessionRow(
             name=prepared_first_session.name,
             user_uuid=prepared_first_session.user_uuid,
             group_id=prepared_first_session.group_id,
+            domain_id=prepared_first_session.domain_id,
             domain_name=prepared_first_session.domain_name,
-            scaling_group_name=scaling_group,
+            resource_group_id=prepared_first_session.resource_group_id,
+            scaling_group_name=prepared_first_session.scaling_group_name,
             status=test_config.second_session_status,
             occupying_slots=ResourceSlot(),
             requested_slots=ResourceSlot(),
@@ -361,7 +371,6 @@ class TestSessionUniqueNamePerUser:
         database_with_tables: ExtendedAsyncSAEngine,
         prepared_first_session: SessionData,
         user_two: UserData,
-        scaling_group: str,
         test_config: TestConfig,
     ) -> None:
         async with database_with_tables.begin_session() as db_sess:
@@ -369,8 +378,10 @@ class TestSessionUniqueNamePerUser:
                 name=prepared_first_session.name,
                 user_uuid=user_two.uuid,  # Different user
                 group_id=prepared_first_session.group_id,
+                domain_id=prepared_first_session.domain_id,
                 domain_name=prepared_first_session.domain_name,
-                scaling_group_name=scaling_group,
+                resource_group_id=prepared_first_session.resource_group_id,
+                scaling_group_name=prepared_first_session.scaling_group_name,
                 status=test_config.second_session_status,
                 occupying_slots=ResourceSlot(),
                 requested_slots=ResourceSlot(),

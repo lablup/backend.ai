@@ -28,7 +28,7 @@ from ai.backend.manager.models.scaling_group import (
     scaling_groups,
     sgroups_for_domains,
 )
-from ai.backend.testutils.fixtures import DomainFixtureData
+from ai.backend.testutils.fixtures import DomainFixtureData, ScalingGroupFixtureData
 
 
 @pytest.fixture()
@@ -78,7 +78,7 @@ class TestScalingGroupCRUD:
         self,
         admin_registry: BackendAIClientRegistry,
         user_registry: BackendAIClientRegistry,
-        scaling_group_fixture: str,
+        scaling_group_fixture: ScalingGroupFixtureData,
         group_fixture: uuid.UUID,
     ) -> None:
         """Public scaling group is visible to both admin and regular user."""
@@ -86,13 +86,18 @@ class TestScalingGroupCRUD:
             group=str(group_fixture),
         )
         assert isinstance(admin_result, ListScalingGroupsResponse)
-        assert any(sg.name == scaling_group_fixture for sg in admin_result.scaling_groups)
+        assert any(
+            sg.name == scaling_group_fixture.scaling_group_name
+            for sg in admin_result.scaling_groups
+        )
 
         user_result = await user_registry.scaling_group.list_scaling_groups(
             group=str(group_fixture),
         )
         assert isinstance(user_result, ListScalingGroupsResponse)
-        assert any(sg.name == scaling_group_fixture for sg in user_result.scaling_groups)
+        assert any(
+            sg.name == scaling_group_fixture.scaling_group_name for sg in user_result.scaling_groups
+        )
 
     async def test_s_visibility_private_sgroup_hidden_from_user(
         self,
@@ -140,7 +145,7 @@ class TestScalingGroupPermissions:
     async def test_regular_user_can_list_scaling_groups(
         self,
         user_registry: BackendAIClientRegistry,
-        scaling_group_fixture: str,
+        scaling_group_fixture: ScalingGroupFixtureData,
         group_fixture: uuid.UUID,
     ) -> None:
         """F-AUTH-LIST: Regular user can list public scaling groups (auth_required, not superadmin).
@@ -155,4 +160,4 @@ class TestScalingGroupPermissions:
         assert isinstance(result, ListScalingGroupsResponse)
         names = [sg.name for sg in result.scaling_groups]
         # The fixture sgroup is public — regular user should see it
-        assert scaling_group_fixture in names
+        assert scaling_group_fixture.scaling_group_name in names

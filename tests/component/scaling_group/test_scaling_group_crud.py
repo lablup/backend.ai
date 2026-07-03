@@ -17,7 +17,7 @@ from ai.backend.manager.models.scaling_group import (
     sgroups_for_domains,
     sgroups_for_groups,
 )
-from ai.backend.testutils.fixtures import DomainFixtureData
+from ai.backend.testutils.fixtures import DomainFixtureData, ScalingGroupFixtureData
 
 
 @pytest.fixture()
@@ -104,7 +104,7 @@ class TestScalingGroupCRUDLifecycle:
     async def test_multiple_scaling_groups_listed(
         self,
         admin_registry: BackendAIClientRegistry,
-        scaling_group_fixture: str,
+        scaling_group_fixture: ScalingGroupFixtureData,
         extra_scaling_group_fixture: str,
         group_fixture: uuid.UUID,
     ) -> None:
@@ -114,13 +114,13 @@ class TestScalingGroupCRUDLifecycle:
         )
         assert isinstance(result, ListScalingGroupsResponse)
         names = [sg.name for sg in result.scaling_groups]
-        assert scaling_group_fixture in names
+        assert scaling_group_fixture.scaling_group_name in names
         assert extra_scaling_group_fixture in names
 
     async def test_scaling_group_domain_association(
         self,
         admin_registry: BackendAIClientRegistry,
-        scaling_group_fixture: str,
+        scaling_group_fixture: ScalingGroupFixtureData,
         group_fixture: uuid.UUID,
     ) -> None:
         """A scaling group associated with the test domain is visible via group filter."""
@@ -128,12 +128,14 @@ class TestScalingGroupCRUDLifecycle:
             group=str(group_fixture),
         )
         assert isinstance(result, ListScalingGroupsResponse)
-        assert any(sg.name == scaling_group_fixture for sg in result.scaling_groups)
+        assert any(
+            sg.name == scaling_group_fixture.scaling_group_name for sg in result.scaling_groups
+        )
 
     async def test_regular_user_sees_public_scaling_groups(
         self,
         user_registry: BackendAIClientRegistry,
-        scaling_group_fixture: str,
+        scaling_group_fixture: ScalingGroupFixtureData,
         private_scaling_group_fixture: str,
         group_fixture: uuid.UUID,
     ) -> None:
@@ -148,7 +150,7 @@ class TestScalingGroupCRUDLifecycle:
         )
         assert isinstance(result, ListScalingGroupsResponse)
         names = [sg.name for sg in result.scaling_groups]
-        assert scaling_group_fixture in names
+        assert scaling_group_fixture.scaling_group_name in names
         assert private_scaling_group_fixture not in names
 
     async def test_admin_sees_private_scaling_groups(
