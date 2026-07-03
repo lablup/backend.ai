@@ -119,6 +119,31 @@ real container received overlay IP `10.128.5.5/24`; `detach`/`kill_container`/
 `remove_container` cleaned up. This validates the actual runtime + CNI code paths, not
 just equivalent shell commands. ✅
 
+## 8. Per-session isolation (same node, different sessions)
+
+Two sessions co-located on one host, each with its own overlay bridge + subnet
+(session A: `baibr4097` / `10.128.5.0/24`; session B: `baibr5000` / `10.128.6.0/24`):
+containers `cA1`, `cA2` in A and `cB` in B, attached via the bridge CNI plugin.
+
+Connectivity matrix (via `ping` from each container's netns):
+
+| from → to | same/cross session | result |
+|-----------|--------------------|--------|
+| cA1 → cA2 | same | **REACHABLE** |
+| cA1 → cB  | cross | **BLOCKED** |
+| cB → cA1  | cross | **BLOCKED** |
+
+Same-session containers reach each other; cross-session traffic is blocked even though
+both sessions run on the same node — separate session bridges (a container only has an
+on-link route to its own session subnet) mean there is no path between sessions. This is
+the core multi-tenant requirement (different orgs sharing a node). ✅
+
+Scope: this exercises OVERLAY isolation with pure overlay attachments (no LOCAL/egress
+interface). In production the LOCAL interface's egress paths remain per the Swarm-parity
+scope (egress firewall is out of scope — see data-plane-backends.md). Cross-*node*
+isolation (two VNIs over vxlan on two hosts) uses the same separate-bridge/VNI mechanism
+but is not yet exercised end-to-end.
+
 ## Notes
 
 - These are manual smoke tests requiring a privileged Linux host (NET_ADMIN),
