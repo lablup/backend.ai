@@ -7,14 +7,18 @@ import pytest
 from ai.backend.agent.containerd.runtime import ContainerdRuntimeClient, TaskHandle
 from ai.backend.agent.containerd.session_network import (
     ContainerdSessionNetwork,
+    UnknownNetworkBackend,
     session_net_meta_from_network_config,
 )
 from ai.backend.common.etcd import AbstractKVStore
 from ai.backend.common.network.types import (
     AgentNetworkCaps,
+    AttachKind,
     EndpointPlan,
     Member,
+    NetworkAttachSpec,
     NetworkBackendKind,
+    NetworkRole,
     SessionNetMeta,
 )
 
@@ -64,6 +68,7 @@ class RecordingBackend:
 
     def __init__(self) -> None:
         self.setup: list[str] = []
+        self.last_self_member: Member | None = None
 
     async def setup_session_network(self, meta: SessionNetMeta, self_member: Member) -> None:
         self.setup.append(meta.session_id)
@@ -74,6 +79,18 @@ class RecordingBackend:
     async def del_peer(self, session_id: str, peer: Member) -> None: ...
     async def probe_caps(self) -> AgentNetworkCaps:
         return AgentNetworkCaps(tunnel_offload=False, native_routing_ok=False)
+
+    async def attach_endpoint(
+        self, kernel_config: Any, cluster_info: Any, *, meta: SessionNetMeta
+    ) -> EndpointPlan:
+        return EndpointPlan(
+            attachments=[
+                NetworkAttachSpec(
+                    kind=AttachKind.CNI, interface_name="baimulti0",
+                    role=NetworkRole.OVERLAY, cni_config={"type": "bridge"},
+                )
+            ]
+        )
 
 
 class FakeRuntime(ContainerdRuntimeClient):
@@ -110,14 +127,20 @@ class RecordingRunner:
         self.calls.append((command, netns))
 
 
-def _facade(etcd: FakeEtcd, backend: RecordingBackend, runner: RecordingRunner) -> ContainerdSessionNetwork:
+def _facade(
+    etcd: FakeEtcd,
+    backend: RecordingBackend,
+    runner: RecordingRunner,
+    *,
+    backends: dict[str, Any] | None = None,
+) -> ContainerdSessionNetwork:
     return ContainerdSessionNetwork(
         cast(AbstractKVStore, etcd),
         agent_id="agent-1",
         host_ip="192.168.0.10",
-        backend=cast(Any, backend),
         runtime=FakeRuntime(),
         cni_runner=runner,
+        backends=backends or {"vxlan": cast(Any, backend), "host-gw": cast(Any, backend)},
     )
 
 
@@ -152,23 +175,39 @@ class TestLaunchTerminate:
     async def test_launch_attaches_to_task_pid(self) -> None:
         etcd, backend, runner = FakeEtcd(), RecordingBackend(), RecordingRunner()
         facade = _facade(etcd, backend, runner)
-        meta = session_net_meta_from_network_config("s1", _VXLAN_NC)
+        meta = await facade.ensure_session("s1", _VXLAN_NC)  # registers the orchestrator
+        try:
+            result = await facade.launch_container(
+                "s1", "c1", image_ref="img", command=["sleep", "600"], oci_spec={},
+                meta=meta, kernel_config=cast(Any, {}), cluster_info=cast(Any, {}),
+            )
+            assert result.handle.pid == 9001
+            assert runner.calls == [("ADD", "/proc/9001/ns/net")]
+        finally:
+            await facade.teardown_session("s1")
 
-        # backend.attach_endpoint is required by the provisioner; add it on the stub
-        async def attach_endpoint(kc: Any, ci: Any, *, meta: SessionNetMeta) -> EndpointPlan:
-            from ai.backend.common.network.types import AttachKind, NetworkAttachSpec, NetworkRole
-            return EndpointPlan(attachments=[
-                NetworkAttachSpec(kind=AttachKind.CNI, interface_name="baimulti0",
-                                  role=NetworkRole.OVERLAY, cni_config={"type": "bridge"})
-            ])
-        backend.attach_endpoint = attach_endpoint  # type: ignore[attr-defined]
 
-        result = await facade.launch_container(
-            "c1", image_ref="img", command=["sleep", "600"], oci_spec={},
-            meta=meta, kernel_config=cast(Any, {}), cluster_info=cast(Any, {}),
+class TestBackendResolution:
+    async def test_selects_backend_by_session_config(self) -> None:
+        etcd, runner = FakeEtcd(), RecordingRunner()
+        vxlan_b, hostgw_b = RecordingBackend(), RecordingBackend()
+        facade = _facade(
+            etcd, vxlan_b, runner, backends={"vxlan": vxlan_b, "host-gw": hostgw_b}
         )
-        assert result.handle.pid == 9001
-        assert runner.calls == [("ADD", "/proc/9001/ns/net")]
+        await facade.ensure_session("sv", _VXLAN_NC)
+        await facade.ensure_session("sh", _HOSTGW_NC)
+        try:
+            assert vxlan_b.setup == ["sv"]  # vxlan config -> vxlan backend only
+            assert hostgw_b.setup == ["sh"]  # host-gw config -> host-gw backend only
+        finally:
+            await facade.teardown_session("sv")
+            await facade.teardown_session("sh")
+
+    async def test_unknown_backend_raises(self) -> None:
+        etcd, backend, runner = FakeEtcd(), RecordingBackend(), RecordingRunner()
+        facade = _facade(etcd, backend, runner, backends={"vxlan": cast(Any, backend)})
+        with pytest.raises(UnknownNetworkBackend):
+            await facade.ensure_session("s1", _HOSTGW_NC)  # host-gw not registered
 
 
 @pytest.mark.parametrize("nc", [_VXLAN_NC, _HOSTGW_NC])

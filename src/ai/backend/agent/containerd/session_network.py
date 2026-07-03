@@ -2,14 +2,16 @@
 
 `ContainerdAgent` holds one of these. It bridges the data the manager sends
 (``cluster_info["network_config"]`` = the CNINetworkPlugin's ``{backend, subnet, vni,
-mtu}``) into the network subsystem, and composes:
+mtu}``) into the network subsystem, resolves the **per-session** data-plane backend
+(vxlan / host-gw / wireguard) by name, and composes:
 
-- per-session setup/teardown via `SessionNetworkCoordinator` (vxlan/bridge + peers), and
+- per-session setup/teardown via `SessionNetworkCoordinator` (bridge + peers), and
 - per-container launch/terminate via `ContainerdKernelOrchestrator`
   (runtime + `ContainerNetworkProvisioner`).
 
 The runtime client and the network subsystem remain separate classes that never
 reference each other; this facade and the orchestrator are the only composition points.
+Each backend is instantiated per session with the backend the manager selected.
 """
 
 from __future__ import annotations
@@ -51,11 +53,19 @@ def session_net_meta_from_network_config(
     )
 
 
+class UnknownNetworkBackend(RuntimeError):
+    pass
+
+
 class ContainerdSessionNetwork:
-    _coordinator: SessionNetworkCoordinator
-    _orchestrator: ContainerdKernelOrchestrator
+    _etcd: AbstractKVStore
     _agent_id: str
     _host_ip: str
+    _runtime: ContainerdRuntimeClient
+    _cni_runner: CniRunner
+    _backends: Mapping[str, AbstractNetworkAgentPluginV2[Any]]
+    _coordinators: dict[str, SessionNetworkCoordinator]
+    _orchestrators: dict[str, ContainerdKernelOrchestrator]
 
     def __init__(
         self,
@@ -63,16 +73,27 @@ class ContainerdSessionNetwork:
         *,
         agent_id: str,
         host_ip: str,
-        backend: AbstractNetworkAgentPluginV2[Any],
         runtime: ContainerdRuntimeClient,
         cni_runner: CniRunner,
+        backends: Mapping[str, AbstractNetworkAgentPluginV2[Any]],
     ) -> None:
+        self._etcd = etcd
         self._agent_id = agent_id
         self._host_ip = host_ip
-        self._coordinator = SessionNetworkCoordinator(etcd, backend, agent_id)
-        self._orchestrator = ContainerdKernelOrchestrator(
-            runtime, ContainerNetworkProvisioner(backend, cni_runner)
-        )
+        self._runtime = runtime
+        self._cni_runner = cni_runner
+        self._backends = backends
+        self._coordinators = {}
+        self._orchestrators = {}
+
+    def _resolve_backend(self, meta: SessionNetMeta) -> AbstractNetworkAgentPluginV2[Any]:
+        try:
+            return self._backends[str(meta.backend)]
+        except KeyError:
+            raise UnknownNetworkBackend(
+                f"no data-plane backend registered for '{meta.backend}' "
+                f"(available: {sorted(self._backends)})"
+            ) from None
 
     def _self_member(self, meta: SessionNetMeta) -> Member:
         return Member(
@@ -85,16 +106,28 @@ class ContainerdSessionNetwork:
     async def ensure_session(
         self, session_id: str, network_config: Mapping[str, Any]
     ) -> SessionNetMeta:
-        """Set up this node's data plane for the session (idempotent per session)."""
+        """Resolve the session's backend, set up this node's data plane, publish
+        membership, and register the per-session coordinator + orchestrator."""
         meta = session_net_meta_from_network_config(session_id, network_config)
-        await self._coordinator.start(meta, self._self_member(meta))
+        backend = self._resolve_backend(meta)
+        coordinator = SessionNetworkCoordinator(self._etcd, backend, self._agent_id)
+        orchestrator = ContainerdKernelOrchestrator(
+            self._runtime, ContainerNetworkProvisioner(backend, self._cni_runner)
+        )
+        self._coordinators[session_id] = coordinator
+        self._orchestrators[session_id] = orchestrator
+        await coordinator.start(meta, self._self_member(meta))
         return meta
 
     async def teardown_session(self, session_id: str) -> None:
-        await self._coordinator.stop(session_id)
+        coordinator = self._coordinators.pop(session_id, None)
+        self._orchestrators.pop(session_id, None)
+        if coordinator is not None:
+            await coordinator.stop(session_id)
 
     async def launch_container(
         self,
+        session_id: str,
         container_id: str,
         *,
         image_ref: str,
@@ -104,7 +137,7 @@ class ContainerdSessionNetwork:
         kernel_config: KernelCreationConfig,
         cluster_info: ClusterInfo,
     ) -> LaunchResult:
-        return await self._orchestrator.launch(
+        return await self._orchestrators[session_id].launch(
             container_id,
             image_ref=image_ref,
             command=command,
@@ -115,6 +148,8 @@ class ContainerdSessionNetwork:
         )
 
     async def terminate_container(
-        self, container_id: str, *, plan: EndpointPlan, task_pid: int
+        self, session_id: str, container_id: str, *, plan: EndpointPlan, task_pid: int
     ) -> None:
-        await self._orchestrator.terminate(container_id, plan=plan, task_pid=task_pid)
+        await self._orchestrators[session_id].terminate(
+            container_id, plan=plan, task_pid=task_pid
+        )
