@@ -60,6 +60,7 @@ from ai.backend.manager.data.image.types import (
     KVPair,
     ResourceLimit,
 )
+from ai.backend.manager.data.permission.permission_defs import ImagePermission
 from ai.backend.manager.data.permission.types import EntityType
 from ai.backend.manager.data.permission.types import ScopeType as PermissionScopeType
 from ai.backend.manager.defs import INTRINSIC_SLOTS, INTRINSIC_SLOTS_MIN
@@ -83,7 +84,6 @@ from ai.backend.manager.models.rbac import (
 )
 from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.rbac.exceptions import InvalidScope
-from ai.backend.manager.models.rbac.permission_defs import ImagePermission
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )

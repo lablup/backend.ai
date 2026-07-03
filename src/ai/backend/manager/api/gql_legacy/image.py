@@ -40,6 +40,7 @@ from ai.backend.manager.data.image.types import (
     ImageType,
     ImageWithAgentInstallStatus,
 )
+from ai.backend.manager.data.permission.permission_defs import ImagePermission
 from ai.backend.manager.defs import DEFAULT_IMAGE_ARCH
 from ai.backend.manager.models.image import (
     ImageIdentifier,
@@ -55,7 +56,6 @@ from ai.backend.manager.models.minilang.queryfilter import (
 )
 from ai.backend.manager.models.rbac import ScopeType
 from ai.backend.manager.models.rbac.context import ClientContext
-from ai.backend.manager.models.rbac.permission_defs import ImagePermission
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.repositories.image.updaters import ImageUpdaterSpec
 from ai.backend.manager.services.container_registry.actions.clear_images import ClearImagesAction

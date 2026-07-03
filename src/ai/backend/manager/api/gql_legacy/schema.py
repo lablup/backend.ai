@@ -104,6 +104,16 @@ if TYPE_CHECKING:
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.manager.data.group.types import ProjectType
 from ai.backend.manager.data.image.types import ImageStatus
+from ai.backend.manager.data.permission.permission_defs import (
+    AgentPermission,
+    ComputeSessionPermission,
+    DomainPermission,
+    ImagePermission,
+    ProjectPermission,
+)
+from ai.backend.manager.data.permission.permission_defs import (
+    VFolderPermission as VFolderRBACPermission,
+)
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.errors.api import InvalidAPIParameters
@@ -116,16 +126,6 @@ from ai.backend.manager.models.image.row import (
     PublicImageLoadFilter,
 )
 from ai.backend.manager.models.rbac import ProjectScope, ScopeType, SystemScope
-from ai.backend.manager.models.rbac.permission_defs import (
-    AgentPermission,
-    ComputeSessionPermission,
-    DomainPermission,
-    ImagePermission,
-    ProjectPermission,
-)
-from ai.backend.manager.models.rbac.permission_defs import (
-    VFolderPermission as VFolderRBACPermission,
-)
 from ai.backend.manager.models.scaling_group.row import (
     ScalingGroupRow,
     and_names,

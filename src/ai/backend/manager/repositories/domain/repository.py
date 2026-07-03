@@ -17,6 +17,10 @@ from ai.backend.manager.data.domain.types import (
     DomainData,
     UserInfo,
 )
+from ai.backend.manager.data.permission.permission_defs import (
+    DomainPermission,
+    ScalingGroupPermission,
+)
 from ai.backend.manager.errors.resource import (
     DomainDeletionFailed,
     DomainHasActiveKernels,
@@ -31,7 +35,6 @@ from ai.backend.manager.models.kernel import AGENT_RESOURCE_OCCUPYING_KERNEL_STA
 from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.rbac import SystemScope
 from ai.backend.manager.models.rbac.context import ClientContext
-from ai.backend.manager.models.rbac.permission_defs import DomainPermission, ScalingGroupPermission
 from ai.backend.manager.models.resource_policy import keypair_resource_policies
 from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow, get_scaling_groups
 from ai.backend.manager.models.user import UserRow
