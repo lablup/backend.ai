@@ -107,13 +107,6 @@ class SessionRepository:
         return await self._db_source.match_sessions(id_or_name_prefix, owner_access_key)
 
     @session_repository_resilience.apply()
-    async def get_session_to_determine_status(
-        self,
-        session_id: SessionId,
-    ) -> SessionRow:
-        return await self._db_source.get_session_to_determine_status(session_id)
-
-    @session_repository_resilience.apply()
     async def get_template_by_id(
         self,
         template_id: uuid.UUID,

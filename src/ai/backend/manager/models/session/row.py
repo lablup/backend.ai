@@ -12,7 +12,6 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Self,
-    cast,
     override,
 )
 from uuid import UUID
@@ -89,7 +88,6 @@ from ai.backend.manager.models.base import (
     URLColumn,
 )
 from ai.backend.manager.models.group import GroupRow
-from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.minilang.queryfilter import FieldSpecType, QueryFilterParser
 from ai.backend.manager.models.network import NetworkRow, NetworkType
@@ -801,50 +799,6 @@ class SessionRow(Base):  # type: ignore[misc]
             replica_id=self.replica_id,
         )
 
-    @classmethod
-    def from_session_info(cls, info: SessionInfo) -> Self:
-        return cls(
-            id=info.identity.id,
-            creation_id=info.identity.creation_id,
-            name=info.identity.name,
-            session_type=info.identity.session_type,
-            priority=info.identity.priority,
-            cluster_mode=info.resource.cluster_mode,
-            cluster_size=info.resource.cluster_size,
-            agent_ids=info.resource.agent_ids,
-            scaling_group_name=info.resource.scaling_group_name,
-            target_sgroup_names=info.resource.target_sgroup_names,
-            domain_name=info.metadata.domain_name,
-            group_id=info.metadata.group_id,
-            user_uuid=info.metadata.user_uuid,
-            access_key=info.metadata.access_key,
-            images=info.image.images,
-            tag=info.image.tag or info.metadata.tag,
-            occupying_slots=info.resource.occupying_slots,
-            requested_slots=info.resource.requested_slots,
-            vfolder_mounts=info.mounts.vfolder_mounts,
-            environ=info.execution.environ,
-            bootstrap_script=info.execution.bootstrap_script,
-            startup_command=info.execution.startup_command,
-            use_host_network=info.execution.use_host_network,
-            batch_timeout=info.lifecycle.batch_timeout,
-            created_at=info.lifecycle.created_at
-            or info.metadata.created_at
-            or datetime.now(tzutc()),
-            terminated_at=info.lifecycle.terminated_at,
-            starts_at=info.lifecycle.starts_at,
-            status=info.lifecycle.status or SessionStatus.PENDING,
-            status_info=info.lifecycle.status_info,
-            status_data=info.lifecycle.status_data,
-            status_history=info.lifecycle.status_history,
-            callback_url=info.execution.callback_url,
-            result=info.lifecycle.result,
-            num_queries=info.metrics.num_queries,
-            last_stat=info.metrics.last_stat,
-            network_type=info.network.network_type,
-            network_id=info.network.network_id,
-        )
-
     def to_session_info(self) -> SessionInfo:
         return SessionInfo(
             identity=SessionIdentity(
@@ -957,60 +911,6 @@ class SessionRow(Base):  # type: ignore[misc]
         if len(kerns) == 0:
             raise KernelNotFound(f"Session has no such kernel (sid:{self.id}, kid:{kernel_id}))")
         return kerns[0]
-
-    def get_kernel_by_cluster_name(self, cluster_name: str) -> KernelRow:
-        kerns = tuple(kern for kern in self.kernels if kern.cluster_name == cluster_name)
-        if len(kerns) > 1:
-            raise TooManyKernelsFound(
-                f"Session (id: {self.id}) has more than 1 kernel with {cluster_name = }",
-            )
-        if len(kerns) == 0:
-            raise MainKernelNotFound(
-                f"Session (id: {self.id}) has no kernel with {cluster_name = }.",
-            )
-        return kerns[0]
-
-    @classmethod
-    async def get_session_id_by_kernel(
-        cls, db: ExtendedAsyncSAEngine, kernel_id: KernelId
-    ) -> SessionId | None:
-        query = sa.select(KernelRow.session_id).where(KernelRow.id == kernel_id)
-        async with db.begin_readonly_session() as db_session:
-            result: SessionId | None = await db_session.scalar(query)
-            return result
-
-    @classmethod
-    async def get_sessions_by_status(
-        cls,
-        db_session: SASession,
-        status: SessionStatus,
-        *,
-        load_kernel_image: bool = False,
-    ) -> list[SessionRow]:
-        load_options = selectinload(SessionRow.kernels)
-        if load_kernel_image:
-            load_options = load_options.options(
-                joinedload(KernelRow.image_row).options(joinedload(ImageRow.registry_row))
-            )
-        stmt = sa.select(SessionRow).where(SessionRow.status == status).options(load_options)
-        return list((await db_session.scalars(stmt)).all())
-
-    @classmethod
-    async def get_session_to_determine_status(
-        cls,
-        db_session: SASession,
-        session_id: SessionId,
-    ) -> SessionRow:
-        stmt = (
-            sa.select(SessionRow)
-            .where(SessionRow.id == session_id)
-            # TODO: Add kernel loading strategy?
-            .options(selectinload(SessionRow.kernels))
-        )
-        session_row = cast(SessionRow | None, await db_session.scalar(stmt))
-        if session_row is None:
-            raise SessionNotFound(f"Session not found (id:{session_id})")
-        return session_row
 
     @classmethod
     async def list_session_by_condition(
@@ -1279,30 +1179,6 @@ class SessionRow(Base):  # type: ignore[misc]
         except IndexError as e:
             raise SessionNotFound(f"Session (id={session_id}) does not exist.") from e
 
-    @classmethod
-    async def get_sgroup_managed_sessions(
-        cls,
-        db_sess: SASession,
-        sgroup_name: str,
-    ) -> list[SessionRow]:
-        candidate_statues = (SessionStatus.PENDING, *AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES)
-        query = (
-            sa.select(SessionRow)
-            .where(
-                (SessionRow.scaling_group_name == sgroup_name)
-                & (SessionRow.status.in_(candidate_statues))
-            )
-            .options(
-                noload("*"),
-                selectinload(SessionRow.group).options(noload("*")),
-                selectinload(SessionRow.domain).options(noload("*")),
-                selectinload(SessionRow.access_key_row).options(noload("*")),
-                selectinload(SessionRow.kernels).options(noload("*")),
-            )
-        )
-        result = await db_sess.execute(query)
-        return list(result.scalars().all())
-
     async def get_network_ref(self, db_sess: SASession) -> str | None:
         if not self.network_id or not self.network_type:
             return None
@@ -1312,15 +1188,6 @@ class SessionRow(Base):  # type: ignore[misc]
             case NetworkType.PERSISTENT:
                 network_row = await NetworkRow.get(db_sess, UUID(self.network_id))
                 return network_row.ref_name
-
-    @classmethod
-    def get_status_elapsed_time(
-        cls, status: SessionStatus, until: datetime
-    ) -> sa.sql.elements.BinaryExpression[Any]:
-        result: sa.sql.elements.BinaryExpression[Any] = until - cls.status_history[
-            status.name
-        ].astext.cast(sa.types.DateTime(timezone=True))
-        return result
 
 
 def by_status(statuses: Iterable[SessionStatus]) -> QueryCondition:

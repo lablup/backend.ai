@@ -169,13 +169,6 @@ class SessionDBSource:
                 owner_access_key,
             )
 
-    async def get_session_to_determine_status(
-        self,
-        session_id: SessionId,
-    ) -> SessionRow:
-        async with self._db.begin_readonly_session_read_committed() as db_sess:
-            return await SessionRow.get_session_to_determine_status(db_sess, session_id)
-
     async def get_template_by_id(
         self,
         template_id: uuid.UUID,
