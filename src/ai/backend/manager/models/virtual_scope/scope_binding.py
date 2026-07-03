@@ -8,6 +8,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.data.permission.virtual_scope import ScopeBindingData
 from ai.backend.common.entity.types import ScopeType
+from ai.backend.common.identifier.scope import ScopeID
 from ai.backend.common.identifier.virtual_scope import VirtualScopeID
 from ai.backend.manager.models.base import (
     GUID,
@@ -29,7 +30,7 @@ class ScopeBindingRow(Base):  # type: ignore[misc]
     scope_type: Mapped[ScopeType] = mapped_column(
         "scope_type", sa.String(length=32), primary_key=True
     )
-    scope_id: Mapped[str] = mapped_column("scope_id", sa.String(length=64), primary_key=True)
+    scope_id: Mapped[ScopeID] = mapped_column("scope_id", GUID(), primary_key=True)
     permission_cap: Mapped[Permission | None] = mapped_column(
         "permission_cap", IntFlagType(Permission), nullable=True
     )

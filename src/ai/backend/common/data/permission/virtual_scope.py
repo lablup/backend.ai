@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.entity.types import EntityType, ScopeType
+from ai.backend.common.identifier.scope import ScopeID
 from ai.backend.common.identifier.virtual_scope import VirtualScopeID
 
 __all__ = (
@@ -17,7 +18,7 @@ __all__ = (
 class VirtualScopeData:
     id: VirtualScopeID
     scope_type: ScopeType
-    scope_id: str
+    scope_id: ScopeID
 
 
 @dataclass(frozen=True)
@@ -31,7 +32,7 @@ class ScopeBindingData:
     """
 
     scope_type: ScopeType
-    scope_id: str
+    scope_id: ScopeID
     virtual_scope_id: VirtualScopeID
     permission_cap: Permission | None
 

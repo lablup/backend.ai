@@ -29,7 +29,7 @@ def upgrade() -> None:
             nullable=False,
         ),
         sa.Column("scope_type", sa.String(length=32), nullable=False),
-        sa.Column("scope_id", sa.String(length=64), nullable=False),
+        sa.Column("scope_id", GUID(), nullable=False),
         sa.Column(
             "created_at",
             sa.DateTime(timezone=True),
@@ -43,7 +43,7 @@ def upgrade() -> None:
         "scope_bindings",
         sa.Column("virtual_scope_id", GUID(), nullable=False),
         sa.Column("scope_type", sa.String(length=32), nullable=False),
-        sa.Column("scope_id", sa.String(length=64), nullable=False),
+        sa.Column("scope_id", GUID(), nullable=False),
         sa.Column("permission_cap", sa.SmallInteger(), nullable=True),
         sa.Column(
             "created_at",
