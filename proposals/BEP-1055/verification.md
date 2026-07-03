@@ -246,6 +246,24 @@ Result: the real container came up with overlay `baimulti0` = `10.128.5.2/24`, L
 orchestrator → vxlan backend → runtime → CNI) composes and runs as real code against live
 containerd. ✅
 
+## 13. Split create/start lifecycle on real containerd (the AbstractAgent path)
+
+The AbstractAgent creation flow splits `prepare_container` (create) from `start_container`
+(start) — the path `ContainerdKernelCreationContext` now drives. Verified via the facade's
+split methods against live containerd:
+
+- `create_container` → the container is created with `pid=0` (not started, isolated netns)
+  — matches `prepare_container`.
+- `start_and_attach_container` → task starts (pid) and CNI attaches — the container gets
+  overlay `baimulti0 = 10.128.5.2/24` + LOCAL `eth0 = 172.30.0.2/24` — matches
+  `start_container`.
+
+Finding: the container must run a long-lived process for the window between start and CNI
+attach; an image whose default CMD exits immediately (e.g. alpine `/bin/sh`) dies before
+attach. Real kernels run the long-lived krunner entrypoint (not yet wired), so
+`translate_creation_config` currently leaves the command empty (image default) — fine once
+krunner injects the entrypoint. ✅
+
 ## Notes
 
 - These are manual smoke tests requiring a privileged Linux host (NET_ADMIN),
