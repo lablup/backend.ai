@@ -21,6 +21,7 @@ __all__ = (
     "RoleNotAssigned",
     "RoleNotFound",
     "UserSystemRoleNotProvisioned",
+    "VirtualScopeNotFound",
 )
 
 
@@ -119,6 +120,26 @@ class ObjectPermissionNotFound(BackendAIError, web.HTTPNotFound):
             domain=ErrorDomain.PERMISSION,
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class VirtualScopeNotFound(BackendAIError, web.HTTPInternalServerError):
+    """Raised when a scope's virtual scope is expected to exist but does not.
+
+    A virtual scope is always created alongside any owner scope, so a missing one is
+    a server-side data-integrity condition (an invariant violation), not a client
+    error — hence 500.
+    """
+
+    error_type = "https://api.backend.ai/probs/virtual-scope-not-found"
+    error_title = "The virtual scope for the given scope does not exist."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.PERMISSION,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
         )
 
 
