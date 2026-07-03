@@ -273,6 +273,7 @@ class SessionAdapter(BaseAdapter):
                     for e in input.resource_entries
                 ],
                 resource_group=input.resource_group,
+                resource_group_id=input.resource_group_id,
                 shmem=input.resource_opts.shmem.expr
                 if input.resource_opts and input.resource_opts.shmem
                 else None,

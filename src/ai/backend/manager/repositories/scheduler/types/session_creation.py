@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.identifier.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.types import (
     SessionId,
     SlotName,
@@ -33,7 +34,8 @@ class SessionDependencyData:
 class AllowedScalingGroup:
     """Allowed scaling group for a user."""
 
-    name: str
+    id: ResourceGroupID
+    name: ResourceGroupName
     is_private: bool
     scheduler_opts: ScalingGroupOpts
 

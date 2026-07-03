@@ -51,6 +51,7 @@ from ai.backend.common.dto.manager.v2.session.types import (
     ProjectSessionScope,
     SessionStatusFilter,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import ImageID, SessionId
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, UUIDFilter, encode_cursor
 from ai.backend.manager.api.gql.common.types import (
@@ -603,7 +604,18 @@ class EnqueueSessionInputGQL(PydanticInputMixin[EnqueueSessionInputDTO]):
     resource_entries: list[SessionResourceSlotEntryInputGQL] = gql_field(
         description="Resource slot allocations."
     )
-    resource_group: str | None = gql_field(default=None, description="Scaling group name.")
+    resource_group: str | None = gql_field(
+        default=None,
+        description=f"Deprecated since {NEXT_RELEASE_VERSION}. Use resource_group_id instead. Resource group name.",
+        deprecation_reason="Use resource_group_id instead.",
+    )
+    resource_group_id: ID | None = gql_added_field(
+        BackendAIGQLMeta(
+            description="Resource group UUID. Auto-selected if omitted.",
+            added_version=NEXT_RELEASE_VERSION,
+        ),
+        default=None,
+    )
     resource_opts: SessionResourceOptsInputGQL | None = gql_field(
         default=None, description="Additional resource options."
     )

@@ -31,7 +31,10 @@ from ai.backend.common.data.permission.types import (
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.project import ProjectID
-from ai.backend.common.identifier.resource_group import ResourceGroupName
+from ai.backend.common.identifier.resource_group import (
+    ResourceGroupID,
+    ResourceGroupName,
+)
 from ai.backend.common.resource.types import TotalResourceData
 from ai.backend.common.types import (
     AccessKey,
@@ -1720,7 +1723,7 @@ class ScheduleDBSource:
         access_key: AccessKey,
         domain_name: str,
         project_id: ProjectID,
-    ) -> ResourceGroupName:
+    ) -> ResourceGroupID:
         """Return the first resource group from the owner's allowlist."""
         async with self._begin_readonly_session_read_committed() as db_sess:
             allowed_rgs = await self._query_allowed_scaling_groups(
@@ -1728,7 +1731,18 @@ class ScheduleDBSource:
             )
         if not allowed_rgs:
             raise InvalidAPIParameters("No accessible scaling group available")
-        return ResourceGroupName(allowed_rgs[0].name)
+        return allowed_rgs[0].id
+
+    async def get_resource_group_name_by_id(
+        self, resource_group_id: ResourceGroupID
+    ) -> ResourceGroupName:
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            resource_group_name = await db_sess.scalar(
+                sa.select(ScalingGroupRow.name).where(ScalingGroupRow.id == resource_group_id)
+            )
+        if resource_group_name is None:
+            raise ScalingGroupNotFound(f"Resource group not found (id:{resource_group_id})")
+        return ResourceGroupName(resource_group_name)
 
     async def _get_scaling_group_network_info(
         self, db_sess: SASession, scaling_group_name: str
@@ -1954,7 +1968,8 @@ class ScheduleDBSource:
 
         return [
             AllowedScalingGroup(
-                name=sg.name,
+                id=ResourceGroupID(sg.id),
+                name=ResourceGroupName(sg.name),
                 is_private=not sg.is_public,  # Convert is_public to is_private
                 scheduler_opts=sg.scheduler_opts,
             )
