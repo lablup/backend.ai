@@ -12,12 +12,14 @@ from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.common.dto.manager.v2.app_config_allow_list.request import (
     CreateAppConfigAllowListInput,
     SearchAppConfigAllowListInput,
+    UpdateAppConfigAllowListInput,
 )
 from ai.backend.common.dto.manager.v2.app_config_allow_list.response import (
     AppConfigAllowListNode,
     CreateAppConfigAllowListPayload,
     PurgeAppConfigAllowListPayload,
     SearchAppConfigAllowListPayload,
+    UpdateAppConfigAllowListPayload,
 )
 
 from .conftest import MockAuth
@@ -118,6 +120,29 @@ class TestAdminGet:
         assert str(call_args[0][1]).endswith(f"/v2/app-config-allow-list/{entry_id}")
         assert isinstance(result, AppConfigAllowListNode)
         assert result.config_name == "preferences"
+
+
+class TestAdminUpdate:
+    async def test_happy_path(self) -> None:
+        entry_id = uuid4()
+        payload = _node_payload(str(entry_id), "theme")
+        payload["rank"] = 250
+        mock_resp = AsyncMock()
+        mock_resp.status = 200
+        mock_resp.json = AsyncMock(return_value={"app_config_allow_list": payload})
+        mock_session = _make_request_session(mock_resp)
+        client = _make_client(mock_session)
+
+        result = await client.admin_update(
+            entry_id,
+            UpdateAppConfigAllowListInput(id=entry_id, rank=250),
+        )
+
+        call_args = mock_session.request.call_args
+        assert call_args[0][0] == "PATCH"
+        assert str(call_args[0][1]).endswith(f"/v2/app-config-allow-list/{entry_id}")
+        assert isinstance(result, UpdateAppConfigAllowListPayload)
+        assert result.app_config_allow_list.rank == 250
 
 
 class TestAdminPurge:

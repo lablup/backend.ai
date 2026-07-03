@@ -9,12 +9,14 @@ from ai.backend.client.v2.base_domain import BaseDomainClient
 from ai.backend.common.dto.manager.v2.app_config_allow_list.request import (
     CreateAppConfigAllowListInput,
     SearchAppConfigAllowListInput,
+    UpdateAppConfigAllowListInput,
 )
 from ai.backend.common.dto.manager.v2.app_config_allow_list.response import (
     AppConfigAllowListNode,
     CreateAppConfigAllowListPayload,
     PurgeAppConfigAllowListPayload,
     SearchAppConfigAllowListPayload,
+    UpdateAppConfigAllowListPayload,
 )
 
 _PATH: Final = "/v2/app-config-allow-list"
@@ -24,8 +26,8 @@ class V2AppConfigAllowListClient(BaseDomainClient):
     """SDK client for app config allow-list operations.
 
     Mirrors the REST v2 surface introduced in BA-6546. All calls require
-    super-admin privileges; the entity supports create, get, search, and
-    purge (no update or delete).
+    super-admin privileges; the entity supports create, get, search, update
+    (rank only), and purge.
     """
 
     async def admin_create(
@@ -58,6 +60,19 @@ class V2AppConfigAllowListClient(BaseDomainClient):
             "GET",
             f"{_PATH}/{app_config_allow_list_id}",
             response_model=AppConfigAllowListNode,
+        )
+
+    async def admin_update(
+        self,
+        app_config_allow_list_id: UUID,
+        request: UpdateAppConfigAllowListInput,
+    ) -> UpdateAppConfigAllowListPayload:
+        """Update an app config allow-list entry's rank by ID (superadmin only)."""
+        return await self._client.typed_request(
+            "PATCH",
+            f"{_PATH}/{app_config_allow_list_id}",
+            request=request,
+            response_model=UpdateAppConfigAllowListPayload,
         )
 
     async def admin_purge(

@@ -31,6 +31,9 @@ from ai.backend.manager.repositories.app_config_allow_list.creators import (
 from ai.backend.manager.repositories.app_config_allow_list.repository import (
     AppConfigAllowListRepository,
 )
+from ai.backend.manager.repositories.app_config_allow_list.updaters import (
+    AppConfigAllowListUpdaterSpec,
+)
 from ai.backend.manager.repositories.app_config_definition.creators import (
     AppConfigDefinitionCreatorSpec,
 )
@@ -45,8 +48,10 @@ from ai.backend.manager.repositories.base import (
     ExistsQuerier,
     OffsetPagination,
     Purger,
+    Updater,
 )
 from ai.backend.manager.repositories.ops import DBOpsProvider
+from ai.backend.manager.types import OptionalState
 from ai.backend.testutils.db import with_tables
 
 
@@ -183,6 +188,34 @@ class TestRankAssignment:
         created = await _create_entry(repository, "theme", AppConfigScopeType.DOMAIN, rank=250)
         assert created.rank == 250
         assert (await repository.get_by_id(created.id)).rank == 250
+
+
+class TestUpdate:
+    async def test_update_changes_rank(
+        self,
+        repository: AppConfigAllowListRepository,
+        existing_entry: AppConfigAllowListData,
+    ) -> None:
+        updated = await repository.update(
+            Updater(
+                spec=AppConfigAllowListUpdaterSpec(rank=OptionalState.update(250)),
+                pk_value=existing_entry.id,
+            )
+        )
+        assert updated.rank == 250
+        assert (await repository.get_by_id(existing_entry.id)).rank == 250
+        # identity fields are untouched
+        assert updated.config_name == existing_entry.config_name
+        assert updated.scope_type is existing_entry.scope_type
+
+    async def test_update_missing_raises(self, repository: AppConfigAllowListRepository) -> None:
+        with pytest.raises(AppConfigAllowListNotFound):
+            await repository.update(
+                Updater(
+                    spec=AppConfigAllowListUpdaterSpec(rank=OptionalState.update(250)),
+                    pk_value=_missing_id(),
+                )
+            )
 
 
 class TestPurge:

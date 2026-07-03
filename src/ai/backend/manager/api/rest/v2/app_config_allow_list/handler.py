@@ -11,6 +11,7 @@ from ai.backend.common.dto.manager.v2.app_config_allow_list.request import (
     CreateAppConfigAllowListInput,
     PurgeAppConfigAllowListInput,
     SearchAppConfigAllowListInput,
+    UpdateAppConfigAllowListInput,
 )
 from ai.backend.common.identifier.app_config_allow_list import AppConfigAllowListID
 from ai.backend.logging import BraceStyleAdapter
@@ -54,6 +55,16 @@ class V2AppConfigAllowListHandler:
         result = await self._adapter.admin_get(
             AppConfigAllowListID(path.parsed.app_config_allow_list_id)
         )
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def admin_update(
+        self,
+        path: PathParam[AppConfigAllowListIdPathParam],
+        body: BodyParam[UpdateAppConfigAllowListInput],
+    ) -> APIResponse:
+        """Update an app config allow-list entry's rank by id (superadmin only)."""
+        merged = body.parsed.model_copy(update={"id": path.parsed.app_config_allow_list_id})
+        result = await self._adapter.admin_update(merged)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def admin_purge(

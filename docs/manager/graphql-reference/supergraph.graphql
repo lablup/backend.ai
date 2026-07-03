@@ -11379,6 +11379,11 @@ type Mutation
   adminPurgeAppConfigAllowList(input: PurgeAppConfigAllowListInput!): PurgeAppConfigAllowListPayload @join__field(graph: STRAWBERRY)
 
   """
+  Added in 26.8.0. Update an app config allow-list entry's rank by id (super admin only).
+  """
+  adminUpdateAppConfigAllowList(input: UpdateAppConfigAllowListInput!): UpdateAppConfigAllowListPayload @join__field(graph: STRAWBERRY)
+
+  """
   Added in 25.14.0. Scan external registries to discover available artifacts. Searches HuggingFace or Reservoir registries for artifacts matching the specified criteria and registers them in the system with SCANNED status. The artifacts become available for import but are not downloaded until explicitly imported. This is the first step in the artifact workflow: Scan → Import → Use
   """
   scanArtifacts(input: ScanArtifactsInput!): ScanArtifactsPayload @join__field(graph: STRAWBERRY)
@@ -19185,6 +19190,29 @@ input UpdateAllowedResourceGroupsForProjectInput
 
   """Resource group names to disallow."""
   remove: [String!] = null
+}
+
+"""
+Added in 26.8.0. Input for updating an app config allow-list entry (rank only).
+"""
+input UpdateAppConfigAllowListInput
+  @join__type(graph: STRAWBERRY)
+{
+  """App config allow-list entry id to update."""
+  id: UUID!
+
+  """
+  New merge rank applied to fragments under this entry (low to high; higher wins). Omit to leave unchanged.
+  """
+  rank: Int = null
+}
+
+"""Added in 26.8.0. Payload for app config allow-list entry update."""
+type UpdateAppConfigAllowListPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """Updated app config allow-list entry."""
+  appConfigAllowList: AppConfigAllowList!
 }
 
 """

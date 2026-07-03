@@ -22,6 +22,7 @@ __all__ = (
     "CreateAppConfigAllowListInput",
     "PurgeAppConfigAllowListInput",
     "SearchAppConfigAllowListInput",
+    "UpdateAppConfigAllowListInput",
 )
 
 
@@ -41,6 +42,23 @@ class CreateAppConfigAllowListInput(BaseRequestModel):
         description=(
             "Merge rank applied to fragments under this entry (low to high; higher wins). "
             "Defaults to the scope type's default rank (public=100, domain=200, user=300)."
+        ),
+    )
+
+
+class UpdateAppConfigAllowListInput(BaseRequestModel):
+    """Input for updating an app config allow-list entry.
+
+    Only ``rank`` is updatable — the identity pair (``config_name``, ``scope_type``)
+    is immutable (purge and recreate to change it).
+    """
+
+    id: UUID = Field(description="App config allow-list entry id to update.")
+    rank: int | None = Field(
+        default=None,
+        description=(
+            "New merge rank applied to fragments under this entry (low to high; "
+            "higher wins). Omit to leave unchanged."
         ),
     )
 

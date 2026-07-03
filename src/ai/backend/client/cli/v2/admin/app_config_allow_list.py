@@ -158,6 +158,34 @@ def search(
 
 @app_config_allow_list.command()
 @click.argument("app_config_allow_list_id", type=click.UUID)
+@click.option(
+    "--rank",
+    required=True,
+    type=int,
+    help=("New merge rank applied to fragments under this entry (low to high; higher wins)."),
+)
+def update(app_config_allow_list_id: uuid.UUID, rank: int) -> None:
+    """Update an app config allow-list entry's rank by ID."""
+    from ai.backend.common.dto.manager.v2.app_config_allow_list.request import (
+        UpdateAppConfigAllowListInput,
+    )
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.app_config_allow_list.admin_update(
+                app_config_allow_list_id,
+                UpdateAppConfigAllowListInput(id=app_config_allow_list_id, rank=rank),
+            )
+            print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())
+
+
+@app_config_allow_list.command()
+@click.argument("app_config_allow_list_id", type=click.UUID)
 def purge(app_config_allow_list_id: uuid.UUID) -> None:
     """Purge an app config allow-list entry by ID."""
 

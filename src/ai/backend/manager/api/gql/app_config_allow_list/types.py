@@ -24,6 +24,9 @@ from ai.backend.common.dto.manager.v2.app_config_allow_list.request import (
 from ai.backend.common.dto.manager.v2.app_config_allow_list.request import (
     PurgeAppConfigAllowListInput as PurgeAppConfigAllowListInputDTO,
 )
+from ai.backend.common.dto.manager.v2.app_config_allow_list.request import (
+    UpdateAppConfigAllowListInput as UpdateAppConfigAllowListInputDTO,
+)
 from ai.backend.common.dto.manager.v2.app_config_allow_list.response import (
     AppConfigAllowListNode,
 )
@@ -32,6 +35,9 @@ from ai.backend.common.dto.manager.v2.app_config_allow_list.response import (
 )
 from ai.backend.common.dto.manager.v2.app_config_allow_list.response import (
     PurgeAppConfigAllowListPayload as PurgeAppConfigAllowListPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.app_config_allow_list.response import (
+    UpdateAppConfigAllowListPayload as UpdateAppConfigAllowListPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.app_config_allow_list.types import (
     AppConfigScopeTypeFilter as AppConfigScopeTypeFilterDTO,
@@ -65,6 +71,8 @@ __all__ = (
     "CreateAppConfigAllowListPayloadGQL",
     "PurgeAppConfigAllowListInputGQL",
     "PurgeAppConfigAllowListPayloadGQL",
+    "UpdateAppConfigAllowListInputGQL",
+    "UpdateAppConfigAllowListPayloadGQL",
 )
 
 
@@ -259,6 +267,38 @@ class CreateAppConfigAllowListInputGQL(PydanticInputMixin[CreateAppConfigAllowLi
 class CreateAppConfigAllowListPayloadGQL(PydanticOutputMixin[CreateAppConfigAllowListPayloadDTO]):
     app_config_allow_list: AppConfigAllowListGQL = gql_field(
         description="The created app config allow-list entry."
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Input for updating an app config allow-list entry (rank only).",
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="UpdateAppConfigAllowListInput",
+)
+class UpdateAppConfigAllowListInputGQL(PydanticInputMixin[UpdateAppConfigAllowListInputDTO]):
+    id: UUID = gql_field(description="App config allow-list entry id to update.")
+    rank: int | None = gql_field(
+        description=(
+            "New merge rank applied to fragments under this entry (low to high; higher "
+            "wins). Omit to leave unchanged."
+        ),
+        default=None,
+    )
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Payload for app config allow-list entry update.",
+    ),
+    model=UpdateAppConfigAllowListPayloadDTO,
+    name="UpdateAppConfigAllowListPayload",
+)
+class UpdateAppConfigAllowListPayloadGQL(PydanticOutputMixin[UpdateAppConfigAllowListPayloadDTO]):
+    app_config_allow_list: AppConfigAllowListGQL = gql_field(
+        description="The updated app config allow-list entry."
     )
 
 

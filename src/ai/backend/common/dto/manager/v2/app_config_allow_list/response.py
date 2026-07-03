@@ -15,6 +15,7 @@ __all__ = (
     "CreateAppConfigAllowListPayload",
     "PurgeAppConfigAllowListPayload",
     "SearchAppConfigAllowListPayload",
+    "UpdateAppConfigAllowListPayload",
 )
 
 
@@ -36,6 +37,14 @@ class CreateAppConfigAllowListPayload(BaseResponseModel):
 
     app_config_allow_list: AppConfigAllowListNode = Field(
         description="Created app config allow-list entry."
+    )
+
+
+class UpdateAppConfigAllowListPayload(BaseResponseModel):
+    """Payload for app config allow-list entry update."""
+
+    app_config_allow_list: AppConfigAllowListNode = Field(
+        description="Updated app config allow-list entry."
     )
 
 

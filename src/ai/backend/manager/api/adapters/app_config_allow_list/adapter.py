@@ -13,12 +13,14 @@ from ai.backend.common.dto.manager.v2.app_config_allow_list.request import (
     CreateAppConfigAllowListInput,
     PurgeAppConfigAllowListInput,
     SearchAppConfigAllowListInput,
+    UpdateAppConfigAllowListInput,
 )
 from ai.backend.common.dto.manager.v2.app_config_allow_list.response import (
     AppConfigAllowListNode,
     CreateAppConfigAllowListPayload,
     PurgeAppConfigAllowListPayload,
     SearchAppConfigAllowListPayload,
+    UpdateAppConfigAllowListPayload,
 )
 from ai.backend.common.dto.manager.v2.app_config_allow_list.types import (
     AppConfigAllowListOrderField,
@@ -40,8 +42,12 @@ from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.repositories.app_config_allow_list.creators import (
     AppConfigAllowListCreatorSpec,
 )
+from ai.backend.manager.repositories.app_config_allow_list.updaters import (
+    AppConfigAllowListUpdaterSpec,
+)
 from ai.backend.manager.repositories.base import (
     Purger,
+    Updater,
     combine_conditions_or,
     negate_conditions,
 )
@@ -58,6 +64,10 @@ from ai.backend.manager.services.app_config_allow_list.actions.purge import (
 from ai.backend.manager.services.app_config_allow_list.actions.search import (
     SearchAppConfigAllowListAction,
 )
+from ai.backend.manager.services.app_config_allow_list.actions.update import (
+    UpdateAppConfigAllowListAction,
+)
+from ai.backend.manager.types import OptionalState
 
 
 @lru_cache(maxsize=1)
@@ -142,6 +152,26 @@ class AppConfigAllowListAdapter(BaseAdapter):
             total_count=action_result.total_count,
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,
+        )
+
+    async def admin_update(
+        self, input: UpdateAppConfigAllowListInput
+    ) -> UpdateAppConfigAllowListPayload:
+        updater = Updater(
+            spec=AppConfigAllowListUpdaterSpec(
+                rank=(
+                    OptionalState.update(input.rank)
+                    if input.rank is not None
+                    else OptionalState.nop()
+                ),
+            ),
+            pk_value=AppConfigAllowListID(input.id),
+        )
+        action_result = await self._processors.app_config_allow_list.update.wait_for_complete(
+            UpdateAppConfigAllowListAction(updater=updater)
+        )
+        return UpdateAppConfigAllowListPayload(
+            app_config_allow_list=self._data_to_node(action_result.allow_list),
         )
 
     async def admin_purge(

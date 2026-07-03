@@ -23,6 +23,7 @@ from .app_config_allow_list import (
     admin_app_config_allow_lists,
     admin_create_app_config_allow_list,
     admin_purge_app_config_allow_list,
+    admin_update_app_config_allow_list,
 )
 from .app_config_definition import (
     admin_app_config_definition,
@@ -708,6 +709,7 @@ class Query:
 class Mutation:
     admin_create_app_config_allow_list = admin_create_app_config_allow_list
     admin_purge_app_config_allow_list = admin_purge_app_config_allow_list
+    admin_update_app_config_allow_list = admin_update_app_config_allow_list
     scan_artifacts = scan_artifacts
     scan_artifact_models = scan_artifact_models
     import_artifacts = import_artifacts
