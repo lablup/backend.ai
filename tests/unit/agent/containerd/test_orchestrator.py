@@ -113,3 +113,26 @@ class TestLaunch:
         await orch.terminate("c1", plan=_plan(), task_pid=4242)
         assert runner.calls == [("DEL", "/proc/4242/ns/net")]
         assert runtime.calls == ["kill_container", "remove_container"]
+
+
+class TestSplitLifecycle:
+    async def test_create_does_not_start_or_attach(self) -> None:
+        runtime = FakeRuntime(pid=4242)
+        runner = RecordingNetworkRunner()
+        orch = _orchestrator(runtime, runner)
+        await orch.create("c1", image_ref="img", command=["sleep", "1"], oci_spec={})
+        assert runtime.calls == ["create_container"]  # no start
+        assert runner.calls == []  # no attach
+
+    async def test_start_and_attach_after_create(self) -> None:
+        runtime = FakeRuntime(pid=4242)
+        runner = RecordingNetworkRunner()
+        orch = _orchestrator(runtime, runner)
+        await orch.create("c1", image_ref="img", command=[], oci_spec={})
+        result = await orch.start_and_attach(
+            "c1", meta=_META, kernel_config=cast(KernelCreationConfig, {}),
+            cluster_info=cast(ClusterInfo, {}),
+        )
+        assert runtime.calls == ["create_container", "start_container"]
+        assert runner.calls == [("ADD", "/proc/4242/ns/net")]
+        assert result.handle.pid == 4242

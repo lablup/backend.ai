@@ -13,6 +13,7 @@ ContainerNetworkProvisioner attaches each container's task PID via CNI.
 
 from __future__ import annotations
 
+import signal
 from collections.abc import Mapping, Sequence
 from decimal import Decimal
 from pathlib import Path
@@ -60,7 +61,10 @@ from ai.backend.common.types import (
     current_resource_slots,
 )
 
+from ai.backend.common.network.types import SessionNetMeta
+
 from .kernel import ContainerdKernel
+from .oci import translate_creation_config
 from .session_network import (
     ContainerdSessionNetwork,
     build_containerd_session_network,
@@ -70,6 +74,11 @@ _TODO = "containerd backend: not yet implemented (requires containerd gRPC clien
 
 
 class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKernel]):
+    _session_network: ContainerdSessionNetwork
+    _net_meta: SessionNetMeta | None
+    _container_id: str
+    _session_id: str
+
     def __init__(
         self,
         ownership_data: KernelOwnershipData,
@@ -80,6 +89,8 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         local_config: Any,
         computers: Mapping[DeviceName, ComputerContext],
         restarting: bool = False,
+        *,
+        session_network: ContainerdSessionNetwork,
     ) -> None:
         super().__init__(
             ownership_data,
@@ -91,6 +102,10 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
             computers,
             restarting=restarting,
         )
+        self._session_network = session_network
+        self._net_meta = None
+        self._container_id = str(kernel_config["kernel_id"])
+        self._session_id = str(kernel_config["session_id"])
 
     @override
     async def get_extra_envs(self) -> Mapping[str, str]:
@@ -139,10 +154,16 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
 
     @override
     async def apply_network(self, cluster_info: ClusterInfo) -> None:
-        # BEP-1055: per-session network setup is driven by SessionNetworkCoordinator
-        # and per-container attach by ContainerNetworkProvisioner (against the task PID),
-        # not here. Left as a no-op for single-node sessions.
-        return
+        # BEP-1055: set up this node's per-session data plane (vxlan/bridge + membership)
+        # and register the per-session orchestrator. Per-container CNI attach happens in
+        # start_container against the task PID. Single-node sessions without a manager-
+        # provided network_config skip this.
+        network_config = cluster_info.get("network_config") or {}
+        if not network_config.get("backend"):
+            return
+        self._net_meta = await self._session_network.ensure_session(
+            self._session_id, network_config
+        )
 
     @override
     async def prepare_ssh(self, cluster_info: ClusterInfo) -> None:
@@ -191,7 +212,29 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         service_ports: list[ServicePort],
         cluster_info: ClusterInfo,
     ) -> ContainerdKernel:
-        raise NotImplementedError(_TODO)
+        # Create the containerd container (isolated netns, not started) and build the
+        # kernel object. NOTE: the krunner entrypoint / resource limits / mounts are not
+        # yet injected into oci_spec — the container runs the image default until the
+        # krunner lifecycle lands.
+        spec = translate_creation_config(self.kernel_config, environ=environ)
+        await self._session_network.create_container(
+            self._session_id,
+            self._container_id,
+            image_ref=spec.image_ref,
+            command=spec.command,
+            oci_spec=spec.oci_spec,
+        )
+        return ContainerdKernel(
+            self.ownership_data,
+            self.kernel_config["network_id"],
+            self.image_ref,
+            self.kspec_version,
+            agent_config=self.local_config.model_dump(by_alias=True),
+            service_ports=service_ports,
+            resource_spec=resource_spec,
+            environ=environ,
+            data={"container_id": self._container_id},
+        )
 
     @override
     async def start_container(
@@ -202,7 +245,34 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         preopen_ports: Sequence[int],
         cluster_info: ClusterInfo,
     ) -> Mapping[str, Any]:
-        raise NotImplementedError(_TODO)
+        # Start the task and attach CNI to its netns (requires apply_network first).
+        if self._net_meta is None:
+            raise RuntimeError(
+                "start_container requires apply_network to have set up the session network"
+            )
+        result = await self._session_network.start_and_attach_container(
+            self._session_id,
+            self._container_id,
+            meta=self._net_meta,
+            kernel_config=self.kernel_config,
+            cluster_info=cluster_info,
+        )
+        overlay = result.plan.overlay()
+        kernel_host = overlay.ip if overlay and overlay.ip else "127.0.0.1"
+        # NOTE: real REPL/service ports come from the krunner running inside the kernel,
+        # which is not yet wired; report the container/network facts we have.
+        return {
+            "container_id": self._container_id,
+            "task_pid": result.handle.pid,
+            "kernel_host": kernel_host,
+            "repl_in_port": 2000,
+            "repl_out_port": 2001,
+            "stdin_port": 2002,
+            "stdout_port": 2003,
+            "host_ports": [],
+            "domain_socket_proxies": [],
+            "block_service_ports": False,
+        }
 
     @override
     async def mount_krunner(
@@ -344,6 +414,7 @@ class ContainerdAgent(
             self.local_config,
             self.computers,
             restarting=restarting,
+            session_network=self._session_network,
         )
 
     @override
@@ -352,7 +423,10 @@ class ContainerdAgent(
         kernel_id: KernelId,
         container_id: ContainerId | None,
     ) -> None:
-        raise NotImplementedError(_TODO)
+        # Stop the container's task (force). Removal happens in clean_kernel.
+        # NOTE: proper CNI detach needs the per-kernel EndpointPlan; tracking it across
+        # destroy/clean is a follow-up (removing the container drops its netns).
+        await self._session_network.kill_container(str(kernel_id), signal=signal.SIGKILL)
 
     @override
     async def clean_kernel(
@@ -361,7 +435,7 @@ class ContainerdAgent(
         container_id: ContainerId | None,
         restarting: bool,
     ) -> None:
-        raise NotImplementedError(_TODO)
+        await self._session_network.remove_container(str(kernel_id))
 
     @override
     async def create_local_network(self, network_name: str) -> None:

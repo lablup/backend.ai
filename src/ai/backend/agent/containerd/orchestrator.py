@@ -47,6 +47,38 @@ class ContainerdKernelOrchestrator:
         self._runtime = runtime
         self._network = network
 
+    async def create(
+        self,
+        container_id: str,
+        *,
+        image_ref: str,
+        command: Sequence[str],
+        oci_spec: dict[str, Any],
+    ) -> None:
+        """Create the container with an isolated (empty) netns; not started."""
+        await self._runtime.create_container(
+            container_id, image_ref=image_ref, command=command, oci_spec=oci_spec
+        )
+
+    async def start_and_attach(
+        self,
+        container_id: str,
+        *,
+        meta: SessionNetMeta,
+        kernel_config: KernelCreationConfig,
+        cluster_info: ClusterInfo,
+    ) -> LaunchResult:
+        """Start the (already created) container's task, then attach CNI to its netns."""
+        handle = await self._runtime.start_container(container_id)
+        plan = await self._network.attach(
+            kernel_config,
+            cluster_info,
+            meta=meta,
+            container_id=container_id,
+            task_pid=handle.pid,
+        )
+        return LaunchResult(handle=handle, plan=plan)
+
     async def launch(
         self,
         container_id: str,
@@ -58,20 +90,13 @@ class ContainerdKernelOrchestrator:
         kernel_config: KernelCreationConfig,
         cluster_info: ClusterInfo,
     ) -> LaunchResult:
-        # 1) runtime: create the container with an empty netns, then start its task
-        await self._runtime.create_container(
+        """Convenience: create then start+attach in one call (single-step callers)."""
+        await self.create(
             container_id, image_ref=image_ref, command=command, oci_spec=oci_spec
         )
-        handle = await self._runtime.start_container(container_id)
-        # 2) hand the task's netns/PID to the network layer to attach CNI
-        plan = await self._network.attach(
-            kernel_config,
-            cluster_info,
-            meta=meta,
-            container_id=container_id,
-            task_pid=handle.pid,
+        return await self.start_and_attach(
+            container_id, meta=meta, kernel_config=kernel_config, cluster_info=cluster_info
         )
-        return LaunchResult(handle=handle, plan=plan)
 
     async def terminate(
         self,

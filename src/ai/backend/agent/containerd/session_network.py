@@ -147,12 +147,46 @@ class ContainerdSessionNetwork:
             cluster_info=cluster_info,
         )
 
+    async def create_container(
+        self,
+        session_id: str,
+        container_id: str,
+        *,
+        image_ref: str,
+        command: list[str],
+        oci_spec: dict[str, Any],
+    ) -> None:
+        """Create the container (not started) — maps to AbstractAgent.prepare_container."""
+        await self._orchestrators[session_id].create(
+            container_id, image_ref=image_ref, command=command, oci_spec=oci_spec
+        )
+
+    async def start_and_attach_container(
+        self,
+        session_id: str,
+        container_id: str,
+        *,
+        meta: SessionNetMeta,
+        kernel_config: KernelCreationConfig,
+        cluster_info: ClusterInfo,
+    ) -> LaunchResult:
+        """Start the container + attach CNI — maps to AbstractAgent.start_container."""
+        return await self._orchestrators[session_id].start_and_attach(
+            container_id, meta=meta, kernel_config=kernel_config, cluster_info=cluster_info
+        )
+
     async def terminate_container(
         self, session_id: str, container_id: str, *, plan: EndpointPlan, task_pid: int
     ) -> None:
         await self._orchestrators[session_id].terminate(
             container_id, plan=plan, task_pid=task_pid
         )
+
+    async def kill_container(self, container_id: str, *, signal: int) -> None:
+        await self._runtime.kill_container(container_id, signal=signal)
+
+    async def remove_container(self, container_id: str) -> None:
+        await self._runtime.remove_container(container_id)
 
 
 def build_containerd_session_network(
