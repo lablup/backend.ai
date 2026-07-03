@@ -41,7 +41,6 @@ def upgrade() -> None:
     )
     op.create_table(
         "scope_bindings",
-        sa.Column("id", GUID(), server_default=sa.text("uuid_generate_v4()"), nullable=False),
         sa.Column("virtual_scope_id", GUID(), nullable=False),
         sa.Column("scope_type", sa.String(length=32), nullable=False),
         sa.Column("scope_id", sa.String(length=64), nullable=False),
@@ -58,9 +57,8 @@ def upgrade() -> None:
             name=op.f("fk_scope_bindings_virtual_scope_id_virtual_scopes"),
             ondelete="CASCADE",
         ),
-        sa.PrimaryKeyConstraint("id", name=op.f("pk_scope_bindings")),
-        sa.UniqueConstraint(
-            "virtual_scope_id", "scope_type", "scope_id", name="uq_scope_bindings_vs_scope"
+        sa.PrimaryKeyConstraint(
+            "virtual_scope_id", "scope_type", "scope_id", name=op.f("pk_scope_bindings")
         ),
     )
     op.create_index(
@@ -71,7 +69,6 @@ def upgrade() -> None:
     )
     op.create_table(
         "entity_memberships",
-        sa.Column("id", GUID(), server_default=sa.text("uuid_generate_v4()"), nullable=False),
         sa.Column("virtual_scope_id", GUID(), nullable=False),
         sa.Column("entity_type", sa.String(length=32), nullable=False),
         sa.Column("entity_id", sa.String(length=64), nullable=False),
@@ -88,9 +85,8 @@ def upgrade() -> None:
             name=op.f("fk_entity_memberships_virtual_scope_id_virtual_scopes"),
             ondelete="CASCADE",
         ),
-        sa.PrimaryKeyConstraint("id", name=op.f("pk_entity_memberships")),
-        sa.UniqueConstraint(
-            "virtual_scope_id", "entity_type", "entity_id", name="uq_entity_memberships_vs_entity"
+        sa.PrimaryKeyConstraint(
+            "virtual_scope_id", "entity_type", "entity_id", name=op.f("pk_entity_memberships")
         ),
     )
     op.create_index(

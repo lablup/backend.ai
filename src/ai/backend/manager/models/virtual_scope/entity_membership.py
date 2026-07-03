@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import uuid
 from datetime import datetime
 
 import sqlalchemy as sa
@@ -19,26 +18,18 @@ from ai.backend.manager.models.base import (
 
 class EntityMembershipRow(Base):  # type: ignore[misc]
     __tablename__ = "entity_memberships"
-    __table_args__ = (
-        sa.Index("ix_entity_memberships_entity", "entity_type", "entity_id"),
-        sa.UniqueConstraint(
-            "virtual_scope_id", "entity_type", "entity_id", name="uq_entity_memberships_vs_entity"
-        ),
-    )
+    __table_args__ = (sa.Index("ix_entity_memberships_entity", "entity_type", "entity_id"),)
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v4()")
-    )
     virtual_scope_id: Mapped[VirtualScopeID] = mapped_column(
         "virtual_scope_id",
         GUID(VirtualScopeID),
         sa.ForeignKey("virtual_scopes.id", ondelete="CASCADE"),
-        nullable=False,
+        primary_key=True,
     )
     entity_type: Mapped[EntityType] = mapped_column(
-        "entity_type", sa.String(length=32), nullable=False
+        "entity_type", sa.String(length=32), primary_key=True
     )
-    entity_id: Mapped[str] = mapped_column("entity_id", sa.String(length=64), nullable=False)
+    entity_id: Mapped[str] = mapped_column("entity_id", sa.String(length=64), primary_key=True)
     permission_cap: Mapped[Permission | None] = mapped_column(
         "permission_cap", IntFlagType(Permission), nullable=True
     )
