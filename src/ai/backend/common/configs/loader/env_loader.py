@@ -28,5 +28,6 @@ class EnvLoader(AbstractConfigLoader):
         return cfg
 
     @property
+    @override
     def source_name(self) -> str:
         return "env"

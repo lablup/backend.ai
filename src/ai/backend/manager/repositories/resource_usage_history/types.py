@@ -6,7 +6,7 @@ import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date, datetime
-from typing import Any
+from typing import Any, override
 
 import sqlalchemy as sa
 
@@ -211,6 +211,7 @@ class DomainUsageBucketSearchScope(SearchScope):
     resource_group: str
     domain_name: str
 
+    @override
     def to_condition(self) -> QueryCondition:
         resource_group = self.resource_group
         domain_name = self.domain_name
@@ -224,6 +225,7 @@ class DomainUsageBucketSearchScope(SearchScope):
         return inner
 
     @property
+    @override
     def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
         return [
             ExistenceCheck(
@@ -247,6 +249,7 @@ class ProjectUsageBucketSearchScope(SearchScope):
     domain_name: str
     project_id: uuid.UUID
 
+    @override
     def to_condition(self) -> QueryCondition:
         resource_group = self.resource_group
         domain_name = self.domain_name
@@ -262,6 +265,7 @@ class ProjectUsageBucketSearchScope(SearchScope):
         return inner
 
     @property
+    @override
     def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
         return [
             ExistenceCheck(
@@ -291,6 +295,7 @@ class UserUsageBucketSearchScope(SearchScope):
     project_id: uuid.UUID
     user_uuid: uuid.UUID
 
+    @override
     def to_condition(self) -> QueryCondition:
         resource_group = self.resource_group
         domain_name = self.domain_name
@@ -308,6 +313,7 @@ class UserUsageBucketSearchScope(SearchScope):
         return inner
 
     @property
+    @override
     def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
         return [
             ExistenceCheck(

@@ -2,7 +2,7 @@ import asyncio
 import uuid
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Any
+from typing import Any, override
 
 import pytest
 from typeguard import TypeCheckError
@@ -39,6 +39,7 @@ async def test_aobject() -> None:
             init_count += 1
             self.x = x
 
+        @override
         async def __ainit__(self) -> None:
             await asyncio.sleep(0.01)
             nonlocal ainit_count
@@ -51,6 +52,7 @@ async def test_aobject() -> None:
             init_count += 1
             self.y = y
 
+        @override
         async def __ainit__(self) -> None:
             await super().__ainit__()
             await asyncio.sleep(0.01)

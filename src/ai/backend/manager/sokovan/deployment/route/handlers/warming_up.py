@@ -2,6 +2,7 @@
 
 import logging
 from collections.abc import Sequence
+from typing import override
 
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.logging import BraceStyleAdapter
@@ -39,18 +40,22 @@ class WarmingUpRouteHandler(RouteHandler):
         self._event_producer = event_producer
 
     @classmethod
+    @override
     def name(cls) -> str:
         return "check-warming-up-routes"
 
     @property
+    @override
     def lock_id(self) -> None:
         return None
 
     @classmethod
+    @override
     def category(cls) -> RouteHandlerCategory:
         return RouteHandlerCategory.LIFECYCLE
 
     @classmethod
+    @override
     def target_statuses(cls) -> RouteTargetStatuses:
         return RouteTargetStatuses(
             lifecycle=[RouteStatus.PROVISIONING],
@@ -58,6 +63,7 @@ class WarmingUpRouteHandler(RouteHandler):
         )
 
     @classmethod
+    @override
     def status_transitions(cls) -> RouteStatusTransitions:
         """Health probe passes → RUNNING + HEALTHY + traffic=ACTIVE.
         Failure stays WARMING_UP (retry); expired/give_up → TERMINATING.
@@ -74,10 +80,12 @@ class WarmingUpRouteHandler(RouteHandler):
             stale=None,
         )
 
+    @override
     async def execute(self, routes: Sequence[RouteData]) -> RouteExecutionResult:
         log.debug("Checking {} warming-up routes for initial health", len(routes))
         return await self._route_executor.check_warming_up_health(routes)
 
+    @override
     async def post_process(self, result: RouteExecutionResult) -> None:
         log.info(
             "Warming-up check: {} routes activated (→ running), {} still probing",

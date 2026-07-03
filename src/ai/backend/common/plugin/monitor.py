@@ -3,7 +3,7 @@ from __future__ import annotations
 import enum
 from abc import ABCMeta, abstractmethod
 from collections.abc import Mapping
-from typing import Any
+from typing import Any, override
 
 from . import AbstractPlugin, BasePluginContext
 
@@ -27,9 +27,11 @@ GAUGE = StatMetricTypes.GAUGE
 
 
 class AbstractStatReporterPlugin(AbstractPlugin, metaclass=ABCMeta):
+    @override
     async def init(self, context: Any | None = None) -> None:
         pass
 
+    @override
     async def cleanup(self) -> None:
         pass
 
@@ -44,9 +46,11 @@ class AbstractStatReporterPlugin(AbstractPlugin, metaclass=ABCMeta):
 
 
 class AbstractErrorReporterPlugin(AbstractPlugin, metaclass=ABCMeta):
+    @override
     async def init(self, context: Any | None = None) -> None:
         pass
 
+    @override
     async def cleanup(self) -> None:
         pass
 

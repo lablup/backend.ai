@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, override
 
 from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.manager.repositories.repositories import Repositories
@@ -47,10 +47,12 @@ class RepositoriesDependency(DomainDependency[RepositoriesInput, Repositories]):
     """
 
     @property
+    @override
     def stage_name(self) -> str:
         return "repositories"
 
     @asynccontextmanager
+    @override
     async def provide(self, setup_input: RepositoriesInput) -> AsyncIterator[Repositories]:
         """Initialize and provide Repositories.
 

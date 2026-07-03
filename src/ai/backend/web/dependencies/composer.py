@@ -4,6 +4,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from pathlib import Path
+from typing import override
 
 import tomli
 
@@ -51,10 +52,12 @@ class WebDependencyComposer(DependencyComposer[DependencyInput, DependencyResour
     """
 
     @property
+    @override
     def stage_name(self) -> str:
         return "web-dependencies"
 
     @asynccontextmanager
+    @override
     async def compose(
         self,
         stack: DependencyStack,

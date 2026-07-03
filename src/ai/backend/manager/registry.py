@@ -1122,10 +1122,13 @@ class AgentRegistry:
         if scaling_group:
             resource_group_name = ResourceGroupName(scaling_group)
         else:
-            resource_group_name = await self._scheduler_repository.pick_default_resource_group(
+            resource_group_id = await self._scheduler_repository.pick_default_resource_group(
                 access_key=access_key,
                 domain_name=user_scope.domain_name,
                 project_id=ProjectID(user_scope.group_id),
+            )
+            resource_group_name = await self._scheduler_repository.get_resource_group_name_by_id(
+                resource_group_id
             )
 
         draft = SessionSpecDraft(

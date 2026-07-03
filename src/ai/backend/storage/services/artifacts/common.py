@@ -55,11 +55,13 @@ class ModelVerifyStep(ImportStep[DownloadStepResult], ABC):
         self._event_producer = event_producer
 
     @property
+    @override
     def step_type(self) -> ArtifactStorageImportStep:
         return ArtifactStorageImportStep.VERIFY
 
     @property
     @abstractmethod
+    @override
     def registry_type(self) -> ArtifactRegistryType:
         """Registry type used for revision resolution"""
         raise NotImplementedAPI
@@ -200,11 +202,13 @@ class ModelArchiveStep(ImportStep[VerifyStepResult], ABC):
         self._transfer_manager = transfer_manager
 
     @property
+    @override
     def step_type(self) -> ArtifactStorageImportStep:
         return ArtifactStorageImportStep.ARCHIVE
 
     @property
     @abstractmethod
+    @override
     def registry_type(self) -> ArtifactRegistryType:
         """Registry type used for revision resolution"""
         raise NotImplementedAPI

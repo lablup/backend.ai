@@ -2,7 +2,7 @@ import logging
 import uuid
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any, cast
+from typing import Any, cast, override
 
 import aiohttp_cors
 import pyotp
@@ -252,18 +252,22 @@ class TOTPWebapp(WebappPlugin):
             self._plugin_config.token_secret, self._plugin_config.token_lifetime
         )
 
+    @override
     async def init(self, context: Any = None) -> None:
         pass
 
+    @override
     async def cleanup(self) -> None:
         pass
 
+    @override
     async def update_plugin_config(self, new_plugin_config: Mapping[str, Any]) -> None:
         self.plugin_config = new_plugin_config
         self._plugin_config = TOTPConfig(**self.plugin_config)
         self._token_parser.set_secret(self._plugin_config.token_secret)
         self._token_parser.set_lifetime(self._plugin_config.token_lifetime)
 
+    @override
     async def create_app(
         self,
         cors_options: CORSOptions,

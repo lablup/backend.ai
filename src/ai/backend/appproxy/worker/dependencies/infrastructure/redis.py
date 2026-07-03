@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
+from typing import override
 
 from ai.backend.appproxy.worker.config import ServerConfig
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
@@ -26,10 +27,12 @@ class RedisProvider(DependencyProvider[ServerConfig, WorkerValkeyClients]):
     """Provider for Redis configuration and Valkey clients."""
 
     @property
+    @override
     def stage_name(self) -> str:
         return "redis"
 
     @asynccontextmanager
+    @override
     async def provide(self, setup_input: ServerConfig) -> AsyncIterator[WorkerValkeyClients]:
         """Create and provide Valkey clients."""
         redis_profile_target = RedisProfileTarget.from_dict(setup_input.redis.to_dict())
@@ -56,6 +59,7 @@ class RedisProvider(DependencyProvider[ServerConfig, WorkerValkeyClients]):
             await valkey_live.close()
             await valkey_stat.close()
 
+    @override
     def gen_liveness_checker(self, resource: WorkerValkeyClients) -> ServiceHealthChecker:
         """Liveness — Valkey connection-stuck observed; restart recovers."""
         return ValkeyHealthChecker(

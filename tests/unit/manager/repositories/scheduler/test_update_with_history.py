@@ -34,7 +34,7 @@ from ai.backend.manager.models.resource_policy import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.scaling_group import ScalingGroupRow
+from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.scheduling_history.row import SessionSchedulingHistoryRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRow
@@ -98,6 +98,27 @@ class TestUpdateWithHistory:
             await db_sess.flush()
 
         yield domain_name
+
+    @pytest.fixture
+    async def test_scaling_group_name(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[str, None]:
+        """Create test scaling group and return its name."""
+        scaling_group_name = f"test-sg-{uuid.uuid4().hex[:8]}"
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            scaling_group = ScalingGroupRow(
+                name=scaling_group_name,
+                driver="static",
+                driver_opts={},
+                scheduler="fifo",
+                scheduler_opts=ScalingGroupOpts(),
+            )
+            db_sess.add(scaling_group)
+            await db_sess.flush()
+
+        yield scaling_group_name
 
     @pytest.fixture
     async def test_resource_policy_name(
@@ -251,6 +272,7 @@ class TestUpdateWithHistory:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_name: str,
         test_group_id: uuid.UUID,
+        test_scaling_group_name: str,
     ) -> AsyncGenerator[SessionId, None]:
         """Create test session in PREPARING status and return session ID."""
         session_id = SessionId(uuid.uuid4())
@@ -263,6 +285,7 @@ class TestUpdateWithHistory:
                 session_type=SessionTypes.INTERACTIVE,
                 domain_name=test_domain_name,
                 group_id=test_group_id,
+                scaling_group_name=test_scaling_group_name,
                 status=SessionStatus.PREPARING,
                 status_info="preparing",
                 result=SessionResult.UNDEFINED,
@@ -413,6 +436,7 @@ class TestUpdateWithHistory:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_name: str,
         test_group_id: uuid.UUID,
+        test_scaling_group_name: str,
     ) -> None:
         """Test update_with_history handles multiple sessions."""
         # Create multiple sessions
@@ -429,6 +453,7 @@ class TestUpdateWithHistory:
                     session_type=SessionTypes.INTERACTIVE,
                     domain_name=test_domain_name,
                     group_id=test_group_id,
+                    scaling_group_name=test_scaling_group_name,
                     status=SessionStatus.PREPARING,
                     status_info="preparing",
                     result=SessionResult.UNDEFINED,
@@ -901,6 +926,7 @@ class TestUpdateWithHistory:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_name: str,
         test_group_id: uuid.UUID,
+        test_scaling_group_name: str,
     ) -> None:
         """Test merge logic works correctly with multiple sessions in batch."""
         # Create multiple sessions
@@ -916,6 +942,7 @@ class TestUpdateWithHistory:
                     session_type=SessionTypes.INTERACTIVE,
                     domain_name=test_domain_name,
                     group_id=test_group_id,
+                    scaling_group_name=test_scaling_group_name,
                     status=SessionStatus.PREPARING,
                     status_info="preparing",
                     result=SessionResult.UNDEFINED,

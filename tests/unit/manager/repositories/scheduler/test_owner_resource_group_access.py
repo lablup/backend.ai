@@ -24,7 +24,7 @@ import pytest
 
 from ai.backend.common.identifier.domain import DomainName
 from ai.backend.common.identifier.project import ProjectID
-from ai.backend.common.identifier.resource_group import ResourceGroupName
+from ai.backend.common.identifier.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.identifier.session import SessionID
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.data.session.draft import (
@@ -91,7 +91,8 @@ class TestOwnerOnlyResourceGroupForDelegation:
     @pytest.fixture
     def sample_accessible_rg(self) -> AllowedScalingGroup:
         return AllowedScalingGroup(
-            name=RG_NAME,
+            id=ResourceGroupID(uuid.uuid4()),
+            name=ResourceGroupName(RG_NAME),
             is_private=False,
             scheduler_opts=ScalingGroupOpts(
                 allowed_session_types=[],
@@ -174,21 +175,13 @@ class TestOwnerOnlyResourceGroupForDelegation:
         ) as mock_query:
             if case.owner_has_access:
                 with pytest.raises(Exception) as exc_info:
-                    await db_source.fetch_session_spec_contexts(
-                        draft,
-                        storage_manager=AsyncMock(),
-                        allowed_vfolder_types=[],
-                    )
+                    await db_source.fetch_session_spec_contexts(draft)
                 assert not isinstance(exc_info.value, InvalidAPIParameters), (
                     f"RG access check must not raise when owner has access; got {exc_info.value!r}"
                 )
             else:
                 with pytest.raises(InvalidAPIParameters, match=RG_NAME):
-                    await db_source.fetch_session_spec_contexts(
-                        draft,
-                        storage_manager=AsyncMock(),
-                        allowed_vfolder_types=[],
-                    )
+                    await db_source.fetch_session_spec_contexts(draft)
 
         # Lookup MUST be scoped to the spec identity's access key — not
         # the requester's. This is the core invariant.

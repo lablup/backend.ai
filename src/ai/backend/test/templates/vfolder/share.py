@@ -16,6 +16,7 @@ from ai.backend.test.utils.exceptions import UnexpectedFailure
 
 class ShareVFolderTemplate(WrapperTestTemplate):
     @property
+    @override
     def name(self) -> str:
         return "share_vfolder"
 

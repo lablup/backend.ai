@@ -31,6 +31,7 @@ from ai.backend.test.utils.exceptions import DependencyNotSet
 
 class SessionTemplateTemplate(WrapperTestTemplate):
     @property
+    @override
     def name(self) -> str:
         return "session_template"
 
@@ -99,6 +100,7 @@ class SessionTemplateTemplate(WrapperTestTemplate):
 
 class BatchSessionFromTemplateTemplate(WrapperTestTemplate):
     @property
+    @override
     def name(self) -> str:
         return "batch_session_from_template"
 
@@ -159,6 +161,7 @@ class BatchSessionFromTemplateTemplate(WrapperTestTemplate):
 
 class InteractiveSessionFromTemplateTemplate(WrapperTestTemplate):
     @property
+    @override
     def name(self) -> str:
         return "interactive_session_from_template"
 

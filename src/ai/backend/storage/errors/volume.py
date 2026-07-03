@@ -4,6 +4,8 @@ Volume-related exceptions.
 
 from __future__ import annotations
 
+from typing import override
+
 from aiohttp import web
 
 from ai.backend.common.exception import (
@@ -21,6 +23,7 @@ class InvalidVolumeError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/storage/volume/invalid"
     error_title = "Invalid Volume"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE,
@@ -35,6 +38,7 @@ class VolumeNotInitializedError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/storage/volume/not-initialized"
     error_title = "Volume Not Initialized"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE,
@@ -49,6 +53,7 @@ class MetadataTooLargeError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/storage/volume/metadata-too-large"
     error_title = "Metadata Too Large"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE,

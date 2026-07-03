@@ -5,6 +5,7 @@ Federated Image (ImageNode) type with full field definitions for Strawberry Grap
 from __future__ import annotations
 
 from collections.abc import Iterable
+from typing import override
 
 from strawberry import ID, Info, relay
 
@@ -29,6 +30,7 @@ class Image(relay.Node):
     id: relay.NodeID[str]
 
     @classmethod
+    @override
     def resolve_nodes(
         cls,
         *,

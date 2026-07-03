@@ -1,10 +1,11 @@
 from collections.abc import Hashable
 from typing import Any as _Any
-from typing import NoReturn
+from typing import NoReturn, override
 
 from trafaret.dataerror import DataError
 
 class TrafaretMeta(type):
+    @override
     def __or__(cls, other: _Any) -> _Any: ...
     def __and__(cls, other: _Any) -> _Any: ...
     def __rshift__(cls, other: str) -> _Any: ...

@@ -18,12 +18,11 @@ from ai.backend.common.types import (
     SessionId,
     SessionTypes,
 )
-from ai.backend.manager.data.kernel.types import KernelInfo
+from ai.backend.manager.data.kernel.types import KernelInfo, KernelStatus
+from ai.backend.manager.data.network.types import NetworkType
 from ai.backend.manager.data.session.types import SessionInfo
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.errors.kernel import MainKernelNotFound, TooManyKernelsFound
-from ai.backend.manager.models.kernel import KernelStatus
-from ai.backend.manager.models.network import NetworkType
 
 from .image import ImageConfigData
 

@@ -1,5 +1,6 @@
 import logging
 import time
+from typing import override
 
 import aiohttp_jinja2
 import jwt
@@ -87,16 +88,20 @@ class BaseHTTPFrontend[TCircuitKeyType: (int, str)](BaseFrontend[HTTPBackend, TC
                 if decoded.get("id") != str(circuit.id):
                     raise InvalidCredentials("E20009: Authorization token mismatch")
 
+    @override
     async def initialize_backend(self, circuit: Circuit, routes: list[RouteInfo]) -> HTTPBackend:
         return HTTPBackend(routes, self.root_context, circuit)
 
+    @override
     async def update_backend(self, backend: HTTPBackend, routes: list[RouteInfo]) -> HTTPBackend:
         await backend.update_routes(routes)
         return backend
 
+    @override
     async def terminate_backend(self, backend: HTTPBackend) -> None:
         await backend.close()
 
+    @override
     async def list_inactive_circuits(self, threshold: int) -> list[Circuit]:
         now = time.time()
         return [

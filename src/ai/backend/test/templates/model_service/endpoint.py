@@ -131,6 +131,7 @@ class _BaseEndpointTemplate(WrapperTestTemplate):
 
 class EndpointTemplate(_BaseEndpointTemplate):
     @property
+    @override
     def name(self) -> str:
         return "endpoint_template"
 
@@ -141,6 +142,7 @@ class EndpointTemplate(_BaseEndpointTemplate):
 
 class PublicEndpointTemplate(_BaseEndpointTemplate):
     @property
+    @override
     def name(self) -> str:
         return "public_endpoint_template"
 
@@ -151,6 +153,7 @@ class PublicEndpointTemplate(_BaseEndpointTemplate):
 
 class CustomGroupEndpointTemplate(_BaseEndpointTemplate):
     @property
+    @override
     def name(self) -> str:
         return "custom_group_endpoint_template"
 

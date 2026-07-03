@@ -2,7 +2,7 @@ import json
 import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Any, Self
+from typing import Any, Self, override
 
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.json import dump_json_str
@@ -74,20 +74,24 @@ class RedisServiceDiscovery(ServiceDiscovery):
 
         return ServiceMetadata.from_dict(result)
 
+    @override
     async def register(self, service_meta: ServiceMetadata) -> None:
         key = self._service_prefix(service_meta.service_group, service_meta.id)
         await self._hsetex(key, service_meta.to_dict())
 
+    @override
     async def unregister(self, service_group: str, service_id: uuid.UUID) -> None:
         """Unregister a service using ValkeyLiveClient."""
         key = self._service_prefix(service_group, service_id)
         await self._valkey_client.delete_key(key)
 
+    @override
     async def heartbeat(self, service_meta: ServiceMetadata) -> None:
         service_meta.health_status.update_heartbeat()
         key = self._service_prefix(service_meta.service_group, service_meta.id)
         await self._hsetex(key, service_meta.to_dict())
 
+    @override
     async def discover(self) -> Sequence[ServiceMetadata]:
         pattern = f"{self._prefix}.*.*"
         keys = await self._scan_keys(pattern)
@@ -95,6 +99,7 @@ class RedisServiceDiscovery(ServiceDiscovery):
             raise ValueError("No service groups found.")
         return [await self._hget_json(key) for key in keys]
 
+    @override
     async def get_service_group(self, service_group: str) -> Sequence[ServiceMetadata]:
         pattern = f"{self._service_group_prefix(service_group)}.*"
         keys = await self._scan_keys(pattern)
@@ -102,10 +107,12 @@ class RedisServiceDiscovery(ServiceDiscovery):
             raise ValueError(f"No services found in group {service_group}.")
         return [await self._hget_json(key) for key in keys]
 
+    @override
     async def get_service(self, service_group: str, service_id: uuid.UUID) -> ServiceMetadata:
         key = self._service_prefix(service_group, service_id)
         return await self._hget_json(key)
 
+    @override
     async def sync_model_service_routes(
         self,
         routes: Sequence[ModelServiceMetadata],

@@ -8,6 +8,7 @@ from typing import (
     Self,
     TypeVar,
     cast,
+    override,
 )
 
 import sqlalchemy as sa
@@ -55,11 +56,13 @@ class GUID[UUID_SubType: uuid.UUID](TypeDecorator[uuid.UUID]):
     uuid_subtype_func: ClassVar[Callable[[Any], Any]] = lambda v: v
     cache_ok = True
 
+    @override
     def load_dialect_impl(self, dialect: Dialect) -> TypeDecorator[Any]:
         if dialect.name == "postgresql":
             return cast(TypeDecorator[Any], dialect.type_descriptor(UUID()))
         return cast(TypeDecorator[Any], dialect.type_descriptor(CHAR(16)))
 
+    @override
     def process_bind_param(
         self, value: UUID_SubType | uuid.UUID | None, dialect: Dialect
     ) -> str | bytes | None:
@@ -73,6 +76,7 @@ class GUID[UUID_SubType: uuid.UUID](TypeDecorator[uuid.UUID]):
             return str(value)
         return value.bytes
 
+    @override
     def process_result_value(self, value: Any, dialect: Dialect) -> UUID_SubType | None:
         if value is None:
             return value
@@ -100,6 +104,7 @@ class StrEnumType[T_StrEnum: enum.Enum](TypeDecorator[str]):
         super().__init__(length=64, **opts)
         self._enum_cls = enum_cls
 
+    @override
     def process_bind_param(  # type: ignore[override]
         self,
         value: T_StrEnum | None,
@@ -107,6 +112,7 @@ class StrEnumType[T_StrEnum: enum.Enum](TypeDecorator[str]):
     ) -> str | None:
         return value.value if value is not None else None
 
+    @override
     def process_result_value(  # type: ignore[override]
         self,
         value: Any | None,
@@ -114,10 +120,12 @@ class StrEnumType[T_StrEnum: enum.Enum](TypeDecorator[str]):
     ) -> T_StrEnum | None:
         return self._enum_cls(value) if value is not None else None
 
+    @override
     def copy(self, **kw: Any) -> Self:
         return StrEnumType(self._enum_cls, **self._opts)  # type: ignore[return-value]
 
     @property
+    @override
     def python_type(self) -> type[T_StrEnum]:
         return self._enum_cls
 
@@ -125,6 +133,7 @@ class StrEnumType[T_StrEnum: enum.Enum](TypeDecorator[str]):
 class PasswordColumn(TypeDecorator[str]):
     impl = VARCHAR
 
+    @override
     def process_bind_param(self, value: Any, dialect: Dialect) -> str:
         return hash_password(value)
 

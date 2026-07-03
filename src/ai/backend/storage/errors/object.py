@@ -4,6 +4,8 @@ Object storage and artifact-related exceptions.
 
 from __future__ import annotations
 
+from typing import override
+
 from aiohttp import web
 
 from ai.backend.common.exception import (
@@ -23,6 +25,7 @@ class FileStreamUploadError(ProcessExecutionError):
     error_type = "https://api.backend.ai/probs/storage/file-stream-upload-failed"
     error_title = "Failed to upload file stream"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.OBJECT_STORAGE,
@@ -37,6 +40,7 @@ class FileStreamDownloadError(ProcessExecutionError):
     error_type = "https://api.backend.ai/probs/storage/file-stream-download-failed"
     error_title = "Failed to download file stream"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.OBJECT_STORAGE,
@@ -51,6 +55,7 @@ class PresignedUploadURLGenerationError(ProcessExecutionError):
     error_type = "https://api.backend.ai/probs/storage/presigned-upload-url-generation-failed"
     error_title = "Failed to generate presigned upload URL"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.OBJECT_STORAGE,
@@ -65,6 +70,7 @@ class PresignedDownloadURLGenerationError(ProcessExecutionError):
     error_type = "https://api.backend.ai/probs/storage/presigned-download-url-generation-failed"
     error_title = "Failed to generate presigned download URL"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.OBJECT_STORAGE,
@@ -79,6 +85,7 @@ class ObjectInfoFetchError(ProcessExecutionError):
     error_type = "https://api.backend.ai/probs/storage/object-info-fetch-failed"
     error_title = "Failed to fetch object info"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.OBJECT_STORAGE,
@@ -93,6 +100,7 @@ class ObjectStorageBucketNotFoundError(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/storage/bucket/object-not-found"
     error_title = "Storage Bucket Not Found"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.OBJECT_STORAGE,
@@ -107,6 +115,7 @@ class StorageBucketFileNotFoundError(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/storage/bucket/file/object-not-found"
     error_title = "Storage Bucket File Not Found"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.OBJECT_STORAGE,
@@ -121,6 +130,7 @@ class ObjectStorageConfigInvalidError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/storage/object/config/invalid"
     error_title = "Object Storage Config Invalid"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.OBJECT_STORAGE,
@@ -135,6 +145,7 @@ class ReservoirStorageConfigInvalidError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/storage/reservoir/config/invalid"
     error_title = "Reservoir Storage Config Invalid"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.VFS_STORAGE,
@@ -149,6 +160,7 @@ class ObjectStorageObjectDeletionError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/storage/object/deletion/failed"
     error_title = "Object Deletion Failed"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.OBJECT_STORAGE,
@@ -166,6 +178,7 @@ class RegistryNotFoundError(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/registries/registry-not-found"
     error_title = "Registry Not Found"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.ARTIFACT_REGISTRY,
@@ -180,6 +193,7 @@ class HuggingFaceAPIError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/registries/huggingface/api-error"
     error_title = "HuggingFace API Error"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.ARTIFACT_REGISTRY,
@@ -194,6 +208,7 @@ class HuggingFaceModelNotFoundError(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/registries/huggingface/model-not-found"
     error_title = "HuggingFace Model Not Found"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.ARTIFACT,
@@ -208,6 +223,7 @@ class ArtifactStorageEmptyError(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/storage/artifact/config/invalid"
     error_title = "Artifact Storage Empty"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.ARTIFACT,
@@ -222,6 +238,7 @@ class ArtifactRevisionEmptyError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/storage/artifact/revision/empty"
     error_title = "Artifact Revision Empty"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.ARTIFACT,
@@ -236,6 +253,7 @@ class ArtifactImportError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/storage/artifact/import/failed"
     error_title = "Artifact Import Failed"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.ARTIFACT,
@@ -250,6 +268,7 @@ class ArtifactVerifyStorageTypeInvalid(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/storage/artifact/verify/storage-type/invalid"
     error_title = "Artifact Verify Storage Type Invalid"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.ARTIFACT,
@@ -264,6 +283,7 @@ class ArtifactVerificationFailedError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/storage/artifact/verification/failed"
     error_title = "Artifact Verification Failed"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.ARTIFACT,
@@ -278,6 +298,7 @@ class UnsupportedFileTypeError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/storage/unsupported-file-type"
     error_title = "Unsupported File Type"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.VFS_STORAGE,

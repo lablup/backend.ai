@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from datetime import datetime
 from enum import StrEnum
-from typing import Any, Self, cast
+from typing import Any, Self, cast, override
 from uuid import UUID
 
 from strawberry import Info
@@ -33,7 +33,6 @@ from ai.backend.common.dto.manager.v2.app_config_definition.response import (
     PurgeAppConfigDefinitionPayload as PurgeAppConfigDefinitionPayloadDTO,
 )
 from ai.backend.common.identifier.app_config_definition import AppConfigDefinitionID
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection, StringFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -70,7 +69,7 @@ __all__ = (
 
 @gql_node_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.7.0",
         description="A registered app config.",
     ),
     name="AppConfigDefinition",
@@ -84,6 +83,7 @@ class AppConfigDefinitionGQL(PydanticNodeMixin[AppConfigDefinitionNode]):
     updated_at: datetime = gql_field(description="Last update timestamp (UTC).")
 
     @classmethod
+    @override
     async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
         cls,
         *,
@@ -102,7 +102,7 @@ AppConfigDefinitionEdge = Edge[AppConfigDefinitionGQL]
 
 @gql_connection_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.7.0",
         description="Paginated connection for app config definition records.",
     ),
 )
@@ -124,7 +124,7 @@ class AppConfigDefinitionConnection(Connection[AppConfigDefinitionGQL]):
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Filter input for querying app config definitions.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.7.0",
     ),
     name="AppConfigDefinitionFilter",
 )
@@ -137,28 +137,22 @@ class AppConfigDefinitionFilterGQL(PydanticInputMixin[AppConfigDefinitionFilterD
         description="Filter by last update datetime.", default=None
     )
     AND: list[Self] | None = gql_added_field(
-        BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION, description="Match all of the given sub-filters."
-        ),
+        BackendAIGQLMeta(added_version="26.7.0", description="Match all of the given sub-filters."),
         default=None,
     )
     OR: list[Self] | None = gql_added_field(
-        BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION, description="Match any of the given sub-filters."
-        ),
+        BackendAIGQLMeta(added_version="26.7.0", description="Match any of the given sub-filters."),
         default=None,
     )
     NOT: list[Self] | None = gql_added_field(
-        BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION, description="Negate the given sub-filters."
-        ),
+        BackendAIGQLMeta(added_version="26.7.0", description="Negate the given sub-filters."),
         default=None,
     )
 
 
 @gql_enum(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.7.0",
         description="Fields available for ordering app config definition results.",
     ),
     name="AppConfigDefinitionOrderField",
@@ -172,7 +166,7 @@ class AppConfigDefinitionOrderFieldGQL(StrEnum):
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Specifies ordering for app config definition results.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.7.0",
     ),
     name="AppConfigDefinitionOrderBy",
 )
@@ -189,7 +183,7 @@ class AppConfigDefinitionOrderByGQL(PydanticInputMixin[AppConfigDefinitionOrderD
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Input for registering a new app config definition.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.7.0",
     ),
     name="CreateAppConfigDefinitionInput",
 )
@@ -200,7 +194,7 @@ class CreateAppConfigDefinitionInputGQL(PydanticInputMixin[CreateAppConfigDefini
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Input for purging an app config definition.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.7.0",
     ),
     name="PurgeAppConfigDefinitionInput",
 )
@@ -210,7 +204,7 @@ class PurgeAppConfigDefinitionInputGQL(PydanticInputMixin[PurgeAppConfigDefiniti
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.7.0",
         description="Payload for app config definition creation.",
     ),
     model=CreateAppConfigDefinitionPayloadDTO,
@@ -224,7 +218,7 @@ class CreateAppConfigDefinitionPayloadGQL(PydanticOutputMixin[CreateAppConfigDef
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.7.0",
         description="Payload for app config definition purge.",
     ),
     model=PurgeAppConfigDefinitionPayloadDTO,

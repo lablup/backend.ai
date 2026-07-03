@@ -176,6 +176,7 @@ class DomainModel(RBACModel[DomainPermission]):
     _permissions: frozenset[DomainPermission] = field(default_factory=frozenset)
 
     @property
+    @override
     def permissions(self) -> Container[DomainPermission]:
         return self._permissions
 
@@ -282,12 +283,14 @@ class DomainPermissionContext(AbstractPermissionContext[DomainPermission, Domain
             )
         return cond
 
+    @override
     async def build_query(self) -> sa.sql.Select[Any] | None:
         cond = self.query_condition
         if cond is None:
             return None
         return sa.select(DomainRow).where(cond)
 
+    @override
     async def calculate_final_permission(self, rbac_obj: DomainRow) -> frozenset[DomainPermission]:
         domain_row = rbac_obj
         domain_name = domain_row.name

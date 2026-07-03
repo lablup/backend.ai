@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
+from typing import override
 
 import sqlalchemy as sa
 
@@ -30,6 +31,7 @@ class DomainSearchScope(SearchScope):
     resource_group: str
     """Required. The scaling group (resource group) to search within."""
 
+    @override
     def to_condition(self) -> QueryCondition:
         """Convert scope to a query condition for ScalingGroupForDomainRow."""
         resource_group = self.resource_group
@@ -40,6 +42,7 @@ class DomainSearchScope(SearchScope):
         return inner
 
     @property
+    @override
     def existence_checks(self) -> Sequence[ExistenceCheck[str]]:
         """Return existence checks for scope validation."""
         return [

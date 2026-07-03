@@ -281,6 +281,9 @@ split-on-trailing-comma = true
 "src/ai/backend/logging/utils.py" = ["PLC0415"]
 # - Test files may use print for debugging, have flexible type annotations, and unused fixtures
 "tests/**/*.py" = ["T20", "ANN", "S101", "ARG", "PTH", "ASYNC"]
+# domain_factory imports the domains table lazily to avoid registering DomainRow
+# on the global SQLAlchemy registry for tests that never use a domain.
+"tests/unit/manager/conftest.py" = ["PLC0415"]
 "src/ai/backend/test/**/*.py" = ["T20", "ANN", "S101", "ARG", "PTH", "ASYNC"]
 # - GraphQL legacy and modern resolvers may have unused parameters for GraphQL interface compatibility
 "src/ai/backend/manager/api/gql_legacy/**/*.py" = ["ARG"]
@@ -331,7 +334,7 @@ namespace_packages = true
 explicit_package_bases = true
 python_executable = "dist/export/python/virtualenvs/python-default/3.13.7/bin/python"
 disable_error_code = ["typeddict-unknown-key", "import-untyped"]
-enable_error_code = ["possibly-undefined"]
+enable_error_code = ["possibly-undefined", "explicit-override"]
 warn_unreachable = true
 
 # Disable errors in client CLI, web server, and tests
@@ -373,6 +376,10 @@ module = [
     "tools.build-macros",
 ]
 ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = "ai.backend.client.cli.pretty"
+disable_error_code = ["explicit-override"]
 
 [tool.pyright]
 pythonVersion = "3.13"

@@ -10,21 +10,36 @@ import sqlalchemy as sa
 from tabulate import tabulate
 
 from ai.backend.common.arch import CURRENT_ARCH
+from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.docker import validate_image_labels
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import ImageAlias, ImageID
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.container_registry.harbor import HarborRegistry_v2
 from ai.backend.manager.data.image.types import ImageStatus
+from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.image import ImageAliasRow, ImageIdentifier, ImageRow
-from ai.backend.manager.models.image import rescan_images as rescan_images_func
 from ai.backend.manager.models.utils import connect_database
+from ai.backend.manager.repositories.image.db_source.db_source import ImageDBSource
 
 from .context import CLIContext, redis_ctx
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
+def _register_image_cli_orm_cluster() -> None:
+    """Register ORM rows reachable only via string relationships so the CLI can configure mappers (kept minimal, not all models)."""
+    from ai.backend.manager.models.agent.row import AgentRow
+    from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+        AssociationScopesEntitiesRow,
+    )
+    from ai.backend.manager.models.scaling_group.row import ScalingGroupForProjectRow
+
+    _ = (AgentRow, AssociationScopesEntitiesRow, ScalingGroupForProjectRow)
+
+
 async def list_images(cli_ctx: CLIContext, short: bool, installed_only: bool) -> None:
+    _register_image_cli_orm_cluster()
     # Connect to postgreSQL DB
     bootstrap_config = await cli_ctx.get_bootstrap_config()
     async with (
@@ -77,6 +92,7 @@ async def list_images(cli_ctx: CLIContext, short: bool, installed_only: bool) ->
 
 
 async def inspect_image(cli_ctx: CLIContext, canonical_or_alias: str, architecture: str) -> None:
+    _register_image_cli_orm_cluster()
     bootstrap_config = await cli_ctx.get_bootstrap_config()
     async with (
         connect_database(bootstrap_config.db) as db,
@@ -98,6 +114,7 @@ async def inspect_image(cli_ctx: CLIContext, canonical_or_alias: str, architectu
 
 
 async def forget_image(cli_ctx: CLIContext, canonical_or_alias: str, architecture: str) -> None:
+    _register_image_cli_orm_cluster()
     bootstrap_config = await cli_ctx.get_bootstrap_config()
     async with (
         connect_database(bootstrap_config.db) as db,
@@ -121,6 +138,7 @@ async def forget_image(cli_ctx: CLIContext, canonical_or_alias: str, architectur
 async def purge_image(
     cli_ctx: CLIContext, canonical_or_alias: str, architecture: str, remove_from_registry: bool
 ) -> None:
+    _register_image_cli_orm_cluster()
     bootstrap_config = await cli_ctx.get_bootstrap_config()
     async with (
         connect_database(bootstrap_config.db) as db,
@@ -138,7 +156,15 @@ async def purge_image(
             await session.delete(image_row)
 
             if remove_from_registry:
-                await image_row.untag_image_from_registry(db=db, session=session)
+                registry_info = await session.get(ContainerRegistryRow, image_row.registry_id)
+                if registry_info is None:
+                    raise click.ClickException(f"Registry not found for image {image_row.name}")
+                if registry_info.type != ContainerRegistryType.HARBOR2:
+                    raise click.ClickException(
+                        "Untagging from the registry is only supported for Harbor v2 registries"
+                    )
+                scanner = HarborRegistry_v2(db, image_row.image_ref.registry, registry_info)
+                await scanner.untag(image_row.image_ref)
 
         except UnknownImageReference:
             log.exception("Image not found.")
@@ -153,6 +179,7 @@ async def set_image_resource_limit(
     range_value: tuple[Decimal | None, Decimal | None],
     architecture: str,
 ) -> None:
+    _register_image_cli_orm_cluster()
     bootstrap_config = await cli_ctx.get_bootstrap_config()
     async with (
         connect_database(bootstrap_config.db) as db,
@@ -178,20 +205,13 @@ async def rescan_images(
 ) -> None:
     if not registry_or_image:
         raise click.BadArgumentUsage("Please specify a valid registry or full image name.")
-    # Import AssociationScopesEntitiesRow to register it with the ORM metadata.
-    # Without this, the CLI rescan path doesn't load this table via the normal
-    # server bootstrap, causing SA to skip it during ORM queries.
-    from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-        AssociationScopesEntitiesRow,
-    )
-
-    _ = AssociationScopesEntitiesRow
+    _register_image_cli_orm_cluster()
     bootstrap_config = await cli_ctx.get_bootstrap_config()
     async with (
         connect_database(bootstrap_config.db) as db,
     ):
         try:
-            result = await rescan_images_func(db, registry_or_image, project)
+            result = await ImageDBSource(db).rescan_images(registry_or_image, project)
             for error in result.errors:
                 log.error(f"Failed to scan registries: {error}")
         except Exception as e:
@@ -199,6 +219,7 @@ async def rescan_images(
 
 
 async def alias(cli_ctx: CLIContext, alias: str, target: str, architecture: str) -> None:
+    _register_image_cli_orm_cluster()
     bootstrap_config = await cli_ctx.get_bootstrap_config()
     async with (
         connect_database(bootstrap_config.db) as db,
@@ -219,6 +240,7 @@ async def alias(cli_ctx: CLIContext, alias: str, target: str, architecture: str)
 
 
 async def dealias(cli_ctx: CLIContext, alias: str) -> None:
+    _register_image_cli_orm_cluster()
     bootstrap_config = await cli_ctx.get_bootstrap_config()
     async with (
         connect_database(bootstrap_config.db) as db,
@@ -234,6 +256,7 @@ async def dealias(cli_ctx: CLIContext, alias: str) -> None:
 
 
 async def validate_image_alias(cli_ctx: CLIContext, alias: str) -> None:
+    _register_image_cli_orm_cluster()
     bootstrap_config = await cli_ctx.get_bootstrap_config()
     async with (
         connect_database(bootstrap_config.db) as db,
@@ -262,6 +285,7 @@ def _resolve_architecture(current: bool, architecture: str | None) -> str:
 async def validate_image_canonical(
     cli_ctx: CLIContext, canonical: str, current: bool, architecture: str | None = None
 ) -> None:
+    _register_image_cli_orm_cluster()
     bootstrap_config = await cli_ctx.get_bootstrap_config()
     async with (
         connect_database(bootstrap_config.db) as db,

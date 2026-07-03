@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import override
+
 from ai.backend.manager.data.deployment.types import ReplicaGroupHandlerCategory
 from ai.backend.manager.models.replica_group.conditions import ReplicaGroupConditions
 from ai.backend.manager.repositories.base import BatchQuerier, NoPagination
@@ -26,6 +28,7 @@ class GroupLifecycleSource(
     def __init__(self, replica_group_repository: ReplicaGroupRepository) -> None:
         self._replica_group_repository = replica_group_repository
 
+    @override
     async def fetch_reconcile_info(
         self,
         category: ReplicaGroupHandlerCategory,
@@ -59,6 +62,7 @@ class GroupAutoscaleSource(
     def __init__(self, replica_group_repository: ReplicaGroupRepository) -> None:
         self._replica_group_repository = replica_group_repository
 
+    @override
     async def fetch_reconcile_info(
         self,
         category: ReplicaGroupHandlerCategory,

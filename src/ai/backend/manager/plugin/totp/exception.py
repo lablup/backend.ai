@@ -1,3 +1,5 @@
+from typing import override
+
 from aiohttp import web
 
 from ai.backend.common.exception import (
@@ -14,6 +16,7 @@ class ExpiredToken(BackendAIError, web.HTTPBadRequest):
     error_title = "Expired Token"
 
     @classmethod
+    @override
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.API,
@@ -27,6 +30,7 @@ class InvalidToken(BackendAIError, web.HTTPBadRequest):
     error_title = "Invalid Token"
 
     @classmethod
+    @override
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.API,
@@ -40,6 +44,7 @@ class AuthorizationFailed(BackendAIError, web.HTTPUnauthorized):
     error_title = "TOTP authorization failed"
 
     @classmethod
+    @override
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.USER,

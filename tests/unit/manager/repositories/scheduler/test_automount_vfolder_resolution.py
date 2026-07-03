@@ -1,8 +1,8 @@
 """Regression test for auto-mount (dot-prefixed) vfolder resolution.
 
-Exercised through ``SchedulerRepository.fetch_session_spec_contexts`` (the
-repository-layer entry point the scheduling controller calls) against a real
-test database.
+Exercised through ``SchedulerRepository.resolve_vfolder_mounts_by_role`` (the
+repository-layer entry point the scheduling controller calls for vfolder mount
+resolution) against a real test database.
 
 Reproduces the 26.4.4rc6 regression where the underlying db_source
 short-circuited a kernel group with no explicit mount requests::
@@ -294,8 +294,8 @@ class TestAutoMountVFolderResolution:
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> SchedulerRepository:
         """A real repository over the test DB. The cache client and config
-        provider are unused by ``fetch_session_spec_contexts`` (DB-only path),
-        so they are mocked.
+        provider are unused by ``resolve_vfolder_mounts_by_role``, so they are
+        mocked.
         """
         return SchedulerRepository(
             db_with_cleanup,
@@ -330,7 +330,7 @@ class TestAutoMountVFolderResolution:
             ),
         )
 
-        result = await scheduler_repository.fetch_session_spec_contexts(
+        result = await scheduler_repository.resolve_vfolder_mounts_by_role(
             draft,
             storage_manager=mock_storage_manager,
             allowed_vfolder_types=["user"],
@@ -338,11 +338,11 @@ class TestAutoMountVFolderResolution:
 
         # The "main" role must carry the auto-mount vfolder even though the
         # group requested no mounts explicitly.
-        assert "main" in result.vfolder_mounts_by_role
-        mounted_names = {mount.name for mount in result.vfolder_mounts_by_role["main"]}
+        assert "main" in result
+        mounted_names = {mount.name for mount in result["main"]}
         assert AUTOMOUNT_VFOLDER_NAME in mounted_names, (
             f"auto-mount vfolder {AUTOMOUNT_VFOLDER_NAME!r} must be resolved for a group "
             f"with no explicit mounts; got {mounted_names!r}"
         )
-        mounted_ids = {mount.vfid.folder_id for mount in result.vfolder_mounts_by_role["main"]}
+        mounted_ids = {mount.vfid.folder_id for mount in result["main"]}
         assert automount_vfolder_id in mounted_ids

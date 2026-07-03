@@ -14,6 +14,7 @@ from typing import (
     ParamSpec,
     TypeVar,
     overload,
+    override,
 )
 
 import sqlalchemy as sa
@@ -131,6 +132,7 @@ class ExtendedAsyncSAEngine(SAEngine):
                 self._readonly_txn_count -= 1
 
     @actxmgr
+    @override
     async def begin(self, bind: SAConnection | None = None) -> AsyncIterator[SAConnection]:
         if bind is None:
             async with self.connect() as _bind, self._begin(_bind) as conn:

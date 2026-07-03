@@ -15,6 +15,7 @@ from typing import (
     Any,
     TypeVar,
     cast,
+    override,
 )
 from uuid import UUID
 
@@ -314,6 +315,7 @@ class BackendAIAccessLogger(AccessLogger):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
 
+    @override
     def log(self, request: web.BaseRequest, response: web.StreamResponse, time: float) -> None:
         if request.get("do_not_print_access_log"):
             return

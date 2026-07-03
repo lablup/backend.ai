@@ -4,7 +4,7 @@ Repository layer exceptions.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, override
 
 from aiohttp import web
 
@@ -23,6 +23,7 @@ class RepositoryError(BackendAIError):
     error_type = "https://api.backend.ai/probs/repository-error"
     error_title = "Repository operation failed."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.BACKENDAI,
@@ -37,6 +38,7 @@ class UpsertEmptyResultError(RepositoryError):
     error_type = "https://api.backend.ai/probs/upsert-empty-result"
     error_title = "Upsert operation did not return any row."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.DATABASE,
@@ -51,6 +53,7 @@ class UnsupportedCompositePrimaryKeyError(RepositoryError):
     error_type = "https://api.backend.ai/probs/unsupported-composite-pk"
     error_title = "Unsupported composite primary key."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.DATABASE,
@@ -70,6 +73,7 @@ class EmptySearchScopeError(RepositoryError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/empty-search-scope"
     error_title = "Search scope must not be empty."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.DATABASE,
@@ -112,6 +116,7 @@ class RepositoryIntegrityError(RepositoryError, web.HTTPConflict):
         self.detail = detail
         self.pgcode = pgcode
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.DATABASE,
@@ -126,6 +131,7 @@ class UniqueConstraintViolationError(RepositoryIntegrityError):
     error_type = "https://api.backend.ai/probs/unique-constraint-violation"
     error_title = "Unique constraint violated."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.DATABASE,
@@ -140,6 +146,7 @@ class ForeignKeyViolationError(RepositoryIntegrityError):
     error_type = "https://api.backend.ai/probs/foreign-key-violation"
     error_title = "Foreign key constraint violated."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.DATABASE,
@@ -154,6 +161,7 @@ class CheckConstraintViolationError(RepositoryIntegrityError):
     error_type = "https://api.backend.ai/probs/check-constraint-violation"
     error_title = "Check constraint violated."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.DATABASE,
@@ -172,6 +180,7 @@ class NotNullViolationError(RepositoryIntegrityError):
     error_title = "Not-null constraint violated."
     status_code = 400
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.DATABASE,
@@ -186,6 +195,7 @@ class ExclusionViolationError(RepositoryIntegrityError):
     error_type = "https://api.backend.ai/probs/exclusion-violation"
     error_title = "Exclusion constraint violated."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.DATABASE,

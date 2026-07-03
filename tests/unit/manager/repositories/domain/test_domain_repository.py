@@ -51,7 +51,7 @@ from ai.backend.manager.models.resource_policy import (
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
-from ai.backend.manager.models.scaling_group import ScalingGroupRow
+from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -336,6 +336,7 @@ class TestDomainRepository:
         user_uuid = uuid.uuid4()
         group_id = uuid.uuid4()
         session_id = uuid.uuid4()
+        sgroup_name = f"default-{uuid.uuid4().hex[:8]}"
 
         async with db_with_default_resource_policies.begin_session() as session:
             domain = DomainRow(
@@ -349,6 +350,17 @@ class TestDomainRepository:
                 integration_id="test-integration",
             )
             session.add(domain)
+
+            sgroup = ScalingGroupRow(
+                name=sgroup_name,
+                description="Test scaling group",
+                is_active=True,
+                driver="static",
+                driver_opts={},
+                scheduler="fifo",
+                scheduler_opts=ScalingGroupOpts(),
+            )
+            session.add(sgroup)
 
             group = GroupRow(
                 id=group_id,
@@ -392,6 +404,7 @@ class TestDomainRepository:
                 cluster_size=1,
                 domain_name=domain_name,
                 group_id=group_id,
+                scaling_group_name=sgroup_name,
                 user_uuid=user_uuid,
                 occupying_slots=ResourceSlot(),
                 requested_slots=ResourceSlot(),

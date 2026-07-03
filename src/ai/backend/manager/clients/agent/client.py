@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar, cast
+from typing import TYPE_CHECKING, Any, TypeVar, cast, override
 
 from pydantic import ConfigDict
 
@@ -82,6 +82,7 @@ class AgentClient(BackendAIClient):
     def agent_id(self) -> AgentId:
         return self._agent_id
 
+    @override
     async def connect(self) -> None:
         """Establish connection to the agent.
 
@@ -109,6 +110,7 @@ class AgentClient(BackendAIClient):
                 )
             raise
 
+    @override
     async def close(self) -> None:
         """Close connection to the agent.
 

@@ -12,7 +12,7 @@ future UX improvements.
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import Any, override
 
 from aiohttp import web
 
@@ -51,6 +51,7 @@ class BackendError(web.HTTPError):
         self.body_dict = body
         self.body = json.dumps(body).encode()
 
+    @override
     def __str__(self) -> str:
         lines = []
         if self.extra_msg:
@@ -61,6 +62,7 @@ class BackendError(web.HTTPError):
             lines.append(" -> extra_data: " + repr(self.extra_data))
         return "\n".join(lines)
 
+    @override
     def __repr__(self) -> str:
         lines = []
         if self.extra_msg:
@@ -73,6 +75,7 @@ class BackendError(web.HTTPError):
             lines.append(" -> extra_data: " + repr(self.extra_data))
         return "\n".join(lines)
 
+    @override
     def __reduce__(self) -> tuple[type[BackendError], tuple[Any, ...], dict[str, Any]]:
         return (
             type(self),

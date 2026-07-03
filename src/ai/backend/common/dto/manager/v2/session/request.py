@@ -22,6 +22,8 @@ from ai.backend.common.dto.manager.v2.session.types import (
     SessionOrderField,
     SessionStatusFilter,
 )
+from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 __all__ = (
     "AdminSearchSessionsInput",
@@ -300,7 +302,11 @@ class EnqueueSessionInput(BaseRequestModel):
         description="Resource slot allocations.",
     )
     resource_group: str | None = Field(
-        default=None, description="Scaling group name. Auto-selected if omitted."
+        default=None,
+        description=f"Deprecated since {NEXT_RELEASE_VERSION}. Use resource_group_id instead. Resource group name.",
+    )
+    resource_group_id: ResourceGroupID | None = Field(
+        default=None, description="Resource group UUID. Auto-selected if omitted."
     )
     resource_opts: ResourceOptsInput | None = Field(
         default=None, description="Additional resource options."

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from typing import override
 
 import pytest
 
@@ -65,6 +66,7 @@ class SimpleDependencyProvider(NonMonitorableDependencyProvider[str, str]):
     """
 
     @property
+    @override
     def stage_name(self) -> str:
         """
 
@@ -73,6 +75,7 @@ class SimpleDependencyProvider(NonMonitorableDependencyProvider[str, str]):
         return "simple"
 
     @asynccontextmanager
+    @override
     async def provide(self, setup_input: str) -> AsyncIterator[str]:
         """
 
@@ -111,10 +114,12 @@ class TestDependencyProviderConcrete:
 
         class ProviderWithCleanup(NonMonitorableDependencyProvider[str, str]):
             @property
+            @override
             def stage_name(self) -> str:
                 return "cleanup-test"
 
             @asynccontextmanager
+            @override
             async def provide(self, setup_input: str) -> AsyncIterator[str]:
                 try:
                     yield "resource"

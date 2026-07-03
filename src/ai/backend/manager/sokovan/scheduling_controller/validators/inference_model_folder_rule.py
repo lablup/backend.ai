@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import override
+
 from ai.backend.common.types import SessionTypes, VFolderUsageMode
 from ai.backend.manager.data.session.spec import SessionSpec
 from ai.backend.manager.errors.api import InvalidAPIParameters
@@ -21,9 +23,11 @@ class InferenceModelFolderRule(SessionSpecValidatorRule):
     needed.
     """
 
+    @override
     def name(self) -> str:
         return "inference_model_folder"
 
+    @override
     def validate(
         self,
         spec: SessionSpec,

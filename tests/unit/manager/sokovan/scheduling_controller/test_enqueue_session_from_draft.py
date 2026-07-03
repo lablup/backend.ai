@@ -207,7 +207,6 @@ def _fetch_bundle(image_id: ImageID) -> SessionSpecContextFetch:
         container_user_info=ContainerUserInfo(uid=1000, main_gid=1000, supplementary_gids=[]),
         image_infos={image_id: _image_info(image_id)},
         resource_group_allow_fractional=False,
-        vfolder_mounts_by_role={"main": (_vfolder_mount(),)},
         dotfile_data=DotfileBundle(),
         keypair_resource_policy=_keypair_policy(),
         known_slot_types={
@@ -274,6 +273,7 @@ class TestEnqueueSessionFromDraft:
 
         repository = AsyncMock()
         repository.fetch_session_spec_contexts.return_value = _fetch_bundle(image_id)
+        repository.resolve_vfolder_mounts_by_role.return_value = {"main": (_vfolder_mount(),)}
         repository.enqueue_session_from_spec.return_value = expected_session_id
         repository.mark_scheduling_needed = AsyncMock()
 
@@ -286,11 +286,15 @@ class TestEnqueueSessionFromDraft:
 
         assert returned_id == expected_session_id
 
-        # Repository fetch got the draft + config-sourced knobs
+        # Repository fetch got the draft
         repository.fetch_session_spec_contexts.assert_awaited_once()
-        call_kwargs = repository.fetch_session_spec_contexts.await_args.kwargs
-        assert call_kwargs["allowed_vfolder_types"] == ["user"]
         assert repository.fetch_session_spec_contexts.await_args.args[0] is draft
+
+        # Vfolder mounts resolved separately with the config-sourced knob
+        repository.resolve_vfolder_mounts_by_role.assert_awaited_once()
+        vfolder_call_kwargs = repository.resolve_vfolder_mounts_by_role.await_args.kwargs
+        assert vfolder_call_kwargs["allowed_vfolder_types"] == ["user"]
+        assert repository.resolve_vfolder_mounts_by_role.await_args.args[0] is draft
 
         # enqueue_session_from_spec got the finalized SessionSpec
         repository.enqueue_session_from_spec.assert_awaited_once()
@@ -324,6 +328,7 @@ class TestEnqueueSessionFromDraft:
     ) -> None:
         repository = AsyncMock()
         repository.fetch_session_spec_contexts.return_value = _fetch_bundle(image_id)
+        repository.resolve_vfolder_mounts_by_role.return_value = {"main": (_vfolder_mount(),)}
         repository.enqueue_session_from_spec = AsyncMock()
 
         controller, _event_producer, _hook_plugin_ctx = _build_controller(
@@ -345,6 +350,7 @@ class TestEnqueueSessionFromDraft:
     ) -> None:
         repository = AsyncMock()
         repository.fetch_session_spec_contexts.return_value = _fetch_bundle(image_id)
+        repository.resolve_vfolder_mounts_by_role.return_value = {"main": (_vfolder_mount(),)}
         repository.enqueue_session_from_spec.return_value = SessionID(uuid.uuid4())
         repository.mark_scheduling_needed = AsyncMock()
 

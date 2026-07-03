@@ -49,7 +49,7 @@ from ai.backend.manager.models.resource_slot.row import (
     ModelCardResourceRequirementRow,
     ResourceSlotTypeRow,
 )
-from ai.backend.manager.models.scaling_group import ScalingGroupRow
+from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.vfolder import VFolderRow
@@ -291,10 +291,20 @@ class TestModelCardDelete:
             )
             db_sess.add(vfolder)
             await db_sess.flush()
+            scaling_group = ScalingGroupRow(
+                name="test-sg",
+                driver="static",
+                driver_opts={},
+                scheduler="fifo",
+                scheduler_opts=ScalingGroupOpts(),
+            )
+            db_sess.add(scaling_group)
+            await db_sess.flush()
             mount_holder = SessionRow(
                 id=uuid.uuid4(),
                 domain_name=test_domain.name,
                 group_id=test_group.id,
+                scaling_group_name="test-sg",
                 user_uuid=test_user.uuid,
                 occupying_slots=ResourceSlot(),
                 requested_slots=ResourceSlot(),

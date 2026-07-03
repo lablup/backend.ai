@@ -146,21 +146,22 @@ class SchedulingController:
 
         Only input is the :class:`SessionSpecDraft` — request-envelope
         extras (sudo, model-definition overlay) ride on
-        ``draft.internal_data_extras``. Every validation-adjacent DB read
-        (image metadata, keypair policy, resource-group network,
-        container uid/gid, resolved vfolder mounts, dotfiles, active
-        session count) flows through
-        :meth:`SchedulerRepository.fetch_session_spec_contexts`.
+        ``draft.internal_data_extras``. Validation-adjacent DB reads (image
+        metadata, keypair policy, resource-group network, container uid/gid,
+        dotfiles, active session count) flow through
+        :meth:`SchedulerRepository.fetch_session_spec_contexts`; vfolder mounts
+        are resolved separately via
+        :meth:`SchedulerRepository.resolve_vfolder_mounts_by_role`.
 
         Flow:
 
-        1. Batch fetch — resolve prep / validation context bundles.
-        2. Preparer chain — draft → finalized ``SessionSpec``.
-        3. ``PRE_ENQUEUE_SESSION`` hook — rejected calls raise.
-        4. Validator chain — spec + context.
-        5. ``SchedulerRepository.enqueue_session_from_spec`` — writer tx.
-        6. Broadcast PENDING + ask the coordinator to schedule.
-        7. ``POST_ENQUEUE_SESSION`` hook notification.
+        1. Context fetch + vfolder-mount resolution + preparer chain →
+           finalized ``SessionSpec`` + validation context.
+        2. ``PRE_ENQUEUE_SESSION`` hook — rejected calls raise.
+        3. Validator chain — spec + context.
+        4. ``SchedulerRepository.enqueue_session_from_spec`` — writer tx.
+        5. Broadcast PENDING + ask the coordinator to schedule.
+        6. ``POST_ENQUEUE_SESSION`` hook notification.
         """
         rg_name = str(draft.scope.resource_group_name) if draft.scope.resource_group_name else ""
 
@@ -171,7 +172,14 @@ class SchedulingController:
         with self._metric_observer.measure_phase(
             "scheduling_controller", rg_name, "spec_fetch_contexts"
         ):
-            fetched = await self._repository.fetch_session_spec_contexts(
+            fetched = await self._repository.fetch_session_spec_contexts(draft)
+
+        # Vfolder mounts are resolved separately (storage-manager RPC / etcd),
+        # kept out of the context fetch so resource-only callers can skip them.
+        with self._metric_observer.measure_phase(
+            "scheduling_controller", rg_name, "vfolder_mount_resolution"
+        ):
+            vfolder_mounts_by_role = await self._repository.resolve_vfolder_mounts_by_role(
                 draft,
                 storage_manager=self._storage_manager,
                 allowed_vfolder_types=allowed_vfolder_types,
@@ -184,7 +192,7 @@ class SchedulingController:
             image_infos=fetched.image_infos,
             resource_group_allow_fractional=fetched.resource_group_allow_fractional,
             dotfile_data=fetched.dotfile_data,
-            vfolder_mounts_by_role=fetched.vfolder_mounts_by_role,
+            vfolder_mounts_by_role=vfolder_mounts_by_role,
         )
         val_ctx = SessionSpecValidationContext(
             keypair_resource_policy=fetched.keypair_resource_policy,

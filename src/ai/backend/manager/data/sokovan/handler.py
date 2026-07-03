@@ -13,7 +13,7 @@ from ai.backend.common.types import (
     SessionTypes,
 )
 from ai.backend.manager.data.kernel.types import KernelStatus
-from ai.backend.manager.models.session import SessionStatus
+from ai.backend.manager.data.session.types import SessionStatus
 
 
 @dataclass

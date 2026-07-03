@@ -3,6 +3,7 @@ Exceptions for the sokovan scheduler.
 """
 
 from abc import ABC, abstractmethod
+from typing import override
 
 from ai.backend.common.exception import (
     BackendAIError,
@@ -24,6 +25,7 @@ class SchedulingError(BackendAIError, ABC):
     error_type = "https://api.backend.ai/probs/scheduling-failed"
     error_title = "Scheduling failed."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.SESSION,

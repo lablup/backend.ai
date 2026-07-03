@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import Annotated, Any, Self
+from typing import Annotated, Any, Self, override
 
 from pydantic import (
     AliasChoices,
@@ -63,9 +63,11 @@ class HostPortPair(BaseConfigModel):
     host: str = Field(examples=["127.0.0.1"])
     port: int = Field(gt=0, lt=65536, examples=[8201])
 
+    @override
     def __repr__(self) -> str:
         return f"{self.host}:{self.port}"
 
+    @override
     def __str__(self) -> str:
         return self.__repr__()
 

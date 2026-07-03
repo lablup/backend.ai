@@ -8,14 +8,15 @@ with fewer unutilized capabilities.
 import sys
 from collections.abc import Sequence
 from decimal import Decimal
+from typing import override
 
 from .selector import (
     AbstractAgentSelector,
     AgentSelectionConfig,
     AgentSelectionCriteria,
     AgentStateTracker,
-    ResourceRequirements,
 )
+from .types import ResourceRequirements
 from .utils import count_unutilized_capabilities, order_slots_by_priority
 
 
@@ -31,18 +32,21 @@ class LegacyAgentSelector(AbstractAgentSelector):
     def __init__(self, agent_selection_resource_priority: list[str]) -> None:
         self.agent_selection_resource_priority = agent_selection_resource_priority
 
+    @override
     def name(self) -> str:
         """
         Return the selector name for predicates.
         """
         return "LegacyAgentSelector"
 
+    @override
     def success_message(self) -> str:
         """
         Return a message describing successful agent selection.
         """
         return "Agent selected using legacy priority-based strategy"
 
+    @override
     def select_tracker_by_strategy(
         self,
         trackers: Sequence[AgentStateTracker],

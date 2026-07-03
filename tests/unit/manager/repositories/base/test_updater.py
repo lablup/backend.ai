@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncGenerator, Callable, Sequence
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, override
 from uuid import UUID
 
 import pytest
@@ -83,9 +83,11 @@ class IntPKStatusUpdaterSpec(UpdaterSpec[UpdaterTestRowInt]):
         self._new_value = new_value
 
     @property
+    @override
     def row_class(self) -> type[UpdaterTestRowInt]:
         return UpdaterTestRowInt
 
+    @override
     def build_values(self) -> dict[str, Any]:
         values: dict[str, Any] = {"status": self._new_status}
         if self._new_value is not None:
@@ -97,9 +99,11 @@ class IntPKNoValuesUpdaterSpec(UpdaterSpec[UpdaterTestRowInt]):
     """Updater spec that produces no column changes (empty build_values)."""
 
     @property
+    @override
     def row_class(self) -> type[UpdaterTestRowInt]:
         return UpdaterTestRowInt
 
+    @override
     def build_values(self) -> dict[str, Any]:
         return {}
 
@@ -111,9 +115,11 @@ class UUIDPKStatusUpdaterSpec(UpdaterSpec[UpdaterTestRowUUID]):
         self._new_status = new_status
 
     @property
+    @override
     def row_class(self) -> type[UpdaterTestRowUUID]:
         return UpdaterTestRowUUID
 
+    @override
     def build_values(self) -> dict[str, Any]:
         return {"status": self._new_status}
 
@@ -125,9 +131,11 @@ class StrPKStatusUpdaterSpec(UpdaterSpec[UpdaterTestRowStr]):
         self._new_status = new_status
 
     @property
+    @override
     def row_class(self) -> type[UpdaterTestRowStr]:
         return UpdaterTestRowStr
 
+    @override
     def build_values(self) -> dict[str, Any]:
         return {"status": self._new_status}
 
@@ -142,9 +150,11 @@ class IntPKBatchUpdaterSpec(BatchUpdaterSpec[UpdaterTestRowInt]):
         self._new_status = new_status
 
     @property
+    @override
     def row_class(self) -> type[UpdaterTestRowInt]:
         return UpdaterTestRowInt
 
+    @override
     def build_values(self) -> dict[str, Any]:
         return {"status": self._new_status}
 
@@ -714,13 +724,16 @@ class UniqueNameUpdaterSpec(UpdaterSpec[UpdaterTestRowWithUnique]):
         self._checks = checks
 
     @property
+    @override
     def row_class(self) -> type[UpdaterTestRowWithUnique]:
         return UpdaterTestRowWithUnique
 
+    @override
     def build_values(self) -> dict[str, Any]:
         return {"name": self._new_name}
 
     @property
+    @override
     def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
         return self._checks
 
@@ -737,13 +750,16 @@ class UniqueNameBatchUpdaterSpec(BatchUpdaterSpec[UpdaterTestRowWithUnique]):
         self._checks = checks
 
     @property
+    @override
     def row_class(self) -> type[UpdaterTestRowWithUnique]:
         return UpdaterTestRowWithUnique
 
+    @override
     def build_values(self) -> dict[str, Any]:
         return {"name": self._new_name}
 
     @property
+    @override
     def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
         return self._checks
 
@@ -941,9 +957,11 @@ class _FieldUpdaterSpec(UpdaterSpec[BulkUpdaterPartialTestRow]):
         self._values = values
 
     @property
+    @override
     def row_class(self) -> type[BulkUpdaterPartialTestRow]:
         return BulkUpdaterPartialTestRow
 
+    @override
     def build_values(self) -> dict[str, Any]:
         return dict(self._values)
 

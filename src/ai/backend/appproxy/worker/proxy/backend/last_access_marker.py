@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Final
+from typing import TYPE_CHECKING, Final, override
 
 from ai.backend.common.cron import PeriodicTask
 
@@ -24,16 +24,20 @@ class LastAccessMarkerTask(PeriodicTask):
         self._route = route
 
     @property
+    @override
     def name(self) -> str:
         return "last_access_marker"
 
     @property
+    @override
     def interval(self) -> float:
         return _LAST_ACCESS_MARKER_INTERVAL
 
     @property
+    @override
     def initial_delay(self) -> float:
         return 0.0
 
+    @override
     async def run(self) -> None:
         await self._backend.mark_last_used_time(self._route)

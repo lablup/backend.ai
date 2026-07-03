@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import override
+
 from ai.backend.common.exception import (
     BackendAIError,
     ErrorCode,
@@ -17,6 +19,7 @@ class ConfigValidationError(BackendAIError):
     error_type = "https://api.backend.ai/probs/appproxy/config-validation-error"
     error_title = "Configuration validation failed."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,
@@ -31,6 +34,7 @@ class InvalidUIDTypeError(BackendAIError):
     error_type = "https://api.backend.ai/probs/appproxy/invalid-uid-type"
     error_title = "UID must be an integer or string."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,
@@ -45,6 +49,7 @@ class UserNotFoundError(BackendAIError):
     error_type = "https://api.backend.ai/probs/appproxy/user-not-found"
     error_title = "Specified user not found in system."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,
@@ -59,6 +64,7 @@ class InvalidGIDTypeError(BackendAIError):
     error_type = "https://api.backend.ai/probs/appproxy/invalid-gid-type"
     error_title = "GID must be an integer or string."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,
@@ -73,6 +79,7 @@ class GroupNotFoundError(BackendAIError):
     error_type = "https://api.backend.ai/probs/appproxy/group-not-found"
     error_title = "Specified group not found in system."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,
@@ -87,6 +94,7 @@ class MissingAnnotationError(BackendAIError):
     error_type = "https://api.backend.ai/probs/appproxy/missing-annotation"
     error_title = "Field annotation is missing."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,

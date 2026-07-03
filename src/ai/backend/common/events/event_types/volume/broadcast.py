@@ -41,6 +41,7 @@ class DoVolumeMountEvent(BaseVolumeEvent):
     edit_fstab: bool = False
     fstab_path: str = "/etc/fstab"
 
+    @override
     def serialize(self) -> tuple[Any, ...]:
         return (
             self.dir_name,
@@ -55,6 +56,7 @@ class DoVolumeMountEvent(BaseVolumeEvent):
         )
 
     @classmethod
+    @override
     def deserialize(cls, value: tuple[Any, ...]) -> Self:
         return cls(
             dir_name=value[0],
@@ -69,6 +71,7 @@ class DoVolumeMountEvent(BaseVolumeEvent):
         )
 
     @classmethod
+    @override
     def event_name(cls) -> str:
         return "do_volume_mount"
 
@@ -87,6 +90,7 @@ class DoVolumeUnmountEvent(BaseVolumeEvent):
     edit_fstab: bool = False
     fstab_path: str | None = None
 
+    @override
     def serialize(self) -> tuple[Any, ...]:
         return (
             self.dir_name,
@@ -98,6 +102,7 @@ class DoVolumeUnmountEvent(BaseVolumeEvent):
         )
 
     @classmethod
+    @override
     def deserialize(cls, value: tuple[Any, ...]) -> Self:
         return cls(
             dir_name=value[0],
@@ -109,6 +114,7 @@ class DoVolumeUnmountEvent(BaseVolumeEvent):
         )
 
     @classmethod
+    @override
     def event_name(cls) -> str:
         return "do_volume_unmount"
 
@@ -121,6 +127,7 @@ class BaseAgentVolumeMountEvent(BaseVolumeEvent):
     quota_scope_id: QuotaScopeID
     err_msg: str | None = None
 
+    @override
     def serialize(self) -> tuple[Any, ...]:
         return (
             self.node_id,
@@ -131,6 +138,7 @@ class BaseAgentVolumeMountEvent(BaseVolumeEvent):
         )
 
     @classmethod
+    @override
     def deserialize(cls, value: tuple[Any, ...]) -> Self:
         return cls(
             value[0],
@@ -143,11 +151,13 @@ class BaseAgentVolumeMountEvent(BaseVolumeEvent):
 
 class VolumeMounted(BaseAgentVolumeMountEvent):
     @classmethod
+    @override
     def event_name(cls) -> str:
         return "volume_mounted"
 
 
 class VolumeUnmounted(BaseAgentVolumeMountEvent):
     @classmethod
+    @override
     def event_name(cls) -> str:
         return "volume_unmounted"

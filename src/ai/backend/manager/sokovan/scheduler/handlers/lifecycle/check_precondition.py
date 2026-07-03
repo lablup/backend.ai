@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Sequence
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, override
 
 from ai.backend.common.types import AccessKey
 from ai.backend.logging import BraceStyleAdapter
@@ -44,21 +44,25 @@ class CheckPreconditionLifecycleHandler(SessionLifecycleHandler):
         self._repository = repository
 
     @classmethod
+    @override
     def name(cls) -> str:
         """Get the name of the handler."""
         return "check-precondition"
 
     @classmethod
+    @override
     def target_statuses(cls) -> list[SessionStatus]:
         """Sessions in SCHEDULED state."""
         return [SessionStatus.SCHEDULED]
 
     @classmethod
+    @override
     def target_kernel_statuses(cls) -> list[KernelStatus] | None:
         """Include sessions where kernels are in SCHEDULED status."""
         return [KernelStatus.SCHEDULED]
 
     @classmethod
+    @override
     def status_transitions(cls) -> StatusTransitions:
         """Define state transitions for check precondition handler (BEP-1030).
 
@@ -91,10 +95,12 @@ class CheckPreconditionLifecycleHandler(SessionLifecycleHandler):
         )
 
     @property
+    @override
     def lock_id(self) -> LockID | None:
         """Lock for operations targeting SCHEDULED sessions transitioning to PREPARING."""
         return LockID.LOCKID_SOKOVAN_TARGET_PREPARING
 
+    @override
     async def execute(
         self,
         _scaling_group: str,

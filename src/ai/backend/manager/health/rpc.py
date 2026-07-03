@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import override
 
 from aiohttp import web
 
@@ -23,6 +24,7 @@ class RpcHealthCheckError(HealthCheckError, web.HTTPServiceUnavailable):
     error_type = "https://api.backend.ai/probs/rpc-health-check-failed"
     error_title = "RPC health check failed"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.HEALTH_CHECK,
@@ -53,10 +55,12 @@ class AgentRpcHealthChecker(StaticServiceHealthChecker):
         self._timeout = timeout
 
     @property
+    @override
     def target_service_group(self) -> ServiceGroup:
         """The service group this checker monitors."""
         return AGENT
 
+    @override
     async def check_service(self) -> ServiceHealth:
         """
         Check agent RPC health by calling the health RPC method.
@@ -86,6 +90,7 @@ class AgentRpcHealthChecker(StaticServiceHealthChecker):
         return ServiceHealth(results={component_id: status})
 
     @property
+    @override
     def timeout(self) -> float:
         """The timeout for the health check in seconds."""
         return self._timeout

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import override
+
 from ai.backend.manager.data.session.spec import SessionSpec
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.models.vfolder import verify_vfolder_name
@@ -20,9 +22,11 @@ class MountNameValidationRule(SessionSpecValidatorRule):
     vfolder at the same path.
     """
 
+    @override
     def name(self) -> str:
         return "mount_name_validation"
 
+    @override
     def validate(
         self,
         spec: SessionSpec,

@@ -1,12 +1,13 @@
 import datetime
 import json
 import uuid
-from typing import Any, Protocol
+from typing import Any, Protocol, override
 
 import orjson
 
 
 class ExtendedJSONEncoder(json.JSONEncoder):
+    @override
     def default(self, o: Any) -> Any:
         if isinstance(o, uuid.UUID):
             return str(o)

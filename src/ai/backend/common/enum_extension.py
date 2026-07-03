@@ -1,16 +1,18 @@
 from __future__ import annotations
 
 import enum
-from typing import Any
+from typing import Any, override
 
 __all__ = ("StringSetFlag",)
 
 
 class StringSetFlag(enum.StrEnum):
+    @override
     def __eq__(self, other: Any) -> bool:
         result: bool = self.value == other
         return result
 
+    @override
     def __hash__(self) -> int:
         return hash(self.value)
 
@@ -51,5 +53,6 @@ class StringSetFlag(enum.StrEnum):
             return other
         raise TypeError
 
+    @override
     def __str__(self) -> str:
         return self.value

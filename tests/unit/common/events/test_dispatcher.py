@@ -4,7 +4,7 @@ import asyncio
 import base64
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, override
 
 import msgpack
 import pytest
@@ -27,24 +27,30 @@ from ai.backend.common.types import AgentId
 class DummyAnycastEvent(AbstractAnycastEvent):
     value: int
 
+    @override
     def serialize(self) -> tuple[Any, ...]:
         return (self.value,)
 
     @classmethod
+    @override
     def deserialize(cls, value: tuple[Any, ...]) -> DummyAnycastEvent:
         return cls(value[0])
 
     @classmethod
+    @override
     def event_domain(cls) -> EventDomain:
         return EventDomain.AGENT
 
+    @override
     def domain_id(self) -> str | None:
         return None
 
+    @override
     def user_event(self) -> UserEvent | None:
         return None
 
     @classmethod
+    @override
     def event_name(cls) -> str:
         return "test_anycast"
 
@@ -53,24 +59,30 @@ class DummyAnycastEvent(AbstractAnycastEvent):
 class DummyBroadcastEvent(AbstractBroadcastEvent):
     value: int
 
+    @override
     def serialize(self) -> tuple[Any, ...]:
         return (self.value,)
 
     @classmethod
+    @override
     def deserialize(cls, value: tuple[Any, ...]) -> DummyBroadcastEvent:
         return cls(value[0])
 
     @classmethod
+    @override
     def event_domain(cls) -> EventDomain:
         return EventDomain.AGENT
 
+    @override
     def domain_id(self) -> str | None:
         return None
 
+    @override
     def user_event(self) -> UserEvent | None:
         return None
 
     @classmethod
+    @override
     def event_name(cls) -> str:
         return "test_broadcast"
 

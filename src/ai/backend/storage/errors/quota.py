@@ -4,6 +4,8 @@ Quota-related exceptions.
 
 from __future__ import annotations
 
+from typing import override
+
 from aiohttp import web
 
 from ai.backend.common.exception import (
@@ -21,6 +23,7 @@ class QuotaDirectoryNotEmptyError(BackendAIError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/storage/quota-directory-not-empty"
     error_title = "Quota Directory Not Empty"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.QUOTA_SCOPE,
@@ -35,6 +38,7 @@ class QuotaScopeNotFoundError(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/storage/quota/scope/not-found"
     error_title = "Quota Scope Not Found"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.QUOTA_SCOPE,
@@ -49,6 +53,7 @@ class QuotaScopeAlreadyExists(BackendAIError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/storage/quota/scope/already-exists"
     error_title = "Quota Scope Already Exists"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.QUOTA_SCOPE,
@@ -63,6 +68,7 @@ class InvalidQuotaConfig(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/storage/quota/config/invalid"
     error_title = "Invalid Quota Config"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.QUOTA_SCOPE,
@@ -77,6 +83,7 @@ class InvalidQuotaScopeError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/storage/quota/scope/invalid"
     error_title = "Invalid Quota Scope"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.QUOTA_SCOPE,
@@ -91,6 +98,7 @@ class InvalidQuotaFormatError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/storage/quota/format/invalid"
     error_title = "Invalid Quota Format"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.QUOTA_SCOPE,
@@ -105,6 +113,7 @@ class QuotaScopeCreationFailedError(BackendAIError, web.HTTPInternalServerError)
     error_type = "https://api.backend.ai/probs/storage/quota/scope/creation-failed"
     error_title = "Quota Scope Creation Failed"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.QUOTA_SCOPE,
@@ -119,6 +128,7 @@ class QuotaTreeNotFoundError(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/storage/quota/tree/not-found"
     error_title = "Quota Tree Not Found"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.QUOTA_SCOPE,

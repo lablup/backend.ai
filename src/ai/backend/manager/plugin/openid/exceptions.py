@@ -1,3 +1,5 @@
+from typing import override
+
 from aiohttp import web
 
 from ai.backend.common.exception import (
@@ -14,6 +16,7 @@ class InvalidSession(BackendAIError, web.HTTPUnauthorized):
     error_title = "The OpenID session is invalid or has expired."
 
     @classmethod
+    @override
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.USER,

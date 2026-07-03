@@ -9,6 +9,7 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from typing import override
 
 from ai.backend.common.types import (
     AgentId,
@@ -72,6 +73,7 @@ class RunningTransitionHook(StatusTransitionHook):
     def __init__(self, deps: RunningHookDependencies) -> None:
         self._deps = deps
 
+    @override
     async def execute(self, session: SessionWithKernels) -> None:
         """Execute RUNNING transition hook.
 
@@ -149,6 +151,7 @@ class TerminatedTransitionHook(StatusTransitionHook):
     def __init__(self, deps: TerminatedHookDependencies) -> None:
         self._deps = deps
 
+    @override
     async def execute(self, session: SessionWithKernels) -> None:
         """Execute TERMINATED transition hook."""
         await self._destroy_network(session)

@@ -9,6 +9,7 @@ from datetime import UTC, datetime, timedelta
 from typing import (
     Any,
     Final,
+    override,
 )
 
 import aiohttp
@@ -257,17 +258,21 @@ class JwksRefreshTask(PeriodicTask):
         self._app = app
 
     @property
+    @override
     def name(self) -> str:
         return "openid.jwks_refresh"
 
     @property
+    @override
     def interval(self) -> float:
         return _JWKS_REFRESH_INTERVAL
 
     @property
+    @override
     def initial_delay(self) -> float:
         return 0.0
 
+    @override
     async def run(self) -> None:
         async with aiohttp.ClientSession() as sess:
             async with sess.get(self._app["openid.jwks_uri"]) as resp:
@@ -284,12 +289,15 @@ class OIDCWebAppPlugin(WebappPlugin):
         super().__init__(plugin_config, local_config)
         self._config = OIDCWebAppConfig(**plugin_config)
 
+    @override
     async def init(self, context: Any = None) -> None:
         pass
 
+    @override
     async def cleanup(self) -> None:
         pass
 
+    @override
     async def update_plugin_config(self, new_etcd_config: Mapping[str, Any]) -> None:
         self.plugin_config = new_etcd_config
         self._config = OIDCWebAppConfig(**new_etcd_config)
@@ -426,6 +434,7 @@ class OIDCWebAppPlugin(WebappPlugin):
         token = encode_jwt_token(token_data, self._config.secret)
         return web.HTTPFound(redirect_uri.update_query({"sToken": token}))
 
+    @override
     async def create_app(
         self,
         cors_options: CORSOptions,

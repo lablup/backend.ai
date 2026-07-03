@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Sequence
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, override
 
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.kernel.types import KernelInfo, KernelStatus
@@ -41,16 +41,19 @@ class SweepStaleKernelsKernelHandler(KernelLifecycleHandler):
         self._terminator = terminator
 
     @classmethod
+    @override
     def name(cls) -> str:
         """Get the name of the handler."""
         return "sweep-stale-kernels"
 
     @classmethod
+    @override
     def target_kernel_statuses(cls) -> list[KernelStatus]:
         """Running kernels that may be stale."""
         return [KernelStatus.RUNNING]
 
     @classmethod
+    @override
     def status_transitions(cls) -> KernelStatusTransitions:
         """Define state transitions for sweep stale kernels handler.
 
@@ -63,10 +66,12 @@ class SweepStaleKernelsKernelHandler(KernelLifecycleHandler):
         )
 
     @property
+    @override
     def lock_id(self) -> LockID | None:
         """Lock for operations targeting TERMINATING sessions."""
         return LockID.LOCKID_SOKOVAN_TARGET_TERMINATING
 
+    @override
     async def execute(
         self,
         _scaling_group: str,

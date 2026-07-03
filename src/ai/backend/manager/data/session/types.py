@@ -25,8 +25,8 @@ from ai.backend.manager.data.user.types import UserData
 
 if TYPE_CHECKING:
     from ai.backend.manager.data.kernel.types import KernelStatus
+    from ai.backend.manager.data.network.types import NetworkType
     from ai.backend.manager.data.session.options import SessionHandlerOptions
-    from ai.backend.manager.models.network import NetworkType
 
 
 class SessionStatus(CIStrEnum):

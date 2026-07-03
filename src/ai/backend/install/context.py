@@ -1970,6 +1970,7 @@ class Context(metaclass=ABCMeta):
 
 
 class DevContext(Context):
+    @override
     def hydrate_install_info(self) -> InstallInfo:
         public_facing_address = self.install_variable.public_facing_address
         return self._build_install_info(
@@ -1990,6 +1991,7 @@ class DevContext(Context):
             },
         )
 
+    @override
     def copy_config(self, template_name: str) -> Path:
         with self.resource_path("ai.backend.install.configs", template_name) as src_path:
             dst_path = Path.cwd() / template_name
@@ -2000,6 +2002,7 @@ class DevContext(Context):
                 shutil.copy(src_path, dst_path)
         return dst_path
 
+    @override
     async def check_prerequisites(self) -> None:
         await super().check_prerequisites()
         await install_git_lfs(self)
@@ -2059,6 +2062,7 @@ class DevContext(Context):
 
 
 class PackageContext(Context):
+    @override
     def hydrate_install_info(self) -> InstallInfo:
         return self._build_install_info(
             install_type=InstallType.PACKAGE,
@@ -2068,6 +2072,7 @@ class PackageContext(Context):
             extra_service_kwargs={},
         )
 
+    @override
     def copy_config(self, template_name: str) -> Path:
         with self.resource_path("ai.backend.install.configs", template_name) as src_path:
             dst_path = self.dist_info.target_path / template_name
@@ -2078,6 +2083,7 @@ class PackageContext(Context):
                 shutil.copy(src_path, dst_path)
         return dst_path
 
+    @override
     async def check_prerequisites(self) -> None:
         await super().check_prerequisites()
         if self.install_variable.with_harbor:

@@ -52,6 +52,7 @@ from ai.backend.common.types import (
     SessionTypes,
     VFolderMount,
 )
+from ai.backend.manager.data.network.types import NetworkType
 from ai.backend.manager.data.session.options import (
     AgentSelectionPolicy,
     FailurePolicy,
@@ -59,7 +60,6 @@ from ai.backend.manager.data.session.options import (
     ResourceOpts,
     SessionHandlerOptions,
 )
-from ai.backend.manager.models.network import NetworkType
 
 
 class _DraftBaseModel(BackendAISchema):
