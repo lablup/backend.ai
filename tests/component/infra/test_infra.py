@@ -29,7 +29,7 @@ from ai.backend.common.dto.manager.infra import (
     UsagePerPeriodRequest,
     UsagePerPeriodResponse,
 )
-from ai.backend.testutils.fixtures import ScalingGroupFixtureData
+from ai.backend.common.identifier.resource_group import ResourceGroupName
 
 
 class TestEtcdConfigRead:
@@ -230,11 +230,11 @@ class TestResourcePresets:
     async def test_list_presets_with_scaling_group_filter(
         self,
         admin_registry: BackendAIClientRegistry,
-        scaling_group_fixture: ScalingGroupFixtureData,
+        scaling_group_name: ResourceGroupName,
     ) -> None:
         """Filtering presets by scaling group."""
         await admin_registry.infra.list_presets(
-            ListPresetsRequest(scaling_group=scaling_group_fixture.scaling_group_name)
+            ListPresetsRequest(scaling_group=scaling_group_name)
         )
 
 

@@ -17,7 +17,8 @@ from ai.backend.common.dto.manager.fair_share import (
     UpsertProjectFairShareWeightRequest,
     UpsertProjectFairShareWeightResponse,
 )
-from ai.backend.testutils.fixtures import DomainFixtureData, ScalingGroupFixtureData
+from ai.backend.common.identifier.resource_group import ResourceGroupName
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 
 class TestProjectFairShareWeights:
@@ -26,18 +27,18 @@ class TestProjectFairShareWeights:
     async def test_get_project_fair_share(
         self,
         admin_registry: BackendAIClientRegistry,
-        scaling_group_fixture: ScalingGroupFixtureData,
+        scaling_group_name: ResourceGroupName,
         group_fixture: uuid.UUID,
     ) -> None:
         """Get project fair share → returns weight data."""
         result = await admin_registry.fair_share.get_project_fair_share(
-            resource_group=scaling_group_fixture.scaling_group_name,
+            resource_group=scaling_group_name,
             project_id=group_fixture,
         )
         assert isinstance(result, GetProjectFairShareResponse)
         assert result.item is not None
         assert result.item.project_id == group_fixture
-        assert result.item.resource_group == scaling_group_fixture.scaling_group_name
+        assert result.item.resource_group == scaling_group_name
 
     async def test_search_project_fair_shares(
         self,
@@ -53,14 +54,14 @@ class TestProjectFairShareWeights:
     async def test_upsert_project_fair_share(
         self,
         admin_registry: BackendAIClientRegistry,
-        scaling_group_fixture: ScalingGroupFixtureData,
+        scaling_group_name: ResourceGroupName,
         group_fixture: uuid.UUID,
         domain_fixture: DomainFixtureData,
     ) -> None:
         """Upsert project fair share → weight created/updated."""
         weight = Decimal("3.5")
         result = await admin_registry.fair_share.upsert_project_fair_share_weight(
-            resource_group=scaling_group_fixture.scaling_group_name,
+            resource_group=scaling_group_name,
             project_id=group_fixture,
             request=UpsertProjectFairShareWeightRequest(
                 domain_name=domain_fixture.domain_name,
@@ -69,12 +70,12 @@ class TestProjectFairShareWeights:
         )
         assert isinstance(result, UpsertProjectFairShareWeightResponse)
         assert result.item.project_id == group_fixture
-        assert result.item.resource_group == scaling_group_fixture.scaling_group_name
+        assert result.item.resource_group == scaling_group_name
         assert result.item.spec.weight == weight
 
         # Verify the weight persists
         get_result = await admin_registry.fair_share.get_project_fair_share(
-            resource_group=scaling_group_fixture.scaling_group_name,
+            resource_group=scaling_group_name,
             project_id=group_fixture,
         )
         assert get_result.item is not None
@@ -87,14 +88,14 @@ class TestBulkUpsertProjectWeights:
     async def test_bulk_upsert_success(
         self,
         admin_registry: BackendAIClientRegistry,
-        scaling_group_fixture: ScalingGroupFixtureData,
+        scaling_group_name: ResourceGroupName,
         group_fixture: uuid.UUID,
         domain_fixture: DomainFixtureData,
     ) -> None:
         """Bulk upsert success → all weights updated."""
         result = await admin_registry.fair_share.bulk_upsert_project_fair_share_weight(
             BulkUpsertProjectFairShareWeightRequest(
-                resource_group=scaling_group_fixture.scaling_group_name,
+                resource_group=scaling_group_name,
                 inputs=[
                     ProjectWeightEntryInput(
                         project_id=group_fixture,
@@ -110,12 +111,12 @@ class TestBulkUpsertProjectWeights:
     async def test_bulk_upsert_empty_input(
         self,
         admin_registry: BackendAIClientRegistry,
-        scaling_group_fixture: ScalingGroupFixtureData,
+        scaling_group_name: ResourceGroupName,
     ) -> None:
         """Bulk upsert empty input → empty result (no error)."""
         result = await admin_registry.fair_share.bulk_upsert_project_fair_share_weight(
             BulkUpsertProjectFairShareWeightRequest(
-                resource_group=scaling_group_fixture.scaling_group_name,
+                resource_group=scaling_group_name,
                 inputs=[],
             ),
         )
@@ -125,13 +126,13 @@ class TestBulkUpsertProjectWeights:
     async def test_bulk_upsert_overwrite(
         self,
         admin_registry: BackendAIClientRegistry,
-        scaling_group_fixture: ScalingGroupFixtureData,
+        scaling_group_name: ResourceGroupName,
         group_fixture: uuid.UUID,
         domain_fixture: DomainFixtureData,
     ) -> None:
         """Bulk upsert overwrites existing weight."""
         await admin_registry.fair_share.upsert_project_fair_share_weight(
-            resource_group=scaling_group_fixture.scaling_group_name,
+            resource_group=scaling_group_name,
             project_id=group_fixture,
             request=UpsertProjectFairShareWeightRequest(
                 domain_name=domain_fixture.domain_name,
@@ -142,7 +143,7 @@ class TestBulkUpsertProjectWeights:
         new_weight = Decimal("3.0")
         result = await admin_registry.fair_share.bulk_upsert_project_fair_share_weight(
             BulkUpsertProjectFairShareWeightRequest(
-                resource_group=scaling_group_fixture.scaling_group_name,
+                resource_group=scaling_group_name,
                 inputs=[
                     ProjectWeightEntryInput(
                         project_id=group_fixture,
@@ -156,7 +157,7 @@ class TestBulkUpsertProjectWeights:
         assert result.upserted_count == 1
 
         get_result = await admin_registry.fair_share.get_project_fair_share(
-            resource_group=scaling_group_fixture.scaling_group_name,
+            resource_group=scaling_group_name,
             project_id=group_fixture,
         )
         assert get_result.item is not None
@@ -169,13 +170,13 @@ class TestProjectScopeAccessControl:
     async def test_global_scope_regular_user_denied(
         self,
         user_registry: BackendAIClientRegistry,
-        scaling_group_fixture: ScalingGroupFixtureData,
+        scaling_group_name: ResourceGroupName,
         group_fixture: uuid.UUID,
     ) -> None:
         """Global-scoped project access as regular user → 403 (denied)."""
         with pytest.raises(PermissionDeniedError):
             await user_registry.fair_share.get_project_fair_share(
-                resource_group=scaling_group_fixture.scaling_group_name,
+                resource_group=scaling_group_name,
                 project_id=group_fixture,
             )
 
@@ -187,20 +188,20 @@ class TestProjectScopeAccessControl:
     async def test_rg_scope_regular_user_allowed(
         self,
         user_registry: BackendAIClientRegistry,
-        scaling_group_fixture: ScalingGroupFixtureData,
+        scaling_group_name: ResourceGroupName,
         domain_fixture: DomainFixtureData,
         group_fixture: uuid.UUID,
     ) -> None:
         """RG-scoped project access as regular user → 200 (allowed)."""
         get_result = await user_registry.fair_share.rg_get_project_fair_share(
-            resource_group=scaling_group_fixture.scaling_group_name,
+            resource_group=scaling_group_name,
             domain_name=domain_fixture.domain_name,
             project_id=group_fixture,
         )
         assert isinstance(get_result, GetProjectFairShareResponse)
 
         search_result = await user_registry.fair_share.rg_search_project_fair_shares(
-            resource_group=scaling_group_fixture.scaling_group_name,
+            resource_group=scaling_group_name,
             domain_name=domain_fixture.domain_name,
             request=SearchProjectFairSharesRequest(),
         )
@@ -213,12 +214,12 @@ class TestProjectDefaultValueFallback:
     async def test_get_project_without_fair_share_default_value(
         self,
         admin_registry: BackendAIClientRegistry,
-        scaling_group_fixture: ScalingGroupFixtureData,
+        scaling_group_name: ResourceGroupName,
         group_fixture: uuid.UUID,
     ) -> None:
         """Get existing project with no fair-share row → default value returned."""
         result = await admin_registry.fair_share.get_project_fair_share(
-            resource_group=scaling_group_fixture.scaling_group_name,
+            resource_group=scaling_group_name,
             project_id=group_fixture,
         )
         assert isinstance(result, GetProjectFairShareResponse)

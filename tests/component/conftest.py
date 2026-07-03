@@ -152,7 +152,7 @@ from ai.backend.testutils.bootstrap import (  # noqa: F401
     postgres_container,
     redis_container,
 )
-from ai.backend.testutils.fixtures import DomainFixtureData, ScalingGroupFixtureData
+from ai.backend.testutils.fixtures import DomainFixtureData
 from ai.backend.testutils.pants import get_parallel_slot
 
 log = logging.getLogger("tests.component.conftest")
@@ -673,16 +673,15 @@ async def resource_policy_fixture(
 
 
 @pytest.fixture()
-async def scaling_group_fixture(
+async def scaling_group_name(
     db_engine: SAEngine,
     domain_fixture: DomainFixtureData,
-) -> AsyncIterator[ScalingGroupFixtureData]:
-    """Insert a scaling group and its domain association; yield its identifiers."""
+) -> AsyncIterator[ResourceGroupName]:
+    """Insert a scaling group and its domain association; yield its name."""
     sgroup_name = ResourceGroupName(f"sgroup-{secrets.token_hex(6)}")
     async with db_engine.begin() as conn:
-        result = await conn.execute(
-            sa.insert(scaling_groups)
-            .values(
+        await conn.execute(
+            sa.insert(scaling_groups).values(
                 name=sgroup_name,
                 description=f"Test scaling group {sgroup_name}",
                 is_active=True,
@@ -691,21 +690,32 @@ async def scaling_group_fixture(
                 scheduler="fifo",
                 scheduler_opts=ScalingGroupOpts(),
             )
-            .returning(scaling_groups.c.id)
         )
-        sgroup_id = ResourceGroupID(result.scalar_one())
         await conn.execute(
             sa.insert(sgroups_for_domains).values(
                 scaling_group=sgroup_name,
                 domain=domain_fixture.domain_name,
             )
         )
-    yield ScalingGroupFixtureData(scaling_group_name=sgroup_name, scaling_group_id=sgroup_id)
+    yield sgroup_name
     async with db_engine.begin() as conn:
         await conn.execute(
             sgroups_for_domains.delete().where(sgroups_for_domains.c.scaling_group == sgroup_name)
         )
         await conn.execute(scaling_groups.delete().where(scaling_groups.c.name == sgroup_name))
+
+
+@pytest.fixture()
+async def scaling_group_id(
+    db_engine: SAEngine,
+    scaling_group_name: ResourceGroupName,
+) -> ResourceGroupID:
+    """Return the inserted scaling group's ID."""
+    async with db_engine.begin() as conn:
+        result = await conn.execute(
+            sa.select(scaling_groups.c.id).where(scaling_groups.c.name == scaling_group_name)
+        )
+        return ResourceGroupID(result.scalar_one())
 
 
 @pytest.fixture()
@@ -936,7 +946,7 @@ async def regular_user_fixture(
 async def database_fixture(
     admin_user_fixture: UserFixtureData,
     regular_user_fixture: UserFixtureData,
-    scaling_group_fixture: ScalingGroupFixtureData,
+    scaling_group_name: ResourceGroupName,
 ) -> AsyncIterator[None]:
     """Backward-compatible aggregate: requests all seed data fixtures."""
     yield

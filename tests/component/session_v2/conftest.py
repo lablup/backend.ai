@@ -28,7 +28,7 @@ from ai.backend.common.data.permission.types import (
     ScopeType,
 )
 from ai.backend.common.identifier.domain import DomainID
-from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.identifier.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.plugin.monitor import ErrorPluginContext
 from ai.backend.common.types import ResourceSlot, SessionId, SessionTypes
 from ai.backend.manager.actions.validators import ActionValidators
@@ -60,7 +60,7 @@ from ai.backend.manager.repositories.session.repository import SessionRepository
 from ai.backend.manager.services.processors import Processors
 from ai.backend.manager.services.session.processors import SessionProcessors
 from ai.backend.manager.services.session.service import SessionService, SessionServiceArgs
-from ai.backend.testutils.fixtures import DomainFixtureData, ScalingGroupFixtureData
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
@@ -421,7 +421,8 @@ async def admin_session_seed(
     domain_fixture: DomainFixtureData,
     group_fixture: uuid.UUID,
     admin_user_fixture: UserFixtureData,
-    scaling_group_fixture: ScalingGroupFixtureData,
+    scaling_group_name: ResourceGroupName,
+    scaling_group_id: ResourceGroupID,
 ) -> AsyncIterator[SessionSeedData]:
     """Seed a RUNNING session owned by the admin user."""
     seed = await _seed_session(
@@ -431,8 +432,8 @@ async def admin_session_seed(
         group_id=group_fixture,
         user_uuid=admin_user_fixture.user_uuid,
         access_key=admin_user_fixture.keypair.access_key,
-        scaling_group=scaling_group_fixture.scaling_group_name,
-        resource_group_id=scaling_group_fixture.scaling_group_id,
+        scaling_group=scaling_group_name,
+        resource_group_id=scaling_group_id,
     )
     yield seed
     await _cleanup_session(db_engine, seed.session_id)
@@ -444,7 +445,8 @@ async def user_session_seed(
     domain_fixture: DomainFixtureData,
     group_fixture: uuid.UUID,
     regular_user_fixture: UserFixtureData,
-    scaling_group_fixture: ScalingGroupFixtureData,
+    scaling_group_name: ResourceGroupName,
+    scaling_group_id: ResourceGroupID,
     user_system_role: uuid.UUID,
 ) -> AsyncIterator[SessionSeedData]:
     """Seed a RUNNING session owned by the regular user.
@@ -458,8 +460,8 @@ async def user_session_seed(
         group_id=group_fixture,
         user_uuid=regular_user_fixture.user_uuid,
         access_key=regular_user_fixture.keypair.access_key,
-        scaling_group=scaling_group_fixture.scaling_group_name,
-        resource_group_id=scaling_group_fixture.scaling_group_id,
+        scaling_group=scaling_group_name,
+        resource_group_id=scaling_group_id,
     )
     yield seed
     await _cleanup_session(db_engine, seed.session_id)

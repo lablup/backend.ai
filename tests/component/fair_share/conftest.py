@@ -9,6 +9,7 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
+from ai.backend.common.identifier.resource_group import ResourceGroupName
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.api.rest.fair_share.handler import FairShareAPIHandler
 from ai.backend.manager.api.rest.fair_share.registry import register_fair_share_routes
@@ -28,7 +29,7 @@ from ai.backend.manager.services.resource_usage.processors import ResourceUsageP
 from ai.backend.manager.services.resource_usage.service import ResourceUsageService
 from ai.backend.manager.services.scaling_group.processors import ScalingGroupProcessors
 from ai.backend.manager.services.scaling_group.service import ScalingGroupService
-from ai.backend.testutils.fixtures import DomainFixtureData, ScalingGroupFixtureData
+from ai.backend.testutils.fixtures import DomainFixtureData
 
 
 @pytest.fixture()
@@ -83,7 +84,7 @@ async def group_fixture(
     db_engine: SAEngine,
     domain_fixture: DomainFixtureData,
     resource_policy_fixture: str,
-    scaling_group_fixture: ScalingGroupFixtureData,
+    scaling_group_name: ResourceGroupName,
 ) -> AsyncIterator[uuid.UUID]:
     """Insert a test group with scaling-group association for fair-share tests."""
     group_id = uuid.uuid4()
@@ -101,7 +102,7 @@ async def group_fixture(
         )
         await conn.execute(
             sa.insert(sgroups_for_groups).values(
-                scaling_group=scaling_group_fixture.scaling_group_name,
+                scaling_group=scaling_group_name,
                 group=group_id,
             )
         )
