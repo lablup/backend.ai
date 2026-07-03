@@ -12,7 +12,6 @@ from strawberry.relay import Connection, Edge, NodeID, PageInfo
 from ai.backend.common.dto.manager.v2.model_card.request import SearchModelCardsInput
 from ai.backend.common.dto.manager.v2.vfolder.response import VFolderNode
 from ai.backend.common.identifier.vfolder import VFolderUUID
-from ai.backend.common.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.common_types import BinarySizeInfoGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -83,14 +82,14 @@ class VFolderGQL(PydanticNodeMixin[VFolderNode]):
     unmanaged_path: str | None = gql_field(description="Path for unmanaged virtual folders.")
     quota: VFolderQuotaInfoGQL = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description="Quota limits (maxSize, maxFiles) configured for the folder.",
         )
     )
 
     @gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description=(
                 "Usage statistics (numFiles, usedBytes) measured on demand through "
                 "the storage proxy when this field is selected. This is a very slow "
@@ -115,7 +114,7 @@ class VFolderGQL(PydanticNodeMixin[VFolderNode]):
 
     @gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description="Model cards backed by this vfolder.",
         )
     )  # type: ignore[misc]

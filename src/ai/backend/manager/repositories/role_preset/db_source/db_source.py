@@ -14,6 +14,11 @@ import sqlalchemy as sa
 from ai.backend.common.identifier.role_permission_preset import RolePermissionPresetID
 from ai.backend.common.identifier.role_preset import RolePresetID
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.data.common.bulk import (
+    BulkCreateFailure,
+    BulkPurgeFailure,
+    BulkUpdateFailure,
+)
 from ai.backend.manager.data.role_preset.types import (
     RolePermissionPresetBulkAddResult,
     RolePermissionPresetBulkRemoveResult,
@@ -115,7 +120,8 @@ class RolePresetDBSource:
         async with self._ops.write_ops() as w:
             result = await w.bulk_update_partial(updaters)
         successes = [row.to_data() for row in result.successes]
-        return RolePresetBulkUpdateResult(successes=successes, failures=result.errors)
+        failures = [BulkUpdateFailure(index=e.index, exception=e.exception) for e in result.errors]
+        return RolePresetBulkUpdateResult(successes=successes, failures=failures)
 
     async def purge(self, preset_id: RolePresetID) -> bool:
         async with self._ops.write_ops() as w:
@@ -130,7 +136,8 @@ class RolePresetDBSource:
         async with self._ops.write_ops() as w:
             result = await w.bulk_purge_partial(purgers)
         successes = [row.to_data() for row in result.successes]
-        return RolePresetBulkPurgeResult(successes=successes, failures=result.errors)
+        failures = [BulkPurgeFailure(index=e.index, exception=e.exception) for e in result.errors]
+        return RolePresetBulkPurgeResult(successes=successes, failures=failures)
 
     async def bulk_add_permissions(
         self,
@@ -141,7 +148,8 @@ class RolePresetDBSource:
         async with self._ops.write_ops() as w:
             result = await w.bulk_create_partial(bulk_creator)
         successes = [row.to_data() for row in result.successes]
-        return RolePermissionPresetBulkAddResult(successes=successes, failures=result.errors)
+        failures = [BulkCreateFailure(index=e.index, exception=e.exception) for e in result.errors]
+        return RolePermissionPresetBulkAddResult(successes=successes, failures=failures)
 
     async def bulk_remove_permissions(
         self,
@@ -151,4 +159,5 @@ class RolePresetDBSource:
         async with self._ops.write_ops() as w:
             result = await w.bulk_purge_partial(purgers)
         successes = [row.to_data() for row in result.successes]
-        return RolePermissionPresetBulkRemoveResult(successes=successes, failures=result.errors)
+        failures = [BulkPurgeFailure(index=e.index, exception=e.exception) for e in result.errors]
+        return RolePermissionPresetBulkRemoveResult(successes=successes, failures=failures)

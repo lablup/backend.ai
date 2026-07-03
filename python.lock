@@ -2062,7 +2062,7 @@ requires-dist = [
     { name = "temporenc", specifier = "~=0.1.0" },
     { name = "tenacity", specifier = ">=9.0" },
     { name = "testcontainers", extras = ["minio", "postgres", "redis"], specifier = "~=4.13.3" },
-    { name = "textual", specifier = "~=0.79.1" },
+    { name = "textual", specifier = "~=6.2" },
     { name = "toml", specifier = "~=0.10.2" },
     { name = "tomli", specifier = "~=2.0.1" },
     { name = "tomli-w", specifier = "~=1.2.0" },
@@ -2901,17 +2901,18 @@ redis = [
 
 [[package]]
 name = "textual"
-version = "0.79.1"
+version = "6.2.1"
 source = { registry = "https://pypi.org/simple/" }
 dependencies = [
     { name = "markdown-it-py", extra = ["linkify", "plugins"] },
     { name = "platformdirs" },
+    { name = "pygments" },
     { name = "rich" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/a4/0d/9c3e18839b696fa6f3bf0e820579967d5c3ffafc9a7c28e557f0ed4a74a3/textual-0.79.1.tar.gz", hash = "sha256:2aaa9778beac5e56957794ee492bd8d281d39516ccb0e507e726484a1327d8b2", size = 1366998, upload-time = "2024-08-31T16:29:03.579Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/a2/30/38b615f7d4b16f6fdd73e4dcd8913e2d880bbb655e68a076e3d91181a7ee/textual-6.2.1.tar.gz", hash = "sha256:4699d8dfae43503b9c417bd2a6fb0da1c89e323fe91c4baa012f9298acaa83e1", size = 1570645, upload-time = "2025-10-01T16:11:24.467Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/6a/4b/cd3a8067f5a0f575d5532095d2cf3430f9926509f0698a55ede73c2532c3/textual-0.79.1-py3-none-any.whl", hash = "sha256:75f26c0a8829560a1a8cc739f758c2c1c684246e27166acb3f4ad40110200692", size = 581639, upload-time = "2024-08-31T16:29:01.286Z" },
+    { url = "https://files.pythonhosted.org/packages/c5/93/02c7adec57a594af28388d85da9972703a4af94ae1399542555cd9581952/textual-6.2.1-py3-none-any.whl", hash = "sha256:3c7190633cd4d8bfe6049ae66808b98da91ded2edb85cef54e82bf77b03d2a54", size = 710702, upload-time = "2025-10-01T16:11:22.161Z" },
 ]
 
 [[package]]

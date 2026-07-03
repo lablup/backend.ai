@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, override
 
+from ai.backend.common.identifier.user import UserID
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.repositories.base.updater import UpdaterSpec
@@ -82,3 +83,11 @@ class UserUpdaterSpec(UpdaterSpec[UserRow]):
     def group_ids_value(self) -> list[str] | None:
         """Helper property for group_ids access."""
         return self.group_ids.optional_value()
+
+
+@dataclass
+class UserUpdateSpec:
+    """Specification for updating a single user, including the target user ID."""
+
+    user_id: UserID
+    updater_spec: UserUpdaterSpec

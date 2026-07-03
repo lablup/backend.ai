@@ -288,6 +288,7 @@ class IdleCheckerHost:
                     kernels.c.session_id,
                     kernels.c.session_type,
                     kernels.c.created_at,
+                    kernels.c.starts_at,
                     kernels.c.occupied_slots,
                     kernels.c.requested_slots,
                     kernels.c.cluster_size,
@@ -841,13 +842,13 @@ class SessionLifetimeChecker(BaseIdleChecker):
 
         session_id = kernel.session_id
         if (max_session_lifetime := policy.max_session_lifetime) > 0:
-            # TODO: once per-status time tracking is implemented, let's change created_at
-            #       to the timestamp when the session entered PREPARING status.
             idle_timeout = timedelta(seconds=max_session_lifetime)
             now: datetime = await get_db_now(dbconn)
-            kernel_created_at: datetime = kernel.created_at
+            # starts_at is set at the RUNNING transition; fall back to created_at
+            # for abnormal/legacy rows where it was never populated.
+            kernel_starts_at: datetime = kernel.starts_at or kernel.created_at
             remaining = calculate_remaining_time(
-                now, kernel_created_at, idle_timeout, grace_period_end
+                now, kernel_starts_at, idle_timeout, grace_period_end
             )
             await self.set_remaining_time_report(
                 session_id, remaining if remaining > 0 else IDLE_TIMEOUT_VALUE

@@ -122,17 +122,107 @@ class SyncContainerLifecyclesConfig(BaseConfigSchema):
     ]
 
 
-class UtilizationMetricConfig(BaseConfigSchema):
+class NodeMetricConfig(BaseConfigSchema):
+    enable: Annotated[
+        bool,
+        Field(default=True),
+        BackendAIConfigMeta(
+            description="Whether to collect per-node and per-device utilization metrics.",
+            added_version="26.4.4",
+            example=ConfigExample(local="true", prod="true"),
+        ),
+    ]
     interval: Annotated[
         float,
         Field(default=30.0, gt=0),
         BackendAIConfigMeta(
             description=(
-                "Time interval in seconds between utilization metric collection cycles "
-                "(per-node, per-container, and per-process statistics)."
+                "Time interval in seconds between per-node utilization metric collection cycles."
             ),
             added_version="26.4.4",
             example=ConfigExample(local="30.0", prod="30.0"),
+        ),
+    ]
+
+
+class ContainerMetricConfig(BaseConfigSchema):
+    enable: Annotated[
+        bool,
+        Field(default=True),
+        BackendAIConfigMeta(
+            description="Whether to collect per-container utilization metrics.",
+            added_version="26.4.4",
+            example=ConfigExample(local="true", prod="true"),
+        ),
+    ]
+    interval: Annotated[
+        float,
+        Field(default=30.0, gt=0),
+        BackendAIConfigMeta(
+            description=(
+                "Time interval in seconds between per-container utilization metric collection "
+                "cycles."
+            ),
+            added_version="26.4.4",
+            example=ConfigExample(local="30.0", prod="30.0"),
+        ),
+    ]
+
+
+class ProcessMetricConfig(BaseConfigSchema):
+    enable: Annotated[
+        bool,
+        Field(default=True),
+        BackendAIConfigMeta(
+            description=(
+                "Whether to collect per-process utilization metrics for each container. "
+                "When disabled, the agent skips listing container processes and reporting "
+                "per-process statistics, while per-node and per-container metrics are "
+                "still collected."
+            ),
+            added_version="26.4.4",
+            example=ConfigExample(local="true", prod="true"),
+        ),
+    ]
+    interval: Annotated[
+        float,
+        Field(default=30.0, gt=0),
+        BackendAIConfigMeta(
+            description=(
+                "Time interval in seconds between per-process utilization metric collection cycles."
+            ),
+            added_version="26.4.4",
+            example=ConfigExample(local="30.0", prod="30.0"),
+        ),
+    ]
+
+
+class UtilizationMetricConfig(BaseConfigSchema):
+    node: Annotated[
+        NodeMetricConfig,
+        Field(default_factory=NodeMetricConfig),
+        BackendAIConfigMeta(
+            description="Per-node and per-device utilization metric collection settings.",
+            added_version="26.4.4",
+            composite=CompositeType.FIELD,
+        ),
+    ]
+    container: Annotated[
+        ContainerMetricConfig,
+        Field(default_factory=ContainerMetricConfig),
+        BackendAIConfigMeta(
+            description="Per-container utilization metric collection settings.",
+            added_version="26.4.4",
+            composite=CompositeType.FIELD,
+        ),
+    ]
+    process: Annotated[
+        ProcessMetricConfig,
+        Field(default_factory=ProcessMetricConfig),
+        BackendAIConfigMeta(
+            description="Per-process utilization metric collection settings.",
+            added_version="26.4.4",
+            composite=CompositeType.FIELD,
         ),
     ]
 
@@ -1216,8 +1306,8 @@ class OverridableAgentConfig(BaseConfigSchema):
         ),
         BackendAIConfigMeta(
             description=(
-                "Configuration for utilization metric collection. Controls the collection "
-                "interval and, derived from it, the Valkey expiration of stored utilization values."
+                "Configuration for utilization metric collection. Holds per-node, per-container, "
+                "and per-process settings, each with its own enable flag and collection interval."
             ),
             added_version="26.4.4",
             composite=CompositeType.FIELD,

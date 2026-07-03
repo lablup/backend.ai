@@ -48,7 +48,6 @@ from ai.backend.common.dto.manager.v2.role_invitation.response import (
 from ai.backend.common.dto.manager.v2.role_invitation.response import (
     RoleInvitationNode as RoleInvitationNodeDTO,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, UUIDFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -71,7 +70,7 @@ from ai.backend.manager.api.gql.types import GQLOrderBy
 
 @gql_enum(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="Role invitation state.",
     ),
     name="RoleInvitationState",
@@ -91,7 +90,7 @@ class RoleInvitationStateGQL(StrEnum):
 
 @gql_enum(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="Role invitation ordering field.",
     ),
     name="RoleInvitationOrderField",
@@ -107,7 +106,7 @@ class RoleInvitationOrderFieldGQL(StrEnum):
 
 @gql_node_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="A role invitation.",
     ),
     name="RoleInvitation",
@@ -181,7 +180,7 @@ RoleInvitationEdge = Edge[RoleInvitationGQL]
 
 @gql_connection_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="Role invitation connection.",
     )
 )
@@ -198,7 +197,7 @@ class RoleInvitationConnection(Connection[RoleInvitationGQL]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="Order by specification for role invitations.",
     ),
     name="RoleInvitationOrderBy",
@@ -213,7 +212,7 @@ class RoleInvitationOrderByGQL(PydanticInputMixin[RoleInvitationOrderByDTO], GQL
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="Filter for role invitation state.",
     ),
     name="RoleInvitationStateFilter",
@@ -233,7 +232,7 @@ class RoleInvitationStateFilterGQL(PydanticInputMixin[RoleInvitationStateFilterD
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="Nested filter for the role associated with an invitation.",
     ),
     name="RoleInvitationRoleNestedFilter",
@@ -244,7 +243,7 @@ class RoleInvitationRoleNestedFilterGQL(PydanticInputMixin[RoleNestedFilterDTO])
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="Nested filter for a user (inviter or invitee) of an invitation.",
     ),
     name="RoleInvitationUserNestedFilter",
@@ -255,7 +254,7 @@ class RoleInvitationUserNestedFilterGQL(PydanticInputMixin[UserNestedFilterDTO])
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="Filter for role invitations.",
     ),
     name="RoleInvitationFilter",
@@ -276,7 +275,7 @@ class RoleInvitationFilterGQL(PydanticInputMixin[RoleInvitationFilterDTO]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="Input for creating role invitations.",
     ),
     name="CreateRoleInvitationInput",
@@ -288,7 +287,7 @@ class CreateRoleInvitationInputGQL(PydanticInputMixin[CreateRoleInvitationInputD
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="Input for accepting a role invitation.",
     ),
     name="AcceptRoleInvitationInput",
@@ -299,7 +298,7 @@ class AcceptRoleInvitationInputGQL(PydanticInputMixin[AcceptRoleInvitationInputD
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="Input for rejecting a role invitation.",
     ),
     name="RejectRoleInvitationInput",
@@ -310,7 +309,7 @@ class RejectRoleInvitationInputGQL(PydanticInputMixin[RejectRoleInvitationInputD
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="Input for canceling a role invitation.",
     ),
     name="CancelRoleInvitationInput",
@@ -324,7 +323,7 @@ class CancelRoleInvitationInputGQL(PydanticInputMixin[CancelRoleInvitationInputD
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="Payload for role invitation creation.",
     ),
     model=CreateRoleInvitationPayloadDTO,

@@ -123,6 +123,7 @@ class LockID(enum.IntEnum):
     LOCKID_REPLICA_GROUP_AUTOSCALE_RECONCILE = (
         238  # For replica-group steady-state autoscale reconcile
     )
+    LOCKID_IDLE_CHECK_RECONCILE = 239  # For idle-check reconcile
 
 
 SERVICE_MAX_RETRIES = 5  # FIXME: make configurable

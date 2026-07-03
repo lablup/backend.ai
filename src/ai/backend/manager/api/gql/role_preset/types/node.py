@@ -16,7 +16,6 @@ from ai.backend.common.dto.manager.v2.role_permission_preset.request import (
 )
 from ai.backend.common.dto.manager.v2.role_preset.response import RolePresetNode
 from ai.backend.common.identifier.role_preset import RolePresetID
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
@@ -39,7 +38,7 @@ from .permission import (
 
 @gql_node_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="Role preset entity implementing the Relay Node pattern.",
     ),
     name="RolePreset",
@@ -67,7 +66,7 @@ class RolePresetGQL(PydanticNodeMixin[RolePresetNode]):
 
     @gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description="Permission entries carried by this role preset.",
         )
     )  # type: ignore[misc]
@@ -124,7 +123,7 @@ RolePresetEdge = Edge[RolePresetGQL]
 
 @gql_connection_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="Paginated connection for role preset records.",
     ),
 )

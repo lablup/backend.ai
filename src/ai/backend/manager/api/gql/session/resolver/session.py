@@ -10,7 +10,6 @@ from ai.backend.common.dto.manager.v2.session.request import (
     AdminSearchSessionsInput,
     TerminateSessionsInput,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import SessionId
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
@@ -169,7 +168,7 @@ async def enqueue_session(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description=(
             "Terminate one or more sessions by ID. Per-session RBAC permission is enforced "
             "by the bulk validator; any denial fails the whole request."

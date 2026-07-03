@@ -2,6 +2,10 @@ from typing import Final
 
 UNDEFINED: Final[str] = "undefined"
 
+# Label values for the boolean "success" metric label (matching ``str(bool)``).
+SUCCESS_LABEL_TRUE: Final[str] = "True"
+SUCCESS_LABEL_FALSE: Final[str] = "False"
+
 UTILIZATION_METRIC_DETENTION: Final[float] = 600.0  # 10 minutes
 
 CONTAINER_UTILIZATION_METRIC_NAME: Final[str] = "backendai_container_utilization"

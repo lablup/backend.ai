@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import io
 from pathlib import Path
 from typing import Any
 
@@ -18,8 +19,8 @@ from textual.widgets import (
     Button,
     Input,
     Label,
+    Log,
     ProgressBar,
-    RichLog,
     Static,
 )
 
@@ -42,7 +43,14 @@ class ProgressItem(Static):
         yield ProgressBar(classes="progress-download")
 
 
-class SetupLog(RichLog):
+class SetupLog(Log):
+    """Scrollable, mouse-selectable install log.
+
+    Uses Textual's ``Log`` rather than ``RichLog`` because ``Log`` supports
+    text selection (drag to select + copy), which ``RichLog`` does not. Rich
+    renderables written to it are rendered to plain text first.
+    """
+
     BINDINGS = [
         Binding("enter", "continue", show=False),
     ]
@@ -52,9 +60,18 @@ class SetupLog(RichLog):
         *args: Any,
         **kwargs: Any,
     ) -> None:
+        kwargs.pop("wrap", None)  # accepted by RichLog, not by Log
         super().__init__(*args, **kwargs)
         self._continue = asyncio.Event()
         self._stdout_console: Console | None = None
+        # Render rich renderables to plain text for the (plain-text) Log widget.
+        self._render_io = io.StringIO()
+        self._render_console = Console(
+            file=self._render_io,
+            force_terminal=False,
+            no_color=True,
+            width=200,
+        )
 
     def on_mount(self) -> None:
         if self.app.is_headless:
@@ -75,21 +92,30 @@ class SetupLog(RichLog):
         except Exception:
             pass
 
+    def _to_plain(self, content: object) -> str:
+        """Render a rich renderable (or string) to plain text for the Log."""
+        self._render_io.seek(0)
+        self._render_io.truncate(0)
+        try:
+            self._render_console.print(content)
+        except Exception:
+            return f"{content}\n"
+        return self._render_io.getvalue()
+
     def write(
         self,
-        content: object,
-        width: int | None = None,
-        expand: bool = False,
-        shrink: bool = True,
+        data: object,
         scroll_end: bool | None = None,
+        **kwargs: Any,
     ) -> SetupLog:
-        """Write content to the log and optionally to stdout."""
-        # Always write to the RichLog widget
-        super().write(content, width=width, expand=expand, shrink=shrink, scroll_end=scroll_end)
+        """Write content (rich renderable or str) to the log as plain text."""
+        # Log is a plain-text widget; render rich content to text so the log
+        # stays selectable/copyable.
+        super().write(self._to_plain(data), scroll_end=scroll_end)
 
         # Write to stdout if headless mode
         if self._stdout_console is not None:
-            self._write_to_stdout(content)
+            self._write_to_stdout(data)
 
         return self
 

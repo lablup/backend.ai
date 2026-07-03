@@ -21,6 +21,7 @@ from ai.backend.manager.data.fair_share import (
     FairShareCalculationContext,
     FairShareCalculationSnapshot,
     FairShareData,
+    FairShareFactorCalculationResult,
     FairShareMetadata,
     FairSharesByLevel,
     FairShareSpec,
@@ -30,7 +31,6 @@ from ai.backend.manager.data.fair_share import (
     UserProjectKey,
 )
 from ai.backend.manager.sokovan.scheduler.fair_share.calculator import (
-    FairShareFactorCalculationResult,
     FairShareFactorCalculator,
 )
 

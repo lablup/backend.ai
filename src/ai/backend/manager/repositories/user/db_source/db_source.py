@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Iterable, Sequence
+from collections.abc import Collection, Iterable, Sequence
 from datetime import datetime, timedelta
 from typing import Any, cast
 from uuid import UUID, uuid4
@@ -18,8 +18,10 @@ from sqlalchemy.sql.expression import bindparam
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.identifier.project import ProjectID
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import AccessKey, VFolderID
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.data.common.bulk import BulkCreateFailure, BulkUpdateFailure
 from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.keypair.types import (
     GeneratedKeyPairData,
@@ -83,14 +85,12 @@ from ai.backend.manager.models.vfolder import (
     VFolderDeletionInfo,
     VFolderRow,
     VFolderStatusSet,
-    initiate_vfolder_deletion,
     vfolder_invitations,
     vfolder_permissions,
     vfolder_status_map,
     vfolders,
 )
 from ai.backend.manager.repositories.base.creator import (
-    BulkCreatorError,
     Creator,
     execute_creator,
 )
@@ -112,7 +112,7 @@ from ai.backend.manager.repositories.base.rbac.scope_binder import (
 from ai.backend.manager.repositories.base.rbac.scope_unbinder import (
     execute_rbac_scope_entity_unbinder,
 )
-from ai.backend.manager.repositories.base.updater import BulkUpdaterError, Updater, execute_updater
+from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 from ai.backend.manager.repositories.group.creators import ProjectUserMembershipCreatorSpec
 from ai.backend.manager.repositories.group.scope_binders import UserProjectEntityUnbinder
 from ai.backend.manager.repositories.keypair.creators import KeyPairCreatorSpec
@@ -120,9 +120,10 @@ from ai.backend.manager.repositories.keypair.types import (
     KeypairResourcePolicyKeypairSearchScope,
     UserKeypairSearchScope,
 )
+from ai.backend.manager.repositories.ops.rbac.provider import RBACOpsProvider
 from ai.backend.manager.repositories.permission_controller.creators import UserRoleCreatorSpec
 from ai.backend.manager.repositories.permission_controller.role_manager import RoleManager
-from ai.backend.manager.repositories.user.creators import UserCreatorSpec
+from ai.backend.manager.repositories.user.creators import UserCreateSpec, UserCreatorSpec
 from ai.backend.manager.repositories.user.purgers import (
     UserBatchPurgerSpec,
     create_user_error_log_purger,
@@ -135,8 +136,8 @@ from ai.backend.manager.repositories.user.types import (
     ProjectUserSearchScope,
     RoleUserSearchScope,
 )
-from ai.backend.manager.repositories.user.updaters import UserUpdaterSpec
-from ai.backend.manager.services.user.types import UserCreateSpec, UserUpdateSpec
+from ai.backend.manager.repositories.user.updaters import UserUpdaterSpec, UserUpdateSpec
+from ai.backend.manager.repositories.vfolder.deletion import initiate_vfolder_deletion
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -149,6 +150,7 @@ class UserDBSource:
 
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
+        self._rbac_ops_provider = RBACOpsProvider(db)
         self._role_manager = RoleManager()
 
     async def get_user_by_uuid(self, user_uuid: UUID) -> UserData:
@@ -368,6 +370,62 @@ class UserDBSource:
 
         return UserCreateResultData(created_user, kp_data)
 
+    async def assign_users_to_scope(
+        self,
+        user_uuid: UserID,
+        domain_name: str | None,
+        project_ids: Collection[ProjectID],
+    ) -> None:
+        """Grant the auto_assign roles of a new user's initial domain/project scopes.
+
+        Maps the user to the active auto_assign roles of its domain scope and
+        each given project scope. Model-store membership is handled separately
+        by :meth:`assign_user_to_model_store`. Idempotent, so it is safe to run
+        after user creation.
+        """
+        async with self._rbac_ops_provider.write_ops() as rbac_write_ops:
+            if domain_name is not None:
+                await rbac_write_ops.add_users_to_scope(
+                    ScopeId(scope_type=ScopeType.DOMAIN, scope_id=domain_name),
+                    [user_uuid],
+                )
+            for project_id in project_ids:
+                await rbac_write_ops.add_users_to_scope(
+                    ScopeId(scope_type=ScopeType.PROJECT, scope_id=str(project_id)),
+                    [user_uuid],
+                )
+
+    async def assign_user_to_model_store(self, user_uuid: UserID, domain_name: str | None) -> None:
+        """Add a user to its domain's model-store project scope and grant its roles.
+
+        Resolves the model-store project(s) of the domain and maps the user to
+        each one's active auto_assign roles. Idempotent: the scope binding is a
+        no-op when the membership already exists.
+        """
+        if domain_name is None:
+            return
+        async with self._db.begin_session_read_committed() as db_session:
+            model_store_project_ids = await self._get_model_store_project_ids(
+                db_session, domain_name
+            )
+        await self.assign_users_to_scope(
+            user_uuid,
+            domain_name,
+            [ProjectID(pid) for pid in model_store_project_ids],
+        )
+
+    async def _get_model_store_project_ids(
+        self, db_session: SASession, domain_name: str
+    ) -> list[UUID]:
+        """Return the model-store project ids of the given domain."""
+        rows = await db_session.scalars(
+            sa.select(GroupRow.id).where(
+                GroupRow.domain_name == domain_name,
+                GroupRow.type == ProjectType.MODEL_STORE,
+            )
+        )
+        return list(rows.all())
+
     async def bulk_create_users_validated(
         self,
         items: list[UserCreateSpec],
@@ -383,7 +441,7 @@ class UserDBSource:
             return BulkUserCreateResultData(successes=[], failures=[])
 
         successes: list[UserCreateResultData] = []
-        failures: list[BulkCreatorError[UserRow]] = []
+        failures: list[BulkCreateFailure] = []
 
         async with self._db.begin_session() as db_session:
             for idx, item in enumerate(items):
@@ -396,7 +454,7 @@ class UserDBSource:
                         successes.append(created)
                 except Exception as e:
                     log.warning("Failed to create user {}: {}", spec.email, str(e))
-                    failures.append(BulkCreatorError(spec=spec, exception=e, index=idx))
+                    failures.append(BulkCreateFailure(index=idx, exception=e))
 
         return BulkUserCreateResultData(successes=successes, failures=failures)
 
@@ -492,7 +550,7 @@ class UserDBSource:
             return BulkUserUpdateResultData(successes=[], failures=[])
 
         successes: list[UserData] = []
-        failures: list[BulkUpdaterError[UserRow]] = []
+        failures: list[BulkUpdateFailure] = []
 
         async with self._db.begin_session() as session:
             for idx, item in enumerate(items):
@@ -504,9 +562,7 @@ class UserDBSource:
                         successes.append(updated_user)
                 except Exception as e:
                     log.warning("Failed to update user {}: {}", item.user_id, str(e))
-                    failures.append(
-                        BulkUpdaterError(spec=item.updater_spec, exception=e, index=idx)
-                    )
+                    failures.append(BulkUpdateFailure(index=idx, exception=e))
 
         return BulkUserUpdateResultData(successes=successes, failures=failures)
 

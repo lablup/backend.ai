@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import secrets
 from collections.abc import Callable, Iterable, Mapping
 from contextvars import ContextVar
@@ -7,6 +8,10 @@ from typing import Self
 
 from aiohttp import web
 from aiohttp.typedefs import Handler
+
+from ai.backend.logging import BraceStyleAdapter
+
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 type RequestPolicy = Callable[[web.Request], None]
 
@@ -16,7 +21,22 @@ type ResponsePolicy = Callable[[web.StreamResponse], web.StreamResponse]
 # Content-Security-Policy header) and the handler that renders index.html.
 csp_nonce_var: ContextVar[str] = ContextVar("csp_nonce", default="")
 
-_NONCED_CSP_DIRECTIVES = frozenset({"script-src", "style-src"})
+# Opt-in placeholder a directive lists to request the per-request nonce.
+_CSP_NONCE_KEYWORD = "nonce"
+
+# The only CSP keyword a nonce overrides: a browser ignores 'unsafe-inline' once
+# a nonce-source is present, so the two cannot take effect together. Other
+# unsafe-* keywords (unsafe-eval, unsafe-hashes, wasm-unsafe-eval) are
+# orthogonal to nonces and may coexist.
+_CSP_UNSAFE_INLINE_KEYWORD = "unsafe-inline"
+
+
+def _is_nonce_keyword(source: str) -> bool:
+    return source.strip("'") == _CSP_NONCE_KEYWORD
+
+
+def _is_unsafe_inline_keyword(source: str) -> bool:
+    return source.strip("'") == _CSP_UNSAFE_INLINE_KEYWORD
 
 
 @web.middleware
@@ -122,9 +142,7 @@ def csp_policy_builder(csp_config: Mapping[str, list[str] | None]) -> ResponsePo
         for key, value in csp_config.items():
             if not value:
                 continue
-            sources = list(value)
-            if nonce and key in _NONCED_CSP_DIRECTIVES:
-                sources.append(f"'nonce-{nonce}'")
+            sources = _resolve_csp_sources(key, list(value), nonce)
             directives.append(key + " " + " ".join(sources))
         csp_str = "; ".join(directives)
         if csp_str:
@@ -133,6 +151,21 @@ def csp_policy_builder(csp_config: Mapping[str, list[str] | None]) -> ResponsePo
         return response
 
     return policy
+
+
+def _resolve_csp_sources(directive: str, sources: list[str], nonce: str) -> list[str]:
+    if not any(_is_nonce_keyword(source) for source in sources):
+        return sources
+    has_unsafe_inline = any(_is_unsafe_inline_keyword(source) for source in sources)
+    if has_unsafe_inline:
+        log.warning(
+            "CSP directive {} lists both the nonce keyword and 'unsafe-inline'; "
+            "dropping the nonce so 'unsafe-inline' keeps effect.",
+            directive,
+        )
+    if has_unsafe_inline or not nonce:
+        return [source for source in sources if not _is_nonce_keyword(source)]
+    return [f"'nonce-{nonce}'" if _is_nonce_keyword(source) else source for source in sources]
 
 
 def set_content_type_nosniff_policy(response: web.StreamResponse) -> web.StreamResponse:

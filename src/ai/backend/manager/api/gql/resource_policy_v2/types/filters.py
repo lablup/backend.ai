@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from enum import StrEnum
+from typing import Self
 
 from ai.backend.common.dto.manager.v2.resource_policy.request import (
     KeypairResourcePolicyFilter as KeypairResourcePolicyFilterDTO,
@@ -47,7 +48,7 @@ from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description=(
             "Nested filter for keypairs assigned to a keypair resource policy. "
             "Filters policies linked to at least one keypair matching all specified conditions."
@@ -79,11 +80,29 @@ class KeypairResourcePolicyV2Filter(PydanticInputMixin[KeypairResourcePolicyFilt
     max_pending_session_count: IntFilter | None = None
     keypair: KeypairResourcePolicyKeypairNestedFilterGQL | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description=(
                 "Filter policies by their assigned keypairs. "
                 "A policy matches if at least one of its keypairs satisfies the conditions."
             ),
+        ),
+        default=None,
+    )
+    AND: list[Self] | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Match all of the given sub-filters."
+        ),
+        default=None,
+    )
+    OR: list[Self] | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Match any of the given sub-filters."
+        ),
+        default=None,
+    )
+    NOT: list[Self] | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Negate the given sub-filters."
         ),
         default=None,
     )
@@ -141,6 +160,24 @@ class UserResourcePolicyV2Filter(PydanticInputMixin[UserResourcePolicyFilterDTO]
     max_quota_scope_size: IntFilter | None = None
     max_session_count_per_model_session: IntFilter | None = None
     max_customized_image_count: IntFilter | None = None
+    AND: list[Self] | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Match all of the given sub-filters."
+        ),
+        default=None,
+    )
+    OR: list[Self] | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Match any of the given sub-filters."
+        ),
+        default=None,
+    )
+    NOT: list[Self] | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Negate the given sub-filters."
+        ),
+        default=None,
+    )
 
 
 @gql_enum(
@@ -192,6 +229,24 @@ class ProjectResourcePolicyV2Filter(PydanticInputMixin[ProjectResourcePolicyFilt
     max_vfolder_count: IntFilter | None = None
     max_quota_scope_size: IntFilter | None = None
     max_network_count: IntFilter | None = None
+    AND: list[Self] | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Match all of the given sub-filters."
+        ),
+        default=None,
+    )
+    OR: list[Self] | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Match any of the given sub-filters."
+        ),
+        default=None,
+    )
+    NOT: list[Self] | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Negate the given sub-filters."
+        ),
+        default=None,
+    )
 
 
 @gql_enum(

@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
+from ai.backend.manager.models.clauses import QueryOrder
 from ai.backend.manager.models.model_card.row import ModelCardRow
-from ai.backend.manager.repositories.base import QueryOrder
 
 __all__ = ("ModelCardOrders",)
 

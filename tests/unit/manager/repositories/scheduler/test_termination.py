@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 
 import pytest
+import sqlalchemy as sa
 from dateutil.tz import tzutc
 
 from ai.backend.common.data.user.types import UserRole
@@ -25,7 +26,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.kernel.types import KernelStatus
-from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.data.session.types import KernelMatchType, SessionStatus
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
@@ -42,6 +43,7 @@ from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.rbac_models import UserRoleRow
+from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
@@ -56,6 +58,7 @@ from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder.row import VFolderRow
+from ai.backend.manager.repositories.scheduler.options import SessionConditions
 from ai.backend.testutils.db import with_tables
 
 
@@ -77,6 +80,7 @@ class TestKernelTermination:
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
                 KeyPairResourcePolicyRow,
+                RoleRow,
                 UserRoleRow,
                 UserRow,
                 KeyPairRow,
@@ -403,6 +407,175 @@ class TestKernelTermination:
             await db_sess.flush()
 
         yield kernel_id
+
+    @pytest.fixture
+    async def test_cancelled_kernel_id(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_session_id: SessionId,
+        test_agent_id: AgentId,
+        test_scaling_group_name: str,
+        test_domain_name: str,
+        test_group_id: uuid.UUID,
+        test_user_uuid: uuid.UUID,
+        test_access_key: AccessKey,
+    ) -> AsyncGenerator[uuid.UUID, None]:
+        """Create test kernel in CANCELLED status and return kernel ID"""
+        kernel_id = uuid.uuid4()
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            kernel = KernelRow(
+                id=kernel_id,
+                session_id=test_session_id,
+                agent=test_agent_id,
+                agent_addr="127.0.0.1:6001",
+                scaling_group=test_scaling_group_name,
+                cluster_idx=0,
+                cluster_role="main",
+                cluster_hostname=f"kernel-{uuid.uuid4().hex[:8]}",
+                image="python:3.8",
+                architecture="x86_64",
+                registry="docker.io",
+                container_id=f"container-{uuid.uuid4().hex[:8]}",
+                status=KernelStatus.CANCELLED,
+                status_changed=datetime.now(tzutc()),
+                occupied_slots=ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("4096")}),
+                requested_slots=ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("4096")}),
+                domain_name=test_domain_name,
+                group_id=test_group_id,
+                user_uuid=test_user_uuid,
+                access_key=test_access_key,
+                mounts=[],
+                environ={},
+                vfolder_mounts=[],
+                preopen_ports=[],
+                repl_in_port=2001,
+                repl_out_port=2002,
+                stdin_port=2003,
+                stdout_port=2004,
+            )
+            db_sess.add(kernel)
+            await db_sess.flush()
+
+        yield kernel_id
+
+    @pytest.fixture
+    async def test_terminated_kernel_id(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_session_id: SessionId,
+        test_agent_id: AgentId,
+        test_scaling_group_name: str,
+        test_domain_name: str,
+        test_group_id: uuid.UUID,
+        test_user_uuid: uuid.UUID,
+        test_access_key: AccessKey,
+    ) -> AsyncGenerator[uuid.UUID, None]:
+        """Create test kernel in TERMINATED status with cluster_idx=1 and return kernel ID"""
+        kernel_id = uuid.uuid4()
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            kernel = KernelRow(
+                id=kernel_id,
+                session_id=test_session_id,
+                agent=test_agent_id,
+                agent_addr="127.0.0.1:6001",
+                scaling_group=test_scaling_group_name,
+                cluster_idx=1,
+                cluster_role="sub",
+                cluster_hostname=f"kernel-{uuid.uuid4().hex[:8]}",
+                image="python:3.8",
+                architecture="x86_64",
+                registry="docker.io",
+                container_id=f"container-{uuid.uuid4().hex[:8]}",
+                status=KernelStatus.TERMINATED,
+                status_changed=datetime.now(tzutc()),
+                occupied_slots=ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("4096")}),
+                requested_slots=ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("4096")}),
+                domain_name=test_domain_name,
+                group_id=test_group_id,
+                user_uuid=test_user_uuid,
+                access_key=test_access_key,
+                mounts=[],
+                environ={},
+                vfolder_mounts=[],
+                preopen_ports=[],
+                repl_in_port=2005,
+                repl_out_port=2006,
+                stdin_port=2007,
+                stdout_port=2008,
+            )
+            db_sess.add(kernel)
+            await db_sess.flush()
+
+        yield kernel_id
+
+    async def test_session_promoted_when_all_kernels_cancelled(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_session_id: SessionId,
+        test_cancelled_kernel_id: uuid.UUID,
+    ) -> None:
+        """Session in TERMINATING with a CANCELLED kernel must be found by terminal_statuses condition."""
+        condition = SessionConditions.by_kernel_match(
+            list(KernelStatus.terminal_statuses()),
+            KernelMatchType.ALL,
+        )
+        stmt = sa.select(SessionRow.id).where(
+            SessionRow.status == SessionStatus.TERMINATING,
+            condition(),
+        )
+        async with db_with_cleanup.begin_session() as db_sess:
+            result = await db_sess.execute(stmt)
+            found_ids = [row[0] for row in result.all()]
+
+        assert test_session_id in found_ids
+
+    async def test_session_not_found_when_cancelled_kernel_with_terminated_only_condition(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_session_id: SessionId,
+        test_cancelled_kernel_id: uuid.UUID,
+    ) -> None:
+        """Session with a CANCELLED kernel must NOT be found by the old condition [TERMINATED only].
+
+        Regression guard — the bug cannot silently return.
+        """
+        condition = SessionConditions.by_kernel_match(
+            [KernelStatus.TERMINATED],
+            KernelMatchType.ALL,
+        )
+        stmt = sa.select(SessionRow.id).where(
+            SessionRow.status == SessionStatus.TERMINATING,
+            condition(),
+        )
+        async with db_with_cleanup.begin_session() as db_sess:
+            result = await db_sess.execute(stmt)
+            found_ids = [row[0] for row in result.all()]
+
+        assert test_session_id not in found_ids
+
+    async def test_session_promoted_when_kernels_mixed_terminated_and_cancelled(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_session_id: SessionId,
+        test_cancelled_kernel_id: uuid.UUID,
+        test_terminated_kernel_id: uuid.UUID,
+    ) -> None:
+        """Session with both TERMINATED and CANCELLED kernels must be found by terminal_statuses condition."""
+        condition = SessionConditions.by_kernel_match(
+            list(KernelStatus.terminal_statuses()),
+            KernelMatchType.ALL,
+        )
+        stmt = sa.select(SessionRow.id).where(
+            SessionRow.status == SessionStatus.TERMINATING,
+            condition(),
+        )
+        async with db_with_cleanup.begin_session() as db_sess:
+            result = await db_sess.execute(stmt)
+            found_ids = [row[0] for row in result.all()]
+
+        assert test_session_id in found_ids
 
     @pytest.fixture
     async def test_running_kernel_id(

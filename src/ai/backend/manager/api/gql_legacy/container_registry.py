@@ -6,6 +6,7 @@ from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, Self, cast
 
 import graphene
+import graphene_federation
 import graphql
 import sqlalchemy as sa
 from graphql import Undefined, UndefinedType
@@ -106,6 +107,7 @@ class ContainerRegistryTypeField(graphene.Scalar):  # type: ignore[misc]
         return ContainerRegistryType(value)
 
 
+@graphene_federation.key("id")
 class ContainerRegistryNode(graphene.ObjectType):  # type: ignore[misc]
     class Meta:
         interfaces = (AsyncNode,)
@@ -150,6 +152,11 @@ class ContainerRegistryNode(graphene.ObjectType):  # type: ignore[misc]
             is_global=data.is_global,
             extra=data.extra,
         )
+
+    async def __resolve_reference(
+        self, info: graphene.ResolveInfo, **kwargs: Any
+    ) -> ContainerRegistryNode:
+        return await ContainerRegistryNode.get_node(info, self.id)
 
     @classmethod
     async def get_node(cls, info: graphene.ResolveInfo, id: str) -> ContainerRegistryNode:

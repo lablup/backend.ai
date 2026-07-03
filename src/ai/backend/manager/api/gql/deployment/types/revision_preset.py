@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import StrEnum
-from typing import TYPE_CHECKING, Annotated
+from typing import TYPE_CHECKING, Annotated, Self
 from uuid import UUID
 
 import strawberry
@@ -152,7 +152,7 @@ class EnvironEntryGQL(PydanticOutputMixin[EnvironEntryInfoDTO]):
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="A mapping of a runtime variant preset to a specific value, used to auto-configure runtime parameters when this deployment preset is applied.",
     ),
     model=PresetValueInfoDTO,
@@ -320,7 +320,7 @@ class DeploymentRevisionPresetGQL(PydanticNodeMixin[NodeDTO]):
 
     @gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description="The container image used to run the inference server. None when the preset does not specify an image.",
         )
     )  # type: ignore[misc]
@@ -384,7 +384,7 @@ class DeploymentRevisionPresetConnection(Connection[DeploymentRevisionPresetGQL]
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="A mapping of a runtime variant preset to a concrete value, used to auto-configure runtime parameters when this deployment preset is applied.",
     ),
     name="RuntimeVariantPresetValueEntryInput",
@@ -407,12 +407,30 @@ class RuntimeVariantPresetValueEntryInputGQL(PydanticInputMixin[PresetValueInput
 )
 class DeploymentRevisionPresetFilterGQL(PydanticInputMixin[FilterDTO]):
     id: UUIDFilterGQL | None = gql_added_field(
-        BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Filter by preset ID."),
+        BackendAIGQLMeta(added_version="26.4.4", description="Filter by preset ID."),
         default=None,
     )
     name: StringFilterGQL | None = gql_field(default=None, description="Name filter.")
     runtime_variant_id: UUIDFilterGQL | None = gql_field(
         default=None, description="Variant ID filter."
+    )
+    AND: list[Self] | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Match all of the given sub-filters."
+        ),
+        default=None,
+    )
+    OR: list[Self] | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Match any of the given sub-filters."
+        ),
+        default=None,
+    )
+    NOT: list[Self] | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Negate the given sub-filters."
+        ),
+        default=None,
     )
 
 
@@ -451,7 +469,7 @@ class PresetDeploymentStrategyInputGQL(PydanticInputMixin[DeploymentStrategyInpu
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="Strict health check configuration for a preset model service.",
     ),
     name="PresetModelHealthCheckInput",
@@ -484,7 +502,7 @@ class PresetModelHealthCheckInputGQL(PydanticInputMixin[PresetModelHealthCheckIn
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="Strict metadata describing a preset model entry.",
     ),
     name="PresetModelMetadataInput",
@@ -513,7 +531,7 @@ class PresetModelMetadataInputGQL(PydanticInputMixin[PresetModelMetadataInputDTO
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="Strict service configuration for a preset model entry.",
     ),
     name="PresetModelServiceConfigInput",
@@ -523,7 +541,22 @@ class PresetModelServiceConfigInputGQL(PydanticInputMixin[PresetModelServiceConf
         description="Pre-start actions to execute before starting the model service. "
         "Provide an empty list when no pre-start actions are needed.",
     )
-    start_command: list[str] = gql_field(description="Command to start the model service.")
+    command: str | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Single-string command to start the model service.",
+        ),
+        default=None,
+    )
+    start_command: list[str] | None = gql_field(
+        description=(
+            "Deprecated since 26.7.0. Command to start the model service. Do "
+            "not set together with `command`; when both are set, `command` takes precedence and "
+            "this field is ignored."
+        ),
+        default=None,
+        deprecation_reason="Use `command` instead.",
+    )
     shell: str = gql_field(
         description="Shell configured for the model service.", default=DEFAULT_SHELL
     )
@@ -537,7 +570,7 @@ class PresetModelServiceConfigInputGQL(PydanticInputMixin[PresetModelServiceConf
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="Strict configuration for a single model within a preset model definition.",
     ),
     name="PresetModelConfigInput",
@@ -555,7 +588,7 @@ class PresetModelConfigInputGQL(PydanticInputMixin[PresetModelConfigInputDTO]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description="Strict model definition for a preset. When provided on create it must be "
         "fully populated with at least one model.",
     ),
@@ -593,20 +626,20 @@ class CreateDeploymentRevisionPresetInputGQL(PydanticInputMixin[CreateInputDTO])
     )
     image_id: UUID = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description="Container image to run the inference server.",
         ),
     )
     description: str | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description="Detailed explanation of when and why to use this preset configuration.",
         ),
         default=None,
     )
     model_definition: PresetModelDefinitionInputGQL | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description="Parsed model definition specifying health checks, ports, and service "
             "configuration for the inference endpoint. Optional, but when provided it must be "
             "fully populated with at least one model.",
@@ -615,54 +648,54 @@ class CreateDeploymentRevisionPresetInputGQL(PydanticInputMixin[CreateInputDTO])
     )
     resource_slots: list[ResourceSlotEntryInputGQL] | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description="Resource slot allocations (e.g. cpu, mem, cuda.device).",
         ),
         default=None,
     )
     resource_opts: list[ResourceOptsEntryInput] | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description="Additional resource options such as shared memory (shmem) size.",
         ),
         default=None,
     )
     cluster_mode: ClusterModeGQL = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description="Deployment topology mode (single-node or multi-node).",
         ),
     )
     cluster_size: int = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description="Number of worker nodes in the cluster.",
         ),
     )
     startup_command: str | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description="Command to start the inference server process inside the container.",
         ),
         default=None,
     )
     bootstrap_script: str | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description="Script executed before the main process starts (e.g. to download model weights).",
         ),
         default=None,
     )
     environ: list[EnvironEntryInputGQL] | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description="Environment variables injected into the inference container.",
         ),
         default=None,
     )
     preset_values: list[RuntimeVariantPresetValueEntryInputGQL] | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description="Runtime variant preset values applied when using this deployment preset.",
         ),
         default=None,
@@ -680,7 +713,7 @@ class UpdateDeploymentRevisionPresetInputGQL(PydanticInputMixin[UpdateInputDTO])
     id: UUID = gql_field(description="Preset ID.")
     runtime_variant_id: UUID | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description="New runtime variant for the preset. Omit to leave unchanged.",
         ),
         default=None,
@@ -710,70 +743,70 @@ class UpdateDeploymentRevisionPresetInputGQL(PydanticInputMixin[UpdateInputDTO])
     )
     image_id: UUID | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description="Container image for the inference server. Set to null to clear.",
         ),
         default=UNSET,
     )
     model_definition: ModelDefinitionInputGQL | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description="Parsed model definition. Set to null to clear.",
         ),
         default=UNSET,
     )
     startup_command: str | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description="Container startup command. Set to null to clear.",
         ),
         default=UNSET,
     )
     bootstrap_script: str | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description="Bootstrap script run before the main process. Set to null to clear.",
         ),
         default=UNSET,
     )
     resource_slots: list[ResourceSlotEntryInputGQL] | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description="Replace resource slot allocations. Omit to leave unchanged.",
         ),
         default=None,
     )
     resource_opts: list[ResourceOptsEntryInput] | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description="Replace additional resource options. Omit to leave unchanged.",
         ),
         default=None,
     )
     cluster_mode: ClusterModeGQL | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description="New cluster topology mode. Omit to leave unchanged.",
         ),
         default=None,
     )
     cluster_size: int | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description="New cluster size. Omit to leave unchanged.",
         ),
         default=None,
     )
     environ: list[EnvironEntryInputGQL] | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description="Replace environment variables. Omit to leave unchanged.",
         ),
         default=None,
     )
     preset_values: list[RuntimeVariantPresetValueEntryInputGQL] | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description="Replace runtime variant preset values. Omit to leave unchanged.",
         ),
         default=None,

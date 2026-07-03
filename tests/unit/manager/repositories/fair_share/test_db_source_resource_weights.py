@@ -17,12 +17,15 @@ from ai.backend.manager.models.fair_share.row import (
     ProjectFairShareRow,
     UserFairShareRow,
 )
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 
 class TestDomainFairShareRowToData:
     """Test DomainFairShareRow.to_data() with resource weight merging."""
 
-    def test_partial_explicit_weights_with_null_weight(self) -> None:
+    async def test_partial_explicit_weights_with_null_weight(
+        self, fair_share_row_tables: ExtendedAsyncSAEngine
+    ) -> None:
         """Scenario 2.2: Domain fair share with NULL weight and partial resource weights."""
         # Given: Create a DomainFairShareRow with partial resource weights
         row = DomainFairShareRow(
@@ -69,7 +72,9 @@ class TestDomainFairShareRowToData:
         assert "mem" in result.data.uses_default_resources
         assert "cuda.device" not in result.data.uses_default_resources
 
-    def test_explicit_weight_with_all_default_resource_weights(self) -> None:
+    async def test_explicit_weight_with_all_default_resource_weights(
+        self, fair_share_row_tables: ExtendedAsyncSAEngine
+    ) -> None:
         """Scenario 2.3: Explicit entity weight but all resource weights use defaults."""
         # Given
         row = DomainFairShareRow(
@@ -115,7 +120,9 @@ class TestDomainFairShareRowToData:
 class TestProjectFairShareRowToData:
     """Test ProjectFairShareRow.to_data() with resource weight merging."""
 
-    def test_partial_resource_weights(self) -> None:
+    async def test_partial_resource_weights(
+        self, fair_share_row_tables: ExtendedAsyncSAEngine
+    ) -> None:
         """Scenario 2.4: Project fair share with partial resource weights."""
         # Given
         row = ProjectFairShareRow(
@@ -158,7 +165,9 @@ class TestProjectFairShareRowToData:
 class TestUserFairShareRowToData:
     """Test UserFairShareRow.to_data() with resource weight merging."""
 
-    def test_empty_resource_weights(self) -> None:
+    async def test_empty_resource_weights(
+        self, fair_share_row_tables: ExtendedAsyncSAEngine
+    ) -> None:
         """Scenario 2.5: User fair share with empty resource weights (all defaults)."""
         # Given
         row = UserFairShareRow(
@@ -202,7 +211,9 @@ class TestUserFairShareRowToData:
 class TestResourceWeightMergingEdgeCases:
     """Test edge cases for resource weight merging."""
 
-    def test_new_resource_type_fallback_to_one(self) -> None:
+    async def test_new_resource_type_fallback_to_one(
+        self, fair_share_row_tables: ExtendedAsyncSAEngine
+    ) -> None:
         """Test fallback to 1.0 for new resource types not in defaults."""
         # Given
         row = DomainFairShareRow(

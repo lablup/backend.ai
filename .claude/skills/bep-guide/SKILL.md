@@ -69,19 +69,21 @@ Implemented-Version:
 
 ### Step 5: Write Sections
 
+A BEP is a **readable tech spec, not an implementation log** — describe interfaces, contracts, and decisions; leave concrete code, SQL, and file-by-file steps to the PR (see "Writing style" in the root `AGENTS.md`).
+
 Each section has a specific purpose. Write in this order:
 
-| Section | Purpose | Length Guide |
-|---------|---------|-------------|
-| Related Issues | JIRA/GitHub links | 2-5 lines |
-| Motivation | Why this change is needed | 10-30 lines |
-| Current Design | What exists today | 10-50 lines, include code |
-| Proposed Design | The new design | Main body, be specific |
-| Migration / Compatibility | Breaking changes, migration plan | 10-30 lines |
-| Implementation Plan | Phased steps | 10-30 lines |
-| Decision Log | Key decisions with rationale | Append as decisions are made |
-| Open Questions | Unresolved items | Update as resolved |
-| References | Related docs, BEPs | 2-10 lines |
+| Section | Purpose | Length | Avoid |
+|---------|---------|--------|-------|
+| Related Issues | JIRA/GitHub links | 2-5 lines | — |
+| Motivation | Why this change is needed | 10-30 lines | how to implement it |
+| Current Design | What exists today | 10-50 lines | full source dumps |
+| Proposed Design | The new design | Main body, be specific | step-by-step code, class-by-class listings |
+| Migration / Compatibility | Breaking changes, migration plan | 10-30 lines | full SQL/script bodies |
+| Implementation Plan | Phased steps | 10-30 lines | line-by-line tasks, code |
+| Decision Log | Key decisions with rationale | append | re-arguing settled decisions |
+| Open Questions | Unresolved items | update | — |
+| References | Related docs, BEPs | 2-10 lines | — |
 
 **Decision Log / Open Questions lifecycle:**
 - When an Open Question is resolved, add a row to Decision Log and remove from Open Questions.
@@ -120,33 +122,19 @@ Separate `overview.md` file is optional for very large BEPs (5+ sub-documents).
 
 ### Main Document (BEP-XXXX-title.md)
 
-The main file must be **concise** (under ~200 lines). It serves as both entry point and overview:
+The main file must be **concise** (under ~200 lines) — overview + index only. Beyond the standard sections (Step 5), segmented-main adds a `context-for-ai` master block and a Document Index:
 
 ```markdown
----
-Author: ...
-Status: Draft
----
-
 <!-- context-for-ai
 type: master-bep
-scope: One-line summary of the proposal
+scope: One-line summary
 detail-docs: [component-a.md, component-b.md, migration.md]
-key-constraints:
-  - constraint 1
-  - constraint 2
-key-decisions:
-  - decision 1 (from Decision Log)
+key-constraints: [constraint 1, constraint 2]
+key-decisions: [decision 1 (from Decision Log)]
 phases: 3
 -->
 
 # Title
-
-## Related Issues
-- JIRA: BA-XXXX
-
-## Motivation
-(Why this change is needed - keep under 30 lines)
 
 ## Document Index
 
@@ -154,23 +142,14 @@ phases: 3
 |----------|-------------|
 | [component-a](./BEP-XXXX/component-a.md) | Data model and queries |
 | [component-b](./BEP-XXXX/component-b.md) | API design and handlers |
-| [migration](./BEP-XXXX/migration.md) | Migration plan and compatibility |
-
-## Implementation Plan
-1. Phase 1: ...
-2. Phase 2: ...
 
 ## Decision Log
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
-| 2026-01-15 | Use event-driven over polling | Lower latency, simpler error handling |
+| 2026-01-15 | Event-driven over polling | Lower latency |
 
-## Open Questions
-(Unresolved items across all sub-documents — single source of truth)
-
-## References
-(Related BEPs, external docs)
+(+ standard sections — Motivation, Implementation Plan, Open Questions, References — per Step 5)
 ```
 
 ### Sub-Document Template
@@ -287,4 +266,4 @@ Example task prompt:
 
 - `proposals/README.md` — BEP process, number registry, file structure rules
 - `proposals/BEP-0000-template.md` — Blank template to copy (sections with example content)
-- `/tdd-guide` — Test scenarios for implementation phase
+- `/test-guide` — Test scenarios for implementation phase

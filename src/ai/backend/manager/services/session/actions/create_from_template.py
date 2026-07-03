@@ -10,7 +10,7 @@ from ai.backend.common.data.permission.types import RBACElementType, ScopeType
 from ai.backend.common.types import AccessKey, ClusterMode, SessionTypes
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.api.utils import Undefined
+from ai.backend.manager.data.common.sentinel import Undefined
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.services.session.base import SessionScopeAction

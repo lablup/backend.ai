@@ -269,6 +269,10 @@ class Context(metaclass=ABCMeta):
     async def run_exec(self, cmdargs: Sequence[str], **kwargs: Any) -> int:
         p = await asyncio.create_subprocess_exec(
             *cmdargs,
+            # Detach from the controlling terminal: a child that inherits the
+            # TUI's stdin would steal terminal input (mouse drag events), which
+            # breaks log text-selection partway through an install.
+            stdin=kwargs.pop("stdin", asyncio.subprocess.DEVNULL),
             stdout=kwargs.pop("stdout", asyncio.subprocess.PIPE),
             stderr=kwargs.pop("stderr", asyncio.subprocess.PIPE),
             **kwargs,
@@ -632,6 +636,8 @@ class Context(metaclass=ABCMeta):
         with self.resource_path(
             "ai.backend.install.fixtures", "example-runtime-variant-presets.json"
         ) as path:
+            await self.run_manager_cli(["mgr", "fixture", "populate", str(path)])
+        with self.resource_path("ai.backend.install.fixtures", "example-roles.json") as path:
             await self.run_manager_cli(["mgr", "fixture", "populate", str(path)])
         with self.resource_path(
             "ai.backend.install.fixtures", "example-prometheus-query-preset-categories.json"
@@ -1250,6 +1256,10 @@ class Context(metaclass=ABCMeta):
             data["proxy_coordinator"]["metric_access_allowed_hosts"] = (
                 self.install_variable.metric_access_cidr
             )
+            announce_addr_table = tomlkit.inline_table()
+            announce_addr_table["host"] = public_facing_address
+            announce_addr_table["port"] = service.appproxy_coordinator_addr.bind.port
+            data["proxy_coordinator"]["announce_addr"] = announce_addr_table
         with coord_conf.open("w") as fp:
             tomlkit.dump(data, fp)
 

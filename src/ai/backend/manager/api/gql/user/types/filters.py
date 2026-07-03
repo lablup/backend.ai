@@ -12,7 +12,6 @@ from ai.backend.common.dto.manager.v2.user.types import (
     UserRoleFilter,
     UserStatusFilter,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
     IntArrayFilter,
@@ -112,14 +111,14 @@ class UserFilterGQL(PydanticInputMixin[UserFilter]):
     email: StringFilter | None = None
     full_name: StringFilter | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description="Filter by full name.",
         ),
         default=None,
     )
     description: StringFilter | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description="Filter by description.",
         ),
         default=None,
@@ -127,7 +126,7 @@ class UserFilterGQL(PydanticInputMixin[UserFilter]):
     status: UserStatusEnumFilterGQL | None = None
     status_info: StringFilter | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description="Filter by status info detail.",
         ),
         default=None,
@@ -142,7 +141,7 @@ class UserFilterGQL(PydanticInputMixin[UserFilter]):
     )
     resource_policy: StringFilter | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description="Filter by user resource policy name.",
         ),
         default=None,
@@ -150,42 +149,42 @@ class UserFilterGQL(PydanticInputMixin[UserFilter]):
     role: UserRoleEnumFilterGQL | None = None
     need_password_change: bool | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description="Filter by whether a password change is required.",
         ),
         default=None,
     )
     totp_activated: bool | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description="Filter by whether TOTP two-factor auth is activated.",
         ),
         default=None,
     )
     sudo_session_enabled: bool | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description="Filter by whether sudo sessions are enabled.",
         ),
         default=None,
     )
     container_uid: IntFilter | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description="Filter by container UID.",
         ),
         default=None,
     )
     container_main_gid: IntFilter | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description="Filter by container main GID.",
         ),
         default=None,
     )
     container_gids: IntArrayFilter | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description="Filter by container supplementary GIDs.",
         ),
         default=None,

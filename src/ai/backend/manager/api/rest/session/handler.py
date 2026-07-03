@@ -87,7 +87,7 @@ from ai.backend.common.types import (
     KernelId,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.api.utils import undefined
+from ai.backend.manager.data.common.sentinel import undefined
 from ai.backend.manager.defs import DEFAULT_IMAGE_ARCH
 from ai.backend.manager.dto.context import RequestCtx
 from ai.backend.manager.errors.api import InvalidAPIParameters, NotImplementedAPI
@@ -1113,11 +1113,11 @@ class SessionHandler:
 
     async def shutdown_service(
         self,
-        body: BodyParam[ShutdownServiceRequest],
+        query: QueryParam[ShutdownServiceRequest],
         ctx: RequestCtx,
     ) -> web.Response:
         request = ctx.request
-        params = body.parsed
+        params = query.parsed
         session_name = request.match_info["session_name"]
         scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
@@ -1189,11 +1189,11 @@ class SessionHandler:
 
     async def download_files(
         self,
-        body: BodyParam[DownloadFilesRequest],
+        query: QueryParam[DownloadFilesRequest],
         ctx: RequestCtx,
     ) -> web.Response:
         request = ctx.request
-        params = body.parsed
+        params = query.parsed
         session_name = request.match_info["session_name"]
         scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(
@@ -1380,11 +1380,11 @@ class SessionHandler:
 
     async def convert_session_to_image(
         self,
-        query: QueryParam[ConvertSessionToImageRequest],
+        body: BodyParam[ConvertSessionToImageRequest],
         ctx: RequestCtx,
     ) -> APIResponse:
         request = ctx.request
-        params = query.parsed
+        params = body.parsed
         session_name: str = request.match_info["session_name"]
         scope = await self._auth.resolve_access_key_scope.wait_for_complete(
             ResolveAccessKeyScopeAction(

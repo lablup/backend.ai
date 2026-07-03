@@ -22,6 +22,7 @@ from ai.backend.common.types import (
     SessionId,
     SessionTypes,
 )
+from ai.backend.manager.data.sokovan import AgentInfo
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.concentrated import (
     ConcentratedAgentSelector,
 )
@@ -33,7 +34,6 @@ from ai.backend.manager.sokovan.scheduler.provisioner.selectors.exceptions impor
     NoAvailableAgentError,
 )
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import (
-    AgentInfo,
     AgentSelectionConfig,
     AgentSelectionCriteria,
     AgentSelector,

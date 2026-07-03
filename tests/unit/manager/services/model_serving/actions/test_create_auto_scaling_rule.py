@@ -17,14 +17,14 @@ from ai.backend.common.types import (
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.data.model_serving.creator import EndpointAutoScalingRuleCreator
+from ai.backend.manager.errors.service import (
+    EndpointNotFound,
+)
 from ai.backend.manager.repositories.model_serving.repositories import ModelServingRepositories
 from ai.backend.manager.repositories.model_serving.repository import ModelServingRepository
 from ai.backend.manager.services.model_serving.actions.create_auto_scaling_rule import (
     CreateEndpointAutoScalingRuleAction,
     CreateEndpointAutoScalingRuleActionResult,
-)
-from ai.backend.manager.services.model_serving.exceptions import (
-    EndpointNotFound,
 )
 from ai.backend.manager.services.model_serving.processors.auto_scaling import (
     ModelServingAutoScalingProcessors,

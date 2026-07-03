@@ -91,7 +91,6 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
 from ai.backend.common.dto.manager.v2.deployment.types import (
     ProjectDeploymentScope as ProjectDeploymentScopeDTO,
 )
-from ai.backend.common.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
     NullableDateTimeFilter,
@@ -99,7 +98,6 @@ from ai.backend.manager.api.gql.base import (
     StringFilter,
     UUIDFilter,
     encode_cursor,
-    to_global_id,
 )
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -155,8 +153,6 @@ from ai.backend.manager.api.gql.domain import Domain
 from ai.backend.manager.api.gql.project import Project
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
-from ai.backend.manager.api.gql_legacy.domain import DomainNode
-from ai.backend.manager.api.gql_legacy.group import GroupNode
 from ai.backend.manager.data.deployment.types import (
     AccessTokenSearchScope,
     AutoScalingRuleSearchScope,
@@ -182,7 +178,7 @@ DeploymentStatusGQL: type[ModelDeploymentStatus] = gql_enum(
 
 ScalingStateGQL: type[ScalingState] = gql_enum(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description=(
             "Replica scaling axis for a deployment, orthogonal to the"
             " lifecycle status. ``SCALING`` while the replica reconciler"
@@ -235,14 +231,14 @@ class ModelDeploymentMetadata:
     updated_at: datetime
     resource_group_name: str = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description="Name of the resource group (scaling group) this deployment runs in.",
         )
     )
 
     @gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
             description="The resource group this deployment runs in, resolved via DataLoader.",
         )
     )  # type: ignore[misc]
@@ -262,10 +258,9 @@ class ModelDeploymentMetadata:
         deprecation_reason="Use project_v2 instead.",
     )  # type: ignore[misc]
     async def project(self, info: Info[StrawberryGQLContext]) -> Project | None:
-        project_global_id = to_global_id(
-            GroupNode, UUID(str(self.project_id)), is_target_graphene_object=True
-        )
-        return Project(id=ID(project_global_id))
+        # Federated GroupNode stub is a relay.Node; pass the inner id so Strawberry
+        # re-encodes the same global ID the graphene subgraph expects.
+        return Project(id=ID(str(UUID(str(self.project_id)))))
 
     @gql_added_field(
         BackendAIGQLMeta(
@@ -289,10 +284,9 @@ class ModelDeploymentMetadata:
         deprecation_reason="Use domain_v2 instead.",
     )  # type: ignore[misc]
     async def domain(self, info: Info[StrawberryGQLContext]) -> Domain | None:
-        domain_global_id = to_global_id(
-            DomainNode, self.domain_name, is_target_graphene_object=True
-        )
-        return Domain(id=ID(domain_global_id))
+        # Federated DomainNode stub is a relay.Node; pass the inner id so Strawberry
+        # re-encodes the same global ID the graphene subgraph expects.
+        return Domain(id=ID(str(self.domain_name)))
 
     @gql_added_field(
         BackendAIGQLMeta(
@@ -344,8 +338,8 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
     options: DeploymentOptionsInfoGQL
     scaling_state: ScalingStateGQL = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
-            deprecated_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.4",
+            deprecated_version="26.4.4",
             deprecation_hint="per-replica-group scaling status",
             description=(
                 "Endpoint-level replica scaling axis. Scaling is now reconciled per replica"
@@ -856,7 +850,7 @@ class AdminRefreshDeploymentRevisionsPayload:
 # Replace deployment options types
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description=(
             "Input for the replaceDeploymentOptions mutation. Full-replace"
             " semantics — the supplied payload is the complete new value."
@@ -871,7 +865,7 @@ class ReplaceDeploymentOptionsInputGQL(PydanticInputMixin[ReplaceDeploymentOptio
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.4.4",
         description=(
             "Payload returned after replacing a deployment's options. Only"
             " the refreshed options surface is returned; the server path uses"

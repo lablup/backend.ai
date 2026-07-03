@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
-from ai.backend.manager.api.utils import Undefined
+from ai.backend.manager.data.common.sentinel import Undefined
 
 
 def drop_undefined(d: dict[Any, Any]) -> dict[Any, Any]:

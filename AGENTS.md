@@ -9,6 +9,16 @@ This file contains the core rules for AI coding agents. For detailed patterns an
 - **`README.md`**: A document for humans to understand the component's composition. Should not change often. Does not duplicate AGENTS/CONTEXTS.
 - Place a rule **only once, at the highest level** of its scope — global at this root, component-global at the component top level. Do not duplicate an upper-level rule lower down.
 
+## Writing style
+
+Applies to every generated artifact — docs, code comments, BEPs, PR descriptions.
+
+- Lead with the conclusion; keep background short.
+- Implementation details live in the code and the PR — docs describe interfaces and contracts, not line-by-line steps.
+- Prefer tables and lists over prose.
+- Code examples show the interface/contract only, not internal implementation.
+- State a rule once at its highest scope (see above); link instead of repeating.
+
 ## Document index
 
 **Core Documents (Read directly):**
@@ -21,16 +31,17 @@ This file contains the core rules for AI coding agents. For detailed patterns an
 **Skills (Invoke with `/skill-name`):**
 
 When to use:
+- Finding where a feature lives / tracing it across layers (REST, GraphQL, Service, Repository, DB) → `/code-trace`
 - Designing features → `/bep-guide`
 - Implementing repo/service/API layers → `/repository-guide`, `/service-guide`, `/api-guide`
 - Implementing SDK/CLI code → `/cli-sdk-guide`
-- Writing tests → `/tdd-guide`
+- Writing tests → `/test-guide`
 - Restarting services after code changes → `/local-dev`
 - **Running any `./bai` command → `/bai-cli` (MUST load before executing)**
 - Checking logs/metrics/traces during development → `/observability` (Grafana MCP)
 - Docker/halfstack issues → `/halfstack`
-- Checking/applying DB migrations → `/db-status`, `/db-migrate`
-- Running component servers directly → `/cli-executor`
+- Checking/applying DB migrations → `/db-migrate`
+- Running component servers directly → `/local-dev`
 - Submitting PR → `/submit`
 - Preparing release → `/release`
 
@@ -111,7 +122,7 @@ test, and log-checking procedures, see the `/local-dev`, `/bai-cli`, and `/obser
 
 **BEP-first:** For significant features, use the `/bep-guide` skill. Check `proposals/README.md` for an existing BEP or create a new one.
 
-**TDD:** Write tests first. For the workflow, see the `/tdd-guide` skill; for strategies, see `tests/AGENTS.md`.
+**Testing:** Agree on test scenarios first (success/exception/edge), then implement and verify each. See the `/test-guide` skill; for strategies, see `tests/AGENTS.md`.
 
 **Implementation patterns:** For details, use the skills:
 - Repository layer → `/repository-guide`

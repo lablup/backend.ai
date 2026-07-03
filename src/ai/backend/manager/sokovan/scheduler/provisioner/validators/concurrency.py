@@ -1,6 +1,6 @@
 """Validator for concurrent session limits."""
 
-from ai.backend.manager.sokovan.data import SessionWorkload, SystemSnapshot
+from ai.backend.manager.data.sokovan import SessionWorkload, SystemSnapshot
 
 from .exceptions import ConcurrencyLimitExceeded
 from .validator import ValidatorRule

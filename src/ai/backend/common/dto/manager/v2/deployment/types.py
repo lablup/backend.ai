@@ -23,7 +23,6 @@ from ai.backend.common.data.model_deployment.types import (
 from ai.backend.common.dto.manager.v2.common import OrderDirection, ResourceSlotInfo
 from ai.backend.common.dto.manager.v2.resource_slot.types import ResourceOptsInfoDTO
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import (
     BackendAISchema,
     ClusterMode,
@@ -304,10 +303,19 @@ class ModelServiceConfigInfoDTO(BaseResponseModel):
         default_factory=list,
         description="List of pre-start actions to execute before starting the model service.",
     )
-    start_command: list[str] | None = Field(
-        default=None, description="Command to start the model service."
+    command: str | None = Field(
+        default=None,
+        description=("Added in 26.7.0. Single-string command to start the model service."),
     )
-    shell: str = Field(
+    start_command: list[str] | None = Field(
+        default=None,
+        description=(
+            "Deprecated since 26.7.0. Command to start the model service. Do "
+            "not set together with `command`; when both are set, `command` takes precedence and "
+            "this field is ignored."
+        ),
+    )
+    shell: str | None = Field(
         default="/bin/bash",
         description="Shell configured for the model service.",
     )
@@ -417,8 +425,7 @@ class ModelMountConfigInfoDTO(BaseResponseModel):
     subpath: str | None = Field(
         default=None,
         description=(
-            f"Added in {NEXT_RELEASE_VERSION}. "
-            "Subpath within the model vfolder. ``None`` means the vfolder root."
+            "Added in 26.4.4. Subpath within the model vfolder. ``None`` means the vfolder root."
         ),
     )
 
@@ -446,8 +453,7 @@ class ExtraVFolderMountGQLDTO(BaseResponseModel):
     subpath: str | None = Field(
         default=None,
         description=(
-            f"Added in {NEXT_RELEASE_VERSION}. "
-            "Subpath within the vfolder. ``None`` means the vfolder root."
+            "Added in 26.4.4. Subpath within the vfolder. ``None`` means the vfolder root."
         ),
     )
 

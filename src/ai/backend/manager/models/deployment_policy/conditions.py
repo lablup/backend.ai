@@ -7,8 +7,8 @@ from collections.abc import Collection
 
 import sqlalchemy as sa
 
+from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.deployment_policy.row import DeploymentPolicyRow
-from ai.backend.manager.repositories.base import QueryCondition
 
 
 class DeploymentPolicyConditions:

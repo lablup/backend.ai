@@ -4,8 +4,8 @@ import uuid
 
 import sqlalchemy as sa
 
+from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.repositories.base import QueryCondition
 
 
 class EndpointConditions:

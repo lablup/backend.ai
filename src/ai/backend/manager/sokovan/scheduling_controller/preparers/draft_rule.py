@@ -23,13 +23,13 @@ from dataclasses import dataclass, field
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.types import VFolderMount
 from ai.backend.manager.data.dotfile.types import DotfileBundle
-from ai.backend.manager.data.session.draft import SessionSpecDraft
-from ai.backend.manager.data.session.options import DefaultSessionOptions
-from ai.backend.manager.repositories.scheduler.types.session_creation import (
+from ai.backend.manager.data.session.creation import (
     ContainerUserInfo,
     ImageInfo,
     ScalingGroupNetworkInfo,
 )
+from ai.backend.manager.data.session.draft import SessionSpecDraft
+from ai.backend.manager.data.session.options import DefaultSessionOptions
 
 
 @dataclass(frozen=True)

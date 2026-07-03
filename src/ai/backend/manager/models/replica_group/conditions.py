@@ -12,8 +12,8 @@ from ai.backend.manager.data.deployment.types import (
     ReplicaGroupLifecycle,
     ReplicaGroupScalingStatus,
 )
+from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
-from ai.backend.manager.repositories.base import QueryCondition
 
 
 class ReplicaGroupConditions:

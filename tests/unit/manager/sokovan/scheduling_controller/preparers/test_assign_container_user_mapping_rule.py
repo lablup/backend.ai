@@ -4,14 +4,14 @@ from __future__ import annotations
 
 import pytest
 
+from ai.backend.manager.data.session.creation import (
+    ContainerUserInfo,
+)
 from ai.backend.manager.data.session.draft import (
     KernelSpecDraft,
     SessionSpecDraft,
 )
 from ai.backend.manager.data.session.options import DefaultSessionOptions
-from ai.backend.manager.repositories.scheduler.types.session_creation import (
-    ContainerUserInfo,
-)
 from ai.backend.manager.sokovan.scheduling_controller.preparers.assign_container_user_mapping_rule import (
     AssignContainerUserMappingRule,
 )
