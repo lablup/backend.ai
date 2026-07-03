@@ -67,20 +67,12 @@ class AppConfigFragmentRepository:
         return await self._db_source.get_by_id(fragment_id)
 
     @app_config_fragment_repository_resilience.apply()
-    async def update(
-        self,
-        updater: Updater[AppConfigFragmentRow],
-        only_if: ExistsQuerier[AppConfigAllowListRow],
-    ) -> AppConfigFragmentData:
-        return await self._db_source.update(updater, only_if)
+    async def update(self, updater: Updater[AppConfigFragmentRow]) -> AppConfigFragmentData:
+        return await self._db_source.update(updater)
 
     @app_config_fragment_repository_resilience.apply()
-    async def purge(
-        self,
-        purger: Purger[AppConfigFragmentRow],
-        only_if: ExistsQuerier[AppConfigAllowListRow],
-    ) -> AppConfigFragmentData:
-        return await self._db_source.purge(purger, only_if)
+    async def purge(self, purger: Purger[AppConfigFragmentRow]) -> AppConfigFragmentData:
+        return await self._db_source.purge(purger)
 
     @app_config_fragment_repository_resilience.apply()
     async def admin_search(self, querier: BatchQuerier) -> AppConfigFragmentSearchResult:

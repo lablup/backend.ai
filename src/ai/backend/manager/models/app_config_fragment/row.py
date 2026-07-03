@@ -20,8 +20,10 @@ __all__ = ("AppConfigFragmentRow",)
 class AppConfigFragmentRow(Base):  # type: ignore[misc]
     """One scoped app config fragment — a single JSON document at ``(config_name, scope_type, scope_id)``.
 
-    The fragment carries no merge priority of its own — its rank is the ``rank`` of
-    the allow-list entry for its ``(config_name, scope_type)``.
+    A fragment hangs off its ``app_config_allow_list`` entry (FK on
+    ``(config_name, scope_type)``, ``ON DELETE CASCADE``): it exists only while the
+    entry does, and its merge priority is the entry's ``rank`` — the fragment row
+    carries no rank of its own.
     """
 
     __tablename__ = "app_config_fragments"
@@ -31,6 +33,12 @@ class AppConfigFragmentRow(Base):  # type: ignore[misc]
             "scope_type",
             "scope_id",
             name="uq_app_config_fragments_config_name_scope_type_scope_id",
+        ),
+        sa.ForeignKeyConstraint(
+            ["config_name", "scope_type"],
+            ["app_config_allow_list.config_name", "app_config_allow_list.scope_type"],
+            name="fk_app_config_fragments_config_name_scope_type",
+            ondelete="CASCADE",
         ),
     )
 

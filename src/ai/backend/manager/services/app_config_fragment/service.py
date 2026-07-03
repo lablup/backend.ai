@@ -34,12 +34,14 @@ __all__ = ("AppConfigFragmentService",)
 class AppConfigFragmentService:
     """Write/read paths for app config fragments (not admin-only).
 
-    ``create`` / ``update`` / ``purge`` are gated by the allow-list write-gate in the
-    repository: the gate check and the write run in a single transaction, so a fragment is
-    only written or removed when an ``app_config_allow_list`` row exists for its
-    ``(config_name, scope_type)``. Because an allow-list row requires a registered
-    ``config_name`` (FK), this also enforces registration. An allow-listed user may
-    therefore manage their own ``user``-scope fragment without admin privileges.
+    ``create`` is gated by the allow-list write-gate in the repository: the gate check
+    and the write run in a single transaction, so a fragment is only written when an
+    ``app_config_allow_list`` row exists for its ``(config_name, scope_type)``. Because
+    an allow-list row requires a registered ``config_name`` (FK), this also enforces
+    registration. ``update`` / ``purge`` need no gate — the fragments' FK to the
+    allow-list (``ON DELETE CASCADE``) guarantees an existing fragment's entry exists.
+    An allow-listed user may therefore manage their own ``user``-scope fragment without
+    admin privileges.
     """
 
     _repository: AppConfigFragmentRepository
@@ -85,11 +87,11 @@ class AppConfigFragmentService:
     async def update(
         self, action: UpdateAppConfigFragmentAction
     ) -> UpdateAppConfigFragmentActionResult:
-        data = await self._repository.update(action.updater, action.only_if)
+        data = await self._repository.update(action.updater)
         return UpdateAppConfigFragmentActionResult(fragment=data)
 
     async def purge(
         self, action: PurgeAppConfigFragmentAction
     ) -> PurgeAppConfigFragmentActionResult:
-        data = await self._repository.purge(action.purger, action.only_if)
+        data = await self._repository.purge(action.purger)
         return PurgeAppConfigFragmentActionResult(fragment=data)

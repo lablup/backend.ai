@@ -201,12 +201,11 @@ class TestAppConfigFragmentService:
             spec=AppConfigFragmentUpdaterSpec(config=OptionalState.update({"b": 2})),
             pk_value=updated.id,
         )
-        gate = ExistsQuerier(row_class=AppConfigAllowListRow)
 
-        result = await service.update(UpdateAppConfigFragmentAction(updater=updater, only_if=gate))
+        result = await service.update(UpdateAppConfigFragmentAction(updater=updater))
 
         assert result.fragment == updated
-        mock_repository.update.assert_called_once_with(updater, gate)
+        mock_repository.update.assert_called_once_with(updater)
 
     # --- purge ---
 
@@ -216,12 +215,11 @@ class TestAppConfigFragmentService:
         fragment = _fragment()
         mock_repository.purge = AsyncMock(return_value=fragment)
         purger = Purger(row_class=AppConfigFragmentRow, pk_value=fragment.id)
-        gate = ExistsQuerier(row_class=AppConfigAllowListRow)
 
-        result = await service.purge(PurgeAppConfigFragmentAction(purger=purger, only_if=gate))
+        result = await service.purge(PurgeAppConfigFragmentAction(purger=purger))
 
         assert result.fragment == fragment
-        mock_repository.purge.assert_called_once_with(purger, gate)
+        mock_repository.purge.assert_called_once_with(purger)
 
 
 class TestCreateActionScope:

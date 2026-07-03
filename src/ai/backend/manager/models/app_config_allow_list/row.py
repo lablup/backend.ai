@@ -18,10 +18,12 @@ __all__ = ("AppConfigAllowListRow",)
 class AppConfigAllowListRow(Base):  # type: ignore[misc]
     """Permission to write config fragments for one config name at one scope type.
 
-    A config fragment may be created, updated, or purged only when a matching row
-    exists here; without one, the write is rejected. ``rank`` is the merge priority
-    the entry's fragments carry (low → high; higher wins) — admin-owned here so
-    fragment owners cannot re-order the merge. There is at most one row per
+    A config fragment may be created only when a matching row exists here; without
+    one, the write is rejected. Fragments reference this table by
+    ``(config_name, scope_type)`` with ``ON DELETE CASCADE``, so removing an entry
+    also removes every fragment written under it. ``rank`` is the merge priority the
+    entry's fragments carry (low → high; higher wins) — admin-owned here so fragment
+    owners cannot re-order the merge. There is at most one row per
     ``(config_name, scope_type)``, and only admins create or remove these rows.
     """
 

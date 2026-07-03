@@ -109,25 +109,6 @@ async def domain_scoped_fragment(database: ExtendedAsyncSAEngine) -> AppConfigFr
         db_sess.add(AppConfigDefinitionRow(config_name="theme"))
         await db_sess.flush()
         db_sess.add(_allow_list_row("theme", AppConfigScopeType.DOMAIN))
-        row = AppConfigFragmentRow(
-            config_name="theme",
-            scope_type=AppConfigScopeType.DOMAIN,
-            scope_id=_DOMAIN_ID,
-            config={"k": "v"},
-        )
-        db_sess.add(row)
-        await db_sess.flush()
-        return row.to_data()
-
-
-@pytest.fixture
-async def fragment_not_allow_listed(database: ExtendedAsyncSAEngine) -> AppConfigFragmentData:
-    """Situation: a ``theme``/domain fragment whose ``(config_name, scope)`` is NOT allow-listed.
-
-    Models a row that survives after its allow-list entry was removed — writes must be gated.
-    """
-    async with database.begin_session() as db_sess:
-        db_sess.add(AppConfigDefinitionRow(config_name="theme"))
         await db_sess.flush()
         row = AppConfigFragmentRow(
             config_name="theme",
@@ -267,16 +248,11 @@ class TestUpdate:
                 spec=AppConfigFragmentUpdaterSpec(config=OptionalState.update({"b": 2})),
                 pk_value=domain_scoped_fragment.id,
             ),
-            ExistsQuerier(row_class=AppConfigAllowListRow),
         )
         assert updated.config == {"b": 2}
         assert (await repository.get_by_id(domain_scoped_fragment.id)).config == {"b": 2}
 
-    async def test_update_missing_raises(
-        self, repository: AppConfigFragmentRepository, theme_registered: None
-    ) -> None:
-        # Writes are allow-listed (gate open), so a missing fragment surfaces as NotFound
-        # rather than the write-gate rejection.
+    async def test_update_missing_raises(self, repository: AppConfigFragmentRepository) -> None:
         missing_id = AppConfigFragmentID(uuid.uuid4())
         with pytest.raises(AppConfigFragmentNotFound):
             await repository.update(
@@ -284,21 +260,6 @@ class TestUpdate:
                     spec=AppConfigFragmentUpdaterSpec(config=OptionalState.update({})),
                     pk_value=missing_id,
                 ),
-                ExistsQuerier(row_class=AppConfigAllowListRow),
-            )
-
-    async def test_update_rejected_when_not_allow_listed(
-        self,
-        repository: AppConfigFragmentRepository,
-        fragment_not_allow_listed: AppConfigFragmentData,
-    ) -> None:
-        with pytest.raises(AppConfigFragmentWriteNotAllowed):
-            await repository.update(
-                Updater(
-                    spec=AppConfigFragmentUpdaterSpec(config=OptionalState.update({"b": 2})),
-                    pk_value=fragment_not_allow_listed.id,
-                ),
-                ExistsQuerier(row_class=AppConfigAllowListRow),
             )
 
 
@@ -310,33 +271,16 @@ class TestPurge:
     ) -> None:
         purged = await repository.purge(
             Purger(row_class=AppConfigFragmentRow, pk_value=domain_scoped_fragment.id),
-            ExistsQuerier(row_class=AppConfigAllowListRow),
         )
         assert purged.id == domain_scoped_fragment.id
         with pytest.raises(AppConfigFragmentNotFound):
             await repository.get_by_id(domain_scoped_fragment.id)
 
-    async def test_purge_missing_raises(
-        self, repository: AppConfigFragmentRepository, theme_registered: None
-    ) -> None:
-        # Writes are allow-listed (gate open), so a missing fragment surfaces as NotFound
-        # rather than the write-gate rejection.
+    async def test_purge_missing_raises(self, repository: AppConfigFragmentRepository) -> None:
         missing_id = AppConfigFragmentID(uuid.uuid4())
         with pytest.raises(AppConfigFragmentNotFound):
             await repository.purge(
                 Purger(row_class=AppConfigFragmentRow, pk_value=missing_id),
-                ExistsQuerier(row_class=AppConfigAllowListRow),
-            )
-
-    async def test_purge_rejected_when_not_allow_listed(
-        self,
-        repository: AppConfigFragmentRepository,
-        fragment_not_allow_listed: AppConfigFragmentData,
-    ) -> None:
-        with pytest.raises(AppConfigFragmentWriteNotAllowed):
-            await repository.purge(
-                Purger(row_class=AppConfigFragmentRow, pk_value=fragment_not_allow_listed.id),
-                ExistsQuerier(row_class=AppConfigAllowListRow),
             )
 
 
