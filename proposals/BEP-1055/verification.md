@@ -264,6 +264,26 @@ attach. Real kernels run the long-lived krunner entrypoint (not yet wired), so
 `translate_creation_config` currently leaves the command empty (image default) — fine once
 krunner injects the entrypoint. ✅
 
+## 14. krunner mount injection on real containerd
+
+`mount_krunner` is **inherited unchanged** from `AbstractKernelCreationContext` (it is
+runtime-agnostic: it populates `resource_spec.mounts` via `get_runner_mount` + sets
+`LD_PRELOAD`). ContainerdAgent only translates those mounts into the OCI spec, which the
+NerdctlRuntimeClient maps to `-v/-e/-l` flags. Verified with the exact flags
+`create_container` emits:
+
+```sh
+nerdctl create --network none -v /host/krunner:/opt/kernel:ro \
+    -e LD_PRELOAD=/opt/kernel/libbaihook.so -l ai.backend.kernel-id=kern-1 alpine ...
+```
+
+Result: inside the real container, the krunner mount is present
+(`/opt/kernel/entrypoint.sh`), `LD_PRELOAD` is set, and the label is applied. So krunner is
+NOT reimplemented — only its Docker-volume/mount injection is retranslated to OCI/nerdctl
+bind mounts. The remaining piece is making the krunner content available as a host path
+(Docker builds a named volume via an extractor; containerd binds an extracted host dir) —
+a deployment task, not a code reimplementation. ✅
+
 ## Notes
 
 - These are manual smoke tests requiring a privileged Linux host (NET_ADMIN),

@@ -119,7 +119,18 @@ class NerdctlRuntimeClient(ContainerdRuntimeClient):
     ) -> None:
         # --network none: nerdctl leaves the container with an isolated netns (only lo);
         # the BEP-1055 network layer attaches CNI after start.
-        args = ["create", "--name", container_id, "--network", "none", image_ref, *command]
+        opts: list[str] = []
+        for mount in oci_spec.get("mounts", []):
+            suffix = ":ro" if mount.get("readonly") else ""
+            opts += ["-v", f"{mount['source']}:{mount['destination']}{suffix}"]
+        for key, value in (oci_spec.get("env") or {}).items():
+            opts += ["-e", f"{key}={value}"]
+        for key, value in (oci_spec.get("labels") or {}).items():
+            opts += ["-l", f"{key}={value}"]
+        args = [
+            "create", "--name", container_id, "--network", "none",
+            *opts, image_ref, *command,
+        ]
         await self._run(args)
 
     async def start_container(self, container_id: str) -> TaskHandle:

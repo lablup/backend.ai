@@ -1,11 +1,16 @@
 from typing import Any, cast
 
+from pathlib import Path
+
 from ai.backend.agent.containerd.oci import (
     KERNEL_ID_LABEL,
+    KRUNNER_ENTRYPOINT,
     SESSION_ID_LABEL,
+    mount_to_oci,
     translate_creation_config,
 )
-from ai.backend.common.types import KernelCreationConfig
+from ai.backend.agent.resources import Mount
+from ai.backend.common.types import KernelCreationConfig, MountPermission, MountTypes
 
 
 def _kernel_config(**over: Any) -> KernelCreationConfig:
@@ -25,7 +30,28 @@ class TestTranslateCreationConfig:
         assert spec.container_id == "kern-123"  # container id = kernel id
         assert spec.session_id == "sess-abc"
         assert spec.image_ref == "cr.backend.ai/stable/python:3.10"
-        assert spec.command == []  # image default until krunner lands
+        assert spec.command == [KRUNNER_ENTRYPOINT]  # default = krunner entrypoint
+
+    def test_injects_mounts(self) -> None:
+        mounts = [
+            Mount(MountTypes.BIND, Path("/host/su-exec"), Path("/opt/kernel/su-exec"),
+                  MountPermission.READ_ONLY),
+            Mount(MountTypes.BIND, Path("/host/work"), Path("/home/work"),
+                  MountPermission.READ_WRITE),
+        ]
+        spec = translate_creation_config(_kernel_config(), environ={}, mounts=mounts)
+        oci_mounts = spec.oci_spec["mounts"]
+        assert oci_mounts[0] == {
+            "source": "/host/su-exec", "destination": "/opt/kernel/su-exec", "readonly": True,
+        }
+        assert oci_mounts[1]["readonly"] is False
+
+
+class TestMountToOci:
+    def test_readonly_flag(self) -> None:
+        ro = mount_to_oci(Mount(MountTypes.BIND, Path("/a"), Path("/b"), MountPermission.READ_ONLY))
+        rw = mount_to_oci(Mount(MountTypes.BIND, Path("/a"), Path("/b"), MountPermission.READ_WRITE))
+        assert ro["readonly"] is True and rw["readonly"] is False
 
     def test_labels_and_env(self) -> None:
         spec = translate_creation_config(_kernel_config(), environ={"A": "1"})

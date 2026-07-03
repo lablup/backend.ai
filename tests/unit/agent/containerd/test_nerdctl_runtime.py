@@ -43,6 +43,31 @@ class TestArgvConstruction:
         argv = runner.calls[0]
         assert "--creds" in argv and argv[argv.index("--creds") + 1] == "u:p"
 
+    async def test_create_translates_mounts_env_labels(self) -> None:
+        runner = FakeRunner([(0, "", "")])
+        oci_spec = {
+            "mounts": [
+                {"source": "/host/su-exec", "destination": "/opt/kernel/su-exec", "readonly": True},
+                {"source": "/host/work", "destination": "/home/work", "readonly": False},
+            ],
+            "env": {"LD_PRELOAD": "/opt/kernel/libbaihook.so"},
+            "labels": {"ai.backend.kernel-id": "kern-1"},
+        }
+        await _client(runner).create_container(
+            "c1", image_ref="img", command=["/opt/kernel/entrypoint.sh"], oci_spec=oci_spec
+        )
+        argv = runner.calls[0]
+        # read-only bind gets :ro, read-write does not
+        assert "-v" in argv
+        v_values = [argv[i + 1] for i, a in enumerate(argv) if a == "-v"]
+        assert "/host/su-exec:/opt/kernel/su-exec:ro" in v_values
+        assert "/host/work:/home/work" in v_values
+        e_values = [argv[i + 1] for i, a in enumerate(argv) if a == "-e"]
+        assert "LD_PRELOAD=/opt/kernel/libbaihook.so" in e_values
+        l_values = [argv[i + 1] for i, a in enumerate(argv) if a == "-l"]
+        assert "ai.backend.kernel-id=kern-1" in l_values
+        assert argv[-1] == "/opt/kernel/entrypoint.sh"  # command after image
+
 
 class TestStartContainer:
     async def test_start_then_reads_pid(self) -> None:

@@ -242,10 +242,14 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         cluster_info: ClusterInfo,
     ) -> ContainerdKernel:
         # Create the containerd container (isolated netns, not started) and build the
-        # kernel object. NOTE: the krunner entrypoint / resource limits / mounts are not
-        # yet injected into oci_spec — the container runs the image default until the
-        # krunner lifecycle lands.
-        spec = translate_creation_config(self.kernel_config, environ=environ)
+        # kernel object. mount_krunner (inherited) has populated resource_spec.mounts with
+        # the krunner bind mounts; combine with process_mounts' vfolder mounts and inject
+        # them (plus env/labels) into the OCI spec. The command defaults to the krunner
+        # entrypoint. (Resource limits + full entrypoint arg construction are follow-ups.)
+        all_mounts = [*resource_spec.mounts, *self._oci_mounts]
+        spec = translate_creation_config(
+            self.kernel_config, environ=environ, mounts=all_mounts
+        )
         await self._session_network.create_container(
             self._session_id,
             self._container_id,
@@ -303,13 +307,9 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
             "block_service_ports": False,
         }
 
-    @override
-    async def mount_krunner(
-        self,
-        resource_spec: KernelResourceSpec,
-        environ: Any,
-    ) -> None:
-        raise NotImplementedError(_TODO)
+    # mount_krunner is inherited from AbstractKernelCreationContext: it populates
+    # resource_spec.mounts (via get_runner_mount) and LD_PRELOAD — runtime-agnostic. The
+    # accumulated mounts are injected into the OCI spec at prepare_container time.
 
 
 class ContainerdAgent(
