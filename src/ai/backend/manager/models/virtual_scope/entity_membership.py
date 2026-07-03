@@ -8,6 +8,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.data.permission.virtual_scope import EntityMembershipData
 from ai.backend.common.entity.types import EntityType
+from ai.backend.common.identifier.entity import EntityID
 from ai.backend.common.identifier.virtual_scope import VirtualScopeID
 from ai.backend.manager.models.base import (
     GUID,
@@ -29,7 +30,7 @@ class EntityMembershipRow(Base):  # type: ignore[misc]
     entity_type: Mapped[EntityType] = mapped_column(
         "entity_type", sa.String(length=32), primary_key=True
     )
-    entity_id: Mapped[str] = mapped_column("entity_id", sa.String(length=64), primary_key=True)
+    entity_id: Mapped[EntityID] = mapped_column("entity_id", GUID(), primary_key=True)
     permission_cap: Mapped[Permission | None] = mapped_column(
         "permission_cap", IntFlagType(Permission), nullable=True
     )

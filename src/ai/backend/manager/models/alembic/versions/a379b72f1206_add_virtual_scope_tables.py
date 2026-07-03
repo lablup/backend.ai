@@ -71,7 +71,7 @@ def upgrade() -> None:
         "entity_memberships",
         sa.Column("virtual_scope_id", GUID(), nullable=False),
         sa.Column("entity_type", sa.String(length=32), nullable=False),
-        sa.Column("entity_id", sa.String(length=64), nullable=False),
+        sa.Column("entity_id", GUID(), nullable=False),
         sa.Column("permission_cap", sa.SmallInteger(), nullable=True),
         sa.Column(
             "created_at",
