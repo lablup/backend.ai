@@ -80,9 +80,14 @@ async def _create_entry(
     repository: AppConfigAllowListRepository,
     config_name: str,
     scope_type: AppConfigScopeType,
+    rank: int | None = None,
 ) -> AppConfigAllowListData:
     return await repository.create(
-        Creator(spec=AppConfigAllowListCreatorSpec(config_name=config_name, scope_type=scope_type))
+        Creator(
+            spec=AppConfigAllowListCreatorSpec(
+                config_name=config_name, scope_type=scope_type, rank=rank
+            )
+        )
     )
 
 
@@ -147,6 +152,37 @@ class TestCreateAndGet:
     ) -> None:
         with pytest.raises(UniqueConstraintViolationError):
             await _create_entry(repository, existing_entry.config_name, existing_entry.scope_type)
+
+
+class TestRankAssignment:
+    @pytest.mark.parametrize(
+        ("scope_type", "expected_rank"),
+        [
+            (AppConfigScopeType.PUBLIC, 100),
+            (AppConfigScopeType.DOMAIN, 200),
+            (AppConfigScopeType.USER, 300),
+        ],
+    )
+    async def test_rank_defaults_by_scope_type(
+        self,
+        repository: AppConfigAllowListRepository,
+        definition_repository: AppConfigDefinitionRepository,
+        scope_type: AppConfigScopeType,
+        expected_rank: int,
+    ) -> None:
+        await _register(definition_repository, "theme")
+        created = await _create_entry(repository, "theme", scope_type)
+        assert created.rank == expected_rank
+
+    async def test_explicit_rank_overrides_default(
+        self,
+        repository: AppConfigAllowListRepository,
+        definition_repository: AppConfigDefinitionRepository,
+    ) -> None:
+        await _register(definition_repository, "theme")
+        created = await _create_entry(repository, "theme", AppConfigScopeType.DOMAIN, rank=250)
+        assert created.rank == 250
+        assert (await repository.get_by_id(created.id)).rank == 250
 
 
 class TestPurge:
@@ -286,6 +322,20 @@ class TestSearch:
             )
         )
         assert [item.id for item in result.items] == [target.id]
+
+    async def test_search_orders_by_rank_asc(
+        self,
+        repository: AppConfigAllowListRepository,
+        seeded_entries: list[AppConfigAllowListData],
+    ) -> None:
+        result = await repository.search(
+            BatchQuerier(
+                pagination=OffsetPagination(limit=10, offset=0),
+                orders=[AppConfigAllowListOrders.rank(ascending=True)],
+            )
+        )
+        expected = [entry.id for entry in sorted(seeded_entries, key=lambda e: e.rank)]
+        assert [item.id for item in result.items] == expected
 
     async def test_search_orders_by_created_at(
         self,

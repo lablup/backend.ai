@@ -18,7 +18,7 @@ from ai.backend.manager.services.app_config_fragment.actions.base import (
 
 @dataclass
 class UpdateAppConfigFragmentAction(AppConfigFragmentSingleEntityAction):
-    """Update a fragment's ``config`` (replaced wholesale); ``rank`` is not updatable.
+    """Update a fragment's ``config`` (replaced wholesale).
 
     Not admin-only: an allow-listed user may update their own ``user``-scope fragment. The
     allow-list write-gate (``only_if``) authorizes the write against the fragment's

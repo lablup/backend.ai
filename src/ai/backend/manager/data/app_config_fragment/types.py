@@ -16,7 +16,6 @@ class AppConfigFragmentData:
     config_name: str
     scope_type: AppConfigScopeType
     scope_id: str
-    rank: int
     config: dict[str, Any]
     created_at: datetime
     updated_at: datetime
