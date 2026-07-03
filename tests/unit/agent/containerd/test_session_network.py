@@ -95,6 +95,9 @@ class RecordingBackend:
 
 
 class FakeRuntime(ContainerdRuntimeClient):
+    def __init__(self) -> None:
+        self.calls: list[str] = []
+
     async def image_exists(self, image_ref: str) -> bool:
         return True
 
@@ -105,12 +108,19 @@ class FakeRuntime(ContainerdRuntimeClient):
     async def remove_image(self, image_ref: str) -> None: ...
     async def create_container(
         self, container_id: str, *, image_ref: str, command: Sequence[str], oci_spec: Mapping[str, Any]
-    ) -> None: ...
+    ) -> None:
+        self.calls.append(f"create:{container_id}:{image_ref}")
+
     async def start_container(self, container_id: str) -> TaskHandle:
+        self.calls.append(f"start:{container_id}")
         return TaskHandle(container_id=container_id, pid=9001)
 
-    async def kill_container(self, container_id: str, *, signal: int) -> None: ...
-    async def remove_container(self, container_id: str) -> None: ...
+    async def kill_container(self, container_id: str, *, signal: int) -> None:
+        self.calls.append(f"kill:{container_id}:{signal}")
+
+    async def remove_container(self, container_id: str) -> None:
+        self.calls.append(f"remove:{container_id}")
+
     async def list_containers(self) -> Sequence[str]:
         return []
 
@@ -134,12 +144,13 @@ def _facade(
     runner: RecordingRunner,
     *,
     backends: dict[str, Any] | None = None,
+    runtime: FakeRuntime | None = None,
 ) -> ContainerdSessionNetwork:
     return ContainerdSessionNetwork(
         cast(AbstractKVStore, etcd),
         agent_id="agent-1",
         host_ip="192.168.0.10",
-        runtime=FakeRuntime(),
+        runtime=runtime or FakeRuntime(),
         cni_runner=runner,
         backends=backends or {"vxlan": cast(Any, backend), "host-gw": cast(Any, backend)},
     )
@@ -186,6 +197,42 @@ class TestLaunchTerminate:
             assert runner.calls == [("ADD", "/proc/9001/ns/net")]
         finally:
             await facade.teardown_session("s1")
+
+
+class TestSplitAndTeardown:
+    async def test_create_container_routes_to_runtime(self) -> None:
+        etcd, backend, runner, rt = FakeEtcd(), RecordingBackend(), RecordingRunner(), FakeRuntime()
+        facade = _facade(etcd, backend, runner, runtime=rt)
+        meta = await facade.ensure_session("s1", _VXLAN_NC)
+        try:
+            await facade.create_container(
+                "s1", "c1", image_ref="img:1", command=["sleep", "1"], oci_spec={}
+            )
+            assert rt.calls == ["create:c1:img:1"]  # created, not started
+        finally:
+            await facade.teardown_session("s1")
+
+    async def test_start_and_attach_starts_then_attaches(self) -> None:
+        etcd, backend, runner, rt = FakeEtcd(), RecordingBackend(), RecordingRunner(), FakeRuntime()
+        facade = _facade(etcd, backend, runner, runtime=rt)
+        meta = await facade.ensure_session("s1", _VXLAN_NC)
+        try:
+            await facade.create_container("s1", "c1", image_ref="img", command=[], oci_spec={})
+            result = await facade.start_and_attach_container(
+                "s1", "c1", meta=meta, kernel_config=cast(Any, {}), cluster_info=cast(Any, {})
+            )
+            assert rt.calls == ["create:c1:img", "start:c1"]
+            assert runner.calls == [("ADD", "/proc/9001/ns/net")]
+            assert result.handle.pid == 9001
+        finally:
+            await facade.teardown_session("s1")
+
+    async def test_kill_and_remove_container(self) -> None:
+        etcd, backend, runner, rt = FakeEtcd(), RecordingBackend(), RecordingRunner(), FakeRuntime()
+        facade = _facade(etcd, backend, runner, runtime=rt)
+        await facade.kill_container("c1", signal=9)
+        await facade.remove_container("c1")
+        assert rt.calls == ["kill:c1:9", "remove:c1"]
 
 
 class TestBackendResolution:
