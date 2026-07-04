@@ -77,17 +77,7 @@ class _DraftBaseModel(BackendAISchema):
 class KernelResourceDraft(_DraftBaseModel):
     """Minimal per-kernel resource inputs for requested-slots resolution.
 
-    The subset of ``KernelExecutionSpecDraft`` that slot computation reads: the
-    image (min slots / shmem label / architecture), the caller's partial
-    resource request, and the shmem override. Factored out so slot resolution
-    can consume a kernel's resource view without the execution-only fields
-    (environ, mounts, commands, timeouts). ``KernelExecutionSpecDraft`` extends
-    this, so ``KernelSpecDraft.execution_spec`` is usable directly as a
-    ``KernelResourceDraft``.
-
-    ``image_id`` may be ``None`` when a resource-group default supplies it
-    downstream; zero / absent ``resources`` entries are filled from the image
-    minimums during computation.
+    ``image_id`` may be ``None`` when a resource-group default supplies it downstream.
     """
 
     image_id: ImageID | None = None
