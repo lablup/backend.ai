@@ -153,3 +153,12 @@ See the following migrations in the codebase for reference:
   -- Checks multiple possible enum states and fixes whichever scenario it finds.
 - `src/ai/backend/manager/models/alembic/versions/c4ea15b77136_ensure_auditlogs_table_exist.py`
   -- Uses `inspector.get_table_names()` to skip table creation when it already exists.
+
+## Large Data Migrations
+
+Always chunk bulk `INSERT`s — never insert every row in one statement. A single
+statement binds at most **32,767** parameters (PostgreSQL Int16 limit), and a multi-row
+`INSERT` binds `rows × columns`, so unbounded backfills overflow on large sites. Use the
+shared `insert_skip_on_conflict` helper in
+`src/ai/backend/manager/models/rbac_models/migration/utils.py`, which chunks by column
+count.
