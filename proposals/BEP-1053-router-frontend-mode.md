@@ -18,11 +18,17 @@ Implemented-Version:
 
 ## Motivation
 
-Backend.AI serves models through a stack of three concepts: a **deployment
-endpoint** (`EndpointRow`) with replicas, revisions, and autoscaling; one or
-more backing **replica sessions** (`RoutingRow`), each reachable at a
-`kernel_host:kernel_port`; and an AppProxy **circuit** that binds the endpoint
-to its replicas on a proxy worker, load balancing by `traffic_ratio`.
+Backend.AI serves models through a stack of concepts: a **deployment
+endpoint** (`EndpointRow`) with autoscaling and a deployment strategy
+(rolling / blue-green, BEP-1006/1049); one or more **replica groups**
+(`ReplicaGroupRow`) within that endpoint — a primary group serving traffic
+plus, mid-rollout, a target group being promoted — each owning its own
+revision pointer, desired replica count, and `traffic_weight`; the backing
+**replica sessions** (`RoutingRow`), each reachable at a
+`kernel_host:kernel_port` and belonging to exactly one replica group; and an
+AppProxy **circuit** that binds the endpoint to its replica sessions on a
+proxy worker. (Circuit-level weighting is covered in detail, including its
+current limits, in "Replica groups and traffic weight today" below.)
 
 Today each endpoint is published at its *own* frontend slot — a dedicated
 wildcard subdomain or port — with its own per-endpoint JWT, the *deployment
@@ -104,6 +110,42 @@ coordinator→worker dialing** (events + pull only), achieves idempotency via
 Traefik path compensates for lossy events with **periodic set-diff
 reconciliation** against the desired state.
 
+### Replica groups and traffic weight today
+
+An endpoint's replicas are not a flat pool: they are partitioned into one or
+more **replica groups** (`ReplicaGroupRow`), each owning a revision pointer,
+a desired replica count, a `lifecycle` (ROLLING/STABLE/FAILED/DRAINING/DRAINED),
+and a `traffic_weight` (0–100). `EndpointRow.primary_replica_group_id` is the
+group serving traffic; `target_replica_group_id` is set only mid-rollout,
+pointing at the group being promoted (reused in place for rolling updates,
+freshly created for blue-green/canary). Every route (`RoutingRow`) belongs to
+exactly one group via `replica_group_id`. The Manager's deployment-strategy
+handler (`sokovan/deployment/handlers/deploying_promoting.py`) ramps the
+target group's `traffic_weight` toward 100 (mirroring it down on the primary)
+as promotion proceeds, per BEP-1049.
+
+**This weight does not currently reach AppProxy.** `traffic_weight` is written
+by the promoting/finalizing handlers and read back only as an FSM completion
+gate — no code path propagates it to the coordinator. The wire type the
+Manager actually pushes per route, `RouteEntry`
+(`common/dto/appproxy_coordinator/v2/endpoint/types.py`), carries only
+`session_id`, `route_id`, `kernel_host`, `kernel_port` — no weight field
+exists on it today. The only traffic control that *does* reach the proxy is
+coarser: a route's `traffic_status` (ACTIVE/INACTIVE) gates whether it is
+included in a circuit's `route_info` at all (see `BEP-1049/blue-green.md`).
+Gradual, weighted traffic shifting across replica groups was scoped out
+explicitly when replica groups were introduced (PR #11871, "Follow-ups (out
+of scope): Group-level traffic distribution via `traffic_weight`") and
+remains open.
+
+This proposal's `ratio` (§3, §7) is deliberately defined at **endpoint**
+granularity so it composes cleanly once replica-group weight propagation
+lands, but ROUTER-mode traffic during an in-flight rollout is, today,
+unweighted across whichever routes are ACTIVE regardless of which replica
+group they belong to. See "Weight composition and normalization" below and
+the follow-up filed on
+[continuum-router#804](https://github.com/lablup/continuum-router/issues/804).
+
 ## Proposed Design
 
 ### Terminology
@@ -143,6 +185,14 @@ used consistently throughout:
   replicas of one router share it. Publications and keys are scoped per
   authority. A **node** is one router *process* under an authority, identified
   by an ephemeral `node_id` for per-node liveness (§2a).
+- **Replica group** — an *existing* Backend.AI concept this proposal composes
+  with rather than introduces: a versioned sub-fleet of routes within one
+  deployment endpoint (`ReplicaGroupRow`), each owning a revision pointer, a
+  desired replica count, and a `traffic_weight`. An endpoint has a primary
+  group (serving) and, mid-rollout, a target group (being promoted). A
+  publication's `ratio` maps a model to **endpoints**, not to replica groups
+  directly — see "Replica groups and traffic weight today" (Current Design)
+  and §7.
 
 Naming rationale: "access key" is deliberately avoided because it already
 means the AK half of the platform keypair (`access_key`/`secret_key`);
@@ -174,9 +224,49 @@ surfaces (GraphQL/CLI/WebUI/docs) use the term *model API key*.
 Two-level hierarchical routing on the worker: an API key scopes the visible
 **models**; a model maps to one or more **deployment endpoints** (each
 mapping carrying a split `ratio`); each endpoint resolves to its replica
-sessions via the circuit's `route_info`, weighted by
-`ratio × traffic_ratio`. The Manager hands users the triple **(base URL,
-model name, API key)** instead of a per-deployment URL.
+sessions via the circuit's `route_info`. An endpoint's own replicas are
+internally partitioned into replica groups (primary + an optional mid-rollout
+target group, see "Replica groups and traffic weight today"), but the worker
+does not need to know that — see "Weight composition and normalization"
+below for how the two levels the worker *does* see compose into a single
+per-route weight. The Manager hands users the triple **(base URL, model
+name, API key)** instead of a per-deployment URL.
+
+#### Weight composition and normalization
+
+`normalize(ratio × traffic_ratio)`, applied by flattening every candidate
+replica across every mapped endpoint and normalizing once at the end, does
+**not** reproduce the configured endpoint split when endpoints carry
+different numbers of (or differently-weighted) replicas — flagged in review
+on the paired continuum-router design
+([PR #748, discussion](https://github.com/lablup/continuum-router/pull/748#discussion_r3465875781))
+and still present in the shipped reconcile (`composed_weight` in
+`src/appproxy/router/reconcile.rs`, continuum-router PR #817). The general
+rule is: **normalize within a level before composing with the level above**,
+so that a 7:3 `ratio` always yields a 7:3 traffic split regardless of how many
+replicas back each side. Concretely, per-route weight should be:
+
+```text
+weight(route) = ratio(endpoint) × normalize_within_endpoint(
+                   weight(route.replica_group) × traffic_ratio(route)
+                )
+```
+
+where `weight(replica_group)` is the (currently unpropagated —
+see above) `traffic_weight`, itself already normalized across an endpoint's
+own replica groups by the promoting handler (primary + target sum to ~100).
+This is a two-part fix, tracked in two places:
+
+- **Endpoint-level normalization** (this proposal / continuum-router): the
+  flatten-then-multiply bug applies regardless of replica groups and should
+  be fixed in the router reconcile independent of anything else — filed as a
+  design note on
+  [continuum-router#804](https://github.com/lablup/continuum-router/issues/804).
+- **Replica-group-level propagation** (Manager, tracked separately): until
+  `traffic_weight` is composed into what the Manager pushes per route (the
+  BA-6233 follow-up), the formula above degrades to
+  `ratio × normalize_within_endpoint(traffic_ratio)` — correct for a stable
+  endpoint, but blind to in-flight rollout progress.
 
 ### Request path and responsibility split
 
@@ -198,6 +288,10 @@ API key ──(1: visibility)──► model ──(2: publication)──► end
 3. **endpoint → replica sessions** (core). Each endpoint's replica set is
    the circuit's `route_info`, fed from the Manager's `RoutingRow` state and
    flowing to the router through the existing circuit route-update events.
+   Internally these replicas are partitioned into replica groups (primary +
+   an optional mid-rollout target, owned by BEP-1049's deployment-strategy
+   handler); that partitioning is not yet visible past the Manager (see
+   "Replica groups and traffic weight today").
 
 The layers split cleanly between what a **user configures deliberately** and
 what the **system maintains continuously**:
@@ -538,7 +632,16 @@ The Manager is the **source of truth and the single user-facing surface**:
   `manual` (user owns ratios) or `strategy-managed` (the deployment-strategy
   handler owns ratios via the same API; manual ratio edits are rejected). This
   proposal adds the flag to avoid a dual-writer conflict; the canary/ramp
-  mechanics are deferred to BEP-1049.
+  mechanics are deferred to BEP-1049. Note this is a **coarser** axis than
+  BEP-1049's own rollout mechanism: `control_mode` governs the publication's
+  per-*endpoint* `ratio` (e.g. splitting traffic across two distinct
+  `EndpointRow`s for a cross-endpoint canary), whereas BEP-1049's handler
+  today ramps `traffic_weight` **within** one endpoint, across its replica
+  groups — a mechanism this proposal does not touch and which does not
+  currently reach `/v2/routers/*` at all (see "Replica groups and traffic
+  weight today"). A `strategy-managed` writer that reflects intra-endpoint
+  rollout progress into the publication's ratio has no data to draw from
+  until that propagation exists.
 - **Access info contract.** For deployments attached to a ROUTER
   publication, the user-visible access information becomes
   (gateway base URL, model name, model API key) instead of a per-deployment
@@ -618,6 +721,23 @@ None for existing deployments. The WebUI/CLI flows that display endpoint
 URLs need a new presentation path for ROUTER-published deployments
 (base URL + model name + key), which is additive.
 
+### Relationship to BEP-1005 (longer-term consolidation)
+
+BEP-1005 proposes dissolving the Coordinator into the Manager entirely
+(shared Redis/etcd, mandatory Manager↔Worker East-West reachability), for
+reasons unrelated to model serving (interactive session/circuit lifecycle
+sync, TCP idle timeout). This proposal instead **deepens** the
+Manager/Coordinator split: new Coordinator-side tables (`router_models`,
+`router_api_keys`), a new REST surface, new events, and a propagation model
+(§4, §8) whose ack-timeout/pull-reconcile shape exists specifically *because*
+the Coordinator is a separate, not-always-reachable process — the opposite
+of BEP-1005's premise. The two are not contradictory (BEP-1005 is Draft, not
+targeted, and predates model publications entirely) but they are not
+demonstrated compatible either: if BEP-1005 ever proceeds, §3–§6 here would
+need to either migrate into the Manager or be re-justified once Manager
+*is* the coordinator. Flagged here as an open question rather than resolved,
+since it does not block this proposal's phases.
+
 ## Implementation Plan
 
 1. **Phase 1 — common + coordinator core**: `FrontendMode.ROUTER`,
@@ -674,6 +794,88 @@ Remaining follow-ups (out of scope for this proposal):
   (§8) proves insufficient for some tenant.
 - The BEP-1049 deployment-strategy ratio-control mechanics behind
   `control_mode = strategy-managed`.
+- **Replica-group traffic-weight propagation** (Manager side, tracked as a
+  BA-6233 follow-up): composing `ReplicaGroupRow.traffic_weight` into the
+  per-route weight the Manager pushes to the coordinator, so an in-flight
+  BEP-1049 rollout is reflected in ROUTER-mode traffic. See "Replica groups
+  and traffic weight today" and "Weight composition and normalization."
+- **Endpoint-level weight normalization** (continuum-router side): the
+  flatten-then-multiply weight formula in the shipped reconcile does not
+  reproduce the configured per-endpoint `ratio` when endpoints have uneven
+  replica counts — flagged in review, not yet fixed; tracked on
+  [continuum-router#804](https://github.com/lablup/continuum-router/issues/804).
+
+## Future Directions
+
+### Hierarchical (chained) routing instead of a flattened replica pool
+
+The two gaps above (replica-group weight never reaching the data plane, and
+endpoint-level weights not being normalized correctly) share a root cause:
+today's model → replica mapping is **flattened to one level** — every
+replica of every mapped endpoint sits in one weighted pool, so any
+replica-count change anywhere recomputes weights for the whole model, and
+`ratio` has to be composed with per-replica weight in a single formula
+instead of being independently normalized at each level.
+
+`BackendConfig` in continuum-router already supports this without any code
+change: a backend's `url` is an arbitrary HTTP endpoint (`backend_type` is
+already provider-agnostic — openai/anthropic/vllm/generic), not necessarily a
+raw `kernel_host:kernel_port`. That means **a backend can itself be another
+router/circuit's address** — nothing structural forces flattening down to
+individual replicas.
+
+**Proposed direction:** give the ROUTER-mode worker one `BackendConfig` per
+*endpoint*, pointing at that endpoint's own existing WILDCARD/PORT circuit
+URL (kept alive as internal-only plumbing, no longer user-facing) instead of
+at that endpoint's individual replicas:
+
+```text
+today (flattened):      model → [replica₁, replica₂, …, replicaₙ]   (n changes constantly)
+chained (hierarchical):  model → [endpoint_A, endpoint_B]            (changes only on (re)publish)
+                                      │              │
+                                      ▼              ▼
+                               endpoint_A's    endpoint_B's
+                               own circuit      own circuit
+                               (existing per-endpoint LB — already
+                                balances its own replicas/groups)
+```
+
+This makes the isolation property this section asks for **inherent** rather
+than something the weight formula has to work around:
+
+- The root weight table has one entry per endpoint in a publication — small
+  and stable — so normalizing `ratio` across it trivially satisfies the
+  jopemachine fix; there is no "endpoints with uneven replica counts"
+  problem left at that level, because each endpoint contributes exactly one
+  upstream regardless of its internal replica or replica-group count.
+- Replica-count changes and BEP-1049 rollout ramps (`traffic_weight` between
+  a primary and target replica group) are absorbed entirely by the
+  endpoint's own existing circuit — no `router_models` mutation, no
+  `revision` bump, no re-pull by every ROUTER node. Replica-group weight
+  propagation (the open item above) would land in the existing per-circuit
+  sync path, not in a new ROUTER-specific wire format.
+
+**Trade-offs, not yet weighed against each other:** an added proxy hop per
+request (likely small on an intra-cluster network, but unverified for
+streaming responses specifically); every ROUTER-published endpoint needs to
+keep a live circuit even though it's no longer the public surface, which
+changes §2's "Endpoint placement" assumption that an endpoint's inference
+circuit lands directly on the ROUTER worker; and health/failure detection
+becomes per-endpoint-circuit rather than per-replica at the root, which may
+be desirable (replica health is already that circuit's job) or may need
+finer propagation depending on how it's implemented.
+
+**Alternative achieving the same isolation without an extra hop:** teach
+continuum-router's own selection algorithm to be two-tier internally — pick
+an endpoint by `ratio`, then a replica within it by locally-normalized weight
+— mirroring Envoy's weighted-cluster-of-clusters pattern. No dependency on a
+live per-endpoint circuit, but requires a data-model/algorithm change inside
+continuum-router rather than being achievable through topology alone.
+
+Neither direction is committed here; both are recorded as design notes on
+[continuum-router#804](https://github.com/lablup/continuum-router/issues/804)
+for whoever picks up the normalization and replica-group-propagation
+follow-ups.
 
 ## References
 
@@ -681,6 +883,10 @@ Remaining follow-ups (out of scope for this proposal):
   (`docs/en/architecture/appproxy-worker.md`) — the worker-side half of this
   design: two-level routing realization, weight composition, key
   enforcement, and the worker's reconcile loop.
+- [continuum-router#804](https://github.com/lablup/continuum-router/issues/804)
+  — epic tracking the router-side ROUTER-mode implementation (now shipped);
+  follow-up comment there tracks the weight-normalization and replica-group
+  propagation gaps noted above.
 - [BEP-1005: Unified AppProxy](BEP-1005-unified-appproxy.md) — longer-term
   consolidation direction; this proposal stays within the current
   coordinator/worker split and remains compatible with it.
