@@ -8,7 +8,6 @@ from collections.abc import AsyncGenerator
 import pytest
 
 from ai.backend.common.data.app_config.types import AppConfigScopeType
-from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
 from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.user import UserID
@@ -23,7 +22,6 @@ from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.models.app_config_allow_list.row import AppConfigAllowListRow
 from ai.backend.manager.models.app_config_definition.row import AppConfigDefinitionRow
 from ai.backend.manager.models.app_config_fragment.conditions import AppConfigFragmentConditions
-from ai.backend.manager.models.app_config_fragment.orders import AppConfigFragmentOrders
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.app_config_fragment.creators import (
@@ -74,6 +72,14 @@ def repository(database: ExtendedAsyncSAEngine) -> AppConfigFragmentRepository:
     return AppConfigFragmentRepository(DBOpsProvider(database))
 
 
+def _allow_list_row(config_name: str, scope_type: AppConfigScopeType) -> AppConfigAllowListRow:
+    return AppConfigAllowListRow(
+        config_name=config_name,
+        scope_type=scope_type,
+        rank=100,
+    )
+
+
 @pytest.fixture
 async def theme_registered(database: ExtendedAsyncSAEngine) -> None:
     """Situation: ``theme`` is registered and allow-listed at every scope; no fragments yet."""
@@ -81,9 +87,9 @@ async def theme_registered(database: ExtendedAsyncSAEngine) -> None:
         db_sess.add(AppConfigDefinitionRow(config_name="theme"))
         await db_sess.flush()
         db_sess.add_all([
-            AppConfigAllowListRow(config_name="theme", scope_type=AppConfigScopeType.PUBLIC),
-            AppConfigAllowListRow(config_name="theme", scope_type=AppConfigScopeType.DOMAIN),
-            AppConfigAllowListRow(config_name="theme", scope_type=AppConfigScopeType.USER),
+            _allow_list_row("theme", AppConfigScopeType.PUBLIC),
+            _allow_list_row("theme", AppConfigScopeType.DOMAIN),
+            _allow_list_row("theme", AppConfigScopeType.USER),
         ])
         await db_sess.flush()
 
@@ -102,14 +108,11 @@ async def domain_scoped_fragment(database: ExtendedAsyncSAEngine) -> AppConfigFr
     async with database.begin_session() as db_sess:
         db_sess.add(AppConfigDefinitionRow(config_name="theme"))
         await db_sess.flush()
-        db_sess.add(
-            AppConfigAllowListRow(config_name="theme", scope_type=AppConfigScopeType.DOMAIN)
-        )
+        db_sess.add(_allow_list_row("theme", AppConfigScopeType.DOMAIN))
         row = AppConfigFragmentRow(
             config_name="theme",
             scope_type=AppConfigScopeType.DOMAIN,
             scope_id=_DOMAIN_ID,
-            rank=100,
             config={"k": "v"},
         )
         db_sess.add(row)
@@ -130,7 +133,6 @@ async def fragment_not_allow_listed(database: ExtendedAsyncSAEngine) -> AppConfi
             config_name="theme",
             scope_type=AppConfigScopeType.DOMAIN,
             scope_id=_DOMAIN_ID,
-            rank=100,
             config={"k": "v"},
         )
         db_sess.add(row)
@@ -142,8 +144,7 @@ async def fragment_not_allow_listed(database: ExtendedAsyncSAEngine) -> AppConfi
 async def fragments_across_scopes(database: ExtendedAsyncSAEngine) -> list[AppConfigFragmentData]:
     """Situation: fragments across every scope_type, two domains, two users, two config_names.
 
-    Returned in creation order so search filters and rank ordering can derive their
-    expectations from it.
+    Returned in creation order so search filters can derive their expectations from it.
     """
     async with database.begin_session() as db_sess:
         db_sess.add_all([
@@ -151,47 +152,48 @@ async def fragments_across_scopes(database: ExtendedAsyncSAEngine) -> list[AppCo
             AppConfigDefinitionRow(config_name="menu"),
         ])
         await db_sess.flush()
+        db_sess.add_all([
+            _allow_list_row("theme", AppConfigScopeType.PUBLIC),
+            _allow_list_row("theme", AppConfigScopeType.DOMAIN),
+            _allow_list_row("theme", AppConfigScopeType.USER),
+            _allow_list_row("menu", AppConfigScopeType.PUBLIC),
+        ])
+        await db_sess.flush()
         rows = [
             AppConfigFragmentRow(
                 config_name="theme",
                 scope_type=AppConfigScopeType.PUBLIC,
                 scope_id="public",
-                rank=100,
                 config={"k": "v"},
             ),
             AppConfigFragmentRow(
                 config_name="theme",
                 scope_type=AppConfigScopeType.DOMAIN,
                 scope_id=_DOMAIN_ID,
-                rank=200,
                 config={"k": "v"},
             ),
             AppConfigFragmentRow(
                 config_name="theme",
                 scope_type=AppConfigScopeType.DOMAIN,
                 scope_id="other",
-                rank=300,
                 config={"k": "v"},
             ),
             AppConfigFragmentRow(
                 config_name="theme",
                 scope_type=AppConfigScopeType.USER,
                 scope_id=_USER_ID,
-                rank=400,
                 config={"k": "v"},
             ),
             AppConfigFragmentRow(
                 config_name="theme",
                 scope_type=AppConfigScopeType.USER,
                 scope_id=_OTHER_USER_ID,
-                rank=500,
                 config={"k": "v"},
             ),
             AppConfigFragmentRow(
                 config_name="menu",
                 scope_type=AppConfigScopeType.PUBLIC,
                 scope_id="public",
-                rank=100,
                 config={"k": "v"},
             ),
         ]
@@ -252,40 +254,6 @@ class TestCreateAndGet:
                 ),
                 ExistsQuerier(row_class=AppConfigAllowListRow),
             )
-
-
-class TestRankAssignment:
-    async def test_rank_increases_per_config_name(
-        self, repository: AppConfigFragmentRepository, theme_registered: None
-    ) -> None:
-        first = await repository.create(
-            AppConfigFragmentCreatorSpec(
-                config_name="theme",
-                scope_type=AppConfigScopeType.PUBLIC,
-                scope_id="public",
-                config={"k": "v"},
-            ),
-            ExistsQuerier(row_class=AppConfigAllowListRow),
-        )
-        second = await repository.create(
-            AppConfigFragmentCreatorSpec(
-                config_name="theme",
-                scope_type=AppConfigScopeType.DOMAIN,
-                scope_id=_DOMAIN_ID,
-                config={"k": "v"},
-            ),
-            ExistsQuerier(row_class=AppConfigAllowListRow),
-        )
-        third = await repository.create(
-            AppConfigFragmentCreatorSpec(
-                config_name="theme",
-                scope_type=AppConfigScopeType.USER,
-                scope_id=_USER_ID,
-                config={"k": "v"},
-            ),
-            ExistsQuerier(row_class=AppConfigAllowListRow),
-        )
-        assert first.rank < second.rank < third.rank
 
 
 class TestUpdate:
@@ -416,27 +384,6 @@ class TestSearch:
         )
         expected = {f.id for f in fragments_across_scopes if f.scope_id == _USER_ID}
         assert {item.id for item in result.items} == expected
-
-    async def test_order_by_rank_desc(
-        self,
-        repository: AppConfigFragmentRepository,
-        fragments_across_scopes: list[AppConfigFragmentData],
-    ) -> None:
-        # Rank is monotonic per config_name, so scope to one config_name for a total order.
-        theme_fragments = [f for f in fragments_across_scopes if f.config_name == "theme"]
-        result = await repository.admin_search(
-            BatchQuerier(
-                pagination=OffsetPagination(limit=10, offset=0),
-                conditions=[
-                    AppConfigFragmentConditions.by_config_name_equals(
-                        StringMatchSpec("theme", case_insensitive=False, negated=False)
-                    )
-                ],
-                orders=[AppConfigFragmentOrders.rank(ascending=False)],
-            )
-        )
-        expected = [f.id for f in sorted(theme_fragments, key=lambda f: f.rank, reverse=True)]
-        assert [item.id for item in result.items] == expected
 
 
 class TestScopedSearch:

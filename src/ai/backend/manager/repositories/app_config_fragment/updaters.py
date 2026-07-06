@@ -14,8 +14,8 @@ from ai.backend.manager.types import OptionalState
 class AppConfigFragmentUpdaterSpec(UpdaterSpec[AppConfigFragmentRow]):
     """UpdaterSpec for app config fragment updates.
 
-    Only ``config`` is updatable (replaced wholesale). ``rank`` is assigned at create and is
-    never updatable — re-ordering is not exposed through the update path.
+    Only ``config`` is updatable (replaced wholesale). Merge priority lives on the
+    fragment's allow-list entry, so re-ordering is not a fragment update.
     """
 
     config: OptionalState[dict[str, Any]] = field(default_factory=OptionalState[dict[str, Any]].nop)

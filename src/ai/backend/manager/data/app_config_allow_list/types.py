@@ -9,11 +9,16 @@ from ai.backend.common.identifier.app_config_allow_list import AppConfigAllowLis
 
 @dataclass(frozen=True)
 class AppConfigAllowListData:
-    """Domain data for one app config allow-list entry — a per-``(config_name, scope_type)`` write gate."""
+    """Domain data for one app config allow-list entry — a per-``(config_name, scope_type)`` write gate.
+
+    ``rank`` is the merge priority applied to every fragment written under the entry
+    (low → high; higher wins).
+    """
 
     id: AppConfigAllowListID
     config_name: str
     scope_type: AppConfigScopeType
+    rank: int
     created_at: datetime
     updated_at: datetime
 

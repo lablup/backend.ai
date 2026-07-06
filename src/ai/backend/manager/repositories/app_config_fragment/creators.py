@@ -7,15 +7,15 @@ from typing import Any, override
 
 from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
-from ai.backend.manager.repositories.base.creator import DependentCreatorSpec
+from ai.backend.manager.repositories.base import CreatorSpec
 
 
 @dataclass
-class AppConfigFragmentCreatorSpec(DependentCreatorSpec[int, AppConfigFragmentRow]):
-    """Fragment creator whose ``rank`` is assigned by the ops layer (next-value) at execution.
+class AppConfigFragmentCreatorSpec(CreatorSpec[AppConfigFragmentRow]):
+    """CreatorSpec for one app config fragment.
 
-    ``build_row`` receives the computed next rank, so a newly created fragment is placed
-    after the existing fragments for the same ``config_name``.
+    The fragment carries no merge priority of its own — its rank is the ``rank`` of
+    the allow-list entry for its ``(config_name, scope_type)``.
     """
 
     config_name: str
@@ -24,11 +24,10 @@ class AppConfigFragmentCreatorSpec(DependentCreatorSpec[int, AppConfigFragmentRo
     config: dict[str, Any]
 
     @override
-    def build_row(self, next_rank: int) -> AppConfigFragmentRow:
+    def build_row(self) -> AppConfigFragmentRow:
         return AppConfigFragmentRow(
             config_name=self.config_name,
             scope_type=self.scope_type,
             scope_id=self.scope_id,
-            rank=next_rank,
             config=self.config,
         )

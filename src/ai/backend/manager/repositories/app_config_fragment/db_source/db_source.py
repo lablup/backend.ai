@@ -21,7 +21,6 @@ from ai.backend.manager.errors.app_config import (
     AppConfigFragmentWriteNotAllowed,
 )
 from ai.backend.manager.models.app_config_allow_list.row import AppConfigAllowListRow
-from ai.backend.manager.models.app_config_definition.row import AppConfigDefinitionRow
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
 from ai.backend.manager.models.scopes import SearchScope
 from ai.backend.manager.repositories.app_config_fragment.creators import (
@@ -29,18 +28,15 @@ from ai.backend.manager.repositories.app_config_fragment.creators import (
 )
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
+    Creator,
     ExistsQuerier,
     Purger,
     Querier,
     Updater,
 )
-from ai.backend.manager.repositories.base.creator import NextValuePolicy
 from ai.backend.manager.repositories.ops import DBOpsProvider
 
 __all__ = ("AppConfigFragmentDBSource",)
-
-# Gap between successive ranks, leaving room to re-order fragments without renumbering.
-RANK_GAP = 100
 
 app_config_fragment_db_source_resilience = Resilience(
     policies=[
@@ -76,14 +72,6 @@ class AppConfigFragmentDBSource:
         spec: AppConfigFragmentCreatorSpec,
         only_if: ExistsQuerier[AppConfigAllowListRow],
     ) -> AppConfigFragmentData:
-        policy = NextValuePolicy(
-            column=AppConfigFragmentRow.rank,
-            scope_condition=lambda: AppConfigFragmentRow.config_name == spec.config_name,
-            lock_selector=sa.select(AppConfigDefinitionRow).where(
-                AppConfigDefinitionRow.config_name == spec.config_name
-            ),
-            gap=RANK_GAP,
-        )
         # ``only_if`` (built by the caller) and the write run in one transaction, so the gate
         # check and the write commit atomically — no check-then-write race.
         async with self._ops.write_ops() as w:
@@ -92,7 +80,7 @@ class AppConfigFragmentDBSource:
                     f"Writing app config {spec.config_name!r} at scope "
                     f"{spec.scope_type.value!r} is not allowed."
                 )
-            created = await w.create_with_next_value(policy, spec)
+            created = await w.create(Creator(spec=spec))
             return created.row.to_data()
 
     @app_config_fragment_db_source_resilience.apply()

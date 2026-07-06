@@ -52,6 +52,7 @@ class TestAppConfigAllowListService:
             id=AppConfigAllowListID(uuid.uuid4()),
             config_name="theme",
             scope_type=AppConfigScopeType.USER,
+            rank=100,
             created_at=datetime.now(UTC),
             updated_at=datetime.now(UTC),
         )

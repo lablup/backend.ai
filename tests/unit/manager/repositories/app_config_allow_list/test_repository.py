@@ -26,6 +26,7 @@ from ai.backend.manager.models.app_config_allow_list.row import AppConfigAllowLi
 from ai.backend.manager.models.app_config_definition.row import AppConfigDefinitionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.app_config_allow_list.creators import (
+    DEFAULT_RANK,
     AppConfigAllowListCreatorSpec,
 )
 from ai.backend.manager.repositories.app_config_allow_list.repository import (
@@ -80,9 +81,14 @@ async def _create_entry(
     repository: AppConfigAllowListRepository,
     config_name: str,
     scope_type: AppConfigScopeType,
+    rank: int | None = None,
 ) -> AppConfigAllowListData:
     return await repository.create(
-        Creator(spec=AppConfigAllowListCreatorSpec(config_name=config_name, scope_type=scope_type))
+        Creator(
+            spec=AppConfigAllowListCreatorSpec(
+                config_name=config_name, scope_type=scope_type, rank=rank
+            )
+        )
     )
 
 
@@ -147,6 +153,27 @@ class TestCreateAndGet:
     ) -> None:
         with pytest.raises(UniqueConstraintViolationError):
             await _create_entry(repository, existing_entry.config_name, existing_entry.scope_type)
+
+
+class TestRankAssignment:
+    async def test_rank_defaults_to_fixed_value(
+        self,
+        repository: AppConfigAllowListRepository,
+        definition_repository: AppConfigDefinitionRepository,
+    ) -> None:
+        await _register(definition_repository, "theme")
+        created = await _create_entry(repository, "theme", AppConfigScopeType.DOMAIN)
+        assert created.rank == DEFAULT_RANK
+
+    async def test_explicit_rank_overrides_default(
+        self,
+        repository: AppConfigAllowListRepository,
+        definition_repository: AppConfigDefinitionRepository,
+    ) -> None:
+        await _register(definition_repository, "theme")
+        created = await _create_entry(repository, "theme", AppConfigScopeType.DOMAIN, rank=250)
+        assert created.rank == 250
+        assert (await repository.get_by_id(created.id)).rank == 250
 
 
 class TestPurge:
