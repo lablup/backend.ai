@@ -14,7 +14,13 @@ from ai.backend.manager.models.app_config_allow_list.row import AppConfigAllowLi
 from ai.backend.manager.repositories.app_config_allow_list.db_source import (
     AppConfigAllowListDBSource,
 )
-from ai.backend.manager.repositories.base import BatchQuerier, Creator, ExistsQuerier, Purger
+from ai.backend.manager.repositories.base import (
+    BatchQuerier,
+    Creator,
+    ExistsQuerier,
+    Purger,
+    Updater,
+)
 from ai.backend.manager.repositories.ops import DBOpsProvider
 
 __all__ = ("AppConfigAllowListRepository",)
@@ -61,6 +67,10 @@ class AppConfigAllowListRepository:
     @app_config_allow_list_repository_resilience.apply()
     async def search(self, querier: BatchQuerier) -> AppConfigAllowListSearchResult:
         return await self._db_source.search(querier)
+
+    @app_config_allow_list_repository_resilience.apply()
+    async def update(self, updater: Updater[AppConfigAllowListRow]) -> AppConfigAllowListData:
+        return await self._db_source.update(updater)
 
     @app_config_allow_list_repository_resilience.apply()
     async def purge(self, purger: Purger[AppConfigAllowListRow]) -> AppConfigAllowListData:

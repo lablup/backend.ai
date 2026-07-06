@@ -570,6 +570,19 @@
           "scope_type": {
             "$ref": "#/components/schemas/AppConfigScopeType",
             "description": "Scope at which fragments may be written (public | domain | user)."
+          },
+          "rank": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Merge rank applied to fragments under this entry (low to high; higher wins). Defaults to the scope type's default rank (public=100, domain=200, user=300).",
+            "title": "Rank"
           }
         },
         "required": [
@@ -705,6 +718,7 @@
         "enum": [
           "config_name",
           "scope_type",
+          "rank",
           "created_at",
           "updated_at"
         ],
@@ -952,6 +966,35 @@
           }
         },
         "title": "SearchAppConfigAllowListInput",
+        "type": "object"
+      },
+      "UpdateAppConfigAllowListInput": {
+        "description": "Input for updating an app config allow-list entry.\n\nOnly ``rank`` is updatable — the identity pair (``config_name``, ``scope_type``)\nis immutable (purge and recreate to change it).",
+        "properties": {
+          "id": {
+            "description": "App config allow-list entry id to update.",
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "rank": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "New merge rank applied to fragments under this entry (low to high; higher wins). Omit to leave unchanged.",
+            "title": "Rank"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "UpdateAppConfigAllowListInput",
         "type": "object"
       },
       "CreateAppConfigDefinitionInput": {
@@ -38612,6 +38655,42 @@
           }
         ],
         "description": "Get an app config allow-list entry by id (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      },
+      "patch": {
+        "operationId": "v2/app-config-allow-list.admin_update",
+        "tags": [
+          "v2/app-config-allow-list"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAppConfigAllowListInput"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "app_config_allow_list_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Update an app config allow-list entry's rank by id (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       },
       "delete": {
         "operationId": "v2/app-config-allow-list.admin_purge",

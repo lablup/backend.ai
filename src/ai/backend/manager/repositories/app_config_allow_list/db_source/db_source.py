@@ -27,6 +27,7 @@ from ai.backend.manager.repositories.base import (
     ExistsQuerier,
     Purger,
     Querier,
+    Updater,
 )
 from ai.backend.manager.repositories.ops import DBOpsProvider
 
@@ -73,6 +74,16 @@ class AppConfigAllowListDBSource:
             if result is None:
                 raise AppConfigAllowListNotFound(
                     f"App config allow-list entry {allow_list_id} not found"
+                )
+            return result.row.to_data()
+
+    @app_config_allow_list_db_source_resilience.apply()
+    async def update(self, updater: Updater[AppConfigAllowListRow]) -> AppConfigAllowListData:
+        async with self._ops.write_ops() as w:
+            result = await w.update(updater)
+            if result is None:
+                raise AppConfigAllowListNotFound(
+                    f"App config allow-list entry {updater.pk_value} not found"
                 )
             return result.row.to_data()
 

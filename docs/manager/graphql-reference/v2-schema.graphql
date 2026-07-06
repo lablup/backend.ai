@@ -622,6 +622,11 @@ type AppConfigAllowList implements Node {
   """Scope type the entry permits writes at (public | domain | user)."""
   scopeType: AppConfigScopeType!
 
+  """
+  Added in 26.8.0. Merge rank applied to fragments under this entry (low to high; higher wins).
+  """
+  rank: Int!
+
   """Creation timestamp (UTC)."""
   createdAt: DateTime!
 
@@ -695,6 +700,7 @@ Added in 26.7.0. Fields available for ordering app config allow-list results.
 enum AppConfigAllowListOrderField {
   CONFIG_NAME
   SCOPE_TYPE
+  RANK
   CREATED_AT
   UPDATED_AT
 }
@@ -2277,6 +2283,11 @@ input CreateAppConfigAllowListInput {
 
   """Scope at which fragments may be written (public | domain | user)."""
   scopeType: AppConfigScopeType!
+
+  """
+  Added in 26.8.0. Merge rank applied to fragments under this entry (low to high; higher wins). Defaults to the scope type's default rank (public=100, domain=200, user=300).
+  """
+  rank: Int = null
 }
 
 """Added in 26.7.0. Payload for app config allow-list entry creation."""
@@ -7225,6 +7236,11 @@ type Mutation {
   Added in 26.7.0. Purge an app config allow-list entry by id (super admin only).
   """
   adminPurgeAppConfigAllowList(input: PurgeAppConfigAllowListInput!): PurgeAppConfigAllowListPayload
+
+  """
+  Added in 26.8.0. Update an app config allow-list entry's rank by id (super admin only).
+  """
+  adminUpdateAppConfigAllowList(input: UpdateAppConfigAllowListInput!): UpdateAppConfigAllowListPayload
 
   """
   Added in 25.14.0. Scan external registries to discover available artifacts. Searches HuggingFace or Reservoir registries for artifacts matching the specified criteria and registers them in the system with SCANNED status. The artifacts become available for import but are not downloaded until explicitly imported. This is the first step in the artifact workflow: Scan → Import → Use
@@ -13365,6 +13381,25 @@ input UpdateAllowedResourceGroupsForProjectInput {
 
   """Resource group names to disallow."""
   remove: [String!] = null
+}
+
+"""
+Added in 26.8.0. Input for updating an app config allow-list entry (rank only).
+"""
+input UpdateAppConfigAllowListInput {
+  """App config allow-list entry id to update."""
+  id: UUID!
+
+  """
+  New merge rank applied to fragments under this entry (low to high; higher wins). Omit to leave unchanged.
+  """
+  rank: Int = null
+}
+
+"""Added in 26.8.0. Payload for app config allow-list entry update."""
+type UpdateAppConfigAllowListPayload {
+  """Updated app config allow-list entry."""
+  appConfigAllowList: AppConfigAllowList!
 }
 
 """
