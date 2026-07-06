@@ -81,6 +81,7 @@ from ai.backend.web.clients.apollo_router_pool import (
     ApolloRouterPoolGateHealthChecker,
 )
 from ai.backend.web.clients.endpoint_pool import (
+    AcquiredEndpoint,
     EndpointPoolSpec,
     HealthyEndpointPool,
     build_endpoint_selection_strategy,
@@ -345,7 +346,7 @@ async def login_check_handler(request: web.Request) -> web.Response:
 
 async def _authorize_via_anonymous_session(
     request: web.Request,
-    manager_pool: HealthyEndpointPool,
+    acquired_endpoint: AcquiredEndpoint,
     config: WebServerUnifiedConfig,
     *,
     username: str,
@@ -353,31 +354,28 @@ async def _authorize_via_anonymous_session(
     extra_args: Mapping[str, Any],
     forward_cookies: bool = False,
 ) -> AuthResponse:
-    """Authorize anonymously against a healthy Manager endpoint from the pool.
+    """Authorize anonymously against the given (pool-acquired) Manager endpoint.
 
-    Routes the auth request through ``manager_pool`` so login and token login fail over
-    to a healthy Manager.
-
-    Raises ``ManagerConnectionUnavailable`` (503) when no endpoint is healthy.
+    Endpoint selection stays with the caller, which acquires ``acquired_endpoint``
+    from ``manager_pool`` and keeps this call inside the acquire context.
     """
-    async with manager_pool.acquire() as acquired:
-        anon_api_config = APIConfig(
-            domain=config.api.domain,
-            endpoint=acquired.endpoint,
-            access_key="",
-            secret_key="",  # anonymous session
-            user_agent=user_agent,
-            skip_sslcert_validation=not config.api.ssl_verify,
+    anon_api_config = APIConfig(
+        domain=config.api.domain,
+        endpoint=acquired_endpoint.endpoint,
+        access_key="",
+        secret_key="",  # anonymous session
+        user_agent=user_agent,
+        skip_sslcert_validation=not config.api.ssl_verify,
+    )
+    if not anon_api_config.is_anonymous:
+        raise InvalidAPIConfigurationError(
+            "Anonymous API configuration is not properly initialized."
         )
-        if not anon_api_config.is_anonymous:
-            raise InvalidAPIConfigurationError(
-                "Anonymous API configuration is not properly initialized."
-            )
-        async with APISession(config=anon_api_config) as api_session:
-            fill_forwarding_hdrs_to_api_session(request, api_session)
-            if forward_cookies:
-                api_session.aiohttp_session.cookie_jar.update_cookies(request.cookies)
-            return await api_session.User.authorize(username, password, extra_args=extra_args)
+    async with APISession(config=anon_api_config) as api_session:
+        fill_forwarding_hdrs_to_api_session(request, api_session)
+        if forward_cookies:
+            api_session.aiohttp_session.cookie_jar.update_cookies(request.cookies)
+        return await api_session.User.authorize(username, password, extra_args=extra_args)
 
 
 async def login_handler(request: web.Request) -> web.Response:
@@ -487,14 +485,15 @@ async def login_handler(request: web.Request) -> web.Response:
         extra_keys = set(creds.keys()) ^ {"username", "password"}
         for extra_key in extra_keys:
             extra_args[extra_key] = creds[extra_key]
-        auth_result = await _authorize_via_anonymous_session(
-            request,
-            manager_pool,
-            config,
-            username=creds["username"],
-            password=creds["password"],
-            extra_args=extra_args,
-        )
+        async with manager_pool.acquire() as acquired_endpoint:
+            auth_result = await _authorize_via_anonymous_session(
+                request,
+                acquired_endpoint,
+                config,
+                username=creds["username"],
+                password=creds["password"],
+                extra_args=extra_args,
+            )
         match auth_result:
             case AuthSuccessResponse():
                 token = auth_result
@@ -725,15 +724,16 @@ async def token_login_handler(request: web.Request) -> web.Response:
     # password do not play any role.
     extra_args = {**rqst_data, auth_token_name: auth_token}
     try:
-        auth_result = await _authorize_via_anonymous_session(
-            request,
-            manager_pool,
-            config,
-            username="fake-email",
-            password="fake-pwd",
-            extra_args=extra_args,
-            forward_cookies=True,
-        )
+        async with manager_pool.acquire() as acquired_endpoint:
+            auth_result = await _authorize_via_anonymous_session(
+                request,
+                acquired_endpoint,
+                config,
+                username="fake-email",
+                password="fake-pwd",
+                extra_args=extra_args,
+                forward_cookies=True,
+            )
         match auth_result:
             case AuthSuccessResponse():
                 token = auth_result

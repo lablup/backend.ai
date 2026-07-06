@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from contextlib import asynccontextmanager
 from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock
 
@@ -10,9 +9,8 @@ from aiohttp import web
 from pytest_mock import MockerFixture
 
 from ai.backend.web import server
-from ai.backend.web.clients.endpoint_pool import AcquiredEndpoint, HealthyEndpointPool
+from ai.backend.web.clients.endpoint_pool import AcquiredEndpoint
 from ai.backend.web.config.unified import WebServerUnifiedConfig
-from ai.backend.web.errors import ManagerConnectionUnavailable
 
 from .conftest import DummyApiConfig, DummyConfig
 
@@ -38,20 +36,10 @@ def _web_config(endpoints: list[str]) -> WebServerUnifiedConfig:
     return cast(WebServerUnifiedConfig, config)
 
 
-def _mock_manager_pool(
-    *, endpoint: str | None = None, raises: Exception | None = None
-) -> HealthyEndpointPool:
-    pool = MagicMock()
-
-    @asynccontextmanager
-    async def _acquire() -> Any:
-        if raises is not None:
-            raise raises
-        assert endpoint is not None
-        yield AcquiredEndpoint(endpoint=endpoint)
-
-    pool.acquire = _acquire
-    return cast(HealthyEndpointPool, pool)
+@pytest.fixture
+def acquired_endpoint() -> AcquiredEndpoint:
+    """A healthy endpoint the caller acquired from the pool."""
+    return AcquiredEndpoint(endpoint="https://m2")
 
 
 def _patch_apisession(mocker: MockerFixture, *, auth_result: object) -> dict[str, Any]:
@@ -71,15 +59,15 @@ def _patch_apisession(mocker: MockerFixture, *, auth_result: object) -> dict[str
 
 
 class TestAuthorizeViaAnonymousSession:
-    async def test_uses_endpoint_acquired_from_pool(self, mocker: MockerFixture) -> None:
+    async def test_uses_acquired_endpoint(
+        self, mocker: MockerFixture, acquired_endpoint: AcquiredEndpoint
+    ) -> None:
         auth_result = object()
         captured = _patch_apisession(mocker, auth_result=auth_result)
-        # The pool hands out the second endpoint (the first is assumed down).
-        pool = _mock_manager_pool(endpoint="https://m2")
 
         result = await server._authorize_via_anonymous_session(
             cast(web.Request, MagicMock()),
-            pool,
+            acquired_endpoint,
             _web_config(["https://m1", "https://m2"]),
             username="user",
             password="pass",
@@ -94,15 +82,16 @@ class TestAuthorizeViaAnonymousSession:
             "user", "pass", extra_args={"otp": "123"}
         )
 
-    async def test_forwards_cookies_when_requested(self, mocker: MockerFixture) -> None:
+    async def test_forwards_cookies_when_requested(
+        self, mocker: MockerFixture, acquired_endpoint: AcquiredEndpoint
+    ) -> None:
         captured = _patch_apisession(mocker, auth_result=object())
-        pool = _mock_manager_pool(endpoint="https://m1")
         request = MagicMock()
         request.cookies = {"sToken": "abc"}
 
         await server._authorize_via_anonymous_session(
             cast(web.Request, request),
-            pool,
+            acquired_endpoint,
             _web_config(["https://m1"]),
             username="fake",
             password="fake",
@@ -114,13 +103,14 @@ class TestAuthorizeViaAnonymousSession:
             request.cookies
         )
 
-    async def test_does_not_forward_cookies_by_default(self, mocker: MockerFixture) -> None:
+    async def test_does_not_forward_cookies_by_default(
+        self, mocker: MockerFixture, acquired_endpoint: AcquiredEndpoint
+    ) -> None:
         captured = _patch_apisession(mocker, auth_result=object())
-        pool = _mock_manager_pool(endpoint="https://m1")
 
         await server._authorize_via_anonymous_session(
             cast(web.Request, MagicMock()),
-            pool,
+            acquired_endpoint,
             _web_config(["https://m1"]),
             username="user",
             password="pass",
@@ -128,20 +118,6 @@ class TestAuthorizeViaAnonymousSession:
         )
 
         captured["session"].aiohttp_session.cookie_jar.update_cookies.assert_not_called()
-
-    async def test_propagates_when_no_healthy_endpoint(self, mocker: MockerFixture) -> None:
-        _patch_apisession(mocker, auth_result=object())
-        pool = _mock_manager_pool(raises=ManagerConnectionUnavailable("no healthy endpoint"))
-
-        with pytest.raises(ManagerConnectionUnavailable):
-            await server._authorize_via_anonymous_session(
-                cast(web.Request, MagicMock()),
-                pool,
-                _web_config(["https://m1"]),
-                username="user",
-                password="pass",
-                extra_args={},
-            )
 
 
 class TestNoAuthClientRegistriesCtx:
