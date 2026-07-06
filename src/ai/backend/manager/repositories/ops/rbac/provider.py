@@ -27,10 +27,13 @@ from ai.backend.manager.models.virtual_scope.entity_membership import EntityMemb
 from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.manager.repositories.base import (
+    BulkCreator,
+    BulkCreatorResult,
     Creator,
     CreatorResult,
     Purger,
     PurgerResult,
+    execute_bulk_creator,
     execute_creator,
     execute_purger,
 )
@@ -41,10 +44,6 @@ from ai.backend.manager.repositories.base.rbac.entity_creator import (
 )
 from ai.backend.manager.repositories.ops.base.provider import DBOpsProvider, WriteOps
 from ai.backend.manager.repositories.permission_controller.role_manager import RoleManager
-
-# =============================================================================
-# Composite specs: pair a real scope-entity spec with its scope reference
-# =============================================================================
 
 
 @dataclass
@@ -64,11 +63,6 @@ class ScopeDeletion[TRow: Base]:
 
     purger: Purger[TRow]
     scope: ScopeRef
-
-
-# =============================================================================
-# Write ops
-# =============================================================================
 
 
 class RBACWriteOps(WriteOps):
@@ -178,20 +172,19 @@ class RBACWriteOps(WriteOps):
     async def bulk_create_scopes[TRow: Base](
         self,
         creations: Sequence[ScopeCreation[TRow]],
-    ) -> list[CreatorResult[TRow]]:
+    ) -> BulkCreatorResult[TRow]:
         """Create multiple real scope entities and their virtual scope nodes.
 
-        Each real scope row and its related virtual scope node are created together
-        inside one nested transaction (savepoint), so an item's row and node commit
-        or roll back as a unit.
+        The real scope rows are created atomically via a single bulk insert: either all
+        rows and their virtual scope nodes are materialized, or the whole batch fails and
+        nothing is created. The virtual scope inserts are idempotent (get-or-create).
         """
-        results: list[CreatorResult[TRow]] = []
-        for creation in creations:
-            async with self.savepoint():
-                result = await execute_creator(self._sess, creation.creator)
-                await self._insert_virtual_scopes([creation.scope])
-            results.append(result)
-        return results
+        result = await execute_bulk_creator(
+            self._sess,
+            BulkCreator(specs=[creation.creator.spec for creation in creations]),
+        )
+        await self._insert_virtual_scopes([creation.scope for creation in creations])
+        return result
 
     async def delete_scope[TRow: Base](
         self,
@@ -305,11 +298,6 @@ class RBACWriteOps(WriteOps):
             ]),
         )
         await self._sess.execute(stmt)
-
-
-# =============================================================================
-# Provider
-# =============================================================================
 
 
 class RBACOpsProvider(DBOpsProvider):

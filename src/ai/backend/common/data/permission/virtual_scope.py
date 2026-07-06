@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from ai.backend.common.data.permission.types import Permission
-from ai.backend.common.entity.types import EntityRef, EntityType, ScopeRef, ScopeType
+from ai.backend.common.entity.types import EntityType, ScopeType
 from ai.backend.common.identifier.entity import EntityID
 from ai.backend.common.identifier.scope import ScopeID
 from ai.backend.common.identifier.virtual_scope import VirtualScopeID
@@ -12,7 +12,6 @@ __all__ = (
     "VirtualScopeData",
     "ScopeBindingData",
     "EntityMembershipData",
-    "VirtualScopeReach",
 )
 
 
@@ -53,19 +52,3 @@ class EntityMembershipData:
     entity_type: EntityType
     entity_id: EntityID
     permission_cap: Permission | None
-
-
-@dataclass(frozen=True)
-class VirtualScopeReach:
-    """One resolved ``scope -> virtual_scope -> entity`` path.
-
-    Carries both hop caps *unclipped*; the caller clips the effective permission by
-    bitwise-ANDing ``binding_cap`` and ``membership_cap`` (``None`` means no ceiling
-    at that hop).
-    """
-
-    virtual_scope_id: VirtualScopeID
-    scope: ScopeRef
-    entity: EntityRef
-    binding_cap: Permission | None  # real scope -> virtual_scope hop
-    membership_cap: Permission | None  # virtual_scope -> entity hop
