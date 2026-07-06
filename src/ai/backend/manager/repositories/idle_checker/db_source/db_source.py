@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+from collections import defaultdict
 from collections.abc import Collection
 
 import sqlalchemy as sa
 
-from ai.backend.common.types import SessionId, SessionTypes
+from ai.backend.common.types import SessionId
 from ai.backend.manager.data.idle_checker.types import IdleCheckSession, ScopeRef, ScopeType
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.models.idle_checker.row import IdleCheckerBindingRow, IdleCheckerRow
@@ -30,7 +31,6 @@ class IdleCheckerDBSource:
     async def fetch_idle_check_batch(
         self,
         session_statuses: Collection[SessionStatus],
-        session_types: Collection[SessionTypes],
     ) -> IdleCheckBatchData:
         """Fetch sessions with the scope-bound idle checkers applicable to each session."""
         binding_query = (
@@ -52,51 +52,63 @@ class IdleCheckerDBSource:
                 IdleCheckerBindingRow.idle_checker_id,
             )
         )
-        session_query = (
-            sa.select(
-                SessionRow.id,
-                SessionRow.created_at,
-                SessionRow.starts_at,
-                SessionRow.resource_group_id,
-                SessionRow.group_id,
-                SessionRow.domain_id,
-            )
-            .select_from(SessionRow)
-            .where(
-                sa.and_(
-                    # The caller (idle-check stage) owns which statuses and session types are
-                    # idle-check targets. Kept as parameters so the policy stays in the stage's
-                    # target_statuses rather than baked into this read.
-                    SessionRow.status.in_(session_statuses),
-                    SessionRow.session_type.in_(session_types),
-                    self._enabled_binding_exists_query(),
-                )
-            )
-            .order_by(SessionRow.created_at, SessionRow.id)
-        )
 
         querier = BatchQuerier(pagination=NoPagination())
         async with self._ops.read_ops() as r:
             binding_rows = (await r.batch_query_in_global(binding_query, querier)).rows
             if not binding_rows:
                 return IdleCheckBatchData(targets=())
-            session_rows = (await r.batch_query_in_global(session_query, querier)).rows
 
-        checkers_by_scope: dict[ScopeRef, list[BoundCheckerData]] = {}
-        for binding_row in binding_rows:
-            binding_scope = ScopeRef(ScopeType(binding_row.scope_type), binding_row.scope_id)
-            checker = IdleCheckerDefinitionData(
-                checker_id=binding_row.checker_id,
-                checker_type=binding_row.checker_type,
-                spec=binding_row.spec,
-            )
-            checkers_by_scope.setdefault(binding_scope, []).append(
-                BoundCheckerData(
-                    scope=binding_scope,
-                    binding_created_at=binding_row.binding_created_at,
-                    checker=checker,
+            scope_columns = {
+                ScopeType.RESOURCE_GROUP: SessionRow.resource_group_id,
+                ScopeType.PROJECT: SessionRow.group_id,
+                ScopeType.DOMAIN: SessionRow.domain_id,
+            }
+            checkers_by_scope: defaultdict[ScopeRef, list[BoundCheckerData]] = defaultdict(list)
+            # Each binding adds one candidate term: match its scope id and the session types
+            # its checker targets, so a session is never pulled for a type no checker wants.
+            candidate_conditions = []
+            for binding_row in binding_rows:
+                scope_type = ScopeType(binding_row.scope_type)
+                scope = ScopeRef(scope_type, binding_row.scope_id)
+                checker = IdleCheckerDefinitionData(
+                    checker_id=binding_row.checker_id,
+                    checker_type=binding_row.checker_type,
+                    spec=binding_row.spec,
                 )
+                candidate_conditions.append(
+                    sa.and_(
+                        scope_columns[scope_type] == binding_row.scope_id,
+                        SessionRow.session_type.in_(checker.spec.target_session_types),
+                    )
+                )
+                checkers_by_scope[scope].append(
+                    BoundCheckerData(
+                        scope=scope,
+                        binding_created_at=binding_row.binding_created_at,
+                        checker=checker,
+                    )
+                )
+
+            session_query = (
+                sa.select(
+                    SessionRow.id,
+                    SessionRow.created_at,
+                    SessionRow.starts_at,
+                    SessionRow.session_type,
+                    SessionRow.resource_group_id,
+                    SessionRow.group_id,
+                    SessionRow.domain_id,
+                )
+                .where(
+                    sa.and_(
+                        SessionRow.status.in_(session_statuses),
+                        sa.or_(*candidate_conditions),
+                    )
+                )
+                .order_by(SessionRow.created_at, SessionRow.id)
             )
+            session_rows = (await r.batch_query_in_global(session_query, querier)).rows
 
         targets: list[IdleCheckTargetData] = []
         for session_row in session_rows:
@@ -105,9 +117,14 @@ class IdleCheckerDBSource:
                 ScopeRef(ScopeType.PROJECT, session_row.group_id),
                 ScopeRef(ScopeType.DOMAIN, session_row.domain_id),
             )
-            checkers = tuple(
-                checker for scope in scopes for checker in checkers_by_scope.get(scope, ())
-            )
+            # Attach only checkers whose target types include this session's type.
+            checkers: list[BoundCheckerData] = []
+            for scope in scopes:
+                for bound in checkers_by_scope.get(scope, ()):
+                    if session_row.session_type in bound.checker.spec.target_session_types:
+                        checkers.append(bound)
+            if not checkers:
+                continue
             targets.append(
                 IdleCheckTargetData(
                     session=IdleCheckSession(
@@ -115,29 +132,8 @@ class IdleCheckerDBSource:
                         created_at=session_row.created_at,
                         starts_at=session_row.starts_at,
                     ),
-                    checkers=checkers,
+                    checkers=tuple(checkers),
                 )
             )
 
         return IdleCheckBatchData(targets=tuple(targets))
-
-    def _enabled_binding_exists_query(self) -> sa.sql.elements.ColumnElement[bool]:
-        return sa.exists().where(
-            sa.and_(
-                IdleCheckerBindingRow.enabled == sa.true(),
-                sa.or_(
-                    sa.and_(
-                        IdleCheckerBindingRow.scope_type == ScopeType.RESOURCE_GROUP.value,
-                        IdleCheckerBindingRow.scope_id == SessionRow.resource_group_id,
-                    ),
-                    sa.and_(
-                        IdleCheckerBindingRow.scope_type == ScopeType.PROJECT.value,
-                        IdleCheckerBindingRow.scope_id == SessionRow.group_id,
-                    ),
-                    sa.and_(
-                        IdleCheckerBindingRow.scope_type == ScopeType.DOMAIN.value,
-                        IdleCheckerBindingRow.scope_id == SessionRow.domain_id,
-                    ),
-                ),
-            )
-        )

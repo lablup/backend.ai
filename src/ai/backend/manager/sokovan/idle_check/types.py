@@ -8,7 +8,7 @@ from datetime import datetime
 from typing import override
 from uuid import UUID
 
-from ai.backend.common.types import SessionId, SessionTypes
+from ai.backend.common.types import SessionId
 from ai.backend.manager.data.reconciler.types import (
     BaseReconcilerCategory,
     HandlerOutcome,
@@ -37,7 +37,6 @@ class IdleCheckKind(BaseReconcilerKind):
 @dataclass(frozen=True)
 class IdleCheckTargetStatuses(BaseReconcilerTargetStatuses):
     session_statuses: frozenset[SessionStatus]
-    session_types: frozenset[SessionTypes]
 
 
 @dataclass

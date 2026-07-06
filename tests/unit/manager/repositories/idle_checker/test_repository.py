@@ -58,6 +58,14 @@ class SeededIdleCheckData:
     domain_checker_id: IdleCheckerID
 
 
+@dataclass(frozen=True)
+class PerTypeCheckerData:
+    interactive_session_id: SessionId
+    batch_session_id: SessionId
+    interactive_checker_id: IdleCheckerID
+    batch_checker_id: IdleCheckerID
+
+
 class TestFetchIdleCheckBatch:
     @pytest.fixture
     async def database(
@@ -380,10 +388,7 @@ class TestFetchIdleCheckBatch:
         self,
         repository: IdleCheckerRepository,
     ) -> None:
-        batch = await repository.fetch_idle_check_batch(
-            [SessionStatus.RUNNING],
-            [SessionTypes.INTERACTIVE, SessionTypes.BATCH, SessionTypes.SYSTEM],
-        )
+        batch = await repository.fetch_idle_check_batch([SessionStatus.RUNNING])
 
         assert batch.targets == ()
 
@@ -397,10 +402,7 @@ class TestFetchIdleCheckBatch:
         repository: IdleCheckerRepository,
         seeded_idle_check_data: SeededIdleCheckData,
     ) -> None:
-        batch = await repository.fetch_idle_check_batch(
-            [SessionStatus.RUNNING],
-            [SessionTypes.INTERACTIVE, SessionTypes.BATCH, SessionTypes.SYSTEM],
-        )
+        batch = await repository.fetch_idle_check_batch([SessionStatus.RUNNING])
         targets_by_session_id = {target.session.session_id: target for target in batch.targets}
         resource_group_target = targets_by_session_id[
             seeded_idle_check_data.resource_group_session_id
@@ -421,10 +423,7 @@ class TestFetchIdleCheckBatch:
         repository: IdleCheckerRepository,
         seeded_idle_check_data: SeededIdleCheckData,
     ) -> None:
-        batch = await repository.fetch_idle_check_batch(
-            [SessionStatus.RUNNING],
-            [SessionTypes.INTERACTIVE, SessionTypes.BATCH, SessionTypes.SYSTEM],
-        )
+        batch = await repository.fetch_idle_check_batch([SessionStatus.RUNNING])
         targets_by_session_id = {target.session.session_id: target for target in batch.targets}
         project_target = targets_by_session_id[seeded_idle_check_data.project_session_id]
         checkers = project_target.checkers
@@ -443,10 +442,7 @@ class TestFetchIdleCheckBatch:
         repository: IdleCheckerRepository,
         seeded_idle_check_data: SeededIdleCheckData,
     ) -> None:
-        batch = await repository.fetch_idle_check_batch(
-            [SessionStatus.RUNNING],
-            [SessionTypes.INTERACTIVE, SessionTypes.BATCH, SessionTypes.SYSTEM],
-        )
+        batch = await repository.fetch_idle_check_batch([SessionStatus.RUNNING])
         targets_by_session_id = {target.session.session_id: target for target in batch.targets}
         domain_target = targets_by_session_id[seeded_idle_check_data.domain_session_id]
         checkers = domain_target.checkers
@@ -465,10 +461,7 @@ class TestFetchIdleCheckBatch:
         repository: IdleCheckerRepository,
         seeded_idle_check_data: SeededIdleCheckData,
     ) -> None:
-        batch = await repository.fetch_idle_check_batch(
-            [SessionStatus.RUNNING],
-            [SessionTypes.INTERACTIVE, SessionTypes.BATCH, SessionTypes.SYSTEM],
-        )
+        batch = await repository.fetch_idle_check_batch([SessionStatus.RUNNING])
         targets_by_session_id = {target.session.session_id: target for target in batch.targets}
 
         assert set(targets_by_session_id) == {
@@ -477,3 +470,151 @@ class TestFetchIdleCheckBatch:
             seeded_idle_check_data.domain_session_id,
         }
         assert seeded_idle_check_data.inference_session_id not in targets_by_session_id
+
+    @pytest.fixture
+    async def per_type_checker_data(
+        self,
+        database: ExtendedAsyncSAEngine,
+    ) -> PerTypeCheckerData:
+        scope = ScopeFixture(
+            domain_name="per-type-domain",
+            domain_id=DomainID(uuid.uuid4()),
+            project_id=uuid.uuid4(),
+            scaling_group_name="per-type-sgroup",
+            scaling_group_id=ResourceGroupID(uuid.uuid4()),
+        )
+        interactive_session_id = SessionId(uuid.uuid4())
+        batch_session_id = SessionId(uuid.uuid4())
+        interactive_checker_id = IdleCheckerID(uuid.uuid4())
+        batch_checker_id = IdleCheckerID(uuid.uuid4())
+        session_specs = (
+            (interactive_session_id, SessionTypes.INTERACTIVE, datetime(2026, 1, 1, tzinfo=UTC)),
+            (batch_session_id, SessionTypes.BATCH, datetime(2026, 1, 2, tzinfo=UTC)),
+        )
+        checker_specs = (
+            (interactive_checker_id, frozenset({SessionTypes.INTERACTIVE})),
+            (batch_checker_id, frozenset({SessionTypes.BATCH})),
+        )
+        async with database.begin_session() as db_sess:
+            db_sess.add(
+                ProjectResourcePolicyRow(
+                    name=f"{scope.domain_name}-policy",
+                    max_vfolder_count=10,
+                    max_quota_scope_size=1024,
+                    max_network_count=10,
+                )
+            )
+            db_sess.add(
+                DomainRow(
+                    id=scope.domain_id,
+                    name=scope.domain_name,
+                    description=None,
+                    is_active=True,
+                )
+            )
+            db_sess.add(
+                GroupRow(
+                    id=scope.project_id,
+                    name=f"{scope.domain_name}-project",
+                    description=None,
+                    is_active=True,
+                    domain_name=scope.domain_name,
+                    resource_policy=f"{scope.domain_name}-policy",
+                )
+            )
+            db_sess.add(
+                ScalingGroupRow(
+                    id=scope.scaling_group_id,
+                    name=scope.scaling_group_name,
+                    description=None,
+                    is_active=True,
+                    is_public=True,
+                    driver="static",
+                    driver_opts={},
+                    scheduler="fifo",
+                    use_host_network=False,
+                )
+            )
+            for session_id, session_type, created_at in session_specs:
+                db_sess.add(
+                    SessionRow(
+                        id=session_id,
+                        creation_id=str(session_id)[:32],
+                        name=f"session-{session_id}",
+                        session_type=session_type,
+                        cluster_mode=ClusterMode.SINGLE_NODE,
+                        cluster_size=1,
+                        domain_name=scope.domain_name,
+                        domain_id=scope.domain_id,
+                        resource_group_id=scope.scaling_group_id,
+                        group_id=scope.project_id,
+                        user_uuid=uuid.uuid4(),
+                        access_key=None,
+                        tag=None,
+                        status=SessionStatus.RUNNING,
+                        status_info=None,
+                        status_data=None,
+                        status_history={},
+                        result=SessionResult.UNDEFINED,
+                        created_at=created_at,
+                        terminated_at=None,
+                        starts_at=created_at,
+                        startup_command=None,
+                        callback_url=None,
+                        occupying_slots=ResourceSlot({"cpu": "1"}),
+                        requested_slots=ResourceSlot({"cpu": "1"}),
+                        vfolder_mounts=[],
+                        environ=None,
+                        bootstrap_script=None,
+                        use_host_network=False,
+                        scaling_group_name=scope.scaling_group_name,
+                    )
+                )
+            for checker_id, target_types in checker_specs:
+                db_sess.add(
+                    IdleCheckerRow(
+                        id=checker_id,
+                        name=f"checker-{checker_id}",
+                        description=None,
+                        checker_type=CheckerType.SESSION_LIFETIME,
+                        spec=IdleCheckerSpec(
+                            type=CheckerType.SESSION_LIFETIME,
+                            target_session_types=target_types,
+                            session_lifetime=SessionLifetimeSpec(),
+                        ),
+                    )
+                )
+            await db_sess.flush()
+            for checker_id, _ in checker_specs:
+                db_sess.add(
+                    IdleCheckerBindingRow(
+                        scope_type=ScopeType.DOMAIN.value,
+                        scope_id=scope.domain_id,
+                        idle_checker_id=checker_id,
+                        enabled=True,
+                    )
+                )
+        return PerTypeCheckerData(
+            interactive_session_id=interactive_session_id,
+            batch_session_id=batch_session_id,
+            interactive_checker_id=interactive_checker_id,
+            batch_checker_id=batch_checker_id,
+        )
+
+    async def test_applies_only_checkers_targeting_session_type(
+        self,
+        repository: IdleCheckerRepository,
+        per_type_checker_data: PerTypeCheckerData,
+    ) -> None:
+        batch = await repository.fetch_idle_check_batch([SessionStatus.RUNNING])
+        targets_by_session_id = {target.session.session_id: target for target in batch.targets}
+
+        interactive_target = targets_by_session_id[per_type_checker_data.interactive_session_id]
+        interactive_checker_ids = [
+            bound.checker.checker_id for bound in interactive_target.checkers
+        ]
+        assert interactive_checker_ids == [per_type_checker_data.interactive_checker_id]
+
+        batch_target = targets_by_session_id[per_type_checker_data.batch_session_id]
+        batch_checker_ids = [bound.checker.checker_id for bound in batch_target.checkers]
+        assert batch_checker_ids == [per_type_checker_data.batch_checker_id]

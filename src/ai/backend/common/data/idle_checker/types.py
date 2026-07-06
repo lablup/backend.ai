@@ -5,7 +5,7 @@ from typing import Self
 
 from pydantic import Field, model_validator
 
-from ai.backend.common.types import BackendAISchema
+from ai.backend.common.types import BackendAISchema, SessionTypes
 
 
 class CheckerType(enum.StrEnum):
@@ -45,6 +45,10 @@ class IdleCheckerSpec(BackendAISchema):
     """
 
     type: CheckerType = Field(description="Idle checker kind; selects the sub-config.")
+    target_session_types: frozenset[SessionTypes] = Field(
+        default=frozenset({SessionTypes.INTERACTIVE, SessionTypes.BATCH, SessionTypes.SYSTEM}),
+        description="Session types this checker applies to; other types are skipped.",
+    )
     session_lifetime: SessionLifetimeSpec | None = Field(
         default=None, description="session_lifetime config."
     )
