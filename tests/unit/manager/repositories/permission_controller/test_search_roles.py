@@ -32,6 +32,7 @@ from ai.backend.manager.models.agent import AgentRow
 # imported/registered by this test; _ORM_CLUSTER keeps them live.
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
+from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.rbac_models import UserRoleRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
@@ -66,6 +67,7 @@ from ai.backend.testutils.db import with_tables
 _ORM_CLUSTER = (
     AgentRow,
     ScalingGroupForDomainRow,
+    ImageRow,
 )
 
 
