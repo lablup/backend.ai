@@ -18,7 +18,11 @@ __all__ = ("AppConfigFragmentRow",)
 
 
 class AppConfigFragmentRow(Base):  # type: ignore[misc]
-    """One scoped app config fragment — a single JSON document at ``(config_name, scope_type, scope_id)``."""
+    """One scoped app config fragment — a single JSON document at ``(config_name, scope_type, scope_id)``.
+
+    The fragment carries no merge priority of its own — its rank is the ``rank`` of
+    the allow-list entry for its ``(config_name, scope_type)``.
+    """
 
     __tablename__ = "app_config_fragments"
     __table_args__ = (
@@ -52,11 +56,6 @@ class AppConfigFragmentRow(Base):  # type: ignore[misc]
         sa.String(length=255),
         nullable=False,
     )
-    rank: Mapped[int] = mapped_column(
-        "rank",
-        sa.Integer,
-        nullable=False,
-    )
     config: Mapped[dict[str, Any]] = mapped_column(
         "config",
         JSONB,
@@ -82,7 +81,6 @@ class AppConfigFragmentRow(Base):  # type: ignore[misc]
             config_name=self.config_name,
             scope_type=self.scope_type,
             scope_id=self.scope_id,
-            rank=self.rank,
             config=self.config,
             created_at=self.created_at,
             updated_at=self.updated_at,

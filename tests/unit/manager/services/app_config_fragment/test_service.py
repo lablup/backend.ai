@@ -75,7 +75,6 @@ def _fragment(
         config_name=config_name,
         scope_type=scope_type,
         scope_id=scope_id,
-        rank=100,
         config={"k": "v"},
         created_at=now,
         updated_at=now,

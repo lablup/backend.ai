@@ -19,9 +19,10 @@ class AppConfigAllowListRow(Base):  # type: ignore[misc]
     """Permission to write config fragments for one config name at one scope type.
 
     A config fragment may be created, updated, or purged only when a matching row
-    exists here; without one, the write is rejected. Reads never consult this table.
-    There is at most one row per ``(config_name, scope_type)``, and only admins
-    create or remove these rows.
+    exists here; without one, the write is rejected. ``rank`` is the merge priority
+    the entry's fragments carry (low → high; higher wins) — admin-owned here so
+    fragment owners cannot re-order the merge. There is at most one row per
+    ``(config_name, scope_type)``, and only admins create or remove these rows.
     """
 
     __tablename__ = "app_config_allow_list"
@@ -48,6 +49,11 @@ class AppConfigAllowListRow(Base):  # type: ignore[misc]
         StrEnumType(AppConfigScopeType),
         nullable=False,
     )
+    rank: Mapped[int] = mapped_column(
+        "rank",
+        sa.Integer,
+        nullable=False,
+    )
     created_at: Mapped[datetime] = mapped_column(
         "created_at",
         sa.DateTime(timezone=True),
@@ -67,6 +73,7 @@ class AppConfigAllowListRow(Base):  # type: ignore[misc]
             id=self.id,
             config_name=self.config_name,
             scope_type=self.scope_type,
+            rank=self.rank,
             created_at=self.created_at,
             updated_at=self.updated_at,
         )
