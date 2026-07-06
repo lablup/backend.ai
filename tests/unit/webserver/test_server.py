@@ -145,40 +145,40 @@ class TestAuthorizeViaAnonymousSession:
 
 
 class TestNoAuthClientRegistriesCtx:
-    def _patch_create(self, mocker: MockerFixture) -> list[MagicMock]:
-        created: list[MagicMock] = []
+    def _patch_create(self, mocker: MockerFixture) -> dict[str, MagicMock]:
+        created_by_endpoint: dict[str, MagicMock] = {}
 
         def _create(config: Any, auth: Any) -> MagicMock:
             registry = MagicMock()
             registry.close = AsyncMock()
-            registry.endpoint = str(config.endpoint)
-            created.append(registry)
+            created_by_endpoint[str(config.endpoint)] = registry
             return registry
 
-        mocker.patch.object(
-            server.BackendAIClientRegistry, "create", AsyncMock(side_effect=_create)
+        mocker.patch(
+            "ai.backend.web.server.BackendAIClientRegistry.create",
+            AsyncMock(side_effect=_create),
         )
-        return created
+        return created_by_endpoint
 
     async def test_builds_one_registry_per_endpoint(self, mocker: MockerFixture) -> None:
-        created = self._patch_create(mocker)
+        created_by_endpoint = self._patch_create(mocker)
 
         async with server.no_auth_client_registries_ctx(
             _web_config(["https://m1", "https://m2", "https://m3"])
         ) as registries:
             assert set(registries.keys()) == {"https://m1", "https://m2", "https://m3"}
-            assert len(created) == 3
+            assert len(created_by_endpoint) == 3
             # Each registry is keyed by the endpoint it was built for, so the
             # handler can look it up by the endpoint the pool hands out.
             for key, registry in registries.items():
-                assert registry.endpoint == key
+                assert registry is created_by_endpoint[key]
 
     async def test_closes_all_registries_on_exit(self, mocker: MockerFixture) -> None:
-        created = self._patch_create(mocker)
+        created_by_endpoint = self._patch_create(mocker)
 
         async with server.no_auth_client_registries_ctx(_web_config(["https://m1", "https://m2"])):
             pass
 
-        assert len(created) == 2
-        for registry in created:
+        assert len(created_by_endpoint) == 2
+        for registry in created_by_endpoint.values():
             registry.close.assert_awaited_once()

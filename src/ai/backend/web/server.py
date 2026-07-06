@@ -377,9 +377,7 @@ async def _authorize_via_anonymous_session(
             fill_forwarding_hdrs_to_api_session(request, api_session)
             if forward_cookies:
                 api_session.aiohttp_session.cookie_jar.update_cookies(request.cookies)
-            return await api_session.User.authorize(
-                username, password, extra_args=extra_args
-            )
+            return await api_session.User.authorize(username, password, extra_args=extra_args)
 
 
 async def login_handler(request: web.Request) -> web.Response:
