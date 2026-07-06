@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from ai.backend.common.types import AgentId, KernelId, ResourceSlotEntry
+from ai.backend.common.types import KernelId, ResourceSlotEntry
 from ai.backend.manager.data.session.draft import KernelResourceDraft
 
 
@@ -21,21 +21,20 @@ class KernelDryRunSpec:
 
 
 @dataclass(frozen=True)
-class KernelDryRunRemediation:
+class UnschedulableReasonHint:
     """What the caller could change so an unschedulable kernel would fit.
 
-    Data-layer mirror of the selector's ``RemediationHint``.
+    Surfaces only the user-actionable subset of the selector's
+    ``RemediationHint``.
 
     - ``required_reduction`` — subtract these slots to fit the best-fitting node.
     - ``required_container_reduction`` — free this many containers.
     - ``available_archs`` — architectures that actually exist.
-    - ``available_agent_ids`` — agents that are actually available.
     """
 
     required_reduction: tuple[ResourceSlotEntry, ...] | None = None
     required_container_reduction: int | None = None
     available_archs: list[str] | None = None
-    available_agent_ids: list[AgentId] | None = None
 
 
 @dataclass(frozen=True)
@@ -51,4 +50,4 @@ class KernelDryRunResult:
     resolved_slots: tuple[ResourceSlotEntry, ...]
     resolved_architecture: str
     schedulable: bool
-    remediation: KernelDryRunRemediation | None = None
+    remediation: UnschedulableReasonHint | None = None
