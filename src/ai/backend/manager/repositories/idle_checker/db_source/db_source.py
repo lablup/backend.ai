@@ -10,6 +10,8 @@ from uuid import UUID
 
 import sqlalchemy as sa
 
+from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import SessionId, SessionTypes
 from ai.backend.manager.data.idle_checker.types import IdleCheckSession, ScopeRef, ScopeType
 from ai.backend.manager.data.session.types import SessionStatus
@@ -29,13 +31,13 @@ from ai.backend.manager.repositories.ops import DBOpsProvider
 class _CandidateSession:
     """Typed view of one session_query row (fields follow the SELECT order)."""
 
-    id: UUID
+    id: SessionId
     created_at: datetime
     starts_at: datetime | None
     session_type: SessionTypes
-    resource_group_id: UUID
+    resource_group_id: ResourceGroupID
     group_id: UUID
-    domain_id: UUID
+    domain_id: DomainID
 
 
 class IdleCheckerDBSource:
