@@ -375,6 +375,7 @@ class TestCancelFreesResourceAllocations:
                     agent=agent_id,
                     agent_addr="127.0.0.1:6001" if agent_id else None,
                     scaling_group=scaling_group_name,
+                    resource_group_id=resource_group_id,
                     cluster_idx=0,
                     cluster_role="main",
                     cluster_hostname=f"kernel-{uuid.uuid4().hex[:8]}",

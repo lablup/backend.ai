@@ -1313,12 +1313,19 @@ class TestScalingGroupRepositoryDB:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         sample_session: SessionId,
+        sample_scaling_group_for_hierarchy: str,
         test_user_domain_group: tuple[uuid.UUID, str, uuid.UUID],
     ) -> AsyncGenerator[uuid.UUID, None]:
         """Create a kernel for the session."""
         test_user_uuid, test_domain, test_group_id = test_user_domain_group
         kernel_id = uuid.uuid4()
         async with db_with_cleanup.begin_session() as db_sess:
+            resource_group_id = await db_sess.scalar(
+                sa.select(ScalingGroupRow.id).where(
+                    ScalingGroupRow.name == sample_scaling_group_for_hierarchy
+                )
+            )
+            assert resource_group_id is not None
             db_sess.add(
                 KernelRow(
                     id=kernel_id,
@@ -1326,6 +1333,8 @@ class TestScalingGroupRepositoryDB:
                     domain_name=test_domain,
                     group_id=test_group_id,
                     user_uuid=test_user_uuid,
+                    scaling_group=sample_scaling_group_for_hierarchy,
+                    resource_group_id=resource_group_id,
                     cluster_role=DEFAULT_ROLE,
                     occupied_slots=ResourceSlot(),
                     repl_in_port=0,

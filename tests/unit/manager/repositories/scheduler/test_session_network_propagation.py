@@ -268,6 +268,7 @@ class TestPersistentNetworkNotRecreated:
                     agent=env["agent_id"],
                     agent_addr="127.0.0.1:6001",
                     scaling_group=env["sg_name"],
+                    resource_group_id=env["sg_id"],
                     cluster_idx=0,
                     cluster_role="main",
                     cluster_hostname=f"kernel-{uuid.uuid4().hex[:8]}",

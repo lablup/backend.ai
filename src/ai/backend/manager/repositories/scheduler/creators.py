@@ -84,6 +84,7 @@ class KernelRowFromSpec(CreatorSpec[KernelRow]):
             local_rank=self.kernel_spec.local_rank,
             cluster_hostname=self.kernel_spec.cluster_hostname,
             scaling_group=str(self.spec.scope.resource_group_name),
+            resource_group_id=self.spec.scope.resource_group_id,
             domain_name=str(self.spec.scope.domain_name),
             group_id=self.spec.scope.project_id,
             user_uuid=self.spec.identity.user_uuid,

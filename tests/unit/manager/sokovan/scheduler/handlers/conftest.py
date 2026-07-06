@@ -10,6 +10,7 @@ from uuid import uuid4
 import pytest
 from dateutil.tz import tzutc
 
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
@@ -196,6 +197,7 @@ def _create_session(
             ),
             resource=ResourceInfo(
                 scaling_group=scaling_group,
+                resource_group_id=ResourceGroupID(uuid4()),
                 agent=agent_id,
                 agent_addr=f"tcp://agent-{i}:5001",
                 container_id=f"container-{kernel_id}",
@@ -298,6 +300,7 @@ def _create_kernel(
         ),
         resource=ResourceInfo(
             scaling_group=scaling_group,
+            resource_group_id=ResourceGroupID(uuid4()),
             agent=aid,
             agent_addr=agent_addr or f"tcp://{aid}:5001",
             container_id=f"container-{kid}",
@@ -518,6 +521,7 @@ def kernel_without_agent() -> KernelInfo:
         cluster=kernel.cluster,
         resource=ResourceInfo(
             scaling_group=kernel.resource.scaling_group,
+            resource_group_id=kernel.resource.resource_group_id,
             agent=None,  # No agent assigned
             agent_addr=None,
             container_id=None,

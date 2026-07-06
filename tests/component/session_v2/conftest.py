@@ -358,6 +358,7 @@ async def _seed_session(
                 user_uuid=user_uuid,
                 access_key=access_key,
                 scaling_group=scaling_group,
+                resource_group_id=resource_group_id,
                 status=KernelStatus.RUNNING,
                 status_info="",
                 occupied_slots=ResourceSlot(),

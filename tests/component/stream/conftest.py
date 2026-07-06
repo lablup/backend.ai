@@ -195,6 +195,7 @@ async def session_seed(
                 user_uuid=admin_user_fixture.user_uuid,
                 access_key=admin_user_fixture.keypair.access_key,
                 scaling_group=scaling_group_name,
+                resource_group_id=scaling_group_id,
                 status=KernelStatus.RUNNING,
                 status_info="",
                 occupied_slots=ResourceSlot(),
