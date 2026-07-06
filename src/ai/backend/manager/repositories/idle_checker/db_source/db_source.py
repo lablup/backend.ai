@@ -65,9 +65,10 @@ class IdleCheckerDBSource:
                 ScopeType.DOMAIN: SessionRow.domain_id,
             }
             checkers_by_scope: defaultdict[ScopeRef, list[BoundCheckerData]] = defaultdict(list)
-            # Each binding adds one candidate term: match its scope id and the session types
-            # its checker targets, so a session is never pulled for a type no checker wants.
+            # A scope can host several checkers, so bindings often yield the same candidate
+            # term; dedupe by (scope, target types) while still attaching every checker.
             candidate_conditions = []
+            seen_candidates = set()
             for binding_row in binding_rows:
                 scope_type = ScopeType(binding_row.scope_type)
                 scope = ScopeRef(scope_type, binding_row.scope_id)
@@ -76,17 +77,25 @@ class IdleCheckerDBSource:
                     checker_type=binding_row.checker_type,
                     spec=binding_row.spec,
                 )
-                candidate_conditions.append(
-                    sa.and_(
-                        scope_columns[scope_type] == binding_row.scope_id,
-                        SessionRow.session_type.in_(checker.spec.target_session_types),
-                    )
-                )
                 checkers_by_scope[scope].append(
                     BoundCheckerData(
                         scope=scope,
                         binding_created_at=binding_row.binding_created_at,
                         checker=checker,
+                    )
+                )
+                candidate_key = (
+                    scope_type,
+                    binding_row.scope_id,
+                    checker.spec.target_session_types,
+                )
+                if candidate_key in seen_candidates:
+                    continue
+                seen_candidates.add(candidate_key)
+                candidate_conditions.append(
+                    sa.and_(
+                        scope_columns[scope_type] == binding_row.scope_id,
+                        SessionRow.session_type.in_(checker.spec.target_session_types),
                     )
                 )
 
