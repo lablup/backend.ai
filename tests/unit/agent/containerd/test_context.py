@@ -34,7 +34,7 @@ class FakeFacade:
         self.local_created: list[str] = []
         self.local_started: list[str] = []
 
-    async def create_local_container(self, container_id: str, *, image_ref: str, command: Any, oci_spec: Any) -> None:
+    async def create_local_container(self, session_id: str, container_id: str, *, image_ref: str, command: Any, oci_spec: Any) -> None:
         self.local_created.append(container_id)
 
     async def start_local_container(self, container_id: str) -> tuple[int, str | None]:

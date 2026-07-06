@@ -189,3 +189,14 @@ class NerdctlRuntimeClient(ContainerdRuntimeClient):
         if rc != 0:
             return None
         return out.strip() or None
+
+    # --- networks ---
+    async def create_network(self, name: str) -> None:
+        # idempotent: skip if it already exists (network inspect rc==0).
+        rc, _, _ = await self._runner([*self._base(), "network", "inspect", name])
+        if rc == 0:
+            return
+        await self._run(["network", "create", name])
+
+    async def remove_network(self, name: str) -> None:
+        await self._run(["network", "rm", name], ok_codes=(0, 1))

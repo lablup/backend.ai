@@ -117,6 +117,12 @@ class FakeRuntime(ContainerdRuntimeClient):
     async def container_ip(self, container_id: str) -> str | None:
         return "172.20.0.2"
 
+    async def create_network(self, name: str) -> None:
+        self.calls.append(f"create_network:{name}")
+
+    async def remove_network(self, name: str) -> None:
+        self.calls.append(f"remove_network:{name}")
+
     async def create_container(
         self, container_id: str, *, image_ref: str, command: Sequence[str], oci_spec: Mapping[str, Any], network: str = "none"
     ) -> None:

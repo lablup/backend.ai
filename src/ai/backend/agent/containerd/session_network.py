@@ -163,19 +163,26 @@ class ContainerdSessionNetwork:
 
     # --- single-node path (no cluster overlay; plain bridge, mirrors Docker) ---
 
+    @staticmethod
+    def local_network_name(session_id: str) -> str:
+        return f"bai-local-{session_id}"
+
     async def create_local_container(
         self,
+        session_id: str,
         container_id: str,
         *,
         image_ref: str,
         command: list[str],
         oci_spec: dict[str, Any],
     ) -> None:
-        """Create a single-node container on the default bridge (has an IP + host
-        reachability). No BEP-1055 overlay/orchestrator needed."""
+        """Create a single-node container on a PER-SESSION bridge (isolated from other
+        sessions), NOT nerdctl's shared default bridge. No BEP-1055 overlay needed."""
+        net = self.local_network_name(session_id)
+        await self._runtime.create_network(net)
         await self._runtime.create_container(
             container_id, image_ref=image_ref, command=command, oci_spec=oci_spec,
-            network="bridge",
+            network=net,
         )
 
     async def start_local_container(self, container_id: str) -> tuple[int, str | None]:
@@ -183,6 +190,9 @@ class ContainerdSessionNetwork:
         handle = await self._runtime.start_container(container_id)
         ip = await self._runtime.container_ip(container_id)
         return handle.pid, ip
+
+    async def teardown_local_session(self, session_id: str) -> None:
+        await self._runtime.remove_network(self.local_network_name(session_id))
 
     async def start_and_attach_container(
         self,

@@ -97,3 +97,12 @@ class ContainerdRuntimeClient(ABC):
     @abstractmethod
     async def container_ip(self, container_id: str) -> str | None:
         """Return the container's primary IP address, or None if it has no network."""
+
+    # --- networks (single-node per-session isolation) ---
+    @abstractmethod
+    async def create_network(self, name: str) -> None:
+        """Create a per-session bridge network (idempotent)."""
+
+    @abstractmethod
+    async def remove_network(self, name: str) -> None:
+        """Remove a network (idempotent)."""

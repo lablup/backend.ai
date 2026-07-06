@@ -296,6 +296,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         if self._net_meta is None:
             # single-node: plain bridge network (no BEP-1055 overlay), like Docker.
             await self._session_network.create_local_container(
+                self._session_id,
                 self._container_id,
                 image_ref=spec.image_ref,
                 command=command,
