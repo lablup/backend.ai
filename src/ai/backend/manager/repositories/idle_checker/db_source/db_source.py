@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from collections.abc import Collection
+from collections.abc import Collection, Sequence
+from typing import Any
 
 import sqlalchemy as sa
 
@@ -118,7 +119,16 @@ class IdleCheckerDBSource:
                 .order_by(SessionRow.created_at, SessionRow.id)
             )
             session_rows = (await r.batch_query_in_global(session_query, querier)).rows
+        idle_checker_targets = self._build_targets(session_rows, checkers_by_scope)
 
+        return IdleCheckBatchData(targets=idle_checker_targets)
+
+    def _build_targets(
+        self,
+        session_rows: Sequence[sa.Row[Any]],
+        checkers_by_scope: dict[ScopeRef, list[BoundCheckerData]],
+    ) -> Sequence[IdleCheckTargetData]:
+        """Attach to each session the in-scope checkers that target its session type."""
         targets: list[IdleCheckTargetData] = []
         for session_row in session_rows:
             scopes = (
@@ -126,7 +136,6 @@ class IdleCheckerDBSource:
                 ScopeRef(ScopeType.PROJECT, session_row.group_id),
                 ScopeRef(ScopeType.DOMAIN, session_row.domain_id),
             )
-            # Attach only checkers whose target types include this session's type.
             checkers: list[BoundCheckerData] = []
             for scope in scopes:
                 for bound in checkers_by_scope.get(scope, ()):
@@ -144,5 +153,4 @@ class IdleCheckerDBSource:
                     checkers=tuple(checkers),
                 )
             )
-
-        return IdleCheckBatchData(targets=tuple(targets))
+        return targets
