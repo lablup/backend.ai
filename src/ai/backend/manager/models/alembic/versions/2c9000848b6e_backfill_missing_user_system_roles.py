@@ -154,7 +154,7 @@ def _backfill_roles_and_permissions(db_conn: Connection, rows: Sequence[Row[Any]
 def upgrade() -> None:
     conn = op.get_bind()
     offset = 0
-    page_size = 1000
+    page_size = 100
     while True:
         rows = _query_users_without_system_roles(conn, offset, page_size)
         if not rows:
