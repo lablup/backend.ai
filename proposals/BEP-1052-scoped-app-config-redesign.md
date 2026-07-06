@@ -129,7 +129,7 @@ advance.
   `(config_name, user)` row; an admin-only value carries
   `(config_name, domain)` and/or `(config_name, public)`.
 - `rank` — the merge priority every fragment under this entry carries
-  (low → high; higher wins). Defaults to a fixed rank (see §2); admins
+  (low → high; higher wins). Defaults per scope type (see §2); admins
   may set it explicitly.
 - `created_at` / `updated_at`.
 
@@ -190,8 +190,8 @@ boundary.
   merged value is the admin's (`public` / `domain` fragments only).
 - **Overridable**: the admin grants `(config_name, user)`. The admin
   sets the `domain` default; the user freely creates/updates/purges
-  their own `user` fragment, which wins on merge when its allow-list
-  entry is ranked above the `domain` entry (see §2).
+  their own `user` fragment, which wins on merge (the `user` entry's
+  default `rank` is the highest).
 - **User-only**: the grant exists and no admin fragment is published.
 
 To promote a fixed value to user-customizable, the admin adds a single
@@ -211,10 +211,11 @@ merge order is admin policy: fragment writes are partly user-owned, and
 a rank on the fragment would let a user re-order the merge by editing
 their own row.
 
-- **Default rank.** A new entry defaults to a fixed `rank`; per-scope-type
-  defaults that order `public` < `domain` < `user` are introduced in a
-  follow-up. Until then the admin sets `rank` explicitly to order the
-  scopes.
+- **Scope-type defaults.** A new entry defaults its `rank` from its
+  `scope_type`: `public` = 100, `domain` = 200, `user` = 300. The
+  defaults order the scopes so a user's own fragment overrides the
+  domain default, which overrides the public value; the 100 gap leaves
+  room for custom placement in between.
 - **Admin override.** The admin may set `rank` explicitly when creating
   the entry — e.g. a `domain` entry ranked above `user` yields a
   domain-enforced value that user fragments cannot beat even where a

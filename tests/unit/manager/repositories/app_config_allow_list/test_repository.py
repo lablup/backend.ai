@@ -26,7 +26,6 @@ from ai.backend.manager.models.app_config_allow_list.row import AppConfigAllowLi
 from ai.backend.manager.models.app_config_definition.row import AppConfigDefinitionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.app_config_allow_list.creators import (
-    DEFAULT_RANK,
     AppConfigAllowListCreatorSpec,
 )
 from ai.backend.manager.repositories.app_config_allow_list.repository import (
@@ -156,14 +155,24 @@ class TestCreateAndGet:
 
 
 class TestRankAssignment:
-    async def test_rank_defaults_to_fixed_value(
+    @pytest.mark.parametrize(
+        ("scope_type", "expected_rank"),
+        [
+            (AppConfigScopeType.PUBLIC, 100),
+            (AppConfigScopeType.DOMAIN, 200),
+            (AppConfigScopeType.USER, 300),
+        ],
+    )
+    async def test_rank_defaults_by_scope_type(
         self,
         repository: AppConfigAllowListRepository,
         definition_repository: AppConfigDefinitionRepository,
+        scope_type: AppConfigScopeType,
+        expected_rank: int,
     ) -> None:
         await _register(definition_repository, "theme")
-        created = await _create_entry(repository, "theme", AppConfigScopeType.DOMAIN)
-        assert created.rank == DEFAULT_RANK
+        created = await _create_entry(repository, "theme", scope_type)
+        assert created.rank == expected_rank
 
     async def test_explicit_rank_overrides_default(
         self,
@@ -313,6 +322,20 @@ class TestSearch:
             )
         )
         assert [item.id for item in result.items] == [target.id]
+
+    async def test_search_orders_by_rank_asc(
+        self,
+        repository: AppConfigAllowListRepository,
+        seeded_entries: list[AppConfigAllowListData],
+    ) -> None:
+        result = await repository.search(
+            BatchQuerier(
+                pagination=OffsetPagination(limit=10, offset=0),
+                orders=[AppConfigAllowListOrders.rank(ascending=True)],
+            )
+        )
+        expected = [entry.id for entry in sorted(seeded_entries, key=lambda e: e.rank)]
+        assert [item.id for item in result.items] == expected
 
     async def test_search_orders_by_created_at(
         self,

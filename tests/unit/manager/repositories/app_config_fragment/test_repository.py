@@ -76,7 +76,7 @@ def _allow_list_row(config_name: str, scope_type: AppConfigScopeType) -> AppConf
     return AppConfigAllowListRow(
         config_name=config_name,
         scope_type=scope_type,
-        rank=100,
+        rank=scope_type.default_rank(),
     )
 
 

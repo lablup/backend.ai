@@ -4,8 +4,8 @@ Move the merge-priority ``rank`` from ``app_config_fragments`` to
 ``app_config_allow_list`` (BEP-1052). Fragment writes are partly user-owned, so
 a rank on the fragment would let a fragment owner re-order the merge; the
 allow-list entry is admin-owned, making it the right carrier for merge
-priority. Existing allow-list rows are backfilled with a fixed default rank
-(per-scope-type defaults follow in a later revision).
+priority. Existing allow-list rows are backfilled with the per-scope-type
+default ranks (public=100, domain=200, user=300).
 
 Revision ID: 66d0f891ed20
 Revises: a379b72f1206
@@ -25,13 +25,17 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # Allow-list entries carry the merge rank; backfill existing rows with the default.
+    # Allow-list entries carry the merge rank; backfill by scope-type default.
     op.add_column("app_config_allow_list", sa.Column("rank", sa.Integer(), nullable=True))
     op.execute(
         sa.text(
             """
             UPDATE app_config_allow_list
-            SET rank = 100
+            SET rank = CASE scope_type
+                WHEN 'public' THEN 100
+                WHEN 'domain' THEN 200
+                WHEN 'user' THEN 300
+            END
             WHERE rank IS NULL
             """
         )
@@ -43,7 +47,7 @@ def upgrade() -> None:
 def downgrade() -> None:
     op.add_column("app_config_fragments", sa.Column("rank", sa.Integer(), nullable=True))
     # Restore each fragment's rank from its allow-list entry. Fragments whose entry
-    # was removed fall back to the default rank; fragments sharing a
+    # was removed fall back to the scope-type default; fragments sharing a
     # ``(config_name, scope_type)`` end up with equal ranks — the pre-move
     # per-fragment next-value ranks are not recoverable.
     op.execute(
@@ -61,7 +65,11 @@ def downgrade() -> None:
         sa.text(
             """
             UPDATE app_config_fragments
-            SET rank = 100
+            SET rank = CASE scope_type
+                WHEN 'public' THEN 100
+                WHEN 'domain' THEN 200
+                WHEN 'user' THEN 300
+            END
             WHERE rank IS NULL
             """
         )
