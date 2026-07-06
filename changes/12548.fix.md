@@ -1,0 +1,1 @@
+Fix `alembic upgrade` crashing with `AttributeError` when a model-definition JSONB column holds a JSON `null` (or other non-object) value, by skipping non-dict rows in the `stringify model service start_command` migration.
