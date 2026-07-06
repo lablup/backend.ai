@@ -16648,6 +16648,80 @@
         "title": "CreateRoleInput",
         "type": "object"
       },
+      "MappedScopeNestedFilter": {
+        "description": "Filter roles by the scope they are mapped (registered) to.",
+        "properties": {
+          "scope_type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RBACElementTypeFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "scope_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "AND": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/MappedScopeNestedFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "And"
+          },
+          "OR": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/MappedScopeNestedFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Or"
+          },
+          "NOT": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/MappedScopeNestedFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Not"
+          }
+        },
+        "title": "MappedScopeNestedFilter",
+        "type": "object"
+      },
       "RoleFilter": {
         "description": "Filter for roles.",
         "properties": {
