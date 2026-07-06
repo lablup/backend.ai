@@ -9,7 +9,7 @@ from aiohttp import web
 from pytest_mock import MockerFixture
 
 from ai.backend.web import server
-from ai.backend.web.clients.endpoint_pool import AcquiredEndpoint
+from ai.backend.web.clients.endpoint_pool import AcquiredEndpoint, HealthyEndpointPool
 from ai.backend.web.config.unified import WebServerUnifiedConfig
 
 from .conftest import DummyApiConfig, DummyConfig
@@ -34,6 +34,20 @@ class _FakeAPISession:
 def _web_config(endpoints: list[str]) -> WebServerUnifiedConfig:
     config = DummyConfig(DummyApiConfig(endpoint=[yarl.URL(e) for e in endpoints]))
     return cast(WebServerUnifiedConfig, config)
+
+
+class _FakePool:
+    """Stand-in for ``HealthyEndpointPool`` exposing only ``all_endpoints``."""
+
+    def __init__(self, endpoints: list[str]) -> None:
+        self._endpoints = endpoints
+
+    def all_endpoints(self) -> list[str]:
+        return list(self._endpoints)
+
+
+def _pool(endpoints: list[str]) -> HealthyEndpointPool:
+    return cast(HealthyEndpointPool, _FakePool(endpoints))
 
 
 @pytest.fixture
@@ -139,8 +153,9 @@ class TestNoAuthClientRegistriesCtx:
     async def test_builds_one_registry_per_endpoint(self, mocker: MockerFixture) -> None:
         registries_by_endpoint = self._patch_create(mocker)
 
+        endpoints = ["https://m1", "https://m2", "https://m3"]
         async with server.no_auth_client_registries_ctx(
-            _web_config(["https://m1", "https://m2", "https://m3"])
+            _pool(endpoints), ssl_verify=False
         ) as registries:
             assert set(registries.keys()) == {"https://m1", "https://m2", "https://m3"}
             assert len(registries_by_endpoint) == 3
@@ -152,7 +167,8 @@ class TestNoAuthClientRegistriesCtx:
     async def test_closes_all_registries_on_exit(self, mocker: MockerFixture) -> None:
         registries_by_endpoint = self._patch_create(mocker)
 
-        async with server.no_auth_client_registries_ctx(_web_config(["https://m1", "https://m2"])):
+        endpoints = ["https://m1", "https://m2"]
+        async with server.no_auth_client_registries_ctx(_pool(endpoints), ssl_verify=False):
             pass
 
         assert len(registries_by_endpoint) == 2

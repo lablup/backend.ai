@@ -975,22 +975,22 @@ async def apollo_router_pool_ctx(
 
 @asynccontextmanager
 async def no_auth_client_registries_ctx(
-    config: WebServerUnifiedConfig,
+    manager_pool: HealthyEndpointPool,
+    ssl_verify: bool,
 ) -> AsyncGenerator[Mapping[str, BackendAIClientRegistry]]:
-    """Build one no-auth v2 client registry per configured Manager endpoint.
+    """Build one no-auth v2 client registry per Manager endpoint in the pool.
 
-    Keyed by the same endpoint strings the manager pool hands out, so the
+    Keyed by the same endpoint strings ``manager_pool`` hands out, so the
     no-auth password reset path can use the registry of a pool-selected
     healthy endpoint instead of pinning to ``config.api.endpoint[0]``.
     """
     registries: dict[str, BackendAIClientRegistry] = {}
     try:
-        for endpoint in config.api.endpoint:
-            key = str(endpoint)
-            registries[key] = await BackendAIClientRegistry.create(
+        for endpoint in manager_pool.all_endpoints():
+            registries[endpoint] = await BackendAIClientRegistry.create(
                 V2ClientConfig(
-                    endpoint=URL(key),
-                    skip_ssl_verification=not config.api.ssl_verify,
+                    endpoint=URL(endpoint),
+                    skip_ssl_verification=not ssl_verify,
                 ),
                 NoAuth(),
             )
@@ -1211,7 +1211,7 @@ async def server_main(
                 apollo_router_pool_ctx(config, app)
             )
         app["no_auth_client_registries"] = await web_init_stack.enter_async_context(
-            no_auth_client_registries_ctx(config)
+            no_auth_client_registries_ctx(app["manager_pool"], config.api.ssl_verify)
         )
         await web_init_stack.enter_async_context(redis_ctx(config, app, pidx))
 
