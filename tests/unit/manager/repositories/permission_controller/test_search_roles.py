@@ -16,7 +16,12 @@ from ai.backend.common.data.filter_specs import (
     StringMatchSpec,
     UUIDEqualMatchSpec,
 )
-from ai.backend.common.data.permission.types import EntityType, OperationType
+from ai.backend.common.data.permission.types import (
+    EntityType,
+    OperationType,
+    RBACElementType,
+    ScopeType,
+)
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.models.agent import AgentRow
@@ -29,8 +34,12 @@ from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.rbac_models import UserRoleRow
+from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+    AssociationScopesEntitiesRow,
+)
 from ai.backend.manager.models.rbac_models.conditions import (
     AssignedUserConditions,
+    EntityScopeConditions,
     RoleConditions,
 )
 from ai.backend.manager.models.rbac_models.orders import RoleOrders
@@ -87,6 +96,7 @@ class TestSearchRoles:
                 KeyPairRow,
                 PermissionRow,
                 ObjectPermissionRow,
+                AssociationScopesEntitiesRow,
             ],
         ):
             yield database_connection
@@ -312,6 +322,60 @@ class TestSearchRoles:
 
         assert result.total_count == 0
         assert result.items == []
+
+    @pytest.fixture
+    async def roles_mapped_to_scope(
+        self,
+        db_with_rbac_tables: ExtendedAsyncSAEngine,
+        created_roles: list[CreatedRole],
+    ) -> tuple[str, list[CreatedRole]]:
+        """Map the first role to a project scope via ``association_scopes_entities``.
+
+        Returns ``(project_scope_id, created_roles)``.
+        """
+        project_scope_id = str(uuid.uuid4())
+
+        async with db_with_rbac_tables.begin_session() as db_sess:
+            db_sess.add(
+                AssociationScopesEntitiesRow(
+                    scope_type=ScopeType.PROJECT,
+                    scope_id=project_scope_id,
+                    entity_type=EntityType.ROLE,
+                    entity_id=str(created_roles[0].role_id),
+                )
+            )
+            await db_sess.flush()
+
+        return project_scope_id, created_roles
+
+    async def test_by_mapped_scope_returns_roles_in_scope(
+        self,
+        repository: PermissionControllerRepository,
+        roles_mapped_to_scope: tuple[str, list[CreatedRole]],
+    ) -> None:
+        """``RoleConditions.by_mapped_scope`` should restrict results to roles
+        registered in the given scope via the correlated EXISTS subquery."""
+        project_scope_id, created_roles = roles_mapped_to_scope
+
+        querier = BatchQuerier(
+            conditions=[
+                RoleConditions.by_mapped_scope([
+                    EntityScopeConditions.by_scope_type_equals(RBACElementType.PROJECT),
+                    EntityScopeConditions.by_scope_id_equals(
+                        StringMatchSpec(
+                            value=project_scope_id, case_insensitive=False, negated=False
+                        )
+                    ),
+                ]),
+            ],
+            orders=[],
+            pagination=OffsetPagination(limit=10, offset=0),
+        )
+
+        result = await repository.search_roles(querier)
+
+        assert result.total_count == 1
+        assert [item.id for item in result.items] == [created_roles[0].role_id]
 
 
 class TestSearchRolesTotalCountNotInflated:
