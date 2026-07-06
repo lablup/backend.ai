@@ -11,9 +11,10 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import load_only, selectinload, with_loader_criteria
 
+from ai.backend.manager.data.permission.permission_defs import BasePermission
+
 from .context import ClientContext
 from .exceptions import InvalidScope, ScopeTypeMismatch
-from .permission_defs import BasePermission
 
 __all__: Sequence[str] = (
     "AbstractPermissionContext",

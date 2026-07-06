@@ -28,6 +28,7 @@ from ai.backend.manager.bgtask.tasks.rescan_gpu_alloc_maps import RescanGPUAlloc
 from ai.backend.manager.bgtask.types import ManagerBgtaskName
 from ai.backend.manager.data.agent.types import AgentData
 from ai.backend.manager.data.kernel.types import KernelStatus
+from ai.backend.manager.data.permission.permission_defs import AgentPermission
 from ai.backend.manager.models.agent import (
     ADMIN_PERMISSIONS,
     AgentRow,
@@ -44,7 +45,6 @@ from ai.backend.manager.models.rbac import (
     ScopeType,
 )
 from ai.backend.manager.models.rbac.context import ClientContext
-from ai.backend.manager.models.rbac.permission_defs import AgentPermission
 from ai.backend.manager.models.resource_slot import AgentResourceRow
 from ai.backend.manager.models.user import UserRole, users
 from ai.backend.manager.repositories.agent.query import QueryConditions, QueryOrders

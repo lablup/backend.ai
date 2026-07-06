@@ -26,6 +26,10 @@ from ai.backend.manager.data.agent.types import (
     AgentDataForHeartbeatUpdate,
     AgentStatus,
 )
+from ai.backend.manager.data.permission.permission_defs import (
+    AgentPermission,
+    ScalingGroupPermission,
+)
 from ai.backend.manager.models.base import (
     Base,
     CurvePublicKeyColumn,
@@ -44,7 +48,6 @@ from ai.backend.manager.models.rbac import (
     get_predefined_roles_in_scope,
 )
 from ai.backend.manager.models.rbac.context import ClientContext
-from ai.backend.manager.models.rbac.permission_defs import AgentPermission, ScalingGroupPermission
 from ai.backend.manager.models.resource_slot import AgentResourceRow
 from ai.backend.manager.models.types import QueryCondition
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_txn_retry

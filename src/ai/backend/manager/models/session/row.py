@@ -51,6 +51,7 @@ from ai.backend.common.types import (
     VFolderMount,
 )
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.data.permission.permission_defs import ComputeSessionPermission
 from ai.backend.manager.data.session.options import SessionStoredOptions
 from ai.backend.manager.data.session.types import (
     ImageSpec,
@@ -103,7 +104,6 @@ from ai.backend.manager.models.rbac import (
     UserScope as UserRBACScope,
 )
 from ai.backend.manager.models.rbac.context import ClientContext
-from ai.backend.manager.models.rbac.permission_defs import ComputeSessionPermission
 from ai.backend.manager.models.resource_slot import ResourceAllocationRow
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.types import (
