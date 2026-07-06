@@ -259,6 +259,7 @@ class TestReconcileAgentResources:
                     stdin_port=0,
                     stdout_port=0,
                     scaling_group=infra.sg_name,
+                    resource_group_id=infra.resource_group_id,
                     agent=infra.agent_id,
                 )
             )
@@ -641,6 +642,7 @@ class TestOrphanedAllocationCleanup:
                     stdin_port=0,
                     stdout_port=0,
                     scaling_group=infra.sg_name,
+                    resource_group_id=infra.resource_group_id,
                     agent=infra.agent_id,
                 )
             )
@@ -818,6 +820,7 @@ class TestOrphanedAllocationCleanup:
                     stdin_port=0,
                     stdout_port=0,
                     scaling_group=infra.sg_name,
+                    resource_group_id=infra.resource_group_id,
                     agent=infra.agent_id,
                 )
             )
@@ -863,6 +866,7 @@ class TestOrphanedAllocationCleanup:
                     stdin_port=0,
                     stdout_port=0,
                     scaling_group=infra.sg_name,
+                    resource_group_id=infra.resource_group_id,
                     agent=infra.agent_id,
                 )
             )
@@ -1117,6 +1121,7 @@ class TestTerminalSessionKernelReconciliation:
                     stdin_port=0,
                     stdout_port=0,
                     scaling_group=infra.sg_name,
+                    resource_group_id=infra.resource_group_id,
                     agent=infra.agent_id,
                 )
             )

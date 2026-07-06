@@ -262,6 +262,7 @@ async def kernel_id(
                 stdin_port=0,
                 stdout_port=0,
                 scaling_group=scaling_group,
+                resource_group_id=scaling_group_id,
                 agent=agent_id,
             )
         )

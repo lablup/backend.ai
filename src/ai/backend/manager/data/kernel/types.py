@@ -8,6 +8,7 @@ from functools import lru_cache
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import (
     CIStrEnum,
     KernelId,
@@ -219,6 +220,7 @@ class UserPermission:
 @dataclass
 class ResourceInfo:
     scaling_group: str | None
+    resource_group_id: ResourceGroupID
     agent: str | None
     agent_addr: str | None
     container_id: str | None

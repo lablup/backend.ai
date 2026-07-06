@@ -28,6 +28,7 @@ from sqlalchemy.orm import (
 
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import (
     AccessKey,
     ClusterMode,
@@ -221,8 +222,15 @@ class KernelRow(Base):  # type: ignore[misc]
     )
 
     # Resource ownership
-    scaling_group: Mapped[str | None] = mapped_column(
-        "scaling_group", sa.ForeignKey("scaling_groups.name"), index=True, nullable=True
+    scaling_group: Mapped[str] = mapped_column(
+        "scaling_group", sa.ForeignKey("scaling_groups.name"), index=True, nullable=False
+    )
+    resource_group_id: Mapped[ResourceGroupID] = mapped_column(
+        "resource_group_id",
+        GUID(ResourceGroupID),
+        sa.ForeignKey("scaling_groups.id"),
+        index=True,
+        nullable=False,
     )
     agent: Mapped[str | None] = mapped_column(
         "agent", sa.String(length=64), sa.ForeignKey("agents.id"), nullable=True
@@ -601,6 +609,7 @@ class KernelRow(Base):  # type: ignore[misc]
             main_gid=info.user_permission.main_gid,
             gids=info.user_permission.gids,
             scaling_group=info.resource.scaling_group,
+            resource_group_id=info.resource.resource_group_id,
             agent=info.resource.agent,
             agent_addr=info.resource.agent_addr,
             domain_name=info.user_permission.domain_name,
@@ -703,6 +712,7 @@ class KernelRow(Base):  # type: ignore[misc]
             ),
             resource=ResourceInfo(
                 scaling_group=self.scaling_group,
+                resource_group_id=self.resource_group_id,
                 agent=self.agent,
                 agent_addr=self.agent_addr,
                 container_id=self.container_id,

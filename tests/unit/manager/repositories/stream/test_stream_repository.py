@@ -110,6 +110,7 @@ def _make_kernel_row(
     cluster_role: str,
     cluster_idx: int,
     domain_name: str,
+    resource_group_id: ResourceGroupID,
     group_id: uuid.UUID,
     created_at: datetime,
 ) -> KernelRow:
@@ -120,6 +121,8 @@ def _make_kernel_row(
         domain_name=domain_name,
         group_id=group_id,
         user_uuid=user_uuid,
+        scaling_group="default",
+        resource_group_id=resource_group_id,
         access_key=access_key,
         cluster_mode=ClusterMode.SINGLE_NODE.value,
         cluster_size=2,
@@ -428,6 +431,7 @@ class TestStreamRepository:
                     cluster_role="main",
                     cluster_idx=0,
                     domain_name=domain_name,
+                    resource_group_id=test_scaling_group_id,
                     group_id=group_id,
                     created_at=now,
                 )
@@ -441,6 +445,7 @@ class TestStreamRepository:
                     cluster_role="sub",
                     cluster_idx=1,
                     domain_name=domain_name,
+                    resource_group_id=test_scaling_group_id,
                     group_id=group_id,
                     created_at=now,
                 )

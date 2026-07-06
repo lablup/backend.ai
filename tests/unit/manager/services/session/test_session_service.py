@@ -1585,6 +1585,7 @@ class TestSearchKernels:
             ),
             resource=ResourceInfo(
                 scaling_group="default",
+                resource_group_id=ResourceGroupID(uuid4()),
                 agent="test-agent",
                 agent_addr="localhost:6001",
                 container_id="container-123",

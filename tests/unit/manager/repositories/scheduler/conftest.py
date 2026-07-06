@@ -445,6 +445,7 @@ async def create_pending_session_with_kernels(
                     agent=None,
                     agent_addr=None,
                     scaling_group=scaling_group_name,
+                    resource_group_id=resource_group_id,
                     cluster_idx=idx,
                     cluster_role="main" if idx == 0 else "sub",
                     cluster_hostname=f"kernel-{uuid.uuid4().hex[:8]}",
