@@ -63,7 +63,6 @@ class UnexpectedAuthResponseError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/webserver/unexpected-auth-response"
     error_title = "Unexpected authorization response from the Manager."
 
-    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.API,
