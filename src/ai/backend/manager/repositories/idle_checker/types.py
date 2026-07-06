@@ -8,6 +8,7 @@ from datetime import datetime
 
 from ai.backend.common.data.idle_checker.types import CheckerType, IdleCheckerSpec
 from ai.backend.common.identifier.idle_checker import IdleCheckerID
+from ai.backend.common.types import SessionTypes
 from ai.backend.manager.data.idle_checker.types import IdleCheckSession, ScopeRef
 
 
@@ -30,6 +31,15 @@ class BoundCheckerData:
     scope: ScopeRef
     binding_created_at: datetime
     checker: IdleCheckerDefinitionData
+
+
+@dataclass(frozen=True)
+class IdleCheckSessionData:
+    """Session data plus scope refs needed to attach bound idle checkers."""
+
+    session: IdleCheckSession
+    session_type: SessionTypes
+    scopes: Sequence[ScopeRef]
 
 
 @dataclass(frozen=True)

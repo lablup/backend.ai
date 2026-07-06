@@ -182,6 +182,117 @@ class TestFetchIdleCheckBatch:
         return session_id
 
     @pytest.fixture
+    async def running_session_with_disabled_binding(
+        self,
+        database: ExtendedAsyncSAEngine,
+    ) -> SessionId:
+        scope = ScopeFixture(
+            domain_name="disabled-binding-domain",
+            domain_id=DomainID(uuid.uuid4()),
+            project_id=uuid.uuid4(),
+            scaling_group_name="disabled-binding-sgroup",
+            scaling_group_id=ResourceGroupID(uuid.uuid4()),
+        )
+        session_id = SessionId(uuid.uuid4())
+        checker_id = IdleCheckerID(uuid.uuid4())
+        async with database.begin_session() as db_sess:
+            db_sess.add(
+                ProjectResourcePolicyRow(
+                    name=f"{scope.domain_name}-policy",
+                    max_vfolder_count=10,
+                    max_quota_scope_size=1024,
+                    max_network_count=10,
+                )
+            )
+            db_sess.add(
+                DomainRow(
+                    id=scope.domain_id,
+                    name=scope.domain_name,
+                    description=None,
+                    is_active=True,
+                )
+            )
+            db_sess.add(
+                GroupRow(
+                    id=scope.project_id,
+                    name=f"{scope.domain_name}-project",
+                    description=None,
+                    is_active=True,
+                    domain_name=scope.domain_name,
+                    resource_policy=f"{scope.domain_name}-policy",
+                )
+            )
+            db_sess.add(
+                ScalingGroupRow(
+                    id=scope.scaling_group_id,
+                    name=scope.scaling_group_name,
+                    description=None,
+                    is_active=True,
+                    is_public=True,
+                    driver="static",
+                    driver_opts={},
+                    scheduler="fifo",
+                    use_host_network=False,
+                )
+            )
+            db_sess.add(
+                SessionRow(
+                    id=session_id,
+                    creation_id=str(session_id)[:32],
+                    name=f"session-{session_id}",
+                    session_type=SessionTypes.INTERACTIVE,
+                    cluster_mode=ClusterMode.SINGLE_NODE,
+                    cluster_size=1,
+                    domain_name=scope.domain_name,
+                    domain_id=scope.domain_id,
+                    resource_group_id=scope.scaling_group_id,
+                    group_id=scope.project_id,
+                    user_uuid=uuid.uuid4(),
+                    access_key=None,
+                    tag=None,
+                    status=SessionStatus.RUNNING,
+                    status_info=None,
+                    status_data=None,
+                    status_history={},
+                    result=SessionResult.UNDEFINED,
+                    created_at=datetime(2026, 1, 1, tzinfo=UTC),
+                    terminated_at=None,
+                    starts_at=datetime(2026, 1, 1, tzinfo=UTC),
+                    startup_command=None,
+                    callback_url=None,
+                    occupying_slots=ResourceSlot({"cpu": "1"}),
+                    requested_slots=ResourceSlot({"cpu": "1"}),
+                    vfolder_mounts=[],
+                    environ=None,
+                    bootstrap_script=None,
+                    use_host_network=False,
+                    scaling_group_name=scope.scaling_group_name,
+                )
+            )
+            db_sess.add(
+                IdleCheckerRow(
+                    id=checker_id,
+                    name=f"checker-{checker_id}",
+                    description=None,
+                    checker_type=CheckerType.SESSION_LIFETIME,
+                    spec=IdleCheckerSpec(
+                        type=CheckerType.SESSION_LIFETIME,
+                        session_lifetime=SessionLifetimeSpec(),
+                    ),
+                )
+            )
+            await db_sess.flush()
+            db_sess.add(
+                IdleCheckerBindingRow(
+                    scope_type=ScopeType.DOMAIN.value,
+                    scope_id=scope.domain_id,
+                    idle_checker_id=checker_id,
+                    enabled=False,
+                )
+            )
+        return session_id
+
+    @pytest.fixture
     async def seeded_idle_check_data(
         self,
         database: ExtendedAsyncSAEngine,
@@ -391,6 +502,17 @@ class TestFetchIdleCheckBatch:
         batch = await repository.fetch_idle_check_batch([SessionStatus.RUNNING])
 
         assert batch.targets == ()
+
+    async def test_ignores_disabled_bindings(
+        self,
+        repository: IdleCheckerRepository,
+        running_session_with_disabled_binding: SessionId,
+    ) -> None:
+        batch = await repository.fetch_idle_check_batch([SessionStatus.RUNNING])
+        target_session_ids = {target.session.session_id for target in batch.targets}
+
+        assert batch.targets == ()
+        assert running_session_with_disabled_binding not in target_session_ids
 
     @pytest.mark.parametrize(
         "seeded_idle_check_data",
