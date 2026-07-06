@@ -355,10 +355,10 @@ async def _authorize_via_anonymous_session(
 ) -> AuthResponse:
     """Authorize anonymously against a healthy Manager endpoint from the pool.
 
-    Routes the auth request through ``manager_pool`` (instead of the pinned
-    ``config.api.endpoint[0]``) so login and edu-launcher token login fail over
-    to a healthy Manager. Raises ``ManagerConnectionUnavailable`` (503) when no
-    endpoint is healthy.
+    Routes the auth request through ``manager_pool`` so login and token login fail over
+    to a healthy Manager.
+
+    Raises ``ManagerConnectionUnavailable`` (503) when no endpoint is healthy.
     """
     async with manager_pool.acquire() as acquired:
         anon_api_config = APIConfig(

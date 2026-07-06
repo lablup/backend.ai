@@ -38,7 +38,7 @@ def _web_config(endpoints: list[str]) -> WebServerUnifiedConfig:
     return cast(WebServerUnifiedConfig, config)
 
 
-def _make_manager_pool(
+def _mock_manager_pool(
     *, endpoint: str | None = None, raises: Exception | None = None
 ) -> HealthyEndpointPool:
     pool = MagicMock()
@@ -75,7 +75,7 @@ class TestAuthorizeViaAnonymousSession:
         auth_result = object()
         captured = _patch_apisession(mocker, auth_result=auth_result)
         # The pool hands out the second endpoint (the first is assumed down).
-        pool = _make_manager_pool(endpoint="https://m2")
+        pool = _mock_manager_pool(endpoint="https://m2")
 
         result = await server._authorize_via_anonymous_session(
             cast(web.Request, MagicMock()),
@@ -96,7 +96,7 @@ class TestAuthorizeViaAnonymousSession:
 
     async def test_forwards_cookies_when_requested(self, mocker: MockerFixture) -> None:
         captured = _patch_apisession(mocker, auth_result=object())
-        pool = _make_manager_pool(endpoint="https://m1")
+        pool = _mock_manager_pool(endpoint="https://m1")
         request = MagicMock()
         request.cookies = {"sToken": "abc"}
 
@@ -116,7 +116,7 @@ class TestAuthorizeViaAnonymousSession:
 
     async def test_does_not_forward_cookies_by_default(self, mocker: MockerFixture) -> None:
         captured = _patch_apisession(mocker, auth_result=object())
-        pool = _make_manager_pool(endpoint="https://m1")
+        pool = _mock_manager_pool(endpoint="https://m1")
 
         await server._authorize_via_anonymous_session(
             cast(web.Request, MagicMock()),
@@ -131,7 +131,7 @@ class TestAuthorizeViaAnonymousSession:
 
     async def test_propagates_when_no_healthy_endpoint(self, mocker: MockerFixture) -> None:
         _patch_apisession(mocker, auth_result=object())
-        pool = _make_manager_pool(raises=ManagerConnectionUnavailable("no healthy endpoint"))
+        pool = _mock_manager_pool(raises=ManagerConnectionUnavailable("no healthy endpoint"))
 
         with pytest.raises(ManagerConnectionUnavailable):
             await server._authorize_via_anonymous_session(
