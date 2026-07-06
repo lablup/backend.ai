@@ -36,10 +36,11 @@ def upgrade() -> None:
     op.alter_column("kernels", "scaling_group", existing_type=sa.String(length=64), nullable=False)
 
     op.add_column("kernels", sa.Column("resource_group_id", GUID(), nullable=True))
-    op.create_index("ix_kernels_resource_group_id", "kernels", ["resource_group_id"])
 
     # The scaling_group name FK guarantees every remaining row matches a
-    # scaling_groups row, so the backfill leaves no NULLs behind.
+    # scaling_groups row, so the backfill leaves no NULLs behind. The index
+    # is created after the backfill so the bulk UPDATE does not pay index
+    # maintenance per row.
     op.execute(
         sa.text("""
         UPDATE kernels
@@ -50,6 +51,7 @@ def upgrade() -> None:
         """)
     )
     op.alter_column("kernels", "resource_group_id", nullable=False)
+    op.create_index("ix_kernels_resource_group_id", "kernels", ["resource_group_id"])
     op.create_foreign_key(
         op.f("fk_kernels_resource_group_id_scaling_groups"),
         "kernels",

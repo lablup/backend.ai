@@ -219,7 +219,7 @@ class UserPermission:
 
 @dataclass
 class ResourceInfo:
-    scaling_group: str | None
+    scaling_group: str
     resource_group_id: ResourceGroupID
     agent: str | None
     agent_addr: str | None
