@@ -116,9 +116,11 @@ class NerdctlRuntimeClient(ContainerdRuntimeClient):
         image_ref: str,
         command: Sequence[str],
         oci_spec: Mapping[str, Any],
+        network: str = "none",
     ) -> None:
-        # --network none: nerdctl leaves the container with an isolated netns (only lo);
-        # the BEP-1055 network layer attaches CNI after start.
+        # network="none": isolated netns (only lo), for multi-node where the BEP-1055 layer
+        # attaches CNI after start. network="bridge": nerdctl's default bridge (an IP +
+        # host reachability) — used for single-node sessions, mirroring Docker.
         opts: list[str] = []
         for mount in oci_spec.get("mounts", []):
             suffix = ":ro" if mount.get("readonly") else ""
@@ -128,9 +130,10 @@ class NerdctlRuntimeClient(ContainerdRuntimeClient):
         for key, value in (oci_spec.get("labels") or {}).items():
             opts += ["-l", f"{key}={value}"]
         args = [
-            "create", "--name", container_id, "--network", "none",
+            "create", "--name", container_id, "--network", network,
             *opts, image_ref, *command,
         ]
+        log.debug("nerdctl create argv: {}", " ".join(self._base() + args))
         await self._run(args)
 
     async def start_container(self, container_id: str) -> TaskHandle:
@@ -173,6 +176,15 @@ class NerdctlRuntimeClient(ContainerdRuntimeClient):
     async def container_status(self, container_id: str) -> str | None:
         rc, out, _ = await self._runner([
             *self._base(), "inspect", "--format", "{{.State.Status}}", container_id
+        ])
+        if rc != 0:
+            return None
+        return out.strip() or None
+
+    async def container_ip(self, container_id: str) -> str | None:
+        rc, out, _ = await self._runner([
+            *self._base(), "inspect", "--format",
+            "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}", container_id,
         ])
         if rc != 0:
             return None

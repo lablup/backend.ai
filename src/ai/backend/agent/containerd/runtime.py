@@ -60,9 +60,16 @@ class ContainerdRuntimeClient(ABC):
     # --- container/task lifecycle ---
     @abstractmethod
     async def create_container(
-        self, container_id: str, *, image_ref: str, command: Sequence[str], oci_spec: Mapping[str, Any]
+        self,
+        container_id: str,
+        *,
+        image_ref: str,
+        command: Sequence[str],
+        oci_spec: Mapping[str, Any],
+        network: str = "none",
     ) -> None:
-        """Create a container (not started) with an isolated, empty network namespace."""
+        """Create a container (not started). network="none" for an isolated netns
+        (multi-node, CNI attached later); network="bridge" for single-node connectivity."""
 
     @abstractmethod
     async def start_container(self, container_id: str) -> TaskHandle:
@@ -86,3 +93,7 @@ class ContainerdRuntimeClient(ABC):
     @abstractmethod
     async def container_status(self, container_id: str) -> str | None:
         """Return the container's status string (e.g. 'running'), or None if absent."""
+
+    @abstractmethod
+    async def container_ip(self, container_id: str) -> str | None:
+        """Return the container's primary IP address, or None if it has no network."""

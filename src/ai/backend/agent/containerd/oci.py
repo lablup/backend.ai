@@ -68,6 +68,12 @@ def translate_creation_config(
                 KERNEL_ID_LABEL: kernel_id,
                 SESSION_ID_LABEL: session_id,
             },
-            "mounts": [mount_to_oci(m) for m in mounts],
+            # Sort by destination depth so parent mounts (e.g. the krunner volume at
+            # /opt/backend.ai) are applied before nested mounts (/opt/backend.ai/lib/...);
+            # otherwise runc cannot create the nested mountpoint on the read-only rootfs.
+            "mounts": [
+                mount_to_oci(m)
+                for m in sorted(mounts, key=lambda m: len(str(m.target).split("/")))
+            ],
         },
     )

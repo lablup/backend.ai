@@ -40,11 +40,22 @@ class TestTranslateCreationConfig:
                   MountPermission.READ_WRITE),
         ]
         spec = translate_creation_config(_kernel_config(), environ={}, mounts=mounts)
-        oci_mounts = spec.oci_spec["mounts"]
-        assert oci_mounts[0] == {
-            "source": "/host/su-exec", "destination": "/opt/kernel/su-exec", "readonly": True,
-        }
-        assert oci_mounts[1]["readonly"] is False
+        oci_mounts = {m["destination"]: m for m in spec.oci_spec["mounts"]}
+        assert oci_mounts["/opt/kernel/su-exec"]["source"] == "/host/su-exec"
+        assert oci_mounts["/opt/kernel/su-exec"]["readonly"] is True
+        assert oci_mounts["/home/work"]["readonly"] is False
+
+    def test_mounts_sorted_parent_before_child(self) -> None:
+        # parent (/opt/backend.ai) must precede nested (/opt/backend.ai/lib/.../kernel)
+        mounts = [
+            Mount(MountTypes.BIND, Path("/h/k"), Path("/opt/backend.ai/lib/py/kernel"),
+                  MountPermission.READ_ONLY),
+            Mount(MountTypes.VOLUME, Path("krunner-vol"), Path("/opt/backend.ai"),
+                  MountPermission.READ_WRITE),
+        ]
+        spec = translate_creation_config(_kernel_config(), environ={}, mounts=mounts)
+        dests = [m["destination"] for m in spec.oci_spec["mounts"]]
+        assert dests.index("/opt/backend.ai") < dests.index("/opt/backend.ai/lib/py/kernel")
 
 
 class TestMountToOci:

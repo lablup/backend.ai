@@ -161,6 +161,29 @@ class ContainerdSessionNetwork:
             container_id, image_ref=image_ref, command=command, oci_spec=oci_spec
         )
 
+    # --- single-node path (no cluster overlay; plain bridge, mirrors Docker) ---
+
+    async def create_local_container(
+        self,
+        container_id: str,
+        *,
+        image_ref: str,
+        command: list[str],
+        oci_spec: dict[str, Any],
+    ) -> None:
+        """Create a single-node container on the default bridge (has an IP + host
+        reachability). No BEP-1055 overlay/orchestrator needed."""
+        await self._runtime.create_container(
+            container_id, image_ref=image_ref, command=command, oci_spec=oci_spec,
+            network="bridge",
+        )
+
+    async def start_local_container(self, container_id: str) -> tuple[int, str | None]:
+        """Start a single-node container; return (task_pid, container_ip)."""
+        handle = await self._runtime.start_container(container_id)
+        ip = await self._runtime.container_ip(container_id)
+        return handle.pid, ip
+
     async def start_and_attach_container(
         self,
         session_id: str,

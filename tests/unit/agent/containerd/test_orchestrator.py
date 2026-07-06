@@ -58,8 +58,11 @@ class FakeRuntime(ContainerdRuntimeClient):
     async def container_status(self, container_id: str) -> str | None:
         return "running"
 
+    async def container_ip(self, container_id: str) -> str | None:
+        return "172.20.0.2"
+
     async def create_container(
-        self, container_id: str, *, image_ref: str, command: Sequence[str], oci_spec: Mapping[str, Any]
+        self, container_id: str, *, image_ref: str, command: Sequence[str], oci_spec: Mapping[str, Any], network: str = "none"
     ) -> None:
         self.calls.append("create_container")
 

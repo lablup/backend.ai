@@ -68,7 +68,7 @@ from ai.backend.common.exception import ImageNotAvailable
 from ai.backend.common.network.types import SessionNetMeta
 
 from .kernel import ContainerdKernel
-from .oci import translate_creation_config
+from .oci import KRUNNER_ENTRYPOINT, translate_creation_config
 from .session_network import (
     ContainerdSessionNetwork,
     build_containerd_session_network,
@@ -84,6 +84,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
     _session_id: str
     _oci_mounts: list[Mount]
     _scratch_dir: Path | None
+    _pending_spec: Any
 
     def __init__(
         self,
@@ -113,6 +114,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         self._container_id = str(kernel_config["kernel_id"])
         self._session_id = str(kernel_config["session_id"])
         self._oci_mounts = []
+        self._pending_spec = None
         self._scratch_dir = None
 
     @override
@@ -161,7 +163,22 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
 
     @override
     async def get_intrinsic_mounts(self) -> Sequence[Mount]:
-        return []
+        # The kernel runner requires the per-kernel scratch dirs: config/ (RO) at
+        # /home/config and work/ (RW) at /home/work. prepare_scratch created them.
+        # (lxcfs, /etc/localtime, coredump, domain-socket proxies are follow-ups.)
+        scratch_dir = (
+            self.local_config.container.scratch_root / str(self._container_id)
+        ).resolve()
+        return [
+            Mount(
+                MountTypes.BIND, scratch_dir / "config", Path("/home/config"),
+                MountPermission.READ_ONLY,
+            ),
+            Mount(
+                MountTypes.BIND, scratch_dir / "work", Path("/home/work"),
+                MountPermission.READ_WRITE,
+            ),
+        ]
 
     @property
     @override
@@ -241,21 +258,14 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         service_ports: list[ServicePort],
         cluster_info: ClusterInfo,
     ) -> ContainerdKernel:
-        # Create the containerd container (isolated netns, not started) and build the
-        # kernel object. mount_krunner (inherited) has populated resource_spec.mounts with
-        # the krunner bind mounts; combine with process_mounts' vfolder mounts and inject
-        # them (plus env/labels) into the OCI spec. The command defaults to the krunner
-        # entrypoint. (Resource limits + full entrypoint arg construction are follow-ups.)
+        # Build (but do NOT create) the container spec + kernel object. mount_krunner
+        # (inherited) has populated resource_spec.mounts with the krunner bind mounts;
+        # combine with process_mounts' vfolder mounts and inject them (plus env/labels)
+        # into the OCI spec. Container creation is deferred to start_container, where the
+        # kernel-runner cmdargs (which the container command must exec) are available.
         all_mounts = [*resource_spec.mounts, *self._oci_mounts]
-        spec = translate_creation_config(
+        self._pending_spec = translate_creation_config(
             self.kernel_config, environ=environ, mounts=all_mounts
-        )
-        await self._session_network.create_container(
-            self._session_id,
-            self._container_id,
-            image_ref=spec.image_ref,
-            command=spec.command,
-            oci_spec=spec.oci_spec,
         )
         return ContainerdKernel(
             self.ownership_data,
@@ -278,25 +288,48 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         preopen_ports: Sequence[int],
         cluster_info: ClusterInfo,
     ) -> Mapping[str, Any]:
-        # Start the task and attach CNI to its netns (requires apply_network first).
+        # The container command = krunner entrypoint + the kernel-runner cmdargs (only known
+        # here), which the entrypoint execs to launch the REPL. Create the container now,
+        # then start it.
+        spec = self._pending_spec
+        command = [KRUNNER_ENTRYPOINT, *cmdargs]
         if self._net_meta is None:
-            raise RuntimeError(
-                "start_container requires apply_network to have set up the session network"
+            # single-node: plain bridge network (no BEP-1055 overlay), like Docker.
+            await self._session_network.create_local_container(
+                self._container_id,
+                image_ref=spec.image_ref,
+                command=command,
+                oci_spec=spec.oci_spec,
             )
-        result = await self._session_network.start_and_attach_container(
-            self._session_id,
-            self._container_id,
-            meta=self._net_meta,
-            kernel_config=self.kernel_config,
-            cluster_info=cluster_info,
-        )
-        overlay = result.plan.overlay()
-        kernel_host = overlay.ip if overlay and overlay.ip else "127.0.0.1"
+            # start on the bridge; kernel_host = container's bridge IP.
+            task_pid, ip = await self._session_network.start_local_container(
+                self._container_id
+            )
+            kernel_host = ip or "127.0.0.1"
+        else:
+            await self._session_network.create_container(
+                self._session_id,
+                self._container_id,
+                image_ref=spec.image_ref,
+                command=command,
+                oci_spec=spec.oci_spec,
+            )
+            # multi-node: start + attach the CNI overlay chain; kernel_host = overlay IP.
+            result = await self._session_network.start_and_attach_container(
+                self._session_id,
+                self._container_id,
+                meta=self._net_meta,
+                kernel_config=self.kernel_config,
+                cluster_info=cluster_info,
+            )
+            overlay = result.plan.overlay()
+            task_pid = result.handle.pid
+            kernel_host = overlay.ip if overlay and overlay.ip else "127.0.0.1"
         # NOTE: real REPL/service ports come from the krunner running inside the kernel,
         # which is not yet wired; report the container/network facts we have.
         return {
             "container_id": self._container_id,
-            "task_pid": result.handle.pid,
+            "task_pid": task_pid,
             "kernel_host": kernel_host,
             "repl_in_port": 2000,
             "repl_out_port": 2001,
@@ -330,20 +363,8 @@ class ContainerdAgent(
             host_ip=host_ip,
         )
 
-    @override
-    async def execute(
-        self,
-        session_id: SessionId,
-        kernel_id: KernelId,
-        run_id: str | None,
-        mode: Literal["query", "batch", "input", "continue"],
-        text: str,
-        *,
-        opts: Mapping[str, Any],
-        api_version: int,
-        flush_timeout: float,
-    ) -> dict[str, Any]:
-        raise NotImplementedError(_TODO)
+    # execute is inherited from AbstractAgent: it delegates to kernel_obj.execute (the code
+    # runner's ZMQ REPL), which is runtime-agnostic. No override needed.
 
     @override
     async def _load_kernel_registry_from_recovery(self) -> dict[KernelId, AbstractKernel]:
