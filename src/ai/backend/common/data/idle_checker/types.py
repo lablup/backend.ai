@@ -46,7 +46,7 @@ class IdleCheckerSpec(BackendAISchema):
 
     type: CheckerType = Field(description="Idle checker kind; selects the sub-config.")
     target_session_types: frozenset[SessionTypes] = Field(
-        default=frozenset({SessionTypes.INTERACTIVE, SessionTypes.BATCH, SessionTypes.SYSTEM}),
+        default=frozenset({SessionTypes.INTERACTIVE, SessionTypes.BATCH}),
         description="Session types this checker applies to; other types are skipped.",
     )
     session_lifetime: SessionLifetimeSpec | None = Field(
