@@ -66,7 +66,6 @@ from ai.backend.manager.data.session.draft import (
 from ai.backend.manager.data.session.options import (
     InternalDataExtras,
     ResourceOpts,
-    SessionHandlerOptions,
 )
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.defs import DEFAULT_ROLE
@@ -1584,7 +1583,9 @@ class SessionService:
         resource_opts_payload: dict[str, Any] = {}
         if action.resource.shmem is not None:
             resource_opts_payload["shmem"] = BinarySize.from_str(action.resource.shmem)
-        resource_opts = ResourceOpts.model_validate(resource_opts_payload)
+        resource_opts = (
+            ResourceOpts.model_validate(resource_opts_payload) if resource_opts_payload else None
+        )
 
         mount_entries = tuple(action.mounts or ())
 
@@ -1681,7 +1682,7 @@ class SessionService:
                     ),
                 ),
                 kernel_groups=kernel_groups,
-                handler_options=SessionHandlerOptions(),
+                handler_options=None,
             ),
             internal_data_extras=InternalDataExtras(
                 sudo_session_enabled=False,
