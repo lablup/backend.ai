@@ -26,6 +26,7 @@ from ai.backend.manager.errors.permission import RoleNotFound
 # registry. These rows are reachable via relationships but are not otherwise
 # imported/registered by this test; _ORM_CLUSTER keeps them live.
 from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow
@@ -61,6 +62,7 @@ ALL_OWNER_OPS = (
 
 _ORM_CLUSTER = (
     AgentRow,
+    ImageRow,
     ScalingGroupForDomainRow,
 )
 
