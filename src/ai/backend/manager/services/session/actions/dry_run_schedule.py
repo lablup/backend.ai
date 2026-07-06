@@ -8,7 +8,8 @@ from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import ClusterMode
 from ai.backend.manager.actions.action import BaseAction, BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.data.session.dry_run import KernelDryRunResult, KernelDryRunSpec
+from ai.backend.manager.data.session.draft import KernelResourceDraft
+from ai.backend.manager.data.session.dry_run import KernelDryRunResult
 
 
 @dataclass(frozen=True)
@@ -18,9 +19,12 @@ class DryRunScheduleAction(BaseAction):
     The fields mirror the scheduler's selection criteria so the real selector can
     be driven directly: ``cluster_mode`` decides whether kernel slots are summed
     onto a single node (SINGLE_NODE) or placed individually (MULTI_NODE).
+
+    Each kernel is an unresolved ``KernelResourceDraft``; the result list
+    corresponds positionally, so callers match results to kernels by index.
     """
 
-    kernels: list[KernelDryRunSpec]
+    kernels: list[KernelResourceDraft]
     cluster_mode: ClusterMode
     resource_group_id: ResourceGroupID
 

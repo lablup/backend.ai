@@ -2,22 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from ai.backend.common.types import KernelId, ResourceSlotEntry
-from ai.backend.manager.data.session.draft import KernelResourceDraft
-
-
-@dataclass(frozen=True)
-class KernelDryRunSpec:
-    """Per-kernel request for a scheduler dry-run (one spec = one kernel).
-
-    ``kernel_id`` is a caller-supplied correlation handle (a dry-run does not
-    enqueue, so there is no persisted ``KernelRow.id``) used to match the result.
-    ``resource`` is the pre-resolution request; the service resolves it to the
-    selector's requested_slots and architecture.
-    """
-
-    kernel_id: KernelId
-    resource: KernelResourceDraft
+from ai.backend.common.types import ResourceSlotEntry
 
 
 @dataclass(frozen=True)
@@ -41,12 +26,15 @@ class UnschedulableReasonHint:
 class KernelDryRunResult:
     """Dry-run outcome for a single kernel.
 
+    Results correspond positionally to the requested kernels: the caller
+    matches each result to its input by list index, so no correlation handle
+    is carried here.
+
     ``remediation`` is populated only when ``schedulable`` is False; it
     describes what to change so the kernel would fit on one of the
     scheduling-target nodes.
     """
 
-    spec: KernelDryRunSpec
     resolved_slots: tuple[ResourceSlotEntry, ...]
     resolved_architecture: str
     schedulable: bool
