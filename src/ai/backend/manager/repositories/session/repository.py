@@ -14,9 +14,10 @@ from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
-from ai.backend.common.types import AccessKey, ImageAlias, SessionId
+from ai.backend.common.types import AccessKey, ImageAlias, KernelId, SessionId
 from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.kernel.types import KernelListResult
+from ai.backend.manager.data.resource_slot.types import ResourceAllocationAggregate
 from ai.backend.manager.data.session.types import (
     SessionData,
     SessionListResult,
@@ -324,6 +325,22 @@ class SessionRepository:
             KernelListResult with items, total count, and pagination info
         """
         return await self._db_source.search_kernels(querier)
+
+    @session_repository_resilience.apply()
+    async def batch_get_resource_allocation_by_session(
+        self,
+        session_ids: Sequence[SessionId],
+    ) -> dict[SessionId, ResourceAllocationAggregate]:
+        """Aggregate resource_allocations per session (requested/used/allocated)."""
+        return await self._db_source.batch_get_resource_allocation_by_session(session_ids)
+
+    @session_repository_resilience.apply()
+    async def batch_get_resource_allocation_by_kernel(
+        self,
+        kernel_ids: Sequence[KernelId],
+    ) -> dict[KernelId, ResourceAllocationAggregate]:
+        """Aggregate resource_allocations per kernel (requested/used/allocated)."""
+        return await self._db_source.batch_get_resource_allocation_by_kernel(kernel_ids)
 
     @session_repository_resilience.apply()
     async def resolve_image_by_id(

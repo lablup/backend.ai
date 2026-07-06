@@ -74,12 +74,14 @@ from ai.backend.common.types import (
     KernelId,
     MountInfoEntry,
     MountPermission,
+    ResourceSlot,
     SessionId,
     SessionTypes,
 )
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.kernel.types import KernelInfo, KernelStatus, KernelStatusInMatchSpec
+from ai.backend.manager.data.resource_slot.types import ResourceAllocationAggregate
 from ai.backend.manager.data.session.types import SessionData, SessionStatus
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.kernel.conditions import KernelConditions
@@ -117,6 +119,12 @@ from ai.backend.manager.repositories.base import (
     negate_conditions,
 )
 from ai.backend.manager.repositories.session.types import ProjectSessionSearchScope
+from ai.backend.manager.services.session.actions.batch_get_kernel_resource_allocation import (
+    BatchGetKernelResourceAllocationAction,
+)
+from ai.backend.manager.services.session.actions.batch_get_session_resource_allocation import (
+    BatchGetSessionResourceAllocationAction,
+)
 from ai.backend.manager.services.session.actions.enqueue_session import (
     EnqueueSessionAction,
     ResourceSlotEntry,
@@ -363,6 +371,66 @@ class SessionAdapter(BaseAdapter):
             info.id: self._kernel_info_to_node(info) for info in action_result.data
         }
         return [kernel_map.get(kernel_id) for kernel_id in kernel_ids]
+
+    @staticmethod
+    def _aggregate_to_allocation_dto(
+        aggregate: ResourceAllocationAggregate | None,
+    ) -> ResourceAllocationGQLDTO:
+        """Convert a per-owner resource-allocation aggregate to the shared GQL DTO.
+
+        A missing aggregate (owner with no resource_allocations rows) maps to empty
+        slot sets rather than null.
+        """
+
+        def _to_info(slots: ResourceSlot | None) -> ResourceSlotInfo:
+            return ResourceSlotInfo(
+                entries=[
+                    ResourceSlotEntryInfo(resource_type=k, quantity=Decimal(str(v)))
+                    for k, v in (slots or {}).items()
+                ]
+            )
+
+        return ResourceAllocationGQLDTO(
+            requested=_to_info(aggregate.requested if aggregate else None),
+            used=_to_info(aggregate.used if aggregate else None),
+            allocated=_to_info(aggregate.allocated if aggregate else None),
+        )
+
+    async def batch_resource_allocation_by_session(
+        self, session_ids: Sequence[SessionId]
+    ) -> list[ResourceAllocationGQLDTO]:
+        """Batch-aggregate resource_allocations per session for DataLoader use.
+
+        Returns one DTO per input session id, in the same order.
+        """
+        if not session_ids:
+            return []
+        action_result = (
+            await self._processors.session.batch_get_session_resource_allocation.wait_for_complete(
+                BatchGetSessionResourceAllocationAction(session_ids=list(session_ids))
+            )
+        )
+        return [
+            self._aggregate_to_allocation_dto(action_result.data.get(sid)) for sid in session_ids
+        ]
+
+    async def batch_resource_allocation_by_kernel(
+        self, kernel_ids: Sequence[KernelId]
+    ) -> list[ResourceAllocationGQLDTO]:
+        """Batch-aggregate resource_allocations per kernel for DataLoader use.
+
+        Returns one DTO per input kernel id, in the same order.
+        """
+        if not kernel_ids:
+            return []
+        action_result = (
+            await self._processors.session.batch_get_kernel_resource_allocation.wait_for_complete(
+                BatchGetKernelResourceAllocationAction(kernel_ids=list(kernel_ids))
+            )
+        )
+        return [
+            self._aggregate_to_allocation_dto(action_result.data.get(kid)) for kid in kernel_ids
+        ]
 
     # -------------------------------------------------------------------------
     # Session search
