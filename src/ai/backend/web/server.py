@@ -94,7 +94,7 @@ from ai.backend.web.security import SecurityPolicy, csp_nonce_var, security_poli
 
 from . import __version__, user_agent
 from .auth import build_forwarding_headers, fill_forwarding_hdrs_to_api_session, get_client_ip
-from .errors import InvalidAPIConfigurationError
+from .errors import InvalidAPIConfigurationError, UnexpectedAuthResponseError
 from .proxy import (
     decrypt_payload,
     web_handler,
@@ -540,7 +540,9 @@ async def login_handler(request: web.Request) -> web.Response:
                 }
                 return web.json_response(result)
             case _:
-                pass
+                raise UnexpectedAuthResponseError(
+                    f"Unexpected auth result type: {type(auth_result)}"
+                )
     except BackendClientError as e:
         # This is error, not failed login, so we should not update login history.
         return web.HTTPBadGateway(
@@ -753,7 +755,9 @@ async def token_login_handler(request: web.Request) -> web.Response:
                 }
                 return web.json_response(result)
             case _:
-                raise RuntimeError(f"Unexpected auth result type: {type(auth_result)}")
+                raise UnexpectedAuthResponseError(
+                    f"Unexpected auth result type: {type(auth_result)}"
+                )
         stored_token = {
             "type": "keypair",
             "access_key": token.access_key,
@@ -992,8 +996,11 @@ async def no_auth_client_registries_ctx(
             )
         yield registries
     finally:
-        for registry in registries.values():
-            await registry.close()
+        # Best-effort close so one failing registry does not leak the others.
+        await asyncio.gather(
+            *(registry.close() for registry in registries.values()),
+            return_exceptions=True,
+        )
 
 
 @asynccontextmanager
