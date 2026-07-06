@@ -4,11 +4,13 @@ from __future__ import annotations
 
 from collections import defaultdict
 from collections.abc import Collection, Sequence
-from typing import Any
+from dataclasses import dataclass
+from datetime import datetime
+from uuid import UUID
 
 import sqlalchemy as sa
 
-from ai.backend.common.types import SessionId
+from ai.backend.common.types import SessionId, SessionTypes
 from ai.backend.manager.data.idle_checker.types import IdleCheckSession, ScopeRef, ScopeType
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.models.idle_checker.row import IdleCheckerBindingRow, IdleCheckerRow
@@ -21,6 +23,19 @@ from ai.backend.manager.repositories.idle_checker.types import (
     IdleCheckTargetData,
 )
 from ai.backend.manager.repositories.ops import DBOpsProvider
+
+
+@dataclass(frozen=True)
+class _CandidateSession:
+    """Typed view of one session_query row (fields follow the SELECT order)."""
+
+    id: UUID
+    created_at: datetime
+    starts_at: datetime | None
+    session_type: SessionTypes
+    resource_group_id: UUID
+    group_id: UUID
+    domain_id: UUID
 
 
 class IdleCheckerDBSource:
@@ -118,14 +133,16 @@ class IdleCheckerDBSource:
                 )
                 .order_by(SessionRow.created_at, SessionRow.id)
             )
-            session_rows = (await r.batch_query_in_global(session_query, querier)).rows
+            session_rows: list[_CandidateSession] = []
+            for row in (await r.batch_query_in_global(session_query, querier)).rows:
+                session_rows.append(_CandidateSession(*row))
         idle_checker_targets = self._build_targets(session_rows, checkers_by_scope)
 
         return IdleCheckBatchData(targets=idle_checker_targets)
 
     def _build_targets(
         self,
-        session_rows: Sequence[sa.Row[Any]],
+        session_rows: Sequence[_CandidateSession],
         checkers_by_scope: dict[ScopeRef, list[BoundCheckerData]],
     ) -> Sequence[IdleCheckTargetData]:
         """Attach to each session the in-scope checkers that target its session type."""
