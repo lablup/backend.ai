@@ -267,6 +267,42 @@ class TestPurge:
             )
         assert remaining == 0
 
+    async def test_definition_purge_cascades_to_allow_list_and_fragments(
+        self,
+        database: ExtendedAsyncSAEngine,
+        repository: AppConfigAllowListRepository,
+        definition_repository: AppConfigDefinitionRepository,
+    ) -> None:
+        # Deleting the definition cascades to its allow-list entry and its fragment.
+        definition = await definition_repository.create(
+            Creator(spec=AppConfigDefinitionCreatorSpec(config_name="theme"))
+        )
+        entry = await _create_entry(repository, "theme", AppConfigScopeType.PUBLIC)
+        async with database.begin_session() as db_sess:
+            db_sess.add(
+                AppConfigFragmentRow(
+                    config_name=entry.config_name,
+                    scope_type=entry.scope_type,
+                    scope_id="public",
+                    config={"k": "v"},
+                )
+            )
+            await db_sess.flush()
+
+        await definition_repository.purge(
+            Purger(row_class=AppConfigDefinitionRow, pk_value=definition.id)
+        )
+
+        async with database.begin_readonly_session() as db_sess:
+            remaining_entries = await db_sess.scalar(
+                sa.select(sa.func.count()).select_from(AppConfigAllowListRow)
+            )
+            remaining_fragments = await db_sess.scalar(
+                sa.select(sa.func.count()).select_from(AppConfigFragmentRow)
+            )
+        assert remaining_entries == 0
+        assert remaining_fragments == 0
+
 
 class TestSearch:
     async def test_search_returns_all_with_total_count(

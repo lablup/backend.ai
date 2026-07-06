@@ -66,12 +66,16 @@ Three scopes cover the use cases (`public` for the pre-login shell):
   `domain` (same-domain read / admin write), `user` (owner+admin read /
   owner-modify + admin write).
 - **Explicitly registered names.** Every config name lives in
-  `app_config_definitions`; fragments and allow-list entries reference it by
-  foreign key. No fragment may exist for an unregistered `config_name`.
-- **Reads are unconditional.** The merge reads `app_config_fragments`
-  joined to `app_config_allow_list` only for each fragment's `rank` — an
-  indexed `(config_name, scope_type)` join. No permission or policy is
-  evaluated at read time.
+  `app_config_definitions`; allow-list entries reference it by foreign key,
+  and fragments reference it transitively through their allow-list entry (a
+  fragment requires an entry, and the entry requires a registered name — so
+  no direct fragment FK is needed). No fragment may exist for an
+  unregistered `config_name`.
+- **Reads are unconditional.** The merge **must** join
+  `app_config_fragments` to `app_config_allow_list` — `rank` lives only on
+  the allow-list entry, so the ordering cannot be computed without it (an
+  indexed `(config_name, scope_type)` join). The join is for `rank` alone;
+  no permission or policy is evaluated at read time.
 - **Allow-list = the write gate and the merge order.** `app_config_allow_list`
   holds **one record per `(config_name, scope_type)`**; a fragment at
   that scope may be created **only if** the record exists — through the
@@ -150,18 +154,23 @@ purging one cascades to its fragments.
 
 ### Integrity
 
-- **Every** fragment create (admin or regular) requires (a) a registered
-  `config_name` (FK to `app_config_definitions`) and (b) an
+- **Every** fragment create (admin or regular) requires an
   `app_config_allow_list` row for the write's `(config_name,
   scope_type)` — enforced both by the write gate (domain error) and by
-  the composite FK. Updates and purges of an existing fragment need no
-  gate: the FK guarantees the entry exists while the fragment does.
+  the composite FK. That entry references a registered `config_name`, so
+  registration is guaranteed transitively; the fragment needs no direct
+  FK to `app_config_definitions`. Updates and purges of an existing
+  fragment need no gate: the FK guarantees the entry exists while the
+  fragment does.
 - A regular (non-admin) mutation is further restricted to the caller's
   own `user` row; admin mutations may target any scope (still gated by
   the allow-list) and are the only writes that may touch the allow-list
   and `app_config_definitions`.
-- `app_config_definitions` purge is rejected while any fragment or allow-list
-  entry still references the `config_name` (`ON DELETE NO ACTION`).
+- `app_config_definitions` purge **cascades down the whole subtree**: its
+  allow-list entries are removed by the `config_name` FK (`ON DELETE
+  CASCADE`), and their fragments cascade from those entries in turn — so
+  retiring a config name clears its allow-list and fragments in one
+  statement.
 - `app_config_allow_list` purge **revokes the grant and drops its data**:
   the fragments at that `(config_name, scope_type)` are removed by the
   `ON DELETE CASCADE` FK, so a revoked value disappears from the merge
@@ -307,8 +316,8 @@ likewise `null` — clients fall back to their built-in defaults.
   grant; the cascade drops the existing `user` fragments with it.
 - **Admin reorders contributions** — set the allow-list entries'
   `rank`s (per `(config_name, scope_type)`, not per fragment).
-- **Admin retires a config name** — purge the allow-list entries (their
-  fragments cascade), then the `app_config_definitions` row (purge is rejected
-  while references remain).
+- **Admin retires a config name** — purge the `app_config_definitions`
+  row; the allow-list entries and their fragments cascade with it, so no
+  prior cleanup is needed.
 - **Admin audit** — cross-scope fragment search and cross-user merged
   search for support.

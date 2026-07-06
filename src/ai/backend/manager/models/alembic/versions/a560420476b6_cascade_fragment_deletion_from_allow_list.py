@@ -1,11 +1,17 @@
-"""cascade fragment deletion from app_config_allow_list
+"""cascade app config subtree deletion
 
-Add a composite FK from ``app_config_fragments (config_name, scope_type)`` to
-``app_config_allow_list`` with ``ON DELETE CASCADE`` (BEP-1052): removing an
-allow-list entry removes every fragment written under it, so a revoked value
-disappears from the merge in the same statement. Fragments whose allow-list
-entry was already removed (previously kept and still merged) are deleted before
-the FK is added — the same outcome the cascade would have produced.
+Cascade deletion down ``definition -> allow_list -> fragment`` (BEP-1052):
+
+1. Composite FK ``app_config_fragments (config_name, scope_type) ->
+   app_config_allow_list`` ``ON DELETE CASCADE`` (orphaned fragments deleted first).
+2. ``app_config_allow_list.config_name -> app_config_definitions`` -> ``CASCADE``.
+3. Drop the redundant direct ``app_config_fragments.config_name ->
+   app_config_definitions`` FK — the composite FK already guarantees a registered
+   ``config_name`` transitively, and this FK only blocked the definition delete.
+
+The released allow-list creation migration entered a wrong (non-convention) name
+for the definitions FK, so its name differs between DBs; we drop both candidate
+names with ``IF EXISTS``.
 
 Revision ID: a560420476b6
 Revises: 66d0f891ed20
@@ -25,8 +31,7 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # Fragments without an allow-list entry are unrepresentable once the FK exists;
-    # remove them as the cascade would have when the entry was purged.
+    # 1. fragment -> allow_list composite FK (drop pre-existing orphans first).
     op.execute(
         sa.text(
             """
@@ -48,9 +53,53 @@ def upgrade() -> None:
         ["config_name", "scope_type"],
         ondelete="CASCADE",
     )
+    # 2. allow_list -> definitions: NO ACTION -> CASCADE.
+    # The released creation migration entered a wrong (non-convention) FK name, so the
+    # actual name differs by DB — drop whichever exists before recreating.
+    op.execute(
+        "ALTER TABLE app_config_allow_list "
+        "DROP CONSTRAINT IF EXISTS fk_app_config_allow_list_config_name"
+    )
+    op.execute(
+        "ALTER TABLE app_config_allow_list "
+        "DROP CONSTRAINT IF EXISTS fk_app_config_allow_list_config_name_app_config_definitions"
+    )
+    op.create_foreign_key(
+        "fk_app_config_allow_list_config_name_app_config_definitions",
+        "app_config_allow_list",
+        "app_config_definitions",
+        ["config_name"],
+        ["config_name"],
+        ondelete="CASCADE",
+    )
+    # 3. fragments -> definitions: drop the redundant direct FK (it blocks the cascade).
+    op.execute(
+        "ALTER TABLE app_config_fragments "
+        "DROP CONSTRAINT IF EXISTS fk_app_config_fragments_config_name_app_config_definitions"
+    )
 
 
 def downgrade() -> None:
+    op.create_foreign_key(
+        "fk_app_config_fragments_config_name_app_config_definitions",
+        "app_config_fragments",
+        "app_config_definitions",
+        ["config_name"],
+        ["config_name"],
+        ondelete="NO ACTION",
+    )
+    op.execute(
+        "ALTER TABLE app_config_allow_list "
+        "DROP CONSTRAINT IF EXISTS fk_app_config_allow_list_config_name_app_config_definitions"
+    )
+    op.create_foreign_key(
+        "fk_app_config_allow_list_config_name_app_config_definitions",
+        "app_config_allow_list",
+        "app_config_definitions",
+        ["config_name"],
+        ["config_name"],
+        ondelete="NO ACTION",
+    )
     op.drop_constraint(
         "fk_app_config_fragments_config_name_scope_type",
         "app_config_fragments",

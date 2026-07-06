@@ -20,10 +20,8 @@ __all__ = ("AppConfigFragmentRow",)
 class AppConfigFragmentRow(Base):  # type: ignore[misc]
     """One scoped app config fragment — a single JSON document at ``(config_name, scope_type, scope_id)``.
 
-    A fragment hangs off its ``app_config_allow_list`` entry (FK on
-    ``(config_name, scope_type)``, ``ON DELETE CASCADE``): it exists only while the
-    entry does, and its merge priority is the entry's ``rank`` — the fragment row
-    carries no rank of its own.
+    A fragment's merge priority is its allow-list entry's ``rank`` — the fragment
+    row carries no rank of its own.
     """
 
     __tablename__ = "app_config_fragments"
@@ -51,7 +49,6 @@ class AppConfigFragmentRow(Base):  # type: ignore[misc]
     config_name: Mapped[str] = mapped_column(
         "config_name",
         sa.String(length=128),
-        sa.ForeignKey("app_config_definitions.config_name", ondelete="NO ACTION"),
         nullable=False,
     )
     scope_type: Mapped[AppConfigScopeType] = mapped_column(
