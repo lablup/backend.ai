@@ -72,7 +72,7 @@ def rg_defaults(rg_image_id: ImageID) -> DefaultSessionOptions:
             resource_input=KernelResourceConfig(
                 image_id=rg_image_id,
                 resources=[ResourceSlotEntry(resource_type="cpu", quantity="2")],
-                resource_opts=ResourceOpts(shmem=BinarySize.from_str("128m")),
+                resource_opts=ResourceOpts(shmem=BinarySize(128 * 1024 * 1024)),
             ),
             environ={"RG_BASE": "1"},
             startup_command="rg-start",
@@ -148,7 +148,9 @@ class TestMergeResourceGroupDefaultsRule:
         assert merged.environ == {"RG_BASE": "1"}
         assert merged.startup_command == "rg-start"
         assert merged.bootstrap_script == "rg-bootstrap"
-        assert merged.resource_input.resource_opts == ResourceOpts(shmem=BinarySize.from_str("128m"))
+        assert merged.resource_input.resource_opts == ResourceOpts(
+            shmem=BinarySize(128 * 1024 * 1024)
+        )
 
     async def test_preserves_caller_execution_spec_over_rg(
         self,
