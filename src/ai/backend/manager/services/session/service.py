@@ -101,6 +101,14 @@ from ai.backend.manager.repositories.scheduler.repository import SchedulerReposi
 from ai.backend.manager.repositories.session.repository import SessionRepository
 from ai.backend.manager.repositories.session.updaters import SessionUpdaterSpec
 from ai.backend.manager.repositories.user.repository import UserRepository
+from ai.backend.manager.services.session.actions.batch_get_kernel_resource_allocation import (
+    BatchGetKernelResourceAllocationAction,
+    BatchGetKernelResourceAllocationActionResult,
+)
+from ai.backend.manager.services.session.actions.batch_get_session_resource_allocation import (
+    BatchGetSessionResourceAllocationAction,
+    BatchGetSessionResourceAllocationActionResult,
+)
 from ai.backend.manager.services.session.actions.commit_session import (
     CommitSessionAction,
     CommitSessionActionResult,
@@ -1514,6 +1522,24 @@ class SessionService:
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,
         )
+
+    async def batch_get_session_resource_allocation(
+        self, action: BatchGetSessionResourceAllocationAction
+    ) -> BatchGetSessionResourceAllocationActionResult:
+        """Aggregate resource_allocations per session (requested/used/allocated)."""
+        data = await self._session_repository.batch_get_resource_allocation_by_session(
+            action.session_ids
+        )
+        return BatchGetSessionResourceAllocationActionResult(data=data)
+
+    async def batch_get_kernel_resource_allocation(
+        self, action: BatchGetKernelResourceAllocationAction
+    ) -> BatchGetKernelResourceAllocationActionResult:
+        """Aggregate resource_allocations per kernel (requested/used/allocated)."""
+        data = await self._session_repository.batch_get_resource_allocation_by_kernel(
+            action.kernel_ids
+        )
+        return BatchGetKernelResourceAllocationActionResult(data=data)
 
     async def enqueue_session(self, action: EnqueueSessionAction) -> EnqueueSessionActionResult:
         """Enqueue a new compute session (PENDING) through the scheduler.

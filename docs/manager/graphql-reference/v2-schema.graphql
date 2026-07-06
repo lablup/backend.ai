@@ -5586,6 +5586,11 @@ type KernelV2 implements Node {
   """Added in 26.2.0. The resource group this kernel is assigned to."""
   resourceGroup: ResourceGroup
 
+  """
+  Added in 26.8.0. Resource allocation (requested / used / allocated) computed on-demand from the resource_allocations table. Unlike the deprecated eager `resource.allocation`, `allocated` here persists after the kernel is freed or terminated (for statistics and billing).
+  """
+  resourceAllocation: ResourceAllocation!
+
   """Added in 26.3.0. The session this kernel belongs to."""
   session: SessionV2
 
@@ -10736,6 +10741,11 @@ type ResourceAllocation {
   The resource slots currently used. Typed as Any because this field holds a nested GQL type (ResourceSlotGQL).
   """
   used: ResourceSlot
+
+  """
+  The resource slots actually allocated, computed from the resource_allocations table. Unlike `used`, this persists after the session/kernel is freed or terminated (for statistics and billing). Typed as Any because this field holds a nested GQL type (ResourceSlotGQL).
+  """
+  allocated: ResourceSlot
 }
 
 """
@@ -12829,6 +12839,11 @@ type SessionV2 implements Node {
   Added in 26.4.4. The model deployment replica served by this session: a single replica instance of a model deployment that runs in this compute session and serves inference requests. Null for non-inference sessions.
   """
   replica: ModelReplica
+
+  """
+  Added in 26.8.0. Resource allocation (requested / used / allocated) computed on-demand from the resource_allocations table. Unlike the deprecated eager `resource.allocation`, `allocated` here persists after the session is freed or terminated (for statistics and billing).
+  """
+  resourceAllocation: ResourceAllocation!
 }
 
 """Added in 26.3.0. Connection type for paginated session results."""

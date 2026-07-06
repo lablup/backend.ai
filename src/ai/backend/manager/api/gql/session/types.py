@@ -466,6 +466,22 @@ class SessionV2GQL(PydanticNodeMixin[SessionNode]):
             return None
         return await info.context.data_loaders.replica_loader.load(UUID(str(self.replica_id)))
 
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Resource allocation (requested / used / allocated) computed on-demand "
+                "from the resource_allocations table. Unlike the deprecated eager "
+                "`resource.allocation`, `allocated` here persists after the session is "
+                "freed or terminated (for statistics and billing)."
+            ),
+        )
+    )  # type: ignore[misc]
+    async def resource_allocation(self, info: Info[StrawberryGQLContext]) -> ResourceAllocationGQL:
+        return await info.context.data_loaders.session_resource_allocation_loader.load(
+            SessionId(UUID(str(self.id)))
+        )
+
     # TODO: Add `vfolder_mounts` dynamic field (VFolder connection type needed)
 
     @classmethod

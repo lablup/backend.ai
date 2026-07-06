@@ -4,7 +4,23 @@ import uuid
 from dataclasses import dataclass
 from decimal import Decimal
 
-from ai.backend.common.types import SlotQuantity
+from ai.backend.common.types import ResourceSlot, SlotQuantity
+
+
+@dataclass(frozen=True)
+class ResourceAllocationAggregate:
+    """Per-owner (session or kernel) resource allocation aggregated from the
+    ``resource_allocations`` table.
+
+    - ``requested``: SUM(requested) over the owner's slots.
+    - ``used``: currently occupying resources (``free_at IS NULL``); empties after free.
+    - ``allocated``: resources ever actually allocated (``used_at IS NOT NULL``);
+      persists after the owner is freed/terminated (for statistics/billing).
+    """
+
+    requested: ResourceSlot
+    used: ResourceSlot
+    allocated: ResourceSlot
 
 
 @dataclass(frozen=True)
