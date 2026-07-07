@@ -35,6 +35,7 @@ from ai.backend.manager.data.resource.types import KeyPairResourcePolicyData, Sl
 from ai.backend.manager.data.session.creation import ImageInfo
 from ai.backend.manager.data.session.options import (
     KernelExecutionSpec,
+    KernelResourceConfig,
     ResourceOpts,
     SchedulingTarget,
     SessionHandlerOptions,
@@ -115,12 +116,16 @@ def _kernel(
         local_rank=0,
         preopen_ports=preopen_ports,
         execution_spec=KernelExecutionSpec(
-            image_id=image_id,
-            resources=[
-                ResourceSlotEntry(resource_type="cpu", quantity=str(Decimal(cpu))),
-                ResourceSlotEntry(resource_type="mem", quantity=str(Decimal(1024 * 1024 * 1024))),
-            ],
-            resource_opts=ResourceOpts(shmem=shmem),
+            resource_input=KernelResourceConfig(
+                image_id=image_id,
+                resources=[
+                    ResourceSlotEntry(resource_type="cpu", quantity=str(Decimal(cpu))),
+                    ResourceSlotEntry(
+                        resource_type="mem", quantity=str(Decimal(1024 * 1024 * 1024))
+                    ),
+                ],
+                resource_opts=ResourceOpts(shmem=shmem),
+            ),
         ),
     )
 
@@ -474,9 +479,11 @@ def _kernel_with_resources(
         cluster_hostname="main1",
         local_rank=0,
         execution_spec=KernelExecutionSpec(
-            image_id=image_id,
-            resources=[ResourceSlotEntry(resource_type=k, quantity=q) for k, q in resources],
-            resource_opts=ResourceOpts(),
+            resource_input=KernelResourceConfig(
+                image_id=image_id,
+                resources=[ResourceSlotEntry(resource_type=k, quantity=q) for k, q in resources],
+                resource_opts=ResourceOpts(),
+            ),
         ),
     )
 

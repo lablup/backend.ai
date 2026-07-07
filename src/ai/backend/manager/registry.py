@@ -109,6 +109,7 @@ from ai.backend.manager.data.model_serving.types import EndpointData
 from ai.backend.manager.data.session.draft import (
     KernelExecutionSpecDraft,
     KernelGroupDraft,
+    KernelResourceInput,
     SchedulingTargetDraft,
     SessionClassificationDraft,
     SessionIdentityDraft,
@@ -1068,9 +1069,11 @@ class AgentRegistry:
             kernel: KernelEnqueueingConfig,
         ) -> KernelExecutionSpecDraft:
             return KernelExecutionSpecDraft(
-                image_id=image_id_by_ref[kernel["image_ref"]],
-                resources=resource_entries,
-                resource_opts=resource_opts,
+                resource_input=KernelResourceInput(
+                    image_id=image_id_by_ref[kernel["image_ref"]],
+                    resources=resource_entries,
+                    resource_opts=resource_opts,
+                ),
                 environ=environ_dict,
                 mounts=mount_entries,
                 startup_command=kernel.get("startup_command") or startup_command,

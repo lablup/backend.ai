@@ -47,7 +47,7 @@ class ResourceLimitRule(SessionSpecValidatorRule):
         context: SessionSpecValidationContext,
     ) -> None:
         for idx, kernel in enumerate(spec.kernel_specs):
-            image_info = context.image_infos.get(kernel.execution_spec.image_id)
+            image_info = context.image_infos.get(kernel.execution_spec.resource_input.image_id)
             if image_info is None:
                 continue
             self._validate_kernel(
@@ -68,13 +68,13 @@ class ResourceLimitRule(SessionSpecValidatorRule):
         policy: SlotTypePolicy,
     ) -> None:
         min_slots = image_min_slots(image_info)
-        shmem = kernel.execution_spec.resource_opts.shmem
+        shmem = kernel.execution_spec.resource_input.resource_opts.shmem
         if shmem is not None:
             min_slots["mem"] = min_slots.get("mem", Decimal(0)) + Decimal(int(shmem))
 
         requested = {
             entry.resource_type: parse_quantity(entry.quantity)
-            for entry in kernel.execution_spec.resources
+            for entry in kernel.execution_spec.resource_input.resources
         }
         for slot_name, min_value in min_slots.items():
             if Decimal(min_value) <= Decimal(0):

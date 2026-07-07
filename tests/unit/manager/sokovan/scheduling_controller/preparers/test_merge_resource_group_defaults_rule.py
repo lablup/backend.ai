@@ -23,6 +23,7 @@ from ai.backend.common.types import ClusterMode, ResourceSlotEntry
 from ai.backend.manager.data.session.draft import (
     KernelExecutionSpecDraft,
     KernelGroupDraft,
+    KernelResourceInput,
     SchedulingTargetDraft,
     SessionOptionsDraft,
     SessionSpecDraft,
@@ -33,6 +34,7 @@ from ai.backend.manager.data.session.options import (
     FailurePolicy,
     HandlerOptions,
     KernelExecutionSpec,
+    KernelResourceConfig,
     ResourceOpts,
     SessionHandlerOptions,
 )
@@ -64,9 +66,11 @@ def rg_defaults(rg_image_id: ImageID) -> DefaultSessionOptions:
         handler_options=SessionHandlerOptions(default=HandlerOptions(timeout=60), by_handler={}),
         agent_selection_policy=AgentSelectionPolicy.STRICT,
         default_kernel_execution_spec=KernelExecutionSpec(
-            image_id=rg_image_id,
-            resources=[ResourceSlotEntry(resource_type="cpu", quantity="2")],
-            resource_opts=ResourceOpts(),
+            resource_input=KernelResourceConfig(
+                image_id=rg_image_id,
+                resources=[ResourceSlotEntry(resource_type="cpu", quantity="2")],
+                resource_opts=ResourceOpts(),
+            ),
             environ={"RG_BASE": "1"},
             startup_command="rg-start",
             bootstrap_script="rg-bootstrap",
@@ -133,8 +137,10 @@ class TestMergeResourceGroupDefaultsRule:
         result = await rule.prepare(draft, _context(rg_defaults))
         assert result.options.kernel_groups is not None
         merged = result.options.kernel_groups[0].execution_spec
-        assert merged.image_id == rg_image_id
-        assert merged.resources == (ResourceSlotEntry(resource_type="cpu", quantity="2"),)
+        assert merged.resource_input.image_id == rg_image_id
+        assert merged.resource_input.resources == (
+            ResourceSlotEntry(resource_type="cpu", quantity="2"),
+        )
         assert merged.environ == {"RG_BASE": "1"}
         assert merged.startup_command == "rg-start"
         assert merged.bootstrap_script == "rg-bootstrap"
@@ -153,7 +159,9 @@ class TestMergeResourceGroupDefaultsRule:
                         role="main",
                         replica_count=1,
                         execution_spec=KernelExecutionSpecDraft(
-                            image_id=caller_image,
+                            resource_input=KernelResourceInput(
+                                image_id=caller_image,
+                            ),
                             environ={"CALLER": "yes"},
                         ),
                     ),
@@ -163,10 +171,12 @@ class TestMergeResourceGroupDefaultsRule:
         result = await rule.prepare(draft, _context(rg_defaults))
         assert result.options.kernel_groups is not None
         merged = result.options.kernel_groups[0].execution_spec
-        assert merged.image_id == caller_image
+        assert merged.resource_input.image_id == caller_image
         assert merged.environ == {"CALLER": "yes"}
         # Unset fields still picked up from RG.
-        assert merged.resources == (ResourceSlotEntry(resource_type="cpu", quantity="2"),)
+        assert merged.resource_input.resources == (
+            ResourceSlotEntry(resource_type="cpu", quantity="2"),
+        )
         assert merged.startup_command == "rg-start"
 
     async def test_noop_group_merge_when_rg_has_no_default(
@@ -183,4 +193,4 @@ class TestMergeResourceGroupDefaultsRule:
         result = await rule.prepare(draft, _context(rg))
         assert result.options.priority == 7
         assert result.options.kernel_groups is not None
-        assert result.options.kernel_groups[0].execution_spec.image_id is None
+        assert result.options.kernel_groups[0].execution_spec.resource_input.image_id is None

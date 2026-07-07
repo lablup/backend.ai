@@ -52,7 +52,7 @@ class RequestedSlotTypeRule(SessionSpecValidatorRule):
         for idx, kernel in enumerate(spec.kernel_specs):
             unknown = sorted({
                 entry.resource_type
-                for entry in kernel.execution_spec.resources
+                for entry in kernel.execution_spec.resource_input.resources
                 if entry.resource_type not in rg_slot_types
                 and parse_quantity(entry.quantity) > Decimal(0)
             })

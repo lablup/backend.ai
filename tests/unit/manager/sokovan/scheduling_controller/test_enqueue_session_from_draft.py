@@ -62,6 +62,7 @@ from ai.backend.manager.data.session.creation import (
 from ai.backend.manager.data.session.draft import (
     KernelExecutionSpecDraft,
     KernelGroupDraft,
+    KernelResourceInput,
     SchedulingTargetDraft,
     SessionClassificationDraft,
     SessionIdentityDraft,
@@ -122,15 +123,17 @@ def draft(image_id: ImageID) -> SessionSpecDraft:
                     role="main",
                     replica_count=1,
                     execution_spec=KernelExecutionSpecDraft(
-                        image_id=image_id,
-                        resources=(
-                            ResourceSlotEntry(resource_type="cpu", quantity=str(Decimal(2))),
-                            ResourceSlotEntry(
-                                resource_type="mem",
-                                quantity=str(Decimal(2 * 1024 * 1024 * 1024)),
+                        resource_input=KernelResourceInput(
+                            image_id=image_id,
+                            resources=(
+                                ResourceSlotEntry(resource_type="cpu", quantity=str(Decimal(2))),
+                                ResourceSlotEntry(
+                                    resource_type="mem",
+                                    quantity=str(Decimal(2 * 1024 * 1024 * 1024)),
+                                ),
                             ),
+                            resource_opts=ResourceOpts(),
                         ),
-                        resource_opts=ResourceOpts(),
                         mounts=(
                             MountInfoEntry(
                                 vfolder_id=VFolderUUID(
@@ -308,7 +311,7 @@ class TestEnqueueSessionFromDraft:
         assert len(enqueued_spec.kernel_specs) == 1
         kernel = enqueued_spec.kernel_specs[0]
         assert kernel.cluster_role == "main"
-        assert kernel.execution_spec.image_id == image_id
+        assert kernel.execution_spec.resource_input.image_id == image_id
         # vfolder mounts flowed through context → resolved on the kernel spec
         assert len(kernel.vfolder_mounts) == 1
         assert kernel.vfolder_mounts[0].kernel_path == PurePosixPath("/home/work/data")

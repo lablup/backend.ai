@@ -68,9 +68,11 @@ class KernelRowFromSpec(CreatorSpec[KernelRow]):
         execution = self.kernel_spec.execution_spec
         image_info = self.image_info
         environ_payload = [f"{k}={v}" for k, v in (execution.environ or {}).items()]
-        resource_opts_payload = execution.resource_opts.model_dump(exclude_none=True)
+        resource_opts_payload = execution.resource_input.resource_opts.model_dump(exclude_none=True)
         resolved_mounts = list(self.kernel_spec.vfolder_mounts)
-        requested_slots = ResourceSlotEntry.inputs_to_resource_slot(execution.resources)
+        requested_slots = ResourceSlotEntry.inputs_to_resource_slot(
+            execution.resource_input.resources
+        )
 
         return KernelRow(
             session_id=self.spec.identity.session_id,
@@ -152,7 +154,7 @@ class SessionRowFromSpec(CreatorSpec[SessionRow]):
         session_image_ids: list[UUID] = []
         requested_slots = ResourceSlot()
         for kernel in kernel_specs:
-            image_id = kernel.execution_spec.image_id
+            image_id = kernel.execution_spec.resource_input.image_id
             image_info = self.image_infos.get(image_id) if image_id is not None else None
             if image_info is not None:
                 session_image_ids.append(image_info.id)
@@ -162,7 +164,7 @@ class SessionRowFromSpec(CreatorSpec[SessionRow]):
                     else:
                         session_images.append(image_info.canonical)
             requested_slots += ResourceSlotEntry.inputs_to_resource_slot(
-                kernel.execution_spec.resources
+                kernel.execution_spec.resource_input.resources
             )
 
         main_mounts = list(main_kernel.vfolder_mounts) if main_kernel else []

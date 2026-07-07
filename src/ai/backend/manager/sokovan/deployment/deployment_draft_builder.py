@@ -31,6 +31,7 @@ from ai.backend.manager.data.session.creation import DeploymentContext
 from ai.backend.manager.data.session.draft import (
     KernelExecutionSpecDraft,
     KernelGroupDraft,
+    KernelResourceInput,
     SchedulingTargetDraft,
     SessionClassificationDraft,
     SessionIdentityDraft,
@@ -83,9 +84,11 @@ class DeploymentSessionDraftBuilder:
         kernel_groups = cls._resolve_kernel_groups(
             cluster_size=target_revision.cluster_config.size,
             execution_spec=KernelExecutionSpecDraft(
-                image_id=target_revision.image_id,
-                resources=resource_entries,
-                resource_opts=resource_opts,
+                resource_input=KernelResourceInput(
+                    image_id=target_revision.image_id,
+                    resources=resource_entries,
+                    resource_opts=resource_opts,
+                ),
                 environ=environ,
                 mounts=mounts,
                 startup_command=startup_command,
