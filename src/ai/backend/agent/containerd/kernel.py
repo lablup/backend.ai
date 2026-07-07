@@ -145,9 +145,15 @@ class ContainerdKernel(AbstractKernel):
     async def shutdown_service(self, service: str) -> None:
         await self._require_runner().feed_shutdown_service(service)
 
+    def _commit_lock_path(self, kernel_id: KernelId, subdir: str) -> Path:
+        base = Path(self.agent_config["agent"]["image-commit-path"])
+        return base / subdir / "lock" / str(kernel_id)
+
     @override
     async def check_duplicate_commit(self, kernel_id: KernelId, subdir: str) -> CommitStatus:
-        raise NotImplementedError(_TODO)
+        if self._commit_lock_path(kernel_id, subdir).exists():
+            return CommitStatus.ONGOING
+        return CommitStatus.READY
 
     @override
     async def commit(

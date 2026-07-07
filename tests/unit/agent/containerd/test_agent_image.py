@@ -43,6 +43,26 @@ class FakeImageRef:
         self.is_local = is_local
 
 
+class _FakeRuntime:
+    """Minimal OciRuntime stub for the distro probe: the container exits immediately."""
+
+    def __init__(self) -> None:
+        self.created = False
+        self.removed = False
+
+    async def create_container(self, container_id: str, **kwargs: Any) -> None:
+        self.created = True
+
+    async def start_container(self, container_id: str) -> Any:
+        return None
+
+    async def container_status(self, container_id: str) -> str | None:
+        return "stopped"
+
+    async def remove_container(self, container_id: str) -> None:
+        self.removed = True
+
+
 def _agent(facade: FakeFacade) -> ContainerdAgent:
     agent = ContainerdAgent.__new__(ContainerdAgent)
     agent._session_network = cast(Any, facade)
@@ -55,10 +75,31 @@ class TestResolveImageDistro:
         image = cast(Any, {"labels": {LabelName.BASE_DISTRO: "ubuntu20.04"}, "canonical": "x"})
         assert await agent.resolve_image_distro(image) == "ubuntu20.04"
 
-    async def test_unlabeled_raises(self) -> None:
+    async def test_unlabeled_probes_ldd(self, tmp_path: Any, monkeypatch: Any) -> None:
+        # No base-distro label -> run an `ldd --version` probe container and parse its stdout.
+        logfile = tmp_path / "probe.log"
+        logfile.write_text("ldd (Ubuntu GLIBC 2.35-0ubuntu3) 2.35\n")
+        monkeypatch.setattr(
+            "ai.backend.agent.containerd.agent.container_log_path", lambda cid: logfile
+        )
+        runtime = _FakeRuntime()
         agent = _agent(FakeFacade())
+        agent._runtime = cast(Any, runtime)
         image = cast(Any, {"labels": {}, "canonical": "cr.example/img:1"})
-        with pytest.raises(NotImplementedError):
+        distro = await agent.resolve_image_distro(image)
+        assert isinstance(distro, str) and distro  # a concrete distro was resolved
+        assert runtime.created and runtime.removed  # probe container created + cleaned up
+
+    async def test_unlabeled_unknown_libc_raises(self, tmp_path: Any, monkeypatch: Any) -> None:
+        logfile = tmp_path / "probe.log"
+        logfile.write_text("some unexpected output\n")
+        monkeypatch.setattr(
+            "ai.backend.agent.containerd.agent.container_log_path", lambda cid: logfile
+        )
+        agent = _agent(FakeFacade())
+        agent._runtime = cast(Any, _FakeRuntime())
+        image = cast(Any, {"labels": {}, "canonical": "cr.example/img:1"})
+        with pytest.raises(ImageNotAvailable):
             await agent.resolve_image_distro(image)
 
 

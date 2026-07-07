@@ -22,11 +22,17 @@ from decimal import Decimal
 from importlib.resources import files
 from pathlib import Path
 from typing import Any, cast, override
+from uuid import uuid4
 
 from ai.backend.agent.agent import (
     AbstractAgent,
     AbstractKernelCreationContext,
     ScanImagesResult,
+)
+from ai.backend.agent.docker.agent import (
+    LDD_GLIBC_REGEX,
+    LDD_MUSL_REGEX,
+    known_glibc_distros,
 )
 from ai.backend.agent.errors import UnsupportedResource
 from ai.backend.agent.kernel import AbstractKernel
@@ -77,7 +83,7 @@ from .oci import (
     translate_accelerator_args,
     translate_creation_config,
 )
-from .runtime.grpc import ContainerdGrpcRuntime
+from .runtime.grpc import ContainerdGrpcRuntime, container_log_path
 from .runtime.interface import OciRuntime
 from .session_network import (
     ContainerdSessionNetwork,
@@ -520,15 +526,41 @@ class ContainerdAgent(
 
     @override
     async def resolve_image_distro(self, image: ImageConfig) -> str:
-        # Backend.AI kernel images carry the base-distro label; use it. (DockerAgent falls
-        # back to an ldd probe for unlabeled images — a follow-up here.)
+        # Backend.AI kernel images carry the base-distro label; use it directly.
         distro = image["labels"].get(LabelName.BASE_DISTRO)
         if distro:
             return distro
-        raise NotImplementedError(
-            f"image {image['canonical']} lacks the {LabelName.BASE_DISTRO} label; "
-            "ldd-based distro detection is not yet implemented for the containerd backend"
+        # Fallback for unlabeled images: probe the C library by running `ldd --version` in a
+        # throwaway container and parsing its captured stdout (same heuristic as DockerAgent).
+        return await self._probe_image_distro(image["canonical"])
+
+    async def _probe_image_distro(self, canonical: str) -> str:
+        probe_id = f"distro-probe-{uuid4().hex[:12]}"
+        oci_spec: dict[str, Any] = {"env": {}, "labels": {}, "mounts": []}
+        await self._runtime.create_container(
+            probe_id, image_ref=canonical, command=["ldd", "--version"], oci_spec=oci_spec
         )
+        try:
+            await self._runtime.start_container(probe_id)
+            for _ in range(50):  # up to ~10s for the trivial command to exit
+                if await self._runtime.container_status(probe_id) in (None, "stopped"):
+                    break
+                await asyncio.sleep(0.2)
+            output = container_log_path(probe_id).read_text(errors="replace")
+        finally:
+            await self._runtime.remove_container(probe_id)
+        first_line = output.splitlines()[0] if output.strip() else ""
+        if m := LDD_GLIBC_REGEX.search(first_line):
+            version = float(m.group(1))
+            if version in known_glibc_distros:
+                return known_glibc_distros[version]
+            for idx, known_version in enumerate(known_glibc_distros.keys()):
+                if version < known_version:
+                    return list(known_glibc_distros.values())[idx - 1]
+            return list(known_glibc_distros.values())[-1]
+        if LDD_MUSL_REGEX.search(first_line):
+            return "alpine3.8"
+        raise ImageNotAvailable(f"cannot determine the C library variant of {canonical}")
 
     @override
     def get_cgroup_path(self, controller: str, container_id: str) -> Path:
