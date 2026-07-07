@@ -66,8 +66,8 @@ def project_search(project_id: str, limit: int, offset: int) -> None:
     help="Usage mode of the vfolder.",
 )
 @click.option(
-    "--group",
-    "group_id",
+    "--project",
+    "project_id",
     default=None,
     type=click.UUID,
     help="Project UUID. Mutually exclusive with --owner-id.",
@@ -80,13 +80,13 @@ def project_search(project_id: str, limit: int, offset: int) -> None:
     type=click.UUID,
     help=(
         "Delegated owner user UUID. Create the vfolder on behalf of this user. "
-        "Mutually exclusive with --group (delegation applies to user-owned vfolders only)."
+        "Mutually exclusive with --project (delegation applies to user-owned vfolders only)."
     ),
 )
 def create(
     name: str,
     usage_mode: str,
-    group_id: UUID | None,
+    project_id: UUID | None,
     host: str | None,
     cloneable: bool,
     owner_id: UUID | None,
@@ -97,16 +97,16 @@ def create(
     from ai.backend.common.dto.manager.v2.vfolder.types import VFolderUsageMode
     from ai.backend.common.identifier.user import UserID
 
-    if group_id is not None and owner_id is not None:
+    if project_id is not None and owner_id is not None:
         raise click.UsageError(
-            "--owner-id cannot be combined with --group; "
-            "omit --group to create a vfolder on behalf of a user."
+            "--owner-id cannot be combined with --project; "
+            "omit --project to create a vfolder on behalf of a user."
         )
 
     input_dto = CreateVFolderInput(
         name=name,
         usage_mode=VFolderUsageMode(usage_mode),
-        project_id=group_id,
+        project_id=project_id,
         host=host,
         cloneable=cloneable,
         owner_id=UserID(owner_id) if owner_id is not None else None,
