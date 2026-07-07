@@ -3755,6 +3755,20 @@
             ],
             "default": null,
             "description": "Initial revision configuration. If omitted, deployment is created without a revision and must be added later via add_revision."
+          },
+          "owner_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Delegated owner user UUID. When set, the deployment is created on behalf of the specified user (that user becomes the created_user / session_owner). Caller must have permission to act on behalf of the target user.",
+            "title": "Owner Id"
           }
         },
         "required": [
