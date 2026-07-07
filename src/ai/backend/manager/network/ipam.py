@@ -12,6 +12,7 @@ import json
 from typing import TYPE_CHECKING
 from urllib.parse import quote
 
+from ai.backend.common.network.keys import endpoint_key, session_ipam_key
 from ai.backend.manager.errors.network import NetworkPoolExhausted, VNIPoolExhausted
 
 if TYPE_CHECKING:
@@ -23,6 +24,19 @@ DEFAULT_VNI_RANGE = (4096, 16777215)
 
 _ALLOCATED_PREFIX = "network/ipam/allocated"
 _VNI_PREFIX = "network/ipam/vni"
+
+
+def _prefix_for_hosts(host_count: int, *, default_prefixlen: int, floor_prefixlen: int) -> int:
+    """Smallest block (largest prefix) that holds ``host_count`` usable addresses.
+
+    A fixed ``/24`` caps a session at 254 endpoints; a larger cluster needs a bigger
+    block. Starts at ``default_prefixlen`` (``/24``) and widens (lowers the prefix) until
+    the block is big enough, bounded by ``floor_prefixlen`` (the pool's own prefix).
+    """
+    prefixlen = default_prefixlen
+    while prefixlen > floor_prefixlen and ((1 << (32 - prefixlen)) - 2) < max(host_count, 1):
+        prefixlen -= 1
+    return prefixlen
 
 
 class SubnetAllocator:
@@ -43,14 +57,23 @@ class SubnetAllocator:
         self._pool = pool
         self._block_prefixlen = block_prefixlen
 
-    async def acquire(self, session_id: str) -> str:
-        """Claim the first free block via CAS and return its CIDR.
+    async def acquire(self, session_id: str, *, host_count: int = 1) -> str:
+        """Claim the first free block sized for ``host_count`` endpoints, via CAS.
+
+        The block prefix is chosen so the session subnet can hold every endpoint of the
+        cluster (``host_count`` = total containers), removing the fixed-``/24`` 254-endpoint
+        ceiling. ``host_count=1`` yields the default ``/24``.
 
         Raises:
-            NetworkPoolExhausted: every block in the pool is already allocated.
+            NetworkPoolExhausted: no free block of the required size remains.
         """
         pool = ipaddress.ip_network(self._pool)
-        for candidate in pool.subnets(new_prefix=self._block_prefixlen):
+        prefixlen = _prefix_for_hosts(
+            host_count,
+            default_prefixlen=self._block_prefixlen,
+            floor_prefixlen=pool.prefixlen,
+        )
+        for candidate in pool.subnets(new_prefix=prefixlen):
             cidr = str(candidate)
             claimed = await self._etcd.put_if_absent(
                 f"{_ALLOCATED_PREFIX}/{quote(cidr, safe='')}",
@@ -62,6 +85,69 @@ class SubnetAllocator:
 
     async def release(self, subnet: str) -> None:
         await self._etcd.delete(f"{_ALLOCATED_PREFIX}/{quote(subnet, safe='')}")
+
+
+def mac_for_ip(ip: str) -> str:
+    """Derive a stable, locally-administered unicast MAC from an IPv4 address.
+
+    Uses the ``02:42:`` prefix (locally-administered, unicast — the same convention
+    Docker uses) followed by the four IPv4 octets, so the MAC is unique per endpoint IP
+    and deterministic (both the CNI attach and the peers' ARP tables agree without a
+    round-trip)."""
+    octets = ipaddress.IPv4Address(ip).packed
+    return "02:42:" + ":".join(f"{b:02x}" for b in octets)
+
+
+class EndpointAllocator:
+    """Assigns a per-endpoint overlay ``{ip, mac}`` centrally, via etcd CAS.
+
+    Central assignment (vs per-node host-local IPAM) is what guarantees disjoint IPs
+    across nodes on a stretched overlay subnet; the written ``endpoints/`` table is also
+    the input the agent coordinator uses to program FDB/ARP proactively. See
+    proposals/BEP-1055/control-plane.md.
+    """
+
+    _etcd: AsyncEtcd
+
+    def __init__(self, etcd: AsyncEtcd) -> None:
+        self._etcd = etcd
+
+    async def assign(
+        self, session_id: str, container_id: str, subnet: str, *, agent_id: str
+    ) -> tuple[str, str]:
+        """Claim the first free host IP in ``subnet`` for ``container_id`` (placed on
+        ``agent_id``) and record the endpoint. Returns ``(ip, mac)``.
+
+        ``agent_id`` is stored so a peer coordinator can resolve the endpoint's VTEP and
+        skip its own local endpoints when programming FDB/ARP.
+
+        Raises:
+            NetworkPoolExhausted: the session subnet has no free host address.
+        """
+        for host in ipaddress.ip_network(subnet).hosts():
+            ip = str(host)
+            claimed = await self._etcd.put_if_absent(
+                session_ipam_key(session_id, ip),
+                json.dumps({"container_id": container_id}),
+            )
+            if not claimed:
+                continue
+            mac = mac_for_ip(ip)
+            await self._etcd.put(
+                endpoint_key(session_id, container_id),
+                json.dumps({
+                    "ip": ip,
+                    "mac": mac,
+                    "agent_id": agent_id,
+                    "container_id": container_id,
+                }),
+            )
+            return ip, mac
+        raise NetworkPoolExhausted()
+
+    async def release(self, session_id: str, container_id: str, ip: str) -> None:
+        await self._etcd.delete(session_ipam_key(session_id, ip))
+        await self._etcd.delete(endpoint_key(session_id, container_id))
 
 
 class VNIAllocator:

@@ -380,6 +380,8 @@ class SessionLauncher:
                         "agent_addr": k.agent_addr or "",
                         "scaling_group": k.scaling_group,
                         "endpoint_id": None,  # For inference endpoints
+                        # BEP-1055: manager-assigned overlay IP (multi-node), else None.
+                        "cluster_network_ip": network_setup.endpoint_ips.get(kernel_id_str),
                     }
                     kernel_configs.append(kernel_config)
 
@@ -465,6 +467,7 @@ class SessionLauncher:
         network_name: str | None = None
         network_config: dict[str, Any] = {}
         cluster_ssh_port_mapping: ClusterSSHPortMapping | None = None
+        endpoint_ips: dict[str, str] = {}
 
         network_type = session.network_type or NetworkType.VOLATILE
 
@@ -518,18 +521,28 @@ class SessionLauncher:
                 member_agents = sorted({
                     str(kernel.agent_id) for kernel in session.kernels if kernel.agent_id
                 })
-                forced_backend = (
-                    self._config_provider.config.network.inter_container.forced_backend
-                )
+                forced_backend = self._config_provider.config.network.inter_container.forced_backend
+                # One endpoint per kernel; the manager assigns each a disjoint overlay IP
+                # (BEP-1055 central IPAM). container_id == kernel_id (the agent keys its
+                # endpoint/CNI on the kernel id).
+                endpoints = [
+                    {"container_id": str(kernel.kernel_id), "agent_id": str(kernel.agent_id)}
+                    for kernel in session.kernels
+                    if kernel.agent_id
+                ]
                 try:
                     network_info = await network_plugin.create_network(
                         identifier=str(session.session_id),
                         options={
                             "member_agents": member_agents,
                             "forced_backend": forced_backend,
+                            "endpoints": endpoints,
                         },
                     )
                     network_config = dict(network_info.options)
+                    # endpoint_ips is a launcher-only side channel (per-kernel), not part of
+                    # the cluster-wide network_config broadcast to every agent.
+                    endpoint_ips = dict(network_config.pop("endpoint_ips", {}))
                     network_name = network_info.network_id
                 except Exception:
                     log.exception(
@@ -571,6 +584,7 @@ class SessionLauncher:
             network_name=network_name,
             network_config=network_config,
             cluster_ssh_port_mapping=cluster_ssh_port_mapping,
+            endpoint_ips=endpoint_ips,
         )
 
     async def _create_cluster_ssh_keypair(self) -> ClusterSSHKeyPair:

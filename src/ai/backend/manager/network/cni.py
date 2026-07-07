@@ -16,9 +16,21 @@ from typing import Any
 
 from ai.backend.common.configs.etcd import EtcdConfig
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
-from ai.backend.common.network.types import NetworkBackendKind
+from ai.backend.common.network.keys import (
+    agent_backend_key,
+    agent_caps_key,
+    agent_vtep_key,
+    member_key,
+    session_meta_key,
+    session_prefix,
+)
+from ai.backend.common.network.types import Member, NetworkBackendKind
 from ai.backend.manager.errors.network import NetworkBackendMismatch
-from ai.backend.manager.network.ipam import SubnetAllocator, VNIAllocator
+from ai.backend.manager.network.ipam import (
+    EndpointAllocator,
+    SubnetAllocator,
+    VNIAllocator,
+)
 from ai.backend.manager.plugin.network import AbstractNetworkManagerPlugin, NetworkInfo
 
 _DEFAULT_MTU = 1500
@@ -27,16 +39,13 @@ _DEFAULT_MTU = 1500
 _CNI_COMPATIBLE_BACKENDS = frozenset({"containerd"})
 
 
-def _session_meta_key(session_id: str) -> str:
-    return f"network/session/{session_id}/meta"
-
-
 class CNINetworkPlugin(AbstractNetworkManagerPlugin):
     """Control-plane plugin for the runtime-neutral cluster network (BEP-1055)."""
 
     _etcd: AsyncEtcd | None
     _subnet_allocator: SubnetAllocator
     _vni_allocator: VNIAllocator
+    _endpoint_allocator: EndpointAllocator
     _forced_backend: NetworkBackendKind | None
 
     def __init__(self, plugin_config: Mapping[str, Any], local_config: Mapping[str, Any]) -> None:
@@ -55,6 +64,7 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         await self._etcd.open()
         self._subnet_allocator = SubnetAllocator(self._etcd)
         self._vni_allocator = VNIAllocator(self._etcd)
+        self._endpoint_allocator = EndpointAllocator(self._etcd)
 
     async def cleanup(self) -> None:
         if self._etcd is not None:
@@ -78,10 +88,14 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         member_agents = list(options.get("member_agents", []))
         forced_raw = options.get("forced_backend")
         forced_backend = NetworkBackendKind(forced_raw) if forced_raw else None
+        # Each endpoint = one container: {"container_id", "agent_id"}. The manager assigns
+        # its overlay IP centrally (BEP-1055) so per-node IPs are disjoint.
+        endpoints = list(options.get("endpoints", []))
 
         await self._require_members_cni_capable(member_agents)
         backend = await self._select_backend(member_agents, forced_backend)
-        subnet = await self._subnet_allocator.acquire(session_id)
+        # Size the session subnet to hold every endpoint (removes the fixed-/24 254 cap).
+        subnet = await self._subnet_allocator.acquire(session_id, host_count=max(len(endpoints), 1))
         vni = (
             await self._vni_allocator.acquire(session_id)
             if backend is NetworkBackendKind.VXLAN
@@ -95,21 +109,50 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
             "backend": str(backend),
             "mtu": mtu,
         }
-        await etcd.put(
-            _session_meta_key(session_id), json.dumps(meta), scope=ConfigScopes.GLOBAL
-        )
-        return NetworkInfo(network_id=session_id, options=meta)
+        await etcd.put(session_meta_key(session_id), json.dumps(meta), scope=ConfigScopes.GLOBAL)
+        # Assign each endpoint a disjoint overlay IP and record it under endpoints/ (the
+        # coordinator programs FDB/ARP from there). Returned map is threaded per-kernel by
+        # the launcher into KernelCreationConfig["cluster_network_ip"].
+        endpoint_ips: dict[str, str] = {}
+        for endpoint in endpoints:
+            container_id = str(endpoint["container_id"])
+            ip, _mac = await self._endpoint_allocator.assign(
+                session_id, container_id, subnet, agent_id=str(endpoint["agent_id"])
+            )
+            endpoint_ips[container_id] = ip
+        # Pre-seed the membership table so each agent's reconcile-at-start finds every
+        # peer's VTEP already present, instead of racing the etcd watch that delivers a
+        # peer's self-published member (which can lag a fast worker's cross-node startup).
+        # VXLAN only: the member's tunnel endpoint is the agent's published VTEP. Agents
+        # whose VTEP is not yet published are skipped — they fall back to self-publish +
+        # watch convergence (no regression).
+        if backend is NetworkBackendKind.VXLAN:
+            await self._preseed_members(session_id, member_agents)
+        return NetworkInfo(network_id=session_id, options={**meta, "endpoint_ips": endpoint_ips})
+
+    async def _preseed_members(self, session_id: str, member_agents: list[str]) -> None:
+        etcd = self._require_etcd()
+        for agent_id in member_agents:
+            vtep = await etcd.get(agent_vtep_key(agent_id), scope=ConfigScopes.GLOBAL)
+            if not vtep:
+                continue
+            member = Member(agent_id=agent_id, host_ip=vtep, vtep_ip=vtep)
+            await etcd.put(
+                member_key(session_id, agent_id),
+                json.dumps(member.to_etcd_payload()),
+                scope=ConfigScopes.GLOBAL,
+            )
 
     async def destroy_network(self, network_id: str) -> None:
         etcd = self._require_etcd()
-        raw = await etcd.get(_session_meta_key(network_id), scope=ConfigScopes.GLOBAL)
+        raw = await etcd.get(session_meta_key(network_id), scope=ConfigScopes.GLOBAL)
         if raw is not None:
             meta = json.loads(raw)
             if subnet := meta.get("subnet"):
                 await self._subnet_allocator.release(subnet)
             if (vni := meta.get("vni")) is not None:
                 await self._vni_allocator.release(int(vni))
-        await etcd.delete_prefix(f"network/session/{network_id}", scope=ConfigScopes.GLOBAL)
+        await etcd.delete_prefix(session_prefix(network_id).rstrip("/"), scope=ConfigScopes.GLOBAL)
 
     async def _require_members_cni_capable(self, member_agents: list[str]) -> None:
         """Enforce the deployment invariant that all member agents can serve the 'cni'
@@ -122,9 +165,7 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         """
         etcd = self._require_etcd()
         for agent_id in member_agents:
-            backend = await etcd.get(
-                f"network/agent/{agent_id}/backend", scope=ConfigScopes.GLOBAL
-            )
+            backend = await etcd.get(agent_backend_key(agent_id), scope=ConfigScopes.GLOBAL)
             if backend is not None and backend not in _CNI_COMPATIBLE_BACKENDS:
                 raise NetworkBackendMismatch(
                     f"agent '{agent_id}' runs the '{backend}' backend, which cannot serve the "
@@ -144,7 +185,7 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
             return NetworkBackendKind.VXLAN
         etcd = self._require_etcd()
         for agent_id in member_agents:
-            raw = await etcd.get(f"network/agent/{agent_id}/caps", scope=ConfigScopes.GLOBAL)
+            raw = await etcd.get(agent_caps_key(agent_id), scope=ConfigScopes.GLOBAL)
             if raw is None:
                 return NetworkBackendKind.VXLAN
             caps = json.loads(raw)
