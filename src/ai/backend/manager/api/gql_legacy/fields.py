@@ -5,11 +5,11 @@ from typing import (
 import graphene
 import graphql
 
+from ai.backend.manager.data.permission.permission_defs import AgentPermission
 from ai.backend.manager.models.rbac import (
     ScopeType,
     deserialize_scope,
 )
-from ai.backend.manager.models.rbac.permission_defs import AgentPermission
 
 
 class ScopeField(graphene.Scalar):  # type: ignore[misc]

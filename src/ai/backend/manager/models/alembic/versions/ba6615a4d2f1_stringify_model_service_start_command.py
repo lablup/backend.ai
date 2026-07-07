@@ -32,6 +32,10 @@ def _stringify_model_definition(conn: Connection, table: str, column: str) -> No
     ).fetchall()
 
     for row_id, model_definition in rows:
+        # The IS NOT NULL filter only excludes SQL NULL; a JSONB column can still
+        # hold a JSON ``null`` (or any non-object value) that decodes to a non-dict.
+        if not isinstance(model_definition, dict):
+            continue
         changed = False
         models = model_definition.get("models") or []
         for model in models:

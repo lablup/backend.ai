@@ -60,3 +60,18 @@ class ManagerConnectionUnavailable(BackendAIError, web.HTTPServiceUnavailable):
             operation=ErrorOperation.REQUEST,
             error_detail=ErrorDetail.UNAVAILABLE,
         )
+
+
+class UnexpectedAuthResponseError(BackendAIError, web.HTTPInternalServerError):
+    """Raised when the Manager returns an unrecognized authorization response type."""
+
+    error_type = "https://api.backend.ai/probs/webserver/unexpected-auth-response"
+    error_title = "Unexpected authorization response from the Manager."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.API,
+            operation=ErrorOperation.AUTH,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )

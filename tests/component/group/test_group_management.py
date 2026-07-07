@@ -36,7 +36,7 @@ from ai.backend.common.dto.manager.group.types import GroupOrder, GroupOrderFiel
 from ai.backend.common.dto.manager.infra.request import UsagePerPeriodRequest
 from ai.backend.common.dto.manager.infra.response import UsagePerPeriodResponse
 from ai.backend.common.dto.manager.query import StringFilter
-from ai.backend.common.identifier.resource_group import ResourceGroupName
+from ai.backend.common.identifier.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.types import (
     QuotaScopeID,
     QuotaScopeType,
@@ -84,6 +84,7 @@ async def group_with_vfolder_mounted(
     db_engine: SAEngine,
     domain_fixture: DomainFixtureData,
     scaling_group_name: ResourceGroupName,
+    scaling_group_id: ResourceGroupID,
     resource_policy_fixture: str,
     regular_user_fixture: Any,
 ) -> AsyncIterator[uuid.UUID]:
@@ -130,9 +131,11 @@ async def group_with_vfolder_mounted(
                 cluster_size=1,
                 cluster_mode="single-node",
                 domain_name=domain_fixture.domain_name,
+                domain_id=domain_fixture.domain_id,
                 group_id=group_id,
                 user_uuid=user_uuid,
                 scaling_group_name=scaling_group_name,
+                resource_group_id=scaling_group_id,
                 status=SessionStatus.RUNNING,
                 occupying_slots=ResourceSlot(),
                 requested_slots=ResourceSlot(),
@@ -155,6 +158,7 @@ async def group_with_vfolder_mounted(
                 user_uuid=user_uuid,
                 domain_name=domain_fixture.domain_name,
                 scaling_group=scaling_group_name,
+                resource_group_id=scaling_group_id,
                 status=KernelStatus.RUNNING,
                 image="python:3.9",
                 occupied_slots=ResourceSlot({}),
@@ -188,6 +192,7 @@ async def group_with_active_kernel(
     db_engine: SAEngine,
     domain_fixture: DomainFixtureData,
     scaling_group_name: ResourceGroupName,
+    scaling_group_id: ResourceGroupID,
     resource_policy_fixture: str,
     regular_user_fixture: Any,
 ) -> AsyncIterator[uuid.UUID]:
@@ -221,9 +226,11 @@ async def group_with_active_kernel(
                 cluster_size=1,
                 cluster_mode="single-node",
                 domain_name=domain_fixture.domain_name,
+                domain_id=domain_fixture.domain_id,
                 group_id=group_id,
                 user_uuid=user_uuid,
                 scaling_group_name=scaling_group_name,
+                resource_group_id=scaling_group_id,
                 status=SessionStatus.RUNNING,
                 occupying_slots=ResourceSlot(),
                 requested_slots=ResourceSlot(),
@@ -246,6 +253,7 @@ async def group_with_active_kernel(
                 user_uuid=user_uuid,
                 domain_name=domain_fixture.domain_name,
                 scaling_group=scaling_group_name,
+                resource_group_id=scaling_group_id,
                 status=KernelStatus.RUNNING,
                 image="python:3.9",
                 occupied_slots=ResourceSlot({}),

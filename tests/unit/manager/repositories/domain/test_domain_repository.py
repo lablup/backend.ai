@@ -424,6 +424,8 @@ class TestDomainRepository:
                 domain_name=domain_name,
                 group_id=group_id,
                 user_uuid=user_uuid,
+                scaling_group=sgroup_name,
+                resource_group_id=sgroup_id,
                 cluster_role="main",
                 status=KernelStatus.RUNNING,
                 occupied_slots=ResourceSlot(),

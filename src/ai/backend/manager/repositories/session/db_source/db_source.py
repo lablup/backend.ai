@@ -12,9 +12,17 @@ from sqlalchemy.orm.strategy_options import _AbstractLoad
 
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.identifier.session import SessionID
-from ai.backend.common.types import AccessKey, AgentId, ImageAlias, SessionId
+from ai.backend.common.types import (
+    AccessKey,
+    AgentId,
+    ImageAlias,
+    KernelId,
+    ResourceSlot,
+    SessionId,
+)
 from ai.backend.manager.data.image.types import ImageIdentifier, ImageStatus
 from ai.backend.manager.data.kernel.types import KernelListResult
+from ai.backend.manager.data.resource_slot.types import ResourceAllocationAggregate
 from ai.backend.manager.data.session.types import (
     SessionData,
     SessionListResult,
@@ -35,6 +43,7 @@ from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.resource_policy import KeyPairResourcePolicyRow
+from ai.backend.manager.models.resource_slot import ResourceAllocationRow
 from ai.backend.manager.models.scaling_group import scaling_groups
 from ai.backend.manager.models.session import (
     DEAD_SESSION_STATUSES,
@@ -688,6 +697,105 @@ class SessionDBSource:
                 has_next_page=result.has_next_page,
                 has_previous_page=result.has_previous_page,
             )
+
+    @staticmethod
+    def _resource_allocation_aggregates() -> tuple[Any, Any, Any]:
+        """Build the three per-slot aggregate expressions over resource_allocations.
+
+        - requested: SUM(requested)
+        - used: currently occupying (free_at IS NULL), coalesced with requested
+        - allocated: ever actually allocated (used_at IS NOT NULL), persists after free
+        """
+        ra = ResourceAllocationRow.__table__
+        requested_expr = sa.func.sum(ra.c.requested).label("requested")
+        used_expr = (
+            sa.func.sum(sa.func.coalesce(ra.c.used, ra.c.requested))
+            .filter(ra.c.free_at.is_(None))
+            .label("used")
+        )
+        allocated_expr = sa.func.sum(ra.c.used).filter(ra.c.used_at.isnot(None)).label("allocated")
+        return requested_expr, used_expr, allocated_expr
+
+    @staticmethod
+    def _rows_to_aggregates(
+        rows: Sequence[Any], key_attr: str
+    ) -> dict[Any, ResourceAllocationAggregate]:
+        requested: dict[Any, ResourceSlot] = {}
+        used: dict[Any, ResourceSlot] = {}
+        allocated: dict[Any, ResourceSlot] = {}
+        for r in rows:
+            key = getattr(r, key_attr)
+            if r.requested is not None:
+                requested.setdefault(key, ResourceSlot())[r.slot_name] = r.requested
+            if r.used is not None:
+                used.setdefault(key, ResourceSlot())[r.slot_name] = r.used
+            if r.allocated is not None:
+                allocated.setdefault(key, ResourceSlot())[r.slot_name] = r.allocated
+        keys = set(requested) | set(used) | set(allocated)
+        return {
+            key: ResourceAllocationAggregate(
+                requested=requested.get(key, ResourceSlot()),
+                used=used.get(key, ResourceSlot()),
+                allocated=allocated.get(key, ResourceSlot()),
+            )
+            for key in keys
+        }
+
+    async def batch_get_resource_allocation_by_session(
+        self,
+        session_ids: Sequence[SessionId],
+    ) -> dict[SessionId, ResourceAllocationAggregate]:
+        """Aggregate resource_allocations per session (grouped by slot).
+
+        Values are computed live from the resource_allocations table; the deprecated
+        JSONB columns are never read.
+        """
+        if not session_ids:
+            return {}
+        ra = ResourceAllocationRow.__table__
+        kernels = KernelRow.__table__
+        requested_expr, used_expr, allocated_expr = self._resource_allocation_aggregates()
+        stmt = (
+            sa.select(
+                kernels.c.session_id.label("session_id"),
+                ra.c.slot_name,
+                requested_expr,
+                used_expr,
+                allocated_expr,
+            )
+            .select_from(ra.join(kernels, ra.c.kernel_id == kernels.c.id))
+            .where(kernels.c.session_id.in_(session_ids))
+            .group_by(kernels.c.session_id, ra.c.slot_name)
+        )
+        async with self._db.begin_readonly_session() as db_sess:
+            rows = (await db_sess.execute(stmt)).all()
+        aggregates = self._rows_to_aggregates(rows, "session_id")
+        return {SessionId(key): agg for key, agg in aggregates.items()}
+
+    async def batch_get_resource_allocation_by_kernel(
+        self,
+        kernel_ids: Sequence[KernelId],
+    ) -> dict[KernelId, ResourceAllocationAggregate]:
+        """Aggregate resource_allocations per kernel (grouped by slot)."""
+        if not kernel_ids:
+            return {}
+        ra = ResourceAllocationRow.__table__
+        requested_expr, used_expr, allocated_expr = self._resource_allocation_aggregates()
+        stmt = (
+            sa.select(
+                ra.c.kernel_id.label("kernel_id"),
+                ra.c.slot_name,
+                requested_expr,
+                used_expr,
+                allocated_expr,
+            )
+            .where(ra.c.kernel_id.in_(kernel_ids))
+            .group_by(ra.c.kernel_id, ra.c.slot_name)
+        )
+        async with self._db.begin_readonly_session() as db_sess:
+            rows = (await db_sess.execute(stmt)).all()
+        aggregates = self._rows_to_aggregates(rows, "kernel_id")
+        return {KernelId(key): agg for key, agg in aggregates.items()}
 
     async def resolve_image_by_id(
         self,

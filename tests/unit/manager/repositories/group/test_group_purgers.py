@@ -267,6 +267,8 @@ class TestGroupPurgersIntegration:
                     domain_name=sample_domain.domain_name,
                     group_id=sample_group.id,
                     user_uuid=sample_user.uuid,
+                    scaling_group=sess.scaling_group_name,
+                    resource_group_id=sess.resource_group_id,
                     occupied_slots=ResourceSlot({}),
                     requested_slots=ResourceSlot({}),
                     occupied_shares={},

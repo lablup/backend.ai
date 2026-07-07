@@ -24,6 +24,7 @@ from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.domain.types import DomainData
+from ai.backend.manager.data.permission.permission_defs import DomainPermission
 from ai.backend.manager.defs import RESERVED_DOTFILES
 from ai.backend.manager.models.base import (
     GUID,
@@ -44,7 +45,6 @@ from ai.backend.manager.models.rbac import (
     required_permission,
 )
 from ai.backend.manager.models.rbac.context import ClientContext
-from ai.backend.manager.models.rbac.permission_defs import DomainPermission
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.group import GroupRow

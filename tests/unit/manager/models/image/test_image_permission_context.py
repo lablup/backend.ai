@@ -15,6 +15,7 @@ import pytest
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.image.types import ImageStatus, ImageType
+from ai.backend.manager.data.permission.permission_defs import ImagePermission
 
 # ORM cluster registration: configure_mappers() (triggered when this isolated
 # test registers a domain-cluster row) resolves string relationships against the
@@ -34,7 +35,6 @@ from ai.backend.manager.models.image.row import (
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.rbac import ProjectScope
 from ai.backend.manager.models.rbac.context import ClientContext
-from ai.backend.manager.models.rbac.permission_defs import ImagePermission
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,

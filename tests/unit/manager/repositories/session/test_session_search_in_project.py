@@ -277,6 +277,8 @@ class TestSessionSearchInProject:
                         cluster_idx=0,
                         local_rank=0,
                         cluster_hostname="main",
+                        scaling_group="default",
+                        resource_group_id=test_scaling_group_id,
                         image="cr.backend.ai/stable/python:latest",
                         architecture="x86_64",
                         registry="cr.backend.ai",

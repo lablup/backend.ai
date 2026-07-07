@@ -42,6 +42,7 @@ def _build_kernel_values(
     user_uuid: uuid.UUID,
     access_key: str,
     scaling_group: str,
+    resource_group_id: ResourceGroupID,
     now: datetime,
 ) -> dict[str, Any]:
     """Return the common kernel column values shared by all session seed fixtures."""
@@ -57,6 +58,7 @@ def _build_kernel_values(
         user_uuid=user_uuid,
         access_key=access_key,
         scaling_group=scaling_group,
+        resource_group_id=resource_group_id,
         status_info="",
         occupied_slots=ResourceSlot(),
         requested_slots=ResourceSlot(),
@@ -99,6 +101,7 @@ async def degraded_session_seed(
         user_uuid=admin_user_fixture.user_uuid,
         access_key=admin_user_fixture.keypair.access_key,
         scaling_group=scaling_group_name,
+        resource_group_id=scaling_group_id,
         now=now,
     )
 
@@ -200,6 +203,7 @@ async def full_lifecycle_session_seed(
         user_uuid=admin_user_fixture.user_uuid,
         access_key=admin_user_fixture.keypair.access_key,
         scaling_group=scaling_group_name,
+        resource_group_id=scaling_group_id,
         now=now,
     )
 

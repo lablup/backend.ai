@@ -23,6 +23,7 @@ from ai.backend.manager.clients.storage_proxy.session_manager import (
     StorageSessionManager,
     VolumeInfo,
 )  # For compatibility with existing code
+from ai.backend.manager.data.permission.permission_defs import StorageHostPermission
 
 from .rbac import (
     AbstractPermissionContext,
@@ -34,7 +35,6 @@ from .rbac import (
     get_predefined_roles_in_scope,
 )
 from .rbac.context import ClientContext
-from .rbac.permission_defs import StorageHostPermission
 from .resource_policy import KeyPairResourcePolicyRow
 from .user import UserRow
 

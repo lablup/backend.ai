@@ -397,6 +397,7 @@ class TestAggregation:
                     stdin_port=0,
                     stdout_port=0,
                     scaling_group="test-sg",
+                    resource_group_id=resource_group_id,
                     agent=agent_id,
                 )
             )
@@ -778,6 +779,7 @@ class TestComputeActualAgentResourceUsage:
                     stdin_port=0,
                     stdout_port=0,
                     scaling_group="test-sg",
+                    resource_group_id=resource_group_id,
                     agent=agent_id,
                 )
             )
