@@ -80,7 +80,7 @@ async def _make_agent(
 
 
 class TestScalingGroupQueries:
-    """Tests for get_schedulable_scaling_groups / get_all_scaling_groups."""
+    """Tests for get_all_scaling_groups."""
 
     @pytest.fixture
     async def db_with_cleanup(
@@ -137,19 +137,6 @@ class TestScalingGroupQueries:
             schedulable=True,
         )
         return fixture
-
-    async def test_schedulable_query_excludes_unschedulable_agents(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        mixed_agents_scenario: ScalingGroupFixture,
-    ) -> None:
-        db_source = ScheduleDBSource(db_with_cleanup)
-        schedulable = set(await db_source.get_schedulable_scaling_groups())
-
-        assert mixed_agents_scenario.schedulable in schedulable
-        assert mixed_agents_scenario.unschedulable not in schedulable
-        assert mixed_agents_scenario.lost not in schedulable
-        assert mixed_agents_scenario.empty not in schedulable
 
     async def test_all_scaling_groups_query_includes_unschedulable_and_lost_agents(
         self,

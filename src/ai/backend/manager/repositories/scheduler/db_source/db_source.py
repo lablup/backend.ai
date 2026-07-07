@@ -28,7 +28,6 @@ from ai.backend.common import msgpack
 from ai.backend.common.data.permission.types import (
     RBACElementType,
 )
-from ai.backend.common.docker import ImageRef
 from ai.backend.common.identifier.domain import DomainID, DomainName
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.project import ProjectID
@@ -1164,19 +1163,6 @@ class ScheduleDBSource:
 
         return force_terminated_sessions
 
-    async def get_schedulable_scaling_groups(self) -> list[str]:
-        """Get list of scaling groups that have schedulable agents."""
-        async with self._begin_readonly_session_read_committed() as session:
-            query = (
-                sa.select(AgentRow.scaling_group)
-                .where(
-                    sa.and_(AgentRow.status == AgentStatus.ALIVE, AgentRow.schedulable == sa.true())
-                )
-                .group_by(AgentRow.scaling_group)
-            )
-            result = await session.execute(query)
-            return [row.scaling_group for row in result.fetchall()]
-
     async def get_all_scaling_groups(self) -> list[str]:
         """Get all defined scaling groups."""
         async with self._begin_readonly_session_read_committed() as session:
@@ -1789,63 +1775,6 @@ class ScheduleDBSource:
         if domain_id is None:
             raise DomainNotFound(name)
         return DomainID(domain_id)
-
-    async def _get_scaling_group_network_info(
-        self, db_sess: SASession, scaling_group_name: str
-    ) -> ScalingGroupNetworkInfo:
-        """
-        Get network configuration from scaling group.
-
-        Args:
-            db_sess: Database session
-            scaling_group_name: Name of the scaling group
-
-        Returns:
-            ScalingGroupNetworkInfo with network configuration
-        """
-        query = sa.select(
-            ScalingGroupRow.use_host_network,
-            ScalingGroupRow.wsproxy_addr,
-        ).where(ScalingGroupRow.name == scaling_group_name)
-
-        result = await db_sess.execute(query)
-        row = result.one_or_none()
-
-        if not row:
-            raise ScalingGroupNotFound(f"Scaling group {scaling_group_name} not found")
-
-        return ScalingGroupNetworkInfo(
-            use_host_network=row.use_host_network,
-            wsproxy_addr=row.wsproxy_addr,
-        )
-
-    async def _resolve_image_info(
-        self, db_sess: SASession, image_refs: list[ImageRef]
-    ) -> dict[str, ImageInfo]:
-        """
-        Resolve image references to image information.
-
-        Args:
-            db_sess: Database session
-            image_refs: List of ImageRef objects to resolve
-
-        Returns:
-            Dictionary mapping image canonical reference to ImageInfo
-        """
-        image_infos = {}
-        for image_ref in image_refs:
-            # Use the ImageRef object directly
-            image_row = await ImageRow.resolve(db_sess, [image_ref])
-            if image_row:
-                image_infos[image_ref.canonical] = ImageInfo(
-                    id=image_row.id,
-                    canonical=image_row.name,  # 'name' is the canonical reference in ImageRow
-                    architecture=image_row.architecture,
-                    registry=image_row.registry,
-                    labels=image_row.labels,
-                    resource_spec=cast(dict[str, Any], image_row.resources),  # Cast to match type
-                )
-        return image_infos
 
     async def _fetch_vfolder_mounts(
         self,
