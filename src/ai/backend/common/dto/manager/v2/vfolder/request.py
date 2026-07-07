@@ -12,6 +12,7 @@ from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter
 from ai.backend.common.dto.manager.v2.deployment.request import DeploymentStrategyInput
 from ai.backend.common.identifier.deployment_preset import DeploymentPresetID
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.typed_validators import VFolderName
 
 from .types import (
@@ -45,6 +46,7 @@ __all__ = (
     "PurgeVFolderOptions",
     "RenameFileInput",
     "RestoreVFolderInput",
+    "RestoreVFolderQuery",
     "ShareVFolderInput",
     "UnshareVFolderInput",
     "UpdateVFolderInput",
@@ -198,6 +200,18 @@ class RestoreVFolderInput(BaseRequestModel):
     """Input for restoring a virtual folder from trash."""
 
     id: UUID = Field(description="VFolder ID to restore")
+
+
+class RestoreVFolderQuery(BaseRequestModel):
+    """Query parameters for the vfolder restore operation."""
+
+    owner_id: UserID | None = Field(
+        default=None,
+        description=(
+            "Delegated owner user UUID. When set, the vfolder is restored on behalf of "
+            "the specified user instead of the caller."
+        ),
+    )
 
 
 class CloneVFolderInput(BaseRequestModel):

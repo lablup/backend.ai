@@ -39,6 +39,7 @@ from ai.backend.common.dto.manager.v2.vfolder.response import (
     SearchVFoldersPayload,
     VFolderNode,
 )
+from ai.backend.common.identifier.user import UserID
 
 _PATH = "/v2/vfolders"
 
@@ -149,12 +150,16 @@ class V2VFolderClient(BaseDomainClient):
             response_model=PurgeVFolderPayload,
         )
 
-    async def restore(self, vfolder_id: UUID) -> RestoreVFolderPayload:
-        """Restore a trashed vfolder."""
+    async def restore(
+        self, vfolder_id: UUID, owner_id: UserID | None = None
+    ) -> RestoreVFolderPayload:
+        """Restore a trashed vfolder, optionally on behalf of ``owner_id``."""
+        params = {"owner_id": str(owner_id)} if owner_id is not None else None
         return await self._client.typed_request(
             "POST",
             f"{_PATH}/{vfolder_id}/restore",
             response_model=RestoreVFolderPayload,
+            params=params,
         )
 
     async def deploy(

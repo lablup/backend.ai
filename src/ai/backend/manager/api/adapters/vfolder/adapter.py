@@ -58,6 +58,7 @@ from ai.backend.common.dto.manager.v2.vfolder.types import (
     VFolderUsageInfo as VFolderUsageInfoDTO,
 )
 from ai.backend.common.exception import BackendAIError, UnreachableError
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import BinarySize, MountPermission, VFolderUsageMode
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
@@ -440,13 +441,20 @@ class VFolderAdapter(BaseAdapter):
         await self._processors.vfolder.delete_v2.wait_for_complete(action)
         return DeleteVFolderPayload(id=vfolder_id)
 
-    async def restore(self, vfolder_id: UUID) -> RestoreVFolderPayload:
-        """Restore a trashed vfolder. RBAC enforced."""
+    async def restore(
+        self, vfolder_id: UUID, owner_id: UserID | None = None
+    ) -> RestoreVFolderPayload:
+        """Restore a trashed vfolder. RBAC enforced.
+
+        When ``owner_id`` is set, the vfolder is restored on behalf of that user
+        (the restore is validated against the owner's ownership). RBAC still
+        authorizes the caller against the target vfolder.
+        """
         me = current_user()
         if me is None:
             raise UnreachableError("User context is not available")
         action = RestoreVFolderFromTrashAction(
-            user_uuid=me.user_id,
+            user_uuid=owner_id if owner_id is not None else me.user_id,
             vfolder_uuid=vfolder_id,
         )
         await self._processors.vfolder.restore_vfolder_from_trash.wait_for_complete(action)
