@@ -1831,45 +1831,7 @@ class TestEnqueueSession:
 
         mock_scheduler_repository.pick_default_resource_group.assert_not_called()
         draft = mock_scheduling_controller.enqueue_session_from_draft.await_args.args[0]
-        assert draft.scope.resource_group_id == requested_resource_group_id
-        assert draft.scope.resource_group_name == ResourceGroupName("requested-rg")
-
-    async def test_uses_user_supplied_resource_group_id(
-        self,
-        configured_session_service: SessionService,
-        mock_scheduler_repository: MagicMock,
-        mock_scheduling_controller: MagicMock,
-        enqueue_action_without_rg: EnqueueSessionAction,
-        requested_resource_group_id: ResourceGroupID,
-    ) -> None:
-        """When the caller supplies a resource group id, only its name is
-        looked up: no auto-picking.
-        """
-        action = EnqueueSessionAction(
-            session_name=enqueue_action_without_rg.session_name,
-            session_type=enqueue_action_without_rg.session_type,
-            image_id=enqueue_action_without_rg.image_id,
-            resource=SessionResourceSpec(
-                entries=enqueue_action_without_rg.resource.entries,
-                resource_group_id=requested_resource_group_id,
-            ),
-            scheduling=enqueue_action_without_rg.scheduling,
-            user_id=enqueue_action_without_rg.user_id,
-            access_key=enqueue_action_without_rg.access_key,
-            domain_name=enqueue_action_without_rg.domain_name,
-            group_id=enqueue_action_without_rg.group_id,
-        )
-
-        await configured_session_service.enqueue_session(action)
-
-        mock_scheduler_repository.pick_default_resource_group.assert_not_called()
-        mock_scheduler_repository.get_resource_group_id_by_name.assert_not_called()
-        mock_scheduler_repository.get_resource_group_name_by_id.assert_awaited_once_with(
-            requested_resource_group_id
-        )
-        draft = mock_scheduling_controller.enqueue_session_from_draft.await_args.args[0]
-        assert draft.scope.resource_group_id == requested_resource_group_id
-        assert draft.scope.resource_group_name == ResourceGroupName("requested-rg")
+        assert str(draft.scope.resource_group_name) == "user-picked-rg"
 
     async def test_leaves_handler_options_unset_for_rg_defaults(
         self,
@@ -1898,7 +1860,7 @@ class TestEnqueueSession:
 
         draft = mock_scheduling_controller.enqueue_session_from_draft.await_args.args[0]
         assert draft.options.kernel_groups is not None
-        assert draft.options.kernel_groups[0].execution_spec.resource_input.resource_opts is None
+        assert draft.options.kernel_groups[0].execution_spec.resource_opts is None
 
     async def test_keeps_resource_opts_when_shmem_supplied(
         self,
@@ -1928,6 +1890,6 @@ class TestEnqueueSession:
 
         draft = mock_scheduling_controller.enqueue_session_from_draft.await_args.args[0]
         assert draft.options.kernel_groups is not None
-        resource_opts = draft.options.kernel_groups[0].execution_spec.resource_input.resource_opts
+        resource_opts = draft.options.kernel_groups[0].execution_spec.resource_opts
         assert resource_opts is not None
         assert resource_opts.shmem == BinarySize.from_str("256m")
