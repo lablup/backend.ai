@@ -16,7 +16,7 @@ from ai.backend.manager.data.reconciler.types import (
 )
 from ai.backend.manager.data.session.options import HandlerPolicyResolver
 from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.repositories.idle_checker.types import IdleCheckBatchData
+from ai.backend.manager.sokovan.idle_check.checkers.base import IdleChecker, IdleCheckerState
 from ai.backend.manager.sokovan.reconciler.base import (
     BaseReconcilerInfo,
     BaseReconcilerKind,
@@ -39,14 +39,33 @@ class IdleCheckTargetStatuses(BaseReconcilerTargetStatuses):
     session_statuses: frozenset[SessionStatus]
 
 
+@dataclass(frozen=True)
+class PreparedChecker:
+    """A checker paired with the state it prepared for one definition."""
+
+    checker: IdleChecker
+    state: IdleCheckerState
+
+    def check_idle(self, session_id: SessionId) -> bool:
+        return self.checker.check_idle(session_id, self.state)
+
+
+@dataclass(frozen=True)
+class PreparedTarget:
+    """One session and its judgment-ready checkers, in resolved order."""
+
+    session_id: SessionId
+    checkers: Sequence[PreparedChecker]
+
+
 @dataclass
 class IdleCheckReconcileInfo(BaseReconcilerInfo):
-    batch: IdleCheckBatchData
+    targets: Sequence[PreparedTarget]
     current_time: datetime
 
     @override
     def entity_ids(self) -> Sequence[UUID]:
-        return [target.session.session_id for target in self.batch.targets]
+        return [target.session_id for target in self.targets]
 
     @override
     def now(self) -> datetime:
