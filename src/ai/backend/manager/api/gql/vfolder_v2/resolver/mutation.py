@@ -10,6 +10,7 @@ from ai.backend.common.dto.manager.v2.vfolder.request import (
     PurgeVFolderInput,
     PurgeVFolderOptions,
 )
+from ai.backend.common.identifier.user import UserID
 from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_mutation
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.vfolder_v2.types.mutations import (
@@ -81,11 +82,15 @@ async def purge_vfolder_v2(
     info: Info[StrawberryGQLContext],
     vfolder_id: UUID,
     options: PurgeVFolderOptionsInputGQL | None = None,
+    owner_id: UUID | None = None,
 ) -> PurgeVFolderPayloadGQL | None:
     options_dto = options.to_pydantic() if options is not None else PurgeVFolderOptions()
     payload = await info.context.adapters.vfolder.purge(
         vfolder_id,
-        PurgeVFolderInput(options=options_dto),
+        PurgeVFolderInput(
+            options=options_dto,
+            owner_id=UserID(owner_id) if owner_id is not None else None,
+        ),
     )
     return PurgeVFolderPayloadGQL.from_pydantic(payload)
 
