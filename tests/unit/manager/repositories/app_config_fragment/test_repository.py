@@ -39,6 +39,7 @@ from ai.backend.manager.repositories.app_config_fragment.updaters import (
 )
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
+    Creator,
     OffsetPagination,
     Purger,
     Updater,
@@ -187,11 +188,13 @@ class TestCreateAndGet:
         self, repository: AppConfigFragmentRepository, theme_registered: None
     ) -> None:
         created = await repository.create(
-            AppConfigFragmentCreatorSpec(
-                config_name="theme",
-                scope_type=AppConfigScopeType.PUBLIC,
-                scope_id="public",
-                config={"theme": "dark"},
+            Creator(
+                spec=AppConfigFragmentCreatorSpec(
+                    config_name="theme",
+                    scope_type=AppConfigScopeType.PUBLIC,
+                    scope_id="public",
+                    config={"theme": "dark"},
+                )
             ),
         )
         fetched = await repository.get_by_id(created.id)
@@ -209,11 +212,13 @@ class TestCreateAndGet:
     ) -> None:
         with pytest.raises(AppConfigFragmentWriteNotAllowed):
             await repository.create(
-                AppConfigFragmentCreatorSpec(
-                    config_name="theme",
-                    scope_type=AppConfigScopeType.PUBLIC,
-                    scope_id="public",
-                    config={"theme": "dark"},
+                Creator(
+                    spec=AppConfigFragmentCreatorSpec(
+                        config_name="theme",
+                        scope_type=AppConfigScopeType.PUBLIC,
+                        scope_id="public",
+                        config={"theme": "dark"},
+                    )
                 ),
             )
 
@@ -224,11 +229,13 @@ class TestCreateAndGet:
     ) -> None:
         with pytest.raises(UniqueConstraintViolationError):
             await repository.create(
-                AppConfigFragmentCreatorSpec(
-                    config_name=domain_scoped_fragment.config_name,
-                    scope_type=domain_scoped_fragment.scope_type,
-                    scope_id=domain_scoped_fragment.scope_id,
-                    config={"k": "v"},
+                Creator(
+                    spec=AppConfigFragmentCreatorSpec(
+                        config_name=domain_scoped_fragment.config_name,
+                        scope_type=domain_scoped_fragment.scope_type,
+                        scope_id=domain_scoped_fragment.scope_id,
+                        config={"k": "v"},
+                    )
                 ),
             )
 

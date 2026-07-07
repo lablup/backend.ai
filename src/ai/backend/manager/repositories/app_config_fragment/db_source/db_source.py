@@ -21,9 +21,6 @@ from ai.backend.manager.errors.app_config import (
 )
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
 from ai.backend.manager.models.scopes import SearchScope
-from ai.backend.manager.repositories.app_config_fragment.creators import (
-    AppConfigFragmentCreatorSpec,
-)
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     Creator,
@@ -64,12 +61,12 @@ class AppConfigFragmentDBSource:
         self._ops = ops_provider
 
     @app_config_fragment_db_source_resilience.apply()
-    async def create(self, spec: AppConfigFragmentCreatorSpec) -> AppConfigFragmentData:
+    async def create(self, creator: Creator[AppConfigFragmentRow]) -> AppConfigFragmentData:
         # The FK to the allow-list is the gate: inserting a fragment with no
         # allow-list row for its ``(config_name, scope_type)`` raises
         # ``AppConfigFragmentWriteNotAllowed`` (see the spec's integrity checks).
         async with self._ops.write_ops() as w:
-            created = await w.create(Creator(spec=spec))
+            created = await w.create(creator)
             return created.row.to_data()
 
     @app_config_fragment_db_source_resilience.apply()
