@@ -12,6 +12,7 @@ import aiohttp
 import pytest
 
 from ai.backend.common.data.permission.types import RBACElementType, ScopeType
+from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.identifier.user import UserID
 from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import (
@@ -492,9 +493,9 @@ class TestCreateVFolderV2Action:
     @staticmethod
     def _make_action(
         *,
-        user_id: uuid.UUID,
+        user_id: UserID,
         owner_id: UserID | None,
-        project_id: uuid.UUID | None = None,
+        project_id: ProjectID | None = None,
     ) -> CreateVFolderV2Action:
         return CreateVFolderV2Action(
             name="test-vfolder",
@@ -509,7 +510,7 @@ class TestCreateVFolderV2Action:
         )
 
     def test_without_owner_targets_caller(self) -> None:
-        caller_id = uuid.uuid4()
+        caller_id = UserID(uuid.uuid4())
         action = self._make_action(user_id=caller_id, owner_id=None)
 
         assert action.scope_id() == str(caller_id)
@@ -518,7 +519,7 @@ class TestCreateVFolderV2Action:
         assert target.element_id == str(caller_id)
 
     def test_with_owner_targets_owner_not_caller(self) -> None:
-        caller_id = uuid.uuid4()
+        caller_id = UserID(uuid.uuid4())
         owner_id = UserID(uuid.uuid4())
         action = self._make_action(user_id=caller_id, owner_id=owner_id)
 
@@ -530,9 +531,9 @@ class TestCreateVFolderV2Action:
         assert target.element_id != str(caller_id)
 
     def test_project_scope_ignores_owner(self) -> None:
-        project_id = uuid.uuid4()
+        project_id = ProjectID(uuid.uuid4())
         action = self._make_action(
-            user_id=uuid.uuid4(), owner_id=UserID(uuid.uuid4()), project_id=project_id
+            user_id=UserID(uuid.uuid4()), owner_id=UserID(uuid.uuid4()), project_id=project_id
         )
 
         # Project-owned vfolders authorize against the project, not a user.
