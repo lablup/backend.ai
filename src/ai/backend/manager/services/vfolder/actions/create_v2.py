@@ -9,12 +9,12 @@ from ai.backend.common.data.permission.types import (
 )
 from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import VFolderUsageMode
-from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.action.scope import BaseScopeAction
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.vfolder.types import VFolderData
 from ai.backend.manager.models.vfolder import VFolderPermission
+from ai.backend.manager.services.vfolder.actions.base import VFolderScopeActionResult
 
 
 @dataclass
@@ -75,9 +75,19 @@ class CreateVFolderV2Action(BaseScopeAction):
 
 
 @dataclass
-class CreateVFolderV2ActionResult(BaseActionResult):
+class CreateVFolderV2ActionResult(VFolderScopeActionResult):
     vfolder: VFolderData
 
     @override
     def entity_id(self) -> str | None:
         return str(self.vfolder.id)
+
+    @override
+    def scope_type(self) -> ScopeType:
+        # The created vfolder is either project-owned or user-owned.
+        return ScopeType.PROJECT if self.vfolder.group is not None else ScopeType.USER
+
+    @override
+    def scope_id(self) -> str:
+        scope_owner = self.vfolder.group if self.vfolder.group is not None else self.vfolder.user
+        return str(scope_owner)
