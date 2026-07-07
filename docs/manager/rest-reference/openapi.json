@@ -48391,6 +48391,25 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "owner_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Delegated owner user UUID. When set, the vfolder is deleted on behalf of the specified user instead of the caller.",
+              "title": "Owner Id"
+            }
           }
         ],
         "description": "Soft-delete a vfolder.\n\n**Preconditions:**\n* User privilege required.\n"
