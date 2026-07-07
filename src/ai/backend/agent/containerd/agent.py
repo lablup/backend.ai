@@ -335,7 +335,17 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         # combine with process_mounts' vfolder mounts and inject them (plus env/labels)
         # into the OCI spec. Container creation is deferred to start_container, where the
         # kernel-runner cmdargs (which the container command must exec) are available.
-        all_mounts = [*resource_spec.mounts, *self._oci_mounts]
+        # resource_spec.mounts (krunner + accelerator) and _oci_mounts (vfolder) can carry
+        # the same intrinsic bind more than once; dedupe by identity so nerdctl's mounts
+        # label stays within its 4 KiB size limit (duplicates only inflate it).
+        seen_mounts: set[tuple[Any, ...]] = set()
+        all_mounts = []
+        for m in (*resource_spec.mounts, *self._oci_mounts):
+            key = (str(m.source), str(m.target), m.permission, m.type)
+            if key in seen_mounts:
+                continue
+            seen_mounts.add(key)
+            all_mounts.append(m)
         self._pending_spec = translate_creation_config(
             self.kernel_config, environ=environ, mounts=all_mounts
         )
