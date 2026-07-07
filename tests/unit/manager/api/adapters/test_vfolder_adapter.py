@@ -11,6 +11,7 @@ import pytest
 
 from ai.backend.common.data.user.types import UserData
 from ai.backend.common.dto.manager.v2.vfolder.request import (
+    PurgeVFolderInput,
     SearchVFoldersInput,
     VFolderFilter,
 )
@@ -334,8 +335,6 @@ class TestVFolderAdapterPurge:
         mock_processors: MagicMock,
     ) -> None:
         """Without owner_id, the action carries no delegated owner."""
-        from ai.backend.common.dto.manager.v2.vfolder.request import PurgeVFolderInput
-
         vfolder_id = uuid4()
         await adapter.purge(vfolder_id, PurgeVFolderInput())
 
@@ -349,8 +348,6 @@ class TestVFolderAdapterPurge:
         mock_processors: MagicMock,
     ) -> None:
         """With owner_id, the action carries the delegated owner."""
-        from ai.backend.common.dto.manager.v2.vfolder.request import PurgeVFolderInput
-
         vfolder_id = uuid4()
         owner_id = UserID(uuid4())
         await adapter.purge(vfolder_id, PurgeVFolderInput(owner_id=owner_id))
