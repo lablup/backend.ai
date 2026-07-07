@@ -4692,6 +4692,9 @@ input CreateVFolderInScopeInput
 
   """Whether the vfolder is cloneable."""
   cloneable: Boolean! = false
+
+  """Delegated owner user UUID. Create the vfolder on behalf of this user."""
+  ownerId: UUID = null
 }
 
 """Added in 26.4.2. Input for creating a new virtual folder."""
