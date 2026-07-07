@@ -19065,6 +19065,12 @@
       "PreemptionConfigInputDTO": {
         "description": "Input for preemption configuration.",
         "properties": {
+          "enabled": {
+            "default": false,
+            "description": "Whether preemption is enabled for this resource group (opt-in).",
+            "title": "Enabled",
+            "type": "boolean"
+          },
           "preemptible_priority": {
             "default": 5,
             "description": "Sessions with priority <= this value are eligible for preemption.",
@@ -19082,6 +19088,13 @@
             "description": "How to preempt sessions (terminate/reschedule).",
             "title": "Mode",
             "type": "string"
+          },
+          "preemption_min_runtime": {
+            "default": 0.0,
+            "description": "Minimum session runtime in seconds before it becomes preemptible (0 = disabled).",
+            "minimum": 0.0,
+            "title": "Preemption Min Runtime",
+            "type": "number"
           }
         },
         "title": "PreemptionConfigInputDTO",
