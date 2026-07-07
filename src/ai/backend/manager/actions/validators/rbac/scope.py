@@ -43,8 +43,7 @@ class ScopeActionRBACValidator(ScopeActionValidator):
             and not user.is_superadmin
         ):
             raise NotEnoughPermission(
-                "Delegating to another user via owner_id requires RBAC "
-                "enforcement to be enabled."
+                "Delegating to another user via owner_id requires RBAC enforcement to be enabled."
             )
 
         if not enforcement_enabled:
