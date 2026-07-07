@@ -34,6 +34,9 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
     DeleteRoleInput as DeleteRoleInputDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.request import (
+    MappedScopeNestedFilter as MappedScopeNestedFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.request import (
     PurgeRoleInput as PurgeRoleInputDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.request import (
@@ -91,6 +94,7 @@ from ai.backend.common.dto.manager.v2.rbac.types import (
 from ai.backend.common.dto.manager.v2.rbac.types import (
     RoleStatusFilter as RoleStatusFilterDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, UUIDFilter, encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -104,7 +108,7 @@ from ai.backend.manager.api.gql.decorators import (
     gql_pydantic_type,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
-from ai.backend.manager.api.gql.rbac.types.scope import ScopeInputGQL
+from ai.backend.manager.api.gql.rbac.types.scope import RBACElementTypeFilterGQL, ScopeInputGQL
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 
 if TYPE_CHECKING:
@@ -532,6 +536,22 @@ class RoleUserNestedFilterGQL(PydanticInputMixin[UserNestedFilterDTO]):
 
 
 @gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter roles by the scope they are mapped (registered) to.",
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="RoleMappedScopeNestedFilter",
+)
+class RoleMappedScopeNestedFilterGQL(PydanticInputMixin[MappedScopeNestedFilterDTO]):
+    scope_type: RBACElementTypeFilterGQL | None = None
+    scope_id: StringFilter | None = None
+
+    AND: list[Self] | None = None
+    OR: list[Self] | None = None
+    NOT: list[Self] | None = None
+
+
+@gql_pydantic_input(
     BackendAIGQLMeta(description="Filter for roles", added_version="26.3.0"),
     name="RoleFilter",
 )
@@ -540,6 +560,7 @@ class RoleFilter(PydanticInputMixin[RoleFilterDTO], GQLFilter):
     source: RoleSourceFilterGQL | None = None
     status: RoleStatusFilterGQL | None = None
     assigned_user: RoleUserNestedFilterGQL | None = None
+    mapped_scope: RoleMappedScopeNestedFilterGQL | None = None
 
     AND: list[Self] | None = None
     OR: list[Self] | None = None
