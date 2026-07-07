@@ -164,14 +164,6 @@ class SchedulerRepository:
         return await self._db_source.mark_sessions_terminating(session_ids, reason, forced=forced)
 
     @scheduler_repository_resilience.apply()
-    async def get_schedulable_scaling_groups(self) -> list[str]:
-        """
-        Get list of scaling groups that have schedulable agents.
-        For sokovan scheduler compatibility.
-        """
-        return await self._db_source.get_schedulable_scaling_groups()
-
-    @scheduler_repository_resilience.apply()
     async def get_all_scaling_groups(self) -> list[str]:
         """Get all defined scaling groups."""
         return await self._db_source.get_all_scaling_groups()

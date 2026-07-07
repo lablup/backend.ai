@@ -1164,19 +1164,6 @@ class ScheduleDBSource:
 
         return force_terminated_sessions
 
-    async def get_schedulable_scaling_groups(self) -> list[str]:
-        """Get list of scaling groups that have schedulable agents."""
-        async with self._begin_readonly_session_read_committed() as session:
-            query = (
-                sa.select(AgentRow.scaling_group)
-                .where(
-                    sa.and_(AgentRow.status == AgentStatus.ALIVE, AgentRow.schedulable == sa.true())
-                )
-                .group_by(AgentRow.scaling_group)
-            )
-            result = await session.execute(query)
-            return [row.scaling_group for row in result.fetchall()]
-
     async def get_all_scaling_groups(self) -> list[str]:
         """Get all defined scaling groups."""
         async with self._begin_readonly_session_read_committed() as session:
