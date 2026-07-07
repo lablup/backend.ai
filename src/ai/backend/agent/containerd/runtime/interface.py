@@ -38,6 +38,19 @@ class TaskHandle:
     pid: int
 
 
+@dataclass(frozen=True)
+class ImageInfo:
+    """Metadata for one locally-stored image, as needed to build the agent's image scan.
+
+    ``labels``/``architecture`` come from the OCI image *config* (not the runtime's image
+    record), which is where kernel-spec/base-distro labels live."""
+
+    name: str
+    digest: str
+    architecture: str
+    labels: Mapping[str, str]
+
+
 class OciRuntime(ABC):
     """Containerd-only lifecycle operations. No network/CNI concerns."""
 
@@ -60,6 +73,11 @@ class OciRuntime(ABC):
 
     @abstractmethod
     async def list_images(self) -> Sequence[str]: ...
+
+    @abstractmethod
+    async def list_image_infos(self) -> Sequence[ImageInfo]:
+        """List locally-stored images with their config labels + architecture (for the
+        agent's image scan). Reads each image's OCI config to surface the labels."""
 
     @abstractmethod
     async def remove_image(self, image_ref: str) -> None: ...

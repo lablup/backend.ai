@@ -5,6 +5,7 @@ from typing import Any, cast
 import pytest
 
 from ai.backend.agent.containerd.agent import ContainerdAgent
+from ai.backend.agent.containerd.runtime.interface import ImageInfo
 from ai.backend.common.docker import LabelName
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.exception import ImageNotAvailable
@@ -103,6 +104,54 @@ class TestResolveImageDistro:
             await agent.resolve_image_distro(image)
 
 
+class _ScanRuntime:
+    def __init__(self, infos: list[Any]) -> None:
+        self._infos = infos
+
+    async def list_image_infos(self) -> list[Any]:
+        return self._infos
+
+
+class TestScanImages:
+    async def test_keeps_only_labeled_bai_kernel_images(self) -> None:
+        infos = [
+            ImageInfo(  # valid kernel image
+                name="cr.backend.ai/stable/python:3.10-ubuntu20.04",
+                digest="sha256:aaa",
+                architecture="amd64",
+                labels={"ai.backend.kernelspec": "1", "ai.backend.base-distro": "ubuntu20.04"},
+            ),
+            ImageInfo(  # no labels -> not a kernel image
+                name="docker.io/library/redis:7",
+                digest="sha256:bbb",
+                architecture="amd64",
+                labels={},
+            ),
+            ImageInfo(  # labeled but kernelspec out of range
+                name="cr.backend.ai/stable/python:3.9",
+                digest="sha256:ccc",
+                architecture="amd64",
+                labels={"ai.backend.kernelspec": "99"},
+            ),
+        ]
+        agent = _agent(FakeFacade())
+        agent._runtime = cast(Any, _ScanRuntime(infos))
+        agent.images = cast(Any, {})
+        result = await agent.scan_images()
+        assert set(result.scanned_images) == {"cr.backend.ai/stable/python:3.10-ubuntu20.04"}
+        info = result.scanned_images["cr.backend.ai/stable/python:3.10-ubuntu20.04"]
+        assert info.digest == "sha256:aaa"
+        assert info.architecture == "x86_64"  # amd64 -> x86_64 alias applied
+
+    async def test_reports_removed_images(self) -> None:
+        agent = _agent(FakeFacade())
+        agent._runtime = cast(Any, _ScanRuntime([]))
+        gone = cast(Any, object())
+        agent.images = cast(Any, {"cr.backend.ai/stable/python:3.10": gone})
+        result = await agent.scan_images()
+        assert set(result.removed_images) == {"cr.backend.ai/stable/python:3.10"}
+
+
 class TestExtractImageCommand:
     async def test_delegates_to_facade_entrypoint(self) -> None:
         agent = _agent(FakeFacade())
@@ -157,12 +206,6 @@ class TestCgroupPath:
 
 
 class TestBootSafe:
-    async def test_scan_images_returns_empty(self) -> None:
-        agent = _agent(FakeFacade())
-        result = await agent.scan_images()
-        assert result.scanned_images == {}
-        assert result.removed_images == {}
-
     async def test_enumerate_containers_empty(self) -> None:
         agent = _agent(FakeFacade())
         assert await agent.enumerate_containers() == []

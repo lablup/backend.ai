@@ -46,7 +46,7 @@ from ai.backend.agent.containerd._grpcapi.api.services.transfer.v1 import (
 )
 from ai.backend.agent.containerd._grpcapi.api.types import mount_pb2
 from ai.backend.agent.containerd._grpcapi.api.types.transfer import imagestore_pb2, registry_pb2
-from ai.backend.agent.containerd.runtime.interface import OciRuntime, TaskHandle
+from ai.backend.agent.containerd.runtime.interface import ImageInfo, OciRuntime, TaskHandle
 from ai.backend.agent.containerd.runtime.spec import build_oci_runtime_spec
 from ai.backend.common.arch import CURRENT_ARCH
 from ai.backend.logging import BraceStyleAdapter
@@ -373,6 +373,26 @@ class ContainerdGrpcRuntime(OciRuntime):
     async def list_images(self) -> Sequence[str]:
         resp = await self._images_stub().List(images_pb2.ListImagesRequest(), metadata=self._md)
         return [img.name for img in resp.images]
+
+    @override
+    async def list_image_infos(self) -> Sequence[ImageInfo]:
+        resp = await self._images_stub().List(images_pb2.ListImagesRequest(), metadata=self._md)
+        infos: list[ImageInfo] = []
+        for img in resp.images:
+            try:
+                _chain, config = await self._resolve_image(img.name)
+            except (grpc.aio.AioRpcError, KeyError, ValueError):
+                continue  # unreadable/foreign image — skip, don't fail the whole scan
+            cfg = config.get("config") or {}
+            infos.append(
+                ImageInfo(
+                    name=img.name,
+                    digest=img.target.digest,
+                    architecture=str(config.get("architecture") or ""),
+                    labels={str(k): str(v) for k, v in (cfg.get("Labels") or {}).items()},
+                )
+            )
+        return infos
 
     @override
     async def remove_image(self, image_ref: str) -> None:

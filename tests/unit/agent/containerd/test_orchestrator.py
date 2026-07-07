@@ -52,6 +52,10 @@ class FakeRuntime(OciRuntime):
         return []
 
     @override
+    async def list_image_infos(self) -> Sequence[Any]:
+        return []
+
+    @override
     async def remove_image(self, image_ref: str) -> None:
         self.calls.append("remove_image")
 

@@ -47,11 +47,12 @@ from ai.backend.agent.resources import (
 )
 from ai.backend.agent.types import Container, KernelOwnershipData, MountInfo
 from ai.backend.common.arch import CURRENT_ARCH
-from ai.backend.common.docker import ImageRef, LabelName
+from ai.backend.common.data.image.types import InstalledImageInfo
+from ai.backend.common.docker import MAX_KERNELSPEC, MIN_KERNELSPEC, ImageRef, LabelName
 from ai.backend.common.dto.agent.response import PurgeImageResp, PurgeImagesResp
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.events.dispatcher import EventProducer
-from ai.backend.common.exception import ImageNotAvailable
+from ai.backend.common.exception import ImageNotAvailable, InvalidImageName, InvalidImageTag
 from ai.backend.common.json import dump_json_str
 from ai.backend.common.network.types import NetworkBackendKind, SessionNetMeta
 from ai.backend.common.types import (
@@ -62,6 +63,7 @@ from ai.backend.common.types import (
     ContainerStatus,
     DeviceId,
     DeviceName,
+    ImageCanonical,
     ImageConfig,
     ImageRegistry,
     KernelCreationConfig,
@@ -578,10 +580,30 @@ class ContainerdAgent(
 
     @override
     async def scan_images(self) -> ScanImagesResult:
-        # Boot-safe: startup calls this to populate self.images. Building InstalledImageInfo
-        # from `nerdctl images` + Backend.AI image labels is a follow-up; empty lets the
-        # agent boot and pull-on-demand via check_image/pull_image.
-        return ScanImagesResult(scanned_images={}, removed_images={})
+        # List local images over the containerd Images service; the kernel-spec label lives in
+        # each image's OCI config (read via Content), so list_image_infos surfaces it. Keep
+        # only valid Backend.AI images whose kernel-spec is in range.
+        scanned: dict[ImageCanonical, InstalledImageInfo] = {}
+        for info in await self._runtime.list_image_infos():
+            if not info.labels:
+                continue  # not a Backend.AI kernel image (no config labels)
+            try:
+                ImageRef.parse_image_str(info.name, "*")
+            except (InvalidImageName, InvalidImageTag):
+                continue
+            try:
+                kernelspec = int(info.labels.get(LabelName.KERNEL_SPEC, "1"))
+            except ValueError:
+                continue
+            if not (MIN_KERNELSPEC <= kernelspec <= MAX_KERNELSPEC):
+                continue
+            canonical = ImageCanonical(info.name)
+            scanned[canonical] = InstalledImageInfo.from_inspect_result(
+                canonical=canonical,
+                inspect_result={"Id": info.digest, "Architecture": info.architecture},
+            )
+        removed = {c: img for c, img in self.images.items() if c not in scanned}
+        return ScanImagesResult(scanned_images=scanned, removed_images=removed)
 
     @override
     async def pull_image(
