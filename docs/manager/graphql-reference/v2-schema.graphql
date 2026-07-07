@@ -3144,7 +3144,9 @@ input CreateVFolderV2Input {
   """Whether the vfolder is cloneable."""
   cloneable: Boolean! = false
 
-  """Delegated owner user UUID. Create the vfolder on behalf of this user."""
+  """
+  Added in 26.7.0. Delegated owner user UUID. Create the vfolder on behalf of this user.
+  """
   ownerId: UUID = null
 }
 
