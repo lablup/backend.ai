@@ -1599,10 +1599,16 @@ class VFolderService:
         user_uuid = action.user_id
         domain_name = action.domain_name
         project_id = action.project_id
-        # Delegation applies only to user-owned vfolders. When project_id is set
-        # the vfolder is project-owned and authorization targets the project
-        # scope (see the action's target_element), so owner_id does not apply.
-        if action.owner_id is not None and project_id is None:
+        if action.owner_id is not None:
+            # Delegation applies only to user-owned vfolders. A project-owned
+            # vfolder authorizes against the project scope (see the action's
+            # target_element), so combining it with owner_id is ambiguous and
+            # rejected rather than silently ignored.
+            if project_id is not None:
+                raise VFolderInvalidParameter(
+                    "owner_id cannot be combined with project_id; "
+                    "omit project_id to create a vfolder on behalf of a user."
+                )
             # Create the vfolder owned by the target user instead of the caller.
             # The caller's permission to act on behalf of the owner is enforced
             # by the RBAC scope validator via the action's target_element (the

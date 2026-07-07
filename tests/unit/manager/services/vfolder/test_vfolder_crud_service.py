@@ -579,6 +579,24 @@ class TestCreateVFolderV2Action:
         with pytest.raises(VFolderInvalidParameter):
             await vfolder_service.create_v2(action)
 
+    async def test_owner_id_with_project_id_is_rejected(
+        self,
+        vfolder_service: VFolderService,
+        mock_user_repository: MagicMock,
+    ) -> None:
+        """owner_id combined with project_id is rejected instead of silently ignored."""
+        action = self._make_action(
+            user_id=UserID(uuid.uuid4()),
+            owner_id=UserID(uuid.uuid4()),
+            project_id=ProjectID(uuid.uuid4()),
+        )
+
+        with pytest.raises(VFolderInvalidParameter):
+            await vfolder_service.create_v2(action)
+
+        # Rejected before resolving the owner.
+        mock_user_repository.get_user_by_uuid.assert_not_called()
+
 
 class TestGetVFolderAction:
     async def test_owned_vfolder_returns_full_details(
