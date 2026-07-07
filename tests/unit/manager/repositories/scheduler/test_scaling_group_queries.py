@@ -13,6 +13,7 @@ from decimal import Decimal
 
 import pytest
 
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import AgentId, ResourceSlot
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.models.agent import AgentRow
@@ -32,10 +33,12 @@ class ScalingGroupFixture:
     empty: str
 
 
-async def _make_scaling_group(db: ExtendedAsyncSAEngine, name: str) -> None:
+async def _make_scaling_group(db: ExtendedAsyncSAEngine, name: str) -> ResourceGroupID:
+    scaling_group_id = ResourceGroupID(uuid.uuid4())
     async with db.begin_session() as db_sess:
         db_sess.add(
             ScalingGroupRow(
+                id=scaling_group_id,
                 name=name,
                 driver="static",
                 scheduler="fifo",
@@ -48,11 +51,13 @@ async def _make_scaling_group(db: ExtendedAsyncSAEngine, name: str) -> None:
                 is_active=True,
             )
         )
+    return scaling_group_id
 
 
 async def _make_agent(
     db: ExtendedAsyncSAEngine,
     scaling_group: str,
+    resource_group_id: ResourceGroupID,
     *,
     status: AgentStatus,
     schedulable: bool,
@@ -65,6 +70,7 @@ async def _make_agent(
                 status=status,
                 region="local",
                 scaling_group=scaling_group,
+                resource_group_id=resource_group_id,
                 available_slots=ResourceSlot({
                     "cpu": Decimal("10"),
                     "mem": Decimal("10240"),
@@ -114,25 +120,28 @@ class TestScalingGroupQueries:
             lost=f"sg-lost-{uuid.uuid4().hex[:8]}",
             empty=f"sg-empty-{uuid.uuid4().hex[:8]}",
         )
-        await _make_scaling_group(db_with_cleanup, fixture.schedulable)
-        await _make_scaling_group(db_with_cleanup, fixture.unschedulable)
-        await _make_scaling_group(db_with_cleanup, fixture.lost)
+        schedulable_id = await _make_scaling_group(db_with_cleanup, fixture.schedulable)
+        unschedulable_id = await _make_scaling_group(db_with_cleanup, fixture.unschedulable)
+        lost_id = await _make_scaling_group(db_with_cleanup, fixture.lost)
         await _make_scaling_group(db_with_cleanup, fixture.empty)
         await _make_agent(
             db_with_cleanup,
             fixture.schedulable,
+            schedulable_id,
             status=AgentStatus.ALIVE,
             schedulable=True,
         )
         await _make_agent(
             db_with_cleanup,
             fixture.unschedulable,
+            unschedulable_id,
             status=AgentStatus.ALIVE,
             schedulable=False,
         )
         await _make_agent(
             db_with_cleanup,
             fixture.lost,
+            lost_id,
             status=AgentStatus.LOST,
             schedulable=True,
         )

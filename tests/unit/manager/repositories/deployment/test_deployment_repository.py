@@ -277,6 +277,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_scaling_group_name: str,
+        test_scaling_group_id: ResourceGroupID,
     ) -> AgentId:
         """Create test agent and return agent ID."""
         agent_id = AgentId(f"i-{uuid.uuid4().hex[:12]}")
@@ -288,6 +289,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                 status_changed=datetime.now(tzutc()),
                 region="local",
                 scaling_group=test_scaling_group_name,
+                resource_group_id=test_scaling_group_id,
                 schedulable=True,
                 available_slots=ResourceSlot({"cpu": Decimal("8.0"), "mem": Decimal("16384")}),
                 occupied_slots=ResourceSlot({"cpu": Decimal("0"), "mem": Decimal("0")}),
@@ -1156,12 +1158,16 @@ class TestGetDefaultArchitectureFromScalingGroup:
         """Helper to create an agent with given properties."""
         agent_id = AgentId(f"i-{suffix or uuid.uuid4().hex[:8]}")
         async with db.begin_session() as db_sess:
+            resource_group_id = await db_sess.scalar(
+                sa.select(ScalingGroupRow.id).where(ScalingGroupRow.name == scaling_group)
+            )
             agent = AgentRow(
                 id=agent_id,
                 status=status,
                 status_changed=datetime.now(tzutc()),
                 region="local",
                 scaling_group=scaling_group,
+                resource_group_id=resource_group_id,
                 schedulable=schedulable,
                 available_slots=ResourceSlot({"cpu": Decimal("8.0"), "mem": Decimal("16384")}),
                 occupied_slots=ResourceSlot({"cpu": Decimal("0"), "mem": Decimal("0")}),

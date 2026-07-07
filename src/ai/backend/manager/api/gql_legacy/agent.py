@@ -46,6 +46,7 @@ from ai.backend.manager.models.rbac import (
 )
 from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.resource_slot import AgentResourceRow
+from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.user import UserRole, users
 from ai.backend.manager.repositories.agent.query import QueryConditions, QueryOrders
 
@@ -914,7 +915,15 @@ class ModifyAgent(graphene.Mutation):  # type: ignore[misc]
         set_if_set(props, data, "schedulable")
         set_if_set(props, data, "scaling_group")
         # TODO: Need to skip the following RPC call if the agent is not alive, or timeout.
-        if (scaling_group := data.get("scaling_group")) is not None:
+        scaling_group = data.get("scaling_group")
+        if scaling_group is not None:
+            async with graph_ctx.db.begin_readonly_read_committed() as conn:
+                resource_group_id = await conn.scalar(
+                    sa.select(ScalingGroupRow.id).where(ScalingGroupRow.name == scaling_group)
+                )
+            if resource_group_id is None:
+                return cls(False, f"no such scaling group: {scaling_group}")
+            data["resource_group_id"] = resource_group_id
             await graph_ctx.registry.update_scaling_group(AgentId(id), scaling_group)
 
         update_query = sa.update(agents).values(data).where(agents.c.id == id)

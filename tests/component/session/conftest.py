@@ -166,6 +166,7 @@ def server_module_registries(
 async def agent_fixture(
     db_engine: SAEngine,
     scaling_group_name: ResourceGroupName,
+    scaling_group_id: ResourceGroupID,
 ) -> AsyncIterator[AgentId]:
     """Insert a test agent record and yield its ID."""
     agent_id = AgentId(f"i-test-agent-{secrets.token_hex(4)}")
@@ -175,6 +176,7 @@ async def agent_fixture(
                 id=agent_id,
                 region="local",
                 scaling_group=scaling_group_name,
+                resource_group_id=scaling_group_id,
                 available_slots=ResourceSlot(),
                 occupied_slots=ResourceSlot(),
                 addr="127.0.0.1:6001",

@@ -296,6 +296,7 @@ class TestForceTerminateResourceDeallocation:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_scaling_group_name: str,
+        test_scaling_group_id: ResourceGroupID,
     ) -> AsyncGenerator[str, None]:
         agent_id = f"test-agent-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as db_sess:
@@ -305,6 +306,7 @@ class TestForceTerminateResourceDeallocation:
                     status=AgentStatus.ALIVE,
                     region="local",
                     scaling_group=test_scaling_group_name,
+                    resource_group_id=test_scaling_group_id,
                     available_slots=ResourceSlot({"cpu": Decimal("10"), "mem": Decimal("10240")}),
                     occupied_slots=ResourceSlot(),
                     addr="127.0.0.1:6001",
@@ -874,6 +876,7 @@ class TestBulkTerminateResourceDeallocation:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_scaling_group_name: str,
+        test_scaling_group_id: ResourceGroupID,
     ) -> AsyncGenerator[str, None]:
         agent_id = f"test-agent-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as db_sess:
@@ -883,6 +886,7 @@ class TestBulkTerminateResourceDeallocation:
                     status=AgentStatus.ALIVE,
                     region="local",
                     scaling_group=test_scaling_group_name,
+                    resource_group_id=test_scaling_group_id,
                     available_slots=ResourceSlot({"cpu": Decimal("10"), "mem": Decimal("10240")}),
                     occupied_slots=ResourceSlot(),
                     addr="127.0.0.1:6001",
@@ -1329,6 +1333,7 @@ class TestNegativeValueGuard:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_scaling_group_name: str,
+        test_scaling_group_id: ResourceGroupID,
     ) -> AsyncGenerator[str, None]:
         agent_id = f"test-agent-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as db_sess:
@@ -1338,6 +1343,7 @@ class TestNegativeValueGuard:
                     status=AgentStatus.ALIVE,
                     region="local",
                     scaling_group=test_scaling_group_name,
+                    resource_group_id=test_scaling_group_id,
                     available_slots=ResourceSlot({"cpu": Decimal("10"), "mem": Decimal("10240")}),
                     occupied_slots=ResourceSlot(),
                     addr="127.0.0.1:6001",

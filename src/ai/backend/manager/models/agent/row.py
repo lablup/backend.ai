@@ -20,6 +20,7 @@ from sqlalchemy.orm import (
 from sqlalchemy.sql.expression import false, true
 
 from ai.backend.common.auth import PublicKey
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import AccessKey, AgentId, ResourceSlot, SlotName, SlotTypes
 from ai.backend.manager.data.agent.types import (
     AgentData,
@@ -31,6 +32,7 @@ from ai.backend.manager.data.permission.permission_defs import (
     ScalingGroupPermission,
 )
 from ai.backend.manager.models.base import (
+    GUID,
     Base,
     CurvePublicKeyColumn,
     EnumType,
@@ -81,6 +83,13 @@ class AgentRow(Base):  # type: ignore[misc]
         server_default="default",
         default="default",
     )
+    resource_group_id: Mapped[ResourceGroupID] = mapped_column(
+        "resource_group_id",
+        GUID(ResourceGroupID),
+        sa.ForeignKey("scaling_groups.id"),
+        index=True,
+        nullable=False,
+    )
     schedulable: Mapped[bool] = mapped_column(
         "schedulable", sa.Boolean(), nullable=False, server_default=true(), default=True
     )
@@ -122,7 +131,9 @@ class AgentRow(Base):  # type: ignore[misc]
     kernels: Mapped[list[KernelRow]] = relationship("KernelRow", back_populates="agent_row")
     agent_resource_rows: Mapped[list[AgentResourceRow]] = relationship("AgentResourceRow")
     scaling_group_row: Mapped[ScalingGroupRow] = relationship(
-        "ScalingGroupRow", back_populates="agents"
+        "ScalingGroupRow",
+        back_populates="agents",
+        foreign_keys="[AgentRow.scaling_group]",
     )
 
     def actual_occupied_slots(self) -> ResourceSlot:

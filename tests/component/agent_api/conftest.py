@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.events.dispatcher import EventProducer
-from ai.backend.common.identifier.resource_group import ResourceGroupName
+from ai.backend.common.identifier.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.types import HostPortPair, ResourceSlot
 from ai.backend.manager.actions.validators import ActionValidators
@@ -107,6 +107,7 @@ def server_module_registries(
 async def agent_fixture(
     db_engine: SAEngine,
     scaling_group_name: ResourceGroupName,
+    scaling_group_id: ResourceGroupID,
 ) -> AsyncIterator[str]:
     """Insert a test agent row and yield its ID.
 
@@ -121,6 +122,7 @@ async def agent_fixture(
                 status=AgentStatus.ALIVE,
                 region="local",
                 scaling_group=scaling_group_name,
+                resource_group_id=scaling_group_id,
                 schedulable=True,
                 available_slots=ResourceSlot({"cpu": "4", "mem": "8589934592"}),
                 occupied_slots=ResourceSlot(),

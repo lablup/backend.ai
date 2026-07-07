@@ -303,6 +303,7 @@ async def test_group_id(
 async def test_agent_id(
     db_with_cleanup: ExtendedAsyncSAEngine,
     test_scaling_group_name: str,
+    test_scaling_group_id: ResourceGroupID,
 ) -> AsyncGenerator[str, None]:
     agent_id = f"test-agent-{uuid.uuid4().hex[:8]}"
     async with db_with_cleanup.begin_session() as db_sess:
@@ -312,6 +313,7 @@ async def test_agent_id(
                 status=AgentStatus.ALIVE,
                 region="local",
                 scaling_group=test_scaling_group_name,
+                resource_group_id=test_scaling_group_id,
                 available_slots=ResourceSlot({"cpu": Decimal("10"), "mem": Decimal("10240")}),
                 occupied_slots=ResourceSlot(),
                 addr=_AGENT_ADDR,

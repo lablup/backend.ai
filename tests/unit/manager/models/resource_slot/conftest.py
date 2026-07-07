@@ -199,6 +199,7 @@ async def project_id(
 async def agent_id(
     database_with_resource_slot_tables: ExtendedAsyncSAEngine,
     scaling_group: str,
+    scaling_group_id: ResourceGroupID,
 ) -> AsyncGenerator[str, None]:
     aid = "i-test-agent-001"
     async with database_with_resource_slot_tables.begin_session() as db_sess:
@@ -206,6 +207,7 @@ async def agent_id(
             AgentRow(
                 id=aid,
                 scaling_group=scaling_group,
+                resource_group_id=scaling_group_id,
                 region="local",
                 addr="tcp://127.0.0.1:6001",
                 available_slots=ResourceSlot({"cpu": Decimal("4"), "mem": Decimal("4294967296")}),

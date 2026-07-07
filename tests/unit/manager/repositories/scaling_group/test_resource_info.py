@@ -196,6 +196,7 @@ class TestResourceInfo:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         base_scaling_group: str,
+        base_scaling_group_id: ResourceGroupID,
     ) -> AsyncGenerator[tuple[str, list[ResourceSlot]], None]:
         """Create scaling group with ALIVE, schedulable agents.
 
@@ -214,6 +215,7 @@ class TestResourceInfo:
                     id=agent_id,
                     status=AgentStatus.ALIVE,
                     scaling_group=base_scaling_group,
+                    resource_group_id=base_scaling_group_id,
                     schedulable=True,
                     available_slots=slots,
                     occupied_slots=ResourceSlot(),
@@ -237,6 +239,7 @@ class TestResourceInfo:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         base_scaling_group: str,
+        base_scaling_group_id: ResourceGroupID,
     ) -> AsyncGenerator[tuple[str, ResourceSlot], None]:
         """Create scaling group with mixed agent statuses.
 
@@ -257,6 +260,7 @@ class TestResourceInfo:
                     id=alive_id,
                     status=AgentStatus.ALIVE,
                     scaling_group=base_scaling_group,
+                    resource_group_id=base_scaling_group_id,
                     schedulable=True,
                     available_slots=alive_slots,
                     occupied_slots=ResourceSlot(),
@@ -277,6 +281,7 @@ class TestResourceInfo:
                     id=lost_id,
                     status=AgentStatus.LOST,
                     scaling_group=base_scaling_group,
+                    resource_group_id=base_scaling_group_id,
                     schedulable=True,
                     available_slots=lost_slots,
                     occupied_slots=ResourceSlot(),
@@ -297,6 +302,7 @@ class TestResourceInfo:
                     id=terminated_id,
                     status=AgentStatus.TERMINATED,
                     scaling_group=base_scaling_group,
+                    resource_group_id=base_scaling_group_id,
                     schedulable=True,
                     available_slots=terminated_slots,
                     occupied_slots=ResourceSlot(),
@@ -327,6 +333,7 @@ class TestResourceInfo:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         base_scaling_group: str,
+        base_scaling_group_id: ResourceGroupID,
     ) -> AsyncGenerator[tuple[str, ResourceSlot], None]:
         """Create scaling group with schedulable and non-schedulable agents.
 
@@ -346,6 +353,7 @@ class TestResourceInfo:
                     id=sched_id,
                     status=AgentStatus.ALIVE,
                     scaling_group=base_scaling_group,
+                    resource_group_id=base_scaling_group_id,
                     schedulable=True,
                     available_slots=schedulable_slots,
                     occupied_slots=ResourceSlot(),
@@ -366,6 +374,7 @@ class TestResourceInfo:
                     id=non_sched_id,
                     status=AgentStatus.ALIVE,
                     scaling_group=base_scaling_group,
+                    resource_group_id=base_scaling_group_id,
                     schedulable=False,
                     available_slots=non_schedulable_slots,
                     occupied_slots=ResourceSlot(),
@@ -503,6 +512,7 @@ class TestResourceInfo:
                     id=agent_id,
                     status=AgentStatus.ALIVE,
                     scaling_group=base_scaling_group,
+                    resource_group_id=base_scaling_group_id,
                     schedulable=True,
                     available_slots=agent_capacity,
                     occupied_slots=ResourceSlot(),
@@ -609,6 +619,7 @@ class TestResourceInfo:
                     id=agent_id,
                     status=AgentStatus.ALIVE,
                     scaling_group=base_scaling_group,
+                    resource_group_id=base_scaling_group_id,
                     schedulable=True,
                     available_slots=agent_capacity,
                     occupied_slots=ResourceSlot(),
