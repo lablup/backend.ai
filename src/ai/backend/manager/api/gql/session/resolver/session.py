@@ -10,6 +10,7 @@ from ai.backend.common.dto.manager.v2.session.request import (
     AdminSearchSessionsInput,
     TerminateSessionsInput,
 )
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import SessionId
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
@@ -179,12 +180,14 @@ async def terminate_sessions_v2(
     info: Info[StrawberryGQLContext],
     session_ids: list[ID],
     forced: bool = False,
+    owner_id: ID | None = None,
 ) -> TerminateSessionsPayloadGQL | None:
     """Terminate one or more sessions identified by ID."""
     payload = await info.context.adapters.session.terminate(
         TerminateSessionsInput(
             session_ids=[UUID(str(sid)) for sid in session_ids],
             forced=forced,
+            owner_id=UserID(UUID(str(owner_id))) if owner_id is not None else None,
         )
     )
     return TerminateSessionsPayloadGQL(
