@@ -54,9 +54,21 @@ def _make_action(
     )
 
 
-def _non_admin(user_id: UserID) -> UserData:
+@pytest.fixture
+def caller_id() -> UserID:
+    return UserID(uuid.uuid4())
+
+
+@pytest.fixture
+def owner_id() -> UserID:
+    return UserID(uuid.uuid4())
+
+
+@pytest.fixture
+def caller(caller_id: UserID) -> UserData:
+    """A non-admin user context to run the validator under."""
     return UserData(
-        user_id=user_id,
+        user_id=caller_id,
         is_authorized=True,
         is_admin=False,
         is_superadmin=False,
@@ -79,9 +91,12 @@ class TestEnqueueSessionActionDelegationScope:
             "owner_id_delegates_to_owner_scope",
         ],
     )
-    def test_rbac_scope_targets_owner_when_delegating(self, delegated: bool) -> None:
-        caller_id = UserID(uuid.uuid4())
-        owner_id = UserID(uuid.uuid4())
+    def test_rbac_scope_targets_owner_when_delegating(
+        self,
+        delegated: bool,
+        caller_id: UserID,
+        owner_id: UserID,
+    ) -> None:
         action = _make_action(
             user_id=caller_id,
             owner_id=owner_id if delegated else None,
@@ -99,15 +114,16 @@ class TestEnqueueSessionDelegationAuthorization:
     async def test_delegation_authorizes_against_owner_scope(
         self,
         trigger_meta: BaseActionTriggerMeta,
+        caller: UserData,
+        caller_id: UserID,
+        owner_id: UserID,
     ) -> None:
-        caller_id = UserID(uuid.uuid4())
-        owner_id = UserID(uuid.uuid4())
         repository = AsyncMock(spec=PermissionControllerRepository)
         repository.check_permission_with_scope_chain.return_value = True
         validator = ScopeActionRBACValidator(repository, MagicMock())
 
         action = _make_action(user_id=caller_id, owner_id=owner_id)
-        with with_user(_non_admin(caller_id)):
+        with with_user(caller):
             await validator.validate(action, trigger_meta)
 
         # The permission check must target the owner's USER scope, not the caller's.
@@ -122,14 +138,15 @@ class TestEnqueueSessionDelegationAuthorization:
     async def test_denied_delegation_raises(
         self,
         trigger_meta: BaseActionTriggerMeta,
+        caller: UserData,
+        caller_id: UserID,
+        owner_id: UserID,
     ) -> None:
-        caller_id = UserID(uuid.uuid4())
-        owner_id = UserID(uuid.uuid4())
         repository = AsyncMock(spec=PermissionControllerRepository)
         repository.check_permission_with_scope_chain.return_value = False
         validator = ScopeActionRBACValidator(repository, MagicMock())
 
         action = _make_action(user_id=caller_id, owner_id=owner_id)
-        with with_user(_non_admin(caller_id)):
+        with with_user(caller):
             with pytest.raises(NotEnoughPermission):
                 await validator.validate(action, trigger_meta)
