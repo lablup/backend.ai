@@ -6,14 +6,17 @@ nerdctl's 4 KiB ``nerdctl/mounts`` label). Drop-in for ``NerdctlRuntimeClient``:
 implements the same ``ContainerdRuntimeClient`` ABC, so the orchestrator and network
 layers are unchanged.
 
-Built incrementally (see BEP-1055): the connection, container/task lifecycle (create via
-a hand-built OCI spec + snapshot, start/kill/remove), and introspection are implemented
-and verified against live containerd. Image ops (pull/exists/entrypoint) land in a later
-phase and raise NotImplementedError meanwhile.
+Covers the full ContainerdRuntimeClient surface, verified against live containerd v2.2.1:
+the connection, container/task lifecycle (create via a hand-built OCI spec + snapshot,
+start/kill/remove), introspection, and image ops (exists/list/remove/entrypoint over the
+Images+Content services). Image *pull/push* delegate to ``ctr`` for now — the gRPC
+Transfer service that does pull server-side is a containerd 1.7+ API absent from these
+stubs, and pull is a control-plane op that never hit the mounts-label limit anyway.
 """
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import logging
@@ -300,31 +303,75 @@ class ContainerdGrpcRuntimeClient(ContainerdRuntimeClient):
             raise
         return resp.process.pid or None
 
-    # --- not yet implemented (later phases) ---
+    # --- image service ---
 
     @override
     async def image_exists(self, image_ref: str) -> bool:
-        raise NotImplementedError("containerd-grpc image ops: Phase 3")
-
-    @override
-    async def pull_image(self, image_ref: str, *, auth: Mapping[str, str] | None = None) -> None:
-        raise NotImplementedError("containerd-grpc image ops: Phase 3")
+        try:
+            await self._images_stub().Get(
+                images_pb2.GetImageRequest(name=image_ref), metadata=self._md
+            )
+        except grpc.aio.AioRpcError as e:
+            if e.code() is grpc.StatusCode.NOT_FOUND:
+                return False
+            raise
+        return True
 
     @override
     async def list_images(self) -> Sequence[str]:
-        raise NotImplementedError("containerd-grpc image ops: Phase 3")
+        resp = await self._images_stub().List(images_pb2.ListImagesRequest(), metadata=self._md)
+        return [img.name for img in resp.images]
 
     @override
     async def remove_image(self, image_ref: str) -> None:
-        raise NotImplementedError("containerd-grpc image ops: Phase 3")
-
-    @override
-    async def push_image(self, image_ref: str) -> None:
-        raise NotImplementedError("containerd-grpc image ops: Phase 3")
+        try:
+            await self._images_stub().Delete(
+                images_pb2.DeleteImageRequest(name=image_ref), metadata=self._md
+            )
+        except grpc.aio.AioRpcError as e:
+            if e.code() is not grpc.StatusCode.NOT_FOUND:
+                raise
 
     @override
     async def image_entrypoint(self, image_ref: str) -> list[str] | None:
-        raise NotImplementedError("containerd-grpc image ops: Phase 3")
+        try:
+            _chain, config = await self._resolve_image(image_ref)
+        except grpc.aio.AioRpcError as e:
+            if e.code() is grpc.StatusCode.NOT_FOUND:
+                return None
+            raise
+        cfg = config.get("config") or {}
+        entry = cfg.get("Entrypoint") or cfg.get("Cmd")
+        return [str(x) for x in entry] if entry else None
+
+    @override
+    async def pull_image(self, image_ref: str, *, auth: Mapping[str, str] | None = None) -> None:
+        # containerd's image *pull* (registry resolve + content ingest + unpack) is heavy;
+        # the gRPC Transfer service that does it server-side is a 1.7+ API not in these
+        # (1.6) stubs. Delegate to `ctr` meanwhile — pull is a control-plane op that never
+        # hits the nerdctl mounts-label limit that motivated this client. (gRPC Transfer:
+        # follow-up once 2.x stubs are generated.)
+        args = ["images", "pull"]
+        if auth and (user := auth.get("username")) and (pw := auth.get("password")):
+            args += ["--user", f"{user}:{pw}"]
+        args += ["--snapshotter", _SNAPSHOTTER, image_ref]
+        await self._ctr(*args)
+
+    @override
+    async def push_image(self, image_ref: str) -> None:
+        await self._ctr("images", "push", image_ref)
+
+    async def _ctr(self, *args: str) -> None:
+        argv = ["ctr", "--namespace", self._namespace, *args]
+        proc = await asyncio.create_subprocess_exec(
+            *argv, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+        )
+        _, stderr = await proc.communicate()
+        if proc.returncode != 0:
+            raise RuntimeError(
+                f"ctr {' '.join(args)} failed (rc={proc.returncode}): "
+                f"{stderr.decode(errors='replace').strip()}"
+            )
 
     @override
     async def container_ip(self, container_id: str) -> str | None:
