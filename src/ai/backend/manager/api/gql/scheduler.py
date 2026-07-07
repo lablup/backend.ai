@@ -253,6 +253,6 @@ class DryRunSchedulePayloadGQL:
 async def dry_run_schedule(
     input: DryRunScheduleInputGQL,
     info: Info[StrawberryGQLContext],
-) -> DryRunSchedulePayloadGQL:
+) -> DryRunSchedulePayloadGQL | None:
     # Schema-only surface: the adapter wiring lands in a follow-up.
     raise ServiceUnavailable("Dry-run schedule is not yet available.")
