@@ -11,6 +11,7 @@ from __future__ import annotations
 import uuid
 
 from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import VFolderUsageMode
 from ai.backend.manager.models.vfolder import VFolderPermission
 from ai.backend.manager.services.vfolder.actions.create_v2 import CreateVFolderV2Action
@@ -19,7 +20,7 @@ from ai.backend.manager.services.vfolder.actions.create_v2 import CreateVFolderV
 def _make_action(
     *,
     user_id: uuid.UUID,
-    owner_id: uuid.UUID | None,
+    owner_id: UserID | None,
     project_id: uuid.UUID | None = None,
 ) -> CreateVFolderV2Action:
     return CreateVFolderV2Action(
@@ -47,7 +48,7 @@ class TestCreateVFolderV2ActionDelegationScope:
 
     def test_with_owner_targets_owner_not_caller(self) -> None:
         caller_id = uuid.uuid4()
-        owner_id = uuid.uuid4()
+        owner_id = UserID(uuid.uuid4())
         action = _make_action(user_id=caller_id, owner_id=owner_id)
 
         # Delegation must authorize against the owner, never the caller.
@@ -59,7 +60,9 @@ class TestCreateVFolderV2ActionDelegationScope:
 
     def test_project_scope_ignores_owner(self) -> None:
         project_id = uuid.uuid4()
-        action = _make_action(user_id=uuid.uuid4(), owner_id=uuid.uuid4(), project_id=project_id)
+        action = _make_action(
+            user_id=uuid.uuid4(), owner_id=UserID(uuid.uuid4()), project_id=project_id
+        )
 
         # Project-owned vfolders authorize against the project, not a user.
         assert action.scope_id() == str(project_id)

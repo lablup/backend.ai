@@ -86,6 +86,7 @@ def create(
 
     from ai.backend.common.dto.manager.v2.vfolder.request import CreateVFolderInput
     from ai.backend.common.dto.manager.v2.vfolder.types import VFolderUsageMode
+    from ai.backend.common.identifier.user import UserID
 
     input_dto = CreateVFolderInput(
         name=name,
@@ -93,7 +94,7 @@ def create(
         project_id=group_id,
         host=host,
         cloneable=cloneable,
-        owner_id=owner_id,
+        owner_id=UserID(owner_id) if owner_id is not None else None,
     )
 
     async def _run() -> None:

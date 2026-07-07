@@ -7,6 +7,7 @@ from ai.backend.common.data.permission.types import (
     RBACElementType,
     ScopeType,
 )
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import VFolderUsageMode
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.action.scope import BaseScopeAction
@@ -28,7 +29,7 @@ class CreateVFolderV2Action(BaseScopeAction):
     usage_mode: VFolderUsageMode
     permission: VFolderPermission
     cloneable: bool
-    owner_id: uuid.UUID | None = None
+    owner_id: UserID | None = None
     """Delegated owner user UUID. When set, the service resolves it and creates
     the vfolder owned by that user instead of the caller."""
 
