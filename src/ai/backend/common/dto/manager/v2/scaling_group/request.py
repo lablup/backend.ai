@@ -19,6 +19,10 @@ __all__ = (
 class PreemptionConfigInput(BaseRequestModel):
     """Input for preemption configuration."""
 
+    enabled: bool = Field(
+        default=False,
+        description="Whether preemption is enabled for this scaling group (opt-in). Default is false.",
+    )
     preemptible_priority: int = Field(
         default=5,
         ge=1,
@@ -32,6 +36,14 @@ class PreemptionConfigInput(BaseRequestModel):
     mode: PreemptionMode = Field(
         default=PreemptionMode.TERMINATE,
         description="Preemption mode (terminate or reschedule).",
+    )
+    preemption_min_runtime: float = Field(
+        default=0.0,
+        ge=0.0,
+        description=(
+            "Minimum session runtime in seconds before it becomes preemptible "
+            "(0 = disabled). Default is 0."
+        ),
     )
 
 

@@ -68,9 +68,11 @@ class ScalingGroupDriverConfig:
 class PreemptionConfig:
     """Preemption configuration for a scaling group."""
 
+    enabled: bool = False
     preemptible_priority: int = 5
     order: PreemptionOrder = PreemptionOrder.OLDEST
     mode: PreemptionMode = PreemptionMode.TERMINATE
+    preemption_min_runtime: timedelta = timedelta(seconds=0)
 
 
 @dataclass
@@ -99,9 +101,11 @@ class ScalingGroupSchedulerOptions:
             "allow_fractional_resource_fragmentation": self.allow_fractional_resource_fragmentation,
             "route_cleanup_target_statuses": self.route_cleanup_target_statuses,
             "preemption": {
+                "enabled": self.preemption.enabled,
                 "preemptible_priority": self.preemption.preemptible_priority,
                 "order": self.preemption.order.value,
                 "mode": self.preemption.mode.value,
+                "preemption_min_runtime": self.preemption.preemption_min_runtime.total_seconds(),
             },
         }
 

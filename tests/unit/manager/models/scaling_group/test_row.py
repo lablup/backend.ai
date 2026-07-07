@@ -8,8 +8,13 @@ import pytest
 from pydantic import ValidationError
 
 from ai.backend.common.exception import BackendAISchemaValidationFailed
-from ai.backend.common.types import AgentSelectionStrategy, SessionTypes
-from ai.backend.manager.models.scaling_group.row import ScalingGroupOpts
+from ai.backend.common.types import (
+    AgentSelectionStrategy,
+    PreemptionMode,
+    PreemptionOrder,
+    SessionTypes,
+)
+from ai.backend.manager.models.scaling_group.row import PreemptionConfig, ScalingGroupOpts
 
 
 class TestScalingGroupOptsDefaults:
@@ -193,3 +198,96 @@ class TestScalingGroupOptsBackwardCompatibility:
         assert opts.agent_selection_strategy == AgentSelectionStrategy.DISPERSED
         assert opts.enforce_spreading_endpoint_replica is False
         assert opts.allow_fractional_resource_fragmentation is True
+
+
+class TestPreemptionConfig:
+    """Test PreemptionConfig defaults, serialization, and backward compatibility."""
+
+    def test_defaults(self) -> None:
+        config = PreemptionConfig()
+        assert config.enabled is False
+        assert config.preemptible_priority == 5
+        assert config.order == PreemptionOrder.OLDEST
+        assert config.mode == PreemptionMode.TERMINATE
+        assert config.preemption_min_runtime == timedelta(seconds=0)
+
+    def test_scaling_group_opts_default_preemption(self) -> None:
+        opts = ScalingGroupOpts()
+        assert opts.preemption == PreemptionConfig()
+        assert opts.preemption.enabled is False
+        assert opts.preemption.preemption_min_runtime == timedelta(seconds=0)
+
+    def test_serialize_json_mode_types(self) -> None:
+        config = PreemptionConfig(
+            enabled=True,
+            preemptible_priority=3,
+            order=PreemptionOrder.NEWEST,
+            mode=PreemptionMode.RESCHEDULE,
+            preemption_min_runtime=timedelta(seconds=300),
+        )
+        dumped = config.model_dump(mode="json")
+        assert dumped["enabled"] is True
+        assert dumped["preemptible_priority"] == 3
+        assert dumped["order"] == PreemptionOrder.NEWEST.value
+        assert dumped["mode"] == PreemptionMode.RESCHEDULE.value
+        # preemption_min_runtime → float seconds
+        assert isinstance(dumped["preemption_min_runtime"], float)
+        assert dumped["preemption_min_runtime"] == 300.0
+
+    def test_validate_min_runtime_from_int(self) -> None:
+        config = PreemptionConfig.model_validate({"preemption_min_runtime": 120})
+        assert config.preemption_min_runtime == timedelta(seconds=120)
+
+    def test_validate_min_runtime_from_float(self) -> None:
+        config = PreemptionConfig.model_validate({"preemption_min_runtime": 90.5})
+        assert config.preemption_min_runtime == timedelta(seconds=90.5)
+
+    def test_roundtrip_custom_values(self) -> None:
+        original = PreemptionConfig(
+            enabled=True,
+            preemptible_priority=1,
+            order=PreemptionOrder.NEWEST,
+            mode=PreemptionMode.RESCHEDULE,
+            preemption_min_runtime=timedelta(minutes=5),
+        )
+        restored = PreemptionConfig.model_validate(original.model_dump(mode="json"))
+        assert restored == original
+
+    def test_backward_compat_missing_new_keys(self) -> None:
+        """Legacy preemption JSON without enabled/preemption_min_runtime loads defaults."""
+        legacy_data = {
+            "preemptible_priority": 5,
+            "order": "oldest",
+            "mode": "terminate",
+        }
+        config = PreemptionConfig.model_validate(legacy_data)
+        assert config.enabled is False
+        assert config.preemption_min_runtime == timedelta(seconds=0)
+        assert config.preemptible_priority == 5
+
+    def test_backward_compat_via_scaling_group_opts(self) -> None:
+        """A legacy scheduler_opts JSONB row without the new preemption keys loads defaults."""
+        legacy_opts = {
+            "preemption": {
+                "preemptible_priority": 3,
+                "order": "newest",
+                "mode": "reschedule",
+            },
+        }
+        opts = ScalingGroupOpts.model_validate(legacy_opts)
+        assert opts.preemption.enabled is False
+        assert opts.preemption.preemption_min_runtime == timedelta(seconds=0)
+        assert opts.preemption.preemptible_priority == 3
+        assert opts.preemption.order == PreemptionOrder.NEWEST
+        assert opts.preemption.mode == PreemptionMode.RESCHEDULE
+
+    def test_scaling_group_opts_roundtrip_with_preemption(self) -> None:
+        original = ScalingGroupOpts(
+            preemption=PreemptionConfig(
+                enabled=True,
+                preemption_min_runtime=timedelta(seconds=300),
+            ),
+        )
+        restored = ScalingGroupOpts.model_validate(original.model_dump(mode="json"))
+        assert restored.preemption.enabled is True
+        assert restored.preemption.preemption_min_runtime == timedelta(seconds=300)
