@@ -276,8 +276,29 @@ def _load_spec(spec_path: Path | None, image: str | None) -> KernelCreateSpec:
     return KernelCreateSpec.model_validate(data)
 
 
+def _jsonable(obj: Any) -> Any:
+    """Coerce an RPC result into a JSON-serialisable structure.
+
+    Agent RPC payloads contain non-``str`` mapping keys (e.g. ``SlotName`` in
+    ``resource_spec``) and typed scalars that ``json.dumps`` rejects even with
+    ``default=str`` (which only covers values, not keys). Walk the structure and
+    stringify keys / unknown scalars so the CLI can always print the result.
+    """
+    from collections.abc import Mapping, Sequence
+
+    if isinstance(obj, Mapping):
+        return {str(k): _jsonable(v) for k, v in obj.items()}
+    if isinstance(obj, (str, bytes)):
+        return obj.decode() if isinstance(obj, bytes) else obj
+    if isinstance(obj, Sequence):
+        return [_jsonable(v) for v in obj]
+    if obj is None or isinstance(obj, (bool, int, float)):
+        return obj
+    return str(obj)
+
+
 def _echo_json(payload: Any) -> None:
-    click.echo(json.dumps(payload, indent=2, default=str, sort_keys=True))
+    click.echo(json.dumps(_jsonable(payload), indent=2, sort_keys=True))
 
 
 # --- command group -----------------------------------------------------------
