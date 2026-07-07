@@ -14,7 +14,7 @@ for the definitions FK, so its name differs between DBs; we drop both candidate
 names with ``IF EXISTS``.
 
 Revision ID: a560420476b6
-Revises: 66d0f891ed20
+Revises: e9a1c77b42d0
 Create Date: 2026-07-03
 
 """
@@ -24,7 +24,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "a560420476b6"
-down_revision = "66d0f891ed20"
+down_revision = "e9a1c77b42d0"
 # Part of: NEXT_RELEASE_VERSION
 branch_labels = None
 depends_on = None
