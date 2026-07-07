@@ -8,7 +8,7 @@ from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import ClusterMode
 from ai.backend.manager.actions.action import BaseAction, BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.data.session.draft import KernelResourceDraft
+from ai.backend.manager.data.session.draft import KernelResourceInput
 from ai.backend.manager.data.session.dry_run import KernelDryRunResult
 
 
@@ -20,22 +20,22 @@ class DryRunScheduleAction(BaseAction):
     be driven directly: ``cluster_mode`` decides whether kernel slots are summed
     onto a single node (SINGLE_NODE) or placed individually (MULTI_NODE).
 
-    Each kernel is an unresolved ``KernelResourceDraft``; the result list
+    Each kernel is an unresolved ``KernelResourceInput``; the result list
     corresponds positionally, so callers match results to kernels by index.
     """
 
-    kernels: list[KernelResourceDraft]
+    kernels: list[KernelResourceInput]
     cluster_mode: ClusterMode
     resource_group_id: ResourceGroupID
 
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return EntityType.SESSION
+        return EntityType.RESOURCE_GROUP
 
     @override
     def entity_id(self) -> str | None:
-        return None
+        return str(self.resource_group_id)
 
     @override
     @classmethod

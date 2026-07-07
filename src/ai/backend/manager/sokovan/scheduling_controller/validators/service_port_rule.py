@@ -40,7 +40,7 @@ class ServicePortRule(SessionSpecValidatorRule):
                         f"collide with reserved ports ({sorted(_RESERVED_PORTS)})."
                     ),
                 )
-            image_info = context.image_infos.get(kernel.execution_spec.image_id)
+            image_info = context.image_infos.get(kernel.execution_spec.resource_input.image_id)
             if image_info is None:
                 continue
             image_service_ports = self._image_service_ports(image_info.labels)

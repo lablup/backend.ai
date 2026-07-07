@@ -30,12 +30,12 @@ class KernelDryRunResult:
     matches each result to its input by list index, so no correlation handle
     is carried here.
 
-    ``remediation`` is populated only when ``schedulable`` is False; it
+    ``reason_hint`` is populated only when ``success`` is False; it
     describes what to change so the kernel would fit on one of the
     scheduling-target nodes.
     """
 
-    resolved_slots: tuple[ResourceSlotEntry, ...]
-    resolved_architecture: str
-    schedulable: bool
-    remediation: UnschedulableReasonHint | None = None
+    requested_slots: tuple[ResourceSlotEntry, ...]
+    requested_architecture: str
+    success: bool
+    reason_hint: UnschedulableReasonHint | None = None

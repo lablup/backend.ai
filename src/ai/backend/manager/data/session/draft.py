@@ -74,10 +74,11 @@ class _DraftBaseModel(BackendAISchema):
     model_config = ConfigDict(arbitrary_types_allowed=True, frozen=True)
 
 
-class KernelResourceDraft(_DraftBaseModel):
+class KernelResourceInput(_DraftBaseModel):
     """Minimal per-kernel resource inputs for requested-slots resolution.
 
-    ``image_id`` may be ``None`` when a resource-group default supplies it downstream.
+    A standalone input consumed by the scheduler dry-run; ``image_id`` may be
+    ``None`` when a resource-group default supplies it downstream.
     """
 
     image_id: ImageID | None = None
@@ -85,9 +86,14 @@ class KernelResourceDraft(_DraftBaseModel):
     resource_opts: ResourceOpts | None = None
 
 
-class KernelExecutionSpecDraft(KernelResourceDraft):
-    """Optional-heavy mirror of ``KernelExecutionSpec``."""
+class KernelExecutionSpecDraft(_DraftBaseModel):
+    """Optional-heavy mirror of ``KernelExecutionSpec``.
 
+    ``resource_input`` groups the slot-resolution inputs (image + resource
+    slots) shared with the scheduler dry-run.
+    """
+
+    resource_input: KernelResourceInput = Field(default_factory=KernelResourceInput)
     environ: Mapping[str, str] = Field(default_factory=dict)
     mounts: tuple[MountInfoEntry, ...] = ()
     startup_command: str | None = None

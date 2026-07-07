@@ -51,7 +51,7 @@ class ImageSlotTypeRule(SessionSpecValidatorRule):
             )
         errors: list[str] = []
         for idx, kernel in enumerate(spec.kernel_specs):
-            image_info = context.image_infos.get(kernel.execution_spec.image_id)
+            image_info = context.image_infos.get(kernel.execution_spec.resource_input.image_id)
             if image_info is None:
                 continue
             min_slots = image_min_slots(image_info)

@@ -40,7 +40,7 @@ class RequiredResourceSlotRule(SessionSpecValidatorRule):
         for idx, kernel in enumerate(spec.kernel_specs):
             requested = {
                 entry.resource_type: parse_quantity(entry.quantity)
-                for entry in kernel.execution_spec.resources
+                for entry in kernel.execution_spec.resource_input.resources
             }
             missing = sorted(
                 str(slot_name)

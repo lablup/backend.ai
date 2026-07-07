@@ -64,7 +64,7 @@ class ComputeKernelResourcesRule(SessionSpecDraftRule):
 
         new_groups = []
         for group in draft.options.kernel_groups:
-            image_id = group.execution_spec.image_id
+            image_id = group.execution_spec.resource_input.image_id
             image_info = context.image_infos.get(image_id) if image_id is not None else None
             if image_info is None:
                 new_groups.append(group)
@@ -82,13 +82,19 @@ class ComputeKernelResourcesRule(SessionSpecDraftRule):
         image_info: ImageInfo,
     ) -> KernelExecutionSpecDraft:
         raw_min_slots = image_min_slots(image_info)
-        resolved_opts = cls._resolve_resource_opts(draft.resource_opts, image_info.labels)
+        resolved_opts = cls._resolve_resource_opts(
+            draft.resource_input.resource_opts, image_info.labels
+        )
         min_slots = cls._apply_shmem_to_mem_min(raw_min_slots, resolved_opts.shmem)
-        resolved_resources = cls._fill_intrinsic_slots(draft.resources, min_slots)
+        resolved_resources = cls._fill_intrinsic_slots(draft.resource_input.resources, min_slots)
         return draft.model_copy(
             update={
-                "resources": resolved_resources,
-                "resource_opts": resolved_opts,
+                "resource_input": draft.resource_input.model_copy(
+                    update={
+                        "resources": resolved_resources,
+                        "resource_opts": resolved_opts,
+                    }
+                ),
             }
         )
 

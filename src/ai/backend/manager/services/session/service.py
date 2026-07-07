@@ -54,6 +54,7 @@ from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.session.draft import (
     KernelExecutionSpecDraft,
     KernelGroupDraft,
+    KernelResourceInput,
     SchedulingTargetDraft,
     SessionClassificationDraft,
     SessionIdentityDraft,
@@ -1627,9 +1628,11 @@ class SessionService:
             cluster_size=action.resource.cluster_size,
             preopen_ports=preopen_ports,
             execution_spec=KernelExecutionSpecDraft(
-                image_id=ImageID(action.image_id),
-                resources=resource_entries,
-                resource_opts=resource_opts,
+                resource_input=KernelResourceInput(
+                    image_id=ImageID(action.image_id),
+                    resources=resource_entries,
+                    resource_opts=resource_opts,
+                ),
                 environ=environ,
                 mounts=mount_entries,
                 startup_command=startup_command,

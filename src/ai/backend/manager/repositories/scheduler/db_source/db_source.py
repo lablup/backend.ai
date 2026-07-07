@@ -1382,9 +1382,9 @@ class ScheduleDBSource:
 
         async with self._begin_session_read_committed() as db_sess:
             image_ids = {
-                kernel.execution_spec.image_id
+                kernel.execution_spec.resource_input.image_id
                 for kernel in spec.kernel_specs
-                if kernel.execution_spec.image_id is not None
+                if kernel.execution_spec.resource_input.image_id is not None
             }
             image_metadata: dict[ImageID, ImageInfo] = {}
             if image_ids:
@@ -1406,7 +1406,7 @@ class ScheduleDBSource:
                 }
 
             for kernel in spec.kernel_specs:
-                image_id = kernel.execution_spec.image_id
+                image_id = kernel.execution_spec.resource_input.image_id
                 if image_id is not None and image_id not in image_metadata:
                     raise ImageNotFound(
                         f"Image {image_id} referenced by kernel "
@@ -1436,8 +1436,8 @@ class ScheduleDBSource:
                     spec=spec,
                     kernel_spec=kernel,
                     image_info=(
-                        image_metadata.get(kernel.execution_spec.image_id)
-                        if kernel.execution_spec.image_id is not None
+                        image_metadata.get(kernel.execution_spec.resource_input.image_id)
+                        if kernel.execution_spec.resource_input.image_id is not None
                         else None
                     ),
                     enqueue_time=enqueue_time,
@@ -1580,7 +1580,7 @@ class ScheduleDBSource:
             image_ids: list[UUID] = []
             seen_ids: set[UUID] = set()
             for group in kernel_specs:
-                img = group.execution_spec.image_id
+                img = group.execution_spec.resource_input.image_id
                 if img is None:
                     continue
                 img_uuid = UUID(str(img))

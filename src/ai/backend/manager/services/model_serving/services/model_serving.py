@@ -69,6 +69,7 @@ from ai.backend.manager.data.model_serving.types import (
 from ai.backend.manager.data.session.draft import (
     KernelExecutionSpecDraft,
     KernelGroupDraft,
+    KernelResourceInput,
     SchedulingTargetDraft,
     SessionClassificationDraft,
     SessionIdentityDraft,
@@ -442,9 +443,11 @@ class ModelServingService:
         kernel_groups = await self._resolve_kernel_groups(
             cluster_size=action.cluster_size,
             execution_spec=KernelExecutionSpecDraft(
-                image_id=ImageID(image_data.id),
-                resources=resource_entries,
-                resource_opts=resource_opts,
+                resource_input=KernelResourceInput(
+                    image_id=ImageID(image_data.id),
+                    resources=resource_entries,
+                    resource_opts=resource_opts,
+                ),
                 environ=environ,
                 mounts=mount_entries,
                 startup_command=action.startup_command,
