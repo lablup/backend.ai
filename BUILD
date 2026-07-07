@@ -10,6 +10,8 @@ python_requirements(
         "etcd-client-py": ["etcd_client"],
         "graphql-core": ["graphql"],
         "graphql-relay": ["graphql_relay"],
+        "grpcio": ["grpc"],
+        "protobuf": ["google.protobuf", "google"],
         "habana-pyhlml": ["pyhlml"],
         "more-itertools": ["more_itertools"],
         "pycryptodome": ["Crypto"],

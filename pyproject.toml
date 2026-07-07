@@ -80,6 +80,7 @@ asyncio_default_fixture_loop_scope = "function"
 [tool.ruff]
 line-length = 100
 src = ["src"]
+extend-exclude = ["src/ai/backend/agent/containerd/_grpcapi"]
 
 [tool.ruff.lint]
 extend-safe-fixes = ["UP030", "UP031", "UP037", "UP040", "UP046", "UP047", "PLC0415"]
@@ -407,3 +408,8 @@ warn_required_dynamic_aliases = false
 
 [tool.setuptools.dynamic]
 version = { file = "VERSION" }
+
+[[tool.mypy.overrides]]
+module = "ai.backend.agent.containerd._grpcapi.*"
+ignore_errors = true
+follow_imports = "skip"
