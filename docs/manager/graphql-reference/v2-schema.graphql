@@ -11440,6 +11440,7 @@ input RoleFilter {
   source: RoleSourceFilter = null
   status: RoleStatusFilter = null
   assignedUser: RoleUserNestedFilter = null
+  mappedScope: RoleMappedScopeNestedFilter = null
   AND: [RoleFilter!] = null
   OR: [RoleFilter!] = null
   NOT: [RoleFilter!] = null
@@ -11560,6 +11561,17 @@ Added in 26.4.4. Nested filter for a user (inviter or invitee) of an invitation.
 """
 input RoleInvitationUserNestedFilter {
   email: StringFilter = null
+}
+
+"""
+Added in 26.8.0. Filter roles by the scope they are mapped (registered) to.
+"""
+input RoleMappedScopeNestedFilter {
+  scopeType: RBACElementTypeFilter = null
+  scopeId: StringFilter = null
+  AND: [RoleMappedScopeNestedFilter!] = null
+  OR: [RoleMappedScopeNestedFilter!] = null
+  NOT: [RoleMappedScopeNestedFilter!] = null
 }
 
 """Added in 26.3.0. Order by specification for roles"""

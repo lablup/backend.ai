@@ -219,6 +219,32 @@ class RoleConditions:
 
         return inner
 
+    @staticmethod
+    def by_mapped_scope(
+        scope_conditions: list[QueryCondition],
+    ) -> QueryCondition:
+        """Match roles registered in a scope satisfying ``scope_conditions`` (correlated EXISTS).
+
+        The role-to-scope binding lives in ``association_scopes_entities`` as a row with
+        ``entity_type == ROLE`` and ``entity_id == role.id``. All ``scope_conditions`` must be
+        satisfied by the same association row.
+        """
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            subq = (
+                sa.select(sa.literal(1))
+                .where(
+                    AssociationScopesEntitiesRow.entity_type == EntityType.ROLE,
+                    AssociationScopesEntitiesRow.entity_id == sa.cast(RoleRow.id, sa.String),
+                )
+                .correlate(RoleRow)
+            )
+            for cond in scope_conditions:
+                subq = subq.where(cond())
+            return sa.exists(subq)
+
+        return inner
+
 
 class PermissionConditions:
     """Query conditions for permissions."""
@@ -745,6 +771,94 @@ class EntityScopeConditions:
             return AssociationScopesEntitiesRow.scope_id == scope_id
 
         return inner
+
+    @staticmethod
+    def by_scope_type_equals(element_type: RBACElementType) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return AssociationScopesEntitiesRow.scope_type == element_type.to_scope_type()
+
+        return inner
+
+    @staticmethod
+    def by_scope_type_not_equals(element_type: RBACElementType) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return AssociationScopesEntitiesRow.scope_type != element_type.to_scope_type()
+
+        return inner
+
+    @staticmethod
+    def by_scope_type_in(element_types: Collection[RBACElementType]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return AssociationScopesEntitiesRow.scope_type.in_([
+                et.to_scope_type() for et in element_types
+            ])
+
+        return inner
+
+    @staticmethod
+    def by_scope_type_not_in(element_types: Collection[RBACElementType]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return AssociationScopesEntitiesRow.scope_type.not_in([
+                et.to_scope_type() for et in element_types
+            ])
+
+        return inner
+
+    @staticmethod
+    def by_scope_id_contains(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = AssociationScopesEntitiesRow.scope_id.ilike(f"%{spec.value}%")
+            else:
+                condition = AssociationScopesEntitiesRow.scope_id.like(f"%{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_scope_id_equals(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = (
+                    sa.func.lower(AssociationScopesEntitiesRow.scope_id) == spec.value.lower()
+                )
+            else:
+                condition = AssociationScopesEntitiesRow.scope_id == spec.value
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_scope_id_starts_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = AssociationScopesEntitiesRow.scope_id.ilike(f"{spec.value}%")
+            else:
+                condition = AssociationScopesEntitiesRow.scope_id.like(f"{spec.value}%")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_scope_id_ends_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.case_insensitive:
+                condition = AssociationScopesEntitiesRow.scope_id.ilike(f"%{spec.value}")
+            else:
+                condition = AssociationScopesEntitiesRow.scope_id.like(f"%{spec.value}")
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    by_scope_id_in = staticmethod(make_string_in_factory(AssociationScopesEntitiesRow.scope_id))
 
     @staticmethod
     def by_entity_type(element_type: RBACElementType) -> QueryCondition:
