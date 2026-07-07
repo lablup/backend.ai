@@ -16,7 +16,7 @@ import asyncio
 import json
 import logging
 from collections.abc import Awaitable, Callable, Mapping, Sequence
-from typing import Any
+from typing import Any, override
 
 from ai.backend.agent.containerd.runtime import ContainerdRuntimeClient, TaskHandle
 from ai.backend.logging import BraceStyleAdapter
@@ -69,10 +69,12 @@ class NerdctlRuntimeClient(ContainerdRuntimeClient):
         return out
 
     # --- image service ---
+    @override
     async def image_exists(self, image_ref: str) -> bool:
         rc, _, _ = await self._runner([*self._base(), "image", "inspect", image_ref])
         return rc == 0
 
+    @override
     async def pull_image(self, image_ref: str, *, auth: Mapping[str, str] | None = None) -> None:
         args = ["pull"]
         if auth and (user := auth.get("username")) and (pw := auth.get("password")):
@@ -80,16 +82,20 @@ class NerdctlRuntimeClient(ContainerdRuntimeClient):
         args.append(image_ref)
         await self._run(args)
 
+    @override
     async def list_images(self) -> Sequence[str]:
         out = await self._run(["images", "--format", "{{.Repository}}:{{.Tag}}"])
         return [line.strip() for line in out.splitlines() if line.strip()]
 
+    @override
     async def remove_image(self, image_ref: str) -> None:
         await self._run(["rmi", image_ref])
 
+    @override
     async def push_image(self, image_ref: str) -> None:
         await self._run(["push", image_ref])
 
+    @override
     async def image_entrypoint(self, image_ref: str) -> list[str] | None:
         rc, out, _ = await self._runner([
             *self._base(),
@@ -113,6 +119,7 @@ class NerdctlRuntimeClient(ContainerdRuntimeClient):
         return _parse(entrypoint_raw) or _parse(cmd_raw)
 
     # --- container/task lifecycle ---
+    @override
     async def create_container(
         self,
         container_id: str,
@@ -152,6 +159,7 @@ class NerdctlRuntimeClient(ContainerdRuntimeClient):
         log.debug("nerdctl create argv: {}", " ".join(self._base() + args))
         await self._run(args)
 
+    @override
     async def start_container(self, container_id: str) -> TaskHandle:
         await self._run(["start", container_id])
         pid = await self.container_pid(container_id)
@@ -159,17 +167,21 @@ class NerdctlRuntimeClient(ContainerdRuntimeClient):
             raise NerdctlError(f"container {container_id} has no PID after start")
         return TaskHandle(container_id=container_id, pid=pid)
 
+    @override
     async def kill_container(self, container_id: str, *, signal: int) -> None:
         await self._run(["kill", "--signal", str(signal), container_id], ok_codes=(0, 1))
 
+    @override
     async def remove_container(self, container_id: str) -> None:
         await self._run(["rm", "--force", container_id], ok_codes=(0, 1))
 
     # --- introspection ---
+    @override
     async def list_containers(self) -> Sequence[str]:
         out = await self._run(["ps", "--all", "--format", "{{.Names}}"])
         return [line.strip() for line in out.splitlines() if line.strip()]
 
+    @override
     async def container_pid(self, container_id: str) -> int | None:
         rc, out, _ = await self._runner([
             *self._base(),
@@ -193,6 +205,7 @@ class NerdctlRuntimeClient(ContainerdRuntimeClient):
                 return None
         return pid or None
 
+    @override
     async def container_status(self, container_id: str) -> str | None:
         rc, out, _ = await self._runner([
             *self._base(),
@@ -205,6 +218,7 @@ class NerdctlRuntimeClient(ContainerdRuntimeClient):
             return None
         return out.strip() or None
 
+    @override
     async def container_ip(self, container_id: str) -> str | None:
         rc, out, _ = await self._runner([
             *self._base(),
@@ -218,6 +232,7 @@ class NerdctlRuntimeClient(ContainerdRuntimeClient):
         return out.strip() or None
 
     # --- networks ---
+    @override
     async def create_network(self, name: str) -> None:
         # idempotent: skip if it already exists (network inspect rc==0).
         rc, _, _ = await self._runner([*self._base(), "network", "inspect", name])
@@ -225,5 +240,6 @@ class NerdctlRuntimeClient(ContainerdRuntimeClient):
             return
         await self._run(["network", "create", name])
 
+    @override
     async def remove_network(self, name: str) -> None:
         await self._run(["network", "rm", name], ok_codes=(0, 1))

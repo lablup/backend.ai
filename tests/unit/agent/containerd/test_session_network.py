@@ -1,6 +1,6 @@
 import json
 from collections.abc import AsyncIterator, Mapping, Sequence
-from typing import Any, cast
+from typing import Any, cast, override
 
 import pytest
 
@@ -103,33 +103,44 @@ class FakeRuntime(ContainerdRuntimeClient):
     def __init__(self) -> None:
         self.calls: list[str] = []
 
+    @override
     async def image_exists(self, image_ref: str) -> bool:
         return True
 
+    @override
     async def pull_image(
         self, image_ref: str, *, auth: Mapping[str, str] | None = None
     ) -> None: ...
+    @override
     async def list_images(self) -> Sequence[str]:
         return []
 
+    @override
     async def remove_image(self, image_ref: str) -> None: ...
+    @override
     async def push_image(self, image_ref: str) -> None: ...
 
+    @override
     async def image_entrypoint(self, image_ref: str) -> list[str] | None:
         return ["/entry"]
 
+    @override
     async def container_status(self, container_id: str) -> str | None:
         return "running"
 
+    @override
     async def container_ip(self, container_id: str) -> str | None:
         return "172.20.0.2"
 
+    @override
     async def create_network(self, name: str) -> None:
         self.calls.append(f"create_network:{name}")
 
+    @override
     async def remove_network(self, name: str) -> None:
         self.calls.append(f"remove_network:{name}")
 
+    @override
     async def create_container(
         self,
         container_id: str,
@@ -141,19 +152,24 @@ class FakeRuntime(ContainerdRuntimeClient):
     ) -> None:
         self.calls.append(f"create:{container_id}:{image_ref}")
 
+    @override
     async def start_container(self, container_id: str) -> TaskHandle:
         self.calls.append(f"start:{container_id}")
         return TaskHandle(container_id=container_id, pid=9001)
 
+    @override
     async def kill_container(self, container_id: str, *, signal: int) -> None:
         self.calls.append(f"kill:{container_id}:{signal}")
 
+    @override
     async def remove_container(self, container_id: str) -> None:
         self.calls.append(f"remove:{container_id}")
 
+    @override
     async def list_containers(self) -> Sequence[str]:
         return []
 
+    @override
     async def container_pid(self, container_id: str) -> int | None:
         return 9001
 

@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 import uuid
 from collections.abc import Mapping
-from typing import Any
+from typing import Any, override
 
 from ai.backend.common.configs.etcd import EtcdConfig
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
@@ -53,6 +53,7 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         self._etcd = None
         self._forced_backend = None
 
+    @override
     async def init(self, context: Any = None) -> None:
         # Build a dedicated AsyncEtcd from the manager's etcd config (same pattern as
         # OverlayNetworkPlugin constructing its own Docker client). local_config is the
@@ -66,11 +67,13 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         self._vni_allocator = VNIAllocator(self._etcd)
         self._endpoint_allocator = EndpointAllocator(self._etcd)
 
+    @override
     async def cleanup(self) -> None:
         if self._etcd is not None:
             await self._etcd.close()
             self._etcd = None
 
+    @override
     async def update_plugin_config(self, plugin_config: Mapping[str, Any]) -> None:
         return await super().update_plugin_config(plugin_config)
 
@@ -79,6 +82,7 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
             raise RuntimeError("CNINetworkPlugin is not initialized (call init() first)")
         return self._etcd
 
+    @override
     async def create_network(
         self, *, identifier: str | None = None, options: dict[str, Any] | None = None
     ) -> NetworkInfo:
@@ -143,6 +147,7 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
                 scope=ConfigScopes.GLOBAL,
             )
 
+    @override
     async def destroy_network(self, network_id: str) -> None:
         etcd = self._require_etcd()
         raw = await etcd.get(session_meta_key(network_id), scope=ConfigScopes.GLOBAL)

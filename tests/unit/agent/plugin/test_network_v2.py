@@ -1,4 +1,4 @@
-from typing import cast
+from typing import cast, override
 
 import pytest
 
@@ -32,30 +32,39 @@ _META = SessionNetMeta(
 class _CompleteV2Plugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
     """Minimal concrete backend implementing every abstract method."""
 
+    @override
     async def init(self, context: object = None) -> None:
         return None
 
+    @override
     async def cleanup(self) -> None:
         return None
 
+    @override
     async def update_plugin_config(self, plugin_config: object) -> None:
         return None
 
+    @override
     async def probe_caps(self) -> AgentNetworkCaps:
         return AgentNetworkCaps(tunnel_offload=False, native_routing_ok=True, backends=["vxlan"])
 
+    @override
     async def setup_session_network(self, meta: SessionNetMeta, self_member: Member) -> None:
         return None
 
+    @override
     async def teardown_session_network(self, session_id: str) -> None:
         return None
 
+    @override
     async def add_peer(self, session_id: str, peer: Member) -> None:
         return None
 
+    @override
     async def del_peer(self, session_id: str, peer: Member) -> None:
         return None
 
+    @override
     async def attach_endpoint(
         self,
         kernel_config: KernelCreationConfig,
@@ -82,6 +91,7 @@ class _CompleteV2Plugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
             ]
         )
 
+    @override
     async def detach_endpoint(self, kernel: AbstractKernel) -> None:
         return None
 
@@ -89,6 +99,7 @@ class _CompleteV2Plugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
 class _IncompleteV2Plugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
     """Missing several abstract methods -> not instantiable."""
 
+    @override
     async def probe_caps(self) -> AgentNetworkCaps:
         return AgentNetworkCaps(tunnel_offload=False, native_routing_ok=False)
 

@@ -13,7 +13,7 @@ import asyncio
 import ipaddress
 import logging
 from collections.abc import Awaitable, Callable, Sequence
-from typing import Any
+from typing import Any, override
 
 from ai.backend.agent.kernel import AbstractKernel
 from ai.backend.agent.network.caps import probe_caps
@@ -229,15 +229,19 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
                 return candidate
         raise RuntimeError("node-local LOCAL subnet pool exhausted (>256 sessions/node)")
 
+    @override
     async def init(self, context: Any = None) -> None:
         pass
 
+    @override
     async def cleanup(self) -> None:
         pass
 
+    @override
     async def update_plugin_config(self, plugin_config: Any) -> None:
         self.plugin_config = plugin_config
 
+    @override
     async def probe_caps(self) -> AgentNetworkCaps:
         return await probe_caps(self._uplink)
 
@@ -248,6 +252,7 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         except RuntimeError:
             pass
 
+    @override
     async def setup_session_network(self, meta: SessionNetMeta, self_member: Member) -> None:
         if meta.backend is not NetworkBackendKind.VXLAN or meta.vni is None:
             raise ValueError(f"VxlanNetworkPlugin requires a vxlan meta with a VNI: {meta}")
@@ -268,6 +273,7 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         await self._runner(link_up_args(bridge_dev(vni)))
         self._sessions[meta.session_id] = meta
 
+    @override
     async def teardown_session_network(self, session_id: str) -> None:
         meta = self._sessions.pop(session_id, None)
         self._local_subnets.pop(session_id, None)
@@ -281,12 +287,14 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
             except RuntimeError:
                 log.debug("link {} already gone during teardown of {}", dev, session_id)
 
+    @override
     async def add_peer(self, session_id: str, peer: Member) -> None:
         meta = self._sessions.get(session_id)
         if meta is None or meta.vni is None or peer.vtep_ip is None:
             return
         await self._runner(fdb_append_args(meta.vni, peer.vtep_ip))
 
+    @override
     async def del_peer(self, session_id: str, peer: Member) -> None:
         meta = self._sessions.get(session_id)
         if meta is None or meta.vni is None or peer.vtep_ip is None:
@@ -296,6 +304,7 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         except RuntimeError:
             log.debug("fdb entry for {} already gone in session {}", peer.vtep_ip, session_id)
 
+    @override
     async def add_endpoint(self, session_id: str, *, ip: str, mac: str, vtep_ip: str) -> None:
         """Proactively program a remote endpoint: unicast MAC→VTEP FDB + permanent ARP.
 
@@ -306,6 +315,7 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         await self._runner(fdb_replace_args(meta.vni, mac, vtep_ip))
         await self._runner(neigh_replace_args(meta.vni, ip, mac))
 
+    @override
     async def del_endpoint(self, session_id: str, *, ip: str, mac: str, vtep_ip: str) -> None:
         meta = self._sessions.get(session_id)
         if meta is None or meta.vni is None:
@@ -316,6 +326,7 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
             except RuntimeError:
                 log.debug("endpoint entry {} already gone in session {}", ip, session_id)
 
+    @override
     async def attach_endpoint(
         self,
         kernel_config: KernelCreationConfig,
@@ -348,5 +359,6 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
             ]
         )
 
+    @override
     async def detach_endpoint(self, kernel: AbstractKernel) -> None:
         pass

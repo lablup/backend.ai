@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import override
+
 from aiohttp import web
 
 from ai.backend.common.exception import (
@@ -17,6 +19,7 @@ class NetworkPoolExhausted(BackendAIError, web.HTTPServiceUnavailable):
     error_type = "https://api.backend.ai/probs/network-pool-exhausted"
     error_title = "No free subnet is available in the cluster-network IPAM pool."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.SESSION,
@@ -29,6 +32,7 @@ class VNIPoolExhausted(BackendAIError, web.HTTPServiceUnavailable):
     error_type = "https://api.backend.ai/probs/vni-pool-exhausted"
     error_title = "No free VNI is available in the cluster-network VNI range."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.SESSION,
@@ -48,6 +52,7 @@ class NetworkBackendMismatch(BackendAIError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/network-backend-mismatch"
     error_title = "Agent network backend does not match the cluster network driver."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.SESSION,
