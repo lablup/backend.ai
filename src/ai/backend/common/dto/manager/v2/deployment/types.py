@@ -9,7 +9,7 @@ from enum import StrEnum
 from typing import Any
 from uuid import UUID
 
-from pydantic import Field, model_validator
+from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
@@ -23,6 +23,7 @@ from ai.backend.common.data.model_deployment.types import (
 from ai.backend.common.dto.manager.v2.common import OrderDirection, ResourceSlotInfo
 from ai.backend.common.dto.manager.v2.resource_slot.types import ResourceOptsInfoDTO
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
+from ai.backend.common.schema.deployment import IntOrPercent
 from ai.backend.common.types import (
     BackendAISchema,
     ClusterMode,
@@ -72,7 +73,6 @@ __all__ = (
     "RouteStatus",
     "RouteTrafficStatus",
     "RuntimeVariant",
-    "IntOrPercent",
     "ProjectDeploymentScope",
 )
 
@@ -111,41 +111,6 @@ class RouteOrderField(StrEnum):
     CREATED_AT = "created_at"
     STATUS = "status"
     TRAFFIC_RATIO = "traffic_ratio"
-
-
-class IntOrPercent(BackendAISchema):
-    """A rolling-update budget value: either an absolute count or a percentage.
-
-    Exactly one of ``count`` or ``percent`` must be provided (oneOf semantics).
-
-    - ``{"count": 2}``        — absolute replica count
-    - ``{"percent": 0.25}``   — fraction of desired replicas (0.0-1.0)
-    """
-
-    count: int | None = Field(default=None, ge=0)
-    percent: float | None = Field(default=None, ge=0.0, le=1.0)
-
-    @model_validator(mode="after")
-    def _validate_one_of(self) -> IntOrPercent:
-        has_count = self.count is not None
-        has_percent = self.percent is not None
-        if has_count == has_percent:
-            raise ValueError("Exactly one of 'count' or 'percent' must be provided.")
-        return self
-
-    @property
-    def is_count(self) -> bool:
-        return self.count is not None
-
-    @property
-    def is_percent(self) -> bool:
-        return self.percent is not None
-
-    @property
-    def is_zero(self) -> bool:
-        if self.count is not None:
-            return self.count == 0
-        return self.percent == 0.0
 
 
 class DeploymentBasicInfo(BaseResponseModel):

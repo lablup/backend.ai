@@ -7,10 +7,10 @@ from dataclasses import dataclass
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.identifier.replica_group import ReplicaGroupID
+from ai.backend.common.schema.deployment import ReplicaGroupRolloutSpec
 from ai.backend.manager.data.deployment.types import (
     DeploymentHandlerOptions,
     ReplicaGroupLifecycle,
-    ReplicaGroupRolloutSpec,
     ReplicaGroupScalingStatus,
 )
 from ai.backend.manager.data.reconciler.types import LastHistory

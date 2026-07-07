@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from uuid import UUID
 
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
-from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUpdateSpec
+from ai.backend.common.schema.deployment import BlueGreenSpec, RollingUpdateSpec
 
 
 @dataclass

@@ -36,11 +36,11 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     ScaleDeploymentInput,
     UpdateDeploymentInput,
 )
-from ai.backend.common.dto.manager.v2.deployment.types import IntOrPercent
 from ai.backend.common.exception import BackendAISchemaValidationFailed
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.common.identifier.vfolder import VFolderUUID
+from ai.backend.common.schema.deployment import IntOrPercent
 from ai.backend.common.types import ClusterMode
 
 

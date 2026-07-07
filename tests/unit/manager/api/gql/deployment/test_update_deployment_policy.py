@@ -27,10 +27,10 @@ from ai.backend.common.dto.manager.v2.deployment.response import (
 from ai.backend.common.dto.manager.v2.deployment.types import (
     BlueGreenConfigInfo,
     BlueGreenStrategySpecInfo,
-    IntOrPercent,
     RollingUpdateConfigInfo,
     RollingUpdateStrategySpecInfo,
 )
+from ai.backend.common.schema.deployment import IntOrPercent
 from ai.backend.manager.api.gql import utils as gql_utils
 from ai.backend.manager.api.gql.deployment.resolver import policy as policy_resolver
 from ai.backend.manager.api.gql.deployment.types.policy import (
