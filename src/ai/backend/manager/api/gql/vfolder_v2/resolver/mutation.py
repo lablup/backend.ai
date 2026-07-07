@@ -10,6 +10,7 @@ from ai.backend.common.dto.manager.v2.vfolder.request import (
     PurgeVFolderInput,
     PurgeVFolderOptions,
 )
+from ai.backend.common.identifier.user import UserID
 from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_mutation
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.vfolder_v2.types.mutations import (
@@ -66,8 +67,12 @@ async def create_vfolder_v2(
 async def delete_vfolder_v2(
     info: Info[StrawberryGQLContext],
     vfolder_id: UUID,
+    owner_id: UUID | None = None,
 ) -> DeleteVFolderPayloadGQL | None:
-    payload = await info.context.adapters.vfolder.delete(vfolder_id)
+    payload = await info.context.adapters.vfolder.delete(
+        vfolder_id,
+        owner_id=UserID(owner_id) if owner_id is not None else None,
+    )
     return DeleteVFolderPayloadGQL.from_pydantic(payload)
 
 
