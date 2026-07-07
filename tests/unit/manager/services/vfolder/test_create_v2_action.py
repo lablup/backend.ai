@@ -59,9 +59,7 @@ class TestCreateVFolderV2ActionDelegationScope:
 
     def test_project_scope_ignores_owner(self) -> None:
         project_id = uuid.uuid4()
-        action = _make_action(
-            user_id=uuid.uuid4(), owner_id=uuid.uuid4(), project_id=project_id
-        )
+        action = _make_action(user_id=uuid.uuid4(), owner_id=uuid.uuid4(), project_id=project_id)
 
         # Project-owned vfolders authorize against the project, not a user.
         assert action.scope_id() == str(project_id)
