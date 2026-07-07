@@ -28240,6 +28240,20 @@
             "description": "Whether the vfolder is cloneable",
             "title": "Cloneable",
             "type": "boolean"
+          },
+          "owner_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Delegated owner user UUID. When set, the vfolder is created on behalf of the specified user instead of the caller. Authorization stays scoped to the project.",
+            "title": "Owner Id"
           }
         },
         "required": [
