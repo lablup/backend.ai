@@ -26279,6 +26279,20 @@
             "description": "Force-terminate without waiting for cleanup.",
             "title": "Forced",
             "type": "boolean"
+          },
+          "owner_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Delegated owner user UUID. When set, the sessions are terminated on behalf of the specified user; all target sessions must be owned by that user.",
+            "title": "Owner Id"
           }
         },
         "required": [
