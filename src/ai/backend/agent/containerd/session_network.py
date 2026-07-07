@@ -16,11 +16,13 @@ Each backend is instantiated per session with the backend the manager selected.
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any
 
 from ai.backend.agent.containerd.orchestrator import ContainerdKernelOrchestrator, LaunchResult
 from ai.backend.agent.containerd.runtime import ContainerdRuntimeClient
+from ai.backend.agent.containerd.session_tracker import SessionContainerTracker, TeardownScope
 from ai.backend.agent.network.cni import CniRunner
 from ai.backend.agent.network.coordinator import SessionNetworkCoordinator
 from ai.backend.agent.network.provisioner import ContainerNetworkProvisioner
@@ -30,11 +32,14 @@ from ai.backend.common.network.types import (
     NetworkBackendKind,
     SessionNetMeta,
 )
+from ai.backend.logging import BraceStyleAdapter
 
 if TYPE_CHECKING:
     from ai.backend.agent.plugin.network_v2 import AbstractNetworkAgentPluginV2
     from ai.backend.common.etcd import AbstractKVStore
     from ai.backend.common.types import ClusterInfo, KernelCreationConfig
+
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 _DEFAULT_MTU = 1500
 
@@ -66,6 +71,9 @@ class ContainerdSessionNetwork:
     _backends: Mapping[str, AbstractNetworkAgentPluginV2[Any]]
     _coordinators: dict[str, SessionNetworkCoordinator]
     _orchestrators: dict[str, ContainerdKernelOrchestrator]
+    # Tracks container<->session so the last kernel's removal deterministically tears the
+    # session network down (otherwise overlay devices + etcd members leak).
+    _tracker: SessionContainerTracker
 
     def __init__(
         self,
@@ -85,6 +93,7 @@ class ContainerdSessionNetwork:
         self._backends = backends
         self._coordinators = {}
         self._orchestrators = {}
+        self._tracker = SessionContainerTracker()
 
     def _resolve_backend(self, meta: SessionNetMeta) -> AbstractNetworkAgentPluginV2[Any]:
         try:
@@ -109,14 +118,21 @@ class ContainerdSessionNetwork:
         """Resolve the session's backend, set up this node's data plane, publish
         membership, and register the per-session coordinator + orchestrator."""
         meta = session_net_meta_from_network_config(session_id, network_config)
+        if session_id in self._coordinators:
+            # Already set up on this node (e.g. a second kernel of the same session placed
+            # here). Session-network setup is per node, not per kernel — do it once.
+            return meta
         backend = self._resolve_backend(meta)
         coordinator = SessionNetworkCoordinator(self._etcd, backend, self._agent_id)
         orchestrator = ContainerdKernelOrchestrator(
             self._runtime, ContainerNetworkProvisioner(backend, self._cni_runner)
         )
+        # Register only AFTER a successful start, so a partial failure (which raises here)
+        # doesn't leave a half-set-up coordinator that the idempotency check above would
+        # then skip on retry — a retry must re-run the full setup cleanly.
+        await coordinator.start(meta, self._self_member(meta))
         self._coordinators[session_id] = coordinator
         self._orchestrators[session_id] = orchestrator
-        await coordinator.start(meta, self._self_member(meta))
         return meta
 
     async def teardown_session(self, session_id: str) -> None:
@@ -137,7 +153,7 @@ class ContainerdSessionNetwork:
         kernel_config: KernelCreationConfig,
         cluster_info: ClusterInfo,
     ) -> LaunchResult:
-        return await self._orchestrators[session_id].launch(
+        result = await self._orchestrators[session_id].launch(
             container_id,
             image_ref=image_ref,
             command=command,
@@ -146,6 +162,8 @@ class ContainerdSessionNetwork:
             kernel_config=kernel_config,
             cluster_info=cluster_info,
         )
+        self._tracker.track(session_id, container_id)
+        return result
 
     async def create_container(
         self,
@@ -160,6 +178,7 @@ class ContainerdSessionNetwork:
         await self._orchestrators[session_id].create(
             container_id, image_ref=image_ref, command=command, oci_spec=oci_spec
         )
+        self._tracker.track(session_id, container_id)
 
     # --- single-node path (no cluster overlay; plain bridge, mirrors Docker) ---
 
@@ -181,9 +200,13 @@ class ContainerdSessionNetwork:
         net = self.local_network_name(session_id)
         await self._runtime.create_network(net)
         await self._runtime.create_container(
-            container_id, image_ref=image_ref, command=command, oci_spec=oci_spec,
+            container_id,
+            image_ref=image_ref,
+            command=command,
+            oci_spec=oci_spec,
             network=net,
         )
+        self._tracker.track(session_id, container_id, local=True)
 
     async def start_local_container(self, container_id: str) -> tuple[int, str | None]:
         """Start a single-node container; return (task_pid, container_ip)."""
@@ -211,9 +234,7 @@ class ContainerdSessionNetwork:
     async def terminate_container(
         self, session_id: str, container_id: str, *, plan: EndpointPlan, task_pid: int
     ) -> None:
-        await self._orchestrators[session_id].terminate(
-            container_id, plan=plan, task_pid=task_pid
-        )
+        await self._orchestrators[session_id].terminate(container_id, plan=plan, task_pid=task_pid)
 
     async def image_entrypoint(self, image_ref: str) -> list[str] | None:
         return await self._runtime.image_entrypoint(image_ref)
@@ -235,6 +256,22 @@ class ContainerdSessionNetwork:
 
     async def remove_container(self, container_id: str) -> None:
         await self._runtime.remove_container(container_id)
+        scope = self._tracker.untrack(container_id)
+        if scope is not None:
+            await self._teardown_session_network(scope)
+
+    async def _teardown_session_network(self, scope: TeardownScope) -> None:
+        """The last kernel of a session on this node is gone — tear its network down
+        deterministically: the overlay coordinator (devices + etcd member) or the
+        per-session local bridge. Best-effort: a teardown failure must not break kernel
+        cleanup, but it is logged so leaks are visible."""
+        try:
+            if scope.local:
+                await self.teardown_local_session(scope.session_id)
+            elif scope.session_id in self._coordinators:
+                await self.teardown_session(scope.session_id)
+        except Exception:
+            log.exception("session network teardown failed for {}", scope.session_id)
 
 
 def build_containerd_session_network(

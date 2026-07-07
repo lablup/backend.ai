@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from ai.backend.agent.containerd.runtime import ContainerdRuntimeClient, TaskHandle
-from ai.backend.common.network.types import EndpointPlan, SessionNetMeta
+from ai.backend.common.network.types import EndpointPlan, NetworkRole, SessionNetMeta
 
 if TYPE_CHECKING:
     from ai.backend.agent.network.provisioner import ContainerNetworkProvisioner
@@ -27,6 +27,12 @@ if TYPE_CHECKING:
 class LaunchResult:
     handle: TaskHandle
     plan: EndpointPlan
+    endpoint_ips: dict[NetworkRole, str]
+
+    @property
+    def local_ip(self) -> str | None:
+        """The host-reachable LOCAL IP — the address the agent uses to reach the kernel."""
+        return self.endpoint_ips.get(NetworkRole.LOCAL)
 
 
 class ContainerdKernelOrchestrator:
@@ -70,14 +76,14 @@ class ContainerdKernelOrchestrator:
     ) -> LaunchResult:
         """Start the (already created) container's task, then attach CNI to its netns."""
         handle = await self._runtime.start_container(container_id)
-        plan = await self._network.attach(
+        plan, endpoint_ips = await self._network.attach(
             kernel_config,
             cluster_info,
             meta=meta,
             container_id=container_id,
             task_pid=handle.pid,
         )
-        return LaunchResult(handle=handle, plan=plan)
+        return LaunchResult(handle=handle, plan=plan, endpoint_ips=endpoint_ips)
 
     async def launch(
         self,
@@ -91,9 +97,7 @@ class ContainerdKernelOrchestrator:
         cluster_info: ClusterInfo,
     ) -> LaunchResult:
         """Convenience: create then start+attach in one call (single-step callers)."""
-        await self.create(
-            container_id, image_ref=image_ref, command=command, oci_spec=oci_spec
-        )
+        await self.create(container_id, image_ref=image_ref, command=command, oci_spec=oci_spec)
         return await self.start_and_attach(
             container_id, meta=meta, kernel_config=kernel_config, cluster_info=cluster_info
         )

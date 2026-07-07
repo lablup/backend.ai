@@ -8,13 +8,10 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, cast
 
-import pytest
-
 from ai.backend.agent.containerd.agent import ContainerdKernelCreationContext
-from ai.backend.agent.resources import Mount
-from ai.backend.common.types import MountPermission, MountTypes
 from ai.backend.agent.containerd.orchestrator import LaunchResult
 from ai.backend.agent.containerd.runtime import TaskHandle
+from ai.backend.agent.resources import Mount
 from ai.backend.common.network.types import (
     AttachKind,
     EndpointPlan,
@@ -23,6 +20,7 @@ from ai.backend.common.network.types import (
     NetworkRole,
     SessionNetMeta,
 )
+from ai.backend.common.types import MountPermission, MountTypes
 
 _VXLAN_NC = {"backend": "vxlan", "subnet": "10.128.5.0/24", "vni": 4097, "mtu": 1450}
 
@@ -34,14 +32,18 @@ class FakeFacade:
         self.local_created: list[str] = []
         self.local_started: list[str] = []
 
-    async def create_local_container(self, session_id: str, container_id: str, *, image_ref: str, command: Any, oci_spec: Any) -> None:
+    async def create_local_container(
+        self, session_id: str, container_id: str, *, image_ref: str, command: Any, oci_spec: Any
+    ) -> None:
         self.local_created.append(container_id)
 
     async def start_local_container(self, container_id: str) -> tuple[int, str | None]:
         self.local_started.append(container_id)
         return 777, "172.20.0.5"
 
-    async def create_container(self, session_id: str, container_id: str, *, image_ref: str, command: Any, oci_spec: Any) -> None:
+    async def create_container(
+        self, session_id: str, container_id: str, *, image_ref: str, command: Any, oci_spec: Any
+    ) -> None:
         pass
 
     async def ensure_session(self, session_id: str, network_config: Any) -> SessionNetMeta:
@@ -55,18 +57,33 @@ class FakeFacade:
         )
 
     async def start_and_attach_container(
-        self, session_id: str, container_id: str, *, meta: Any, kernel_config: Any, cluster_info: Any
+        self,
+        session_id: str,
+        container_id: str,
+        *,
+        meta: Any,
+        kernel_config: Any,
+        cluster_info: Any,
     ) -> LaunchResult:
         self.started.append((session_id, container_id))
         plan = EndpointPlan(
             attachments=[
                 NetworkAttachSpec(
-                    kind=AttachKind.CNI, interface_name="baimulti0",
-                    role=NetworkRole.OVERLAY, ip="10.128.5.7", cni_config={},
+                    kind=AttachKind.CNI,
+                    interface_name="baimulti0",
+                    role=NetworkRole.OVERLAY,
+                    ip="10.128.5.7",
+                    cni_config={},
                 )
             ]
         )
-        return LaunchResult(handle=TaskHandle(container_id=container_id, pid=555), plan=plan)
+        return LaunchResult(
+            handle=TaskHandle(container_id=container_id, pid=555),
+            plan=plan,
+            # agent reaches the kernel via the LOCAL interface (host is its gateway),
+            # NOT the overlay IP (unreachable from the host)
+            endpoint_ips={NetworkRole.LOCAL: "172.30.1.2", NetworkRole.OVERLAY: "10.128.5.7"},
+        )
 
 
 def _context(facade: FakeFacade) -> ContainerdKernelCreationContext:
@@ -77,7 +94,9 @@ def _context(facade: FakeFacade) -> ContainerdKernelCreationContext:
     ctx._net_meta = None
     ctx._oci_mounts = []
     ctx._scratch_dir = None
-    ctx._pending_spec = SimpleNamespace(image_ref="img:1", oci_spec={}, command=["/opt/kernel/entrypoint.sh"])
+    ctx._pending_spec = SimpleNamespace(
+        image_ref="img:1", oci_spec={}, command=["/opt/kernel/entrypoint.sh"]
+    )
     ctx.kernel_config = cast(Any, {})
     return ctx
 
@@ -108,7 +127,9 @@ class TestApplyNetwork:
 class TestScratchAndMounts:
     async def test_prepare_scratch_creates_config_and_work(self, tmp_path: Path) -> None:
         ctx = _context(FakeFacade())
-        ctx.local_config = cast(Any, SimpleNamespace(container=SimpleNamespace(scratch_root=tmp_path)))
+        ctx.local_config = cast(
+            Any, SimpleNamespace(container=SimpleNamespace(scratch_root=tmp_path))
+        )
         await ctx.prepare_scratch()
         assert (tmp_path / "kern-123" / "config").is_dir()
         assert (tmp_path / "kern-123" / "work").is_dir()
@@ -143,12 +164,13 @@ class TestStartContainer:
         assert result["kernel_host"] == "172.20.0.5"  # container bridge IP
         assert result["task_pid"] == 777
 
-    async def test_starts_and_reports_overlay_host(self) -> None:
+    async def test_starts_and_reports_local_host(self) -> None:
         facade = FakeFacade()
         ctx = _context(facade)
         await ctx.apply_network(cast(Any, {"network_config": _VXLAN_NC}))
         result = await ctx.start_container(cast(Any, None), [], None, [], cast(Any, {}))
         assert facade.started == [("sess-abc", "kern-123")]
-        assert result["kernel_host"] == "10.128.5.7"  # overlay IP
+        # kernel_host is the LOCAL IP (host-reachable), not the overlay IP
+        assert result["kernel_host"] == "172.30.1.2"
         assert result["task_pid"] == 555
         assert result["container_id"] == "kern-123"

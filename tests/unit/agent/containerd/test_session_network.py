@@ -54,9 +54,9 @@ class FakeEtcd:
 
     async def get_prefix(self, prefix: str, **kwargs: Any) -> dict[str, str]:
         return {
-            k[len(prefix):]: v
+            k[len(prefix) :]: v
             for k, v in self.store.items()
-            if k.startswith(prefix) and "/" not in k[len(prefix):]
+            if k.startswith(prefix) and "/" not in k[len(prefix) :]
         }
 
     async def watch_prefix(self, prefix: str, **kwargs: Any) -> AsyncIterator[None]:
@@ -69,13 +69,16 @@ class RecordingBackend:
 
     def __init__(self) -> None:
         self.setup: list[str] = []
+        self.torndown: list[str] = []
         self.last_self_member: Member | None = None
 
     async def setup_session_network(self, meta: SessionNetMeta, self_member: Member) -> None:
         self.setup.append(meta.session_id)
         self.last_self_member = self_member
 
-    async def teardown_session_network(self, session_id: str) -> None: ...
+    async def teardown_session_network(self, session_id: str) -> None:
+        self.torndown.append(session_id)
+
     async def add_peer(self, session_id: str, peer: Member) -> None: ...
     async def del_peer(self, session_id: str, peer: Member) -> None: ...
     async def probe_caps(self) -> AgentNetworkCaps:
@@ -87,8 +90,10 @@ class RecordingBackend:
         return EndpointPlan(
             attachments=[
                 NetworkAttachSpec(
-                    kind=AttachKind.CNI, interface_name="baimulti0",
-                    role=NetworkRole.OVERLAY, cni_config={"type": "bridge"},
+                    kind=AttachKind.CNI,
+                    interface_name="baimulti0",
+                    role=NetworkRole.OVERLAY,
+                    cni_config={"type": "bridge"},
                 )
             ]
         )
@@ -101,7 +106,9 @@ class FakeRuntime(ContainerdRuntimeClient):
     async def image_exists(self, image_ref: str) -> bool:
         return True
 
-    async def pull_image(self, image_ref: str, *, auth: Mapping[str, str] | None = None) -> None: ...
+    async def pull_image(
+        self, image_ref: str, *, auth: Mapping[str, str] | None = None
+    ) -> None: ...
     async def list_images(self) -> Sequence[str]:
         return []
 
@@ -124,7 +131,13 @@ class FakeRuntime(ContainerdRuntimeClient):
         self.calls.append(f"remove_network:{name}")
 
     async def create_container(
-        self, container_id: str, *, image_ref: str, command: Sequence[str], oci_spec: Mapping[str, Any], network: str = "none"
+        self,
+        container_id: str,
+        *,
+        image_ref: str,
+        command: Sequence[str],
+        oci_spec: Mapping[str, Any],
+        network: str = "none",
     ) -> None:
         self.calls.append(f"create:{container_id}:{image_ref}")
 
@@ -181,6 +194,7 @@ class TestEnsureSession:
         try:
             assert backend.setup == ["s1"]
             # vxlan -> self member advertises its vtep = host_ip
+            assert backend.last_self_member is not None
             assert backend.last_self_member.vtep_ip == "192.168.0.10"
             # membership published to etcd
             assert "network/session/s1/members/agent-1" in etcd.store
@@ -195,6 +209,7 @@ class TestEnsureSession:
         facade = _facade(etcd, backend, runner)
         await facade.ensure_session("s2", _HOSTGW_NC)
         try:
+            assert backend.last_self_member is not None
             assert backend.last_self_member.vtep_ip is None
         finally:
             await facade.teardown_session("s2")
@@ -207,8 +222,14 @@ class TestLaunchTerminate:
         meta = await facade.ensure_session("s1", _VXLAN_NC)  # registers the orchestrator
         try:
             result = await facade.launch_container(
-                "s1", "c1", image_ref="img", command=["sleep", "600"], oci_spec={},
-                meta=meta, kernel_config=cast(Any, {}), cluster_info=cast(Any, {}),
+                "s1",
+                "c1",
+                image_ref="img",
+                command=["sleep", "600"],
+                oci_spec={},
+                meta=meta,
+                kernel_config=cast(Any, {}),
+                cluster_info=cast(Any, {}),
             )
             assert result.handle.pid == 9001
             assert runner.calls == [("ADD", "/proc/9001/ns/net")]
@@ -220,7 +241,7 @@ class TestSplitAndTeardown:
     async def test_create_container_routes_to_runtime(self) -> None:
         etcd, backend, runner, rt = FakeEtcd(), RecordingBackend(), RecordingRunner(), FakeRuntime()
         facade = _facade(etcd, backend, runner, runtime=rt)
-        meta = await facade.ensure_session("s1", _VXLAN_NC)
+        await facade.ensure_session("s1", _VXLAN_NC)
         try:
             await facade.create_container(
                 "s1", "c1", image_ref="img:1", command=["sleep", "1"], oci_spec={}
@@ -252,13 +273,55 @@ class TestSplitAndTeardown:
         assert rt.calls == ["kill:c1:9", "remove:c1"]
 
 
+class TestDeterministicTeardown:
+    async def test_removing_last_kernel_tears_down_session_network(self) -> None:
+        etcd, backend, runner, rt = FakeEtcd(), RecordingBackend(), RecordingRunner(), FakeRuntime()
+        facade = _facade(etcd, backend, runner, runtime=rt)
+        await facade.ensure_session("s1", _VXLAN_NC)
+        await facade.create_container("s1", "c1", image_ref="img", command=[], oci_spec={})
+        assert "network/session/s1/members/agent-1" in etcd.store
+
+        await facade.remove_container("c1")
+
+        # last kernel gone -> devices + membership torn down, coordinator dropped
+        assert backend.torndown == ["s1"]
+        assert "network/session/s1/members/agent-1" not in etcd.store
+        assert "s1" not in facade._coordinators
+
+    async def test_teardown_only_after_last_kernel_removed(self) -> None:
+        etcd, backend, runner, rt = FakeEtcd(), RecordingBackend(), RecordingRunner(), FakeRuntime()
+        facade = _facade(etcd, backend, runner, runtime=rt)
+        await facade.ensure_session("s1", _VXLAN_NC)
+        await facade.create_container("s1", "c1", image_ref="img", command=[], oci_spec={})
+        await facade.create_container("s1", "c2", image_ref="img", command=[], oci_spec={})
+
+        await facade.remove_container("c1")
+        assert backend.torndown == []  # c2 still alive -> keep the network
+        assert "s1" in facade._coordinators
+
+        await facade.remove_container("c2")
+        assert backend.torndown == ["s1"]  # now the last one is gone
+
+    async def test_removing_local_session_container_removes_local_network(self) -> None:
+        etcd, backend, runner, rt = FakeEtcd(), RecordingBackend(), RecordingRunner(), FakeRuntime()
+        facade = _facade(etcd, backend, runner, runtime=rt)
+        await facade.create_local_container("s1", "c1", image_ref="img", command=[], oci_spec={})
+        await facade.remove_container("c1")
+        assert f"remove_network:{facade.local_network_name('s1')}" in rt.calls
+
+    async def test_remove_untracked_container_is_noop_teardown(self) -> None:
+        etcd, backend, runner, rt = FakeEtcd(), RecordingBackend(), RecordingRunner(), FakeRuntime()
+        facade = _facade(etcd, backend, runner, runtime=rt)
+        await facade.remove_container("unknown")  # never created here
+        assert backend.torndown == []
+        assert rt.calls == ["remove:unknown"]
+
+
 class TestBackendResolution:
     async def test_selects_backend_by_session_config(self) -> None:
         etcd, runner = FakeEtcd(), RecordingRunner()
         vxlan_b, hostgw_b = RecordingBackend(), RecordingBackend()
-        facade = _facade(
-            etcd, vxlan_b, runner, backends={"vxlan": vxlan_b, "host-gw": hostgw_b}
-        )
+        facade = _facade(etcd, vxlan_b, runner, backends={"vxlan": vxlan_b, "host-gw": hostgw_b})
         await facade.ensure_session("sv", _VXLAN_NC)
         await facade.ensure_session("sh", _HOSTGW_NC)
         try:
@@ -297,7 +360,7 @@ class TestFactory:
             cni_runner=runner,
             backends={"vxlan": cast(Any, backend)},
         )
-        assert facade._backends["vxlan"] is backend
+        assert cast(Any, facade._backends["vxlan"]) is backend
 
 
 @pytest.mark.parametrize("nc", [_VXLAN_NC, _HOSTGW_NC])

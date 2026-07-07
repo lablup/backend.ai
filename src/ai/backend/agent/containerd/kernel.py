@@ -13,10 +13,10 @@ import os
 from collections.abc import Mapping
 from typing import Any, override
 
+from ai.backend.agent.errors.kernel import KernelRunnerNotInitializedError
 from ai.backend.agent.kernel import (
     AbstractCodeRunner,
     AbstractKernel,
-    KernelRunnerNotInitializedError,
 )
 from ai.backend.agent.types import AgentEventData, KernelOwnershipData
 from ai.backend.common.docker import ImageRef
@@ -82,7 +82,7 @@ class ContainerdKernel(AbstractKernel):
         return self.runner
 
     @override
-    async def check_status(self) -> dict[str, Any]:
+    async def check_status(self) -> dict[str, Any] | None:
         return await self._require_runner().feed_and_get_status()
 
     @override

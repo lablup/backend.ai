@@ -14,12 +14,14 @@ ContainerNetworkProvisioner attaches each container's task PID via CNI.
 from __future__ import annotations
 
 import asyncio
+import logging
 import signal
+import subprocess
 from collections.abc import Mapping, Sequence
-from importlib.resources import files
 from decimal import Decimal
+from importlib.resources import files
 from pathlib import Path
-from typing import Any, Literal, override
+from typing import Any, override
 
 from ai.backend.agent.agent import (
     AbstractAgent,
@@ -29,6 +31,7 @@ from ai.backend.agent.agent import (
 from ai.backend.agent.errors import UnsupportedResource
 from ai.backend.agent.kernel import AbstractKernel
 from ai.backend.agent.kernel_registry.writer.types import KernelRegistrySaveMetadata
+from ai.backend.agent.network.caps import publish_vtep
 from ai.backend.agent.resources import (
     AbstractComputePlugin,
     ComputerContext,
@@ -37,10 +40,14 @@ from ai.backend.agent.resources import (
     known_slot_types,
 )
 from ai.backend.agent.types import Container, KernelOwnershipData, MountInfo
-from ai.backend.common.docker import ImageRef
+from ai.backend.common.arch import CURRENT_ARCH
+from ai.backend.common.docker import ImageRef, LabelName
 from ai.backend.common.dto.agent.response import PurgeImageResp, PurgeImagesResp
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.events.dispatcher import EventProducer
+from ai.backend.common.exception import ImageNotAvailable
+from ai.backend.common.json import dump_json_str
+from ai.backend.common.network.types import SessionNetMeta
 from ai.backend.common.types import (
     AutoPullBehavior,
     ClusterInfo,
@@ -58,14 +65,10 @@ from ai.backend.common.types import (
     ResourceSlot,
     Sentinel,
     ServicePort,
-    SessionId,
     SlotName,
     current_resource_slots,
 )
-
-from ai.backend.common.docker import LabelName
-from ai.backend.common.exception import ImageNotAvailable
-from ai.backend.common.network.types import SessionNetMeta
+from ai.backend.logging import BraceStyleAdapter
 
 from .kernel import ContainerdKernel
 from .oci import KRUNNER_ENTRYPOINT, translate_creation_config
@@ -74,7 +77,26 @@ from .session_network import (
     build_containerd_session_network,
 )
 
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
 _TODO = "containerd backend: not yet implemented (requires containerd gRPC client)"
+
+
+def _uplink_for_ip(host_ip: str) -> str:
+    """Resolve the local interface that owns ``host_ip`` (the VTEP address).
+
+    The vxlan device must be created on the interface carrying the node's advertised
+    (VTEP) IP so the overlay rides the same L2 the agents reach each other on. Falls back
+    to ``eth0`` if no interface matches (single-node / misconfiguration)."""
+    import socket
+
+    import psutil
+
+    for iface, addrs in psutil.net_if_addrs().items():
+        for addr in addrs:
+            if addr.family == socket.AF_INET and addr.address == host_ip:
+                return iface
+    return "eth0"
 
 
 class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKernel]):
@@ -148,9 +170,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
     async def prepare_scratch(self) -> None:
         # Create the per-kernel scratch dirs (config/ + work/). Full parity (tmpfs/loop
         # scratch types, dotfile cloning) is a follow-up.
-        scratch_dir = (
-            self.local_config.container.scratch_root / str(self._container_id)
-        ).resolve()
+        scratch_dir = (self.local_config.container.scratch_root / str(self._container_id)).resolve()
         config_dir = scratch_dir / "config"
         work_dir = scratch_dir / "work"
 
@@ -166,16 +186,18 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         # The kernel runner requires the per-kernel scratch dirs: config/ (RO) at
         # /home/config and work/ (RW) at /home/work. prepare_scratch created them.
         # (lxcfs, /etc/localtime, coredump, domain-socket proxies are follow-ups.)
-        scratch_dir = (
-            self.local_config.container.scratch_root / str(self._container_id)
-        ).resolve()
+        scratch_dir = (self.local_config.container.scratch_root / str(self._container_id)).resolve()
         return [
             Mount(
-                MountTypes.BIND, scratch_dir / "config", Path("/home/config"),
+                MountTypes.BIND,
+                scratch_dir / "config",
+                Path("/home/config"),
                 MountPermission.READ_ONLY,
             ),
             Mount(
-                MountTypes.BIND, scratch_dir / "work", Path("/home/work"),
+                MountTypes.BIND,
+                scratch_dir / "work",
+                Path("/home/work"),
                 MountPermission.READ_WRITE,
             ),
         ]
@@ -205,12 +227,46 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
 
     @override
     async def prepare_ssh(self, cluster_info: ClusterInfo) -> None:
-        # Minimal: ensure the ssh config dir exists. Dropbear host-key generation + cluster
-        # keypair writing (needs the dropbearmulti krunner binary) is a follow-up.
+        # Provision the cluster SSH material into config/ssh (mounted at /home/config/ssh)
+        # for PARITY with DockerAgent: the id_cluster keypair enables passwordless
+        # chief<->worker SSH that distributed workloads (MPI/torchrun/bssh) rely on, and
+        # port-mapping.json carries the cluster SSH port map. This is NOT required for the
+        # kernel to reach RUNNING (verified: the container's own dropbear self-generates its
+        # host key and the runner does not consume id_cluster at startup) — it is the
+        # multi-node cluster-session contract for user workloads. Best-effort throughout.
         if self._scratch_dir is None:
             return
-        ssh_dir = self._scratch_dir / "config" / "ssh"
-        await asyncio.to_thread(lambda: ssh_dir.mkdir(parents=True, exist_ok=True))
+        scratch_dir = self._scratch_dir
+        sshkey = cluster_info.get("ssh_keypair")
+        port_mapping = cluster_info.get("cluster_ssh_port_mapping")
+
+        def _write() -> None:
+            ssh_dir = scratch_dir / "config" / "ssh"
+            ssh_dir.mkdir(parents=True, exist_ok=True)
+            if sshkey is not None:
+                priv = ssh_dir / "id_cluster"
+                priv.write_text(sshkey["private_key"])
+                priv.chmod(0o600)
+                (ssh_dir / "id_cluster.pub").write_text(sshkey["public_key"])
+            if port_mapping is not None:
+                (ssh_dir / "port-mapping.json").write_text(dump_json_str(port_mapping))
+            host_key = ssh_dir / "dropbear_rsa_host_key"
+            if not host_key.is_file():
+                dropbear = self.resolve_krunner_filepath(f"runner/dropbearmulti.{CURRENT_ARCH}.bin")
+                if dropbear.exists():
+                    try:
+                        subprocess.run(
+                            [str(dropbear), "dropbearkey", "-t", "rsa", "-s", "2048",
+                             "-f", str(host_key)],
+                            check=True, capture_output=True,
+                        )  # fmt: skip
+                        host_key.chmod(0o600)
+                    except subprocess.CalledProcessError:
+                        log.debug(
+                            "dropbear host key generation failed; will regenerate in container"
+                        )
+
+        await asyncio.to_thread(_write)
 
     @override
     async def process_mounts(self, mounts: Sequence[Mount]) -> None:
@@ -303,9 +359,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
                 oci_spec=spec.oci_spec,
             )
             # start on the bridge; kernel_host = container's bridge IP.
-            task_pid, ip = await self._session_network.start_local_container(
-                self._container_id
-            )
+            task_pid, ip = await self._session_network.start_local_container(self._container_id)
             kernel_host = ip or "127.0.0.1"
         else:
             await self._session_network.create_container(
@@ -323,19 +377,24 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
                 kernel_config=self.kernel_config,
                 cluster_info=cluster_info,
             )
-            overlay = result.plan.overlay()
             task_pid = result.handle.pid
-            kernel_host = overlay.ip if overlay and overlay.ip else "127.0.0.1"
-        # NOTE: real REPL/service ports come from the krunner running inside the kernel,
-        # which is not yet wired; report the container/network facts we have.
+            # The agent reaches the kernel's REPL over the LOCAL interface (the host is that
+            # bridge's gateway); the OVERLAY IP is only reachable between kernels, not from
+            # the host, so it must NOT be used as kernel_host.
+            kernel_host = result.local_ip or "127.0.0.1"
+        # REPL ports are the krunner intrinsic, container-internal ports (self.repl_ports);
+        # the agent connects to them directly at kernel_host (the container's bridge/overlay
+        # IP), so no host-port mapping is needed (cf. DockerAgent's container_network_info
+        # path). stdin/stdout ports are legacy and unused (0), matching DockerAgent.
+        repl_in_port, repl_out_port = self.repl_ports
         return {
             "container_id": self._container_id,
             "task_pid": task_pid,
             "kernel_host": kernel_host,
-            "repl_in_port": 2000,
-            "repl_out_port": 2001,
-            "stdin_port": 2002,
-            "stdout_port": 2003,
+            "repl_in_port": repl_in_port,
+            "repl_out_port": repl_out_port,
+            "stdin_port": 0,  # legacy
+            "stdout_port": 0,  # legacy
             "host_ports": [],
             "domain_socket_proxies": [],
             "block_service_ports": False,
@@ -350,19 +409,30 @@ class ContainerdAgent(
     AbstractAgent[ContainerdKernel, ContainerdKernelCreationContext],
 ):
     _session_network: ContainerdSessionNetwork
+    _host_ip: str
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         # Cluster networking is delegated to the BEP-1055 agent.network stack via a
-        # (verified) facade; the kernel-creation lifecycle will drive it. The uplink /
-        # cni_path defaults should later be sourced from a containerd network config.
+        # (verified) facade; the kernel-creation lifecycle will drive it. The vxlan uplink
+        # must be the interface carrying this node's VTEP (host_ip) — deriving it from the
+        # host_ip keeps the overlay on the same L2 the agents advertise on, instead of a
+        # hard-coded eth0.
         container_cfg = self.local_config.container
-        host_ip = str(container_cfg.advertised_host or container_cfg.bind_host)
+        self._host_ip = str(container_cfg.advertised_host or container_cfg.bind_host)
         self._session_network = build_containerd_session_network(
             self.etcd,
             agent_id=str(self.id),
-            host_ip=host_ip,
+            host_ip=self._host_ip,
+            uplink=_uplink_for_ip(self._host_ip),
         )
+
+    @override
+    async def __ainit__(self) -> None:
+        await super().__ainit__()
+        # Advertise this node's VTEP so the manager can pre-seed session membership and
+        # eliminate the peer-publish race for multi-node overlays (BEP-1055).
+        await publish_vtep(self.etcd, str(self.id), self._host_ip)
 
     # execute is inherited from AbstractAgent: it delegates to kernel_obj.execute (the code
     # runner's ZMQ REPL), which is runtime-agnostic. No override needed.
