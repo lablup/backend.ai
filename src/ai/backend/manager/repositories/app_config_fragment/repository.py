@@ -9,6 +9,7 @@ from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPoli
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.data.app_config_fragment.types import (
+    AppConfigFragmentBulkResult,
     AppConfigFragmentData,
     AppConfigFragmentSearchResult,
 )
@@ -17,7 +18,13 @@ from ai.backend.manager.models.scopes import SearchScope
 from ai.backend.manager.repositories.app_config_fragment.db_source import (
     AppConfigFragmentDBSource,
 )
-from ai.backend.manager.repositories.base import BatchQuerier, Creator, Purger, Updater
+from ai.backend.manager.repositories.base import (
+    BatchQuerier,
+    BulkCreator,
+    Creator,
+    Purger,
+    Updater,
+)
 from ai.backend.manager.repositories.ops import DBOpsProvider
 
 __all__ = ("AppConfigFragmentRepository",)
@@ -75,3 +82,24 @@ class AppConfigFragmentRepository:
         self, querier: BatchQuerier, scopes: Sequence[SearchScope]
     ) -> AppConfigFragmentSearchResult:
         return await self._db_source.scoped_search(querier, scopes)
+
+    @app_config_fragment_repository_resilience.apply()
+    async def bulk_create(
+        self,
+        bulk_creator: BulkCreator[AppConfigFragmentRow],
+    ) -> AppConfigFragmentBulkResult:
+        return await self._db_source.bulk_create(bulk_creator)
+
+    @app_config_fragment_repository_resilience.apply()
+    async def bulk_update(
+        self,
+        updaters: Sequence[Updater[AppConfigFragmentRow]],
+    ) -> AppConfigFragmentBulkResult:
+        return await self._db_source.bulk_update(updaters)
+
+    @app_config_fragment_repository_resilience.apply()
+    async def bulk_purge(
+        self,
+        purgers: Sequence[Purger[AppConfigFragmentRow]],
+    ) -> AppConfigFragmentBulkResult:
+        return await self._db_source.bulk_purge(purgers)

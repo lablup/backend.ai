@@ -13,6 +13,8 @@ from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPoli
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.data.app_config_fragment.types import (
+    AppConfigFragmentBulkItemError,
+    AppConfigFragmentBulkResult,
     AppConfigFragmentData,
     AppConfigFragmentSearchResult,
 )
@@ -23,6 +25,7 @@ from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentR
 from ai.backend.manager.models.scopes import SearchScope
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
+    BulkCreator,
     Creator,
     Purger,
     Querier,
@@ -96,6 +99,70 @@ class AppConfigFragmentDBSource:
             if result is None:
                 raise AppConfigFragmentNotFound(f"App config fragment {purger.pk_value} not found")
             return result.row.to_data()
+
+    @app_config_fragment_db_source_resilience.apply()
+    async def bulk_create(
+        self,
+        bulk_creator: BulkCreator[AppConfigFragmentRow],
+    ) -> AppConfigFragmentBulkResult:
+        """Create many fragments with per-item partial success."""
+        async with self._ops.write_ops() as w:
+            result = await w.bulk_create_partial(bulk_creator)
+            return AppConfigFragmentBulkResult(
+                succeeded=[row.to_data() for row in result.successes],
+                failed=[
+                    AppConfigFragmentBulkItemError(index=error.index, message=str(error.exception))
+                    for error in result.errors
+                ],
+            )
+
+    @app_config_fragment_db_source_resilience.apply()
+    async def bulk_update(
+        self,
+        updaters: Sequence[Updater[AppConfigFragmentRow]],
+    ) -> AppConfigFragmentBulkResult:
+        """Update many fragments with per-item partial success."""
+        async with self._ops.write_ops() as w:
+            result = await w.bulk_update_partial(updaters)
+            succeeded = [row.to_data() for row in result.successes]
+            succeeded_ids = {data.id for data in succeeded}
+            errors_by_index = {e.index: str(e.exception) for e in result.errors}
+            # A missing PK is skipped by the partial op (no row, no error); report as not-found.
+            failed = [
+                AppConfigFragmentBulkItemError(
+                    index=index,
+                    message=errors_by_index.get(
+                        index, f"App config fragment {updater.pk_value} not found"
+                    ),
+                )
+                for index, updater in enumerate(updaters)
+                if index in errors_by_index or updater.pk_value not in succeeded_ids
+            ]
+            return AppConfigFragmentBulkResult(succeeded=succeeded, failed=failed)
+
+    @app_config_fragment_db_source_resilience.apply()
+    async def bulk_purge(
+        self,
+        purgers: Sequence[Purger[AppConfigFragmentRow]],
+    ) -> AppConfigFragmentBulkResult:
+        """Purge many fragments with per-item partial success."""
+        async with self._ops.write_ops() as w:
+            result = await w.bulk_purge_partial(list(purgers))
+            succeeded = [row.to_data() for row in result.successes]
+            succeeded_ids = {data.id for data in succeeded}
+            errors_by_index = {e.index: str(e.exception) for e in result.errors}
+            # A missing PK is skipped by the partial op (no row, no error); report as not-found.
+            failed = [
+                AppConfigFragmentBulkItemError(
+                    index=index,
+                    message=errors_by_index.get(
+                        index, f"App config fragment {purger.pk_value} not found"
+                    ),
+                )
+                for index, purger in enumerate(purgers)
+                if index in errors_by_index or purger.pk_value not in succeeded_ids
+            ]
+            return AppConfigFragmentBulkResult(succeeded=succeeded, failed=failed)
 
     @app_config_fragment_db_source_resilience.apply()
     async def admin_search(self, querier: BatchQuerier) -> AppConfigFragmentSearchResult:

@@ -39,6 +39,7 @@ from ai.backend.manager.repositories.app_config_fragment.updaters import (
 )
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
+    BulkCreator,
     Creator,
     OffsetPagination,
     Purger,
@@ -397,3 +398,174 @@ class TestScopedSearch:
             [DomainAppConfigFragmentSearchScope(domain_id=DomainID(uuid.uuid4()))],
         )
         assert result.items == []
+
+
+@pytest.fixture
+async def menu_defined(database: ExtendedAsyncSAEngine, theme_registered: None) -> None:
+    """``theme`` is allow-listed at every scope (theme_registered); ``menu`` is defined, NOT allow-listed."""
+    async with database.begin_session() as db_sess:
+        db_sess.add(AppConfigDefinitionRow(config_name="menu"))
+        await db_sess.flush()
+
+
+@pytest.fixture
+async def two_fragments(database: ExtendedAsyncSAEngine) -> list[AppConfigFragmentData]:
+    """A domain-scoped and a user-scoped ``theme`` fragment, both allow-listed."""
+    async with database.begin_session() as db_sess:
+        db_sess.add(AppConfigDefinitionRow(config_name="theme"))
+        await db_sess.flush()
+        db_sess.add_all([
+            _allow_list_row("theme", AppConfigScopeType.DOMAIN),
+            _allow_list_row("theme", AppConfigScopeType.USER),
+        ])
+        await db_sess.flush()
+        rows = [
+            AppConfigFragmentRow(
+                config_name="theme",
+                scope_type=AppConfigScopeType.DOMAIN,
+                scope_id=_DOMAIN_ID,
+                config={"a": 1},
+            ),
+            AppConfigFragmentRow(
+                config_name="theme",
+                scope_type=AppConfigScopeType.USER,
+                scope_id=_USER_ID,
+                config={"b": 2},
+            ),
+        ]
+        db_sess.add_all(rows)
+        await db_sess.flush()
+        return [row.to_data() for row in rows]
+
+
+class TestBulkCreate:
+    async def test_all_created(
+        self, repository: AppConfigFragmentRepository, theme_registered: None
+    ) -> None:
+        result = await repository.bulk_create(
+            BulkCreator(
+                specs=[
+                    AppConfigFragmentCreatorSpec(
+                        config_name="theme",
+                        scope_type=AppConfigScopeType.PUBLIC,
+                        scope_id="public",
+                        config={"a": 1},
+                    ),
+                    AppConfigFragmentCreatorSpec(
+                        config_name="theme",
+                        scope_type=AppConfigScopeType.DOMAIN,
+                        scope_id=_DOMAIN_ID,
+                        config={"b": 2},
+                    ),
+                ]
+            )
+        )
+        assert len(result.succeeded) == 2
+        assert result.failed == []
+        for fragment in result.succeeded:
+            assert (await repository.get_by_id(fragment.id)).id == fragment.id
+
+    async def test_partial_when_one_not_allow_listed(
+        self, repository: AppConfigFragmentRepository, menu_defined: None
+    ) -> None:
+        result = await repository.bulk_create(
+            BulkCreator(
+                specs=[
+                    AppConfigFragmentCreatorSpec(
+                        config_name="theme",  # allow-listed
+                        scope_type=AppConfigScopeType.DOMAIN,
+                        scope_id=_DOMAIN_ID,
+                        config={"a": 1},
+                    ),
+                    AppConfigFragmentCreatorSpec(
+                        config_name="menu",  # defined but NOT allow-listed -> FK rejects the insert
+                        scope_type=AppConfigScopeType.PUBLIC,
+                        scope_id="public",
+                        config={"b": 2},
+                    ),
+                ]
+            )
+        )
+        # partial: the allow-listed theme fragment is created; the menu item (index 1) is rejected
+        assert [f.config_name for f in result.succeeded] == ["theme"]
+        assert [f.index for f in result.failed] == [1]
+        # the created theme fragment persists (not rolled back with the rejected one)
+        search = await repository.admin_search(
+            BatchQuerier(pagination=OffsetPagination(limit=10, offset=0))
+        )
+        assert {item.config_name for item in search.items} == {"theme"}
+
+
+class TestBulkUpdate:
+    async def test_all_updated(
+        self,
+        repository: AppConfigFragmentRepository,
+        two_fragments: list[AppConfigFragmentData],
+    ) -> None:
+        result = await repository.bulk_update([
+            Updater(
+                spec=AppConfigFragmentUpdaterSpec(config=OptionalState.update({"x": 1})),
+                pk_value=two_fragments[0].id,
+            ),
+            Updater(
+                spec=AppConfigFragmentUpdaterSpec(config=OptionalState.update({"y": 2})),
+                pk_value=two_fragments[1].id,
+            ),
+        ])
+        assert [u.config for u in result.succeeded] == [{"x": 1}, {"y": 2}]
+        assert result.failed == []
+        assert (await repository.get_by_id(two_fragments[0].id)).config == {"x": 1}
+
+    async def test_partial_when_one_missing(
+        self,
+        repository: AppConfigFragmentRepository,
+        two_fragments: list[AppConfigFragmentData],
+    ) -> None:
+        missing_id = AppConfigFragmentID(uuid.uuid4())
+        result = await repository.bulk_update([
+            Updater(
+                spec=AppConfigFragmentUpdaterSpec(config=OptionalState.update({"x": 1})),
+                pk_value=two_fragments[0].id,
+            ),
+            Updater(
+                spec=AppConfigFragmentUpdaterSpec(config=OptionalState.update({"z": 9})),
+                pk_value=missing_id,  # missing -> reported
+            ),
+        ])
+        # partial: the existing fragment is updated; the missing one (index 1) is reported
+        assert [u.config for u in result.succeeded] == [{"x": 1}]
+        assert [f.index for f in result.failed] == [1]
+        assert (await repository.get_by_id(two_fragments[0].id)).config == {"x": 1}
+
+
+class TestBulkPurge:
+    async def test_all_purged(
+        self,
+        repository: AppConfigFragmentRepository,
+        two_fragments: list[AppConfigFragmentData],
+    ) -> None:
+        result = await repository.bulk_purge([
+            Purger(row_class=AppConfigFragmentRow, pk_value=fragment.id)
+            for fragment in two_fragments
+        ])
+        assert {p.id for p in result.succeeded} == {f.id for f in two_fragments}
+        assert result.failed == []
+        for fragment in two_fragments:
+            with pytest.raises(AppConfigFragmentNotFound):
+                await repository.get_by_id(fragment.id)
+
+    async def test_partial_when_one_missing(
+        self,
+        repository: AppConfigFragmentRepository,
+        two_fragments: list[AppConfigFragmentData],
+    ) -> None:
+        missing_id = AppConfigFragmentID(uuid.uuid4())
+        result = await repository.bulk_purge([
+            Purger(row_class=AppConfigFragmentRow, pk_value=two_fragments[0].id),
+            Purger(row_class=AppConfigFragmentRow, pk_value=missing_id),  # missing -> reported
+        ])
+        # partial: the existing fragment is purged; the missing one (index 1) is reported
+        assert [p.id for p in result.succeeded] == [two_fragments[0].id]
+        assert [f.index for f in result.failed] == [1]
+        with pytest.raises(AppConfigFragmentNotFound):
+            await repository.get_by_id(two_fragments[0].id)
