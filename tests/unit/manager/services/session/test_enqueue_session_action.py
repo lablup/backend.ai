@@ -43,7 +43,6 @@ class TestEnqueueSessionActionDelegationScope:
         caller_id = uuid.uuid4()
         action = _make_action(user_id=caller_id, owner_id=None)
 
-        assert action.delegated_owner_id() is None
         assert action.scope_id() == str(caller_id)
         target = action.target_element()
         assert target.element_type == RBACElementType.USER
@@ -55,7 +54,6 @@ class TestEnqueueSessionActionDelegationScope:
         action = _make_action(user_id=caller_id, owner_id=owner_id)
 
         # Delegation must authorize against the owner, never the caller.
-        assert action.delegated_owner_id() == str(owner_id)
         assert action.scope_id() == str(owner_id)
         target = action.target_element()
         assert target.element_type == RBACElementType.USER

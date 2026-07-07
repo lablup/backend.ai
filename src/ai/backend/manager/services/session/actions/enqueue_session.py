@@ -127,10 +127,6 @@ class EnqueueSessionAction(SessionScopeAction):
             element_id=str(target_user_id),
         )
 
-    @override
-    def delegated_owner_id(self) -> str | None:
-        return str(self.owner_id) if self.owner_id is not None else None
-
 
 @dataclass
 class EnqueueSessionActionResult(BaseActionResult):
