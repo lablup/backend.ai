@@ -6724,6 +6724,35 @@ input DomainWeightInputItem
   weight: Decimal = null
 }
 
+"""
+Added in 26.8.0. Per-kernel resource request for a scheduling dry-run. The image is optional when a resource-group default supplies it downstream.
+"""
+input DryRunKernelResourceInput
+  @join__type(graph: STRAWBERRY)
+{
+  imageId: ID = null
+  resources: [ResourceSlotEntryInput!] = null
+}
+
+"""
+Added in 26.8.0. Dry-run a session's scheduling against a resource group without provisioning.
+"""
+input DryRunScheduleInput
+  @join__type(graph: STRAWBERRY)
+{
+  kernels: [DryRunKernelResourceInput!]!
+  clusterMode: SessionClusterMode!
+  resourceGroupId: ID!
+}
+
+"""Added in 26.8.0. Result of a dry-run schedule request."""
+type DryRunSchedulePayload
+  @join__type(graph: STRAWBERRY)
+{
+  """Per-kernel dry-run outcomes, correlated to the request by list index."""
+  dryRunResults: [KernelDryRunResult!]!
+}
+
 """Added in 26.4.2. Breakdown of resource allocation by scope."""
 type EffectiveBreakdownV2
   @join__type(graph: STRAWBERRY)
@@ -8279,6 +8308,25 @@ type KernelConnection
 
   """Total count of the GQL nodes of the query."""
   count: Int
+}
+
+"""
+Added in 26.8.0. Dry-run outcome for a single kernel. Results correspond positionally to the requested kernels.
+"""
+type KernelDryRunResult
+  @join__type(graph: STRAWBERRY)
+{
+  """Resource slots resolved for this kernel after applying defaults."""
+  requestedSlots: [ResourceSlotEntry!]!
+
+  """Architecture resolved for this kernel."""
+  requestedArchitecture: String!
+
+  """Whether this kernel could be scheduled onto a target node."""
+  success: Boolean!
+
+  """What to change so the kernel would fit. Null when success is True."""
+  reasonHint: UnschedulableReasonHint
 }
 
 """Added in 24.09.0. A Relay edge containing a `Kernel` and its cursor."""
@@ -14555,6 +14603,11 @@ type Query
   schedulingHandlers: [SchedulingHandlerNode!] @join__field(graph: STRAWBERRY)
 
   """
+  Added in 26.8.0. Dry-run a session's scheduling against a resource group without provisioning. Returns per-kernel admission outcomes and, for kernels that do not fit, hints on what to reduce.
+  """
+  dryRunSchedule(input: DryRunScheduleInput!): DryRunSchedulePayload @join__field(graph: STRAWBERRY)
+
+  """
   Added in 26.4.2. Get allowed resource groups for a domain (admin only).
   """
   adminAllowedResourceGroupsForDomainV2(domainName: String!): AllowedResourceGroupsPayload @join__field(graph: STRAWBERRY)
@@ -19162,6 +19215,22 @@ type UnregisterStorageNamespacePayload
 {
   """ID of the unregistered storage namespace"""
   id: UUID!
+}
+
+"""
+Added in 26.8.0. What the caller could change so an unschedulable kernel would fit. Present only when the kernel's dry-run did not succeed.
+"""
+type UnschedulableReasonHint
+  @join__type(graph: STRAWBERRY)
+{
+  """Subtract these slots to fit the best-fitting node."""
+  requiredReduction: [ResourceSlotEntry!]
+
+  """Number of containers that must be freed to fit."""
+  requiredContainerReduction: Int
+
+  """Architectures that actually exist among the scheduling targets."""
+  availableArchs: [String!]
 }
 
 type UnsetQuotaScope
