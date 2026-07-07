@@ -7954,7 +7954,7 @@ type Mutation {
   deleteVfolderV2(vfolderId: UUID!): DeleteVFolderV2Payload
 
   """Added in 26.4.2. Permanently purge a virtual folder."""
-  purgeVfolderV2(vfolderId: UUID!, options: PurgeVFolderOptionsInput = null): PurgeVFolderV2Payload
+  purgeVfolderV2(vfolderId: UUID!, options: PurgeVFolderOptionsInput = null, ownerId: UUID = null): PurgeVFolderV2Payload
 
   """
   Added in 26.4.4. Restore a trashed virtual folder. RBAC enforced via scope chain.
