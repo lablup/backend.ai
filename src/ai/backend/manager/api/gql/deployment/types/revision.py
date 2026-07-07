@@ -444,7 +444,7 @@ class ModelServiceConfigGQL:
             "Shell used to run the command. If set, the kernel runs "
             "`[shell, '-c', command]`; null or empty disables shell wrapping."
         ),
-        default="/bin/bash",
+        default=None,
     )
     port: int = gql_field(description="Port number for the model service.")
     health_check: ModelHealthCheckGQL | None = gql_field(
