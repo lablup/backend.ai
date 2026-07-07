@@ -47,6 +47,7 @@ from ai.backend.common.identifier.deployment_preset import DeploymentPresetID
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.resource_group import ResourceGroupName
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import (
     AutoScalingMetricSource,
@@ -514,6 +515,14 @@ class CreateDeploymentInput(BaseRequestModel):
     initial_revision: CreateRevisionInput | None = Field(
         default=None,
         description="Initial revision configuration. If omitted, deployment is created without a revision and must be added later via add_revision.",
+    )
+    owner_id: UserID | None = Field(
+        default=None,
+        description=(
+            "Delegated owner user UUID. When set, the deployment is created on behalf of "
+            "the specified user (that user becomes the created_user / session_owner). "
+            "Caller must have permission to act on behalf of the target user."
+        ),
     )
 
 

@@ -248,7 +248,11 @@ class DeploymentProcessors(AbstractProcessorPackage):
     ) -> None:
         # Deployment CRUD
         rbac_single_entity_validators = [validators.rbac.single_entity]
-        self.create_deployment = ActionProcessor(service.create_deployment, action_monitors)
+        self.create_deployment = ActionProcessor(
+            service.create_deployment,
+            action_monitors,
+            validators=[cast(ActionValidator, validators.rbac.scope)],
+        )
         self.create_legacy_deployment = ActionProcessor(
             service.create_legacy_deployment, action_monitors
         )

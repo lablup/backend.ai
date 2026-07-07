@@ -132,6 +132,12 @@ def get(deployment_id: str) -> None:
     type=str,
     help="Initial revision as JSON string or @file path. If omitted, deployment starts without a revision.",
 )
+@click.option(
+    "--owner-id",
+    default=None,
+    type=click.UUID,
+    help="Delegated owner user UUID. Create the deployment on behalf of this user.",
+)
 def create(
     name: str,
     project_id: str,
@@ -141,6 +147,7 @@ def create(
     open_to_public: bool,
     strategy: str,
     initial_revision: str | None,
+    owner_id: UUID | None,
 ) -> None:
     """Create a deployment."""
 
@@ -155,6 +162,7 @@ def create(
         ModelDeploymentNetworkAccessInput,
     )
     from ai.backend.common.identifier.resource_group import ResourceGroupName
+    from ai.backend.common.identifier.user import UserID
 
     revision_dto: CreateRevisionInput | None = None
     if initial_revision is not None:
@@ -180,6 +188,7 @@ def create(
         ),
         replica_count=replicas,
         initial_revision=revision_dto,
+        owner_id=UserID(owner_id) if owner_id is not None else None,
     )
 
     async def _run() -> None:

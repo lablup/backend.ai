@@ -664,14 +664,17 @@ class DeploymentAdapter(BaseAdapter):
                 strategy_spec=RollingUpdateSpec(),
             )
         meta = input.metadata
+        # Delegation: when owner_id is set, the deployment is owned by that user.
+        # The RBAC scope validator authorizes the caller against the owner's scope.
+        owner_id = input.owner_id if input.owner_id is not None else created_user_id
         creator = NewDeploymentCreator(
             metadata=DeploymentMetadata(
-                name=meta.name or f"deployment-{created_user_id.hex[:8]}",
+                name=meta.name or f"deployment-{owner_id.hex[:8]}",
                 domain=meta.domain_name,
                 project=meta.project_id,
                 resource_group=meta.resource_group_name,
-                created_user=created_user_id,
-                session_owner=created_user_id,
+                created_user=owner_id,
+                session_owner=owner_id,
                 created_at=None,
                 revision_history_limit=10,
                 tag=",".join(meta.tags) if meta.tags else None,
