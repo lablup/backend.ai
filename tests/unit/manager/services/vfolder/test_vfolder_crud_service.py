@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
+from typing import Literal
 from unittest.mock import AsyncMock, MagicMock
 
 import aiohttp
@@ -482,6 +483,9 @@ class TestCreateVFolderAction:
             await vfolder_service.create(action)
 
 
+_ScopeTarget = Literal["caller", "owner", "project"]
+
+
 class TestCreateVFolderV2Action:
     """RBAC scope targeting for CreateVFolderV2Action owner delegation.
 
@@ -527,12 +531,12 @@ class TestCreateVFolderV2Action:
         with_owner: bool,
         with_project: bool,
         expected_type: RBACElementType,
-        expected_target: str,
+        expected_target: _ScopeTarget,
     ) -> None:
         caller_id = UserID(uuid.uuid4())
         owner_id = UserID(uuid.uuid4())
         project_id = ProjectID(uuid.uuid4())
-        expected_ids = {
+        expected_ids: dict[_ScopeTarget, str] = {
             "caller": str(caller_id),
             "owner": str(owner_id),
             "project": str(project_id),
