@@ -106,9 +106,7 @@ class TestEnqueueSessionActionDelegationScope:
             owner_id=enqueue_on_behalf.owner_id if delegated else None,
         )
         # Delegation must authorize against the owner, never the caller.
-        expected_id = (
-            enqueue_on_behalf.owner_id if delegated else enqueue_on_behalf.caller_id
-        )
+        expected_id = enqueue_on_behalf.owner_id if delegated else enqueue_on_behalf.caller_id
 
         assert action.scope_id() == str(expected_id)
         target = action.target_element()
