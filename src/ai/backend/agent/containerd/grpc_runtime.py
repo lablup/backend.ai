@@ -1,10 +1,9 @@
 """Native containerd gRPC ``ContainerdRuntimeClient`` (BEP-1055).
 
-Talks to the containerd daemon directly over its gRPC API (unix socket) instead of
-shelling out to the ``nerdctl`` CLI, avoiding CLI overhead and CLI-imposed limits (e.g.
-nerdctl's 4 KiB ``nerdctl/mounts`` label). Drop-in for ``NerdctlRuntimeClient``: it
-implements the same ``ContainerdRuntimeClient`` ABC, so the orchestrator and network
-layers are unchanged.
+Talks to the containerd daemon directly over its gRPC API (unix socket) — the sole
+runtime client, with no ``nerdctl``/``ctr`` CLI dependency (and none of the CLI-imposed
+limits such as nerdctl's 4 KiB ``nerdctl/mounts`` label). Implements the
+``ContainerdRuntimeClient`` ABC, so the orchestrator and network layers are unchanged.
 
 Covers the full ContainerdRuntimeClient surface over the containerd gRPC API alone (no
 ctr/nerdctl), verified against live containerd v2.2.1: the connection, container/task
@@ -101,6 +100,7 @@ class ContainerdGrpcRuntimeClient(ContainerdRuntimeClient):
         self._transfer = None
         self._rootfs: dict[str, list[mount_pb2.Mount]] = {}
 
+    @override
     async def open(self) -> None:
         """Establish the gRPC channel and service stubs (idempotent)."""
         if self._channel is not None:
@@ -113,6 +113,7 @@ class ContainerdGrpcRuntimeClient(ContainerdRuntimeClient):
         self._snapshots = snapshots_pb2_grpc.SnapshotsStub(self._channel)
         self._transfer = transfer_pb2_grpc.TransferStub(self._channel)
 
+    @override
     async def close(self) -> None:
         if self._channel is not None:
             await self._channel.close()
@@ -410,18 +411,3 @@ class ContainerdGrpcRuntimeClient(ContainerdRuntimeClient):
             transfer_pb2.TransferRequest(source=source, destination=destination),
             metadata=self._md,
         )
-
-    @override
-    async def container_ip(self, container_id: str) -> str | None:
-        # The BEP-1055 network layer owns CNI/addressing; the runtime does not resolve IPs.
-        return None
-
-    @override
-    async def create_network(self, name: str) -> None:
-        # containerd has no "network" object (unlike nerdctl's named networks); the BEP-1055
-        # network layer attaches CNI directly. Nothing to create at the runtime level.
-        return None
-
-    @override
-    async def remove_network(self, name: str) -> None:
-        return None

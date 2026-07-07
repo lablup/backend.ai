@@ -30,17 +30,6 @@ class FakeFacade:
     def __init__(self) -> None:
         self.ensured: list[tuple[str, dict[str, Any]]] = []
         self.started: list[tuple[str, str]] = []
-        self.local_created: list[str] = []
-        self.local_started: list[str] = []
-
-    async def create_local_container(
-        self, session_id: str, container_id: str, *, image_ref: str, command: Any, oci_spec: Any
-    ) -> None:
-        self.local_created.append(container_id)
-
-    async def start_local_container(self, container_id: str) -> tuple[int, str | None]:
-        self.local_started.append(container_id)
-        return 777, "172.20.0.5"
 
     async def create_container(
         self, session_id: str, container_id: str, *, image_ref: str, command: Any, oci_spec: Any
@@ -122,18 +111,23 @@ class TestApplyNetwork:
         assert ctx._net_meta is not None
         assert ctx._net_meta.vni == 4097
 
-    async def test_noop_without_backend(self) -> None:
+    async def test_synthesizes_bridge_without_backend(self) -> None:
+        # single-node: no manager backend -> synthesize a node-local BRIDGE config so the
+        # same CNI path applies (no nerdctl-managed network).
         facade = FakeFacade()
         ctx = _context(facade)
         await ctx.apply_network(cast(Any, {"network_config": {}}))
-        assert facade.ensured == []
-        assert ctx._net_meta is None
+        assert len(facade.ensured) == 1
+        assert facade.ensured[0][1]["backend"] == "bridge"
+        assert ctx._net_meta is not None
+        assert ctx._net_meta.backend is NetworkBackendKind.BRIDGE
 
-    async def test_noop_without_network_config(self) -> None:
+    async def test_synthesizes_bridge_without_network_config(self) -> None:
         facade = FakeFacade()
         ctx = _context(facade)
         await ctx.apply_network(cast(Any, {}))
-        assert facade.ensured == []
+        assert len(facade.ensured) == 1
+        assert facade.ensured[0][1]["backend"] == "bridge"
 
 
 class TestScratchAndMounts:
@@ -167,14 +161,16 @@ class TestScratchAndMounts:
 
 
 class TestStartContainer:
-    async def test_single_node_uses_bridge_and_reports_container_ip(self) -> None:
-        # no apply_network / _net_meta -> single-node: bridge network, kernel_host = container IP
+    async def test_single_node_bridge_uses_cni_path_and_local_ip(self) -> None:
+        # single-node: apply_network synthesizes a bridge meta, then start goes through the
+        # SAME create_container + start_and_attach CNI path; kernel_host = the LOCAL IP.
         facade = FakeFacade()
         ctx = _context(facade)
+        await ctx.apply_network(cast(Any, {}))
         result = await ctx.start_container(cast(Any, None), [], None, [], cast(Any, {}))
-        assert facade.local_started == ["kern-123"]
-        assert result["kernel_host"] == "172.20.0.5"  # container bridge IP
-        assert result["task_pid"] == 777
+        assert facade.started == [("sess-abc", "kern-123")]
+        assert result["kernel_host"] == "172.30.1.2"  # LOCAL bridge IP
+        assert result["task_pid"] == 555
 
     async def test_starts_and_reports_local_host(self) -> None:
         facade = FakeFacade()

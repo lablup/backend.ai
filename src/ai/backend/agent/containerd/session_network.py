@@ -95,6 +95,13 @@ class ContainerdSessionNetwork:
         self._orchestrators = {}
         self._tracker = SessionContainerTracker()
 
+    async def open(self) -> None:
+        """Open the runtime client (e.g. establish the containerd gRPC channel)."""
+        await self._runtime.open()
+
+    async def close(self) -> None:
+        await self._runtime.close()
+
     def _resolve_backend(self, meta: SessionNetMeta) -> AbstractNetworkAgentPluginV2[Any]:
         try:
             return self._backends[str(meta.backend)]
@@ -180,43 +187,6 @@ class ContainerdSessionNetwork:
         )
         self._tracker.track(session_id, container_id)
 
-    # --- single-node path (no cluster overlay; plain bridge, mirrors Docker) ---
-
-    @staticmethod
-    def local_network_name(session_id: str) -> str:
-        return f"bai-local-{session_id}"
-
-    async def create_local_container(
-        self,
-        session_id: str,
-        container_id: str,
-        *,
-        image_ref: str,
-        command: list[str],
-        oci_spec: dict[str, Any],
-    ) -> None:
-        """Create a single-node container on a PER-SESSION bridge (isolated from other
-        sessions), NOT nerdctl's shared default bridge. No BEP-1058 overlay needed."""
-        net = self.local_network_name(session_id)
-        await self._runtime.create_network(net)
-        await self._runtime.create_container(
-            container_id,
-            image_ref=image_ref,
-            command=command,
-            oci_spec=oci_spec,
-            network=net,
-        )
-        self._tracker.track(session_id, container_id, local=True)
-
-    async def start_local_container(self, container_id: str) -> tuple[int, str | None]:
-        """Start a single-node container; return (task_pid, container_ip)."""
-        handle = await self._runtime.start_container(container_id)
-        ip = await self._runtime.container_ip(container_id)
-        return handle.pid, ip
-
-    async def teardown_local_session(self, session_id: str) -> None:
-        await self._runtime.remove_network(self.local_network_name(session_id))
-
     async def start_and_attach_container(
         self,
         session_id: str,
@@ -262,13 +232,11 @@ class ContainerdSessionNetwork:
 
     async def _teardown_session_network(self, scope: TeardownScope) -> None:
         """The last kernel of a session on this node is gone — tear its network down
-        deterministically: the overlay coordinator (devices + etcd member) or the
-        per-session local bridge. Best-effort: a teardown failure must not break kernel
-        cleanup, but it is logged so leaks are visible."""
+        deterministically via the per-session coordinator (data-plane devices + etcd
+        member). Best-effort: a teardown failure must not break kernel cleanup, but it is
+        logged so leaks are visible."""
         try:
-            if scope.local:
-                await self.teardown_local_session(scope.session_id)
-            elif scope.session_id in self._coordinators:
+            if scope.session_id in self._coordinators:
                 await self.teardown_session(scope.session_id)
         except Exception:
             log.exception("session network teardown failed for {}", scope.session_id)
@@ -287,24 +255,24 @@ def build_containerd_session_network(
 ) -> ContainerdSessionNetwork:
     """Assemble a ContainerdSessionNetwork with default real collaborators.
 
-    Defaults: NerdctlRuntimeClient over a subprocess runner, CniPluginRunner exec'ing
-    CNI plugins under ``cni_path``, and the vxlan backend on ``uplink``. Any collaborator
-    can be overridden (used by ContainerdAgent, and injectable in tests). Additional
-    backends (host-gw / wireguard) are registered here as they land.
+    Defaults: the native containerd gRPC runtime client, CniPluginRunner exec'ing CNI
+    plugins under ``cni_path``, and both the vxlan (multi-node overlay) and bridge
+    (single-node local) backends on ``uplink``. Any collaborator can be overridden (used by
+    ContainerdAgent, and injectable in tests). Additional backends (host-gw / wireguard) are
+    registered here as they land.
     """
     # Lazy imports: keep this facade module decoupled from the concrete runtime/backend.
-    from ai.backend.agent.containerd.nerdctl_runtime import (
-        NerdctlRuntimeClient,
-        default_command_runner,
-    )
+    from ai.backend.agent.containerd.grpc_runtime import ContainerdGrpcRuntimeClient
+    from ai.backend.agent.network.backends.bridge import BridgeNetworkPlugin
     from ai.backend.agent.network.backends.vxlan import VxlanNetworkPlugin
     from ai.backend.agent.network.cni_runner import CniPluginRunner
 
-    runtime = runtime or NerdctlRuntimeClient(default_command_runner)
+    runtime = runtime or ContainerdGrpcRuntimeClient(namespace="backend-ai")
     cni_runner = cni_runner or CniPluginRunner(cni_path=cni_path)
     if backends is None:
         backends = {
             str(NetworkBackendKind.VXLAN): VxlanNetworkPlugin({}, {}, uplink=uplink),
+            str(NetworkBackendKind.BRIDGE): BridgeNetworkPlugin({}, {}, uplink=uplink),
         }
     return ContainerdSessionNetwork(
         etcd,

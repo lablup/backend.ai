@@ -68,18 +68,6 @@ class FakeRuntime(ContainerdRuntimeClient):
         return "running"
 
     @override
-    async def container_ip(self, container_id: str) -> str | None:
-        return "172.20.0.2"
-
-    @override
-    async def create_network(self, name: str) -> None:
-        self.calls.append(f"create_network:{name}")
-
-    @override
-    async def remove_network(self, name: str) -> None:
-        self.calls.append(f"remove_network:{name}")
-
-    @override
     async def create_container(
         self,
         container_id: str,

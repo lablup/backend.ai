@@ -37,6 +37,14 @@ class TaskHandle:
 class ContainerdRuntimeClient(ABC):
     """Containerd-only lifecycle operations. No network/CNI concerns."""
 
+    # --- lifecycle ---
+    async def open(self) -> None:
+        """Open any underlying connection (e.g. the containerd gRPC channel). Default no-op
+        for clients that need no setup; idempotent."""
+
+    async def close(self) -> None:
+        """Release the underlying connection. Default no-op; idempotent."""
+
     # --- image service ---
     @abstractmethod
     async def image_exists(self, image_ref: str) -> bool: ...
@@ -70,8 +78,9 @@ class ContainerdRuntimeClient(ABC):
         oci_spec: Mapping[str, Any],
         network: str = "none",
     ) -> None:
-        """Create a container (not started). network="none" for an isolated netns
-        (multi-node, CNI attached later); network="bridge" for single-node connectivity."""
+        """Create a container (not started) with an isolated netns; the network layer
+        attaches CNI to the task after start (``network`` is retained for interface
+        compatibility and is otherwise "none")."""
 
     @abstractmethod
     async def start_container(self, container_id: str) -> TaskHandle:
@@ -95,16 +104,3 @@ class ContainerdRuntimeClient(ABC):
     @abstractmethod
     async def container_status(self, container_id: str) -> str | None:
         """Return the container's status string (e.g. 'running'), or None if absent."""
-
-    @abstractmethod
-    async def container_ip(self, container_id: str) -> str | None:
-        """Return the container's primary IP address, or None if it has no network."""
-
-    # --- networks (single-node per-session isolation) ---
-    @abstractmethod
-    async def create_network(self, name: str) -> None:
-        """Create a per-session bridge network (idempotent)."""
-
-    @abstractmethod
-    async def remove_network(self, name: str) -> None:
-        """Remove a network (idempotent)."""

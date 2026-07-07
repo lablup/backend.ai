@@ -129,18 +129,6 @@ class FakeRuntime(ContainerdRuntimeClient):
         return "running"
 
     @override
-    async def container_ip(self, container_id: str) -> str | None:
-        return "172.20.0.2"
-
-    @override
-    async def create_network(self, name: str) -> None:
-        self.calls.append(f"create_network:{name}")
-
-    @override
-    async def remove_network(self, name: str) -> None:
-        self.calls.append(f"remove_network:{name}")
-
-    @override
     async def create_container(
         self,
         container_id: str,
@@ -318,13 +306,6 @@ class TestDeterministicTeardown:
         await facade.remove_container("c2")
         assert backend.torndown == ["s1"]  # now the last one is gone
 
-    async def test_removing_local_session_container_removes_local_network(self) -> None:
-        etcd, backend, runner, rt = FakeEtcd(), RecordingBackend(), RecordingRunner(), FakeRuntime()
-        facade = _facade(etcd, backend, runner, runtime=rt)
-        await facade.create_local_container("s1", "c1", image_ref="img", command=[], oci_spec={})
-        await facade.remove_container("c1")
-        assert f"remove_network:{facade.local_network_name('s1')}" in rt.calls
-
     async def test_remove_untracked_container_is_noop_teardown(self) -> None:
         etcd, backend, runner, rt = FakeEtcd(), RecordingBackend(), RecordingRunner(), FakeRuntime()
         facade = _facade(etcd, backend, runner, runtime=rt)
@@ -356,7 +337,7 @@ class TestBackendResolution:
 
 class TestFactory:
     def test_builds_facade_with_defaults(self) -> None:
-        # default path registers the real vxlan backend + a NerdctlRuntimeClient
+        # default path registers the vxlan + bridge backends and the containerd gRPC runtime
         facade = build_containerd_session_network(
             cast(AbstractKVStore, FakeEtcd()),
             agent_id="agent-1",
@@ -365,6 +346,7 @@ class TestFactory:
         )
         assert isinstance(facade, ContainerdSessionNetwork)
         assert "vxlan" in facade._backends
+        assert "bridge" in facade._backends
 
     def test_injected_collaborators_are_used(self) -> None:
         backend, runner = RecordingBackend(), RecordingRunner()

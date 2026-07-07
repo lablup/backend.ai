@@ -18,6 +18,10 @@ class NetworkBackendKind(StrEnum):
 
     VXLAN = "vxlan"
     """VXLAN overlay. Portable default; per-session isolation via VNI."""
+    BRIDGE = "bridge"
+    """Node-local per-session bridge with no cross-node overlay. Used for single-node
+    sessions: a plain CNI bridge (host-local IPAM) gives the container a host-reachable IP,
+    replacing the former nerdctl-managed bridge."""
     HOST_GW = "host-gw"
     """Native L3 routing without encapsulation; requires a cooperative fabric."""
     WIREGUARD = "wireguard"

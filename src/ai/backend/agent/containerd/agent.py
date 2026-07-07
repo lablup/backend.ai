@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import os
 import signal
 import subprocess
 from collections.abc import Mapping, Sequence
@@ -48,7 +47,7 @@ from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.exception import ImageNotAvailable
 from ai.backend.common.json import dump_json_str
-from ai.backend.common.network.types import SessionNetMeta
+from ai.backend.common.network.types import NetworkBackendKind, SessionNetMeta
 from ai.backend.common.types import (
     AutoPullBehavior,
     ClusterInfo,
@@ -71,7 +70,6 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging import BraceStyleAdapter
 
-from .grpc_runtime import ContainerdGrpcRuntimeClient
 from .kernel import ContainerdKernel
 from .oci import (
     KRUNNER_ENTRYPOINT,
@@ -87,6 +85,9 @@ from .session_network import (
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 _TODO = "containerd backend: not yet implemented (requires containerd gRPC client)"
+# Placeholder subnet for a single-node BRIDGE session; the bridge backend allocates the
+# real node-local /24 per session and ignores this value (SessionNetMeta requires a subnet).
+_LOCAL_SUBNET = "172.30.0.0/24"
 
 
 def _uplink_for_ip(host_ip: str) -> str:
@@ -223,13 +224,14 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
 
     @override
     async def apply_network(self, cluster_info: ClusterInfo) -> None:
-        # BEP-1058: set up this node's per-session data plane (vxlan/bridge + membership)
-        # and register the per-session orchestrator. Per-container CNI attach happens in
-        # start_container against the task PID. Single-node sessions without a manager-
-        # provided network_config skip this.
-        network_config = cluster_info.get("network_config") or {}
+        # BEP-1058: set up this node's per-session data plane and register the per-session
+        # orchestrator. Per-container CNI attach happens in start_container against the task
+        # PID. Multi-node sessions carry a manager-provided network_config (vxlan overlay);
+        # single-node sessions have none, so synthesize a node-local BRIDGE config — the
+        # same CNI attach path then applies, with no nerdctl-managed network.
+        network_config = dict(cluster_info.get("network_config") or {})
         if not network_config.get("backend"):
-            return
+            network_config = {"backend": str(NetworkBackendKind.BRIDGE), "subnet": _LOCAL_SUBNET}
         self._net_meta = await self._session_network.ensure_session(
             self._session_id, network_config
         )
@@ -389,38 +391,28 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         spec = self._pending_spec
         command = [KRUNNER_ENTRYPOINT, *cmdargs]
         if self._net_meta is None:
-            # single-node: plain bridge network (no BEP-1058 overlay), like Docker.
-            await self._session_network.create_local_container(
-                self._session_id,
-                self._container_id,
-                image_ref=spec.image_ref,
-                command=command,
-                oci_spec=spec.oci_spec,
-            )
-            # start on the bridge; kernel_host = container's bridge IP.
-            task_pid, ip = await self._session_network.start_local_container(self._container_id)
-            kernel_host = ip or "127.0.0.1"
-        else:
-            await self._session_network.create_container(
-                self._session_id,
-                self._container_id,
-                image_ref=spec.image_ref,
-                command=command,
-                oci_spec=spec.oci_spec,
-            )
-            # multi-node: start + attach the CNI overlay chain; kernel_host = overlay IP.
-            result = await self._session_network.start_and_attach_container(
-                self._session_id,
-                self._container_id,
-                meta=self._net_meta,
-                kernel_config=self.kernel_config,
-                cluster_info=cluster_info,
-            )
-            task_pid = result.handle.pid
-            # The agent reaches the kernel's REPL over the LOCAL interface (the host is that
-            # bridge's gateway); the OVERLAY IP is only reachable between kernels, not from
-            # the host, so it must NOT be used as kernel_host.
-            kernel_host = result.local_ip or "127.0.0.1"
+            raise RuntimeError("apply_network must run before start_container (no net meta)")
+        await self._session_network.create_container(
+            self._session_id,
+            self._container_id,
+            image_ref=spec.image_ref,
+            command=command,
+            oci_spec=spec.oci_spec,
+        )
+        # Start + attach the CNI chain (bridge for single-node, +overlay for multi-node);
+        # kernel_host = the LOCAL bridge IP (see below).
+        result = await self._session_network.start_and_attach_container(
+            self._session_id,
+            self._container_id,
+            meta=self._net_meta,
+            kernel_config=self.kernel_config,
+            cluster_info=cluster_info,
+        )
+        task_pid = result.handle.pid
+        # The agent reaches the kernel's REPL over the LOCAL interface (the host is that
+        # bridge's gateway); the OVERLAY IP is only reachable between kernels, not from the
+        # host, so it must NOT be used as kernel_host.
+        kernel_host = result.local_ip or "127.0.0.1"
         # REPL ports are the krunner intrinsic, container-internal ports (self.repl_ports);
         # the agent connects to them directly at kernel_host (the container's bridge/overlay
         # IP), so no host-port mapping is needed (cf. DockerAgent's container_network_info
@@ -449,7 +441,6 @@ class ContainerdAgent(
 ):
     _session_network: ContainerdSessionNetwork
     _host_ip: str
-    _grpc_runtime: ContainerdGrpcRuntimeClient | None
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
@@ -457,30 +448,20 @@ class ContainerdAgent(
         # (verified) facade; the kernel-creation lifecycle will drive it. The vxlan uplink
         # must be the interface carrying this node's VTEP (host_ip) — deriving it from the
         # host_ip keeps the overlay on the same L2 the agents advertise on, instead of a
-        # hard-coded eth0.
+        # hard-coded eth0. The runtime is the native containerd gRPC client (no nerdctl CLI).
         container_cfg = self.local_config.container
         self._host_ip = str(container_cfg.advertised_host or container_cfg.bind_host)
-        # Runtime backend: the native containerd gRPC client (no nerdctl CLI / mounts-label
-        # limit) when BACKENDAI_CONTAINERD_RUNTIME=grpc, else the default nerdctl client.
-        self._grpc_runtime = (
-            ContainerdGrpcRuntimeClient(namespace="backend-ai")
-            if os.environ.get("BACKENDAI_CONTAINERD_RUNTIME") == "grpc"
-            else None
-        )
         self._session_network = build_containerd_session_network(
             self.etcd,
             agent_id=str(self.id),
             host_ip=self._host_ip,
             uplink=_uplink_for_ip(self._host_ip),
-            runtime=self._grpc_runtime,
         )
 
     @override
     async def __ainit__(self) -> None:
         await super().__ainit__()
-        if self._grpc_runtime is not None:
-            await self._grpc_runtime.open()
-            log.info("containerd runtime: native gRPC client")
+        await self._session_network.open()
         # Advertise this node's VTEP so the manager can pre-seed session membership and
         # eliminate the peer-publish race for multi-node overlays (BEP-1058).
         await publish_vtep(self.etcd, str(self.id), self._host_ip)
