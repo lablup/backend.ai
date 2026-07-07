@@ -10,6 +10,7 @@ runner; the command builders and CNI-config assembly are pure and unit-tested.
 from __future__ import annotations
 
 import asyncio
+import ipaddress
 import logging
 from collections.abc import Awaitable, Callable, Sequence
 from typing import Any
@@ -88,13 +89,48 @@ def fdb_del_args(vni: int, dst: str, *, mac: str = _BROADCAST_MAC) -> list[str]:
     return ["bridge", "fdb", "del", mac, "dev", vxlan_dev(vni), "dst", dst]
 
 
+# --- proactive endpoint programming (unicast FDB + ARP; replaces BUM flooding) ---
+
+
+def fdb_replace_args(vni: int, mac: str, dst: str) -> list[str]:
+    """Program the exact unicast MAC→VTEP forwarding entry for a known remote endpoint."""
+    return ["bridge", "fdb", "replace", mac, "dev", vxlan_dev(vni), "dst", dst]
+
+
+def neigh_replace_args(vni: int, ip: str, mac: str) -> list[str]:
+    """Program a permanent ARP entry (IP→MAC) on the overlay bridge — ARP suppression, so
+    a known remote endpoint never triggers a broadcast ARP over the tunnel."""
+    return ["ip", "neigh", "replace", ip, "lladdr", mac, "dev", bridge_dev(vni), "nud", "permanent"]
+
+
+def neigh_del_args(vni: int, ip: str) -> list[str]:
+    return ["ip", "neigh", "del", ip, "dev", bridge_dev(vni)]
+
+
 # --- pure CNI config assembly ---
 
 
-def overlay_cni_config(meta: SessionNetMeta) -> dict[str, Any]:
-    """CNI 'bridge' config attaching the container to this session's overlay bridge,
-    with host-local IPAM confined to the session subnet."""
-    assert meta.vni is not None
+def _overlay_ipam(meta: SessionNetMeta, ip: str | None) -> dict[str, Any]:
+    """Static IPAM with the manager-assigned endpoint IP when available, else host-local.
+
+    The static path is the BEP-1055 default for multi-node: a central per-endpoint IP
+    (from the manager's ``endpoints/`` table) is disjoint across nodes by construction,
+    unlike per-node host-local which hands every node the same first address on the
+    stretched overlay subnet (cross-node collision). Host-local remains the fallback for
+    single-node / not-yet-assigned cases."""
+    if ip is None:
+        return {"type": "host-local", "subnet": meta.subnet}
+    prefixlen = ipaddress.ip_network(meta.subnet).prefixlen
+    return {"type": "static", "addresses": [{"address": f"{ip}/{prefixlen}"}]}
+
+
+def overlay_cni_config(meta: SessionNetMeta, ip: str | None = None) -> dict[str, Any]:
+    """CNI 'bridge' config attaching the container to this session's overlay bridge.
+
+    With ``ip`` set, uses static IPAM at the manager-assigned address; otherwise falls back
+    to host-local confined to the session subnet."""
+    if meta.vni is None:
+        raise ValueError(f"overlay_cni_config requires a vxlan meta with a VNI: {meta}")
     return {
         "cniVersion": "1.0.0",
         "name": f"bai-overlay-{meta.session_id}",
@@ -103,10 +139,7 @@ def overlay_cni_config(meta: SessionNetMeta) -> dict[str, Any]:
         "isGateway": False,
         "ipMasq": False,
         "mtu": meta.mtu,
-        "ipam": {
-            "type": "host-local",
-            "subnet": meta.subnet,
-        },
+        "ipam": _overlay_ipam(meta, ip),
     }
 
 
@@ -208,10 +241,26 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
     async def probe_caps(self) -> AgentNetworkCaps:
         return await probe_caps(self._uplink)
 
+    async def _delete_link_quiet(self, dev: str) -> None:
+        """Delete a link if present; ignore 'does not exist' failures."""
+        try:
+            await self._runner(link_del_args(dev))
+        except RuntimeError:
+            pass
+
     async def setup_session_network(self, meta: SessionNetMeta, self_member: Member) -> None:
         if meta.backend is not NetworkBackendKind.VXLAN or meta.vni is None:
             raise ValueError(f"VxlanNetworkPlugin requires a vxlan meta with a VNI: {meta}")
         vni = meta.vni
+        # Leftover-safe: a stale device from a crashed/uncleaned prior session would make
+        # `ip link add` fail with 'File exists' (and could carry stale FDB/IP). Delete any
+        # pre-existing devices of these names first so setup always yields a fresh device.
+        # The LOCAL bridge (bailo{vni}) is created later by CNI, but a leftover one keyed by
+        # the (reused) vni retains a prior session's gateway IP and makes CNI ADD fail with
+        # "already has an IP address different from ..." — so clear it here too.
+        await self._delete_link_quiet(bridge_dev(vni))
+        await self._delete_link_quiet(vxlan_dev(vni))
+        await self._delete_link_quiet(local_bridge_dev(vni))
         await self._runner(vxlan_link_add_args(vni, self._uplink))
         await self._runner(bridge_link_add_args(vni))
         await self._runner(set_master_args(vni))
@@ -247,6 +296,26 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         except RuntimeError:
             log.debug("fdb entry for {} already gone in session {}", peer.vtep_ip, session_id)
 
+    async def add_endpoint(self, session_id: str, *, ip: str, mac: str, vtep_ip: str) -> None:
+        """Proactively program a remote endpoint: unicast MAC→VTEP FDB + permanent ARP.
+
+        Idempotent (``replace``). Known unicast then never floods over the tunnel."""
+        meta = self._sessions.get(session_id)
+        if meta is None or meta.vni is None:
+            return
+        await self._runner(fdb_replace_args(meta.vni, mac, vtep_ip))
+        await self._runner(neigh_replace_args(meta.vni, ip, mac))
+
+    async def del_endpoint(self, session_id: str, *, ip: str, mac: str, vtep_ip: str) -> None:
+        meta = self._sessions.get(session_id)
+        if meta is None or meta.vni is None:
+            return
+        for argv in (fdb_del_args(meta.vni, vtep_ip, mac=mac), neigh_del_args(meta.vni, ip)):
+            try:
+                await self._runner(argv)
+            except RuntimeError:
+                log.debug("endpoint entry {} already gone in session {}", ip, session_id)
+
     async def attach_endpoint(
         self,
         kernel_config: KernelCreationConfig,
@@ -254,6 +323,9 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         *,
         meta: SessionNetMeta,
     ) -> EndpointPlan:
+        # Static IP at the manager-assigned overlay address (disjoint across nodes); falls
+        # back to host-local only if the manager did not assign one (single-node / legacy).
+        overlay_ip = kernel_config.get("cluster_network_ip")
         return EndpointPlan(
             attachments=[
                 NetworkAttachSpec(
@@ -271,7 +343,7 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
                     kind=AttachKind.CNI,
                     interface_name=OVERLAY_IFNAME,
                     role=NetworkRole.OVERLAY,
-                    cni_config=overlay_cni_config(meta),
+                    cni_config=overlay_cni_config(meta, overlay_ip),
                 ),
             ]
         )

@@ -16,6 +16,7 @@ import json
 import logging
 import os
 from collections.abc import Mapping
+from pathlib import Path
 from typing import Any
 
 from ai.backend.logging import BraceStyleAdapter
@@ -35,10 +36,10 @@ def resolve_plugin_binary(plugin_type: str, cni_path: str) -> str:
     first directory joined with the type (the executor surfaces ENOENT at exec time)."""
     dirs = [d for d in cni_path.split(os.pathsep) if d]
     for directory in dirs:
-        candidate = os.path.join(directory, plugin_type)
-        if os.path.exists(candidate):
-            return candidate
-    return os.path.join(dirs[0] if dirs else DEFAULT_CNI_PATH, plugin_type)
+        candidate = Path(directory) / plugin_type
+        if candidate.exists():
+            return str(candidate)
+    return str(Path(dirs[0] if dirs else DEFAULT_CNI_PATH) / plugin_type)
 
 
 def build_cni_env(
@@ -96,7 +97,8 @@ class CniPluginRunner:
         if proc.returncode != 0:
             raise CniError.from_output(plugin_type, command, proc.returncode, stdout, stderr)
         if command == "ADD" and stdout.strip():
-            return json.loads(stdout)
+            result: dict[str, Any] = json.loads(stdout)
+            return result
         return None
 
 

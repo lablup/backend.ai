@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING, Any
 
 from ai.backend.agent.network.cni import CniAttacher, CniRunner
 from ai.backend.agent.network.cni_runner import netns_path_for_pid
-from ai.backend.common.network.types import EndpointPlan, SessionNetMeta
+from ai.backend.common.network.types import EndpointPlan, NetworkRole, SessionNetMeta
 
 if TYPE_CHECKING:
     from ai.backend.agent.plugin.network_v2 import AbstractNetworkAgentPluginV2
@@ -40,18 +40,19 @@ class ContainerNetworkProvisioner:
         meta: SessionNetMeta,
         container_id: str,
         task_pid: int,
-    ) -> EndpointPlan:
-        """Attach a running container (identified by its task PID) to its session
-        network and return the applied plan (kept by the caller for later detach)."""
+    ) -> tuple[EndpointPlan, dict[NetworkRole, str]]:
+        """Attach a running container (identified by its task PID) to its session network.
+
+        Returns the applied plan (kept by the caller for later detach) and the assigned IP
+        per interface role (LOCAL is the host-reachable control address; OVERLAY is for
+        cross-node kernel traffic)."""
         plan = await self._backend.attach_endpoint(kernel_config, cluster_info, meta=meta)
-        await self._attacher.attach(
+        assigned = await self._attacher.attach(
             plan, container_id=container_id, netns=netns_path_for_pid(task_pid)
         )
-        return plan
+        return plan, assigned
 
-    async def detach(
-        self, plan: EndpointPlan, *, container_id: str, task_pid: int
-    ) -> None:
+    async def detach(self, plan: EndpointPlan, *, container_id: str, task_pid: int) -> None:
         await self._attacher.detach(
             plan, container_id=container_id, netns=netns_path_for_pid(task_pid)
         )

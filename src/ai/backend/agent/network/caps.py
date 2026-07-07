@@ -19,6 +19,11 @@ import logging
 from typing import TYPE_CHECKING
 
 from ai.backend.common.etcd import ConfigScopes
+from ai.backend.common.network.keys import (
+    agent_backend_key,
+    agent_caps_key,
+    agent_vtep_key,
+)
 from ai.backend.common.network.types import AgentNetworkCaps
 from ai.backend.logging import BraceStyleAdapter
 
@@ -94,18 +99,10 @@ async def probe_caps(iface: str, *, native_routing_ok: bool = False) -> AgentNet
     return compute_caps(tunnel_offload=tunnel_offload, native_routing_ok=native_routing_ok)
 
 
-def caps_key(agent_id: str) -> str:
-    return f"network/agent/{agent_id}/caps"
-
-
-def backend_key(agent_id: str) -> str:
-    return f"network/agent/{agent_id}/backend"
-
-
 async def publish_caps(etcd: AbstractKVStore, agent_id: str, caps: AgentNetworkCaps) -> None:
     """Publish this agent's capabilities to etcd for the manager's backend selection."""
     await etcd.put(
-        caps_key(agent_id),
+        agent_caps_key(agent_id),
         json.dumps(dataclasses.asdict(caps)),
         scope=ConfigScopes.GLOBAL,
     )
@@ -114,4 +111,12 @@ async def publish_caps(etcd: AbstractKVStore, agent_id: str, caps: AgentNetworkC
 async def publish_backend(etcd: AbstractKVStore, agent_id: str, backend: str) -> None:
     """Publish this agent's runtime backend (e.g. 'containerd') so the manager can enforce
     the backend<->network-driver pairing invariant. Called at agent startup."""
-    await etcd.put(backend_key(agent_id), backend, scope=ConfigScopes.GLOBAL)
+    await etcd.put(agent_backend_key(agent_id), backend, scope=ConfigScopes.GLOBAL)
+
+
+async def publish_vtep(etcd: AbstractKVStore, agent_id: str, vtep_ip: str) -> None:
+    """Publish this agent's VTEP (overlay tunnel endpoint = advertised host IP) so the
+    manager can pre-seed the per-session membership table at create_network time. That
+    removes the peer-publish race: each agent's reconcile-at-start finds every peer's VTEP
+    already present instead of waiting for the etcd watch to deliver it. Called at startup."""
+    await etcd.put(agent_vtep_key(agent_id), vtep_ip, scope=ConfigScopes.GLOBAL)

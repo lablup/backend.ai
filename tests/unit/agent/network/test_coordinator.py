@@ -2,12 +2,9 @@ import json
 from collections.abc import AsyncIterator
 from typing import Any, cast
 
-from ai.backend.agent.network.coordinator import (
-    SessionNetworkCoordinator,
-    member_key,
-    members_prefix,
-)
+from ai.backend.agent.network.coordinator import SessionNetworkCoordinator
 from ai.backend.common.etcd import AbstractKVStore
+from ai.backend.common.network.keys import endpoints_prefix, member_key, members_prefix
 from ai.backend.common.network.types import Member, NetworkBackendKind, SessionNetMeta
 
 _META = SessionNetMeta(
@@ -36,7 +33,7 @@ class FakeEtcd:
         out: dict[str, str] = {}
         for key, val in self.store.items():
             if key.startswith(prefix):
-                remainder = key[len(prefix):]
+                remainder = key[len(prefix) :]
                 if "/" not in remainder:
                     out[remainder] = val
         return out
@@ -53,6 +50,21 @@ class FakeEtcd:
             "ip_range": member.ip_range,
         })
 
+    def seed_endpoint(
+        self,
+        container_id: str,
+        ip: str,
+        mac: str,
+        agent_id: str,
+        session_id: str = "s1",
+    ) -> None:
+        self.store[f"{endpoints_prefix(session_id)}{container_id}"] = json.dumps({
+            "ip": ip,
+            "mac": mac,
+            "agent_id": agent_id,
+            "container_id": container_id,
+        })
+
 
 class RecordingBackend:
     def __init__(self) -> None:
@@ -60,6 +72,8 @@ class RecordingBackend:
         self.teardown: list[str] = []
         self.added: list[str] = []
         self.removed: list[str] = []
+        self.endpoints_added: list[tuple[str, str]] = []
+        self.endpoints_removed: list[tuple[str, str]] = []
 
     async def setup_session_network(self, meta: SessionNetMeta, self_member: Member) -> None:
         self.setup.append(meta.session_id)
@@ -72,6 +86,12 @@ class RecordingBackend:
 
     async def del_peer(self, session_id: str, peer: Member) -> None:
         self.removed.append(peer.agent_id)
+
+    async def add_endpoint(self, session_id: str, *, ip: str, mac: str, vtep_ip: str) -> None:
+        self.endpoints_added.append((ip, vtep_ip))
+
+    async def del_endpoint(self, session_id: str, *, ip: str, mac: str, vtep_ip: str) -> None:
+        self.endpoints_removed.append((ip, vtep_ip))
 
 
 def _coordinator(etcd: FakeEtcd, backend: RecordingBackend) -> SessionNetworkCoordinator:
@@ -143,7 +163,55 @@ class TestStartStop:
         assert member_key("s1", "a1") not in etcd.store
 
 
+class TestReconcileEndpoints:
+    async def test_programs_remote_endpoints_resolving_vtep(self) -> None:
+        etcd = FakeEtcd()
+        etcd.seed_member(_SELF)
+        etcd.seed_member(_PEER2)
+        etcd.seed_endpoint("c-remote", "10.128.5.20", "02:42:0a:80:05:14", agent_id="a2")
+        backend = RecordingBackend()
+        coord = _coordinator(etcd, backend)
+        await coord.reconcile_endpoints("s1")
+        # remote endpoint programmed with its owner's VTEP (a2 -> 10.0.0.2)
+        assert backend.endpoints_added == [("10.128.5.20", "10.0.0.2")]
+
+    async def test_skips_own_endpoints(self) -> None:
+        etcd = FakeEtcd()
+        etcd.seed_member(_SELF)
+        etcd.seed_endpoint("c-local", "10.128.5.10", "02:42:0a:80:05:0a", agent_id="a1")
+        backend = RecordingBackend()
+        coord = _coordinator(etcd, backend)
+        await coord.reconcile_endpoints("s1")
+        assert backend.endpoints_added == []  # local endpoint not programmed
+
+    async def test_skips_remote_without_published_vtep(self) -> None:
+        etcd = FakeEtcd()
+        etcd.seed_member(_SELF)
+        # a2's endpoint exists but a2's member (VTEP) not yet published
+        etcd.seed_endpoint("c-remote", "10.128.5.20", "02:42:0a:80:05:14", agent_id="a2")
+        backend = RecordingBackend()
+        coord = _coordinator(etcd, backend)
+        await coord.reconcile_endpoints("s1")
+        assert backend.endpoints_added == []  # retried on a later watch tick
+
+    async def test_idempotent_and_detects_removal(self) -> None:
+        etcd = FakeEtcd()
+        etcd.seed_member(_SELF)
+        etcd.seed_member(_PEER2)
+        etcd.seed_endpoint("c-remote", "10.128.5.20", "02:42:0a:80:05:14", agent_id="a2")
+        backend = RecordingBackend()
+        coord = _coordinator(etcd, backend)
+        await coord.reconcile_endpoints("s1")
+        await coord.reconcile_endpoints("s1")
+        assert backend.endpoints_added == [("10.128.5.20", "10.0.0.2")]  # not re-added
+
+        await etcd.delete(f"{endpoints_prefix('s1')}c-remote")
+        await coord.reconcile_endpoints("s1")
+        assert backend.endpoints_removed == [("10.128.5.20", "10.0.0.2")]
+
+
 class TestKeys:
     def test_members_prefix_and_member_key(self) -> None:
         assert members_prefix("s1") == "network/session/s1/members/"
         assert member_key("s1", "a2") == "network/session/s1/members/a2"
+        assert endpoints_prefix("s1") == "network/session/s1/endpoints/"

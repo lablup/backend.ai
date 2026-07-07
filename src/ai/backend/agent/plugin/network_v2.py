@@ -71,6 +71,19 @@ class AbstractNetworkAgentPluginV2[TKernel: AbstractKernel](AbstractPlugin, meta
         """Reflect a departed peer. Must be idempotent (lease-driven recovery)."""
         raise NotImplementedError
 
+    async def add_endpoint(self, session_id: str, *, ip: str, mac: str, vtep_ip: str) -> None:
+        """Proactively program forwarding + ARP for a known remote container endpoint,
+        from the manager-assigned ``endpoints/`` table (no BUM flood).
+
+        Overlay-specific (vxlan programs unicast FDB + neighbor). Backends whose peers are
+        node-granular (host-gw routes) do not need per-endpoint programming; default no-op.
+        Must be idempotent."""
+        pass
+
+    async def del_endpoint(self, session_id: str, *, ip: str, mac: str, vtep_ip: str) -> None:
+        """Remove a departed endpoint's forwarding + ARP state. Idempotent; default no-op."""
+        pass
+
     @abstractmethod
     async def attach_endpoint(
         self,
