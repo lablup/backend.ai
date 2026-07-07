@@ -1777,35 +1777,6 @@ class ScheduleDBSource:
             raise DomainNotFound(name)
         return DomainID(domain_id)
 
-    async def _get_scaling_group_network_info(
-        self, db_sess: SASession, scaling_group_name: str
-    ) -> ScalingGroupNetworkInfo:
-        """
-        Get network configuration from scaling group.
-
-        Args:
-            db_sess: Database session
-            scaling_group_name: Name of the scaling group
-
-        Returns:
-            ScalingGroupNetworkInfo with network configuration
-        """
-        query = sa.select(
-            ScalingGroupRow.use_host_network,
-            ScalingGroupRow.wsproxy_addr,
-        ).where(ScalingGroupRow.name == scaling_group_name)
-
-        result = await db_sess.execute(query)
-        row = result.one_or_none()
-
-        if not row:
-            raise ScalingGroupNotFound(f"Scaling group {scaling_group_name} not found")
-
-        return ScalingGroupNetworkInfo(
-            use_host_network=row.use_host_network,
-            wsproxy_addr=row.wsproxy_addr,
-        )
-
     async def _resolve_image_info(
         self, db_sess: SASession, image_refs: list[ImageRef]
     ) -> dict[str, ImageInfo]:
