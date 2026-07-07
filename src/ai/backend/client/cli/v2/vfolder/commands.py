@@ -246,14 +246,15 @@ def purge(vfolder_id: UUID) -> None:
 )
 def restore(vfolder_id: UUID, owner_id: UUID | None) -> None:
     """Restore a trashed vfolder."""
+    from ai.backend.common.dto.manager.v2.vfolder.request import RestoreVFolderOptions
     from ai.backend.common.identifier.user import UserID
+
+    options = RestoreVFolderOptions(owner_id=UserID(owner_id) if owner_id is not None else None)
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
-            result = await registry.vfolder.restore(
-                vfolder_id, owner_id=UserID(owner_id) if owner_id is not None else None
-            )
+            result = await registry.vfolder.restore(vfolder_id, options)
             print_result(result)
         finally:
             await registry.close()

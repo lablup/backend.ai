@@ -11,6 +11,7 @@ import pytest
 
 from ai.backend.common.data.user.types import UserData
 from ai.backend.common.dto.manager.v2.vfolder.request import (
+    RestoreVFolderOptions,
     SearchVFoldersInput,
     VFolderFilter,
 )
@@ -357,7 +358,7 @@ class TestVFolderAdapterRestore:
             "ai.backend.manager.api.adapters.vfolder.adapter.current_user",
             return_value=user_data,
         ):
-            await adapter.restore(vfolder_id, owner_id=owner_id)
+            await adapter.restore(vfolder_id, RestoreVFolderOptions(owner_id=owner_id))
 
         restore_mock = mock_processors.vfolder.restore_vfolder_from_trash.wait_for_complete
         action = restore_mock.call_args[0][0]

@@ -9,6 +9,7 @@ from strawberry import Info
 from ai.backend.common.dto.manager.v2.vfolder.request import (
     PurgeVFolderInput,
     PurgeVFolderOptions,
+    RestoreVFolderOptions,
 )
 from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_mutation
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
@@ -104,8 +105,8 @@ async def restore_vfolder_v2(
     options: RestoreVFolderOptionsInputGQL | None = None,
 ) -> RestoreVFolderPayloadGQL | None:
     """Restore a virtual folder from trash."""
-    owner_id = options.to_pydantic().owner_id if options is not None else None
-    payload = await info.context.adapters.vfolder.restore(vfolder_id, owner_id=owner_id)
+    options_dto = options.to_pydantic() if options is not None else RestoreVFolderOptions()
+    payload = await info.context.adapters.vfolder.restore(vfolder_id, options_dto)
     return RestoreVFolderPayloadGQL.from_pydantic(payload)
 
 
