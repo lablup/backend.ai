@@ -27787,7 +27787,7 @@
               }
             ],
             "default": null,
-            "description": "Project ID for project-owned vfolder",
+            "description": "Project ID for project-owned vfolder. Mutually exclusive with owner_id.",
             "title": "Project Id"
           },
           "cloneable": {
@@ -27820,7 +27820,7 @@
               }
             ],
             "default": null,
-            "description": "Delegated owner user UUID. When set, the vfolder is created on behalf of the specified user instead of the caller. Caller must have permission to act on behalf of the target user.",
+            "description": "Delegated owner user UUID. When set, the vfolder is created on behalf of the specified user instead of the caller. Caller must have permission to act on behalf of the target user. Mutually exclusive with project_id: delegation applies to user-owned vfolders only, so passing both is rejected.",
             "title": "Owner Id"
           }
         },

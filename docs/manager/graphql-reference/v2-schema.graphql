@@ -3129,7 +3129,9 @@ input CreateVFolderV2Input {
   """VFolder name."""
   name: String!
 
-  """Project ID for project-owned vfolder."""
+  """
+  Project ID for project-owned vfolder. Mutually exclusive with owner_id.
+  """
   projectId: UUID = null
 
   """Storage host for the vfolder."""
@@ -3145,7 +3147,7 @@ input CreateVFolderV2Input {
   cloneable: Boolean! = false
 
   """
-  Added in 26.8.0. Delegated owner user UUID. Create the vfolder on behalf of this user.
+  Added in 26.8.0. Delegated owner user UUID. Create the vfolder on behalf of this user. Mutually exclusive with project_id (delegation applies to user-owned vfolders only).
   """
   ownerId: UUID = null
 }
