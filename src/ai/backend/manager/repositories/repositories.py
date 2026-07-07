@@ -32,6 +32,7 @@ from ai.backend.manager.repositories.group.repositories import GroupRepositories
 from ai.backend.manager.repositories.huggingface_registry.repositories import (
     HuggingFaceRegistryRepositories,
 )
+from ai.backend.manager.repositories.idle_checker.repositories import IdleCheckerRepositories
 from ai.backend.manager.repositories.image.repositories import ImageRepositories
 from ai.backend.manager.repositories.keypair_resource_policy.repositories import (
     KeypairResourcePolicyRepositories,
@@ -103,6 +104,7 @@ class Repositories:
     export: ExportRepositories
     fair_share: FairShareRepositories
     group: GroupRepositories
+    idle_checker: IdleCheckerRepositories
     image: ImageRepositories
     keypair_resource_policy: KeypairResourcePolicyRepositories
     manager_admin: ManagerAdminRepositories
@@ -156,6 +158,7 @@ class Repositories:
         export_repositories = ExportRepositories.create(args)
         fair_share_repositories = FairShareRepositories.create(args)
         group_repositories = GroupRepositories.create(args)
+        idle_checker_repositories = IdleCheckerRepositories.create(args)
         image_repositories = ImageRepositories.create(args)
         keypair_resource_policy_repositories = KeypairResourcePolicyRepositories.create(args)
         manager_admin_repositories = ManagerAdminRepositories.create(args)
@@ -210,6 +213,7 @@ class Repositories:
             export=export_repositories,
             fair_share=fair_share_repositories,
             group=group_repositories,
+            idle_checker=idle_checker_repositories,
             image=image_repositories,
             keypair_resource_policy=keypair_resource_policy_repositories,
             manager_admin=manager_admin_repositories,

@@ -1,11 +1,15 @@
 from __future__ import annotations
 
-import enum
+from dataclasses import dataclass
+from datetime import datetime
+
+from ai.backend.common.types import SessionId
 
 
-class CheckerType(enum.StrEnum):
-    """Discriminator for the kind of idle checker; selects the concrete spec."""
+@dataclass(frozen=True)
+class IdleCheckSession:
+    """Session fields needed to evaluate idle checkers."""
 
-    SESSION_LIFETIME = "session_lifetime"
-    NETWORK_TIMEOUT = "network_timeout"
-    UTILIZATION = "utilization"
+    session_id: SessionId
+    created_at: datetime
+    starts_at: datetime | None

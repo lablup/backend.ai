@@ -23,6 +23,7 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
 from ai.backend.manager.repositories.fair_share import FairShareRepository
+from ai.backend.manager.repositories.idle_checker.repository import IdleCheckerRepository
 from ai.backend.manager.repositories.prometheus_query_preset.repository import (
     PrometheusQueryPresetRepository,
 )
@@ -62,6 +63,7 @@ class SokovanOrchestratorInput:
     scheduler_repository: SchedulerRepository
     deployment_repository: DeploymentRepository
     replica_group_repository: ReplicaGroupRepository
+    idle_checker_repository: IdleCheckerRepository
     fair_share_repository: FairShareRepository
     resource_usage_repository: ResourceUsageHistoryRepository
     config_provider: ManagerConfigProvider
@@ -192,6 +194,7 @@ class SokovanOrchestratorDependency(
         # Reconciler coordinator: sokovan owns its stage assembly (DI just passes deps).
         reconciler_coordinator, reconciler_task_specs = build_reconciler_coordinator(
             replica_group_repository=setup_input.replica_group_repository,
+            idle_checker_repository=setup_input.idle_checker_repository,
             valkey_schedule=setup_input.valkey_schedule,
             lock_factory=setup_input.distributed_lock_factory,
             config_provider=setup_input.config_provider,
