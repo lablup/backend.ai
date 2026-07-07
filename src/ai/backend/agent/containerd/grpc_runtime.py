@@ -6,17 +6,17 @@ nerdctl's 4 KiB ``nerdctl/mounts`` label). Drop-in for ``NerdctlRuntimeClient``:
 implements the same ``ContainerdRuntimeClient`` ABC, so the orchestrator and network
 layers are unchanged.
 
-Covers the full ContainerdRuntimeClient surface, verified against live containerd v2.2.1:
-the connection, container/task lifecycle (create via a hand-built OCI spec + snapshot,
-start/kill/remove), introspection, and image ops (exists/list/remove/entrypoint over the
-Images+Content services). Image *pull/push* delegate to ``ctr`` for now — the gRPC
-Transfer service that does pull server-side is a containerd 1.7+ API absent from these
-stubs, and pull is a control-plane op that never hit the mounts-label limit anyway.
+Covers the full ContainerdRuntimeClient surface over the containerd gRPC API alone (no
+ctr/nerdctl), verified against live containerd v2.2.1: the connection, container/task
+lifecycle (create via a hand-built OCI spec + snapshot, start/kill/remove), introspection,
+image ops (exists/list/remove/entrypoint over the Images+Content services), and pull/push
+over the Transfer service (an OCIRegistry <-> ImageStore transfer that also unpacks into
+the snapshotter).
 """
 
 from __future__ import annotations
 
-import asyncio
+import base64
 import hashlib
 import json
 import logging
@@ -37,7 +37,9 @@ from ._grpcapi.api.services.content.v1 import content_pb2, content_pb2_grpc
 from ._grpcapi.api.services.images.v1 import images_pb2, images_pb2_grpc
 from ._grpcapi.api.services.snapshots.v1 import snapshots_pb2, snapshots_pb2_grpc
 from ._grpcapi.api.services.tasks.v1 import tasks_pb2, tasks_pb2_grpc
+from ._grpcapi.api.services.transfer.v1 import transfer_pb2, transfer_pb2_grpc
 from ._grpcapi.api.types import mount_pb2
+from ._grpcapi.api.types.transfer import imagestore_pb2, registry_pb2
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -56,6 +58,13 @@ _GOARCH = {"aarch64": "arm64", "x86_64": "amd64"}
 
 # containerd task status enum (api/types/task/task.proto) -> our string status.
 _TASK_STATUS = {0: "unknown", 1: "created", 2: "running", 3: "stopped", 4: "paused", 5: "pausing"}
+
+
+def _containerd_any(msg: Any) -> any_pb2.Any:
+    """Wrap a message in an Any the way containerd's typeurl expects: the bare proto full
+    name as the URL, NOT protobuf's ``type.googleapis.com/`` prefix (which the daemon's
+    transfer plugin does not match on)."""
+    return any_pb2.Any(type_url=msg.DESCRIPTOR.full_name, value=msg.SerializeToString())
 
 
 def _chain_id(diff_ids: Sequence[str]) -> str:
@@ -77,6 +86,7 @@ class ContainerdGrpcRuntimeClient(ContainerdRuntimeClient):
     _images: images_pb2_grpc.ImagesStub | None
     _content: content_pb2_grpc.ContentStub | None
     _snapshots: snapshots_pb2_grpc.SnapshotsStub | None
+    _transfer: transfer_pb2_grpc.TransferStub | None
     _rootfs: dict[str, list[mount_pb2.Mount]]
 
     def __init__(self, *, address: str = DEFAULT_ADDRESS, namespace: str = "backend-ai") -> None:
@@ -88,6 +98,7 @@ class ContainerdGrpcRuntimeClient(ContainerdRuntimeClient):
         self._images = None
         self._content = None
         self._snapshots = None
+        self._transfer = None
         self._rootfs: dict[str, list[mount_pb2.Mount]] = {}
 
     async def open(self) -> None:
@@ -100,13 +111,14 @@ class ContainerdGrpcRuntimeClient(ContainerdRuntimeClient):
         self._images = images_pb2_grpc.ImagesStub(self._channel)
         self._content = content_pb2_grpc.ContentStub(self._channel)
         self._snapshots = snapshots_pb2_grpc.SnapshotsStub(self._channel)
+        self._transfer = transfer_pb2_grpc.TransferStub(self._channel)
 
     async def close(self) -> None:
         if self._channel is not None:
             await self._channel.close()
             self._channel = None
             self._containers = self._tasks = None
-            self._images = self._content = self._snapshots = None
+            self._images = self._content = self._snapshots = self._transfer = None
 
     @property
     def _md(self) -> list[tuple[str, str]]:
@@ -136,6 +148,11 @@ class ContainerdGrpcRuntimeClient(ContainerdRuntimeClient):
         if self._snapshots is None:
             raise RuntimeError("ContainerdGrpcRuntimeClient is not open (call open() first)")
         return self._snapshots
+
+    def _transfer_stub(self) -> transfer_pb2_grpc.TransferStub:
+        if self._transfer is None:
+            raise RuntimeError("ContainerdGrpcRuntimeClient is not open (call open() first)")
+        return self._transfer
 
     # --- image content helpers (read the manifest chain to resolve the rootfs) ---
 
@@ -365,32 +382,34 @@ class ContainerdGrpcRuntimeClient(ContainerdRuntimeClient):
 
     @override
     async def pull_image(self, image_ref: str, *, auth: Mapping[str, str] | None = None) -> None:
-        # containerd's image *pull* (registry resolve + content ingest + unpack) is heavy;
-        # the gRPC Transfer service that does it server-side is a 1.7+ API not in these
-        # (1.6) stubs. Delegate to `ctr` meanwhile — pull is a control-plane op that never
-        # hits the nerdctl mounts-label limit that motivated this client. (gRPC Transfer:
-        # follow-up once 2.x stubs are generated.)
-        args = ["images", "pull"]
+        # Pull server-side via the Transfer service: an OCIRegistry source streamed into an
+        # ImageStore destination (which also unpacks into the snapshotter). Pure containerd
+        # API — no ctr/nerdctl.
+        resolver = registry_pb2.RegistryResolver()
         if auth and (user := auth.get("username")) and (pw := auth.get("password")):
-            args += ["--user", f"{user}:{pw}"]
-        args += ["--snapshotter", _SNAPSHOTTER, image_ref]
-        await self._ctr(*args)
+            token = base64.b64encode(f"{user}:{pw}".encode()).decode()
+            resolver.headers["Authorization"] = f"Basic {token}"
+        source = _containerd_any(registry_pb2.OCIRegistry(reference=image_ref, resolver=resolver))
+        destination = _containerd_any(
+            imagestore_pb2.ImageStore(
+                name=image_ref,
+                unpacks=[imagestore_pb2.UnpackConfiguration(snapshotter=_SNAPSHOTTER)],
+            )
+        )
+        await self._transfer_stub().Transfer(
+            transfer_pb2.TransferRequest(source=source, destination=destination),
+            metadata=self._md,
+        )
 
     @override
     async def push_image(self, image_ref: str) -> None:
-        await self._ctr("images", "push", image_ref)
-
-    async def _ctr(self, *args: str) -> None:
-        argv = ["ctr", "--namespace", self._namespace, *args]
-        proc = await asyncio.create_subprocess_exec(
-            *argv, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+        # Reverse of pull: an ImageStore source pushed to an OCIRegistry destination.
+        source = _containerd_any(imagestore_pb2.ImageStore(name=image_ref))
+        destination = _containerd_any(registry_pb2.OCIRegistry(reference=image_ref))
+        await self._transfer_stub().Transfer(
+            transfer_pb2.TransferRequest(source=source, destination=destination),
+            metadata=self._md,
         )
-        _, stderr = await proc.communicate()
-        if proc.returncode != 0:
-            raise RuntimeError(
-                f"ctr {' '.join(args)} failed (rc={proc.returncode}): "
-                f"{stderr.decode(errors='replace').strip()}"
-            )
 
     @override
     async def container_ip(self, container_id: str) -> str | None:

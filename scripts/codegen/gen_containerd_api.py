@@ -81,6 +81,18 @@ def main() -> None:
         (pkg_root / "gogoproto/gogo.proto").write_text(
             _rewrite_proto_imports((gogo_proto / "gogoproto/gogo.proto").read_text())
         )
+        # The Transfer service (pure-API image pull) exists only in containerd 2.x, shipped
+        # in the separately-versioned `api` module. Overlay just its service + types onto the
+        # tree above; they reuse the api/types (platform, descriptor) generated from 1.6.
+        transfer_api = Path(
+            os.environ.get("CONTAINERD_TRANSFER_PROTO_DIR")
+            or _find_go_mod("github.com/containerd/containerd/api@*")
+        )
+        for sub in ("services/transfer", "types/transfer"):
+            for src in (transfer_api / sub).rglob("*.proto"):
+                dst = pkg_root / "api" / src.relative_to(transfer_api)
+                dst.parent.mkdir(parents=True, exist_ok=True)
+                dst.write_text(_rewrite_proto_imports(src.read_text()))
 
         # Compile: all api/types + protobuf + gogoproto (deps) + the target services.
         # (Skip introspection/diff/events/version — they pull in google/rpc which is
@@ -90,6 +102,7 @@ def main() -> None:
             *(pkg_root / "protobuf").rglob("*.proto"),
             pkg_root / "gogoproto/gogo.proto",
             *[pkg_root / f"api/services/{s}/v1/{s}.proto" for s in SERVICES],
+            pkg_root / "api/services/transfer/v1/transfer.proto",
         ]
         out = Path(tmp) / "out"
         out.mkdir()
