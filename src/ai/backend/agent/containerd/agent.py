@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import signal
 import subprocess
 from collections.abc import Mapping, Sequence
@@ -70,6 +71,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging import BraceStyleAdapter
 
+from .grpc_runtime import ContainerdGrpcRuntimeClient
 from .kernel import ContainerdKernel
 from .oci import (
     KRUNNER_ENTRYPOINT,
@@ -447,6 +449,7 @@ class ContainerdAgent(
 ):
     _session_network: ContainerdSessionNetwork
     _host_ip: str
+    _grpc_runtime: ContainerdGrpcRuntimeClient | None
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
@@ -457,16 +460,27 @@ class ContainerdAgent(
         # hard-coded eth0.
         container_cfg = self.local_config.container
         self._host_ip = str(container_cfg.advertised_host or container_cfg.bind_host)
+        # Runtime backend: the native containerd gRPC client (no nerdctl CLI / mounts-label
+        # limit) when BACKENDAI_CONTAINERD_RUNTIME=grpc, else the default nerdctl client.
+        self._grpc_runtime = (
+            ContainerdGrpcRuntimeClient(namespace="backend-ai")
+            if os.environ.get("BACKENDAI_CONTAINERD_RUNTIME") == "grpc"
+            else None
+        )
         self._session_network = build_containerd_session_network(
             self.etcd,
             agent_id=str(self.id),
             host_ip=self._host_ip,
             uplink=_uplink_for_ip(self._host_ip),
+            runtime=self._grpc_runtime,
         )
 
     @override
     async def __ainit__(self) -> None:
         await super().__ainit__()
+        if self._grpc_runtime is not None:
+            await self._grpc_runtime.open()
+            log.info("containerd runtime: native gRPC client")
         # Advertise this node's VTEP so the manager can pre-seed session membership and
         # eliminate the peer-publish race for multi-node overlays (BEP-1058).
         await publish_vtep(self.etcd, str(self.id), self._host_ip)
