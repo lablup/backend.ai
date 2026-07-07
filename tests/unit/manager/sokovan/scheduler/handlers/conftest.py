@@ -428,6 +428,15 @@ def scheduled_sessions_multiple() -> list[SessionWithKernels]:
     ]
 
 
+@pytest.fixture
+def preparing_session_with_pulling_kernel() -> SessionWithKernels:
+    """Re-triggered PREPARING session whose kernel is still PULLING."""
+    return _create_session(
+        status=SessionStatus.PREPARING,
+        kernel_status=KernelStatus.PULLING,
+    )
+
+
 # =============================================================================
 # Pre-created Session Fixtures for StartSessionsLifecycleHandler
 # =============================================================================

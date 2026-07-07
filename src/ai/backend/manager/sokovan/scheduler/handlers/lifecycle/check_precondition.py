@@ -52,14 +52,27 @@ class CheckPreconditionLifecycleHandler(SessionLifecycleHandler):
     @classmethod
     @override
     def target_statuses(cls) -> list[SessionStatus]:
-        """Sessions in SCHEDULED state."""
-        return [SessionStatus.SCHEDULED]
+        """Sessions in SCHEDULED or PREPARING state.
+
+        PREPARING is included so the handler re-queries sessions that have
+        already started preparation and re-triggers the idempotent image
+        pull. This recovers sessions stuck in PREPARING when a pull-related
+        event (e.g. ImagePullFinished) was lost in transit, since nothing
+        else re-sends check_and_pull once the session leaves SCHEDULED.
+        """
+        return [SessionStatus.SCHEDULED, SessionStatus.PREPARING]
 
     @classmethod
     @override
     def target_kernel_statuses(cls) -> list[KernelStatus] | None:
-        """Include sessions where kernels are in SCHEDULED status."""
-        return [KernelStatus.SCHEDULED]
+        """Include sessions with kernels in SCHEDULED, PREPARING, or PULLING status.
+
+        PREPARING/PULLING cover kernels whose pull already finished on the
+        agent but were never updated to PREPARED because the ImagePullFinished
+        event was lost; re-triggering makes the agent re-emit the completion
+        event.
+        """
+        return [KernelStatus.SCHEDULED, KernelStatus.PREPARING, KernelStatus.PULLING]
 
     @classmethod
     @override
@@ -132,17 +145,22 @@ class CheckPreconditionLifecycleHandler(SessionLifecycleHandler):
             sessions_for_pull_data.image_configs,
         )
 
-        # Mark all sessions as success for status transition
+        # Report re-triggered PREPARING sessions as skipped so the coordinator
+        # does not re-apply the PREPARING transition (avoids racing against
+        # concurrent promotions and re-broadcasting the same status event).
         for session in sessions:
             session_info = session.session_info
-            result.successes.append(
-                SessionTransitionInfo(
-                    session_id=session_info.identity.id,
-                    from_status=session_info.lifecycle.status,
-                    reason="passed-preconditions",
-                    creation_id=session_info.identity.creation_id,
-                    access_key=AccessKey(session_info.metadata.access_key),
-                )
+            from_status = session_info.lifecycle.status
+            transition_info = SessionTransitionInfo(
+                session_id=session_info.identity.id,
+                from_status=from_status,
+                reason="passed-preconditions",
+                creation_id=session_info.identity.creation_id,
+                access_key=AccessKey(session_info.metadata.access_key),
             )
+            if from_status == SessionStatus.PREPARING:
+                result.skipped.append(transition_info)
+            else:
+                result.successes.append(transition_info)
 
         return result

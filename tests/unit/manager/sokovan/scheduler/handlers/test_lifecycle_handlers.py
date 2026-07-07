@@ -4,7 +4,7 @@ Based on BEP-1033 test scenarios for handler-level testing.
 
 Test Scenarios:
 - SC-SS-001 ~ SC-SS-005: ScheduleSessionsLifecycleHandler
-- SC-CP-001 ~ SC-CP-004: CheckPreconditionLifecycleHandler
+- SC-CP-001 ~ SC-CP-006: CheckPreconditionLifecycleHandler
 - SC-ST-001 ~ SC-ST-005: StartSessionsLifecycleHandler
 - SC-TE-001 ~ SC-TE-005: TerminateSessionsLifecycleHandler
 """
@@ -17,6 +17,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.sokovan import (
     SessionsForPullWithImages,
     SessionsForStartWithImages,
@@ -304,15 +305,16 @@ class TestScheduleSessionsLifecycleHandler:
 
 
 # =============================================================================
-# CheckPreconditionLifecycleHandler Tests (SC-CP-001 ~ SC-CP-004)
+# CheckPreconditionLifecycleHandler Tests (SC-CP-001 ~ SC-CP-006)
 # =============================================================================
 
 
 class TestCheckPreconditionLifecycleHandler:
     """Tests for CheckPreconditionLifecycleHandler.
 
-    Verifies the handler correctly triggers image pulling via launcher
-    and marks all sessions as successful.
+    Verifies the handler correctly triggers image pulling via launcher,
+    marks SCHEDULED sessions as successful, and reports re-triggered
+    PREPARING sessions as skipped.
     """
 
     @pytest.fixture
@@ -433,6 +435,80 @@ class TestCheckPreconditionLifecycleHandler:
 
         # Assert
         expected_ids = [s.session_info.identity.id for s in scheduled_sessions_multiple]
+        mock_repository.get_sessions_for_pull_by_ids.assert_awaited_once_with(expected_ids)
+
+    async def test_retriggered_preparing_session_reported_as_skipped(
+        self,
+        handler: CheckPreconditionLifecycleHandler,
+        mock_launcher: AsyncMock,
+        mock_repository: AsyncMock,
+        preparing_session_with_pulling_kernel: SessionWithKernels,
+        sessions_for_pull_factory: Callable[..., SessionsForPullWithImages],
+    ) -> None:
+        """SC-CP-005: Re-triggered PREPARING session is skipped, not success.
+
+        Given: A PREPARING session (re-triggered for a potentially stuck pull)
+        When: Handler is invoked
+        Then: Image pulling is re-triggered but the session is reported as
+              skipped so the coordinator does not re-apply the PREPARING
+              transition
+        """
+        # Arrange
+        sessions = [preparing_session_with_pulling_kernel]
+        sessions_for_pull = sessions_for_pull_factory(sessions)
+        mock_repository.get_sessions_for_pull_by_ids.return_value = sessions_for_pull
+
+        # Act
+        result = await handler.execute("default", sessions)
+
+        # Assert
+        assert len(result.successes) == 0
+        assert len(result.failures) == 0
+        assert len(result.skipped) == 1
+        assert result.skipped[0].from_status == SessionStatus.PREPARING
+
+        # Image pulling is still re-triggered for the skipped session
+        mock_launcher.trigger_image_pulling.assert_awaited_once_with(
+            sessions_for_pull.sessions,
+            sessions_for_pull.image_configs,
+        )
+
+    async def test_mixed_scheduled_and_preparing_sessions_categorized(
+        self,
+        handler: CheckPreconditionLifecycleHandler,
+        mock_launcher: AsyncMock,
+        mock_repository: AsyncMock,
+        scheduled_session: SessionWithKernels,
+        preparing_session_with_pulling_kernel: SessionWithKernels,
+        sessions_for_pull_factory: Callable[..., SessionsForPullWithImages],
+    ) -> None:
+        """SC-CP-006: SCHEDULED sessions succeed while PREPARING ones are skipped.
+
+        Given: A SCHEDULED session and a re-triggered PREPARING session
+        When: Handler is invoked
+        Then: The SCHEDULED session is reported as success and the PREPARING
+              session as skipped, with image pulling triggered for both
+        """
+        # Arrange
+        sessions = [scheduled_session, preparing_session_with_pulling_kernel]
+        sessions_for_pull = sessions_for_pull_factory(sessions)
+        mock_repository.get_sessions_for_pull_by_ids.return_value = sessions_for_pull
+
+        # Act
+        result = await handler.execute("default", sessions)
+
+        # Assert
+        assert len(result.successes) == 1
+        assert result.successes[0].session_id == scheduled_session.session_info.identity.id
+        assert len(result.skipped) == 1
+        assert (
+            result.skipped[0].session_id
+            == preparing_session_with_pulling_kernel.session_info.identity.id
+        )
+        assert len(result.failures) == 0
+
+        # Image pulling is triggered for both sessions
+        expected_ids = [s.session_info.identity.id for s in sessions]
         mock_repository.get_sessions_for_pull_by_ids.assert_awaited_once_with(expected_ids)
 
 
