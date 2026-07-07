@@ -57,21 +57,21 @@ def _make_action(
 
 
 @dataclass(frozen=True)
-class _Delegation:
-    """A caller enqueuing a session on behalf of another owner."""
+class _EnqueueOnBehalf:
+    """A caller enqueuing a session on behalf of another user (the owner)."""
 
-    caller_id: UserID
-    owner_id: UserID
-    caller: UserData  # non-admin user context to run the validator under
+    caller_id: UserID  # who sends the request
+    owner_id: UserID  # who the session is created for
+    caller_user: UserData  # the caller's non-admin auth context
 
 
 @pytest.fixture
-def delegation() -> _Delegation:
+def enqueue_on_behalf() -> _EnqueueOnBehalf:
     caller_id = UserID(uuid.uuid4())
-    return _Delegation(
+    return _EnqueueOnBehalf(
         caller_id=caller_id,
         owner_id=UserID(uuid.uuid4()),
-        caller=UserData(
+        caller_user=UserData(
             user_id=caller_id,
             is_authorized=True,
             is_admin=False,
@@ -99,14 +99,16 @@ class TestEnqueueSessionActionDelegationScope:
     def test_rbac_scope_targets_owner_when_delegating(
         self,
         delegated: bool,
-        delegation: _Delegation,
+        enqueue_on_behalf: _EnqueueOnBehalf,
     ) -> None:
         action = _make_action(
-            user_id=delegation.caller_id,
-            owner_id=delegation.owner_id if delegated else None,
+            user_id=enqueue_on_behalf.caller_id,
+            owner_id=enqueue_on_behalf.owner_id if delegated else None,
         )
         # Delegation must authorize against the owner, never the caller.
-        expected_id = delegation.owner_id if delegated else delegation.caller_id
+        expected_id = (
+            enqueue_on_behalf.owner_id if delegated else enqueue_on_behalf.caller_id
+        )
 
         assert action.scope_id() == str(expected_id)
         target = action.target_element()
@@ -116,27 +118,30 @@ class TestEnqueueSessionActionDelegationScope:
 
 class TestEnqueueSessionDelegationAuthorization:
     @pytest.mark.parametrize(
-        "granted, expectation",
+        "permission_granted, expected_outcome",
         [
             (True, nullcontext()),
             (False, pytest.raises(NotEnoughPermission)),
         ],
-        ids=["granted_passes", "denied_raises"],
+        ids=["permission_granted_allows", "permission_denied_raises"],
     )
     async def test_delegation_authorizes_against_owner_scope(
         self,
-        granted: bool,
-        expectation: AbstractContextManager[object],
+        permission_granted: bool,
+        expected_outcome: AbstractContextManager[object],
         trigger_meta: BaseActionTriggerMeta,
-        delegation: _Delegation,
+        enqueue_on_behalf: _EnqueueOnBehalf,
     ) -> None:
         repository = AsyncMock(spec=PermissionControllerRepository)
-        repository.check_permission_with_scope_chain.return_value = granted
+        repository.check_permission_with_scope_chain.return_value = permission_granted
         validator = ScopeActionRBACValidator(repository, MagicMock())
 
-        action = _make_action(user_id=delegation.caller_id, owner_id=delegation.owner_id)
-        with with_user(delegation.caller):
-            with expectation:
+        action = _make_action(
+            user_id=enqueue_on_behalf.caller_id,
+            owner_id=enqueue_on_behalf.owner_id,
+        )
+        with with_user(enqueue_on_behalf.caller_user):
+            with expected_outcome:
                 await validator.validate(action, trigger_meta)
 
         # Regardless of the verdict, the check must target the owner's USER scope.
@@ -144,6 +149,6 @@ class TestEnqueueSessionDelegationAuthorization:
         checked: ScopeChainPermissionCheckInput = (
             repository.check_permission_with_scope_chain.await_args.args[0]
         )
-        assert checked.key.user_id == delegation.caller_id
+        assert checked.key.user_id == enqueue_on_behalf.caller_id
         assert checked.key.element_type == RBACElementType.USER
-        assert checked.key.entity_id == str(delegation.owner_id)
+        assert checked.key.entity_id == str(enqueue_on_behalf.owner_id)
