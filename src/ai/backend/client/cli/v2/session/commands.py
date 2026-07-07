@@ -89,14 +89,22 @@ def project_search(project_id: str, limit: int, offset: int) -> None:
 @session.command()
 @click.argument("session_ids", nargs=-1, required=True)
 @click.option("--forced", is_flag=True, default=False, help="Force-terminate without cleanup.")
-def terminate(session_ids: tuple[str, ...], forced: bool) -> None:
+@click.option(
+    "--owner-id",
+    default=None,
+    type=click.UUID,
+    help="Delegated owner user UUID. Terminate the owner's sessions on their behalf.",
+)
+def terminate(session_ids: tuple[str, ...], forced: bool, owner_id: UUID | None) -> None:
     """Terminate one or more sessions by ID."""
 
     from ai.backend.common.dto.manager.v2.session.request import TerminateSessionsInput
+    from ai.backend.common.identifier.user import UserID
 
     body = TerminateSessionsInput(
         session_ids=[UUID(sid) for sid in session_ids],
         forced=forced,
+        owner_id=UserID(owner_id) if owner_id is not None else None,
     )
 
     async def _run() -> None:

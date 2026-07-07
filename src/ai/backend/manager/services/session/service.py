@@ -70,6 +70,7 @@ from ai.backend.manager.data.session.options import (
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.errors.common import (
+    Forbidden,
     InternalServerError,
     ServiceUnavailable,
 )
@@ -861,6 +862,17 @@ class SessionService:
         self, action: TerminateSessionsAction
     ) -> TerminateSessionsActionResult:
         """Terminate multiple sessions by their IDs."""
+        if action.owner_id is not None:
+            # Delegation: verify every target session is owned by the delegated
+            # owner before terminating on their behalf.
+            owner = await self._user_repository.get_user_by_uuid(action.owner_id)
+            for session_id in action.session_ids:
+                session_owner = await self._session_repository.get_session_owner(session_id)
+                if session_owner.id != owner.id:
+                    raise Forbidden(
+                        f"Session {session_id} is not owned by the delegated owner "
+                        f"{action.owner_id}."
+                    )
         reason = (
             KernelLifecycleEventReason.FORCE_TERMINATED
             if action.forced

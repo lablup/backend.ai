@@ -23,6 +23,7 @@ from ai.backend.common.dto.manager.v2.session.types import (
     SessionStatusFilter,
 )
 from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 __all__ = (
@@ -382,6 +383,13 @@ class TerminateSessionsInput(BaseRequestModel):
 
     session_ids: list[UUID] = Field(description="Session UUIDs to terminate.")
     forced: bool = Field(default=False, description="Force-terminate without waiting for cleanup.")
+    owner_id: UserID | None = Field(
+        default=None,
+        description=(
+            "Delegated owner user UUID. When set, the sessions are terminated on behalf "
+            "of the specified user; all target sessions must be owned by that user."
+        ),
+    )
 
 
 # ---------------------------------------------------------------------------

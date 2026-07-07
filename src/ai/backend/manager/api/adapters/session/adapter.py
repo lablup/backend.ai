@@ -873,6 +873,7 @@ class SessionAdapter(BaseAdapter):
         action = TerminateSessionsAction(
             session_ids=[SessionId(sid) for sid in input.session_ids],
             forced=input.forced,
+            owner_id=input.owner_id,
         )
         result = await self._processors.session.terminate_sessions.wait_for_complete(action)
         return TerminateSessionsPayload(

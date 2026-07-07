@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from typing import override
 
 from ai.backend.common.data.permission.types import EntityType, RBACElementType
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import SessionId
 from ai.backend.manager.actions.action.bulk import BaseBulkAction, BaseBulkActionResult
 from ai.backend.manager.actions.action.types import ActionTarget
@@ -36,6 +37,9 @@ class TerminateSessionsAction(BaseBulkAction[SessionTerminationTarget]):
 
     session_ids: list[SessionId]
     forced: bool
+    owner_id: UserID | None = None
+    """Delegated owner user UUID. When set, the service verifies that every
+    target session is owned by that user before terminating."""
 
     @override
     def entity_id(self) -> str | None:

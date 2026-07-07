@@ -18,6 +18,7 @@ from ai.backend.common.dto.agent.response import CodeCompletionResp, CodeComplet
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.resource_group import ResourceGroupID, ResourceGroupName
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import (
     AccessKey,
     ClusterMode,
@@ -43,6 +44,7 @@ from ai.backend.manager.data.kernel.types import (
     UserPermission,
 )
 from ai.backend.manager.data.session.types import SessionData, SessionListResult, SessionStatus
+from ai.backend.manager.errors.common import Forbidden
 from ai.backend.manager.errors.kernel import SessionNotFound
 from ai.backend.manager.errors.storage import VFolderBadRequest
 from ai.backend.manager.models.network import NetworkType
@@ -110,6 +112,9 @@ from ai.backend.manager.services.session.actions.shutdown_service import (
     ShutdownServiceAction,
     ShutdownServiceActionResult,
 )
+from ai.backend.manager.services.session.actions.terminate_sessions import (
+    TerminateSessionsAction,
+)
 from ai.backend.manager.services.session.actions.upload_files import (
     UploadFilesAction,
     UploadFilesActionResult,
@@ -176,6 +181,12 @@ def mock_scheduler_repository() -> MagicMock:
 
 
 @pytest.fixture
+def mock_user_repository() -> MagicMock:
+    """Create mocked user repository."""
+    return MagicMock()
+
+
+@pytest.fixture
 def mock_appproxy_client_pool() -> MagicMock:
     """Create mocked AppProxy client pool."""
     return MagicMock()
@@ -193,6 +204,7 @@ async def session_service(
     mock_scheduling_controller: MagicMock,
     mock_scheduler_repository: MagicMock,
     mock_appproxy_client_pool: MagicMock,
+    mock_user_repository: MagicMock,
 ) -> SessionService:
     """Create SessionService with mocked dependencies."""
     args = SessionServiceArgs(
@@ -206,7 +218,7 @@ async def session_service(
         scheduler_repository=mock_scheduler_repository,
         scheduling_controller=mock_scheduling_controller,
         appproxy_client_pool=mock_appproxy_client_pool,
-        user_repository=MagicMock(),
+        user_repository=mock_user_repository,
     )
     return SessionService(args)
 
@@ -1904,3 +1916,58 @@ class TestEnqueueSession:
         draft = mock_scheduling_controller.enqueue_session_from_draft.await_args.args[0]
         assert draft.scope.resource_group_id == requested_resource_group_id
         assert draft.scope.resource_group_name == ResourceGroupName("requested-rg")
+
+
+class TestTerminateSessionsDelegation:
+    """owner_id delegation in SessionService.terminate_sessions()."""
+
+    async def test_rejects_session_not_owned_by_owner(
+        self,
+        session_service: SessionService,
+        mock_session_repository: MagicMock,
+        mock_scheduling_controller: MagicMock,
+        mock_user_repository: MagicMock,
+    ) -> None:
+        """Terminating on behalf of an owner rejects sessions the owner does not own."""
+        owner_id = uuid4()
+        session_id = SessionId(uuid4())
+        mock_user_repository.get_user_by_uuid = AsyncMock(return_value=MagicMock(id=owner_id))
+        # The session is owned by a different user.
+        mock_session_repository.get_session_owner = AsyncMock(return_value=MagicMock(id=uuid4()))
+        mock_scheduling_controller.mark_sessions_for_termination = AsyncMock()
+        action = TerminateSessionsAction(
+            session_ids=[session_id], forced=False, owner_id=UserID(owner_id)
+        )
+
+        with pytest.raises(Forbidden):
+            await session_service.terminate_sessions(action)
+        mock_scheduling_controller.mark_sessions_for_termination.assert_not_called()
+
+    async def test_terminates_when_all_sessions_owned(
+        self,
+        session_service: SessionService,
+        mock_session_repository: MagicMock,
+        mock_scheduling_controller: MagicMock,
+        mock_user_repository: MagicMock,
+    ) -> None:
+        """Terminating on behalf of an owner proceeds when the owner owns the sessions."""
+        owner_id = uuid4()
+        session_id = SessionId(uuid4())
+        mock_user_repository.get_user_by_uuid = AsyncMock(return_value=MagicMock(id=owner_id))
+        mock_session_repository.get_session_owner = AsyncMock(return_value=MagicMock(id=owner_id))
+        mock_scheduling_controller.mark_sessions_for_termination = AsyncMock(
+            return_value=MagicMock(
+                cancelled_sessions=[],
+                terminating_sessions=[session_id],
+                force_terminated_sessions=[],
+                skipped_sessions=[],
+            )
+        )
+        action = TerminateSessionsAction(
+            session_ids=[session_id], forced=False, owner_id=UserID(owner_id)
+        )
+
+        result = await session_service.terminate_sessions(action)
+
+        mock_scheduling_controller.mark_sessions_for_termination.assert_called_once()
+        assert result.terminating == [session_id]
