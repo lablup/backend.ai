@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import uuid
 from contextlib import AbstractContextManager, nullcontext
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
 
@@ -55,26 +56,29 @@ def _make_action(
     )
 
 
-@pytest.fixture
-def caller_id() -> UserID:
-    return UserID(uuid.uuid4())
+@dataclass(frozen=True)
+class _Delegation:
+    """A caller enqueuing a session on behalf of another owner."""
+
+    caller_id: UserID
+    owner_id: UserID
+    caller: UserData  # non-admin user context to run the validator under
 
 
 @pytest.fixture
-def owner_id() -> UserID:
-    return UserID(uuid.uuid4())
-
-
-@pytest.fixture
-def caller(caller_id: UserID) -> UserData:
-    """A non-admin user context to run the validator under."""
-    return UserData(
-        user_id=caller_id,
-        is_authorized=True,
-        is_admin=False,
-        is_superadmin=False,
-        role=UserRole.USER,
-        domain_name="default",
+def delegation() -> _Delegation:
+    caller_id = UserID(uuid.uuid4())
+    return _Delegation(
+        caller_id=caller_id,
+        owner_id=UserID(uuid.uuid4()),
+        caller=UserData(
+            user_id=caller_id,
+            is_authorized=True,
+            is_admin=False,
+            is_superadmin=False,
+            role=UserRole.USER,
+            domain_name="default",
+        ),
     )
 
 
@@ -95,15 +99,14 @@ class TestEnqueueSessionActionDelegationScope:
     def test_rbac_scope_targets_owner_when_delegating(
         self,
         delegated: bool,
-        caller_id: UserID,
-        owner_id: UserID,
+        delegation: _Delegation,
     ) -> None:
         action = _make_action(
-            user_id=caller_id,
-            owner_id=owner_id if delegated else None,
+            user_id=delegation.caller_id,
+            owner_id=delegation.owner_id if delegated else None,
         )
         # Delegation must authorize against the owner, never the caller.
-        expected_id = owner_id if delegated else caller_id
+        expected_id = delegation.owner_id if delegated else delegation.caller_id
 
         assert action.scope_id() == str(expected_id)
         target = action.target_element()
@@ -125,16 +128,14 @@ class TestEnqueueSessionDelegationAuthorization:
         granted: bool,
         expectation: AbstractContextManager[object],
         trigger_meta: BaseActionTriggerMeta,
-        caller: UserData,
-        caller_id: UserID,
-        owner_id: UserID,
+        delegation: _Delegation,
     ) -> None:
         repository = AsyncMock(spec=PermissionControllerRepository)
         repository.check_permission_with_scope_chain.return_value = granted
         validator = ScopeActionRBACValidator(repository, MagicMock())
 
-        action = _make_action(user_id=caller_id, owner_id=owner_id)
-        with with_user(caller):
+        action = _make_action(user_id=delegation.caller_id, owner_id=delegation.owner_id)
+        with with_user(delegation.caller):
             with expectation:
                 await validator.validate(action, trigger_meta)
 
@@ -143,6 +144,6 @@ class TestEnqueueSessionDelegationAuthorization:
         checked: ScopeChainPermissionCheckInput = (
             repository.check_permission_with_scope_chain.await_args.args[0]
         )
-        assert checked.key.user_id == caller_id
+        assert checked.key.user_id == delegation.caller_id
         assert checked.key.element_type == RBACElementType.USER
-        assert checked.key.entity_id == str(owner_id)
+        assert checked.key.entity_id == str(delegation.owner_id)
