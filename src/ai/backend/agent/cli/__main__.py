@@ -69,3 +69,8 @@ def dependencies() -> None:
 @main.group(cls=LazyGroup, import_name="ai.backend.agent.cli.health:cli")
 def health() -> None:
     """Command set for health checking."""
+
+
+@main.group(cls=LazyGroup, import_name="ai.backend.agent.cli.kernel:cli")
+def kernel() -> None:
+    """Command set for driving kernel RPC on a running agent (parity verification)."""

@@ -5,6 +5,7 @@ from typing import override
 
 from aiohttp import web
 
+from ai.backend.common.clients.agent.client import AgentClient
 from ai.backend.common.exception import ErrorCode, ErrorDetail, ErrorDomain, ErrorOperation
 from ai.backend.common.health_checker.abc import StaticServiceHealthChecker
 from ai.backend.common.health_checker.exceptions import HealthCheckError
@@ -15,7 +16,6 @@ from ai.backend.common.health_checker.types import (
     ServiceGroup,
     ServiceHealth,
 )
-from ai.backend.manager.clients.agent.client import AgentClient
 
 
 class RpcHealthCheckError(HealthCheckError, web.HTTPServiceUnavailable):
