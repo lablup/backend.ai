@@ -20,6 +20,7 @@ from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.types import (
     AccessKey,
+    BinarySize,
     ClusterMode,
     KernelId,
     ResourceSlot,
@@ -1904,3 +1905,64 @@ class TestEnqueueSession:
         draft = mock_scheduling_controller.enqueue_session_from_draft.await_args.args[0]
         assert draft.scope.resource_group_id == requested_resource_group_id
         assert draft.scope.resource_group_name == ResourceGroupName("requested-rg")
+
+    async def test_leaves_handler_options_unset_for_rg_defaults(
+        self,
+        configured_session_service: SessionService,
+        mock_scheduling_controller: MagicMock,
+        enqueue_action_without_rg: EnqueueSessionAction,
+    ) -> None:
+        """The enqueue draft leaves handler_options unset so the resource-group
+        default can fill it downstream instead of being shadowed by a default.
+        """
+        await configured_session_service.enqueue_session(enqueue_action_without_rg)
+
+        draft = mock_scheduling_controller.enqueue_session_from_draft.await_args.args[0]
+        assert draft.options.handler_options is None
+
+    async def test_leaves_resource_opts_unset_when_shmem_omitted(
+        self,
+        configured_session_service: SessionService,
+        mock_scheduling_controller: MagicMock,
+        enqueue_action_without_rg: EnqueueSessionAction,
+    ) -> None:
+        """The execution spec leaves resource_opts unset when the caller gives
+        no shmem, so the resource-group default can fill it.
+        """
+        await configured_session_service.enqueue_session(enqueue_action_without_rg)
+
+        draft = mock_scheduling_controller.enqueue_session_from_draft.await_args.args[0]
+        assert draft.options.kernel_groups is not None
+        assert draft.options.kernel_groups[0].execution_spec.resource_input.resource_opts is None
+
+    async def test_keeps_resource_opts_when_shmem_supplied(
+        self,
+        configured_session_service: SessionService,
+        mock_scheduling_controller: MagicMock,
+        enqueue_action_without_rg: EnqueueSessionAction,
+    ) -> None:
+        """A caller-supplied shmem is preserved on the execution spec's
+        resource_opts rather than being dropped to None.
+        """
+        action = EnqueueSessionAction(
+            session_name=enqueue_action_without_rg.session_name,
+            session_type=enqueue_action_without_rg.session_type,
+            image_id=enqueue_action_without_rg.image_id,
+            resource=SessionResourceSpec(
+                entries=enqueue_action_without_rg.resource.entries,
+                shmem="256m",
+            ),
+            scheduling=enqueue_action_without_rg.scheduling,
+            user_id=enqueue_action_without_rg.user_id,
+            access_key=enqueue_action_without_rg.access_key,
+            domain_name=enqueue_action_without_rg.domain_name,
+            group_id=enqueue_action_without_rg.group_id,
+        )
+
+        await configured_session_service.enqueue_session(action)
+
+        draft = mock_scheduling_controller.enqueue_session_from_draft.await_args.args[0]
+        assert draft.options.kernel_groups is not None
+        resource_opts = draft.options.kernel_groups[0].execution_spec.resource_input.resource_opts
+        assert resource_opts is not None
+        assert resource_opts.shmem == BinarySize.from_str("256m")
