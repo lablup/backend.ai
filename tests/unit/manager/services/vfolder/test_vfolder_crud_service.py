@@ -509,38 +509,48 @@ class TestCreateVFolderV2Action:
             owner_id=owner_id,
         )
 
-    def test_without_owner_targets_caller(self) -> None:
-        caller_id = UserID(uuid.uuid4())
-        action = self._make_action(user_id=caller_id, owner_id=None)
-
-        assert action.scope_id() == str(caller_id)
-        target = action.target_element()
-        assert target.element_type == RBACElementType.USER
-        assert target.element_id == str(caller_id)
-
-    def test_with_owner_targets_owner_not_caller(self) -> None:
+    @pytest.mark.parametrize(
+        ("with_owner", "with_project", "expected_type", "expected_target"),
+        [
+            # No delegation, no project: authorize against the caller's own scope.
+            pytest.param(False, False, RBACElementType.USER, "caller", id="own-targets-caller"),
+            # Delegation: authorize against the owner's USER scope, never the caller.
+            pytest.param(True, False, RBACElementType.USER, "owner", id="owner-targets-owner"),
+            # Project-owned: authorize against the project; owner_id is irrelevant.
+            pytest.param(
+                True, True, RBACElementType.PROJECT, "project", id="project-ignores-owner"
+            ),
+        ],
+    )
+    def test_rbac_scope_target(
+        self,
+        with_owner: bool,
+        with_project: bool,
+        expected_type: RBACElementType,
+        expected_target: str,
+    ) -> None:
         caller_id = UserID(uuid.uuid4())
         owner_id = UserID(uuid.uuid4())
-        action = self._make_action(user_id=caller_id, owner_id=owner_id)
-
-        # Delegation must authorize against the owner, never the caller.
-        assert action.scope_id() == str(owner_id)
-        target = action.target_element()
-        assert target.element_type == RBACElementType.USER
-        assert target.element_id == str(owner_id)
-        assert target.element_id != str(caller_id)
-
-    def test_project_scope_ignores_owner(self) -> None:
         project_id = ProjectID(uuid.uuid4())
+        expected_ids = {
+            "caller": str(caller_id),
+            "owner": str(owner_id),
+            "project": str(project_id),
+        }
         action = self._make_action(
-            user_id=UserID(uuid.uuid4()), owner_id=UserID(uuid.uuid4()), project_id=project_id
+            user_id=caller_id,
+            owner_id=owner_id if with_owner else None,
+            project_id=project_id if with_project else None,
         )
 
-        # Project-owned vfolders authorize against the project, not a user.
-        assert action.scope_id() == str(project_id)
+        expected_id = expected_ids[expected_target]
+        assert action.scope_id() == expected_id
         target = action.target_element()
-        assert target.element_type == RBACElementType.PROJECT
-        assert target.element_id == str(project_id)
+        assert target.element_type == expected_type
+        assert target.element_id == expected_id
+        # Whenever an owner/project is in play, the caller must never be the target.
+        if expected_target != "caller":
+            assert target.element_id != str(caller_id)
 
     async def test_delegation_swaps_acting_user_to_owner(
         self,
