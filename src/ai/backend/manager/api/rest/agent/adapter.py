@@ -15,10 +15,10 @@ from ai.backend.common.dto.manager.agent import (
     SearchAgentsRequest,
 )
 from ai.backend.manager.data.agent.types import AgentDetailData, AgentStatus
-from ai.backend.manager.data.filter.adapter import BaseFilterAdapter
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.repositories.agent.query import QueryConditions, QueryOrders
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.repositories.base.filter_adapter import BaseFilterAdapter
 
 __all__ = ("AgentAdapter",)
 

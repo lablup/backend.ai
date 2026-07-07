@@ -4,7 +4,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from ai.backend.common.dto.manager.quota_scope import QuotaScopeDTO
-from ai.backend.manager.data.filter.adapter import BaseFilterAdapter
+from ai.backend.manager.repositories.base.filter_adapter import BaseFilterAdapter
 
 __all__ = ("QuotaScopeAdapter",)
 

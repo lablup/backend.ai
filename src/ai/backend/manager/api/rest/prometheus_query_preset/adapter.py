@@ -19,7 +19,6 @@ from ai.backend.common.dto.manager.prometheus_query_preset import (
     QueryDefinitionOrderField,
     SearchQueryDefinitionsRequest,
 )
-from ai.backend.manager.data.filter.adapter import BaseFilterAdapter
 from ai.backend.manager.data.prometheus_query_preset import PrometheusQueryPresetData
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.prometheus_query_preset import PrometheusQueryPresetRow
@@ -28,6 +27,7 @@ from ai.backend.manager.models.prometheus_query_preset.conditions import (
 )
 from ai.backend.manager.models.prometheus_query_preset.orders import PrometheusQueryPresetOrders
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination, Updater
+from ai.backend.manager.repositories.base.filter_adapter import BaseFilterAdapter
 from ai.backend.manager.repositories.prometheus_query_preset.updaters import (
     PrometheusQueryPresetUpdaterSpec,
 )
