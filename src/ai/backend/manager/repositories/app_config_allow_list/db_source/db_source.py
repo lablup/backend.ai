@@ -24,7 +24,6 @@ from ai.backend.manager.models.app_config_allow_list.row import AppConfigAllowLi
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     Creator,
-    ExistsQuerier,
     Purger,
     Querier,
     Updater,
@@ -106,9 +105,3 @@ class AppConfigAllowListDBSource:
                 has_next_page=result.has_next_page,
                 has_previous_page=result.has_previous_page,
             )
-
-    @app_config_allow_list_db_source_resilience.apply()
-    async def exists(self, querier: ExistsQuerier[AppConfigAllowListRow]) -> bool:
-        """Whether any allow-list row matches the querier's conditions."""
-        async with self._ops.read_ops() as r:
-            return await r.exists(querier)

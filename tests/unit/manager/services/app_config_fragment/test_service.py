@@ -18,7 +18,6 @@ from ai.backend.manager.data.app_config_fragment.types import (
     AppConfigFragmentSearchResult,
 )
 from ai.backend.manager.errors.app_config import AppConfigFragmentNotFound
-from ai.backend.manager.models.app_config_allow_list.row import AppConfigAllowListRow
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
 from ai.backend.manager.repositories.app_config_fragment.creators import (
     AppConfigFragmentCreatorSpec,
@@ -31,7 +30,6 @@ from ai.backend.manager.repositories.app_config_fragment.updaters import (
 )
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
-    ExistsQuerier,
     OffsetPagination,
     Purger,
     Updater,
@@ -105,14 +103,11 @@ class TestAppConfigFragmentService:
             scope_id=_USER_ID,
             config={"k": "v"},
         )
-        gate = ExistsQuerier(row_class=AppConfigAllowListRow)
 
-        result = await service.create(
-            CreateAppConfigFragmentAction(creator_spec=spec, only_if=gate)
-        )
+        result = await service.create(CreateAppConfigFragmentAction(creator_spec=spec))
 
         assert result.fragment == fragment
-        mock_repository.create.assert_called_once_with(spec, gate)
+        mock_repository.create.assert_called_once_with(spec)
 
     # --- get / search ---
 
@@ -247,7 +242,6 @@ class TestCreateActionScope:
                 scope_id=scope_id,
                 config={"k": "v"},
             ),
-            only_if=ExistsQuerier(row_class=AppConfigAllowListRow),
         )
         assert action.scope_type() == expected_scope_type
         assert action.scope_id() == expected_scope_id

@@ -12,7 +12,6 @@ from ai.backend.manager.data.app_config_fragment.types import (
     AppConfigFragmentData,
     AppConfigFragmentSearchResult,
 )
-from ai.backend.manager.models.app_config_allow_list.row import AppConfigAllowListRow
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
 from ai.backend.manager.models.scopes import SearchScope
 from ai.backend.manager.repositories.app_config_fragment.creators import (
@@ -21,7 +20,7 @@ from ai.backend.manager.repositories.app_config_fragment.creators import (
 from ai.backend.manager.repositories.app_config_fragment.db_source import (
     AppConfigFragmentDBSource,
 )
-from ai.backend.manager.repositories.base import BatchQuerier, ExistsQuerier, Purger, Updater
+from ai.backend.manager.repositories.base import BatchQuerier, Purger, Updater
 from ai.backend.manager.repositories.ops import DBOpsProvider
 
 __all__ = ("AppConfigFragmentRepository",)
@@ -55,12 +54,8 @@ class AppConfigFragmentRepository:
         self._db_source = AppConfigFragmentDBSource(ops_provider)
 
     @app_config_fragment_repository_resilience.apply()
-    async def create(
-        self,
-        spec: AppConfigFragmentCreatorSpec,
-        only_if: ExistsQuerier[AppConfigAllowListRow],
-    ) -> AppConfigFragmentData:
-        return await self._db_source.create(spec, only_if)
+    async def create(self, spec: AppConfigFragmentCreatorSpec) -> AppConfigFragmentData:
+        return await self._db_source.create(spec)
 
     @app_config_fragment_repository_resilience.apply()
     async def get_by_id(self, fragment_id: AppConfigFragmentID) -> AppConfigFragmentData:

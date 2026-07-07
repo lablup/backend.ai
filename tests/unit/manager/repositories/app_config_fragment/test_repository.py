@@ -39,7 +39,6 @@ from ai.backend.manager.repositories.app_config_fragment.updaters import (
 )
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
-    ExistsQuerier,
     OffsetPagination,
     Purger,
     Updater,
@@ -194,7 +193,6 @@ class TestCreateAndGet:
                 scope_id="public",
                 config={"theme": "dark"},
             ),
-            ExistsQuerier(row_class=AppConfigAllowListRow),
         )
         fetched = await repository.get_by_id(created.id)
         assert fetched.id == created.id
@@ -217,7 +215,6 @@ class TestCreateAndGet:
                     scope_id="public",
                     config={"theme": "dark"},
                 ),
-                ExistsQuerier(row_class=AppConfigAllowListRow),
             )
 
     async def test_unique_constraint_violation(
@@ -233,7 +230,6 @@ class TestCreateAndGet:
                     scope_id=domain_scoped_fragment.scope_id,
                     config={"k": "v"},
                 ),
-                ExistsQuerier(row_class=AppConfigAllowListRow),
             )
 
 

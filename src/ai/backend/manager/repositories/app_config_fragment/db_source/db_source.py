@@ -18,9 +18,7 @@ from ai.backend.manager.data.app_config_fragment.types import (
 )
 from ai.backend.manager.errors.app_config import (
     AppConfigFragmentNotFound,
-    AppConfigFragmentWriteNotAllowed,
 )
-from ai.backend.manager.models.app_config_allow_list.row import AppConfigAllowListRow
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
 from ai.backend.manager.models.scopes import SearchScope
 from ai.backend.manager.repositories.app_config_fragment.creators import (
@@ -29,7 +27,6 @@ from ai.backend.manager.repositories.app_config_fragment.creators import (
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     Creator,
-    ExistsQuerier,
     Purger,
     Querier,
     Updater,
@@ -67,20 +64,11 @@ class AppConfigFragmentDBSource:
         self._ops = ops_provider
 
     @app_config_fragment_db_source_resilience.apply()
-    async def create(
-        self,
-        spec: AppConfigFragmentCreatorSpec,
-        only_if: ExistsQuerier[AppConfigAllowListRow],
-    ) -> AppConfigFragmentData:
-        # ``only_if`` (built by the caller) and the write run in one transaction, so the gate
-        # check and the write commit atomically — no check-then-write race. The FK to the
-        # allow-list would also reject the insert, but the gate surfaces the domain error.
+    async def create(self, spec: AppConfigFragmentCreatorSpec) -> AppConfigFragmentData:
+        # The FK to the allow-list is the gate: inserting a fragment with no
+        # allow-list row for its ``(config_name, scope_type)`` raises
+        # ``AppConfigFragmentWriteNotAllowed`` (see the spec's integrity checks).
         async with self._ops.write_ops() as w:
-            if not await w.exists(only_if):
-                raise AppConfigFragmentWriteNotAllowed(
-                    f"Writing app config {spec.config_name!r} at scope "
-                    f"{spec.scope_type.value!r} is not allowed."
-                )
             created = await w.create(Creator(spec=spec))
             return created.row.to_data()
 

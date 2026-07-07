@@ -92,24 +92,6 @@ async def execute_querier[TRow: Base](
 
 
 # =============================================================================
-# Existence Querier (by conditions)
-# =============================================================================
-
-
-@dataclass
-class ExistsQuerier[TRow: Base]:
-    """Existence check over a table by a set of conditions (combined with AND).
-
-    Attributes:
-        row_class: ORM class for table access.
-        conditions: Query conditions; an empty list checks whether the table has any row.
-    """
-
-    row_class: type[TRow]
-    conditions: list[QueryCondition] = field(default_factory=list)
-
-
-# =============================================================================
 # Batch Querier (with pagination)
 # =============================================================================
 

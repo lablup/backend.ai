@@ -34,14 +34,11 @@ __all__ = ("AppConfigFragmentService",)
 class AppConfigFragmentService:
     """Write/read paths for app config fragments (not admin-only).
 
-    ``create`` is gated by the allow-list write-gate in the repository: the gate check
-    and the write run in a single transaction, so a fragment is only written when an
-    ``app_config_allow_list`` row exists for its ``(config_name, scope_type)``. Because
-    an allow-list row requires a registered ``config_name`` (FK), this also enforces
-    registration. ``update`` / ``purge`` need no gate — the fragments' FK to the
-    allow-list (``ON DELETE CASCADE``) guarantees an existing fragment's entry exists.
-    An allow-listed user may therefore manage their own ``user``-scope fragment without
-    admin privileges.
+    ``create`` is gated by the fragment's FK to ``app_config_allow_list``: an insert with
+    no allow-list row for its ``(config_name, scope_type)`` is rejected as a write-not-
+    allowed error. An allow-list row requires a registered ``config_name`` (FK), so this
+    also enforces registration. An allow-listed user may therefore manage their own
+    ``user``-scope fragment without admin privileges.
     """
 
     _repository: AppConfigFragmentRepository
@@ -52,7 +49,7 @@ class AppConfigFragmentService:
     async def create(
         self, action: CreateAppConfigFragmentAction
     ) -> CreateAppConfigFragmentActionResult:
-        data = await self._repository.create(action.creator_spec, action.only_if)
+        data = await self._repository.create(action.creator_spec)
         return CreateAppConfigFragmentActionResult(fragment=data)
 
     async def get(self, action: GetAppConfigFragmentAction) -> GetAppConfigFragmentActionResult:
