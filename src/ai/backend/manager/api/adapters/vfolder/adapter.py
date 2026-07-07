@@ -457,6 +457,7 @@ class VFolderAdapter(BaseAdapter):
         action = PurgeVFolderV2Action(
             vfolder_id=vfolder_id,
             cascade_model_card=input.options.cascade_model_card,
+            force=input.options.force,
         )
         await self._processors.vfolder.purge_v2.wait_for_complete(action)
         return PurgeVFolderPayload(id=vfolder_id)
@@ -561,6 +562,7 @@ class VFolderAdapter(BaseAdapter):
             action = PurgeVFolderV2Action(
                 vfolder_id=vfolder_id,
                 cascade_model_card=input.options.cascade_model_card,
+                force=input.options.force,
             )
             try:
                 await self._processors.vfolder.purge_v2.wait_for_complete(action)

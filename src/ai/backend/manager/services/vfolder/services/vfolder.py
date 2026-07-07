@@ -730,7 +730,10 @@ class VFolderService:
         vfolder_data = await self._vfolder_repository.get_by_id_validated(
             action.vfolder_uuid, user.id, user.domain_name
         )
-        result = await self._vfolder_repository.delete_vfolders_forever([action.vfolder_uuid])
+        # Explicit escape hatch: bypass the in-use / status guards.
+        result = await self._vfolder_repository.delete_vfolders_forever(
+            [action.vfolder_uuid], force=True
+        )
         if result.failures:
             raise result.failures[0].exception
         await self._remove_vfolder_from_storage(vfolder_data)
@@ -1878,6 +1881,7 @@ class VFolderService:
         result = await self._vfolder_repository.delete_vfolders_forever(
             [action.vfolder_id],
             cascade_model_card=action.cascade_model_card,
+            force=action.force,
         )
         if result.failures:
             raise result.failures[0].exception

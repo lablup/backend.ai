@@ -222,13 +222,30 @@ def delete(vfolder_id: UUID) -> None:
 
 @vfolder.command()
 @click.argument("vfolder_id", type=click.UUID)
-def purge(vfolder_id: UUID) -> None:
+@click.option(
+    "--force",
+    is_flag=True,
+    default=False,
+    help=(
+        "Bypass the in-use guards and purge even when the vfolder is mounted by a "
+        "live session, referenced by an active model-service endpoint, or not in a "
+        "purgable status. Irreversible."
+    ),
+)
+def purge(vfolder_id: UUID, force: bool) -> None:
     """Permanently delete a vfolder."""
+
+    from ai.backend.common.dto.manager.v2.vfolder.request import (
+        PurgeVFolderInput,
+        PurgeVFolderOptions,
+    )
+
+    input_dto = PurgeVFolderInput(options=PurgeVFolderOptions(force=force))
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
-            result = await registry.vfolder.purge(vfolder_id)
+            result = await registry.vfolder.purge(vfolder_id, input_dto)
             print_result(result)
         finally:
             await registry.close()
@@ -482,12 +499,25 @@ def bulk_delete(ids: tuple[UUID, ...]) -> None:
 
 @vfolder.command(name="bulk-purge")
 @click.argument("ids", nargs=-1, required=True, type=click.UUID)
-def bulk_purge(ids: tuple[UUID, ...]) -> None:
+@click.option(
+    "--force",
+    is_flag=True,
+    default=False,
+    help=(
+        "Bypass the in-use guards for every vfolder in the batch and purge even when "
+        "mounted by a live session, referenced by an active model-service endpoint, or "
+        "not in a purgable status. Irreversible."
+    ),
+)
+def bulk_purge(ids: tuple[UUID, ...], force: bool) -> None:
     """Permanently purge multiple vfolders."""
 
-    from ai.backend.common.dto.manager.v2.vfolder.request import BulkPurgeVFoldersInput
+    from ai.backend.common.dto.manager.v2.vfolder.request import (
+        BulkPurgeVFoldersInput,
+        PurgeVFolderOptions,
+    )
 
-    input_dto = BulkPurgeVFoldersInput(ids=list(ids))
+    input_dto = BulkPurgeVFoldersInput(ids=list(ids), options=PurgeVFolderOptions(force=force))
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
