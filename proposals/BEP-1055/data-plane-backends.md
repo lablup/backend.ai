@@ -12,7 +12,7 @@ key-decisions:
 
 ## Summary
 
-Each backend satisfies the same control-plane contract (`setup_session_network`, `add_peer`/`del_peer`, `attach_endpoint`, `probe_caps`) but realizes connectivity and isolation differently. No backend wins in every environment, so the backend is selected per session.
+Each backend satisfies the same control-plane contract (`setup_session_network`, `add_peer`/`del_peer` for node VTEPs, `add_endpoint`/`del_endpoint` for proactively programming per-endpoint forwarding+ARP, `attach_endpoint`, `probe_caps`) but realizes connectivity and isolation differently. No backend wins in every environment, so the backend is selected per session.
 
 ## Why pluggable (environment matrix)
 
@@ -29,10 +29,11 @@ Each backend satisfies the same control-plane contract (`setup_session_network`,
 ### vxlan (portable default)
 
 - **Setup:** `ip link add vxlan-{vni} type vxlan id {vni} dstport 4789 nolearning`, bridge `br-{vni}`, veth attach.
-- **Peers:** unicast head-end replication via `bridge fdb append 00:00:00:00:00:00 dev vxlan-{vni} dst {peer.vtep_ip}` — driven by etcd `members/` watch, no multicast/gossip.
+- **Peers (node discovery):** unicast head-end replication via `bridge fdb append 00:00:00:00:00:00 dev vxlan-{vni} dst {peer.vtep_ip}` — driven by etcd `members/` watch, no multicast/gossip. This bootstraps reachability to peer VTEPs.
+- **Endpoints (proactive, no flood):** the coordinator watches etcd `endpoints/` (manager-assigned `{ip, mac, agent_id}`) and, for every non-local endpoint, programs the exact forwarding + ARP state: `bridge fdb replace {mac} dev vxlan-{vni} dst {peer.vtep_ip}` (unicast MAC→VTEP) and `ip neigh replace {ip} lladdr {mac} dev br-{vni} nud permanent` (ARP suppression). Known unicast then never floods; the broadcast `members/` FDB entry remains only as a fallback for as-yet-unprogrammed endpoints. This mirrors Docker Swarm's gossip-programmed neighbor tables (Swarm parity) and is what keeps the data plane from O(N²) BUM flooding as clusters grow.
 - **Isolation:** per-session VNI = separate L2 segment; immune to switch policy because the fabric only sees host-to-host UDP/4789.
 - **Perf notes:** enable tunnel offload where present; otherwise apply software mitigations (RPS/RFS, GRO) and jumbo frames. Not encrypted (see wireguard).
-- **Attach:** `NetworkAttachSpec(kind=CNI, cni_config=<bridge to br-{vni}>)`.
+- **Attach:** `NetworkAttachSpec(kind=CNI, cni_config=<bridge to br-{vni}, static IPAM = the manager-assigned endpoint ip>)` — the overlay interface uses the central endpoint IP, not per-node host-local (avoids cross-node collision).
 
 ### host-gw (native routing, no encapsulation)
 

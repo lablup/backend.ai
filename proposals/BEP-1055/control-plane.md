@@ -43,9 +43,9 @@ network/agent/{agent_id}/caps            -> {tunnel_offload, native_routing_ok, 
 
 ### IPAM / VNI allocation (conflict-safe)
 
-- `SubnetAllocator.acquire()` iterates candidate blocks from `ipam-pool` (default `/12`) at `ipam-block-size` (default `/24`) and claims the first free one with an etcd **transaction**: compare `allocated/{block}` absent → put. Advances `cursor`.
-- Container IPs are assigned agent-locally within the session subnet; for `host-gw` each agent stays within its pre-split `ip_range`, removing cross-node IP conflicts by construction.
-- `VNIAllocator` mirrors this over `vni-range`, only when `backend == "vxlan"`.
+- **Session subnet (variable prefix).** `SubnetAllocator.acquire(host_count)` picks a block prefix large enough to hold `host_count` endpoints (default cap `/24` = 254; a bigger cluster gets `/23`, `/22`, … up to the pool limit), then claims the first free block of that size from `ipam-pool` (default `/12`) with an etcd **transaction** (compare `allocated/{block}` absent → put). A fixed `/24` would cap a session at ~254 endpoints regardless of node count; sizing by `cluster_size` (known at `create_network`) removes that ceiling. Advances `cursor`.
+- **Endpoint IPs are assigned centrally by the manager, per endpoint** (populating `network/session/{sid}/endpoints/{container_id} = {ip, mac, agent_id}`), **not agent-locally.** Per-node host-local IPAM would give every node the same first address on the stretched overlay subnet → duplicate-IP collision (see Decision Log 2026-07-06). The manager already owns subnet/VNI allocation and knows kernel placement, so it is the single authority that guarantees disjoint IPs; the `endpoints/` table it writes is also the input to proactive FDB/ARP programming (no BUM flood — see [data-plane-backends](./data-plane-backends.md)). `host-gw` continues to use per-node `ip_range` (native routes are per-range, not per-endpoint).
+- `VNIAllocator` mirrors the block claim over `vni-range`, only when `backend == "vxlan"`.
 - Exhaustion raises a `BackendAIError` subclass (`NetworkPoolExhausted`).
 
 ### Backend selection
@@ -60,7 +60,7 @@ select_backend: all(members.caps.native_routing_ok) ? "host-gw" : "vxlan"
 
 ### Sequences
 
-**Session create (manager):** allocate subnet (+VNI), select backend, write `meta`, (host-gw) pre-split `ip_range` per member, then instruct/allow agents to join.
+**Session create (manager):** size + allocate subnet from `cluster_size` (+VNI), select backend, write `meta`, assign a per-endpoint overlay `ip` (+`mac`) to each kernel and write `endpoints/{container_id}` (overlay backends), (host-gw) pre-split `ip_range` per member, then instruct/allow agents to join.
 
 **Agent join:** read `meta` → load backend → `setup_session_network` → write `members/{self}=ready` → watch `members/` for peers → `add_peer`/`del_peer`. Barrier on all-ready before container start.
 
@@ -70,12 +70,16 @@ select_backend: all(members.caps.native_routing_ok) ? "host-gw" : "vxlan"
 
 ```python
 class SubnetAllocator:
-    async def acquire(self, etcd) -> str      # returns CIDR, CAS-guarded
-    async def release(self, etcd, subnet) -> None
+    async def acquire(self, session_id, *, host_count=1) -> str  # sizes prefix to host_count, CAS-guarded CIDR
+    async def release(self, subnet) -> None
+
+class EndpointAllocator:
+    async def assign(self, session_id, container_id, subnet) -> EndpointAddr  # per-endpoint {ip, mac}, CAS-guarded
+    async def release(self, session_id, container_id) -> None
 
 class VNIAllocator:
-    async def acquire(self, etcd) -> int
-    async def release(self, etcd, vni) -> None
+    async def acquire(self, session_id) -> int
+    async def release(self, vni) -> None
 
 # CNINetworkPlugin(AbstractNetworkManagerPlugin):
 async def create_network(self, *, identifier, options) -> NetworkInfo   # allocates + writes meta

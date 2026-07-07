@@ -97,6 +97,7 @@ The **manager plugin stays as-is**; a new `CNINetworkPlugin` implements it and d
 | P6 | `host-gw` backend + capability probe + per-session backend selection. |
 | P7 | `wireguard` backend (encrypted option). |
 | P8 | Failure/GC: lease-driven peer cleanup, node-crash recovery. |
+| P9 | Central endpoint IPAM: manager assigns per-endpoint overlay IPs (variable-prefix session subnet by `cluster_size`), writes `endpoints/`; coordinator programs FDB+ARP from it; overlay CNI uses the assigned static IP. Removes host-local collision + BUM flood (Swarm parity). |
 
 ## Decision Log
 
@@ -116,12 +117,15 @@ The **manager plugin stays as-is**; a new `CNINetworkPlugin` implements it and d
 | 2026-07-02 | The prototype's **CRI gRPC client is not reused**; a low-level containerd runtime client is needed instead | The CRI client (`feat/containerd-agent-prototype`) is built around the sandbox→auto-CNI model, which conflicts with separate CNI ownership. Only the netns/PID contract crosses the boundary, so the runtime client must expose task creation + PID, not CRI sandboxes. |
 | 2026-07-03 | **The LOCAL (egress) bridge is per-session, not one node-shared bridge**; cross-session isolation on it comes from separate bridges, not ICC-off firewall rules | Real testing (verification.md §9) showed the stock CNI `bridge` plugin does NOT implement ICC-off, so a shared per-node LOCAL bridge lets different sessions reach each other (a cross-session leak). A per-session LOCAL bridge (like the overlay bridge) gives egress + isolation with no firewall rules — the same separate-bridge mechanism verified in §8. Supersedes the earlier "LOCAL ICC-off" framing. Its NAT subnet is a node-local per-session allocation (behind NAT, no cross-node coordination). |
 | 2026-07-02 | **Runtime management and network management are two completely separate classes**; the agent is the sole composition point. `ContainerdRuntimeClient` (containerd only — no network imports) and the network subsystem (`SessionNetworkCoordinator`/`ContainerNetworkProvisioner`, containerd-agnostic) never reference each other. `ContainerdAgent` composes them and hands the task's netns/PID from the runtime to the network layer | Enforces the separation as a code-level invariant, not just a convention: either side can be tested, versioned, or replaced in isolation, and the coupling is confined to one orchestration method. |
+| 2026-07-06 | **Overlay endpoint IPs are assigned centrally by the manager (per endpoint), not agent-locally by per-node host-local IPAM**; the agent coordinator programs FDB + neighbor (ARP) entries from the etcd `endpoints/` table (proactive), instead of relying on broadcast-flood learning | Per-node host-local IPAM gives every node the same first address on the stretched overlay subnet → **duplicate-IP collision** (verified: two nodes both allocate `.2`; only a manual reservation avoided it in verification §11). A single authority — the manager, which already owns subnet/VNI allocation and knows kernel placement — guarantees disjoint IPs. Because it also knows IP→VTEP, coordinators can pre-program FDB/ARP so no BUM flood is needed. This matches Docker Swarm's centralized IPAM + gossip-programmed neighbor tables (Swarm parity, the BEP goal). Supersedes control-plane.md's earlier "container IPs assigned agent-locally" for overlay backends. |
+| 2026-07-06 | **The session subnet size scales with `cluster_size` (variable prefix), not a fixed `/24`** | A fixed `/24` caps a session at ~254 endpoints, so ≥255-endpoint clusters cannot fit — before per-node division even matters. The manager knows `cluster_size` at `create_network` time and sizes the block to cover all endpoints; the pool budget (fewer, larger blocks) is an operator-tunable tradeoff. Very large fleets (hundreds of nodes) additionally outgrow unicast head-end replication and need multicast/EVPN — a separate data-plane track, out of scope here. |
 
 ## Open Questions
 
 - Should `wireguard` be a standalone backend or a composable underlay flag on `vxlan`/`host-gw`?
 - Capability probe cadence: boot-only vs periodic re-probe when NIC/topology changes.
-- IPAM pool defaults and per-scaling-group override semantics.
+- IPAM pool sizing policy for large clusters: default pool `/12` vs a larger/hierarchical pool once sessions request variable (larger-than-`/24`) blocks; per-scaling-group override semantics.
+- Endpoint IP lifecycle on kernel migration/restart: reuse the same IP (sticky) vs reallocate.
 
 ## References
 
