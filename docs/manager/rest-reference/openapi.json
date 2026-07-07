@@ -3504,7 +3504,7 @@
                 "type": "null"
               }
             ],
-            "default": null,
+            "default": "/bin/bash",
             "description": "Shell used to run the command. If set, the kernel runs `[shell, '-c', command]`; null or empty disables shell wrapping.",
             "title": "Shell"
           },

@@ -13,6 +13,7 @@ from pydantic import Field, field_validator
 
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
 from ai.backend.common.config import (
+    DEFAULT_SHELL,
     ModelDefinitionDraft,
     PreStartAction,
 )
@@ -153,7 +154,7 @@ class ModelServiceConfigInput(BaseRequestModel):
     command: str | None = None
     start_command: list[str] | None = None
     shell: str | None = Field(
-        default=None,
+        default=DEFAULT_SHELL,
         description=(
             "Shell used to run the command. If set, the kernel runs "
             "`[shell, '-c', command]`; null or empty disables shell wrapping."
