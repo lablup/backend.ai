@@ -1126,7 +1126,9 @@ class VFolderService:
                     volume_usage["total"] = storage_capacity_bytes
                 if show_percentage:
                     try:
-                        volume_usage["percentage"] = storage_used_bytes / storage_capacity_bytes
+                        volume_usage["percentage"] = (
+                            storage_used_bytes / storage_capacity_bytes
+                        ) * 100
                     except ZeroDivisionError:
                         volume_usage["percentage"] = 0.0
 
