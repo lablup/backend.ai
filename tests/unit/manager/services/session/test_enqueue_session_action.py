@@ -79,11 +79,13 @@ def trigger_meta() -> BaseActionTriggerMeta:
     return BaseActionTriggerMeta(action_id=uuid.uuid4(), started_at=datetime.now(UTC))
 
 
-class TestEnqueueSessionActionDelegationScope:
-    """When ``owner_id`` is set, the RBAC scope must target the *owner's* USER scope.
+class TestEnqueueSessionOwnerDelegation:
+    """Enqueuing on behalf of an owner authorizes against the owner's USER scope.
 
-    Otherwise the validator would authorize the caller against their own scope,
-    which always passes and leaves delegation unguarded.
+    The action must target the owner's scope, not the caller's own scope which
+    would always pass and leave delegation unguarded; the validator must then
+    authorize against that scope. The permission lookup itself is the
+    repository's job, so the authorization test mocks it.
     """
 
     @pytest.mark.parametrize(
@@ -110,15 +112,6 @@ class TestEnqueueSessionActionDelegationScope:
         target = action.target_element()
         assert target.element_type == RBACElementType.USER
         assert target.element_id == str(expected_id)
-
-
-class TestEnqueueSessionDelegationAuthorization:
-    """The validator authorizes delegation against the owner's scope.
-
-    The permission lookup itself is the repository's job, so it is mocked here;
-    these tests only assert which scope the validator asks about and how the
-    verdict propagates.
-    """
 
     @pytest.mark.parametrize(
         "permission_granted, expected_outcome",
