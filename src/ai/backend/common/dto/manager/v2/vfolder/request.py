@@ -72,7 +72,8 @@ class CreateVFolderInput(BaseRequestModel):
         description="Default permission of the vfolder",
     )
     project_id: UUID | None = Field(
-        default=None, description="Project ID for project-owned vfolder"
+        default=None,
+        description="Project ID for project-owned vfolder. Mutually exclusive with owner_id.",
     )
     cloneable: bool = Field(default=False, description="Whether the vfolder is cloneable")
     unmanaged_path: str | None = Field(default=None, description="Path for unmanaged vfolders")
@@ -81,7 +82,8 @@ class CreateVFolderInput(BaseRequestModel):
         description=(
             "Delegated owner user UUID. When set, the vfolder is created on behalf of "
             "the specified user instead of the caller. Caller must have permission to "
-            "act on behalf of the target user."
+            "act on behalf of the target user. Mutually exclusive with project_id: "
+            "delegation applies to user-owned vfolders only, so passing both is rejected."
         ),
     )
 

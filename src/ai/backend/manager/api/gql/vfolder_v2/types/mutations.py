@@ -125,7 +125,8 @@ from ai.backend.manager.api.gql.vfolder_v2.types.node import VFolderGQL
 class CreateVFolderInputGQL(PydanticInputMixin[CreateInputDTO]):
     name: str = gql_field(description="VFolder name.")
     project_id: UUID | None = gql_field(
-        default=None, description="Project ID for project-owned vfolder."
+        default=None,
+        description="Project ID for project-owned vfolder. Mutually exclusive with owner_id.",
     )
     host: str | None = gql_field(default=None, description="Storage host for the vfolder.")
     usage_mode: str = gql_field(
@@ -138,7 +139,11 @@ class CreateVFolderInputGQL(PydanticInputMixin[CreateInputDTO]):
     owner_id: UUID | None = gql_added_field(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
-            description="Delegated owner user UUID. Create the vfolder on behalf of this user.",
+            description=(
+                "Delegated owner user UUID. Create the vfolder on behalf of this user. "
+                "Mutually exclusive with project_id (delegation applies to user-owned "
+                "vfolders only)."
+            ),
         ),
         default=None,
     )
