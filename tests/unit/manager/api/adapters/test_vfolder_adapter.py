@@ -339,34 +339,20 @@ class TestVFolderAdapterRestore:
     def adapter(self, mock_processors: MagicMock) -> VFolderAdapter:
         return VFolderAdapter(mock_processors)
 
-    async def test_restore_without_owner_uses_caller(
+    @pytest.mark.parametrize(
+        "with_owner",
+        [pytest.param(False, id="no-owner"), pytest.param(True, id="with-owner")],
+    )
+    async def test_restore_acting_user_follows_owner_id(
         self,
         adapter: VFolderAdapter,
         mock_processors: MagicMock,
         user_data: UserData,
+        with_owner: bool,
     ) -> None:
-        """Without owner_id, the acting user is the caller."""
+        """Without owner_id the acting user is the caller; with owner_id it is the owner."""
         vfolder_id = uuid4()
-        with patch(
-            "ai.backend.manager.api.adapters.vfolder.adapter.current_user",
-            return_value=user_data,
-        ):
-            await adapter.restore(vfolder_id)
-
-        restore_mock = mock_processors.vfolder.restore_vfolder_from_trash.wait_for_complete
-        action = restore_mock.call_args[0][0]
-        assert action.user_uuid == user_data.user_id
-        assert action.vfolder_uuid == vfolder_id
-
-    async def test_restore_with_owner_uses_owner(
-        self,
-        adapter: VFolderAdapter,
-        mock_processors: MagicMock,
-        user_data: UserData,
-    ) -> None:
-        """With owner_id, the acting user is the owner, not the caller."""
-        vfolder_id = uuid4()
-        owner_id = UserID(uuid4())
+        owner_id = UserID(uuid4()) if with_owner else None
         with patch(
             "ai.backend.manager.api.adapters.vfolder.adapter.current_user",
             return_value=user_data,
@@ -375,5 +361,8 @@ class TestVFolderAdapterRestore:
 
         restore_mock = mock_processors.vfolder.restore_vfolder_from_trash.wait_for_complete
         action = restore_mock.call_args[0][0]
-        assert action.user_uuid == owner_id
-        assert action.user_uuid != user_data.user_id
+        expected_user = owner_id if with_owner else user_data.user_id
+        assert action.user_uuid == expected_user
+        assert action.vfolder_uuid == vfolder_id
+        if with_owner:
+            assert action.user_uuid != user_data.user_id
