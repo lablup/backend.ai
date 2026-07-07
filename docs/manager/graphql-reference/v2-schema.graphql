@@ -2390,6 +2390,7 @@ input CreateDeploymentInput {
   defaultDeploymentStrategy: DeploymentStrategyInput!
   replicaCount: Int!
   initialRevision: CreateRevisionInput = null
+  ownerId: UUID = null
 }
 
 """Added in 25.19.0. Payload for creating a model deployment."""
