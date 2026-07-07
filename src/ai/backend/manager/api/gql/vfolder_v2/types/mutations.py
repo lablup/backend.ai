@@ -91,6 +91,7 @@ from ai.backend.common.dto.manager.v2.vfolder.response import (
 from ai.backend.common.dto.manager.v2.vfolder.response import (
     RestoreVFolderPayload as RestorePayloadDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
@@ -136,7 +137,7 @@ class CreateVFolderInputGQL(PydanticInputMixin[CreateInputDTO]):
     cloneable: bool = gql_field(default=False, description="Whether the vfolder is cloneable.")
     owner_id: UUID | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version="26.7.0",
+            added_version=NEXT_RELEASE_VERSION,
             description="Delegated owner user UUID. Create the vfolder on behalf of this user.",
         ),
         default=None,
