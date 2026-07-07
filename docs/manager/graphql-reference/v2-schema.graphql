@@ -8427,6 +8427,9 @@ input PreStartActionInput {
 
 """Added in 26.3.0. Preemption configuration for a resource group."""
 type PreemptionConfig {
+  """Whether preemption is enabled for this resource group (opt-in)."""
+  enabled: Boolean!
+
   """Sessions with priority <= this value are eligible for preemption."""
   preemptiblePriority: Int!
 
@@ -8435,10 +8438,20 @@ type PreemptionConfig {
 
   """How to preempt a session when preemption is triggered."""
   mode: PreemptionMode!
+
+  """
+  Minimum session runtime in seconds before it becomes preemptible (0 = disabled).
+  """
+  preemptionMinRuntime: Float!
 }
 
 """Added in 26.3.0. Input for preemption configuration."""
 input PreemptionConfigInput {
+  """
+  Added in 26.8.0. Whether preemption is enabled for this resource group (opt-in). Default is false.
+  """
+  enabled: Boolean! = false
+
   """Sessions with priority <= this value are preemptible. Default is 5."""
   preemptiblePriority: Int! = 5
 
@@ -8449,6 +8462,11 @@ input PreemptionConfigInput {
 
   """How to preempt sessions (TERMINATE, RESCHEDULE). Default is TERMINATE."""
   mode: PreemptionMode! = TERMINATE
+
+  """
+  Added in 26.8.0. Minimum session runtime in seconds before it becomes preemptible (0 = disabled). Default is 0.
+  """
+  preemptionMinRuntime: Float! = 0
 }
 
 """

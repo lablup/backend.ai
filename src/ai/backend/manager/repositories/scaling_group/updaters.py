@@ -143,9 +143,11 @@ class ScalingGroupSchedulerConfigUpdaterSpec(UpdaterSpec[ScalingGroupRow]):
             to_update["scheduler_opts"] = scheduler_opts
         if (preemption := self.preemption_config.optional_value()) is not None:
             preemption_dict = {
+                "enabled": preemption.enabled,
                 "preemptible_priority": preemption.preemptible_priority,
                 "order": preemption.order.value,
                 "mode": preemption.mode.value,
+                "preemption_min_runtime": preemption.preemption_min_runtime.total_seconds(),
             }
             to_update["scheduler_opts"] = func.jsonb_set(
                 sa.literal_column("scheduler_opts"),

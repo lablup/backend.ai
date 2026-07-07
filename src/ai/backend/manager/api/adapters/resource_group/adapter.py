@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
+from datetime import timedelta
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
@@ -611,9 +612,13 @@ class ResourceGroupAdapter(BaseAdapter):
         if input.preemption is not None:
             preemption_config_state = OptionalState.update(
                 DataPreemptionConfig(
+                    enabled=input.preemption.enabled,
                     preemptible_priority=input.preemption.preemptible_priority,
                     order=PreemptionOrder(input.preemption.order),
                     mode=PreemptionMode(input.preemption.mode),
+                    preemption_min_runtime=timedelta(
+                        seconds=input.preemption.preemption_min_runtime
+                    ),
                 )
             )
 
@@ -787,9 +792,11 @@ class ResourceGroupAdapter(BaseAdapter):
             scheduler=ResourceGroupSchedulerConfigInfo(
                 type=SchedulerTypeDTO(data.scheduler.name.value),
                 preemption=PreemptionConfigInfo(
+                    enabled=data.scheduler.options.preemption.enabled,
                     preemptible_priority=data.scheduler.options.preemption.preemptible_priority,
                     order=PreemptionOrderDTO(data.scheduler.options.preemption.order.value),
                     mode=PreemptionModeDTO(data.scheduler.options.preemption.mode.value),
+                    preemption_min_runtime=data.scheduler.options.preemption.preemption_min_runtime.total_seconds(),
                 ),
             ),
             default_deployment_options=deployment_options_to_info(data.default_deployment_options),

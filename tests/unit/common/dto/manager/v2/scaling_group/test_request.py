@@ -23,19 +23,29 @@ class TestPreemptionConfigInput:
 
     def test_defaults_are_valid(self) -> None:
         req = PreemptionConfigInput()
+        assert req.enabled is False
         assert req.preemptible_priority == 5
         assert req.order == PreemptionOrder.OLDEST
         assert req.mode == PreemptionMode.TERMINATE
+        assert req.preemption_min_runtime == 0.0
 
     def test_valid_creation_with_all_fields(self) -> None:
         req = PreemptionConfigInput(
+            enabled=True,
             preemptible_priority=3,
             order=PreemptionOrder.NEWEST,
             mode=PreemptionMode.RESCHEDULE,
+            preemption_min_runtime=300.0,
         )
+        assert req.enabled is True
         assert req.preemptible_priority == 3
         assert req.order == PreemptionOrder.NEWEST
         assert req.mode == PreemptionMode.RESCHEDULE
+        assert req.preemption_min_runtime == 300.0
+
+    def test_negative_min_runtime_raises_validation_error(self) -> None:
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
+            PreemptionConfigInput(preemption_min_runtime=-1.0)
 
     def test_min_priority_is_valid(self) -> None:
         req = PreemptionConfigInput(preemptible_priority=1)
@@ -55,15 +65,19 @@ class TestPreemptionConfigInput:
 
     def test_round_trip(self) -> None:
         req = PreemptionConfigInput(
+            enabled=True,
             preemptible_priority=7,
             order=PreemptionOrder.NEWEST,
             mode=PreemptionMode.RESCHEDULE,
+            preemption_min_runtime=120.0,
         )
         json_data = req.model_dump_json()
         restored = PreemptionConfigInput.model_validate_json(json_data)
+        assert restored.enabled == req.enabled
         assert restored.preemptible_priority == req.preemptible_priority
         assert restored.order == req.order
         assert restored.mode == req.mode
+        assert restored.preemption_min_runtime == req.preemption_min_runtime
 
 
 class TestUpdateScalingGroupInput:

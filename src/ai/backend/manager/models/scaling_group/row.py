@@ -89,6 +89,9 @@ __all__: Sequence[str] = (
 class PreemptionConfig(BackendAISchema):
     model_config = ConfigDict(frozen=True)
 
+    enabled: bool = False
+    """Whether preemption is enabled for this resource group (opt-in)"""
+
     preemptible_priority: int = 5
     """Sessions with priority <= this value are preemptible"""
 
@@ -98,6 +101,9 @@ class PreemptionConfig(BackendAISchema):
     mode: PreemptionMode = PreemptionMode.TERMINATE
     """How to preempt sessions"""
 
+    preemption_min_runtime: timedelta = timedelta(seconds=0)
+    """Minimum session runtime before it becomes preemptible (0 = disabled)"""
+
     @field_serializer("order", mode="plain")
     def serialize_order(self, value: PreemptionOrder) -> str:
         return value.value
@@ -105,6 +111,10 @@ class PreemptionConfig(BackendAISchema):
     @field_serializer("mode", mode="plain")
     def serialize_mode(self, value: PreemptionMode) -> str:
         return value.value
+
+    @field_serializer("preemption_min_runtime", mode="plain")
+    def serialize_preemption_min_runtime(self, value: timedelta) -> float:
+        return value.total_seconds()
 
 
 class ScalingGroupOpts(BackendAISchema):
@@ -402,9 +412,11 @@ class ScalingGroupRow(Base):  # type: ignore[misc]
                     allow_fractional_resource_fragmentation=self.scheduler_opts.allow_fractional_resource_fragmentation,
                     route_cleanup_target_statuses=self.scheduler_opts.route_cleanup_target_statuses,
                     preemption=DataPreemptionConfig(
+                        enabled=self.scheduler_opts.preemption.enabled,
                         preemptible_priority=self.scheduler_opts.preemption.preemptible_priority,
                         order=self.scheduler_opts.preemption.order,
                         mode=self.scheduler_opts.preemption.mode,
+                        preemption_min_runtime=self.scheduler_opts.preemption.preemption_min_runtime,
                     ),
                 ),
             ),
