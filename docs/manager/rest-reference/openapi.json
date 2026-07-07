@@ -27931,6 +27931,20 @@
           "options": {
             "$ref": "#/components/schemas/PurgeVFolderOptions",
             "description": "Optional behavior flags for the purge."
+          },
+          "owner_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Delegated owner user UUID. When set, the vfolder is purged on behalf of the specified user instead of the caller.",
+            "title": "Owner Id"
           }
         },
         "title": "PurgeVFolderInput",
