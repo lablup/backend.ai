@@ -75,6 +75,14 @@ class CreateVFolderInput(BaseRequestModel):
     )
     cloneable: bool = Field(default=False, description="Whether the vfolder is cloneable")
     unmanaged_path: str | None = Field(default=None, description="Path for unmanaged vfolders")
+    owner_id: UUID | None = Field(
+        default=None,
+        description=(
+            "Delegated owner user UUID. When set, the vfolder is created on behalf of "
+            "the specified user instead of the caller. Caller must have permission to "
+            "act on behalf of the target user."
+        ),
+    )
 
     @field_validator("name", mode="before")
     @classmethod

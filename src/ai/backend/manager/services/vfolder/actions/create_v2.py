@@ -28,6 +28,9 @@ class CreateVFolderV2Action(BaseScopeAction):
     usage_mode: VFolderUsageMode
     permission: VFolderPermission
     cloneable: bool
+    owner_id: uuid.UUID | None = None
+    """Delegated owner user UUID. When set, the service resolves it and creates
+    the vfolder owned by that user instead of the caller."""
 
     @override
     @classmethod
@@ -49,7 +52,10 @@ class CreateVFolderV2Action(BaseScopeAction):
 
     @override
     def scope_id(self) -> str:
-        return str(self.project_id) if self.project_id else str(self.user_id)
+        if self.project_id:
+            return str(self.project_id)
+        # When delegating, authorize against the owner's USER scope.
+        return str(self.owner_id) if self.owner_id is not None else str(self.user_id)
 
     @override
     def target_element(self) -> RBACElementRef:
@@ -58,9 +64,12 @@ class CreateVFolderV2Action(BaseScopeAction):
                 element_type=RBACElementType.PROJECT,
                 element_id=str(self.project_id),
             )
+        # When delegating (owner_id set), authorize the caller against the
+        # owner's USER scope, not the caller's own.
+        target_user_id = self.owner_id if self.owner_id is not None else self.user_id
         return RBACElementRef(
             element_type=RBACElementType.USER,
-            element_id=str(self.user_id),
+            element_id=str(target_user_id),
         )
 
 

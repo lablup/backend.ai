@@ -1599,6 +1599,16 @@ class VFolderService:
         user_uuid = action.user_id
         domain_name = action.domain_name
         project_id = action.project_id
+        if action.owner_id is not None:
+            # Delegation: create the vfolder owned by the target user instead of
+            # the caller. The caller's permission to act on behalf of the owner
+            # is enforced by the RBAC scope validator via the action's
+            # target_element (the owner's USER scope).
+            owner = await self._user_repository.get_user_by_uuid(action.owner_id)
+            if owner.domain_name is None:
+                raise ObjectNotFound(object_name="Delegated owner domain")
+            user_uuid = owner.id
+            domain_name = owner.domain_name
 
         user_with_hosts = await self._vfolder_repository.get_user_with_keypair_policy_vfolder_hosts(
             user_uuid
