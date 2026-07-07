@@ -23,7 +23,9 @@ def _plan() -> EndpointPlan:
     return EndpointPlan(
         attachments=[
             NetworkAttachSpec(
-                kind=AttachKind.CNI, interface_name="baimulti0", role=NetworkRole.OVERLAY,
+                kind=AttachKind.CNI,
+                interface_name="baimulti0",
+                role=NetworkRole.OVERLAY,
                 cni_config={"type": "bridge"},
             )
         ]
@@ -68,7 +70,13 @@ class FakeRuntime(ContainerdRuntimeClient):
         self.calls.append(f"remove_network:{name}")
 
     async def create_container(
-        self, container_id: str, *, image_ref: str, command: Sequence[str], oci_spec: Mapping[str, Any], network: str = "none"
+        self,
+        container_id: str,
+        *,
+        image_ref: str,
+        command: Sequence[str],
+        oci_spec: Mapping[str, Any],
+        network: str = "none",
     ) -> None:
         self.calls.append("create_container")
 
@@ -99,13 +107,17 @@ class RecordingNetworkRunner:
         self.calls.append((command, netns))
 
 
-def _orchestrator(runtime: FakeRuntime, runner: RecordingNetworkRunner) -> ContainerdKernelOrchestrator:
+def _orchestrator(
+    runtime: FakeRuntime, runner: RecordingNetworkRunner
+) -> ContainerdKernelOrchestrator:
     provisioner = ContainerNetworkProvisioner(cast(Any, _FixedPlanBackend()), runner)
     return ContainerdKernelOrchestrator(runtime, provisioner)
 
 
 class _FixedPlanBackend:
-    async def attach_endpoint(self, kernel_config: Any, cluster_info: Any, *, meta: SessionNetMeta) -> EndpointPlan:
+    async def attach_endpoint(
+        self, kernel_config: Any, cluster_info: Any, *, meta: SessionNetMeta
+    ) -> EndpointPlan:
         return _plan()
 
 
@@ -115,8 +127,13 @@ class TestLaunch:
         runner = RecordingNetworkRunner()
         orch = _orchestrator(runtime, runner)
         result = await orch.launch(
-            "c1", image_ref="img", command=["sleep", "600"], oci_spec={},
-            meta=_META, kernel_config=cast(KernelCreationConfig, {}), cluster_info=cast(ClusterInfo, {}),
+            "c1",
+            image_ref="img",
+            command=["sleep", "600"],
+            oci_spec={},
+            meta=_META,
+            kernel_config=cast(KernelCreationConfig, {}),
+            cluster_info=cast(ClusterInfo, {}),
         )
         # runtime creates + starts the container BEFORE the network attaches
         assert runtime.calls == ["create_container", "start_container"]
@@ -148,7 +165,9 @@ class TestSplitLifecycle:
         orch = _orchestrator(runtime, runner)
         await orch.create("c1", image_ref="img", command=[], oci_spec={})
         result = await orch.start_and_attach(
-            "c1", meta=_META, kernel_config=cast(KernelCreationConfig, {}),
+            "c1",
+            meta=_META,
+            kernel_config=cast(KernelCreationConfig, {}),
             cluster_info=cast(ClusterInfo, {}),
         )
         assert runtime.calls == ["create_container", "start_container"]

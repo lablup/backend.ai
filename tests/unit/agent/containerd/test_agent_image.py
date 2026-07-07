@@ -6,6 +6,7 @@ import pytest
 
 from ai.backend.agent.containerd.agent import ContainerdAgent
 from ai.backend.common.docker import LabelName
+from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.exception import ImageNotAvailable
 from ai.backend.common.types import AutoPullBehavior
 
@@ -71,7 +72,9 @@ class TestPullImage:
     async def test_pulls_canonical(self) -> None:
         facade = FakeFacade()
         agent = _agent(facade)
-        await agent.pull_image(cast(Any, FakeImageRef("cr.example/img:1")), cast(Any, {}), timeout_seconds=None)
+        await agent.pull_image(
+            cast(Any, FakeImageRef("cr.example/img:1")), cast(Any, {}), timeout_seconds=None
+        )
         assert facade.pulled == ["cr.example/img:1"]
 
 
@@ -91,8 +94,6 @@ class TestPushImage:
 
 class TestPurgeImages:
     async def test_removes_each_and_reports(self) -> None:
-        from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
-
         facade = FakeFacade()
         agent = _agent(facade)
         resp = await agent.purge_images(PurgeImagesReq(images=["a:1", "b:2"]))
@@ -101,8 +102,6 @@ class TestPurgeImages:
         assert all(r.error is None for r in resp.responses)
 
     async def test_reports_error_per_image(self) -> None:
-        from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
-
         facade = FakeFacade(remove_error="in use")
         agent = _agent(facade)
         resp = await agent.purge_images(PurgeImagesReq(images=["a:1"]))

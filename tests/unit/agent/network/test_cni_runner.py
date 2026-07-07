@@ -48,7 +48,10 @@ class TestHelpers:
 
     def test_build_cni_env(self) -> None:
         env = build_cni_env(
-            "ADD", container_id="c1", netns="/proc/1/ns/net", ifname="baimulti0",
+            "ADD",
+            container_id="c1",
+            netns="/proc/1/ns/net",
+            ifname="baimulti0",
             cni_path="/opt/cni/bin",
         )
         assert env["CNI_COMMAND"] == "ADD"
@@ -77,14 +80,18 @@ class TestCniPluginRunner:
 
         runner = CniPluginRunner(cni_path="/opt/cni/bin")
         result = await runner(
-            "ADD", ifname="baimulti0", netns="/proc/1/ns/net",
-            container_id="c1", config=_CONFIG,
+            "ADD",
+            ifname="baimulti0",
+            netns="/proc/1/ns/net",
+            container_id="c1",
+            config=_CONFIG,
         )
         assert result is not None
         assert result["ips"][0]["address"] == "10.128.5.5/24"
         assert captured["env"]["CNI_COMMAND"] == "ADD"
         assert captured["env"]["CNI_IFNAME"] == "baimulti0"
         # config was written to stdin
+        assert proc.stdin_data is not None
         assert json.loads(proc.stdin_data) == _CONFIG
 
     async def test_del_with_empty_output_returns_none(
@@ -94,8 +101,11 @@ class TestCniPluginRunner:
         _patch_exec(monkeypatch, proc)
         runner = CniPluginRunner()
         result = await runner(
-            "DEL", ifname="baimulti0", netns="/proc/1/ns/net",
-            container_id="c1", config=_CONFIG,
+            "DEL",
+            ifname="baimulti0",
+            netns="/proc/1/ns/net",
+            container_id="c1",
+            config=_CONFIG,
         )
         assert result is None
 
@@ -108,7 +118,10 @@ class TestCniPluginRunner:
         runner = CniPluginRunner()
         with pytest.raises(CniError) as exc:
             await runner(
-                "ADD", ifname="baimulti0", netns="/proc/1/ns/net",
-                container_id="c1", config=_CONFIG,
+                "ADD",
+                ifname="baimulti0",
+                netns="/proc/1/ns/net",
+                container_id="c1",
+                config=_CONFIG,
             )
         assert "bridge not found" in str(exc.value)

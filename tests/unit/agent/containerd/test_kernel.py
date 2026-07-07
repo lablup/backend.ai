@@ -5,7 +5,7 @@ from typing import Any, cast
 import pytest
 
 from ai.backend.agent.containerd.kernel import ContainerdKernel
-from ai.backend.agent.kernel import KernelRunnerNotInitializedError
+from ai.backend.agent.errors.kernel import KernelRunnerNotInitializedError
 from ai.backend.common.dto.agent.response import CodeCompletionResult
 
 
@@ -40,7 +40,12 @@ class FakeRunner:
         return {"status": "done", "data": []}
 
 
-def _kernel(runner: FakeRunner | None, *, service_ports: list[Any] | None = None, data: dict | None = None) -> ContainerdKernel:
+def _kernel(
+    runner: FakeRunner | None,
+    *,
+    service_ports: list[Any] | None = None,
+    data: dict[str, Any] | None = None,
+) -> ContainerdKernel:
     k = ContainerdKernel.__new__(ContainerdKernel)
     k.runner = cast(Any, runner)
     k.service_ports = service_ports or []
@@ -73,13 +78,18 @@ class TestRunnerDelegation:
 
 class TestStartService:
     async def test_invalid_service_name(self) -> None:
-        k = _kernel(FakeRunner(), service_ports=[{"name": "jupyter", "container_ports": [8080], "protocol": "http"}])
+        k = _kernel(
+            FakeRunner(),
+            service_ports=[{"name": "jupyter", "container_ports": [8080], "protocol": "http"}],
+        )
         result = await k.start_service("nope", {})
         assert result == {"status": "failed", "error": "invalid service name"}
 
     async def test_valid_service_feeds_runner(self) -> None:
         r = FakeRunner()
-        k = _kernel(r, service_ports=[{"name": "jupyter", "container_ports": [8080], "protocol": "http"}])
+        k = _kernel(
+            r, service_ports=[{"name": "jupyter", "container_ports": [8080], "protocol": "http"}]
+        )
         result = await k.start_service("jupyter", {})
         assert result == {"status": "started"}
         assert "start_service:jupyter" in r.calls

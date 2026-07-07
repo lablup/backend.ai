@@ -42,9 +42,7 @@ class _CompleteV2Plugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         return None
 
     async def probe_caps(self) -> AgentNetworkCaps:
-        return AgentNetworkCaps(
-            tunnel_offload=False, native_routing_ok=True, backends=["vxlan"]
-        )
+        return AgentNetworkCaps(tunnel_offload=False, native_routing_ok=True, backends=["vxlan"])
 
     async def setup_session_network(self, meta: SessionNetMeta, self_member: Member) -> None:
         return None
@@ -96,7 +94,7 @@ class _IncompleteV2Plugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
 
 
 def _make(plugin_cls: type) -> AbstractNetworkAgentPluginV2[AbstractKernel]:
-    return plugin_cls({}, {})
+    return cast(AbstractNetworkAgentPluginV2[AbstractKernel], plugin_cls({}, {}))
 
 
 class TestPluginGroup:
@@ -123,8 +121,8 @@ class TestDefaults:
     async def test_optional_hooks_are_noops_by_default(self) -> None:
         plugin = _make(_CompleteV2Plugin)
         kernel = cast(AbstractKernel, object())
-        assert await plugin.prepare_port_forward(kernel, "127.0.0.1", []) is None
-        assert await plugin.expose_ports(kernel, "127.0.0.1", []) is None
+        await plugin.prepare_port_forward(kernel, "127.0.0.1", [])
+        await plugin.expose_ports(kernel, "127.0.0.1", [])
 
 
 class TestAttachEndpoint:

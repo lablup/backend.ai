@@ -10,7 +10,7 @@ from ai.backend.agent.types import get_agent_discovery as dispatch_discovery
 
 class TestBackendRegistration:
     def test_enum_has_containerd(self) -> None:
-        assert AgentBackend.CONTAINERD == "containerd"
+        assert AgentBackend.CONTAINERD.value == "containerd"
 
     def test_module_discovery_returns_containerd(self) -> None:
         discovery = get_agent_discovery()
