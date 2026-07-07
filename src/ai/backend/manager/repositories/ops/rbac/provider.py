@@ -27,15 +27,14 @@ from ai.backend.manager.models.virtual_scope.entity_membership import EntityMemb
 from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.manager.repositories.base import (
+    BatchPurger,
+    BatchPurgerResult,
     BulkCreator,
     BulkCreatorResult,
     Creator,
     CreatorResult,
     Purger,
     PurgerResult,
-    execute_bulk_creator,
-    execute_creator,
-    execute_purger,
 )
 from ai.backend.manager.repositories.base.rbac.entity_creator import (
     RBACBulkEntityCreatorResult,
@@ -63,6 +62,15 @@ class ScopeDeletion[TRow: Base]:
 
     purger: Purger[TRow]
     scope: ScopeRef
+
+
+@dataclass
+class ScopeBatchDeletion[TRow: Base]:
+    """A batch purger selecting real scope-entity rows to delete, together with the
+    virtual scopes to drop for the deleted rows."""
+
+    purger: BatchPurger[TRow]
+    scopes: Sequence[ScopeRef]
 
 
 class RBACWriteOps(WriteOps):
@@ -157,16 +165,15 @@ class RBACWriteOps(WriteOps):
 
     async def create_scope[TRow: Base](
         self,
-        creator: Creator[TRow],
-        scope: ScopeRef,
+        creation: ScopeCreation[TRow],
     ) -> CreatorResult[TRow]:
-        """Create the real scope entity via ``creator`` and its virtual scope node.
+        """Create the real scope entity via ``creation.creator`` and its virtual scope node.
 
-        The virtual scope insert is idempotent (get-or-create). ``scope.scope_id``
+        The virtual scope insert is idempotent (get-or-create). ``creation.scope.scope_id``
         must match the id the created row carries.
         """
-        result = await execute_creator(self._sess, creator)
-        await self._insert_virtual_scopes([scope])
+        result = await self.create(creation.creator)
+        await self._insert_virtual_scopes([creation.scope])
         return result
 
     async def bulk_create_scopes[TRow: Base](
@@ -179,8 +186,7 @@ class RBACWriteOps(WriteOps):
         rows and their virtual scope nodes are materialized, or the whole batch fails and
         nothing is created. The virtual scope inserts are idempotent (get-or-create).
         """
-        result = await execute_bulk_creator(
-            self._sess,
+        result = await self.bulk_create(
             BulkCreator(specs=[creation.creator.spec for creation in creations]),
         )
         await self._insert_virtual_scopes([creation.scope for creation in creations])
@@ -188,34 +194,31 @@ class RBACWriteOps(WriteOps):
 
     async def delete_scope[TRow: Base](
         self,
-        purger: Purger[TRow],
-        scope: ScopeRef,
+        deletion: ScopeDeletion[TRow],
     ) -> PurgerResult[TRow] | None:
-        """Delete the real scope entity via ``purger`` and its virtual scope node.
+        """Delete the real scope entity via ``deletion.purger`` and its virtual scope node.
 
         Deleting the virtual scope cascades to its scope bindings and entity
         memberships (FK ``ON DELETE CASCADE``).
         """
-        await self._delete_virtual_scopes([scope])
-        return await execute_purger(self._sess, purger)
+        result = await self.purge(deletion.purger)
+        await self._delete_virtual_scopes([deletion.scope])
+        return result
 
-    async def bulk_delete_scopes[TRow: Base](
+    async def batch_delete_scopes[TRow: Base](
         self,
-        deletions: Sequence[ScopeDeletion[TRow]],
-    ) -> list[PurgerResult[TRow] | None]:
-        """Delete multiple real scope entities and their virtual scope nodes.
+        deletion: ScopeBatchDeletion[TRow],
+    ) -> BatchPurgerResult:
+        """Delete the real scope entities matched by ``deletion.purger`` and their virtual
+        scope nodes.
 
-        Each virtual scope node and its related real scope row are deleted together
-        inside one nested transaction (savepoint), so an item's node (with its
-        cascaded edges) and row commit or roll back as a unit.
+        The real scope rows are purged atomically via the batch purge (all-or-nothing), then
+        the virtual scope nodes for ``deletion.scopes`` are dropped (FK ``ON DELETE CASCADE``
+        removes their edges).
         """
-        results: list[PurgerResult[TRow] | None] = []
-        for deletion in deletions:
-            async with self.savepoint():
-                await self._delete_virtual_scopes([deletion.scope])
-                result = await execute_purger(self._sess, deletion.purger)
-            results.append(result)
-        return results
+        result = await self.batch_purge(deletion.purger)
+        await self._delete_virtual_scopes(deletion.scopes)
+        return result
 
     # -- Virtual scope: inbound edges (scope_bindings) ----------------------------
 
