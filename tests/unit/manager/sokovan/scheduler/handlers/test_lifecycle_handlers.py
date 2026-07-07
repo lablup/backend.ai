@@ -18,7 +18,10 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.data.sokovan import (
+from ai.backend.manager.repositories.scheduler.types.session import (
+    TerminatingSessionData,
+)
+from ai.backend.manager.sokovan.data import (
     SessionsForPullWithImages,
     SessionsForStartWithImages,
     SessionWithKernels,
