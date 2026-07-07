@@ -13,6 +13,7 @@ import uuid
 import pytest
 
 from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import SessionTypes
 from ai.backend.manager.services.session.actions.enqueue_session import (
     EnqueueSessionAction,
@@ -24,8 +25,8 @@ from ai.backend.manager.services.session.actions.enqueue_session import (
 
 def _make_action(
     *,
-    user_id: uuid.UUID,
-    owner_id: uuid.UUID | None,
+    user_id: UserID,
+    owner_id: UserID | None,
 ) -> EnqueueSessionAction:
     return EnqueueSessionAction(
         session_name="test-session",
@@ -41,10 +42,17 @@ def _make_action(
 
 
 class TestEnqueueSessionActionDelegationScope:
-    @pytest.mark.parametrize("delegated", [False, True], ids=["caller", "owner"])
+    @pytest.mark.parametrize(
+        "delegated",
+        [False, True],
+        ids=[
+            "no_owner_id_falls_back_to_caller_scope",
+            "owner_id_delegates_to_owner_scope",
+        ],
+    )
     def test_rbac_scope_targets_owner_when_delegating(self, delegated: bool) -> None:
-        caller_id = uuid.uuid4()
-        owner_id = uuid.uuid4()
+        caller_id = UserID(uuid.uuid4())
+        owner_id = UserID(uuid.uuid4())
         action = _make_action(
             user_id=caller_id,
             owner_id=owner_id if delegated else None,
