@@ -65,13 +65,14 @@ class CheckPreconditionLifecycleHandler(SessionLifecycleHandler):
     @classmethod
     @override
     def target_kernel_statuses(cls) -> list[KernelStatus] | None:
-        """Include sessions with kernels in SCHEDULED or PULLING status.
+        """Include sessions with kernels in SCHEDULED, PREPARING, or PULLING status.
 
-        PULLING covers kernels whose pull already finished on the agent but
-        were never updated to PREPARED because the ImagePullFinished event
-        was lost; re-triggering makes the agent re-emit the completion event.
+        PREPARING/PULLING cover kernels whose pull already finished on the
+        agent but were never updated to PREPARED because the ImagePullFinished
+        event was lost; re-triggering makes the agent re-emit the completion
+        event.
         """
-        return [KernelStatus.SCHEDULED, KernelStatus.PULLING]
+        return [KernelStatus.SCHEDULED, KernelStatus.PREPARING, KernelStatus.PULLING]
 
     @classmethod
     @override
