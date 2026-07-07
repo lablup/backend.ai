@@ -30,6 +30,7 @@ from ai.backend.common.data.permission.types import (
 )
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.exception import UnreachableError
+from ai.backend.common.types import SessionTypes
 from ai.backend.manager.actions.action.base import BaseActionTriggerMeta
 from ai.backend.manager.actions.action.bulk import BaseBulkAction
 from ai.backend.manager.actions.action.scope import BaseScopeAction
@@ -74,6 +75,12 @@ from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
+)
+from ai.backend.manager.services.session.actions.enqueue_session import (
+    EnqueueSessionAction,
+    ResourceSlotEntry,
+    SessionResourceSpec,
+    SessionSchedulingSpec,
 )
 from ai.backend.testutils.db import with_tables
 
@@ -647,3 +654,78 @@ class TestBulkActionRBACValidator:
 
         assert result.allowed_entities == []
         assert result.denied_entities == []
+
+
+def _make_enqueue_action(
+    *,
+    caller_id: uuid.UUID,
+    owner_id: uuid.UUID,
+) -> EnqueueSessionAction:
+    """Enqueue action delegating to ``owner_id`` (targets the owner's USER scope)."""
+    return EnqueueSessionAction(
+        session_name="delegation-test",
+        session_type=SessionTypes.INTERACTIVE,
+        image_id=uuid.uuid4(),
+        resource=SessionResourceSpec(
+            entries=[ResourceSlotEntry(resource_type="cpu", quantity="1")],
+        ),
+        scheduling=SessionSchedulingSpec(),
+        user_id=caller_id,
+        owner_id=owner_id,
+    )
+
+
+@pytest.fixture
+async def delegation_users(
+    db_with_rbac_tables: ExtendedAsyncSAEngine,
+) -> tuple[uuid.UUID, uuid.UUID]:
+    """Two regular users with asymmetric session-create permission.
+
+    user-a's role is granted SESSION:CREATE on user-b's own USER scope; user-b
+    holds no permission over user-a. Returns ``(user_a, user_b)``.
+    """
+    user_a = uuid.uuid4()
+    user_b = uuid.uuid4()
+    role_a = uuid.uuid4()
+    await _seed_user_with_role(db_with_rbac_tables, user_id=user_a, role_id=role_a)
+    await _seed_user_with_role(db_with_rbac_tables, user_id=user_b, role_id=uuid.uuid4())
+    await _grant_permission(
+        db_with_rbac_tables,
+        role_id=role_a,
+        scope_type=ScopeType.USER,
+        scope_id=str(user_b),
+        entity_type=EntityType.SESSION,
+        operation=OperationType.CREATE,
+    )
+    return user_a, user_b
+
+
+class TestScopeActionDelegationAuthorization:
+    """Session enqueue delegation is authorized against the owner's USER scope."""
+
+    async def test_delegation_to_owner_with_permission_passes(
+        self,
+        repository: PermissionControllerRepository,
+        trigger_meta: BaseActionTriggerMeta,
+        delegation_users: tuple[uuid.UUID, uuid.UUID],
+    ) -> None:
+        # user-a holds SESSION:CREATE on user-b's scope → delegating to user-b passes.
+        user_a, user_b = delegation_users
+        validator = ScopeActionRBACValidator(repository, MagicMock())
+        action = _make_enqueue_action(caller_id=user_a, owner_id=user_b)
+        with with_user(_make_user_data(user_a, is_superadmin=False)):
+            await validator.validate(action, trigger_meta)
+
+    async def test_delegation_to_owner_without_permission_raises(
+        self,
+        repository: PermissionControllerRepository,
+        trigger_meta: BaseActionTriggerMeta,
+        delegation_users: tuple[uuid.UUID, uuid.UUID],
+    ) -> None:
+        # user-b has no permission on user-a's scope → delegating to user-a is denied.
+        user_a, user_b = delegation_users
+        validator = ScopeActionRBACValidator(repository, MagicMock())
+        action = _make_enqueue_action(caller_id=user_b, owner_id=user_a)
+        with with_user(_make_user_data(user_b, is_superadmin=False)):
+            with pytest.raises(NotEnoughPermission):
+                await validator.validate(action, trigger_meta)
