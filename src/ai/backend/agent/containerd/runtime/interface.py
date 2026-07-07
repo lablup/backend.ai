@@ -1,21 +1,25 @@
 """OCI container runtime interface (BEP-1058).
 
-This is the **containerd-only** management surface: image and container/task lifecycle
-over containerd's native tooling/API (NOT CRI — CRI's RunPodSandbox couples the runtime
-to CNI, which BEP-1058 owns separately). It imports nothing from the network layer and
-knows nothing about CNI, vxlan, or sessions.
+This is the **container-only** management surface: image and container/task lifecycle over
+containerd's native gRPC API (Containers/Tasks/Images/Content/Snapshots services).
 
-The single value that crosses the runtime↔network boundary is a task's network
-namespace, exposed here as ``TaskHandle.pid`` (the network layer derives
-``/proc/{pid}/ns/net``). The ``ContainerdKernelOrchestrator`` is the sole place that
-composes this client with the network subsystem; neither side references the other.
+Terminology — this is deliberately NOT the CRI path:
+- **CRI** (Container Runtime Interface) is Kubernetes' gRPC *interface* (a spec); containerd
+  implements it with a higher-level *cri plugin* that layers a pod/sandbox model on top of
+  the native services.
+- That CRI implementation hides the network namespace behind ``RunPodSandbox`` and drives
+  CNI itself — the runtime would own the network. BEP-1058 owns the network separately
+  (multi-attach LOCAL/OVERLAY, central IPAM, vxlan), so we call the **native** API directly.
 
-Lifecycle model: a container is created with an **isolated, empty network namespace**
-(only loopback) and then started; the running task's PID is returned so the network
-layer can attach CNI into its netns. (A future containerd-gRPC implementation may attach
-in the pre-start "created" state; the tooling-based client cannot expose a PID before
-start, so networking attaches immediately after start — validated to work in
-BEP-1058/verification.md §5.)
+This interface therefore imports nothing from the network layer and knows nothing about CNI,
+vxlan, or sessions. The single value that crosses the runtime↔network boundary is a task's
+network namespace, exposed as ``TaskHandle.pid`` (the network layer derives
+``/proc/{pid}/ns/net``). The ``ContainerdKernelOrchestrator`` is the sole place that composes
+a runtime with the network subsystem; neither side references the other.
+
+Lifecycle model: a container is created with an **isolated, empty network namespace** (only
+loopback) and then started; the running task's PID is returned so the network layer can
+attach CNI into its netns after start (validated in BEP-1058/verification.md §5).
 """
 
 from __future__ import annotations
