@@ -9,7 +9,8 @@ from datetime import datetime
 from ai.backend.common.data.idle_checker.types import CheckerType, IdleCheckerSpec
 from ai.backend.common.identifier.idle_checker import IdleCheckerID
 from ai.backend.common.types import SessionTypes
-from ai.backend.manager.data.idle_checker.types import IdleCheckSession, ScopeRef
+from ai.backend.manager.data.idle_checker.types import IdleCheckSession
+from ai.backend.manager.data.permission.id import ScopeId
 
 
 @dataclass(frozen=True)
@@ -28,7 +29,7 @@ class BoundCheckerData:
     ``binding_created_at`` is the stable tiebreak within the same scope.
     """
 
-    scope: ScopeRef
+    scope: ScopeId
     binding_created_at: datetime
     checker: IdleCheckerDefinitionData
 
@@ -39,7 +40,7 @@ class IdleCheckSessionData:
 
     session: IdleCheckSession
     session_type: SessionTypes
-    scopes: Sequence[ScopeRef]
+    scopes: Sequence[ScopeId]
 
 
 @dataclass(frozen=True)

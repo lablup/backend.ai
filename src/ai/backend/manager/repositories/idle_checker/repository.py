@@ -4,7 +4,7 @@ from collections import defaultdict
 from collections.abc import Collection
 
 from ai.backend.common.types import SessionTypes
-from ai.backend.manager.data.idle_checker.types import ScopeRef
+from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.models.idle_checker.conditions import IdleCheckerBindingConditions
 from ai.backend.manager.models.session.conditions import SessionConditions
@@ -42,7 +42,7 @@ class IdleCheckerRepository:
             return IdleCheckBatchData(targets=())
 
         seen_candidates = set()
-        idle_check_candidates: list[tuple[ScopeRef, Collection[SessionTypes]]] = []
+        idle_check_candidates: list[tuple[ScopeId, Collection[SessionTypes]]] = []
         for bound_checker in bound_checkers:
             target_session_types = bound_checker.checker.spec.target_session_types
             candidate_key = (
@@ -63,7 +63,7 @@ class IdleCheckerRepository:
             ],
         )
         candidate_sessions = await self._db_source.fetch_candidate_sessions(session_querier)
-        checkers_by_scope: defaultdict[ScopeRef, list[BoundCheckerData]] = defaultdict(list)
+        checkers_by_scope: defaultdict[ScopeId, list[BoundCheckerData]] = defaultdict(list)
         for bound_checker in bound_checkers:
             checkers_by_scope[bound_checker.scope].append(bound_checker)
 

@@ -14,6 +14,7 @@ from ai.backend.common.data.idle_checker.types import (
     SessionLifetimeSpec,
     UtilizationSpec,
 )
+from ai.backend.common.data.permission.types import ScopeType
 from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.idle_checker import IdleCheckerID
 from ai.backend.common.identifier.resource_group import ResourceGroupID
@@ -24,7 +25,6 @@ from ai.backend.common.types import (
     SessionResult,
     SessionTypes,
 )
-from ai.backend.manager.data.idle_checker.types import ScopeType
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import GroupRow

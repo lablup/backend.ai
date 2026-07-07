@@ -3,11 +3,16 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from typing import cast
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.idle_checker.types import CheckerType, IdleCheckerSpec
+from ai.backend.common.data.permission.types import ScopeType
+from ai.backend.common.identifier.idle_checker import IdleCheckerID
 from ai.backend.common.types import SessionId
-from ai.backend.manager.data.idle_checker.types import IdleCheckSession, ScopeRef, ScopeType
+from ai.backend.manager.data.idle_checker.types import IdleCheckSession
+from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.models.idle_checker.row import IdleCheckerBindingRow, IdleCheckerRow
 from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.repositories.base import BatchQuerier
@@ -42,14 +47,14 @@ class IdleCheckerDBSource:
             binding_rows = (await r.batch_query_in_global(binding_query, querier)).rows
         bound_checkers: list[BoundCheckerData] = []
         for row in binding_rows:
-            scope = ScopeRef(
+            scope = ScopeId(
                 scope_type=ScopeType(row.scope_type),
-                scope_id=row.scope_id,
+                scope_id=str(row.scope_id),
             )
             checker = IdleCheckerDefinitionData(
-                checker_id=row.idle_checker_id,
-                checker_type=row.checker_type,
-                spec=row.spec,
+                checker_id=cast(IdleCheckerID, row.idle_checker_id),
+                checker_type=cast(CheckerType, row.checker_type),
+                spec=cast(IdleCheckerSpec, row.spec),
             )
             bound_checkers.append(
                 BoundCheckerData(
@@ -84,9 +89,9 @@ class IdleCheckerDBSource:
                 ),
                 session_type=row.session_type,
                 scopes=(
-                    ScopeRef(ScopeType.RESOURCE_GROUP, row.resource_group_id),
-                    ScopeRef(ScopeType.PROJECT, row.group_id),
-                    ScopeRef(ScopeType.DOMAIN, row.domain_id),
+                    ScopeId(ScopeType.RESOURCE_GROUP, str(row.resource_group_id)),
+                    ScopeId(ScopeType.PROJECT, str(row.group_id)),
+                    ScopeId(ScopeType.DOMAIN, str(row.domain_id)),
                 ),
             )
             for row in session_rows

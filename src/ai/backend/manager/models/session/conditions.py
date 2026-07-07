@@ -15,9 +15,10 @@ if TYPE_CHECKING:
         UUIDInMatchSpec,
     )
 
+from ai.backend.common.data.permission.types import ScopeType
 from ai.backend.common.types import SessionId, SessionTypes
-from ai.backend.manager.data.idle_checker.types import ScopeRef, ScopeType
 from ai.backend.manager.data.kernel.types import KernelStatus
+from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.data.session.types import KernelMatchType, SessionStatus
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.condition_utils import make_string_in_factory
@@ -45,7 +46,7 @@ class SessionConditions:
 
     @staticmethod
     def by_idle_check_candidates(
-        candidates: Collection[tuple[ScopeRef, Collection[SessionTypes]]],
+        candidates: Collection[tuple[ScopeId, Collection[SessionTypes]]],
     ) -> QueryCondition:
         scope_columns = {
             ScopeType.RESOURCE_GROUP: SessionRow.resource_group_id,
