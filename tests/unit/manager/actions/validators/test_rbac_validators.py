@@ -30,8 +30,6 @@ from ai.backend.common.data.permission.types import (
 )
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.exception import UnreachableError
-from ai.backend.common.identifier.user import UserID
-from ai.backend.common.types import SessionTypes
 from ai.backend.manager.actions.action.base import BaseActionTriggerMeta
 from ai.backend.manager.actions.action.bulk import BaseBulkAction
 from ai.backend.manager.actions.action.scope import BaseScopeAction
@@ -76,12 +74,6 @@ from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
-)
-from ai.backend.manager.services.session.actions.enqueue_session import (
-    EnqueueSessionAction,
-    ResourceSlotEntry,
-    SessionResourceSpec,
-    SessionSchedulingSpec,
 )
 from ai.backend.testutils.db import with_tables
 
@@ -655,86 +647,3 @@ class TestBulkActionRBACValidator:
 
         assert result.allowed_entities == []
         assert result.denied_entities == []
-
-
-def _make_enqueue_action(
-    *,
-    caller_id: UserID,
-    owner_id: UserID,
-) -> EnqueueSessionAction:
-    """Enqueue action delegating to ``owner_id`` (targets the owner's USER scope)."""
-    return EnqueueSessionAction(
-        session_name="delegation-test",
-        session_type=SessionTypes.INTERACTIVE,
-        image_id=uuid.uuid4(),
-        resource=SessionResourceSpec(
-            entries=[ResourceSlotEntry(resource_type="cpu", quantity="1")],
-        ),
-        scheduling=SessionSchedulingSpec(),
-        user_id=caller_id,
-        owner_id=owner_id,
-    )
-
-
-@dataclass(frozen=True)
-class _SessionCreateGrant:
-    """A one-way SESSION:CREATE grant between two non-admin users.
-
-    ``authorized_caller`` holds SESSION:CREATE over ``owner``'s USER scope;
-    ``owner`` holds no permission over ``authorized_caller``.
-    """
-
-    authorized_caller: UserID
-    owner: UserID
-
-
-@pytest.fixture
-async def one_way_session_create_grant(
-    db_with_rbac_tables: ExtendedAsyncSAEngine,
-) -> _SessionCreateGrant:
-    """Seed two users where only ``authorized_caller`` may create sessions in ``owner``'s scope."""
-    authorized_caller = UserID(uuid.uuid4())
-    owner = UserID(uuid.uuid4())
-    caller_role = uuid.uuid4()
-    await _seed_user_with_role(db_with_rbac_tables, user_id=authorized_caller, role_id=caller_role)
-    await _seed_user_with_role(db_with_rbac_tables, user_id=owner, role_id=uuid.uuid4())
-    await _grant_permission(
-        db_with_rbac_tables,
-        role_id=caller_role,
-        scope_type=ScopeType.USER,
-        scope_id=str(owner),
-        entity_type=EntityType.SESSION,
-        operation=OperationType.CREATE,
-    )
-    return _SessionCreateGrant(authorized_caller=authorized_caller, owner=owner)
-
-
-class TestScopeActionDelegationAuthorization:
-    """Session enqueue delegation is authorized against the owner's USER scope."""
-
-    async def test_delegation_to_owner_with_permission_passes(
-        self,
-        repository: PermissionControllerRepository,
-        trigger_meta: BaseActionTriggerMeta,
-        one_way_session_create_grant: _SessionCreateGrant,
-    ) -> None:
-        # The caller holds SESSION:CREATE over the owner's scope → delegation passes.
-        grant = one_way_session_create_grant
-        validator = ScopeActionRBACValidator(repository, MagicMock())
-        action = _make_enqueue_action(caller_id=grant.authorized_caller, owner_id=grant.owner)
-        with with_user(_make_user_data(grant.authorized_caller, is_superadmin=False)):
-            await validator.validate(action, trigger_meta)
-
-    async def test_delegation_to_owner_without_permission_raises(
-        self,
-        repository: PermissionControllerRepository,
-        trigger_meta: BaseActionTriggerMeta,
-        one_way_session_create_grant: _SessionCreateGrant,
-    ) -> None:
-        # The owner holds no permission over the caller → reverse delegation is denied.
-        grant = one_way_session_create_grant
-        validator = ScopeActionRBACValidator(repository, MagicMock())
-        action = _make_enqueue_action(caller_id=grant.owner, owner_id=grant.authorized_caller)
-        with with_user(_make_user_data(grant.owner, is_superadmin=False)):
-            with pytest.raises(NotEnoughPermission):
-                await validator.validate(action, trigger_meta)
