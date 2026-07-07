@@ -14,6 +14,7 @@ from ai.backend.common.dto.manager.v2.vfolder.request import (
     SearchVFoldersInput,
     VFolderFilter,
 )
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import QuotaScopeID, VFolderUsageMode
 from ai.backend.manager.api.adapters.vfolder.adapter import VFolderAdapter
@@ -312,3 +313,67 @@ class TestVFolderAdapterGetFolderUsage:
         dto = await adapter.get_folder_usage(uuid4())
 
         assert dto is None
+
+
+class TestVFolderAdapterRestore:
+    """Tests for VFolderAdapter.restore() owner_id delegation."""
+
+    @pytest.fixture
+    def user_data(self) -> UserData:
+        return UserData(
+            user_id=uuid4(),
+            is_authorized=True,
+            is_admin=False,
+            is_superadmin=False,
+            role=UserRole.USER,
+            domain_name="default",
+        )
+
+    @pytest.fixture
+    def mock_processors(self) -> MagicMock:
+        processors = MagicMock()
+        processors.vfolder.restore_vfolder_from_trash.wait_for_complete = AsyncMock()
+        return processors
+
+    @pytest.fixture
+    def adapter(self, mock_processors: MagicMock) -> VFolderAdapter:
+        return VFolderAdapter(mock_processors)
+
+    async def test_restore_without_owner_uses_caller(
+        self,
+        adapter: VFolderAdapter,
+        mock_processors: MagicMock,
+        user_data: UserData,
+    ) -> None:
+        """Without owner_id, the acting user is the caller."""
+        vfolder_id = uuid4()
+        with patch(
+            "ai.backend.manager.api.adapters.vfolder.adapter.current_user",
+            return_value=user_data,
+        ):
+            await adapter.restore(vfolder_id)
+
+        restore_mock = mock_processors.vfolder.restore_vfolder_from_trash.wait_for_complete
+        action = restore_mock.call_args[0][0]
+        assert action.user_uuid == user_data.user_id
+        assert action.vfolder_uuid == vfolder_id
+
+    async def test_restore_with_owner_uses_owner(
+        self,
+        adapter: VFolderAdapter,
+        mock_processors: MagicMock,
+        user_data: UserData,
+    ) -> None:
+        """With owner_id, the acting user is the owner, not the caller."""
+        vfolder_id = uuid4()
+        owner_id = UserID(uuid4())
+        with patch(
+            "ai.backend.manager.api.adapters.vfolder.adapter.current_user",
+            return_value=user_data,
+        ):
+            await adapter.restore(vfolder_id, owner_id=owner_id)
+
+        restore_mock = mock_processors.vfolder.restore_vfolder_from_trash.wait_for_complete
+        action = restore_mock.call_args[0][0]
+        assert action.user_uuid == owner_id
+        assert action.user_uuid != user_data.user_id

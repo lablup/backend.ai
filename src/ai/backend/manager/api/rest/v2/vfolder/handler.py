@@ -108,9 +108,7 @@ class V2VFolderHandler:
         query: QueryParam[RestoreVFolderQuery],
     ) -> APIResponse:
         """Restore a trashed vfolder."""
-        result = await self._adapter.restore(
-            path.parsed.vfolder_id, owner_id=query.parsed.owner_id
-        )
+        result = await self._adapter.restore(path.parsed.vfolder_id, owner_id=query.parsed.owner_id)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def project_create(
