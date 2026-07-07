@@ -134,6 +134,10 @@ class CreateVFolderInputGQL(PydanticInputMixin[CreateInputDTO]):
         default="rw", description="Default permission of the vfolder (ro, rw, wd)."
     )
     cloneable: bool = gql_field(default=False, description="Whether the vfolder is cloneable.")
+    owner_id: UUID | None = gql_field(
+        default=None,
+        description="Delegated owner user UUID. Create the vfolder on behalf of this user.",
+    )
 
 
 @gql_pydantic_input(
