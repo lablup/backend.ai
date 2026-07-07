@@ -1,6 +1,6 @@
 """Composition of containerd runtime + cluster network (BEP-1058).
 
-The runtime (`ContainerdRuntimeClient`) and the network subsystem
+The runtime (`OciRuntime`) and the network subsystem
 (`ContainerNetworkProvisioner`) are two completely separate classes that never
 reference each other. This orchestrator is the ONLY place they meet: it creates the
 task via the runtime, then hands the task's netns/PID to the network layer to attach
@@ -15,7 +15,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
-from ai.backend.agent.containerd.runtime import ContainerdRuntimeClient, TaskHandle
+from ai.backend.agent.containerd.runtime.interface import OciRuntime, TaskHandle
 from ai.backend.common.network.types import EndpointPlan, NetworkRole, SessionNetMeta
 
 if TYPE_CHECKING:
@@ -42,12 +42,12 @@ class ContainerdKernelOrchestrator:
     here and nowhere else.
     """
 
-    _runtime: ContainerdRuntimeClient
+    _runtime: OciRuntime
     _network: ContainerNetworkProvisioner
 
     def __init__(
         self,
-        runtime: ContainerdRuntimeClient,
+        runtime: OciRuntime,
         network: ContainerNetworkProvisioner,
     ) -> None:
         self._runtime = runtime

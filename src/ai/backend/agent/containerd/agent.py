@@ -77,6 +77,8 @@ from .oci import (
     translate_accelerator_args,
     translate_creation_config,
 )
+from .runtime.grpc import ContainerdGrpcRuntime
+from .runtime.interface import OciRuntime
 from .session_network import (
     ContainerdSessionNetwork,
     build_containerd_session_network,
@@ -439,16 +441,21 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
 class ContainerdAgent(
     AbstractAgent[ContainerdKernel, ContainerdKernelCreationContext],
 ):
+    _runtime: OciRuntime
     _session_network: ContainerdSessionNetwork
     _host_ip: str
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
+        # The container runtime is the OCI runtime interface, implemented by the native
+        # containerd gRPC client (no nerdctl/ctr CLI). The agent owns it and injects it into
+        # the network facade; opened in __ainit__.
+        self._runtime = ContainerdGrpcRuntime(namespace="backend-ai")
         # Cluster networking is delegated to the BEP-1058 agent.network stack via a
         # (verified) facade; the kernel-creation lifecycle will drive it. The vxlan uplink
         # must be the interface carrying this node's VTEP (host_ip) — deriving it from the
         # host_ip keeps the overlay on the same L2 the agents advertise on, instead of a
-        # hard-coded eth0. The runtime is the native containerd gRPC client (no nerdctl CLI).
+        # hard-coded eth0.
         container_cfg = self.local_config.container
         self._host_ip = str(container_cfg.advertised_host or container_cfg.bind_host)
         self._session_network = build_containerd_session_network(
@@ -456,6 +463,7 @@ class ContainerdAgent(
             agent_id=str(self.id),
             host_ip=self._host_ip,
             uplink=_uplink_for_ip(self._host_ip),
+            runtime=self._runtime,
         )
 
     @override

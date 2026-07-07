@@ -1,11 +1,11 @@
-"""Native containerd gRPC ``ContainerdRuntimeClient`` (BEP-1055).
+"""Native containerd gRPC OCI runtime (BEP-1058).
 
 Talks to the containerd daemon directly over its gRPC API (unix socket) — the sole
 runtime client, with no ``nerdctl``/``ctr`` CLI dependency (and none of the CLI-imposed
 limits such as nerdctl's 4 KiB ``nerdctl/mounts`` label). Implements the
-``ContainerdRuntimeClient`` ABC, so the orchestrator and network layers are unchanged.
+``OciRuntime`` interface, so the orchestrator and network layers are unchanged.
 
-Covers the full ContainerdRuntimeClient surface over the containerd gRPC API alone (no
+Covers the full OciRuntime surface over the containerd gRPC API alone (no
 ctr/nerdctl), verified against live containerd v2.2.1: the connection, container/task
 lifecycle (create via a hand-built OCI spec + snapshot, start/kill/remove), introspection,
 image ops (exists/list/remove/entrypoint over the Images+Content services), and pull/push
@@ -25,19 +25,30 @@ from typing import Any, override
 import grpc
 from google.protobuf import any_pb2
 
-from ai.backend.agent.containerd.runtime import ContainerdRuntimeClient, TaskHandle
-from ai.backend.agent.containerd.runtime_spec import build_oci_runtime_spec
+from ai.backend.agent.containerd._grpcapi.api.services.containers.v1 import (
+    containers_pb2,
+    containers_pb2_grpc,
+)
+from ai.backend.agent.containerd._grpcapi.api.services.content.v1 import (
+    content_pb2,
+    content_pb2_grpc,
+)
+from ai.backend.agent.containerd._grpcapi.api.services.images.v1 import images_pb2, images_pb2_grpc
+from ai.backend.agent.containerd._grpcapi.api.services.snapshots.v1 import (
+    snapshots_pb2,
+    snapshots_pb2_grpc,
+)
+from ai.backend.agent.containerd._grpcapi.api.services.tasks.v1 import tasks_pb2, tasks_pb2_grpc
+from ai.backend.agent.containerd._grpcapi.api.services.transfer.v1 import (
+    transfer_pb2,
+    transfer_pb2_grpc,
+)
+from ai.backend.agent.containerd._grpcapi.api.types import mount_pb2
+from ai.backend.agent.containerd._grpcapi.api.types.transfer import imagestore_pb2, registry_pb2
+from ai.backend.agent.containerd.runtime.interface import OciRuntime, TaskHandle
+from ai.backend.agent.containerd.runtime.spec import build_oci_runtime_spec
 from ai.backend.common.arch import CURRENT_ARCH
 from ai.backend.logging import BraceStyleAdapter
-
-from ._grpcapi.api.services.containers.v1 import containers_pb2, containers_pb2_grpc
-from ._grpcapi.api.services.content.v1 import content_pb2, content_pb2_grpc
-from ._grpcapi.api.services.images.v1 import images_pb2, images_pb2_grpc
-from ._grpcapi.api.services.snapshots.v1 import snapshots_pb2, snapshots_pb2_grpc
-from ._grpcapi.api.services.tasks.v1 import tasks_pb2, tasks_pb2_grpc
-from ._grpcapi.api.services.transfer.v1 import transfer_pb2, transfer_pb2_grpc
-from ._grpcapi.api.types import mount_pb2
-from ._grpcapi.api.types.transfer import imagestore_pb2, registry_pb2
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -75,7 +86,7 @@ def _chain_id(diff_ids: Sequence[str]) -> str:
     return chain
 
 
-class ContainerdGrpcRuntimeClient(ContainerdRuntimeClient):
+class ContainerdGrpcRuntime(OciRuntime):
     _address: str
     _namespace: str
     _channel: grpc.aio.Channel | None
@@ -126,32 +137,32 @@ class ContainerdGrpcRuntimeClient(ContainerdRuntimeClient):
 
     def _containers_stub(self) -> containers_pb2_grpc.ContainersStub:
         if self._containers is None:
-            raise RuntimeError("ContainerdGrpcRuntimeClient is not open (call open() first)")
+            raise RuntimeError("ContainerdGrpcRuntime is not open (call open() first)")
         return self._containers
 
     def _tasks_stub(self) -> tasks_pb2_grpc.TasksStub:
         if self._tasks is None:
-            raise RuntimeError("ContainerdGrpcRuntimeClient is not open (call open() first)")
+            raise RuntimeError("ContainerdGrpcRuntime is not open (call open() first)")
         return self._tasks
 
     def _images_stub(self) -> images_pb2_grpc.ImagesStub:
         if self._images is None:
-            raise RuntimeError("ContainerdGrpcRuntimeClient is not open (call open() first)")
+            raise RuntimeError("ContainerdGrpcRuntime is not open (call open() first)")
         return self._images
 
     def _content_stub(self) -> content_pb2_grpc.ContentStub:
         if self._content is None:
-            raise RuntimeError("ContainerdGrpcRuntimeClient is not open (call open() first)")
+            raise RuntimeError("ContainerdGrpcRuntime is not open (call open() first)")
         return self._content
 
     def _snapshots_stub(self) -> snapshots_pb2_grpc.SnapshotsStub:
         if self._snapshots is None:
-            raise RuntimeError("ContainerdGrpcRuntimeClient is not open (call open() first)")
+            raise RuntimeError("ContainerdGrpcRuntime is not open (call open() first)")
         return self._snapshots
 
     def _transfer_stub(self) -> transfer_pb2_grpc.TransferStub:
         if self._transfer is None:
-            raise RuntimeError("ContainerdGrpcRuntimeClient is not open (call open() first)")
+            raise RuntimeError("ContainerdGrpcRuntime is not open (call open() first)")
         return self._transfer
 
     # --- image content helpers (read the manifest chain to resolve the rootfs) ---

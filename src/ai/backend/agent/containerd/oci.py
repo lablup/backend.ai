@@ -1,6 +1,6 @@
 """Translate a Backend.AI KernelCreationConfig into a containerd container spec (BEP-1058).
 
-Pure translation from kernel-domain concepts to what `ContainerdRuntimeClient` needs
+Pure translation from kernel-domain concepts to what `OciRuntime` needs
 (image ref, command, OCI-ish spec + labels/env). Kept small and testable; the full OCI
 spec (krunner entrypoint, resource limits, mounts, cgroup placement) is layered on as the
 containerd agent lifecycle matures.

@@ -1,4 +1,4 @@
-"""Low-level containerd runtime client contract (BEP-1058).
+"""OCI container runtime interface (BEP-1058).
 
 This is the **containerd-only** management surface: image and container/task lifecycle
 over containerd's native tooling/API (NOT CRI — CRI's RunPodSandbox couples the runtime
@@ -34,7 +34,7 @@ class TaskHandle:
     pid: int
 
 
-class ContainerdRuntimeClient(ABC):
+class OciRuntime(ABC):
     """Containerd-only lifecycle operations. No network/CNI concerns."""
 
     # --- lifecycle ---

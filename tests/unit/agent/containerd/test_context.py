@@ -11,7 +11,7 @@ from typing import Any, cast
 from ai.backend.agent.containerd.agent import ContainerdKernelCreationContext
 from ai.backend.agent.containerd.oci import AcceleratorSpec
 from ai.backend.agent.containerd.orchestrator import LaunchResult
-from ai.backend.agent.containerd.runtime import TaskHandle
+from ai.backend.agent.containerd.runtime.interface import TaskHandle
 from ai.backend.agent.resources import Mount
 from ai.backend.common.network.types import (
     AttachKind,

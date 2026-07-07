@@ -1,4 +1,4 @@
-from ai.backend.agent.containerd.runtime_spec import OCI_VERSION, build_oci_runtime_spec
+from ai.backend.agent.containerd.runtime.spec import OCI_VERSION, build_oci_runtime_spec
 
 
 def _oci(**over: object) -> dict[str, object]:

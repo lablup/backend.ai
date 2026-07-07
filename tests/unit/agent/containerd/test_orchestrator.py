@@ -2,7 +2,7 @@ from collections.abc import Mapping, Sequence
 from typing import Any, cast, override
 
 from ai.backend.agent.containerd.orchestrator import ContainerdKernelOrchestrator
-from ai.backend.agent.containerd.runtime import ContainerdRuntimeClient, TaskHandle
+from ai.backend.agent.containerd.runtime.interface import OciRuntime, TaskHandle
 from ai.backend.agent.network.provisioner import ContainerNetworkProvisioner
 from ai.backend.common.network.types import (
     AttachKind,
@@ -32,7 +32,7 @@ def _plan() -> EndpointPlan:
     )
 
 
-class FakeRuntime(ContainerdRuntimeClient):
+class FakeRuntime(OciRuntime):
     """Records the runtime call order; returns a fixed task PID."""
 
     def __init__(self, pid: int = 4242) -> None:

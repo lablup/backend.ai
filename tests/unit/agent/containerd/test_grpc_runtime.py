@@ -1,6 +1,6 @@
 import hashlib
 
-from ai.backend.agent.containerd.grpc_runtime import _chain_id
+from ai.backend.agent.containerd.runtime.grpc import _chain_id
 
 
 class TestChainId:

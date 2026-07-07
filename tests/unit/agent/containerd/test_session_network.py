@@ -4,7 +4,7 @@ from typing import Any, cast, override
 
 import pytest
 
-from ai.backend.agent.containerd.runtime import ContainerdRuntimeClient, TaskHandle
+from ai.backend.agent.containerd.runtime.interface import OciRuntime, TaskHandle
 from ai.backend.agent.containerd.session_network import (
     ContainerdSessionNetwork,
     UnknownNetworkBackend,
@@ -99,7 +99,7 @@ class RecordingBackend:
         )
 
 
-class FakeRuntime(ContainerdRuntimeClient):
+class FakeRuntime(OciRuntime):
     def __init__(self) -> None:
         self.calls: list[str] = []
 

@@ -21,7 +21,7 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any
 
 from ai.backend.agent.containerd.orchestrator import ContainerdKernelOrchestrator, LaunchResult
-from ai.backend.agent.containerd.runtime import ContainerdRuntimeClient
+from ai.backend.agent.containerd.runtime.interface import OciRuntime
 from ai.backend.agent.containerd.session_tracker import SessionContainerTracker, TeardownScope
 from ai.backend.agent.network.cni import CniRunner
 from ai.backend.agent.network.coordinator import SessionNetworkCoordinator
@@ -66,7 +66,7 @@ class ContainerdSessionNetwork:
     _etcd: AbstractKVStore
     _agent_id: str
     _host_ip: str
-    _runtime: ContainerdRuntimeClient
+    _runtime: OciRuntime
     _cni_runner: CniRunner
     _backends: Mapping[str, AbstractNetworkAgentPluginV2[Any]]
     _coordinators: dict[str, SessionNetworkCoordinator]
@@ -81,7 +81,7 @@ class ContainerdSessionNetwork:
         *,
         agent_id: str,
         host_ip: str,
-        runtime: ContainerdRuntimeClient,
+        runtime: OciRuntime,
         cni_runner: CniRunner,
         backends: Mapping[str, AbstractNetworkAgentPluginV2[Any]],
     ) -> None:
@@ -249,7 +249,7 @@ def build_containerd_session_network(
     host_ip: str,
     uplink: str = "eth0",
     cni_path: str = "/opt/cni/bin",
-    runtime: ContainerdRuntimeClient | None = None,
+    runtime: OciRuntime | None = None,
     cni_runner: CniRunner | None = None,
     backends: Mapping[str, AbstractNetworkAgentPluginV2[Any]] | None = None,
 ) -> ContainerdSessionNetwork:
@@ -262,12 +262,12 @@ def build_containerd_session_network(
     registered here as they land.
     """
     # Lazy imports: keep this facade module decoupled from the concrete runtime/backend.
-    from ai.backend.agent.containerd.grpc_runtime import ContainerdGrpcRuntimeClient
+    from ai.backend.agent.containerd.runtime.grpc import ContainerdGrpcRuntime
     from ai.backend.agent.network.backends.bridge import BridgeNetworkPlugin
     from ai.backend.agent.network.backends.vxlan import VxlanNetworkPlugin
     from ai.backend.agent.network.cni_runner import CniPluginRunner
 
-    runtime = runtime or ContainerdGrpcRuntimeClient(namespace="backend-ai")
+    runtime = runtime or ContainerdGrpcRuntime(namespace="backend-ai")
     cni_runner = cni_runner or CniPluginRunner(cni_path=cni_path)
     if backends is None:
         backends = {
