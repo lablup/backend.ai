@@ -4,9 +4,10 @@ Unit tests for VFolderService CRUD operations.
 
 from __future__ import annotations
 
+import enum
 import uuid
 from datetime import UTC, datetime
-from typing import Literal
+from typing import NamedTuple
 from unittest.mock import AsyncMock, MagicMock
 
 import aiohttp
@@ -483,7 +484,21 @@ class TestCreateVFolderAction:
             await vfolder_service.create(action)
 
 
-_ScopeTarget = Literal["caller", "owner", "project"]
+class _ScopeParticipant(enum.Enum):
+    """Which identity a create action is expected to authorize against."""
+
+    CALLER = enum.auto()
+    OWNER = enum.auto()
+    PROJECT = enum.auto()
+
+
+class _ScopeTargetCase(NamedTuple):
+    """One RBAC scope-targeting scenario for CreateVFolderV2Action."""
+
+    with_owner: bool
+    with_project: bool
+    expected_element_type: RBACElementType
+    expected_target: _ScopeParticipant
 
 
 class TestCreateVFolderV2Action:
@@ -514,46 +529,54 @@ class TestCreateVFolderV2Action:
         )
 
     @pytest.mark.parametrize(
-        ("with_owner", "with_project", "expected_type", "expected_target"),
+        "case",
         [
             # No delegation, no project: authorize against the caller's own scope.
-            pytest.param(False, False, RBACElementType.USER, "caller", id="own-targets-caller"),
+            _ScopeTargetCase(
+                with_owner=False,
+                with_project=False,
+                expected_element_type=RBACElementType.USER,
+                expected_target=_ScopeParticipant.CALLER,
+            ),
             # Delegation: authorize against the owner's USER scope, never the caller.
-            pytest.param(True, False, RBACElementType.USER, "owner", id="owner-targets-owner"),
+            _ScopeTargetCase(
+                with_owner=True,
+                with_project=False,
+                expected_element_type=RBACElementType.USER,
+                expected_target=_ScopeParticipant.OWNER,
+            ),
             # Project-owned: authorize against the project; owner_id is irrelevant.
-            pytest.param(
-                True, True, RBACElementType.PROJECT, "project", id="project-ignores-owner"
+            _ScopeTargetCase(
+                with_owner=True,
+                with_project=True,
+                expected_element_type=RBACElementType.PROJECT,
+                expected_target=_ScopeParticipant.PROJECT,
             ),
         ],
+        ids=lambda case: case.expected_target.name.lower(),
     )
-    def test_rbac_scope_target(
-        self,
-        with_owner: bool,
-        with_project: bool,
-        expected_type: RBACElementType,
-        expected_target: _ScopeTarget,
-    ) -> None:
+    def test_rbac_scope_target(self, case: _ScopeTargetCase) -> None:
         caller_id = UserID(uuid.uuid4())
         owner_id = UserID(uuid.uuid4())
         project_id = ProjectID(uuid.uuid4())
-        expected_ids: dict[_ScopeTarget, str] = {
-            "caller": str(caller_id),
-            "owner": str(owner_id),
-            "project": str(project_id),
+        expected_ids: dict[_ScopeParticipant, str] = {
+            _ScopeParticipant.CALLER: str(caller_id),
+            _ScopeParticipant.OWNER: str(owner_id),
+            _ScopeParticipant.PROJECT: str(project_id),
         }
         action = self._make_action(
             user_id=caller_id,
-            owner_id=owner_id if with_owner else None,
-            project_id=project_id if with_project else None,
+            owner_id=owner_id if case.with_owner else None,
+            project_id=project_id if case.with_project else None,
         )
 
-        expected_id = expected_ids[expected_target]
+        expected_id = expected_ids[case.expected_target]
         assert action.scope_id() == expected_id
         target = action.target_element()
-        assert target.element_type == expected_type
+        assert target.element_type == case.expected_element_type
         assert target.element_id == expected_id
         # Whenever an owner/project is in play, the caller must never be the target.
-        if expected_target != "caller":
+        if case.expected_target is not _ScopeParticipant.CALLER:
             assert target.element_id != str(caller_id)
 
     async def test_delegation_swaps_acting_user_to_owner(
