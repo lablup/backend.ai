@@ -11,6 +11,7 @@ the validator asks about and how the verdict propagates.
 from __future__ import annotations
 
 import uuid
+from contextlib import AbstractContextManager, nullcontext
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
 
@@ -111,22 +112,33 @@ class TestEnqueueSessionActionDelegationScope:
 
 
 class TestEnqueueSessionDelegationAuthorization:
+    @pytest.mark.parametrize(
+        "granted, expectation",
+        [
+            (True, nullcontext()),
+            (False, pytest.raises(NotEnoughPermission)),
+        ],
+        ids=["granted_passes", "denied_raises"],
+    )
     async def test_delegation_authorizes_against_owner_scope(
         self,
+        granted: bool,
+        expectation: AbstractContextManager[object],
         trigger_meta: BaseActionTriggerMeta,
         caller: UserData,
         caller_id: UserID,
         owner_id: UserID,
     ) -> None:
         repository = AsyncMock(spec=PermissionControllerRepository)
-        repository.check_permission_with_scope_chain.return_value = True
+        repository.check_permission_with_scope_chain.return_value = granted
         validator = ScopeActionRBACValidator(repository, MagicMock())
 
         action = _make_action(user_id=caller_id, owner_id=owner_id)
         with with_user(caller):
-            await validator.validate(action, trigger_meta)
+            with expectation:
+                await validator.validate(action, trigger_meta)
 
-        # The permission check must target the owner's USER scope, not the caller's.
+        # Regardless of the verdict, the check must target the owner's USER scope.
         repository.check_permission_with_scope_chain.assert_awaited_once()
         checked: ScopeChainPermissionCheckInput = (
             repository.check_permission_with_scope_chain.await_args.args[0]
@@ -134,19 +146,3 @@ class TestEnqueueSessionDelegationAuthorization:
         assert checked.key.user_id == caller_id
         assert checked.key.element_type == RBACElementType.USER
         assert checked.key.entity_id == str(owner_id)
-
-    async def test_denied_delegation_raises(
-        self,
-        trigger_meta: BaseActionTriggerMeta,
-        caller: UserData,
-        caller_id: UserID,
-        owner_id: UserID,
-    ) -> None:
-        repository = AsyncMock(spec=PermissionControllerRepository)
-        repository.check_permission_with_scope_chain.return_value = False
-        validator = ScopeActionRBACValidator(repository, MagicMock())
-
-        action = _make_action(user_id=caller_id, owner_id=owner_id)
-        with with_user(caller):
-            with pytest.raises(NotEnoughPermission):
-                await validator.validate(action, trigger_meta)
