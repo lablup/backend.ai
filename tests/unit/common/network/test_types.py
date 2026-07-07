@@ -54,17 +54,25 @@ class TestMember:
         assert member.vtep_ip == "192.168.0.10"
         assert member.ip_range == "10.128.1.0/26"
 
+    def test_etcd_payload_roundtrip_excludes_agent_id(self) -> None:
+        # single-sourced on-wire schema shared by agent self-publish and manager pre-seed
+        member = Member(agent_id="a1", host_ip="1.2.3.4", vtep_ip="1.2.3.4")
+        payload = member.to_etcd_payload()
+        assert payload == {"host_ip": "1.2.3.4", "vtep_ip": "1.2.3.4", "ip_range": None}
+        assert "agent_id" not in payload  # agent_id is the key, not the value
+        assert Member.from_etcd_payload("a1", payload) == member
+
 
 class TestEnums:
     def test_backend_kind_values(self) -> None:
-        assert NetworkBackendKind.VXLAN == "vxlan"
-        assert NetworkBackendKind.HOST_GW == "host-gw"
-        assert NetworkBackendKind.WIREGUARD == "wireguard"
+        assert NetworkBackendKind.VXLAN.value == "vxlan"
+        assert NetworkBackendKind.HOST_GW.value == "host-gw"
+        assert NetworkBackendKind.WIREGUARD.value == "wireguard"
 
     def test_attach_kind_values(self) -> None:
-        assert AttachKind.CNI == "cni"
-        assert AttachKind.DOCKER_NETWORK == "docker"
-        assert AttachKind.HOST_NETNS == "netns"
+        assert AttachKind.CNI.value == "cni"
+        assert AttachKind.DOCKER_NETWORK.value == "docker"
+        assert AttachKind.HOST_NETNS.value == "netns"
 
 
 class TestNetworkAttachSpec:

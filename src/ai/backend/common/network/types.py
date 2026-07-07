@@ -79,6 +79,38 @@ class Member:
     ip_range: str | None = None
     """Sub-range of the session subnet owned by this node; used by the host-gw backend."""
 
+    def to_etcd_payload(self) -> dict[str, str | None]:
+        """The member's etcd value (``agent_id`` is the key, not part of the value).
+
+        Single source of the on-wire member schema — used by both the agent (self-publish)
+        and the manager (pre-seed) so the two never drift."""
+        return {"host_ip": self.host_ip, "vtep_ip": self.vtep_ip, "ip_range": self.ip_range}
+
+    @classmethod
+    def from_etcd_payload(cls, agent_id: str, payload: Mapping[str, Any]) -> Member:
+        return cls(
+            agent_id=agent_id,
+            host_ip=payload["host_ip"],
+            vtep_ip=payload.get("vtep_ip"),
+            ip_range=payload.get("ip_range"),
+        )
+
+
+@dataclass(frozen=True)
+class EndpointAddr:
+    """A manager-assigned overlay address for one container endpoint.
+
+    Written by the manager under ``network/session/{session_id}/endpoints/{container_id}``
+    and consumed by overlay backends: the CNI attach uses ``ip`` (static IPAM) and the
+    coordinator proactively programs FDB + neighbor (ARP) entries from ``ip``/``mac``/
+    ``agent_id`` — no per-node host-local allocation, no BUM flood.
+    """
+
+    container_id: str
+    ip: str
+    mac: str
+    agent_id: str
+
 
 @dataclass(frozen=True)
 class NetworkAttachSpec:
