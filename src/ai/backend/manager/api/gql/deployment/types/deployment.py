@@ -762,6 +762,8 @@ class CreateDeploymentInput(PydanticInputMixin[CreateDeploymentInputDTO]):
     default_deployment_strategy: DeploymentStrategyInputGQL
     replica_count: int
     initial_revision: CreateRevisionInput | None = None
+    owner_id: UUID | None = None
+    """Delegated owner user UUID. Create the deployment on behalf of this user."""
 
 
 @gql_pydantic_input(
