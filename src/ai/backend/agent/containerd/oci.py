@@ -40,6 +40,66 @@ class ContainerSpec:
     oci_spec: dict[str, Any] = field(default_factory=dict)
 
 
+@dataclass(frozen=True)
+class DevicePassthrough:
+    """A host device node exposed into the container (AMD/NPU accelerators, etc.)."""
+
+    source: str
+    destination: str
+    permissions: str = "rwm"
+
+
+@dataclass(frozen=True)
+class AcceleratorSpec:
+    """Runtime-neutral accelerator wiring translated from a compute plugin's Docker args.
+
+    - ``devices``: explicit /dev node passthrough (AMD ROCm, Furiosa/Rebellions/Habana NPUs).
+    - ``gpu_device_ids``: NVIDIA device IDs handled by nvidia-container-toolkit (`--gpus`).
+    - ``env``: extra environment the plugin injects (e.g. NVIDIA_DRIVER_CAPABILITIES).
+    """
+
+    devices: list[DevicePassthrough] = field(default_factory=list)
+    gpu_device_ids: list[str] = field(default_factory=list)
+    env: dict[str, str] = field(default_factory=dict)
+
+
+def _normalize_env(raw: Any) -> dict[str, str]:
+    if isinstance(raw, Mapping):
+        return {str(k): str(v) for k, v in raw.items()}
+    env: dict[str, str] = {}
+    for item in raw or []:  # docker-style ["KEY=value", ...]
+        key, _, value = str(item).partition("=")
+        env[key] = value
+    return env
+
+
+def translate_accelerator_args(docker_args: Mapping[str, Any]) -> AcceleratorSpec:
+    """Translate a compute plugin's ``generate_docker_args`` output (a Docker HostConfig)
+    into runtime-neutral accelerator wiring for the containerd (nerdctl/OCI) path.
+
+    Reuses the per-vendor logic the plugins already encode — only the transport differs:
+    NVIDIA rides DeviceRequests/Runtime=nvidia -> nvidia-container-toolkit; every other
+    accelerator is plain /dev node passthrough (HostConfig.Devices)."""
+    host_config = docker_args.get("HostConfig") or {}
+    devices = [
+        DevicePassthrough(
+            source=d["PathOnHost"],
+            destination=d.get("PathInContainer") or d["PathOnHost"],
+            permissions=d.get("CgroupPermissions") or "rwm",
+        )
+        for d in host_config.get("Devices") or []
+    ]
+    gpu_ids: list[str] = []
+    for req in host_config.get("DeviceRequests") or []:
+        if req.get("Driver") == "nvidia":
+            gpu_ids.extend(str(i) for i in (req.get("DeviceIDs") or []))
+    env = _normalize_env(docker_args.get("Env") or host_config.get("Env") or {})
+    if not gpu_ids and host_config.get("Runtime") == "nvidia":
+        visible = env.get("NVIDIA_VISIBLE_DEVICES", "")
+        gpu_ids.extend(d for d in visible.split(",") if d and d != "void")
+    return AcceleratorSpec(devices=devices, gpu_device_ids=gpu_ids, env=env)
+
+
 def translate_creation_config(
     kernel_config: KernelCreationConfig,
     *,
@@ -72,8 +132,7 @@ def translate_creation_config(
             # /opt/backend.ai) are applied before nested mounts (/opt/backend.ai/lib/...);
             # otherwise runc cannot create the nested mountpoint on the read-only rootfs.
             "mounts": [
-                mount_to_oci(m)
-                for m in sorted(mounts, key=lambda m: len(str(m.target).split("/")))
+                mount_to_oci(m) for m in sorted(mounts, key=lambda m: len(str(m.target).split("/")))
             ],
         },
     )

@@ -21,7 +21,7 @@ from collections.abc import Mapping, Sequence
 from decimal import Decimal
 from importlib.resources import files
 from pathlib import Path
-from typing import Any, override
+from typing import Any, cast, override
 
 from ai.backend.agent.agent import (
     AbstractAgent,
@@ -71,7 +71,12 @@ from ai.backend.common.types import (
 from ai.backend.logging import BraceStyleAdapter
 
 from .kernel import ContainerdKernel
-from .oci import KRUNNER_ENTRYPOINT, translate_creation_config
+from .oci import (
+    KRUNNER_ENTRYPOINT,
+    AcceleratorSpec,
+    translate_accelerator_args,
+    translate_creation_config,
+)
 from .session_network import (
     ContainerdSessionNetwork,
     build_containerd_session_network,
@@ -107,6 +112,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
     _oci_mounts: list[Mount]
     _scratch_dir: Path | None
     _pending_spec: Any
+    _accel_spec: AcceleratorSpec
 
     def __init__(
         self,
@@ -138,6 +144,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         self._oci_mounts = []
         self._pending_spec = None
         self._scratch_dir = None
+        self._accel_spec = AcceleratorSpec()
 
     @override
     async def get_extra_envs(self) -> Mapping[str, str]:
@@ -279,9 +286,18 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         computer: AbstractComputePlugin,
         device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
     ) -> None:
-        # No-op for CPU/mem. GPU/accelerator device injection into the OCI spec (the
-        # containerd analogue of generate_docker_args) is a follow-up.
-        return
+        # Reuse the compute plugin's per-vendor Docker args (the plugins already encode the
+        # right mechanism: NVIDIA via nvidia-container-toolkit, AMD/NPUs via /dev node
+        # passthrough) and translate them to runtime-neutral device/gpu/env for the nerdctl
+        # path. The `docker` arg is unused by the plugins here (cached version / list_devices),
+        # so None is safe. Accumulated across accelerators and merged at prepare_container.
+        docker_args = await computer.generate_docker_args(cast(Any, None), device_alloc)
+        spec = translate_accelerator_args(docker_args)
+        self._accel_spec = AcceleratorSpec(
+            devices=[*self._accel_spec.devices, *spec.devices],
+            gpu_device_ids=[*self._accel_spec.gpu_device_ids, *spec.gpu_device_ids],
+            env={**self._accel_spec.env, **spec.env},
+        )
 
     @override
     async def generate_accelerator_mounts(
@@ -323,6 +339,17 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         self._pending_spec = translate_creation_config(
             self.kernel_config, environ=environ, mounts=all_mounts
         )
+        # Layer in accelerator wiring collected by apply_accelerator_allocation: extra env,
+        # /dev node passthrough (AMD/NPU), and NVIDIA GPU IDs (nvidia-container-toolkit).
+        oci_spec = self._pending_spec.oci_spec
+        oci_spec["env"].update(self._accel_spec.env)
+        if self._accel_spec.devices:
+            oci_spec["devices"] = [
+                {"source": d.source, "destination": d.destination, "permissions": d.permissions}
+                for d in self._accel_spec.devices
+            ]
+        if self._accel_spec.gpu_device_ids:
+            oci_spec["gpus"] = list(self._accel_spec.gpu_device_ids)
         return ContainerdKernel(
             self.ownership_data,
             self.kernel_config["network_id"],

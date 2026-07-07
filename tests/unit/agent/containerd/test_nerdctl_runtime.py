@@ -33,6 +33,23 @@ class TestArgvConstruction:
         assert "--network" in argv and argv[argv.index("--network") + 1] == "none"
         assert argv[-2:] == ["sleep", "600"]
 
+    async def test_create_emits_device_and_gpu_flags(self) -> None:
+        runner = FakeRunner([(0, "", "")])
+        await _client(runner).create_container(
+            "c1",
+            image_ref="img",
+            command=["run"],
+            oci_spec={
+                "devices": [
+                    {"source": "/dev/kfd", "destination": "/dev/kfd", "permissions": "rwm"}
+                ],
+                "gpus": ["0", "1"],
+            },
+        )
+        argv = runner.calls[0]
+        assert argv[argv.index("--device") + 1] == "/dev/kfd:/dev/kfd:rwm"  # AMD/NPU passthrough
+        assert argv[argv.index("--gpus") + 1] == "device=0,1"  # NVIDIA via toolkit
+
     async def test_image_exists_maps_returncode(self) -> None:
         assert await _client(FakeRunner([(0, "", "")])).image_exists("x") is True
         assert await _client(FakeRunner([(1, "", "not found")])).image_exists("x") is False

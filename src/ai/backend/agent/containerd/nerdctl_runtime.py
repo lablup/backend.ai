@@ -92,8 +92,12 @@ class NerdctlRuntimeClient(ContainerdRuntimeClient):
 
     async def image_entrypoint(self, image_ref: str) -> list[str] | None:
         rc, out, _ = await self._runner([
-            *self._base(), "image", "inspect", "--format",
-            "{{json .Config.Entrypoint}}\t{{json .Config.Cmd}}", image_ref,
+            *self._base(),
+            "image",
+            "inspect",
+            "--format",
+            "{{json .Config.Entrypoint}}\t{{json .Config.Cmd}}",
+            image_ref,
         ])
         if rc != 0:
             return None
@@ -129,9 +133,21 @@ class NerdctlRuntimeClient(ContainerdRuntimeClient):
             opts += ["-e", f"{key}={value}"]
         for key, value in (oci_spec.get("labels") or {}).items():
             opts += ["-l", f"{key}={value}"]
+        # Accelerator wiring (BEP-1055): /dev node passthrough (AMD/NPU) and NVIDIA GPUs
+        # (nerdctl --gpus drives nvidia-container-toolkit, same as docker --gpus).
+        for dev in oci_spec.get("devices") or []:
+            opts += ["--device", f"{dev['source']}:{dev['destination']}:{dev['permissions']}"]
+        if gpus := oci_spec.get("gpus"):
+            opts += ["--gpus", f"device={','.join(gpus)}"]
         args = [
-            "create", "--name", container_id, "--network", network,
-            *opts, image_ref, *command,
+            "create",
+            "--name",
+            container_id,
+            "--network",
+            network,
+            *opts,
+            image_ref,
+            *command,
         ]
         log.debug("nerdctl create argv: {}", " ".join(self._base() + args))
         await self._run(args)
@@ -156,7 +172,11 @@ class NerdctlRuntimeClient(ContainerdRuntimeClient):
 
     async def container_pid(self, container_id: str) -> int | None:
         rc, out, _ = await self._runner([
-            *self._base(), "inspect", "--format", "{{.State.Pid}}", container_id
+            *self._base(),
+            "inspect",
+            "--format",
+            "{{.State.Pid}}",
+            container_id,
         ])
         if rc != 0:
             return None
@@ -175,7 +195,11 @@ class NerdctlRuntimeClient(ContainerdRuntimeClient):
 
     async def container_status(self, container_id: str) -> str | None:
         rc, out, _ = await self._runner([
-            *self._base(), "inspect", "--format", "{{.State.Status}}", container_id
+            *self._base(),
+            "inspect",
+            "--format",
+            "{{.State.Status}}",
+            container_id,
         ])
         if rc != 0:
             return None
@@ -183,8 +207,11 @@ class NerdctlRuntimeClient(ContainerdRuntimeClient):
 
     async def container_ip(self, container_id: str) -> str | None:
         rc, out, _ = await self._runner([
-            *self._base(), "inspect", "--format",
-            "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}", container_id,
+            *self._base(),
+            "inspect",
+            "--format",
+            "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}",
+            container_id,
         ])
         if rc != 0:
             return None

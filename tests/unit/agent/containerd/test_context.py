@@ -9,6 +9,7 @@ from types import SimpleNamespace
 from typing import Any, cast
 
 from ai.backend.agent.containerd.agent import ContainerdKernelCreationContext
+from ai.backend.agent.containerd.oci import AcceleratorSpec
 from ai.backend.agent.containerd.orchestrator import LaunchResult
 from ai.backend.agent.containerd.runtime import TaskHandle
 from ai.backend.agent.resources import Mount
@@ -94,11 +95,22 @@ def _context(facade: FakeFacade) -> ContainerdKernelCreationContext:
     ctx._net_meta = None
     ctx._oci_mounts = []
     ctx._scratch_dir = None
+    ctx._accel_spec = AcceleratorSpec()
     ctx._pending_spec = SimpleNamespace(
         image_ref="img:1", oci_spec={}, command=["/opt/kernel/entrypoint.sh"]
     )
     ctx.kernel_config = cast(Any, {})
     return ctx
+
+
+class _FakeComputer:
+    """Compute plugin stub whose generate_docker_args returns a fixed Docker HostConfig."""
+
+    def __init__(self, docker_args: dict[str, Any]) -> None:
+        self._docker_args = docker_args
+
+    async def generate_docker_args(self, docker: Any, device_alloc: Any) -> dict[str, Any]:
+        return self._docker_args
 
 
 class TestApplyNetwork:
@@ -174,3 +186,17 @@ class TestStartContainer:
         assert result["kernel_host"] == "172.30.1.2"
         assert result["task_pid"] == 555
         assert result["container_id"] == "kern-123"
+
+
+class TestAcceleratorAllocation:
+    async def test_nvidia_and_device_accumulate(self) -> None:
+        ctx = _context(FakeFacade())
+        nvidia = _FakeComputer({
+            "HostConfig": {"DeviceRequests": [{"Driver": "nvidia", "DeviceIDs": ["0"]}]}
+        })
+        npu = _FakeComputer({"HostConfig": {"Devices": [{"PathOnHost": "/dev/rbln0"}]}})
+        await ctx.apply_accelerator_allocation(cast(Any, nvidia), cast(Any, {}))
+        await ctx.apply_accelerator_allocation(cast(Any, npu), cast(Any, {}))
+        # accumulated across accelerators
+        assert ctx._accel_spec.gpu_device_ids == ["0"]
+        assert [d.source for d in ctx._accel_spec.devices] == ["/dev/rbln0"]
