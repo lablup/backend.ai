@@ -4,6 +4,7 @@ from uuid import uuid4
 
 import pytest
 
+from ai.backend.common.clients.agent.client import AgentClient
 from ai.backend.common.types import (
     AgentId,
     ClusterInfo,
@@ -12,7 +13,6 @@ from ai.backend.common.types import (
     KernelId,
     SessionId,
 )
-from ai.backend.manager.clients.agent.client import AgentClient
 
 
 def _v2_hwinfo_response() -> dict[str, list[dict[str, object]]]:

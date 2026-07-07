@@ -30,7 +30,7 @@ from ai.backend.logging import BraceStyleAdapter
 from .abc import BackendAIClient
 
 if TYPE_CHECKING:
-    from ai.backend.manager.agent_cache import PeerInvoker
+    from .peer import PeerInvoker
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
