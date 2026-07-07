@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import uuid
 
+import pytest
+
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.types import SessionTypes
 from ai.backend.manager.services.session.actions.enqueue_session import (
@@ -39,23 +41,18 @@ def _make_action(
 
 
 class TestEnqueueSessionActionDelegationScope:
-    def test_without_owner_targets_caller(self) -> None:
-        caller_id = uuid.uuid4()
-        action = _make_action(user_id=caller_id, owner_id=None)
-
-        assert action.scope_id() == str(caller_id)
-        target = action.target_element()
-        assert target.element_type == RBACElementType.USER
-        assert target.element_id == str(caller_id)
-
-    def test_with_owner_targets_owner_not_caller(self) -> None:
+    @pytest.mark.parametrize("delegated", [False, True], ids=["caller", "owner"])
+    def test_rbac_scope_targets_owner_when_delegating(self, delegated: bool) -> None:
         caller_id = uuid.uuid4()
         owner_id = uuid.uuid4()
-        action = _make_action(user_id=caller_id, owner_id=owner_id)
-
+        action = _make_action(
+            user_id=caller_id,
+            owner_id=owner_id if delegated else None,
+        )
         # Delegation must authorize against the owner, never the caller.
-        assert action.scope_id() == str(owner_id)
+        expected_id = owner_id if delegated else caller_id
+
+        assert action.scope_id() == str(expected_id)
         target = action.target_element()
         assert target.element_type == RBACElementType.USER
-        assert target.element_id == str(owner_id)
-        assert target.element_id != str(caller_id)
+        assert target.element_id == str(expected_id)
