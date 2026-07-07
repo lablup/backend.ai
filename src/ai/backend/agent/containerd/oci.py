@@ -75,7 +75,7 @@ def _normalize_env(raw: Any) -> dict[str, str]:
 
 def translate_accelerator_args(docker_args: Mapping[str, Any]) -> AcceleratorSpec:
     """Translate a compute plugin's ``generate_docker_args`` output (a Docker HostConfig)
-    into runtime-neutral accelerator wiring for the containerd (nerdctl/OCI) path.
+    into runtime-neutral accelerator wiring for the containerd (OCI) path.
 
     Reuses the per-vendor logic the plugins already encode — only the transport differs:
     NVIDIA rides DeviceRequests/Runtime=nvidia -> nvidia-container-toolkit; every other

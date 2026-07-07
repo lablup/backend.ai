@@ -1,8 +1,8 @@
 """Containerd agent backend (BEP-1058).
 
-Selectable via ``agent.backend = "containerd"``. Reuses the Docker backend's resource
-and krunner-env logic (containerd runs the same Linux containers with the same
-cgroup-based compute plugins); only the agent class differs.
+Selectable via ``agent.backend = "containerd"``. Reuses the Docker backend's resource and
+compute-plugin logic (containerd runs the same Linux containers with the same cgroup-based
+compute plugins), but provisions krunner natively (extract-to-host-dir, no Docker/nerdctl).
 """
 
 from collections.abc import Mapping
@@ -10,7 +10,7 @@ from decimal import Decimal
 from typing import Any, override
 
 from ai.backend.agent.agent import AbstractAgent
-from ai.backend.agent.docker.kernel import prepare_krunner_env
+from ai.backend.agent.containerd.krunner import prepare_krunner_env
 from ai.backend.agent.docker.resources import load_resources, scan_available_resources
 from ai.backend.agent.resources import AbstractComputePlugin
 from ai.backend.agent.types import AbstractAgentDiscovery

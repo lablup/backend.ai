@@ -1,7 +1,6 @@
 """Build a containerd/runc OCI *runtime* spec from our runtime-neutral oci_spec (BEP-1058).
 
-The nerdctl runtime lets nerdctl assemble the OCI runtime spec from ``-v/-e/--device``
-flags. The gRPC runtime has no such helper: ``Containers.Create`` takes the full OCI
+There is no CLI to assemble the OCI runtime spec for us: ``Containers.Create`` takes the full OCI
 runtime spec (the runc ``config.json`` structure) directly, so we build it here.
 
 Pure and testable: input is the runtime-neutral ``oci_spec`` (mounts/env/labels/devices/

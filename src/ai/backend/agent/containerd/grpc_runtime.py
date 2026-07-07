@@ -20,7 +20,6 @@ import hashlib
 import json
 import logging
 from collections.abc import Mapping, Sequence
-from pathlib import Path
 from typing import Any, override
 
 import grpc
@@ -157,14 +156,6 @@ class ContainerdGrpcRuntimeClient(ContainerdRuntimeClient):
 
     # --- image content helpers (read the manifest chain to resolve the rootfs) ---
 
-    def _resolve_volume_source(self, source: str) -> str:
-        """Map a nerdctl named-volume source to its on-disk data dir (absolute paths pass
-        through)."""
-        if source.startswith("/"):
-            return source
-        hits = list(Path("/var/lib/nerdctl").glob(f"*/volumes/{self._namespace}/{source}/_data"))
-        return str(hits[0]) if hits else source
-
     async def _read_content(self, digest: str) -> bytes:
         buf = bytearray()
         async for resp in self._content_stub().Read(
@@ -215,16 +206,11 @@ class ContainerdGrpcRuntimeClient(ContainerdRuntimeClient):
         network: str = "none",
     ) -> None:
         chain_id, image_config = await self._resolve_image(image_ref)
-        # A mount source that is not an absolute path is a nerdctl *named volume* (e.g. the
-        # krunner volume); nerdctl resolves it, but runc needs the real path. Resolve it to
-        # the volume's data dir so the OCI runtime spec carries a valid bind source.
-        oci_spec = {
-            **oci_spec,
-            "mounts": [
-                {**m, "source": self._resolve_volume_source(str(m["source"]))}
-                for m in oci_spec.get("mounts", [])
-            ],
-        }
+        # Every mount source must be an absolute host path — runc binds it directly. (There
+        # are no named volumes: krunner is extracted to a host dir, cf. containerd/krunner.py.)
+        for mount in oci_spec.get("mounts", []):
+            if not str(mount["source"]).startswith("/"):
+                raise ValueError(f"mount source must be an absolute path, got {mount['source']!r}")
         # Active snapshot for the writable rootfs, layered on the image's chain.
         prepared = await self._snapshots_stub().Prepare(
             snapshots_pb2.PrepareSnapshotRequest(

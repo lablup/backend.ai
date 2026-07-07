@@ -292,7 +292,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
     ) -> None:
         # Reuse the compute plugin's per-vendor Docker args (the plugins already encode the
         # right mechanism: NVIDIA via nvidia-container-toolkit, AMD/NPUs via /dev node
-        # passthrough) and translate them to runtime-neutral device/gpu/env for the nerdctl
+        # passthrough) and translate them to runtime-neutral device/gpu/env for the containerd
         # path. The `docker` arg is unused by the plugins here (cached version / list_devices),
         # so None is safe. Accumulated across accelerators and merged at prepare_container.
         docker_args = await computer.generate_docker_args(cast(Any, None), device_alloc)
@@ -340,7 +340,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         # into the OCI spec. Container creation is deferred to start_container, where the
         # kernel-runner cmdargs (which the container command must exec) are available.
         # resource_spec.mounts (krunner + accelerator) and _oci_mounts (vfolder) can carry
-        # the same intrinsic bind more than once; dedupe by identity so nerdctl's mounts
+        # the same intrinsic bind more than once; dedupe by identity so the OCI runtime spec's mounts
         # label stays within its 4 KiB size limit (duplicates only inflate it).
         seen_mounts: set[tuple[Any, ...]] = set()
         all_mounts = []
@@ -540,7 +540,7 @@ class ContainerdAgent(
         *,
         timeout_seconds: float | None,
     ) -> None:
-        # TODO: honor registry_conf auth + timeout_seconds; nerdctl uses its own config.
+        # TODO: honor registry_conf auth + timeout_seconds via the Transfer RegistryResolver.
         await self._session_network.pull_image(image_ref.canonical)
 
     @override
@@ -553,7 +553,7 @@ class ContainerdAgent(
     ) -> None:
         if image_ref.is_local:
             return
-        # TODO: honor registry_conf auth (nerdctl --creds) + timeout_seconds.
+        # TODO: honor registry_conf auth + timeout_seconds via the Transfer RegistryResolver.
         await self._session_network.push_image(image_ref.canonical)
 
     @override
