@@ -51,16 +51,23 @@ class DevicePassthrough:
 
 @dataclass(frozen=True)
 class AcceleratorSpec:
-    """Runtime-neutral accelerator wiring translated from a compute plugin's Docker args.
+    """Runtime-neutral compute wiring translated from a compute plugin's Docker args.
 
+    Accumulated across ALL compute plugins (cpu, mem, accelerators):
     - ``devices``: explicit /dev node passthrough (AMD ROCm, Furiosa/Rebellions/Habana NPUs).
     - ``gpu_device_ids``: NVIDIA device IDs handled by nvidia-container-toolkit (`--gpus`).
     - ``env``: extra environment the plugin injects (e.g. NVIDIA_DRIVER_CAPABILITIES).
+    - ``cpuset_cpus`` / ``cpuset_mems``: cgroup CPU/NUMA pinning (from the CPU plugin).
+    - ``memory_limit`` / ``memory_swap``: cgroup memory limits in bytes (from the mem plugin).
     """
 
     devices: list[DevicePassthrough] = field(default_factory=list)
     gpu_device_ids: list[str] = field(default_factory=list)
     env: dict[str, str] = field(default_factory=dict)
+    cpuset_cpus: str | None = None
+    cpuset_mems: str | None = None
+    memory_limit: int | None = None
+    memory_swap: int | None = None
 
 
 def _normalize_env(raw: Any) -> dict[str, str]:
@@ -97,7 +104,17 @@ def translate_accelerator_args(docker_args: Mapping[str, Any]) -> AcceleratorSpe
     if not gpu_ids and host_config.get("Runtime") == "nvidia":
         visible = env.get("NVIDIA_VISIBLE_DEVICES", "")
         gpu_ids.extend(d for d in visible.split(",") if d and d != "void")
-    return AcceleratorSpec(devices=devices, gpu_device_ids=gpu_ids, env=env)
+    memory = host_config.get("Memory")
+    memory_swap = host_config.get("MemorySwap")
+    return AcceleratorSpec(
+        devices=devices,
+        gpu_device_ids=gpu_ids,
+        env=env,
+        cpuset_cpus=host_config.get("CpusetCpus") or None,
+        cpuset_mems=host_config.get("CpusetMems") or None,
+        memory_limit=int(memory) if memory else None,
+        memory_swap=int(memory_swap) if memory_swap else None,
+    )
 
 
 def translate_creation_config(

@@ -18,6 +18,11 @@ from typing import Any
 OCI_VERSION = "1.1.0"
 _TYPE_URL = "types.containerd.io/opencontainers/runtime-spec/1/Spec"
 
+# nvidia-container-toolkit's OCI hook: injects the requested GPU device nodes + driver
+# libraries at container start, driven by the NVIDIA_VISIBLE_DEVICES env it reads from the
+# spec. This is what nerdctl/docker's `--gpus` ultimately wires up.
+_NVIDIA_HOOK_PATH = "/usr/bin/nvidia-container-runtime-hook"
+
 # Minimal default capability set (runc's default bounded set for non-privileged).
 _DEFAULT_CAPS = [
     "CAP_CHOWN",
@@ -83,6 +88,46 @@ def _linux_devices(
     return devices, rules
 
 
+def _nvidia_hooks(oci_spec: Mapping[str, Any], env: list[str]) -> dict[str, Any] | None:
+    """If NVIDIA GPUs are requested, register the nvidia-container-toolkit prestart hook and
+    ensure the env it consumes is present. Returns the OCI ``hooks`` dict (or None)."""
+    gpus = oci_spec.get("gpus")
+    if not gpus:
+        return None
+    if not any(e.startswith("NVIDIA_VISIBLE_DEVICES=") for e in env):
+        env.append("NVIDIA_VISIBLE_DEVICES=" + ",".join(str(g) for g in gpus))
+    if not any(e.startswith("NVIDIA_DRIVER_CAPABILITIES=") for e in env):
+        env.append("NVIDIA_DRIVER_CAPABILITIES=all")
+    return {
+        "prestart": [
+            {"path": _NVIDIA_HOOK_PATH, "args": ["nvidia-container-runtime-hook", "prestart"]}
+        ]
+    }
+
+
+def _linux_resources(
+    oci_spec: Mapping[str, Any], device_rules: list[dict[str, Any]]
+) -> dict[str, Any]:
+    """Assemble linux.resources: the device cgroup rules plus CPU pinning and memory
+    limits (the cgroup enforcement the CPU/memory compute plugins allocate)."""
+    resources: dict[str, Any] = {"devices": device_rules}
+    cpu: dict[str, Any] = {}
+    if oci_spec.get("cpuset_cpus"):
+        cpu["cpus"] = oci_spec["cpuset_cpus"]
+    if oci_spec.get("cpuset_mems"):
+        cpu["mems"] = oci_spec["cpuset_mems"]
+    if cpu:
+        resources["cpu"] = cpu
+    memory: dict[str, Any] = {}
+    if oci_spec.get("memory_limit") is not None:
+        memory["limit"] = int(oci_spec["memory_limit"])
+    if oci_spec.get("memory_swap") is not None:
+        memory["swap"] = int(oci_spec["memory_swap"])
+    if memory:
+        resources["memory"] = memory
+    return resources
+
+
 def build_oci_runtime_spec(
     oci_spec: Mapping[str, Any],
     *,
@@ -99,6 +144,8 @@ def build_oci_runtime_spec(
     """
     env = [f"{k}={v}" for k, v in (oci_spec.get("env") or {}).items()]
     devices, device_rules = _linux_devices(oci_spec)
+    resources = _linux_resources(oci_spec, device_rules)
+    hooks = _nvidia_hooks(oci_spec, env)  # mutates env with the NVIDIA_* vars the hook needs
     namespaces: list[dict[str, Any]] = [
         {"type": "pid"},
         {"type": "ipc"},
@@ -110,7 +157,7 @@ def build_oci_runtime_spec(
         net_ns["path"] = network_ns_path
     namespaces.append(net_ns)
 
-    return {
+    spec: dict[str, Any] = {
         "ociVersion": OCI_VERSION,
         "process": {
             "terminal": False,
@@ -131,7 +178,10 @@ def build_oci_runtime_spec(
         "linux": {
             "namespaces": namespaces,
             "devices": devices,
-            "resources": {"devices": device_rules},
+            "resources": resources,
             "cgroupsPath": f"/backend-ai/{oci_spec.get('labels', {}).get('ai.backend.kernel-id', '')}",
         },
     }
+    if hooks is not None:
+        spec["hooks"] = hooks
+    return spec

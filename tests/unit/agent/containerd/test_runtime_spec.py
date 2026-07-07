@@ -60,3 +60,45 @@ class TestBuildOciRuntimeSpec:
     def test_cgroups_path_uses_kernel_id(self) -> None:
         spec = build_oci_runtime_spec(_oci(), command=["x"], rootfs_path="/r")
         assert spec["linux"]["cgroupsPath"] == "/backend-ai/kern-1"
+
+    def test_cpu_and_memory_limits_emitted(self) -> None:
+        spec = build_oci_runtime_spec(
+            _oci(
+                cpuset_cpus="0,2,4",
+                cpuset_mems="0",
+                memory_limit=2147483648,
+                memory_swap=2147483648,
+            ),
+            command=["x"],
+            rootfs_path="/r",
+        )
+        res = spec["linux"]["resources"]
+        assert res["cpu"] == {"cpus": "0,2,4", "mems": "0"}
+        assert res["memory"] == {"limit": 2147483648, "swap": 2147483648}
+
+    def test_no_resource_keys_when_unlimited(self) -> None:
+        res = build_oci_runtime_spec(_oci(), command=["x"], rootfs_path="/r")["linux"]["resources"]
+        assert "cpu" not in res  # no cpuset -> omit (unbounded), don't emit empty dicts
+        assert "memory" not in res
+
+
+class TestNvidiaGpu:
+    def test_hook_and_env_emitted_when_gpus_present(self) -> None:
+        spec = build_oci_runtime_spec(_oci(gpus=["0", "3"]), command=["x"], rootfs_path="/r")
+        hook = spec["hooks"]["prestart"][0]
+        assert hook["path"].endswith("nvidia-container-runtime-hook")
+        assert "NVIDIA_VISIBLE_DEVICES=0,3" in spec["process"]["env"]
+        assert any(e.startswith("NVIDIA_DRIVER_CAPABILITIES=") for e in spec["process"]["env"])
+
+    def test_no_hooks_without_gpus(self) -> None:
+        spec = build_oci_runtime_spec(_oci(), command=["x"], rootfs_path="/r")
+        assert "hooks" not in spec
+
+    def test_respects_preexisting_visible_devices(self) -> None:
+        spec = build_oci_runtime_spec(
+            _oci(gpus=["0"], env={"NVIDIA_VISIBLE_DEVICES": "GPU-uuid"}),
+            command=["x"],
+            rootfs_path="/r",
+        )
+        vis = [e for e in spec["process"]["env"] if e.startswith("NVIDIA_VISIBLE_DEVICES=")]
+        assert vis == ["NVIDIA_VISIBLE_DEVICES=GPU-uuid"]  # not overwritten

@@ -139,3 +139,17 @@ class TestTranslateAcceleratorArgs:
     def test_empty_args_yield_empty_spec(self) -> None:
         spec = translate_accelerator_args({})
         assert spec.devices == [] and spec.gpu_device_ids == [] and spec.env == {}
+        assert spec.cpuset_cpus is None and spec.memory_limit is None
+
+    def test_cpu_pinning_extracted(self) -> None:
+        # CPUPlugin -> HostConfig{Cpus, CpusetCpus}
+        spec = translate_accelerator_args({"HostConfig": {"Cpus": 3, "CpusetCpus": "0,2,4"}})
+        assert spec.cpuset_cpus == "0,2,4"
+
+    def test_memory_limits_extracted(self) -> None:
+        # MemoryPlugin -> HostConfig{Memory, MemorySwap}
+        spec = translate_accelerator_args({
+            "HostConfig": {"Memory": 2147483648, "MemorySwap": 2147483648}
+        })
+        assert spec.memory_limit == 2147483648
+        assert spec.memory_swap == 2147483648

@@ -299,10 +299,16 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         # so None is safe. Accumulated across accelerators and merged at prepare_container.
         docker_args = await computer.generate_docker_args(cast(Any, None), device_alloc)
         spec = translate_accelerator_args(docker_args)
+        prev = self._accel_spec
         self._accel_spec = AcceleratorSpec(
-            devices=[*self._accel_spec.devices, *spec.devices],
-            gpu_device_ids=[*self._accel_spec.gpu_device_ids, *spec.gpu_device_ids],
-            env={**self._accel_spec.env, **spec.env},
+            devices=[*prev.devices, *spec.devices],
+            gpu_device_ids=[*prev.gpu_device_ids, *spec.gpu_device_ids],
+            env={**prev.env, **spec.env},
+            # Each of cpu/mem limits comes from exactly one plugin; keep the first non-None.
+            cpuset_cpus=prev.cpuset_cpus or spec.cpuset_cpus,
+            cpuset_mems=prev.cpuset_mems or spec.cpuset_mems,
+            memory_limit=prev.memory_limit or spec.memory_limit,
+            memory_swap=prev.memory_swap or spec.memory_swap,
         )
 
     @override
@@ -366,6 +372,11 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
             ]
         if self._accel_spec.gpu_device_ids:
             oci_spec["gpus"] = list(self._accel_spec.gpu_device_ids)
+        # cgroup resource limits (cpu pinning + memory), from the cpu/mem compute plugins.
+        oci_spec["cpuset_cpus"] = self._accel_spec.cpuset_cpus
+        oci_spec["cpuset_mems"] = self._accel_spec.cpuset_mems
+        oci_spec["memory_limit"] = self._accel_spec.memory_limit
+        oci_spec["memory_swap"] = self._accel_spec.memory_swap
         return ContainerdKernel(
             self.ownership_data,
             self.kernel_config["network_id"],
