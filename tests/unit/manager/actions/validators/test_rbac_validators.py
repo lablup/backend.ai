@@ -15,7 +15,7 @@ import uuid
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import NamedTuple, override
+from typing import override
 from unittest.mock import MagicMock
 
 import pytest
@@ -676,7 +676,8 @@ def _make_enqueue_action(
     )
 
 
-class _SessionCreateGrant(NamedTuple):
+@dataclass(frozen=True)
+class _SessionCreateGrant:
     """A one-way SESSION:CREATE grant between two non-admin users.
 
     ``authorized_caller`` holds SESSION:CREATE over ``owner``'s USER scope;
