@@ -1767,6 +1767,15 @@ class VFolderService:
         user_uuid = action.user_id
         domain_name = action.domain_name
         project_id = action.project_id
+        if action.owner_id is not None:
+            # Delegation: record the vfolder as created by the target user.
+            # Authorization stays PROJECT-scoped (validated above), so this only
+            # swaps the creating user's identity.
+            owner = await self._user_repository.get_user_by_uuid(action.owner_id)
+            if owner.domain_name is None:
+                raise DomainNotFound()
+            user_uuid = owner.id
+            domain_name = owner.domain_name
 
         user_with_hosts = await self._vfolder_repository.get_user_with_keypair_policy_vfolder_hosts(
             user_uuid

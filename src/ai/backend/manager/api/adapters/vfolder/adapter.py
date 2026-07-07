@@ -388,6 +388,7 @@ class VFolderAdapter(BaseAdapter):
             usage_mode=VFolderUsageMode(input.usage_mode.value),
             permission=VFolderPermission(input.permission.value),
             cloneable=input.cloneable,
+            owner_id=input.owner_id,
         )
         result = await self._processors.vfolder.create_vfolder_in_project.wait_for_complete(action)
         return CreateVFolderPayload(vfolder=self._vfolder_data_to_node(result.vfolder))

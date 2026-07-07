@@ -174,12 +174,19 @@ def get(vfolder_id: UUID) -> None:
 )
 @click.option("--host", default=None, type=str, help="Storage host.")
 @click.option("--cloneable", is_flag=True, default=False, help="Allow cloning.")
+@click.option(
+    "--owner-id",
+    default=None,
+    type=click.UUID,
+    help="Delegated owner user UUID. Create the vfolder on behalf of this user.",
+)
 def project_create(
     project_id: UUID,
     name: str,
     usage_mode: str,
     host: str | None,
     cloneable: bool,
+    owner_id: UUID | None,
 ) -> None:
     """Create a vfolder owned by a project."""
 
@@ -191,6 +198,7 @@ def project_create(
         usage_mode=VFolderUsageMode(usage_mode),
         host=host,
         cloneable=cloneable,
+        owner_id=owner_id,
     )
 
     async def _run() -> None:

@@ -38,6 +38,10 @@ class CreateVFolderInProjectAction(VFolderScopeAction):
     usage_mode: VFolderUsageMode
     permission: VFolderPermission
     cloneable: bool
+    owner_id: uuid.UUID | None = None
+    """Delegated owner user UUID. When set, the service records the vfolder as
+    created by that user instead of the caller. Authorization stays
+    PROJECT-scoped (the caller needs CREATE on the project)."""
 
     @override
     def entity_id(self) -> str | None:

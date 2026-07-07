@@ -107,6 +107,14 @@ class CreateVFolderInScopeInput(BaseRequestModel):
         description="Default permission of the vfolder",
     )
     cloneable: bool = Field(default=False, description="Whether the vfolder is cloneable")
+    owner_id: UUID | None = Field(
+        default=None,
+        description=(
+            "Delegated owner user UUID. When set, the vfolder is created on behalf of "
+            "the specified user instead of the caller. Authorization stays scoped to "
+            "the project."
+        ),
+    )
 
     @field_validator("name", mode="before")
     @classmethod
