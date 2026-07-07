@@ -293,7 +293,7 @@ class TestVFolderAdapterGetFolderUsage:
 
         assert dto is not None
         assert dto.num_files == 2
-        assert dto.used_bytes.value == 524308
+        assert dto.used_bytes.expr == "524308"
 
     async def test_unmanaged_vfolder_returns_none(
         self,
