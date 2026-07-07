@@ -30,3 +30,18 @@ class InstanceNotFoundError(BackendAIError, web.HTTPNotFound):
             operation=ErrorOperation.ACCESS,
             error_detail=ErrorDetail.NOT_FOUND,
         )
+
+
+class InstanceAlreadyExistsError(BackendAIError, web.HTTPConflict):
+    """Raised when creating an instance whose id is already tracked by the backend."""
+
+    error_type = "https://api.backend.ai/probs/agent/instance-already-exists"
+    error_title = "Instance already exists."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.INSTANCE,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.ALREADY_EXISTS,
+        )
