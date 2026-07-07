@@ -32,6 +32,15 @@ class BaseScopeAction(BaseAction):
         """
         raise NotImplementedError
 
+    def delegated_owner_id(self) -> str | None:
+        """Return the user id this action acts on behalf of, if delegation is requested.
+
+        Returns None for non-delegated actions. Actions that support owner
+        delegation (e.g. session enqueue via ``owner_id``) override this so RBAC
+        validators can fail closed when enforcement is disabled.
+        """
+        return None
+
 
 class BaseScopeActionResult(BaseActionResult):
     @override

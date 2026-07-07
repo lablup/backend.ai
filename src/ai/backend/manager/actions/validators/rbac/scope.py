@@ -27,12 +27,29 @@ class ScopeActionRBACValidator(ScopeActionValidator):
 
     @override
     async def validate(self, action: BaseScopeAction, meta: BaseActionTriggerMeta) -> None:
-        if not self._config_provider.config.manager.rbac.enforcement_enabled:
-            return
-
         user = current_user()
         if user is None:
             raise UnreachableError("User context is not available")
+
+        enforcement_enabled = self._config_provider.config.manager.rbac.enforcement_enabled
+
+        # Delegation has no legacy-path equivalent, so it must be authorized by
+        # RBAC. When enforcement is disabled there is no scope-chain check to
+        # gate it — fail closed for non-superadmin delegation instead of
+        # silently acting on behalf of the owner.
+        if (
+            not enforcement_enabled
+            and action.delegated_owner_id() is not None
+            and not user.is_superadmin
+        ):
+            raise NotEnoughPermission(
+                "Delegating to another user via owner_id requires RBAC "
+                "enforcement to be enabled."
+            )
+
+        if not enforcement_enabled:
+            return
+
         if user.is_superadmin:
             return
 

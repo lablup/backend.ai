@@ -114,14 +114,22 @@ class EnqueueSessionAction(SessionScopeAction):
 
     @override
     def scope_id(self) -> str:
-        return str(self.user_id)
+        return str(self.owner_id) if self.owner_id is not None else str(self.user_id)
 
     @override
     def target_element(self) -> RBACElementRef:
+        # When delegating (owner_id set), authorize the caller against the
+        # *owner's* USER scope, not the caller's own — otherwise the check
+        # trivially passes and delegation is unguarded.
+        target_user_id = self.owner_id if self.owner_id is not None else self.user_id
         return RBACElementRef(
             element_type=RBACElementType.USER,
-            element_id=str(self.user_id),
+            element_id=str(target_user_id),
         )
+
+    @override
+    def delegated_owner_id(self) -> str | None:
+        return str(self.owner_id) if self.owner_id is not None else None
 
 
 @dataclass
