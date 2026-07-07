@@ -27846,6 +27846,12 @@
             "description": "If true, also delete model card record(s) referencing the vfolder. If false, the request is rejected when any model card still references it.",
             "title": "Cascade Model Card",
             "type": "boolean"
+          },
+          "force": {
+            "default": false,
+            "description": "If true, bypass the in-use guards and purge the vfolder even when it is mounted by a live session, referenced by an active model-service endpoint, or not in a purgable status. Irreversible — use with caution. If false (default), the request is rejected in those cases.",
+            "title": "Force",
+            "type": "boolean"
           }
         },
         "title": "PurgeVFolderOptions",
