@@ -19,7 +19,7 @@ import uuid
 import pytest
 
 from ai.backend.common.identifier.image import ImageID
-from ai.backend.common.types import ClusterMode, ResourceSlotEntry
+from ai.backend.common.types import BinarySize, ClusterMode, ResourceSlotEntry
 from ai.backend.manager.data.session.draft import (
     KernelExecutionSpecDraft,
     KernelGroupDraft,
@@ -61,12 +61,17 @@ def rg_defaults(rg_image_id: ImageID) -> DefaultSessionOptions:
         is_preemptible=False,
         cluster_mode=ClusterMode.MULTI_NODE,
         default_failure_policy=FailurePolicy.STRICT,
-        handler_options=SessionHandlerOptions(default=HandlerOptions(timeout=60), by_handler={}),
+        handler_options=SessionHandlerOptions(
+            default=HandlerOptions(timeout=60),
+            by_handler={"schedule-sessions": HandlerOptions(max_retry_count=1)},
+        ),
         agent_selection_policy=AgentSelectionPolicy.STRICT,
         default_kernel_execution_spec=KernelExecutionSpec(
-            image_id=rg_image_id,
-            resources=[ResourceSlotEntry(resource_type="cpu", quantity="2")],
-            resource_opts=ResourceOpts(),
+            resource_input=KernelResourceConfig(
+                image_id=rg_image_id,
+                resources=[ResourceSlotEntry(resource_type="cpu", quantity="2")],
+                resource_opts=ResourceOpts(shmem=BinarySize(128 * 1024 * 1024)),
+            ),
             environ={"RG_BASE": "1"},
             startup_command="rg-start",
             bootstrap_script="rg-bootstrap",
@@ -91,7 +96,8 @@ class TestMergeResourceGroupDefaultsRule:
         assert opts.is_preemptible is False
         assert opts.cluster_mode == ClusterMode.MULTI_NODE
         assert opts.handler_options == SessionHandlerOptions(
-            default=HandlerOptions(timeout=60), by_handler={}
+            default=HandlerOptions(timeout=60),
+            by_handler={"schedule-sessions": HandlerOptions(max_retry_count=1)},
         )
         assert opts.scheduling_target.agent_selection_policy == AgentSelectionPolicy.STRICT
 
@@ -138,6 +144,9 @@ class TestMergeResourceGroupDefaultsRule:
         assert merged.environ == {"RG_BASE": "1"}
         assert merged.startup_command == "rg-start"
         assert merged.bootstrap_script == "rg-bootstrap"
+        assert merged.resource_input.resource_opts == ResourceOpts(
+            shmem=BinarySize(128 * 1024 * 1024)
+        )
 
     async def test_preserves_caller_execution_spec_over_rg(
         self,
