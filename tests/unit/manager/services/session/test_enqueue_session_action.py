@@ -1,12 +1,4 @@
-"""RBAC scope targeting and authorization for EnqueueSessionAction owner delegation.
-
-When a session is enqueued on behalf of another user (``owner_id`` set), the
-RBAC scope must target the *owner's* USER scope so the validator authorizes the
-caller against the owner rather than against the caller's own scope (which would
-always pass and leave delegation unguarded). The permission lookup itself is the
-repository's job, so the authorization tests mock it and only assert which scope
-the validator asks about and how the verdict propagates.
-"""
+"""RBAC scope targeting and authorization for EnqueueSessionAction owner delegation."""
 
 from __future__ import annotations
 
@@ -88,6 +80,12 @@ def trigger_meta() -> BaseActionTriggerMeta:
 
 
 class TestEnqueueSessionActionDelegationScope:
+    """When ``owner_id`` is set, the RBAC scope must target the *owner's* USER scope.
+
+    Otherwise the validator would authorize the caller against their own scope,
+    which always passes and leaves delegation unguarded.
+    """
+
     @pytest.mark.parametrize(
         "delegated",
         [False, True],
@@ -115,6 +113,13 @@ class TestEnqueueSessionActionDelegationScope:
 
 
 class TestEnqueueSessionDelegationAuthorization:
+    """The validator authorizes delegation against the owner's scope.
+
+    The permission lookup itself is the repository's job, so it is mocked here;
+    these tests only assert which scope the validator asks about and how the
+    verdict propagates.
+    """
+
     @pytest.mark.parametrize(
         "permission_granted, expected_outcome",
         [
