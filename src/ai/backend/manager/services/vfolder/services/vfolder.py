@@ -41,7 +41,7 @@ from ai.backend.manager.data.vfolder.types import (
 )
 from ai.backend.manager.errors.common import Forbidden, InternalServerError, ObjectNotFound
 from ai.backend.manager.errors.kernel import BackendAgentError
-from ai.backend.manager.errors.resource import ProjectNotFound
+from ai.backend.manager.errors.resource import DomainNotFound, ProjectNotFound
 from ai.backend.manager.errors.storage import (
     TooManyVFoldersFound,
     UnexpectedStorageProxyResponseError,
