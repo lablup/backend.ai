@@ -12092,7 +12092,7 @@ type Mutation
   createVFolderInProject(projectId: UUID!, input: CreateVFolderInScopeInput!): CreateVFolderV2Payload @join__field(graph: STRAWBERRY)
 
   """Added in 26.4.2. Soft-delete a virtual folder (move to trash)."""
-  deleteVfolderV2(vfolderId: UUID!): DeleteVFolderV2Payload @join__field(graph: STRAWBERRY)
+  deleteVfolderV2(vfolderId: UUID!, ownerId: UUID = null): DeleteVFolderV2Payload @join__field(graph: STRAWBERRY)
 
   """Added in 26.4.2. Permanently purge a virtual folder."""
   purgeVfolderV2(vfolderId: UUID!, options: PurgeVFolderOptionsInput = null): PurgeVFolderV2Payload @join__field(graph: STRAWBERRY)
