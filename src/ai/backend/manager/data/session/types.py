@@ -45,6 +45,9 @@ class SessionStatus(CIStrEnum):
     RUNNING = "RUNNING"
     RESTARTING = "RESTARTING"
     RUNNING_DEGRADED = "RUNNING_DEGRADED"
+    # transient: confirmed preemption victim; after kernel cleanup it
+    # branches by PreemptionMode to TERMINATED (terminate) or PENDING (reschedule)
+    PREEMPTED = "PREEMPTED"
     # ---
     TERMINATING = "TERMINATING"
     TERMINATED = "TERMINATED"
@@ -70,6 +73,7 @@ class SessionStatus(CIStrEnum):
             not in (
                 cls.PENDING,
                 cls.DEPRIORITIZING,
+                cls.PREEMPTED,
                 cls.TERMINATED,
                 cls.CANCELLED,
             )
@@ -105,6 +109,17 @@ class SessionStatus(CIStrEnum):
                 cls.ERROR,
             )
         )
+
+    @classmethod
+    @lru_cache(maxsize=1)
+    def preemptable_statuses(cls) -> frozenset[SessionStatus]:
+        """Return statuses that can transition to PREEMPTED.
+
+        Only RUNNING sessions are eligible preemption victims (BEP-1055).
+        Sessions still being provisioned or already terminating are never
+        marked PREEMPTED, so those source statuses are rejected.
+        """
+        return frozenset((cls.RUNNING,))
 
     @classmethod
     @lru_cache(maxsize=1)
