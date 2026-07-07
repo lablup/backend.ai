@@ -206,13 +206,22 @@ def project_create(
 
 @vfolder.command()
 @click.argument("vfolder_id", type=click.UUID)
-def delete(vfolder_id: UUID) -> None:
+@click.option(
+    "--owner-id",
+    default=None,
+    type=click.UUID,
+    help="Delegated owner user UUID. Delete the vfolder on behalf of this user.",
+)
+def delete(vfolder_id: UUID, owner_id: UUID | None) -> None:
     """Delete a vfolder (move to trash)."""
+    from ai.backend.common.identifier.user import UserID
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
-            result = await registry.vfolder.delete(vfolder_id)
+            result = await registry.vfolder.delete(
+                vfolder_id, owner_id=UserID(owner_id) if owner_id is not None else None
+            )
             print_result(result)
         finally:
             await registry.close()

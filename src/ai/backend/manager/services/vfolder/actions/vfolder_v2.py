@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.common.identifier.user import UserID
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.services.vfolder.actions.base import (
@@ -18,6 +19,9 @@ class DeleteVFolderV2Action(VFolderSingleEntityAction):
     """Soft-delete a vfolder by ID with RBAC enforcement."""
 
     vfolder_id: uuid.UUID
+    owner_id: UserID | None = None
+    """Delegated owner user UUID. When set, the delete is performed on behalf of
+    that user (host permission is resolved from the owner)."""
 
     @override
     def entity_id(self) -> str | None:

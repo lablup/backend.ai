@@ -5,7 +5,7 @@ from __future__ import annotations
 from http import HTTPStatus
 from typing import TYPE_CHECKING
 
-from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
+from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam, QueryParam
 from ai.backend.common.dto.manager.v2.vfolder.request import (
     BulkDeleteVFoldersInput,
     BulkPurgeVFoldersInput,
@@ -15,6 +15,7 @@ from ai.backend.common.dto.manager.v2.vfolder.request import (
     CreateVFolderInput,
     CreateVFolderInScopeInput,
     DeleteFilesInput,
+    DeleteVFolderQuery,
     DeployVFolderInput,
     ListFilesInput,
     MkdirInput,
@@ -87,9 +88,10 @@ class V2VFolderHandler:
     async def delete(
         self,
         path: PathParam[VFolderIdPathParam],
+        query: QueryParam[DeleteVFolderQuery],
     ) -> APIResponse:
         """Soft-delete a vfolder."""
-        result = await self._adapter.delete(path.parsed.vfolder_id)
+        result = await self._adapter.delete(path.parsed.vfolder_id, owner_id=query.parsed.owner_id)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def purge(

@@ -39,6 +39,7 @@ from ai.backend.common.dto.manager.v2.vfolder.response import (
     SearchVFoldersPayload,
     VFolderNode,
 )
+from ai.backend.common.identifier.user import UserID
 
 _PATH = "/v2/vfolders"
 
@@ -126,12 +127,16 @@ class V2VFolderClient(BaseDomainClient):
             response_model=VFolderNode,
         )
 
-    async def delete(self, vfolder_id: UUID) -> DeleteVFolderPayload:
-        """Soft-delete a vfolder."""
+    async def delete(
+        self, vfolder_id: UUID, owner_id: UserID | None = None
+    ) -> DeleteVFolderPayload:
+        """Soft-delete a vfolder, optionally on behalf of ``owner_id``."""
+        params = {"owner_id": str(owner_id)} if owner_id is not None else None
         return await self._client.typed_request(
             "DELETE",
             f"{_PATH}/{vfolder_id}",
             response_model=DeleteVFolderPayload,
+            params=params,
         )
 
     async def purge(

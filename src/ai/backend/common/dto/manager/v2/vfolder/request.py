@@ -12,6 +12,7 @@ from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter
 from ai.backend.common.dto.manager.v2.deployment.request import DeploymentStrategyInput
 from ai.backend.common.identifier.deployment_preset import DeploymentPresetID
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.typed_validators import VFolderName
 
 from .types import (
@@ -36,6 +37,7 @@ __all__ = (
     "DeleteFilesInput",
     "DeleteInvitationInput",
     "DeleteVFolderInput",
+    "DeleteVFolderQuery",
     "DeployVFolderInput",
     "InviteVFolderInput",
     "ListFilesInput",
@@ -146,6 +148,18 @@ class DeleteVFolderInput(BaseRequestModel):
     """Input for soft-deleting a virtual folder."""
 
     id: UUID = Field(description="VFolder ID to delete")
+
+
+class DeleteVFolderQuery(BaseRequestModel):
+    """Query parameters for the vfolder delete operation."""
+
+    owner_id: UserID | None = Field(
+        default=None,
+        description=(
+            "Delegated owner user UUID. When set, the vfolder is deleted on behalf of "
+            "the specified user instead of the caller."
+        ),
+    )
 
 
 class PurgeVFolderOptions(BaseRequestModel):

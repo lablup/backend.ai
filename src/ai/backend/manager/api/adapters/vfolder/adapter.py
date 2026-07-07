@@ -58,6 +58,7 @@ from ai.backend.common.dto.manager.v2.vfolder.types import (
     VFolderUsageInfo as VFolderUsageInfoDTO,
 )
 from ai.backend.common.exception import BackendAIError, UnreachableError
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import BinarySize, MountPermission, VFolderUsageMode
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
@@ -434,9 +435,16 @@ class VFolderAdapter(BaseAdapter):
             used_bytes=_to_binary_size_info(usage.used_bytes),
         )
 
-    async def delete(self, vfolder_id: UUID) -> DeleteVFolderPayload:
-        """Soft-delete a vfolder (move to trash). RBAC enforced."""
-        action = DeleteVFolderV2Action(vfolder_id=vfolder_id)
+    async def delete(
+        self, vfolder_id: UUID, owner_id: UserID | None = None
+    ) -> DeleteVFolderPayload:
+        """Soft-delete a vfolder (move to trash). RBAC enforced.
+
+        When ``owner_id`` is set, the delete is performed on behalf of that user
+        (host permission is resolved from the owner). RBAC still authorizes the
+        caller against the target vfolder.
+        """
+        action = DeleteVFolderV2Action(vfolder_id=vfolder_id, owner_id=owner_id)
         await self._processors.vfolder.delete_v2.wait_for_complete(action)
         return DeleteVFolderPayload(id=vfolder_id)
 
