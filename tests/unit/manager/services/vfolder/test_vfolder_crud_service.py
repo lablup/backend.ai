@@ -542,6 +542,43 @@ class TestCreateVFolderV2Action:
         assert target.element_type == RBACElementType.PROJECT
         assert target.element_id == str(project_id)
 
+    async def test_delegation_swaps_acting_user_to_owner(
+        self,
+        vfolder_service: VFolderService,
+        mock_user_repository: MagicMock,
+        mock_vfolder_repository: MagicMock,
+    ) -> None:
+        """create_v2 resolves owner_id and creates the vfolder under that user."""
+        owner_uuid = uuid.uuid4()
+        mock_user_repository.get_user_by_uuid = AsyncMock(
+            return_value=MagicMock(id=owner_uuid, domain_name="default")
+        )
+        # Stop right after the swap: the next repo call receives the acting user.
+        mock_vfolder_repository.get_user_with_keypair_policy_vfolder_hosts = AsyncMock(
+            side_effect=RuntimeError("stop")
+        )
+        action = self._make_action(user_id=UserID(uuid.uuid4()), owner_id=UserID(owner_uuid))
+
+        with pytest.raises(RuntimeError):
+            await vfolder_service.create_v2(action)
+
+        mock_user_repository.get_user_by_uuid.assert_awaited_once()
+        mock_vfolder_repository.get_user_with_keypair_policy_vfolder_hosts.assert_awaited_once_with(
+            owner_uuid
+        )
+
+    async def test_delegation_owner_without_domain_raises(
+        self,
+        vfolder_service: VFolderService,
+        mock_user_repository: MagicMock,
+    ) -> None:
+        """A delegated owner with no domain is rejected as an invalid parameter."""
+        mock_user_repository.get_user_by_uuid = AsyncMock(return_value=MagicMock(domain_name=None))
+        action = self._make_action(user_id=UserID(uuid.uuid4()), owner_id=UserID(uuid.uuid4()))
+
+        with pytest.raises(VFolderInvalidParameter):
+            await vfolder_service.create_v2(action)
+
 
 class TestGetVFolderAction:
     async def test_owned_vfolder_returns_full_details(

@@ -41,7 +41,7 @@ from ai.backend.manager.data.vfolder.types import (
 )
 from ai.backend.manager.errors.common import Forbidden, InternalServerError, ObjectNotFound
 from ai.backend.manager.errors.kernel import BackendAgentError
-from ai.backend.manager.errors.resource import DomainNotFound, ProjectNotFound
+from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.errors.storage import (
     TooManyVFoldersFound,
     UnexpectedStorageProxyResponseError,
@@ -1599,14 +1599,17 @@ class VFolderService:
         user_uuid = action.user_id
         domain_name = action.domain_name
         project_id = action.project_id
-        if action.owner_id is not None:
-            # Delegation: create the vfolder owned by the target user instead of
-            # the caller. The caller's permission to act on behalf of the owner
-            # is enforced by the RBAC scope validator via the action's
-            # target_element (the owner's USER scope).
+        # Delegation applies only to user-owned vfolders. When project_id is set
+        # the vfolder is project-owned and authorization targets the project
+        # scope (see the action's target_element), so owner_id does not apply.
+        if action.owner_id is not None and project_id is None:
+            # Create the vfolder owned by the target user instead of the caller.
+            # The caller's permission to act on behalf of the owner is enforced
+            # by the RBAC scope validator via the action's target_element (the
+            # owner's USER scope).
             owner = await self._user_repository.get_user_by_uuid(action.owner_id)
             if owner.domain_name is None:
-                raise DomainNotFound()
+                raise VFolderInvalidParameter("User has no domain assigned")
             user_uuid = owner.id
             domain_name = owner.domain_name
 
