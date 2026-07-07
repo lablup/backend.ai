@@ -275,6 +275,7 @@ class TestFetchIdleCheckBatch:
                     name=f"checker-{checker_id}",
                     description=None,
                     checker_type=CheckerType.SESSION_LIFETIME,
+                    target_session_types=[SessionTypes.INTERACTIVE, SessionTypes.BATCH],
                     spec=IdleCheckerSpec(
                         type=CheckerType.SESSION_LIFETIME,
                         session_lifetime=SessionLifetimeSpec(),
@@ -469,6 +470,7 @@ class TestFetchIdleCheckBatch:
                         name=f"{checker_type.value}-{checker_id}",
                         description=None,
                         checker_type=checker_type,
+                        target_session_types=[SessionTypes.INTERACTIVE, SessionTypes.BATCH],
                         spec=spec,
                     )
                 )
@@ -699,9 +701,9 @@ class TestFetchIdleCheckBatch:
                         name=f"checker-{checker_id}",
                         description=None,
                         checker_type=CheckerType.SESSION_LIFETIME,
+                        target_session_types=list(target_types),
                         spec=IdleCheckerSpec(
                             type=CheckerType.SESSION_LIFETIME,
-                            target_session_types=target_types,
                             session_lifetime=SessionLifetimeSpec(),
                         ),
                     )

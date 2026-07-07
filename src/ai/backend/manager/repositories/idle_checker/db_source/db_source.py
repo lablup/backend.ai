@@ -10,7 +10,7 @@ import sqlalchemy as sa
 from ai.backend.common.data.idle_checker.types import CheckerType, IdleCheckerSpec
 from ai.backend.common.data.permission.types import ScopeType
 from ai.backend.common.identifier.idle_checker import IdleCheckerID
-from ai.backend.common.types import SessionId
+from ai.backend.common.types import SessionId, SessionTypes
 from ai.backend.manager.data.idle_checker.types import IdleCheckSession
 from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.models.idle_checker.row import IdleCheckerBindingRow, IdleCheckerRow
@@ -40,6 +40,7 @@ class IdleCheckerDBSource:
             IdleCheckerBindingRow.created_at,
             IdleCheckerBindingRow.idle_checker_id,
             IdleCheckerRow.checker_type,
+            IdleCheckerRow.target_session_types,
             IdleCheckerRow.spec,
         ).join(IdleCheckerRow, IdleCheckerBindingRow.idle_checker_id == IdleCheckerRow.id)
 
@@ -54,6 +55,9 @@ class IdleCheckerDBSource:
             checker = IdleCheckerDefinitionData(
                 checker_id=cast(IdleCheckerID, row.idle_checker_id),
                 checker_type=cast(CheckerType, row.checker_type),
+                target_session_types=frozenset(
+                    cast(Sequence[SessionTypes], row.target_session_types)
+                ),
                 spec=cast(IdleCheckerSpec, row.spec),
             )
             bound_checkers.append(

@@ -19,6 +19,7 @@ class IdleCheckerDefinitionData:
 
     checker_id: IdleCheckerID
     checker_type: CheckerType
+    target_session_types: frozenset[SessionTypes]
     spec: IdleCheckerSpec
 
 

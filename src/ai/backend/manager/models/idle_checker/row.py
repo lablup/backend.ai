@@ -8,6 +8,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common.data.idle_checker.types import CheckerType, IdleCheckerSpec
 from ai.backend.common.identifier.idle_checker import IdleCheckerID
+from ai.backend.common.types import SessionTypes
 from ai.backend.manager.models.base import GUID, Base, PydanticColumn, StrEnumType
 
 
@@ -21,6 +22,11 @@ class IdleCheckerRow(Base):  # type: ignore[misc]
     description: Mapped[str | None] = mapped_column("description", sa.Text, nullable=True)
     checker_type: Mapped[CheckerType] = mapped_column(
         "checker_type", StrEnumType(CheckerType), nullable=False
+    )
+    target_session_types: Mapped[list[SessionTypes]] = mapped_column(
+        "target_session_types",
+        sa.ARRAY(StrEnumType(SessionTypes, use_name=True)),
+        nullable=False,
     )
     spec: Mapped[IdleCheckerSpec] = mapped_column(
         "spec", PydanticColumn(IdleCheckerSpec), nullable=False

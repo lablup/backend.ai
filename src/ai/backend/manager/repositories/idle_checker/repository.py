@@ -44,7 +44,7 @@ class IdleCheckerRepository:
         seen_candidates = set()
         idle_check_candidates: list[tuple[ScopeId, Collection[SessionTypes]]] = []
         for bound_checker in bound_checkers:
-            target_session_types = bound_checker.checker.spec.target_session_types
+            target_session_types = bound_checker.checker.target_session_types
             candidate_key = (
                 bound_checker.scope.scope_type,
                 bound_checker.scope.scope_id,
@@ -72,7 +72,7 @@ class IdleCheckerRepository:
             checkers: list[BoundCheckerData] = []
             for scope in session_row.scopes:
                 for bound in checkers_by_scope.get(scope, ()):
-                    if session_row.session_type in bound.checker.spec.target_session_types:
+                    if session_row.session_type in bound.checker.target_session_types:
                         checkers.append(bound)
             if not checkers:
                 continue
