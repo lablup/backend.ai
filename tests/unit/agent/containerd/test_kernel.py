@@ -1,5 +1,8 @@
 """Unit tests for ContainerdKernel runner-delegating methods (runner injected via __new__)."""
 
+import io
+import json
+import tarfile
 from typing import Any, cast
 
 import pytest
@@ -104,3 +107,46 @@ class TestRunnerNotInitialized:
     async def test_check_status_without_runner_raises(self) -> None:
         with pytest.raises(KernelRunnerNotInitializedError):
             await _kernel(None).check_status()
+
+
+def _fs_kernel(scratch_root: Any, kernel_id: str = "kern-1") -> ContainerdKernel:
+    k = ContainerdKernel.__new__(ContainerdKernel)
+    k.data = {"container_id": kernel_id}
+    k.kernel_id = cast(Any, kernel_id)
+    k.agent_config = cast(Any, {"container": {"scratch-root": scratch_root}})
+    (scratch_root / kernel_id / "work").mkdir(parents=True, exist_ok=True)
+    return k
+
+
+class TestFileOps:
+    async def test_accept_then_download_single_roundtrips(self, tmp_path: Any) -> None:
+        k = _fs_kernel(tmp_path)
+        await k.accept_file("hello.txt", b"hi there")
+        assert (tmp_path / "kern-1" / "work" / "hello.txt").read_bytes() == b"hi there"
+        assert await k.download_single("hello.txt") == b"hi there"
+
+    async def test_accept_creates_parent_dirs(self, tmp_path: Any) -> None:
+        k = _fs_kernel(tmp_path)
+        await k.accept_file("sub/dir/f.bin", b"x")
+        assert (tmp_path / "kern-1" / "work" / "sub" / "dir" / "f.bin").read_bytes() == b"x"
+
+    async def test_download_file_returns_tar(self, tmp_path: Any) -> None:
+        k = _fs_kernel(tmp_path)
+        await k.accept_file("a.txt", b"data")
+        tar_bytes = await k.download_file("a.txt")
+        with tarfile.open(fileobj=io.BytesIO(tar_bytes)) as tar:
+            assert tar.getnames() == ["a.txt"]
+
+    async def test_list_files_reports_entries(self, tmp_path: Any) -> None:
+        k = _fs_kernel(tmp_path)
+        await k.accept_file("one.txt", b"1")
+        await k.accept_file("two.txt", b"22")
+        result = await k.list_files(".")
+        names = {e["filename"] for e in json.loads(result["files"])}
+        assert names == {"one.txt", "two.txt"}
+        assert result["errors"] == ""
+
+    async def test_escape_outside_home_is_rejected(self, tmp_path: Any) -> None:
+        k = _fs_kernel(tmp_path)
+        with pytest.raises(PermissionError):
+            await k.accept_file("../../etc/passwd", b"x")
