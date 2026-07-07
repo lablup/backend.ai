@@ -25771,6 +25771,7 @@
           "RESTARTING",
           "RUNNING_DEGRADED",
           "DEPRIORITIZING",
+          "PREEMPTED",
           "TERMINATING",
           "TERMINATED",
           "ERROR",
