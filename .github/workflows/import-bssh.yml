@@ -67,8 +67,9 @@ jobs:
                       ls -la "${TARGET_DIR}/${TOOL}.${ARCH}.bin"
                     done
                   done
-                  # Move manpages (only bssh currently ships a manpage)
-                  for MAN in bssh.1 bssh-server.1; do
+                  # Move manpages. bssh (user command) ships section 1;
+                  # bssh-server (daemon) ships section 8.
+                  for MAN in bssh.1 bssh-server.8; do
                     if [ -f "${MAN}" ]; then
                       mv "${MAN}" "${TARGET_DIR}/"
                       echo "Manpage moved to ${TARGET_DIR}/${MAN}"

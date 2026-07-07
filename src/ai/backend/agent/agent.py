@@ -638,7 +638,7 @@ class AbstractKernelCreationContext[KernelObjectType: AbstractKernel](aobject):
         mount_static_binary("bssh.1", "/usr/local/share/man/man1/bssh.1", skip_missing=True)
         mount_static_binary(f"bssh-server.{arch}.bin", "/opt/kernel/bssh-server", skip_missing=True)
         mount_static_binary(
-            "bssh-server.1", "/usr/local/share/man/man1/bssh-server.1", skip_missing=True
+            "bssh-server.8", "/usr/local/share/man/man8/bssh-server.8", skip_missing=True
         )
 
         jail_path: Path | None
