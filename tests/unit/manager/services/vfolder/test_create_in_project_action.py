@@ -10,6 +10,7 @@ from __future__ import annotations
 import uuid
 
 from ai.backend.common.data.permission.types import RBACElementType, ScopeType
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import VFolderUsageMode
 from ai.backend.manager.models.vfolder import VFolderPermission
 from ai.backend.manager.services.vfolder.actions.vfolder_in_project import (
@@ -17,7 +18,7 @@ from ai.backend.manager.services.vfolder.actions.vfolder_in_project import (
 )
 
 
-def _make_action(*, owner_id: uuid.UUID | None) -> CreateVFolderInProjectAction:
+def _make_action(*, owner_id: UserID | None) -> CreateVFolderInProjectAction:
     return CreateVFolderInProjectAction(
         project_id=uuid.uuid4(),
         user_id=uuid.uuid4(),
@@ -42,7 +43,7 @@ class TestCreateVFolderInProjectActionScope:
         assert target.element_id == str(action.project_id)
 
     def test_target_stays_project_with_owner(self) -> None:
-        action = _make_action(owner_id=uuid.uuid4())
+        action = _make_action(owner_id=UserID(uuid.uuid4()))
 
         # Delegation must not move the RBAC target off the project.
         assert action.scope_id() == str(action.project_id)

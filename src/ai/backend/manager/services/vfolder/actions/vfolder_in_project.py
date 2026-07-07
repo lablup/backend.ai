@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.permission.types import RBACElementType, ScopeType
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import VFolderUsageMode
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.permission.types import RBACElementRef
@@ -38,7 +39,7 @@ class CreateVFolderInProjectAction(VFolderScopeAction):
     usage_mode: VFolderUsageMode
     permission: VFolderPermission
     cloneable: bool
-    owner_id: uuid.UUID | None = None
+    owner_id: UserID | None = None
     """Delegated owner user UUID. When set, the service records the vfolder as
     created by that user instead of the caller. Authorization stays
     PROJECT-scoped (the caller needs CREATE on the project)."""

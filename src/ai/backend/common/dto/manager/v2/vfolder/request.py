@@ -12,6 +12,7 @@ from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter
 from ai.backend.common.dto.manager.v2.deployment.request import DeploymentStrategyInput
 from ai.backend.common.identifier.deployment_preset import DeploymentPresetID
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.typed_validators import VFolderName
 
 from .types import (
@@ -107,7 +108,7 @@ class CreateVFolderInScopeInput(BaseRequestModel):
         description="Default permission of the vfolder",
     )
     cloneable: bool = Field(default=False, description="Whether the vfolder is cloneable")
-    owner_id: UUID | None = Field(
+    owner_id: UserID | None = Field(
         default=None,
         description=(
             "Delegated owner user UUID. When set, the vfolder is created on behalf of "
