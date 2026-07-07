@@ -60,10 +60,15 @@ class PurgeVFolderV2Action(VFolderSingleEntityAction):
     By default the call is rejected when any model card references the
     vfolder. Set ``cascade_model_card=True`` to also remove the linked
     model card row(s) atomically.
+
+    By default the call is also rejected when the vfolder is mounted by a
+    live session, referenced by an active model-service endpoint, or not in
+    a purgable status. Set ``force=True`` to bypass those in-use guards.
     """
 
     vfolder_id: uuid.UUID
     cascade_model_card: bool = False
+    force: bool = False
 
     @override
     def entity_id(self) -> str | None:

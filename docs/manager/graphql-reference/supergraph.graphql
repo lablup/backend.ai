@@ -14029,6 +14029,11 @@ input PurgeVFolderOptionsInput
   If true, also delete model card record(s) referencing the vfolder. If false, the request is rejected when any model card still references it.
   """
   cascadeModelCard: Boolean! = false
+
+  """
+  Added in 26.8.0. If true, bypass the in-use guards and purge the vfolder even when it is mounted by a live session, referenced by an active model-service endpoint, or not in a purgable status. Irreversible — use with caution. If false (default), the request is rejected in those cases.
+  """
+  force: Boolean! = false
 }
 
 """
