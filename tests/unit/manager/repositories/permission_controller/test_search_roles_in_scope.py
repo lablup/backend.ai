@@ -20,6 +20,7 @@ from ai.backend.manager.models.agent import AgentRow
 # test registers a domain-cluster row) resolves string relationships against the
 # registry. These rows are reachable via relationships but are not otherwise
 # imported/registered by this test; _ORM_CLUSTER keeps them live.
+from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
@@ -35,6 +36,7 @@ from ai.backend.testutils.db import with_tables
 
 _ORM_CLUSTER = (
     AgentRow,
+    ImageRow,
     ScalingGroupForDomainRow,
 )
 
