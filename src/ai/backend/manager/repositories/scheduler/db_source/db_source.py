@@ -28,7 +28,6 @@ from ai.backend.common import msgpack
 from ai.backend.common.data.permission.types import (
     RBACElementType,
 )
-from ai.backend.common.docker import ImageRef
 from ai.backend.common.identifier.domain import DomainID, DomainName
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.project import ProjectID
@@ -1776,34 +1775,6 @@ class ScheduleDBSource:
         if domain_id is None:
             raise DomainNotFound(name)
         return DomainID(domain_id)
-
-    async def _resolve_image_info(
-        self, db_sess: SASession, image_refs: list[ImageRef]
-    ) -> dict[str, ImageInfo]:
-        """
-        Resolve image references to image information.
-
-        Args:
-            db_sess: Database session
-            image_refs: List of ImageRef objects to resolve
-
-        Returns:
-            Dictionary mapping image canonical reference to ImageInfo
-        """
-        image_infos = {}
-        for image_ref in image_refs:
-            # Use the ImageRef object directly
-            image_row = await ImageRow.resolve(db_sess, [image_ref])
-            if image_row:
-                image_infos[image_ref.canonical] = ImageInfo(
-                    id=image_row.id,
-                    canonical=image_row.name,  # 'name' is the canonical reference in ImageRow
-                    architecture=image_row.architecture,
-                    registry=image_row.registry,
-                    labels=image_row.labels,
-                    resource_spec=cast(dict[str, Any], image_row.resources),  # Cast to match type
-                )
-        return image_infos
 
     async def _fetch_vfolder_mounts(
         self,
