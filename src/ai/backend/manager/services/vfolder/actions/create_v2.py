@@ -3,22 +3,23 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.permission.types import (
-    EntityType,
     RBACElementType,
     ScopeType,
 )
 from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import VFolderUsageMode
-from ai.backend.manager.actions.action.scope import BaseScopeAction
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.vfolder.types import VFolderData
 from ai.backend.manager.models.vfolder import VFolderPermission
-from ai.backend.manager.services.vfolder.actions.base import VFolderScopeActionResult
+from ai.backend.manager.services.vfolder.actions.base import (
+    VFolderScopeAction,
+    VFolderScopeActionResult,
+)
 
 
 @dataclass
-class CreateVFolderV2Action(BaseScopeAction):
+class CreateVFolderV2Action(VFolderScopeAction):
     """Create a new vfolder. Policy is resolved internally from user_id."""
 
     name: str
@@ -32,11 +33,6 @@ class CreateVFolderV2Action(BaseScopeAction):
     owner_id: UserID | None = None
     """Delegated owner user UUID. When set, the service resolves it and creates
     the vfolder owned by that user instead of the caller."""
-
-    @override
-    @classmethod
-    def entity_type(cls) -> EntityType:
-        return EntityType.VFOLDER
 
     @override
     @classmethod
