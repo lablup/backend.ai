@@ -1,10 +1,10 @@
 """Containerd agent backend (BEP-1058).
 
 An independent agent backend parallel to DockerAgent, targeting containerd's native
-gRPC/task model instead of the Docker daemon. This is a structural scaffold: the
-container-facing operations (image scan/pull, task create/start, destroy) raise
-``NotImplementedError`` pending the containerd gRPC client; the runtime-agnostic parts
-(resource spec, registration, kernel context wiring) are real.
+gRPC/task model instead of the Docker daemon. The container/image lifecycle (scan/pull/push,
+create/start/destroy, resource limits, GPU/device injection, distro probe) runs over the
+containerd gRPC API with no nerdctl/ctr; cluster networking is delegated to the BEP-1058
+stack. Session-to-image ``commit`` is the remaining TODO.
 
 Cluster networking is provided by the BEP-1058 runtime-neutral stack
 (``agent.network``): the SessionNetworkCoordinator handles per-session setup and the

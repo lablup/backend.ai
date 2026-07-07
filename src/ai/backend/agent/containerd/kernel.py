@@ -1,10 +1,9 @@
 """Containerd kernel + code runner (BEP-1058 / containerd agent backend).
 
-Mirrors the Docker kernel contract but targets containerd's native task model.
-Container-facing operations that require the containerd gRPC client are marked
-``NotImplementedError`` (TODO: containerd) — this is a structural scaffold, not yet a
-functional backend. Trivial/metadata methods return sensible defaults so the class is
-concrete and selectable.
+Mirrors the Docker kernel contract on containerd's native task model. REPL/service ops go
+through the code runner (network-based); file transfer and logs work off the host scratch
+mount + captured task stdout. Only session-to-image ``commit`` remains a TODO (it needs the
+containerd Diff/Content image-build flow).
 """
 
 from __future__ import annotations
