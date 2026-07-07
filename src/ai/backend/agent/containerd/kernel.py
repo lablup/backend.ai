@@ -19,6 +19,7 @@ from collections.abc import Mapping
 from pathlib import Path, PurePosixPath
 from typing import Any, override
 
+from ai.backend.agent.containerd.runtime.grpc import container_log_path
 from ai.backend.agent.errors.kernel import KernelRunnerNotInitializedError
 from ai.backend.agent.kernel import (
     AbstractCodeRunner,
@@ -101,8 +102,17 @@ class ContainerdKernel(AbstractKernel):
 
     @override
     async def get_logs(self) -> dict[str, Any]:
-        # TODO: fetch task logs via the runtime client (nerdctl logs); needs runtime access.
-        raise NotImplementedError(_TODO)
+        # The runtime captures the task's stdout+stderr to a host log file (keyed by the
+        # container id, which is the kernel id here); read it back.
+        log_path = container_log_path(self.data["container_id"])
+
+        def _read() -> str:
+            try:
+                return log_path.read_text(errors="replace")
+            except FileNotFoundError:
+                return ""
+
+        return {"logs": await asyncio.to_thread(_read)}
 
     @override
     async def interrupt_kernel(self) -> dict[str, Any]:

@@ -20,6 +20,7 @@ import hashlib
 import json
 import logging
 from collections.abc import Mapping, Sequence
+from pathlib import Path
 from typing import Any, override
 
 import grpc
@@ -53,6 +54,14 @@ from ai.backend.logging import BraceStyleAdapter
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 DEFAULT_ADDRESS = "unix:///run/containerd/containerd.sock"
+# Host dir where each task's captured stdout+stderr is written (read back by get_logs).
+CONTAINER_LOG_ROOT = Path("/var/lib/backend.ai/containerd-logs")
+
+
+def container_log_path(container_id: str) -> Path:
+    return CONTAINER_LOG_ROOT / f"{container_id}.log"
+
+
 # containerd multiplexes all objects by namespace; every RPC must carry it as metadata.
 _NAMESPACE_HEADER = "containerd-namespace"
 _RUNC_RUNTIME = "io.containerd.runc.v2"
@@ -260,9 +269,17 @@ class ContainerdGrpcRuntime(OciRuntime):
 
     @override
     async def start_container(self, container_id: str) -> TaskHandle:
+        # Capture the task's stdout+stderr to a host log file (the containerd shim writes a
+        # plain path directly); ContainerdKernel.get_logs reads it back.
+        log_path = container_log_path(container_id)
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        log_path.touch(exist_ok=True)
         resp = await self._tasks_stub().Create(
             tasks_pb2.CreateTaskRequest(
-                container_id=container_id, rootfs=self._rootfs.get(container_id, [])
+                container_id=container_id,
+                rootfs=self._rootfs.get(container_id, []),
+                stdout=str(log_path),
+                stderr=str(log_path),
             ),
             metadata=self._md,
         )
@@ -303,6 +320,7 @@ class ContainerdGrpcRuntime(OciRuntime):
                 if e.code() is not grpc.StatusCode.NOT_FOUND:
                     raise
         self._rootfs.pop(container_id, None)
+        container_log_path(container_id).unlink(missing_ok=True)
 
     # --- container/task introspection (Phase 1) ---
 
