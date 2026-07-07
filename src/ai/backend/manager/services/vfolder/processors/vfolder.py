@@ -182,7 +182,7 @@ class VFolderProcessors(AbstractProcessorPackage):
     get_folder_usage: SingleEntityActionProcessor[
         GetVFolderUsageAction, GetVFolderUsageActionResult
     ]
-    create_vfolder_v2: ActionProcessor[CreateVFolderV2Action, CreateVFolderV2ActionResult]
+    create_vfolder_v2: ScopeActionProcessor[CreateVFolderV2Action, CreateVFolderV2ActionResult]
     create_upload_session_v2: ActionProcessor[
         CreateUploadSessionV2Action, CreateUploadSessionV2ActionResult
     ]
@@ -286,7 +286,11 @@ class VFolderProcessors(AbstractProcessorPackage):
         self.get_folder_usage = SingleEntityActionProcessor(
             service.get_folder_usage, action_monitors, validators=single_entity_rbac_validators
         )
-        self.create_vfolder_v2 = ActionProcessor(service.create_v2, action_monitors)
+        self.create_vfolder_v2 = ScopeActionProcessor(
+            service.create_v2,
+            action_monitors,
+            validators=scope_rbac_validators,
+        )
         self.create_upload_session_v2 = ActionProcessor(
             service.create_upload_session_v2, action_monitors
         )
