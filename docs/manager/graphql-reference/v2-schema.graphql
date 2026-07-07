@@ -7959,7 +7959,7 @@ type Mutation {
   """
   Added in 26.4.4. Restore a trashed virtual folder. RBAC enforced via scope chain.
   """
-  restoreVFolder(vfolderId: UUID!, ownerId: UUID = null): RestoreVFolderPayload
+  restoreVFolder(vfolderId: UUID!, options: RestoreVFolderOptions = null): RestoreVFolderPayload
 
   """Added in 26.4.2. Deploy a deployment directly from a model VFolder."""
   deployVfolderV2(vfolderId: UUID!, input: DeployVFolderV2Input!): DeployVFolderV2Payload
@@ -11252,6 +11252,12 @@ Added in 25.15.0. Response payload for artifact restoration operations. Contains
 type RestoreArtifactsPayload {
   """List of restored artifacts."""
   artifacts: [Artifact!]!
+}
+
+"""Added in 26.8.0. Options for restoring a virtual folder from trash."""
+input RestoreVFolderOptions {
+  """Delegated owner user UUID. Restore the vfolder on behalf of this user."""
+  ownerId: UUID = null
 }
 
 """
