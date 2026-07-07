@@ -20,7 +20,7 @@ from ai.backend.common.dto.manager.v2.vfolder.request import (
     MkdirInput,
     MoveFileInput,
     PurgeVFolderInput,
-    RestoreVFolderQuery,
+    RestoreVFolderOptions,
     SearchVFoldersInput,
 )
 from ai.backend.manager.api.rest.v2.path_params import ProjectIdPathParam, VFolderIdPathParam
@@ -105,7 +105,7 @@ class V2VFolderHandler:
     async def restore(
         self,
         path: PathParam[VFolderIdPathParam],
-        query: QueryParam[RestoreVFolderQuery],
+        query: QueryParam[RestoreVFolderOptions],
     ) -> APIResponse:
         """Restore a trashed vfolder."""
         result = await self._adapter.restore(path.parsed.vfolder_id, owner_id=query.parsed.owner_id)

@@ -46,7 +46,7 @@ __all__ = (
     "PurgeVFolderOptions",
     "RenameFileInput",
     "RestoreVFolderInput",
-    "RestoreVFolderQuery",
+    "RestoreVFolderOptions",
     "ShareVFolderInput",
     "UnshareVFolderInput",
     "UpdateVFolderInput",
@@ -202,8 +202,12 @@ class RestoreVFolderInput(BaseRequestModel):
     id: UUID = Field(description="VFolder ID to restore")
 
 
-class RestoreVFolderQuery(BaseRequestModel):
-    """Query parameters for the vfolder restore operation."""
+class RestoreVFolderOptions(BaseRequestModel):
+    """Options for the vfolder restore operation.
+
+    Shared by the REST query parameters and the GraphQL ``options`` input so the
+    delegation flag lives in one place instead of a bare mutation argument.
+    """
 
     owner_id: UserID | None = Field(
         default=None,

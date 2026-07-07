@@ -43,6 +43,9 @@ from ai.backend.common.dto.manager.v2.vfolder.request import (
 from ai.backend.common.dto.manager.v2.vfolder.request import (
     PurgeVFolderOptions as PurgeVFolderOptionsDTO,
 )
+from ai.backend.common.dto.manager.v2.vfolder.request import (
+    RestoreVFolderOptions as RestoreVFolderOptionsDTO,
+)
 from ai.backend.common.dto.manager.v2.vfolder.response import (
     BulkDeleteVFoldersPayload as BulkDeletePayloadDTO,
 )
@@ -91,6 +94,7 @@ from ai.backend.common.dto.manager.v2.vfolder.response import (
 from ai.backend.common.dto.manager.v2.vfolder.response import (
     RestoreVFolderPayload as RestorePayloadDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
@@ -458,6 +462,20 @@ class PurgeVFolderOptionsInputGQL(PydanticInputMixin[PurgeVFolderOptionsDTO]):
             "If true, also delete model card record(s) referencing the vfolder. "
             "If false, the request is rejected when any model card still references it."
         ),
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Options for restoring a virtual folder from trash.",
+    ),
+    name="RestoreVFolderOptions",
+)
+class RestoreVFolderOptionsInputGQL(PydanticInputMixin[RestoreVFolderOptionsDTO]):
+    owner_id: UUID | None = gql_field(
+        default=None,
+        description="Delegated owner user UUID. Restore the vfolder on behalf of this user.",
     )
 
 

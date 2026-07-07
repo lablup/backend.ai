@@ -10,7 +10,6 @@ from ai.backend.common.dto.manager.v2.vfolder.request import (
     PurgeVFolderInput,
     PurgeVFolderOptions,
 )
-from ai.backend.common.identifier.user import UserID
 from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_mutation
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.vfolder_v2.types.mutations import (
@@ -38,6 +37,7 @@ from ai.backend.manager.api.gql.vfolder_v2.types.mutations import (
     MoveFilePayloadGQL,
     PurgeVFolderOptionsInputGQL,
     PurgeVFolderPayloadGQL,
+    RestoreVFolderOptionsInputGQL,
     RestoreVFolderPayloadGQL,
     UploadSessionInputGQL,
     UploadSessionPayloadGQL,
@@ -101,13 +101,11 @@ async def purge_vfolder_v2(
 async def restore_vfolder_v2(
     info: Info[StrawberryGQLContext],
     vfolder_id: UUID,
-    owner_id: UUID | None = None,
+    options: RestoreVFolderOptionsInputGQL | None = None,
 ) -> RestoreVFolderPayloadGQL | None:
     """Restore a virtual folder from trash."""
-    payload = await info.context.adapters.vfolder.restore(
-        vfolder_id,
-        owner_id=UserID(owner_id) if owner_id is not None else None,
-    )
+    owner_id = options.to_pydantic().owner_id if options is not None else None
+    payload = await info.context.adapters.vfolder.restore(vfolder_id, owner_id=owner_id)
     return RestoreVFolderPayloadGQL.from_pydantic(payload)
 
 
