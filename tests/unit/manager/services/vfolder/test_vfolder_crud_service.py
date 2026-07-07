@@ -11,7 +11,8 @@ from unittest.mock import AsyncMock, MagicMock
 import aiohttp
 import pytest
 
-from ai.backend.common.data.permission.types import ScopeType
+from ai.backend.common.data.permission.types import RBACElementType, ScopeType
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import (
     QuotaScopeID,
@@ -66,6 +67,7 @@ from ai.backend.manager.services.vfolder.actions.base import (
     UpdateVFolderAttributeAction,
     UpdateVFolderAttributeActionResult,
 )
+from ai.backend.manager.services.vfolder.actions.create_v2 import CreateVFolderV2Action
 from ai.backend.manager.services.vfolder.actions.file_v2 import CloneVFolderV2Action
 from ai.backend.manager.services.vfolder.services.vfolder import VFolderService
 
@@ -477,6 +479,67 @@ class TestCreateVFolderAction:
 
         with pytest.raises(VFolderCreationFailure):
             await vfolder_service.create(action)
+
+
+class TestCreateVFolderV2Action:
+    """RBAC scope targeting for CreateVFolderV2Action owner delegation.
+
+    When delegating (``owner_id`` set), the RBAC scope must target the owner's
+    USER scope so the validator authorizes the caller against the owner, not the
+    caller's own scope. Project-scoped creation is unaffected.
+    """
+
+    @staticmethod
+    def _make_action(
+        *,
+        user_id: uuid.UUID,
+        owner_id: UserID | None,
+        project_id: uuid.UUID | None = None,
+    ) -> CreateVFolderV2Action:
+        return CreateVFolderV2Action(
+            name="test-vfolder",
+            user_id=user_id,
+            domain_name="default",
+            project_id=project_id,
+            host=None,
+            usage_mode=VFolderUsageMode.GENERAL,
+            permission=VFolderPermission.READ_WRITE,
+            cloneable=False,
+            owner_id=owner_id,
+        )
+
+    def test_without_owner_targets_caller(self) -> None:
+        caller_id = uuid.uuid4()
+        action = self._make_action(user_id=caller_id, owner_id=None)
+
+        assert action.scope_id() == str(caller_id)
+        target = action.target_element()
+        assert target.element_type == RBACElementType.USER
+        assert target.element_id == str(caller_id)
+
+    def test_with_owner_targets_owner_not_caller(self) -> None:
+        caller_id = uuid.uuid4()
+        owner_id = UserID(uuid.uuid4())
+        action = self._make_action(user_id=caller_id, owner_id=owner_id)
+
+        # Delegation must authorize against the owner, never the caller.
+        assert action.scope_id() == str(owner_id)
+        target = action.target_element()
+        assert target.element_type == RBACElementType.USER
+        assert target.element_id == str(owner_id)
+        assert target.element_id != str(caller_id)
+
+    def test_project_scope_ignores_owner(self) -> None:
+        project_id = uuid.uuid4()
+        action = self._make_action(
+            user_id=uuid.uuid4(), owner_id=UserID(uuid.uuid4()), project_id=project_id
+        )
+
+        # Project-owned vfolders authorize against the project, not a user.
+        assert action.scope_id() == str(project_id)
+        target = action.target_element()
+        assert target.element_type == RBACElementType.PROJECT
+        assert target.element_id == str(project_id)
 
 
 class TestGetVFolderAction:
