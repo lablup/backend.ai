@@ -121,7 +121,6 @@ from ai.backend.manager.data.session.draft import (
 from ai.backend.manager.data.session.options import (
     InternalDataExtras,
     ResourceOpts,
-    SessionHandlerOptions,
 )
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.models.resource_slot import ResourceAllocationRow
@@ -1020,7 +1019,10 @@ class AgentRegistry:
         resource_entries = self._resource_entries_from_legacy_dict(
             creation_config.get("resources") or {}
         )
-        resource_opts = ResourceOpts.model_validate(creation_config.get("resource_opts") or {})
+        resource_opts_payload = creation_config.get("resource_opts") or {}
+        resource_opts = (
+            ResourceOpts.model_validate(resource_opts_payload) if resource_opts_payload else None
+        )
         environ_dict = dict(creation_config.get("environ") or {})
         preopen_ports = tuple(creation_config.get("preopen_ports") or ())
         # Session-level fields (callback, dependencies, etc.) flow onto
@@ -1170,7 +1172,7 @@ class AgentRegistry:
                     designated_agents=tuple(AgentId(a) for a in (agent_list or ())),
                 ),
                 kernel_groups=tuple(groups_by_role.values()),
-                handler_options=SessionHandlerOptions(),
+                handler_options=None,
             ),
             internal_data_extras=InternalDataExtras(
                 sudo_session_enabled=sudo_session_enabled,

@@ -43,7 +43,6 @@ from ai.backend.manager.data.session.draft import (
 from ai.backend.manager.data.session.options import (
     InternalDataExtras,
     ResourceOpts,
-    SessionHandlerOptions,
 )
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.errors.deployment import RevisionMissingModelVFolder
@@ -72,8 +71,9 @@ class DeploymentSessionDraftBuilder:
         startup_command = target_revision.execution.startup_command
         mounts = cls._resolve_mounts(target_revision)
         resource_entries = cls._resource_entries(target_revision)
-        resource_opts = ResourceOpts.model_validate(
-            dict(target_revision.resource_config.resource_opts) or {}
+        resource_opts_payload = dict(target_revision.resource_config.resource_opts) or {}
+        resource_opts = (
+            ResourceOpts.model_validate(resource_opts_payload) if resource_opts_payload else None
         )
         model_definition_payload = cls._model_definition_payload(target_revision, context)
 
@@ -124,7 +124,7 @@ class DeploymentSessionDraftBuilder:
                 cluster_size=target_revision.cluster_config.size,
                 scheduling_target=SchedulingTargetDraft(),
                 kernel_groups=kernel_groups,
-                handler_options=SessionHandlerOptions(),
+                handler_options=None,
             ),
             internal_data_extras=InternalDataExtras(
                 sudo_session_enabled=context.session_owner.sudo_session_enabled,

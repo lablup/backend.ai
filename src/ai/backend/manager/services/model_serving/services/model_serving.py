@@ -81,7 +81,6 @@ from ai.backend.manager.data.session.draft import (
 from ai.backend.manager.data.session.options import (
     InternalDataExtras,
     ResourceOpts,
-    SessionHandlerOptions,
 )
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.vfolder.types import VFolderOwnershipType
@@ -437,7 +436,10 @@ class ModelServingService:
             service_prepare_ctx.extra_mounts,
         )
         resource_entries = self._resource_entries_from_config(action.config.resources)
-        resource_opts = ResourceOpts.model_validate(action.config.resource_opts or {})
+        resource_opts_payload = action.config.resource_opts or {}
+        resource_opts = (
+            ResourceOpts.model_validate(resource_opts_payload) if resource_opts_payload else None
+        )
         environ = dict(action.config.environ or {})
         callback_url = URL(action.callback_url.unicode_string()) if action.callback_url else None
         kernel_groups = await self._resolve_kernel_groups(
@@ -500,7 +502,7 @@ class ModelServingService:
                 cluster_size=action.cluster_size,
                 scheduling_target=SchedulingTargetDraft(),
                 kernel_groups=kernel_groups,
-                handler_options=SessionHandlerOptions(),
+                handler_options=None,
             ),
             internal_data_extras=InternalDataExtras(
                 sudo_session_enabled=sudo_session_enabled,
