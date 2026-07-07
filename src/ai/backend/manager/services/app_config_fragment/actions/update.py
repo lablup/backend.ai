@@ -7,9 +7,8 @@ from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.app_config_fragment.types import AppConfigFragmentData
 from ai.backend.manager.data.permission.types import RBACElementRef
-from ai.backend.manager.models.app_config_allow_list.row import AppConfigAllowListRow
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
-from ai.backend.manager.repositories.base import ExistsQuerier, Updater
+from ai.backend.manager.repositories.base import Updater
 from ai.backend.manager.services.app_config_fragment.actions.base import (
     AppConfigFragmentSingleEntityAction,
     AppConfigFragmentSingleEntityActionResult,
@@ -20,13 +19,13 @@ from ai.backend.manager.services.app_config_fragment.actions.base import (
 class UpdateAppConfigFragmentAction(AppConfigFragmentSingleEntityAction):
     """Update a fragment's ``config`` (replaced wholesale).
 
-    Not admin-only: an allow-listed user may update their own ``user``-scope fragment. The
-    allow-list write-gate (``only_if``) authorizes the write against the fragment's
-    ``(config_name, scope_type)``.
+    Not admin-only: a user may update their own ``user``-scope fragment. No allow-list
+    gate is needed — a fragment row exists only while its ``(config_name, scope_type)``
+    allow-list entry does (FK with cascade), so an existing fragment is always writable
+    at its own scope.
     """
 
     updater: Updater[AppConfigFragmentRow]
-    only_if: ExistsQuerier[AppConfigAllowListRow]
 
     @override
     @classmethod

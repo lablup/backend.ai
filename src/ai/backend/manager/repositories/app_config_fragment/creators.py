@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, override
 
 from ai.backend.common.data.app_config.types import AppConfigScopeType
+from ai.backend.manager.errors.app_config import AppConfigFragmentWriteNotAllowed
+from ai.backend.manager.errors.repository import ForeignKeyViolationError
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
-from ai.backend.manager.repositories.base import CreatorSpec
+from ai.backend.manager.repositories.base import CreatorSpec, IntegrityErrorCheck
 
 
 @dataclass
@@ -22,6 +25,22 @@ class AppConfigFragmentCreatorSpec(CreatorSpec[AppConfigFragmentRow]):
     scope_type: AppConfigScopeType
     scope_id: str
     config: dict[str, Any]
+
+    @property
+    @override
+    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
+        # The FK to app_config_allow_list is the only gate: an insert with no
+        # allow-list row for (config_name, scope_type) surfaces as write-not-allowed.
+        return (
+            IntegrityErrorCheck(
+                violation_type=ForeignKeyViolationError,
+                constraint_name="fk_app_config_fragments_config_name_scope_type",
+                error=AppConfigFragmentWriteNotAllowed(
+                    f"Writing app config {self.config_name!r} at scope "
+                    f"{self.scope_type.value!r} is not allowed."
+                ),
+            ),
+        )
 
     @override
     def build_row(self) -> AppConfigFragmentRow:

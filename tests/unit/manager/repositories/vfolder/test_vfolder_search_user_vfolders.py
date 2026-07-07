@@ -19,8 +19,10 @@ from ai.backend.manager.data.vfolder.types import (
     VFolderOwnershipType,
 )
 from ai.backend.manager.errors.user import UserNotFound
+from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import GroupRow
+from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
@@ -54,6 +56,8 @@ class TestVfolderSearchUserVfolders:
                 UserRow,
                 KeyPairRow,
                 GroupRow,
+                ContainerRegistryRow,
+                ImageRow,
                 VFolderRow,
                 VFolderPermissionRow,
             ],

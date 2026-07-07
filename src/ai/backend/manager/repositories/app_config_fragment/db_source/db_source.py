@@ -18,18 +18,12 @@ from ai.backend.manager.data.app_config_fragment.types import (
 )
 from ai.backend.manager.errors.app_config import (
     AppConfigFragmentNotFound,
-    AppConfigFragmentWriteNotAllowed,
 )
-from ai.backend.manager.models.app_config_allow_list.row import AppConfigAllowListRow
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
 from ai.backend.manager.models.scopes import SearchScope
-from ai.backend.manager.repositories.app_config_fragment.creators import (
-    AppConfigFragmentCreatorSpec,
-)
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     Creator,
-    ExistsQuerier,
     Purger,
     Querier,
     Updater,
@@ -67,20 +61,12 @@ class AppConfigFragmentDBSource:
         self._ops = ops_provider
 
     @app_config_fragment_db_source_resilience.apply()
-    async def create(
-        self,
-        spec: AppConfigFragmentCreatorSpec,
-        only_if: ExistsQuerier[AppConfigAllowListRow],
-    ) -> AppConfigFragmentData:
-        # ``only_if`` (built by the caller) and the write run in one transaction, so the gate
-        # check and the write commit atomically — no check-then-write race.
+    async def create(self, creator: Creator[AppConfigFragmentRow]) -> AppConfigFragmentData:
+        # The FK to the allow-list is the gate: inserting a fragment with no
+        # allow-list row for its ``(config_name, scope_type)`` raises
+        # ``AppConfigFragmentWriteNotAllowed`` (see the spec's integrity checks).
         async with self._ops.write_ops() as w:
-            if not await w.exists(only_if):
-                raise AppConfigFragmentWriteNotAllowed(
-                    f"Writing app config {spec.config_name!r} at scope "
-                    f"{spec.scope_type.value!r} is not allowed."
-                )
-            created = await w.create(Creator(spec=spec))
+            created = await w.create(creator)
             return created.row.to_data()
 
     @app_config_fragment_db_source_resilience.apply()
@@ -92,36 +78,20 @@ class AppConfigFragmentDBSource:
             return result.row.to_data()
 
     @app_config_fragment_db_source_resilience.apply()
-    async def update(
-        self,
-        updater: Updater[AppConfigFragmentRow],
-        only_if: ExistsQuerier[AppConfigAllowListRow],
-    ) -> AppConfigFragmentData:
-        # Gate first, then write — both in one transaction so the check and the write commit
-        # atomically. A missing fragment surfaces as the update returning None below.
+    async def update(self, updater: Updater[AppConfigFragmentRow]) -> AppConfigFragmentData:
+        # No write-gate here: the FK to the allow-list guarantees a fragment row exists
+        # only while its ``(config_name, scope_type)`` entry does, so an existing
+        # fragment is always writable at its own scope.
         async with self._ops.write_ops() as w:
-            if not await w.exists(only_if):
-                raise AppConfigFragmentWriteNotAllowed(
-                    f"Writing app config fragment {updater.pk_value} is not allowed."
-                )
             result = await w.update(updater)
             if result is None:
                 raise AppConfigFragmentNotFound(f"App config fragment {updater.pk_value} not found")
             return result.row.to_data()
 
     @app_config_fragment_db_source_resilience.apply()
-    async def purge(
-        self,
-        purger: Purger[AppConfigFragmentRow],
-        only_if: ExistsQuerier[AppConfigAllowListRow],
-    ) -> AppConfigFragmentData:
-        # Gate first, then write — both in one transaction so the check and the write commit
-        # atomically. A missing fragment surfaces as the purge returning None below.
+    async def purge(self, purger: Purger[AppConfigFragmentRow]) -> AppConfigFragmentData:
+        # No write-gate here — see ``update``.
         async with self._ops.write_ops() as w:
-            if not await w.exists(only_if):
-                raise AppConfigFragmentWriteNotAllowed(
-                    f"Writing app config fragment {purger.pk_value} is not allowed."
-                )
             result = await w.purge(purger)
             if result is None:
                 raise AppConfigFragmentNotFound(f"App config fragment {purger.pk_value} not found")

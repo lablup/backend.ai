@@ -12,16 +12,12 @@ from ai.backend.manager.data.app_config_fragment.types import (
     AppConfigFragmentData,
     AppConfigFragmentSearchResult,
 )
-from ai.backend.manager.models.app_config_allow_list.row import AppConfigAllowListRow
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
 from ai.backend.manager.models.scopes import SearchScope
-from ai.backend.manager.repositories.app_config_fragment.creators import (
-    AppConfigFragmentCreatorSpec,
-)
 from ai.backend.manager.repositories.app_config_fragment.db_source import (
     AppConfigFragmentDBSource,
 )
-from ai.backend.manager.repositories.base import BatchQuerier, ExistsQuerier, Purger, Updater
+from ai.backend.manager.repositories.base import BatchQuerier, Creator, Purger, Updater
 from ai.backend.manager.repositories.ops import DBOpsProvider
 
 __all__ = ("AppConfigFragmentRepository",)
@@ -55,32 +51,20 @@ class AppConfigFragmentRepository:
         self._db_source = AppConfigFragmentDBSource(ops_provider)
 
     @app_config_fragment_repository_resilience.apply()
-    async def create(
-        self,
-        spec: AppConfigFragmentCreatorSpec,
-        only_if: ExistsQuerier[AppConfigAllowListRow],
-    ) -> AppConfigFragmentData:
-        return await self._db_source.create(spec, only_if)
+    async def create(self, creator: Creator[AppConfigFragmentRow]) -> AppConfigFragmentData:
+        return await self._db_source.create(creator)
 
     @app_config_fragment_repository_resilience.apply()
     async def get_by_id(self, fragment_id: AppConfigFragmentID) -> AppConfigFragmentData:
         return await self._db_source.get_by_id(fragment_id)
 
     @app_config_fragment_repository_resilience.apply()
-    async def update(
-        self,
-        updater: Updater[AppConfigFragmentRow],
-        only_if: ExistsQuerier[AppConfigAllowListRow],
-    ) -> AppConfigFragmentData:
-        return await self._db_source.update(updater, only_if)
+    async def update(self, updater: Updater[AppConfigFragmentRow]) -> AppConfigFragmentData:
+        return await self._db_source.update(updater)
 
     @app_config_fragment_repository_resilience.apply()
-    async def purge(
-        self,
-        purger: Purger[AppConfigFragmentRow],
-        only_if: ExistsQuerier[AppConfigAllowListRow],
-    ) -> AppConfigFragmentData:
-        return await self._db_source.purge(purger, only_if)
+    async def purge(self, purger: Purger[AppConfigFragmentRow]) -> AppConfigFragmentData:
+        return await self._db_source.purge(purger)
 
     @app_config_fragment_repository_resilience.apply()
     async def admin_search(self, querier: BatchQuerier) -> AppConfigFragmentSearchResult:
