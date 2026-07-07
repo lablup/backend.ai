@@ -7140,7 +7140,7 @@ input ModelServiceConfigInput {
   """
   Shell used to run the command. If set, the kernel runs `[shell, '-c', command]`; null or empty disables shell wrapping.
   """
-  shell: String = null
+  shell: String = "/bin/bash"
 
   """Port number for the model service."""
   port: Int = null
