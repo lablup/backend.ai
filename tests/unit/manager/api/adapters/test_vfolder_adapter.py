@@ -14,6 +14,7 @@ from ai.backend.common.dto.manager.v2.vfolder.request import (
     SearchVFoldersInput,
     VFolderFilter,
 )
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import QuotaScopeID, VFolderUsageMode
 from ai.backend.manager.api.adapters.vfolder.adapter import VFolderAdapter
@@ -312,3 +313,47 @@ class TestVFolderAdapterGetFolderUsage:
         dto = await adapter.get_folder_usage(uuid4())
 
         assert dto is None
+
+
+class TestVFolderAdapterPurge:
+    """Tests for VFolderAdapter.purge() owner_id delegation."""
+
+    @pytest.fixture
+    def mock_processors(self) -> MagicMock:
+        processors = MagicMock()
+        processors.vfolder.purge_v2.wait_for_complete = AsyncMock()
+        return processors
+
+    @pytest.fixture
+    def adapter(self, mock_processors: MagicMock) -> VFolderAdapter:
+        return VFolderAdapter(mock_processors)
+
+    async def test_purge_without_owner(
+        self,
+        adapter: VFolderAdapter,
+        mock_processors: MagicMock,
+    ) -> None:
+        """Without owner_id, the action carries no delegated owner."""
+        from ai.backend.common.dto.manager.v2.vfolder.request import PurgeVFolderInput
+
+        vfolder_id = uuid4()
+        await adapter.purge(vfolder_id, PurgeVFolderInput())
+
+        action = mock_processors.vfolder.purge_v2.wait_for_complete.call_args[0][0]
+        assert action.vfolder_id == vfolder_id
+        assert action.owner_id is None
+
+    async def test_purge_with_owner_forwards_owner(
+        self,
+        adapter: VFolderAdapter,
+        mock_processors: MagicMock,
+    ) -> None:
+        """With owner_id, the action carries the delegated owner."""
+        from ai.backend.common.dto.manager.v2.vfolder.request import PurgeVFolderInput
+
+        vfolder_id = uuid4()
+        owner_id = UserID(uuid4())
+        await adapter.purge(vfolder_id, PurgeVFolderInput(owner_id=owner_id))
+
+        action = mock_processors.vfolder.purge_v2.wait_for_complete.call_args[0][0]
+        assert action.owner_id == owner_id

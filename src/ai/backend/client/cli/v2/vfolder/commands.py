@@ -222,13 +222,23 @@ def delete(vfolder_id: UUID) -> None:
 
 @vfolder.command()
 @click.argument("vfolder_id", type=click.UUID)
-def purge(vfolder_id: UUID) -> None:
+@click.option(
+    "--owner-id",
+    default=None,
+    type=click.UUID,
+    help="Delegated owner user UUID. Purge the vfolder on behalf of this user.",
+)
+def purge(vfolder_id: UUID, owner_id: UUID | None) -> None:
     """Permanently delete a vfolder."""
+    from ai.backend.common.dto.manager.v2.vfolder.request import PurgeVFolderInput
+    from ai.backend.common.identifier.user import UserID
+
+    request = PurgeVFolderInput(owner_id=UserID(owner_id) if owner_id is not None else None)
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
-            result = await registry.vfolder.purge(vfolder_id)
+            result = await registry.vfolder.purge(vfolder_id, request)
             print_result(result)
         finally:
             await registry.close()

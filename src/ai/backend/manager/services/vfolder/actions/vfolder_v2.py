@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.common.identifier.user import UserID
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.services.vfolder.actions.base import (
@@ -64,6 +65,9 @@ class PurgeVFolderV2Action(VFolderSingleEntityAction):
 
     vfolder_id: uuid.UUID
     cascade_model_card: bool = False
+    owner_id: UserID | None = None
+    """Delegated owner user UUID. When set, the purge is performed on behalf of
+    that user (host permission is resolved from the owner)."""
 
     @override
     def entity_id(self) -> str | None:

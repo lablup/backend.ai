@@ -1866,13 +1866,20 @@ class VFolderService:
         me = current_user()
         if me is None:
             raise UnreachableError("User context is not available")
+        acting_user_id = me.user_id
+        if action.owner_id is not None:
+            # Delegation: perform the purge on behalf of the target user, so the
+            # host permission is resolved from the owner. RBAC still authorizes
+            # the caller against the target vfolder.
+            owner = await self._user_repository.get_user_by_uuid(action.owner_id)
+            acting_user_id = owner.id
         vfolder_data = await self._vfolder_repository.get_by_id(action.vfolder_id)
 
-        # Host permission check — resolved from current user context
+        # Host permission check — resolved from the acting user context
         await self._vfolder_repository.ensure_host_permission_allowed_by_user(
             vfolder_data.host,
             permission=VFolderHostPermission.DELETE,
-            user_uuid=me.user_id,
+            user_uuid=acting_user_id,
         )
 
         result = await self._vfolder_repository.delete_vfolders_forever(
