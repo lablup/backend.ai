@@ -32,5 +32,5 @@ class NetworkSetup:
     network_config: dict[str, Any] = field(default_factory=dict)
     cluster_ssh_port_mapping: ClusterSSHPortMapping | None = None
     endpoint_ips: dict[str, str] = field(default_factory=dict)
-    """Manager-assigned overlay IP per kernel (container_id -> ip) for BEP-1055 central
+    """Manager-assigned overlay IP per kernel (container_id -> ip) for BEP-1058 central
     IPAM; threaded into each kernel's KernelCreationConfig. Empty unless multi-node overlay."""

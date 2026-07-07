@@ -1925,7 +1925,7 @@ class InterContainerNetworkConfig(BaseConfigSchema):
                 "One of 'vxlan', 'host-gw', or 'wireguard'. "
                 "When unset (null), the backend is selected per session from agent capabilities "
                 "('host-gw' if all members support native routing, otherwise 'vxlan'). "
-                "See BEP-1055."
+                "See BEP-1058."
             ),
             added_version="25.14.0",
             example=ConfigExample(local="vxlan", prod="null"),

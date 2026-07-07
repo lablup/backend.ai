@@ -2,7 +2,7 @@
 
 Allocation state lives in etcd under ``network/ipam/*`` and is claimed with
 ``AsyncEtcd.put_if_absent`` (a compare-and-swap on ``create_revision == 0``),
-replacing Swarm's internal global IPAM. See proposals/BEP-1055/control-plane.md.
+replacing Swarm's internal global IPAM. See proposals/BEP-1058/control-plane.md.
 """
 
 from __future__ import annotations
@@ -104,7 +104,7 @@ class EndpointAllocator:
     Central assignment (vs per-node host-local IPAM) is what guarantees disjoint IPs
     across nodes on a stretched overlay subnet; the written ``endpoints/`` table is also
     the input the agent coordinator uses to program FDB/ARP proactively. See
-    proposals/BEP-1055/control-plane.md.
+    proposals/BEP-1058/control-plane.md.
     """
 
     _etcd: AsyncEtcd

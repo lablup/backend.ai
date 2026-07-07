@@ -4,7 +4,7 @@ Unlike v1 (`agent/plugin/network.py`), whose `join_network()` returns a Docker
 container-config dict, v2 separates host-level *session-network lifecycle* (the agent
 builds the vxlan/bridge/routes itself) from runtime-specific *endpoint attach*, and
 returns a runtime-neutral `NetworkAttachSpec` that a Docker or containerd provisioner
-interprets. See proposals/BEP-1055/agent-plugin-v2.md.
+interprets. See proposals/BEP-1058/agent-plugin-v2.md.
 """
 
 from abc import ABCMeta, abstractmethod
@@ -36,7 +36,7 @@ class AbstractNetworkAgentPluginV2[TKernel: AbstractKernel](AbstractPlugin, meta
     Contract: implementations are stateless data-plane executors. They must NOT start
     their own etcd ``members/`` watch. A per-session, runtime-neutral
     ``SessionNetworkCoordinator`` owns membership watching and drives ``add_peer`` /
-    ``del_peer`` (which must be idempotent). See BEP-1055/agent-plugin-v2.md.
+    ``del_peer`` (which must be idempotent). See BEP-1058/agent-plugin-v2.md.
     """
 
     @abstractmethod

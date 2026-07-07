@@ -1,4 +1,4 @@
-"""Containerd agent backend (BEP-1055).
+"""Containerd agent backend (BEP-1058).
 
 Selectable via ``agent.backend = "containerd"``. Reuses the Docker backend's resource
 and krunner-env logic (containerd runs the same Linux containers with the same

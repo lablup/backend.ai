@@ -1,4 +1,4 @@
-"""Agent-facing composition of session network + container runtime (BEP-1055).
+"""Agent-facing composition of session network + container runtime (BEP-1058).
 
 `ContainerdAgent` holds one of these. It bridges the data the manager sends
 (``cluster_info["network_config"]`` = the CNINetworkPlugin's ``{backend, subnet, vni,
@@ -196,7 +196,7 @@ class ContainerdSessionNetwork:
         oci_spec: dict[str, Any],
     ) -> None:
         """Create a single-node container on a PER-SESSION bridge (isolated from other
-        sessions), NOT nerdctl's shared default bridge. No BEP-1055 overlay needed."""
+        sessions), NOT nerdctl's shared default bridge. No BEP-1058 overlay needed."""
         net = self.local_network_name(session_id)
         await self._runtime.create_network(net)
         await self._runtime.create_container(

@@ -1,6 +1,6 @@
 <!-- context-for-ai
 type: detail-doc
-parent: BEP-1055 (Runtime-Neutral Cluster Network with Pluggable Data Plane)
+parent: BEP-1058 (Runtime-Neutral Cluster Network with Pluggable Data Plane)
 scope: The runtime-neutral v2 agent network plugin — splits host-level session-network lifecycle from runtime-specific endpoint attach, returning a neutral NetworkAttachSpec.
 depends-on: [control-plane.md, data-plane-backends.md]
 key-decisions:
@@ -8,7 +8,7 @@ key-decisions:
   - attach_endpoint returns a runtime-neutral NetworkAttachSpec; provisioners translate it.
 -->
 
-# BEP-1055: Runtime-Neutral Agent Plugin (v2)
+# BEP-1058: Runtime-Neutral Agent Plugin (v2)
 
 ## Summary
 

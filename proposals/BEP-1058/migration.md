@@ -1,6 +1,6 @@
 <!-- context-for-ai
 type: detail-doc
-parent: BEP-1055 (Runtime-Neutral Cluster Network with Pluggable Data Plane)
+parent: BEP-1058 (Runtime-Neutral Cluster Network with Pluggable Data Plane)
 scope: Rollout, backward compatibility, and the two config switches (default_driver, forced_backend).
 depends-on: [control-plane.md, agent-plugin-v2.md]
 key-decisions:
@@ -8,7 +8,7 @@ key-decisions:
   - forced_backend pins a data plane; unset means capability-based auto-selection.
 -->
 
-# BEP-1055: Migration & Compatibility
+# BEP-1058: Migration & Compatibility
 
 ## Summary
 

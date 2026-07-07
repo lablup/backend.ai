@@ -1,4 +1,4 @@
-"""Cluster-session network exceptions (BEP-1055)."""
+"""Cluster-session network exceptions (BEP-1058)."""
 
 from __future__ import annotations
 
@@ -42,7 +42,7 @@ class VNIPoolExhausted(BackendAIError, web.HTTPServiceUnavailable):
 
 
 class NetworkBackendMismatch(BackendAIError, web.HTTPConflict):
-    """A member agent is not CNI-capable while the network driver is 'cni' (BEP-1055).
+    """A member agent is not CNI-capable while the network driver is 'cni' (BEP-1058).
 
     This guards the deployment invariant that the agent backend (docker/containerd) and the
     global network driver (overlay/cni) must be a matched pair — a multi-node session

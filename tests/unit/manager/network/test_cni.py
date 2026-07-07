@@ -1,4 +1,4 @@
-"""Tests for the BEP-1055 control-plane pieces.
+"""Tests for the BEP-1058 control-plane pieces.
 
 IPAM allocators are tested against an in-memory fake that models the etcd
 compare-and-swap boundary (``put_if_absent``/``delete``); CAS atomicity itself is

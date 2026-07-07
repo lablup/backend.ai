@@ -1,4 +1,4 @@
-"""Containerd agent backend (BEP-1055).
+"""Containerd agent backend (BEP-1058).
 
 An independent agent backend parallel to DockerAgent, targeting containerd's native
 gRPC/task model instead of the Docker daemon. This is a structural scaffold: the
@@ -6,7 +6,7 @@ container-facing operations (image scan/pull, task create/start, destroy) raise
 ``NotImplementedError`` pending the containerd gRPC client; the runtime-agnostic parts
 (resource spec, registration, kernel context wiring) are real.
 
-Cluster networking is provided by the BEP-1055 runtime-neutral stack
+Cluster networking is provided by the BEP-1058 runtime-neutral stack
 (``agent.network``): the SessionNetworkCoordinator handles per-session setup and the
 ContainerNetworkProvisioner attaches each container's task PID via CNI.
 """
@@ -221,7 +221,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
 
     @override
     async def apply_network(self, cluster_info: ClusterInfo) -> None:
-        # BEP-1055: set up this node's per-session data plane (vxlan/bridge + membership)
+        # BEP-1058: set up this node's per-session data plane (vxlan/bridge + membership)
         # and register the per-session orchestrator. Per-container CNI attach happens in
         # start_container against the task PID. Single-node sessions without a manager-
         # provided network_config skip this.
@@ -377,7 +377,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         spec = self._pending_spec
         command = [KRUNNER_ENTRYPOINT, *cmdargs]
         if self._net_meta is None:
-            # single-node: plain bridge network (no BEP-1055 overlay), like Docker.
+            # single-node: plain bridge network (no BEP-1058 overlay), like Docker.
             await self._session_network.create_local_container(
                 self._session_id,
                 self._container_id,
@@ -440,7 +440,7 @@ class ContainerdAgent(
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
-        # Cluster networking is delegated to the BEP-1055 agent.network stack via a
+        # Cluster networking is delegated to the BEP-1058 agent.network stack via a
         # (verified) facade; the kernel-creation lifecycle will drive it. The vxlan uplink
         # must be the interface carrying this node's VTEP (host_ip) — deriving it from the
         # host_ip keeps the overlay on the same L2 the agents advertise on, instead of a
@@ -458,7 +458,7 @@ class ContainerdAgent(
     async def __ainit__(self) -> None:
         await super().__ainit__()
         # Advertise this node's VTEP so the manager can pre-seed session membership and
-        # eliminate the peer-publish race for multi-node overlays (BEP-1055).
+        # eliminate the peer-publish race for multi-node overlays (BEP-1058).
         await publish_vtep(self.etcd, str(self.id), self._host_ip)
 
     # execute is inherited from AbstractAgent: it delegates to kernel_obj.execute (the code
@@ -620,7 +620,7 @@ class ContainerdAgent(
 
     @override
     async def create_local_network(self, network_name: str) -> None:
-        # Single-node multi-kernel local bridge. In BEP-1055 intra-node connectivity is
+        # Single-node multi-kernel local bridge. In BEP-1058 intra-node connectivity is
         # covered by the per-session overlay/LOCAL bridges, so this is a no-op for now.
         # TODO: a dedicated agent-local bridge for single-node cluster sessions.
         return

@@ -4,7 +4,7 @@ Replaces the Swarm-based `OverlayNetworkPlugin` for containerd and other host-na
 runtimes. This plugin owns the *control plane*: it allocates a per-session subnet
 (and a VNI for the vxlan backend), selects the data-plane backend from agent
 capabilities, and writes the session network descriptor to etcd. The data plane
-itself is realized by the agent-side v2 plugins (see BEP-1055/agent-plugin-v2.md).
+itself is realized by the agent-side v2 plugins (see BEP-1058/agent-plugin-v2.md).
 """
 
 from __future__ import annotations
@@ -35,12 +35,12 @@ from ai.backend.manager.plugin.network import AbstractNetworkManagerPlugin, Netw
 
 _DEFAULT_MTU = 1500
 
-# Agent backends whose network stack can serve the BEP-1055 'cni' driver.
+# Agent backends whose network stack can serve the BEP-1058 'cni' driver.
 _CNI_COMPATIBLE_BACKENDS = frozenset({"containerd"})
 
 
 class CNINetworkPlugin(AbstractNetworkManagerPlugin):
-    """Control-plane plugin for the runtime-neutral cluster network (BEP-1055)."""
+    """Control-plane plugin for the runtime-neutral cluster network (BEP-1058)."""
 
     _etcd: AsyncEtcd | None
     _subnet_allocator: SubnetAllocator
@@ -93,7 +93,7 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         forced_raw = options.get("forced_backend")
         forced_backend = NetworkBackendKind(forced_raw) if forced_raw else None
         # Each endpoint = one container: {"container_id", "agent_id"}. The manager assigns
-        # its overlay IP centrally (BEP-1055) so per-node IPs are disjoint.
+        # its overlay IP centrally (BEP-1058) so per-node IPs are disjoint.
         endpoints = list(options.get("endpoints", []))
 
         await self._require_members_cni_capable(member_agents)

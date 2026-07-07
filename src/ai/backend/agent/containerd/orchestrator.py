@@ -1,4 +1,4 @@
-"""Composition of containerd runtime + cluster network (BEP-1055).
+"""Composition of containerd runtime + cluster network (BEP-1058).
 
 The runtime (`ContainerdRuntimeClient`) and the network subsystem
 (`ContainerNetworkProvisioner`) are two completely separate classes that never

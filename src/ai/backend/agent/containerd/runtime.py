@@ -1,8 +1,8 @@
-"""Low-level containerd runtime client contract (BEP-1055).
+"""Low-level containerd runtime client contract (BEP-1058).
 
 This is the **containerd-only** management surface: image and container/task lifecycle
 over containerd's native tooling/API (NOT CRI — CRI's RunPodSandbox couples the runtime
-to CNI, which BEP-1055 owns separately). It imports nothing from the network layer and
+to CNI, which BEP-1058 owns separately). It imports nothing from the network layer and
 knows nothing about CNI, vxlan, or sessions.
 
 The single value that crosses the runtime↔network boundary is a task's network
@@ -15,7 +15,7 @@ Lifecycle model: a container is created with an **isolated, empty network namesp
 layer can attach CNI into its netns. (A future containerd-gRPC implementation may attach
 in the pre-start "created" state; the tooling-based client cannot expose a PID before
 start, so networking attaches immediately after start — validated to work in
-BEP-1055/verification.md §5.)
+BEP-1058/verification.md §5.)
 """
 
 from __future__ import annotations

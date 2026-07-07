@@ -2322,7 +2322,7 @@ class AgentSpecificConfig(BaseConfigSchema):
                 DockerExtraConfig.model_validate(self.container.model_dump())
             case AgentBackend.CONTAINERD:
                 # containerd runs the same Linux containers as Docker; reuse its
-                # container-config validation. See BEP-1055.
+                # container-config validation. See BEP-1058.
                 DockerExtraConfig.model_validate(self.container.model_dump())
             case AgentBackend.DUMMY:
                 pass

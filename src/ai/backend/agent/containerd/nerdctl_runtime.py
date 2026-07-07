@@ -1,7 +1,7 @@
-"""nerdctl-based ContainerdRuntimeClient (BEP-1055, initial implementation).
+"""nerdctl-based ContainerdRuntimeClient (BEP-1058, initial implementation).
 
 Drives containerd through the ``nerdctl`` CLI with ``--network none`` so nerdctl never
-touches networking — CNI ownership stays with the BEP-1055 network subsystem. This is
+touches networking — CNI ownership stays with the BEP-1058 network subsystem. This is
 the first working, end-to-end-verifiable implementation; it can be swapped for a
 low-level containerd-gRPC client later without touching the orchestrator or the network
 layer (both depend only on the ``ContainerdRuntimeClient`` ABC).
@@ -129,7 +129,7 @@ class NerdctlRuntimeClient(ContainerdRuntimeClient):
         oci_spec: Mapping[str, Any],
         network: str = "none",
     ) -> None:
-        # network="none": isolated netns (only lo), for multi-node where the BEP-1055 layer
+        # network="none": isolated netns (only lo), for multi-node where the BEP-1058 layer
         # attaches CNI after start. network="bridge": nerdctl's default bridge (an IP +
         # host reachability) — used for single-node sessions, mirroring Docker.
         opts: list[str] = []
@@ -140,7 +140,7 @@ class NerdctlRuntimeClient(ContainerdRuntimeClient):
             opts += ["-e", f"{key}={value}"]
         for key, value in (oci_spec.get("labels") or {}).items():
             opts += ["-l", f"{key}={value}"]
-        # Accelerator wiring (BEP-1055): /dev node passthrough (AMD/NPU) and NVIDIA GPUs
+        # Accelerator wiring (BEP-1058): /dev node passthrough (AMD/NPU) and NVIDIA GPUs
         # (nerdctl --gpus drives nvidia-container-toolkit, same as docker --gpus).
         for dev in oci_spec.get("devices") or []:
             opts += ["--device", f"{dev['source']}:{dev['destination']}:{dev['permissions']}"]

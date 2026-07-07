@@ -1953,7 +1953,7 @@ class KernelCreationConfig(TypedDict):
     agent_addr: str
     endpoint_id: str | None
     cluster_network_ip: NotRequired[str | None]
-    """Manager-assigned overlay IP for this kernel's OVERLAY interface (BEP-1055 central
+    """Manager-assigned overlay IP for this kernel's OVERLAY interface (BEP-1058 central
     IPAM). Set only for multi-node overlay sessions; the agent uses it as the static CNI
     address so per-node IPs are disjoint. Absent/None => host-local fallback."""
 

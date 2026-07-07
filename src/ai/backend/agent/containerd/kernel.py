@@ -1,4 +1,4 @@
-"""Containerd kernel + code runner (BEP-1055 / containerd agent backend).
+"""Containerd kernel + code runner (BEP-1058 / containerd agent backend).
 
 Mirrors the Docker kernel contract but targets containerd's native task model.
 Container-facing operations that require the containerd gRPC client are marked

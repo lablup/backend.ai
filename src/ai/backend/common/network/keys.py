@@ -1,4 +1,4 @@
-"""Canonical etcd key layout for the BEP-1055 cluster-network control plane.
+"""Canonical etcd key layout for the BEP-1058 cluster-network control plane.
 
 Single source of truth for the etcd paths the manager (control plane) writes and the
 agent (data plane) reads. Both sides MUST agree on these paths; defining them once here —

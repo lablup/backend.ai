@@ -1,4 +1,4 @@
-"""VXLAN cluster-network backend (BEP-1055).
+"""VXLAN cluster-network backend (BEP-1058).
 
 Portable default data plane: per-session VXLAN VNI + bridge, with unicast head-end
 replication (FDB) driven by the SessionNetworkCoordinator's etcd membership watch.
@@ -113,7 +113,7 @@ def neigh_del_args(vni: int, ip: str) -> list[str]:
 def _overlay_ipam(meta: SessionNetMeta, ip: str | None) -> dict[str, Any]:
     """Static IPAM with the manager-assigned endpoint IP when available, else host-local.
 
-    The static path is the BEP-1055 default for multi-node: a central per-endpoint IP
+    The static path is the BEP-1058 default for multi-node: a central per-endpoint IP
     (from the manager's ``endpoints/`` table) is disjoint across nodes by construction,
     unlike per-node host-local which hands every node the same first address on the
     stretched overlay subnet (cross-node collision). Host-local remains the fallback for
@@ -151,7 +151,7 @@ def local_cni_config(session_id: str, *, bridge: str, subnet: str) -> dict[str, 
     """CNI 'bridge' config for the host-local interface: agent<->container control
     channel plus egress NAT, carrying the default route.
 
-    Per BEP-1055 Decision Log (2026-07-03): the LOCAL bridge is **per session**, on a
+    Per BEP-1058 Decision Log (2026-07-03): the LOCAL bridge is **per session**, on a
     **node-local** NAT subnet (not the stretched overlay subnet). Cross-session isolation
     comes from separate bridges (verified §8), not ICC-off firewall rules (the stock CNI
     bridge does not implement ICC-off — §9). A node-local subnet also avoids the
