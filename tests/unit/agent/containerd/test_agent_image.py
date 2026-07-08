@@ -340,3 +340,27 @@ class TestAgentSocket:
     async def test_invalid_action(self) -> None:
         reply = await self._agent_with_sandbox(False)._agent_sock_reply([b"bogus"])
         assert reply[0] == struct.pack("i", -2)
+
+
+class TestSeccompConversion:
+    def test_null_subarchitectures_and_syscalls(self) -> None:
+        # Docker profiles may carry explicit JSON null for subArchitectures/syscalls; .get(k, [])
+        # would return None (key present) and blow up — the converter must treat null as empty.
+        oci = agent_mod._docker_seccomp_to_oci({
+            "defaultAction": "SCMP_ACT_ERRNO",
+            "archMap": [{"architecture": "SCMP_ARCH_X86_64", "subArchitectures": None}],
+            "syscalls": None,
+        })
+        assert oci["architectures"] == ["SCMP_ARCH_X86_64"]
+        assert oci["syscalls"] == []
+
+    def test_maps_docker_shape_to_oci(self) -> None:
+        oci = agent_mod._docker_seccomp_to_oci({
+            "defaultAction": "SCMP_ACT_ERRNO",
+            "archMap": [
+                {"architecture": "SCMP_ARCH_X86_64", "subArchitectures": ["SCMP_ARCH_X86"]}
+            ],
+            "syscalls": [{"names": ["read", "write"], "action": "SCMP_ACT_ALLOW"}],
+        })
+        assert oci["architectures"] == ["SCMP_ARCH_X86_64", "SCMP_ARCH_X86"]
+        assert oci["syscalls"] == [{"names": ["read", "write"], "action": "SCMP_ACT_ALLOW"}]

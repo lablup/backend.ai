@@ -128,11 +128,11 @@ def _docker_seccomp_to_oci(profile: Mapping[str, Any]) -> dict[str, Any]:
     OCI runtime-spec linux.seccomp shape (flat architectures; conditional includes/excludes are
     dropped — the listed syscalls are simply allowed)."""
     architectures: list[str] = []
-    for entry in profile.get("archMap", []):
+    for entry in profile.get("archMap") or []:
         architectures.append(entry["architecture"])
-        architectures.extend(entry.get("subArchitectures", []))
+        architectures.extend(entry.get("subArchitectures") or [])
     syscalls: list[dict[str, Any]] = []
-    for sc in profile.get("syscalls", []):
+    for sc in profile.get("syscalls") or []:
         oci_sc: dict[str, Any] = {"names": sc["names"], "action": sc["action"]}
         if sc.get("errnoRet") is not None:
             oci_sc["errnoRet"] = sc["errnoRet"]
