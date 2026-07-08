@@ -51,6 +51,19 @@ class ImageInfo:
     labels: Mapping[str, str]
 
 
+@dataclass(frozen=True)
+class ContainerInfo:
+    """A container as seen by the runtime, for lifecycle reconciliation on agent restart.
+
+    ``status`` is the containerd task status string ('running'/'stopped'/'created'/...);
+    the agent maps it to its own ContainerStatus."""
+
+    id: str
+    image: str
+    labels: Mapping[str, str]
+    status: str
+
+
 class OciRuntime(ABC):
     """Containerd-only lifecycle operations. No network/CNI concerns."""
 
@@ -120,6 +133,10 @@ class OciRuntime(ABC):
     # --- introspection ---
     @abstractmethod
     async def list_containers(self) -> Sequence[str]: ...
+
+    @abstractmethod
+    async def list_container_infos(self) -> Sequence[ContainerInfo]:
+        """List containers with labels + image + task status (for restart reconciliation)."""
 
     @abstractmethod
     async def container_pid(self, container_id: str) -> int | None:

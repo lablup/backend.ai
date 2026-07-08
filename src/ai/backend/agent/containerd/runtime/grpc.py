@@ -46,7 +46,12 @@ from ai.backend.agent.containerd._grpcapi.api.services.transfer.v1 import (
 )
 from ai.backend.agent.containerd._grpcapi.api.types import mount_pb2
 from ai.backend.agent.containerd._grpcapi.api.types.transfer import imagestore_pb2, registry_pb2
-from ai.backend.agent.containerd.runtime.interface import ImageInfo, OciRuntime, TaskHandle
+from ai.backend.agent.containerd.runtime.interface import (
+    ContainerInfo,
+    ImageInfo,
+    OciRuntime,
+    TaskHandle,
+)
 from ai.backend.agent.containerd.runtime.spec import build_oci_runtime_spec
 from ai.backend.common.arch import CURRENT_ARCH
 from ai.backend.logging import BraceStyleAdapter
@@ -330,6 +335,23 @@ class ContainerdGrpcRuntime(OciRuntime):
             containers_pb2.ListContainersRequest(), metadata=self._md
         )
         return [c.id for c in resp.containers]
+
+    @override
+    async def list_container_infos(self) -> Sequence[ContainerInfo]:
+        resp: containers_pb2.ListContainersResponse = await self._containers_stub().List(
+            containers_pb2.ListContainersRequest(), metadata=self._md
+        )
+        infos: list[ContainerInfo] = []
+        for c in resp.containers:
+            infos.append(
+                ContainerInfo(
+                    id=c.id,
+                    image=c.image,
+                    labels=dict(c.labels),
+                    status=await self.container_status(c.id) or "stopped",
+                )
+            )
+        return infos
 
     @override
     async def container_status(self, container_id: str) -> str | None:

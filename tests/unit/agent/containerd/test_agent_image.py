@@ -5,11 +5,11 @@ from typing import Any, cast
 import pytest
 
 from ai.backend.agent.containerd.agent import ContainerdAgent
-from ai.backend.agent.containerd.runtime.interface import ImageInfo
+from ai.backend.agent.containerd.runtime.interface import ContainerInfo, ImageInfo
 from ai.backend.common.docker import LabelName
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.exception import ImageNotAvailable
-from ai.backend.common.types import AutoPullBehavior
+from ai.backend.common.types import AutoPullBehavior, ContainerStatus
 
 
 class FakeFacade:
@@ -224,10 +224,40 @@ class TestCgroupPath:
         assert str(path) == "/sys/fs/cgroup/system.slice/containerd-abc123.scope"
 
 
-class TestBootSafe:
-    async def test_enumerate_containers_empty(self) -> None:
+class TestEnumerateContainers:
+    def _runtime_with(self, infos: list[Any]) -> Any:
+        class _R:
+            async def list_container_infos(self) -> list[Any]:
+                return infos
+
+        return _R()
+
+    async def test_maps_kernel_containers_by_label(self) -> None:
+        kid = "11111111-1111-1111-1111-111111111111"
+        infos = [
+            ContainerInfo(id=kid, image="img:1", status="running",
+                          labels={"ai.backend.kernel-id": kid}),
+            ContainerInfo(id="c2", image="redis", status="running", labels={}),  # not a kernel
+        ]  # fmt: skip
         agent = _agent(FakeFacade())
-        assert await agent.enumerate_containers() == []
+        agent._runtime = cast(Any, self._runtime_with(infos))
+        result = await agent.enumerate_containers()
+        assert len(result) == 1
+        got_kid, container = result[0]
+        assert str(got_kid) == kid
+        assert container.status is ContainerStatus.RUNNING
+        assert container.id == kid
+
+    async def test_status_filter_excludes(self) -> None:
+        kid = "22222222-2222-2222-2222-222222222222"
+        infos = [
+            ContainerInfo(id=kid, image="img:1", status="stopped",
+                          labels={"ai.backend.kernel-id": kid}),
+        ]  # fmt: skip
+        agent = _agent(FakeFacade())
+        agent._runtime = cast(Any, self._runtime_with(infos))
+        # stopped -> EXITED; filtering to RUNNING excludes it
+        assert await agent.enumerate_containers(frozenset({ContainerStatus.RUNNING})) == []
 
     def test_cgroup_version_is_v2(self) -> None:
         assert _agent(FakeFacade()).get_cgroup_version() == "2"

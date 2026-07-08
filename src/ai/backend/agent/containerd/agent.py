@@ -22,7 +22,7 @@ from decimal import Decimal
 from importlib.resources import files
 from pathlib import Path
 from typing import Any, cast, override
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from ai.backend.agent.agent import (
     AbstractAgent,
@@ -80,6 +80,7 @@ from ai.backend.logging import BraceStyleAdapter
 
 from .kernel import ContainerdKernel
 from .oci import (
+    KERNEL_ID_LABEL,
     KRUNNER_ENTRYPOINT,
     AcceleratorSpec,
     translate_accelerator_args,
@@ -98,6 +99,12 @@ _TODO = "containerd backend: not yet implemented (requires containerd gRPC clien
 # Placeholder subnet for a single-node BRIDGE session; the bridge backend allocates the
 # real node-local /24 per session and ignores this value (SessionNetMeta requires a subnet).
 _LOCAL_SUBNET = "172.30.0.0/24"
+# containerd task status -> Backend.AI ContainerStatus (anything not running/paused = exited).
+_CONTAINERD_TO_STATUS = {
+    "running": ContainerStatus.RUNNING,
+    "paused": ContainerStatus.PAUSED,
+    "pausing": ContainerStatus.PAUSED,
+}
 
 
 def _registry_auth(registry_conf: ImageRegistry) -> dict[str, str] | None:
@@ -529,10 +536,33 @@ class ContainerdAgent(
         self,
         status_filter: frozenset[ContainerStatus] = frozenset(),
     ) -> Sequence[tuple[KernelId, Container]]:
-        # Boot-safe: no live-container reconciliation yet. Enumerating kernels from
-        # containerd (list_containers + the ai.backend.kernel-id label -> Container) is a
-        # follow-up; returning empty keeps startup/lifecycle sync working.
-        return []
+        # Reconcile live kernels from containerd: every container carrying the kernel-id label
+        # is one of ours (the containerd instance is per-node/per-agent). Lets the agent
+        # recover running kernels across a restart.
+        result: list[tuple[KernelId, Container]] = []
+        for ci in await self._runtime.list_container_infos():
+            raw_kid = ci.labels.get(KERNEL_ID_LABEL)
+            if not raw_kid:
+                continue
+            status = _CONTAINERD_TO_STATUS.get(ci.status, ContainerStatus.EXITED)
+            if status_filter and status not in status_filter:
+                continue
+            try:
+                kernel_id = KernelId(UUID(raw_kid))
+            except ValueError:
+                continue
+            result.append((
+                kernel_id,
+                Container(
+                    id=ContainerId(ci.id),
+                    status=status,
+                    image=ci.image,
+                    labels=dict(ci.labels),
+                    ports=[],
+                    backend_obj=ci,
+                ),
+            ))
+        return result
 
     @override
     async def resolve_image_distro(self, image: ImageConfig) -> str:
