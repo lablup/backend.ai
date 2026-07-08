@@ -9,7 +9,14 @@ from typing import Final
 from ai.backend.common.arch import CURRENT_ARCH
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH as DEFAULT_IMAGE_ARCH_
 from ai.backend.common.arch import arch_name_aliases as arch_name_aliases_
+from ai.backend.common.defs import NOOP_STORAGE_VOLUME_NAME
 from ai.backend.common.types import SlotName, SlotTypes
+
+
+def is_noop_host(vfolder_host: str) -> bool:
+    _, _, volume_name = vfolder_host.partition(":")
+    return volume_name == NOOP_STORAGE_VOLUME_NAME
+
 
 INTRINSIC_SLOTS: Final = {
     SlotName("cpu"): SlotTypes("count"),

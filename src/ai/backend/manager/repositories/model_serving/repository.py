@@ -27,6 +27,7 @@ from ai.backend.common.types import (
     ResourceSlot,
     SessionTypes,
 )
+from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
 from ai.backend.manager.data.deployment.types import RouteHealthStatus
 from ai.backend.manager.data.image.types import ImageData
@@ -57,7 +58,6 @@ from ai.backend.manager.models.endpoint import (
     EndpointLifecycle,
     EndpointRow,
     EndpointTokenRow,
-    ModelServiceHelper,
 )
 from ai.backend.manager.models.group import resolve_group_name_or_id
 from ai.backend.manager.models.image import ImageAlias, ImageIdentifier, ImageRow
@@ -67,7 +67,6 @@ from ai.backend.manager.models.routing import RouteStatus, RoutingRow
 from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
 from ai.backend.manager.models.scaling_group import scaling_groups
 from ai.backend.manager.models.session import KernelLoadingStrategy, SessionRow
-from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_retry
 from ai.backend.manager.models.vfolder import VFolderRow, VFolderUsageMode
@@ -87,6 +86,7 @@ from ai.backend.manager.repositories.base.rbac.entity_creator import (
     execute_rbac_entity_creator,
 )
 from ai.backend.manager.repositories.deployment.creators import DeploymentPolicyCreatorSpec
+from ai.backend.manager.repositories.model_serving.mount import check_extra_mounts
 from ai.backend.manager.repositories.model_serving.updaters import EndpointUpdaterSpec
 from ai.backend.manager.types import MountOptionModel, UserScope
 from ai.backend.manager.utils import query_userinfo
@@ -1055,9 +1055,9 @@ class ModelServingRepository:
 
             model_id = folder_row["id"]
 
-            vfolder_mounts = await ModelServiceHelper.check_extra_mounts(
+            vfolder_mounts = await check_extra_mounts(
                 conn,
-                legacy_etcd_loader,
+                allowed_vfolder_types,
                 storage_manager,
                 model_id,
                 model_mount_destination,

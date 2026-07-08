@@ -10,6 +10,7 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.types import AccessKey, ResourceSlot
+from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.errors.deployment import (
     NoActiveKeypairForDeployment,
     UserNotFoundInDeployment,
@@ -20,7 +21,6 @@ from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.deployment.db_source.db_source import DeploymentDBSource

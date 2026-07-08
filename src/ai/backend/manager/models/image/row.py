@@ -43,10 +43,10 @@ from ai.backend.common.types import (
     ImageRegistry,
     ResourceSlot,
     SlotName,
+    SlotTypes,
 )
 from ai.backend.common.utils import join_non_empty
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
 from ai.backend.manager.data.image.types import (
     ImageAliasData,
     ImageData,
@@ -639,8 +639,7 @@ class ImageRow(Base):  # type: ignore[misc]
         result: dict[SlotName, dict[str, Any]] = ImageRow._resources.type._schema.check(resources)
         return result
 
-    async def get_min_slot(self, etcd_loader: LegacyEtcdLoader) -> ResourceSlot:
-        slot_units = await etcd_loader.get_resource_slots()
+    async def get_min_slot(self, slot_units: Mapping[SlotName, SlotTypes]) -> ResourceSlot:
         min_slot = ResourceSlot()
 
         for slot_key, resource in self.resources.items():

@@ -10,9 +10,9 @@ from ruamel.yaml import YAML
 from ai.backend.common.config import ModelDefinitionDraft
 from ai.backend.common.exception import BackendAIError, InvalidAPIParameters
 from ai.backend.common.types import BackendAISchema, SchemaValidationFailureInfo, VFolderID
+from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.data.deployment.types import FetchedModelDefinition
 from ai.backend.manager.data.vfolder.types import VFolderLocation
-from ai.backend.manager.models.storage import StorageSessionManager
 
 
 @dataclass(frozen=True)

@@ -5,9 +5,9 @@ from ai.backend.common.types import (
     VFolderHostPermission,
     VFolderID,
 )
+from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.errors.storage import VFolderInvalidParameter
-from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.vfolder import (
     is_unmanaged,
 )

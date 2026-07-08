@@ -32,10 +32,10 @@ if TYPE_CHECKING:
     from ai.backend.manager.agent_cache import AgentRPCCache
     from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
     from ai.backend.manager.clients.prometheus.client import PrometheusClient
+    from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
     from ai.backend.manager.config.provider import ManagerConfigProvider
     from ai.backend.manager.idle import IdleCheckerHost
     from ai.backend.manager.models.keypair.ssh_key_validator import SSHKeyValidator
-    from ai.backend.manager.models.storage import StorageSessionManager
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
     from ai.backend.manager.notification import NotificationCenter
     from ai.backend.manager.registry import AgentRegistry
