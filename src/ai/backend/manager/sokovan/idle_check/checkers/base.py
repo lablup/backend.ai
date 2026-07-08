@@ -29,15 +29,15 @@ class PrepareRequest:
     sessions: Sequence[IdleCheckSession]
 
 
-class IdleChecker(ABC):
-    """Stateless per-``CheckerType`` judgment behavior."""
+class IdleChecker[StateT: IdleCheckerState](ABC):
+    """Stateless per-``CheckerType`` judgment behavior over its own state type."""
 
     @abstractmethod
     async def prepare(
         self,
         context: IdleCheckContext,
         requests: Sequence[PrepareRequest],
-    ) -> Mapping[IdleCheckerID, IdleCheckerState]:
+    ) -> Mapping[IdleCheckerID, StateT]:
         """Called once per tick with every definition of this type.
 
         Batch the I/O across all requests and return one state per definition;
@@ -46,6 +46,6 @@ class IdleChecker(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def check_idle(self, session_id: SessionId, state: IdleCheckerState) -> bool:
+    def check_idle(self, session_id: SessionId, state: StateT) -> bool:
         """Judge one session from prepared state alone; True means idle."""
         raise NotImplementedError

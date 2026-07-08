@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import override
+from typing import Any, override
 from uuid import UUID
 
 from ai.backend.common.types import SessionId
@@ -43,7 +43,7 @@ class IdleCheckTargetStatuses(BaseReconcilerTargetStatuses):
 class CheckerWithState:
     """A checker paired with the state it prepared for one definition."""
 
-    checker: IdleChecker
+    checker: IdleChecker[Any]
     state: IdleCheckerState
 
     def check_idle(self, session_id: SessionId) -> bool:

@@ -27,7 +27,7 @@ class RecordingState(IdleCheckerState):
     pass
 
 
-class RecordingChecker(IdleChecker):
+class RecordingChecker(IdleChecker[RecordingState]):
     """Judges idle from a preset session-id set and records every check_idle call."""
 
     _idle_session_ids: frozenset[SessionId]
@@ -42,11 +42,11 @@ class RecordingChecker(IdleChecker):
         self,
         context: IdleCheckContext,
         requests: Sequence[PrepareRequest],
-    ) -> Mapping[IdleCheckerID, IdleCheckerState]:
+    ) -> Mapping[IdleCheckerID, RecordingState]:
         return {request.definition.checker_id: RecordingState() for request in requests}
 
     @override
-    def check_idle(self, session_id: SessionId, state: IdleCheckerState) -> bool:
+    def check_idle(self, session_id: SessionId, state: RecordingState) -> bool:
         self.checked_session_ids.append(session_id)
         return session_id in self._idle_session_ids
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
-from typing import Final, override
+from typing import Any, Final, override
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
@@ -51,7 +51,7 @@ class PreparedState(IdleCheckerState):
     pass
 
 
-class PrepareRecordingChecker(IdleChecker):
+class PrepareRecordingChecker(IdleChecker[PreparedState]):
     """Records each prepare call as [(checker_id, session_ids), ...] per batch."""
 
     prepare_calls: list[list[tuple[IdleCheckerID, list[SessionId]]]]
@@ -64,7 +64,7 @@ class PrepareRecordingChecker(IdleChecker):
         self,
         context: IdleCheckContext,
         requests: Sequence[PrepareRequest],
-    ) -> Mapping[IdleCheckerID, IdleCheckerState]:
+    ) -> Mapping[IdleCheckerID, PreparedState]:
         self.prepare_calls.append([
             (
                 request.definition.checker_id,
@@ -75,7 +75,7 @@ class PrepareRecordingChecker(IdleChecker):
         return {request.definition.checker_id: PreparedState() for request in requests}
 
     @override
-    def check_idle(self, session_id: SessionId, state: IdleCheckerState) -> bool:
+    def check_idle(self, session_id: SessionId, state: PreparedState) -> bool:
         return False
 
 
@@ -119,15 +119,17 @@ class TestIdleCheckSource:
         return IdleCheckTargetStatuses(session_statuses=frozenset([SessionStatus.RUNNING]))
 
     @pytest.fixture()
-    def checker_registry(self, monkeypatch: pytest.MonkeyPatch) -> dict[CheckerType, IdleChecker]:
+    def checker_registry(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> dict[CheckerType, IdleChecker[Any]]:
         """Swap the static checker_for dispatch with a test-local registry."""
-        registry: dict[CheckerType, IdleChecker] = {}
+        registry: dict[CheckerType, IdleChecker[Any]] = {}
         monkeypatch.setattr(idle_check_preparer, "checker_for", registry.get)
         return registry
 
     @pytest.fixture()
     def lifetime_checker(
-        self, checker_registry: dict[CheckerType, IdleChecker]
+        self, checker_registry: dict[CheckerType, IdleChecker[Any]]
     ) -> PrepareRecordingChecker:
         checker = PrepareRecordingChecker()
         checker_registry[CheckerType.SESSION_LIFETIME] = checker
@@ -135,7 +137,7 @@ class TestIdleCheckSource:
 
     @pytest.fixture()
     def network_checker(
-        self, checker_registry: dict[CheckerType, IdleChecker]
+        self, checker_registry: dict[CheckerType, IdleChecker[Any]]
     ) -> PrepareRecordingChecker:
         checker = PrepareRecordingChecker()
         checker_registry[CheckerType.NETWORK_TIMEOUT] = checker
