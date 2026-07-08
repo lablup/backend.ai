@@ -7,11 +7,13 @@ from typing import Any
 import pytest
 from aiohttp.test_utils import make_mocked_request
 
+from ai.backend.common.contexts.user import is_impersonating
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.manager.api.rest.middleware import auth as auth_mw
 from ai.backend.manager.api.rest.middleware.auth import (
     ACT_AS_HEADER,
     _resolve_impersonation,
+    _setup_user_context,
 )
 from ai.backend.manager.errors.auth import InsufficientPrivilege, InvalidAuthParameters
 from ai.backend.manager.errors.common import ObjectNotFound
@@ -96,3 +98,19 @@ async def test_invalid_uuid_header_is_rejected() -> None:
     request = _make_request(role=UserRole.SUPERADMIN, headers={ACT_AS_HEADER: "not-a-uuid"})
     with pytest.raises(InvalidAuthParameters):
         await _resolve_impersonation(request, db=None)  # type: ignore[arg-type]
+
+
+def test_setup_user_context_sets_impersonation_flag_when_header_present() -> None:
+    request = _make_request(role=UserRole.SUPERADMIN, headers={ACT_AS_HEADER: str(uuid.uuid4())})
+    caller = auth_mw._build_authenticated_user_data(request)
+    assert not is_impersonating()
+    with _setup_user_context(request, caller, caller):
+        assert is_impersonating()
+    assert not is_impersonating()
+
+
+def test_setup_user_context_no_flag_without_header() -> None:
+    request = _make_request(role=UserRole.USER)
+    caller = auth_mw._build_authenticated_user_data(request)
+    with _setup_user_context(request, caller, caller):
+        assert not is_impersonating()

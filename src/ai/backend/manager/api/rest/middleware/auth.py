@@ -36,7 +36,11 @@ from dateutil.parser import parse as dtparse
 from dateutil.tz import tzutc
 
 from ai.backend.common.contexts.client_ip import with_client_ip
-from ai.backend.common.contexts.user import with_triggered_user, with_user
+from ai.backend.common.contexts.user import (
+    with_impersonation,
+    with_triggered_user,
+    with_user,
+)
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.exception import InvalidIpAddressValue
 from ai.backend.common.jwt.exceptions import JWTError
@@ -741,6 +745,10 @@ def _setup_user_context(
         )
     if trigger_user is not None:
         stack.enter_context(with_triggered_user(trigger_user))
+    # The header is already validated by _resolve_impersonation; its presence
+    # marks the whole request as impersonation (self-impersonation included).
+    if request.headers.get(ACT_AS_HEADER):
+        stack.enter_context(with_impersonation())
 
     client_ip = extract_client_ip(request)
     if client_ip:

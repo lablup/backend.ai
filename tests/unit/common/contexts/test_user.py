@@ -4,7 +4,9 @@ import uuid
 
 from ai.backend.common.contexts.user import (
     current_user,
+    is_impersonating,
     triggered_user,
+    with_impersonation,
     with_triggered_user,
     with_user,
 )
@@ -41,6 +43,13 @@ def test_current_and_triggered_are_independent() -> None:
         assert triggered_user() == trigger
     assert current_user() is None
     assert triggered_user() is None
+
+
+def test_is_impersonating_flag() -> None:
+    assert is_impersonating() is False
+    with with_impersonation():
+        assert is_impersonating() is True
+    assert is_impersonating() is False
 
 
 def test_nested_triggered_user_restores_previous() -> None:

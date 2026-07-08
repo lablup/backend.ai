@@ -43,6 +43,7 @@ from ai.backend.common.json import load_json
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.dto.context import RequestCtx, UserContext
 from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.utils import reject_owner_access_key_while_impersonating
 from ai.backend.manager.services.group.actions.resolve_project_id_by_name import (
     ResolveProjectIdByNameAction,
 )
@@ -99,6 +100,7 @@ class SessionTemplateHandler:
         req: RequestCtx,
     ) -> APIResponse:
         params = body.parsed
+        reject_owner_access_key_while_impersonating(params.owner_access_key)
         domain = params.domain or ctx.user_domain
         owner_access_key = params.owner_access_key
         log.info(
@@ -183,6 +185,7 @@ class SessionTemplateHandler:
         req: RequestCtx,
     ) -> APIResponse:
         params = query.parsed
+        reject_owner_access_key_while_impersonating(params.owner_access_key)
         if params.format not in ("yaml", "json"):
             raise InvalidAPIParameters('format should be "yaml" or "json"')
         log.info(
@@ -215,6 +218,7 @@ class SessionTemplateHandler:
         req: RequestCtx,
     ) -> APIResponse:
         params = body.parsed
+        reject_owner_access_key_while_impersonating(params.owner_access_key)
         template_id = path.parsed.template_id
         domain = params.domain or ctx.user_domain
         owner_access_key = params.owner_access_key
@@ -269,6 +273,7 @@ class SessionTemplateHandler:
     ) -> APIResponse:
         template_id = path.parsed.template_id
         params = query.parsed
+        reject_owner_access_key_while_impersonating(params.owner_access_key)
         log.info(
             "SESSION_TEMPLATE.DELETE (ak:{0}/{1})",
             ctx.access_key,

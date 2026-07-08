@@ -5,7 +5,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
-from ai.backend.common.contexts.user import current_user, triggered_user
+from ai.backend.common.contexts.user import is_impersonating
 from ai.backend.common.types import AccessKey
 
 from .data.permission.types import EntityType, ScopeType
@@ -21,18 +21,21 @@ from .models.resource_policy import keypair_resource_policies
 from .models.user import UserRole, users
 
 
-def _reject_owner_access_key_while_impersonating() -> None:
-    """Reject ``owner_access_key`` delegation while a super admin is impersonating.
+def reject_owner_access_key_while_impersonating(owner_access_key: Any = None) -> None:
+    """Reject ``owner_access_key`` delegation while impersonating (``X-BackendAI-Act-As``).
 
     The two mechanisms delegate different things (policy vs. the acting subject),
     so combining them yields an ambiguous executing subject (BEP-1058 §4.4).
-    Impersonation is active when the effective and trigger users differ.
+    Call this from every ``owner_access_key`` consumer, passing the raw request
+    field: when it is present (any value, even the caller's own key) and the
+    request carries the impersonation header — self-impersonation included — the
+    request is rejected. A ``None`` field is a no-op.
     """
-    effective = current_user()
-    trigger = triggered_user()
-    if effective is not None and trigger is not None and effective.user_id != trigger.user_id:
+    if owner_access_key is None:
+        return
+    if is_impersonating():
         raise InvalidAPIParameters(
-            "owner_access_key cannot be combined with impersonation (X-BackendAI-Act-As)."
+            "owner_access_key cannot be used while impersonating (X-BackendAI-Act-As)."
         )
 
 
@@ -42,7 +45,13 @@ def check_if_requester_is_eligible_to_act_as_target_user(
     target_role: UserRole,
     target_domain: str,
 ) -> bool:
-    _reject_owner_access_key_while_impersonating()
+    # Defense-in-depth: any acting-on-behalf-of delegation (owner_access_key,
+    # owner_user_email) is refused while impersonating, regardless of read site.
+    if is_impersonating():
+        raise InvalidAPIParameters(
+            "Acting on behalf of another user is not allowed while impersonating "
+            "(X-BackendAI-Act-As)."
+        )
     if requester_role == UserRole.SUPERADMIN:
         pass
     elif requester_role == UserRole.ADMIN:

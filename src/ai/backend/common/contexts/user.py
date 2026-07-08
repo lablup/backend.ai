@@ -6,6 +6,7 @@ from ai.backend.common.data.user.types import UserData
 
 _user_var: ContextVar[UserData] = ContextVar("user_data")
 _triggered_user_var: ContextVar[UserData] = ContextVar("triggered_user_data")
+_impersonating_var: ContextVar[bool] = ContextVar("impersonating")
 
 
 def current_user() -> UserData | None:
@@ -63,3 +64,27 @@ def with_triggered_user(user: UserData) -> Iterator[None]:
         yield
     finally:
         _triggered_user_var.reset(token)
+
+
+def is_impersonating() -> bool:
+    """
+    True when the request carries an ``X-BackendAI-Act-As`` impersonation signal.
+
+    This reflects the *presence* of the impersonation header, not whether the
+    target differs from the caller — a super admin impersonating themselves still
+    returns True. Returns False when unset.
+    """
+    try:
+        return _impersonating_var.get()
+    except LookupError:
+        return False
+
+
+@contextmanager
+def with_impersonation() -> Iterator[None]:
+    """Context manager marking the current request as an impersonation (act-as)."""
+    token = _impersonating_var.set(True)
+    try:
+        yield
+    finally:
+        _impersonating_var.reset(token)

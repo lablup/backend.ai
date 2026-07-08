@@ -35,6 +35,7 @@ from ai.backend.manager.errors.common import GenericForbidden
 from ai.backend.manager.errors.resource import NoCurrentTaskContext
 from ai.backend.manager.exceptions import InvalidArgument
 from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.utils import reject_owner_access_key_while_impersonating
 from ai.backend.manager.services.events.actions.resolve_group_for_events import (
     ResolveGroupForEventsAction,
 )
@@ -88,6 +89,7 @@ class EventsHandler:
         scope = params.scope
         user_role = request["user"]["role"]
         user_uuid = user_ctx.user_uuid
+        reject_owner_access_key_while_impersonating(params.owner_access_key)
         access_key = params.owner_access_key
         if access_key is None:
             access_key = user_ctx.access_key

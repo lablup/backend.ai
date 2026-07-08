@@ -1,52 +1,55 @@
-"""Guard: owner_access_key delegation is rejected while impersonating (BEP-1058 §4.4).
+"""Guard: owner_access_key is rejected whenever the X-BackendAI-Act-As header is
+present (BEP-1058 §4.4), regardless of the value — self-impersonation included.
 
-The check lives at the delegation authorization site
-(``check_if_requester_is_eligible_to_act_as_target_user``), not in the auth
-middleware — the middleware must not inspect per-endpoint request bodies.
+The check lives at the owner_access_key consumers (and the delegation
+authorization site), not in the auth middleware — the middleware must not
+inspect per-endpoint request bodies.
 """
 
 from __future__ import annotations
 
-import uuid
-
 import pytest
 
-from ai.backend.common.contexts.user import with_triggered_user, with_user
-from ai.backend.common.data.user.types import UserData, UserRole
+from ai.backend.common.contexts.user import with_impersonation
+from ai.backend.common.data.user.types import UserRole
 from ai.backend.manager.errors.api import InvalidAPIParameters
-from ai.backend.manager.utils import check_if_requester_is_eligible_to_act_as_target_user
-
-
-def _user(role: UserRole = UserRole.USER, user_id: uuid.UUID | None = None) -> UserData:
-    return UserData(
-        user_id=user_id or uuid.uuid4(),
-        is_authorized=True,
-        is_admin=role in (UserRole.ADMIN, UserRole.SUPERADMIN),
-        is_superadmin=role == UserRole.SUPERADMIN,
-        role=role,
-        domain_name="default",
-    )
+from ai.backend.manager.utils import (
+    check_if_requester_is_eligible_to_act_as_target_user,
+    reject_owner_access_key_while_impersonating,
+)
 
 
 def test_owner_access_key_rejected_while_impersonating() -> None:
-    effective = _user(UserRole.USER)  # target
-    trigger = _user(UserRole.SUPERADMIN)  # super admin caller
-    with with_user(effective), with_triggered_user(trigger):
+    with with_impersonation():
+        with pytest.raises(InvalidAPIParameters):
+            reject_owner_access_key_while_impersonating("AKIAOWNER")
+
+
+def test_owner_access_key_rejected_even_for_self_impersonation() -> None:
+    # The caller's own key is still rejected: the header presence is what matters.
+    with with_impersonation():
+        with pytest.raises(InvalidAPIParameters):
+            reject_owner_access_key_while_impersonating("AKIACALLER")
+
+
+def test_none_owner_access_key_is_noop_while_impersonating() -> None:
+    with with_impersonation():
+        reject_owner_access_key_while_impersonating(None)
+
+
+def test_owner_access_key_allowed_when_not_impersonating() -> None:
+    reject_owner_access_key_while_impersonating("AKIAOWNER")
+
+
+def test_eligibility_check_rejected_while_impersonating() -> None:
+    with with_impersonation():
         with pytest.raises(InvalidAPIParameters):
             check_if_requester_is_eligible_to_act_as_target_user(
                 UserRole.SUPERADMIN, "default", UserRole.USER, "default"
             )
 
 
-def test_owner_access_key_allowed_when_not_impersonating() -> None:
-    same = _user(UserRole.SUPERADMIN)
-    with with_user(same), with_triggered_user(same):
-        assert check_if_requester_is_eligible_to_act_as_target_user(
-            UserRole.SUPERADMIN, "default", UserRole.USER, "default"
-        )
-
-
-def test_owner_access_key_allowed_without_user_context() -> None:
+def test_eligibility_check_allowed_when_not_impersonating() -> None:
     assert check_if_requester_is_eligible_to_act_as_target_user(
         UserRole.SUPERADMIN, "default", UserRole.USER, "default"
     )
