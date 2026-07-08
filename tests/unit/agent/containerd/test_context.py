@@ -8,6 +8,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, cast
 
+from ai.backend.agent.config.unified import ScratchType
 from ai.backend.agent.containerd.agent import ContainerdKernelCreationContext
 from ai.backend.agent.containerd.oci import AcceleratorSpec
 from ai.backend.agent.containerd.orchestrator import LaunchResult
@@ -134,12 +135,43 @@ class TestScratchAndMounts:
     async def test_prepare_scratch_creates_config_and_work(self, tmp_path: Path) -> None:
         ctx = _context(FakeFacade())
         ctx.local_config = cast(
-            Any, SimpleNamespace(container=SimpleNamespace(scratch_root=tmp_path))
+            Any,
+            SimpleNamespace(
+                container=SimpleNamespace(scratch_root=tmp_path, scratch_type=ScratchType.HOSTDIR)
+            ),
         )
         await ctx.prepare_scratch()
         assert (tmp_path / "kern-123" / "config").is_dir()
         assert (tmp_path / "kern-123" / "work").is_dir()
         assert ctx._scratch_dir == (tmp_path / "kern-123").resolve()
+
+    async def test_prepare_scratch_hostfile_creates_loop_fs(
+        self, tmp_path: Path, monkeypatch: Any
+    ) -> None:
+        # HOSTFILE backs the scratch with a loop-mounted image; prepare_scratch must invoke
+        # create_loop_filesystem (with the kernel id + configured size) before making config/work.
+        calls: list[tuple[Any, ...]] = []
+
+        async def fake_create(root: Any, size: int, kid: Any) -> None:
+            calls.append((root, size, kid))
+
+        monkeypatch.setattr("ai.backend.agent.containerd.agent.create_loop_filesystem", fake_create)
+        monkeypatch.setattr("ai.backend.agent.containerd.agent.sys.platform", "linux")
+        ctx = _context(FakeFacade())
+        ctx.kernel_id = cast(Any, "kern-123")
+        ctx.local_config = cast(
+            Any,
+            SimpleNamespace(
+                container=SimpleNamespace(
+                    scratch_root=tmp_path,
+                    scratch_type=ScratchType.HOSTFILE,
+                    scratch_size=1024,
+                )
+            ),
+        )
+        await ctx.prepare_scratch()
+        assert calls == [(tmp_path, 1024, "kern-123")]
+        assert (tmp_path / "kern-123" / "config").is_dir()
 
     async def test_process_mounts_accumulates(self) -> None:
         ctx = _context(FakeFacade())

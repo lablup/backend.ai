@@ -21,6 +21,7 @@ import shutil
 import signal
 import struct
 import subprocess
+import sys
 from collections.abc import Mapping, Sequence
 from decimal import Decimal
 from importlib.resources import files
@@ -54,6 +55,7 @@ from ai.backend.agent.resources import (
     Mount,
     known_slot_types,
 )
+from ai.backend.agent.scratch import create_loop_filesystem, destroy_loop_filesystem
 from ai.backend.agent.types import (
     AgentEventData,
     Container,
@@ -262,10 +264,19 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
     @override
     async def prepare_scratch(self) -> None:
         # Create the per-kernel scratch dirs (config/ + work/) and seed the default dotfiles.
-        # (tmpfs/loop scratch types remain a follow-up; containers run as root so no chown.)
-        scratch_dir = (self.local_config.container.scratch_root / str(self._container_id)).resolve()
+        # (Containers run as root so no chown is needed.)
+        scratch_type = self.local_config.container.scratch_type
+        scratch_root = self.local_config.container.scratch_root
+        scratch_dir = (scratch_root / str(self._container_id)).resolve()
         config_dir = scratch_dir / "config"
         work_dir = scratch_dir / "work"
+        # HOSTFILE: back the scratch with a fixed-size loop-mounted ext4 image (per-session disk
+        # quota). create_loop_filesystem makes + mounts the image at scratch_dir; config/work then
+        # live inside that mount.
+        if sys.platform.startswith("linux") and scratch_type == ScratchType.HOSTFILE:
+            await create_loop_filesystem(
+                scratch_root, self.local_config.container.scratch_size, self.kernel_id
+            )
 
         def _prepare() -> None:
             config_dir.mkdir(parents=True, exist_ok=True)
@@ -561,7 +572,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         shmem = (self.kernel_config.get("resource_opts") or {}).get("shmem")
         if shmem:
             oci_spec["shmem"] = int(shmem)
-        # MEMORY scratch type -> in-memory (tmpfs) /tmp. (LOOP scratch is a follow-up.)
+        # MEMORY scratch type -> in-memory (tmpfs) /tmp.
         if self.local_config.container.scratch_type == ScratchType.MEMORY:
             oci_spec["tmpfs_tmp"] = True
         # Direct-IP model: kernel_host is the container's own IP, so each service is reachable
@@ -1037,6 +1048,17 @@ class ContainerdAgent(
         restarting: bool,
     ) -> None:
         await self._session_network.remove_container(str(kernel_id))
+        # Tear down the scratch (skipped on restart, which reuses it). HOSTFILE must be
+        # unmounted (loop image) before removal; otherwise remove the directory tree.
+        if not restarting:
+            scratch_type = self.local_config.container.scratch_type
+            scratch_root = self.local_config.container.scratch_root
+            if sys.platform.startswith("linux") and scratch_type == ScratchType.HOSTFILE:
+                await destroy_loop_filesystem(scratch_root, kernel_id)
+            else:
+                await asyncio.to_thread(
+                    shutil.rmtree, scratch_root / str(kernel_id), ignore_errors=True
+                )
 
     @override
     async def create_local_network(self, network_name: str) -> None:
