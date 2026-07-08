@@ -24,6 +24,7 @@ import secrets
 import uuid
 from collections.abc import Awaitable, Callable, Mapping
 from contextlib import ExitStack
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any, Final
 from urllib.parse import urlparse
@@ -54,8 +55,9 @@ from ai.backend.manager.errors.auth import (
     InsufficientPrivilege,
     InvalidAuthParameters,
     InvalidClientIPConfig,
+    UserNotFound,
 )
-from ai.backend.manager.errors.common import GenericForbidden, ObjectNotFound, RejectedByHook
+from ai.backend.manager.errors.common import GenericForbidden, RejectedByHook
 from ai.backend.manager.models.keypair import keypairs
 from ai.backend.manager.models.resource_policy import (
     keypair_resource_policies,
@@ -71,10 +73,6 @@ if TYPE_CHECKING:
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
-
-# Impersonation signal (BEP-1058): a super admin may run a request under a
-# target user's permission context by supplying the target's UUID here.
-ACT_AS_HEADER: Final = "X-BackendAI-Act-As"
 
 _whois_timezone_info: Final = {
     "A": 1 * 3600,
@@ -655,16 +653,22 @@ async def _authenticate_via_hook(
     await valkey_stat.increment_keypair_query_count(access_key)
 
 
-def _build_authenticated_user_data(request: web.Request) -> UserData | None:
-    """Build the authenticated caller's ``UserData`` from the auth result, or None."""
+@dataclass(frozen=True)
+class RequestIdentity:
+    """The effective (scope) and trigger (caller) users resolved for a request."""
+
+    effective_user: UserData | None
+    trigger_user: UserData | None
+    impersonating: bool = False
+
+
+def _user_data_from_auth_result(request: web.Request) -> UserData | None:
+    """The authenticated caller's ``UserData``, reusing the auth-middleware result."""
     user = request.get("user")
-    if not user:
-        return None
-    user_id = user.get("uuid")
-    if user_id is None:
+    if not user or user.get("uuid") is None:
         return None
     return UserData(
-        user_id=user_id,
+        user_id=user["uuid"],
         is_authorized=request.get("is_authorized", False),
         is_admin=request.get("is_admin", False),
         is_superadmin=request.get("is_superadmin", False),
@@ -673,22 +677,19 @@ def _build_authenticated_user_data(request: web.Request) -> UserData | None:
     )
 
 
-async def _query_target_user(db: ExtendedAsyncSAEngine, target_id: uuid.UUID) -> Any:
-    async with db.begin_readonly() as conn:
-        query = sa.select(
-            users.c.uuid,
-            users.c.role,
-            users.c.domain_name,
-        ).where(users.c.uuid == target_id)
-        result = await conn.execute(query)
-        return result.first()
+async def _load_user_data(db: ExtendedAsyncSAEngine, user_id: uuid.UUID) -> UserData:
+    """Load a user's ``UserData`` by UUID (impersonation target). Raises if not found."""
 
+    async def _query() -> Any:
+        async with db.begin_readonly() as conn:
+            query = sa.select(users.c.uuid, users.c.role, users.c.domain_name).where(
+                users.c.uuid == user_id
+            )
+            return (await conn.execute(query)).first()
 
-async def _load_target_user_data(db: ExtendedAsyncSAEngine, target_id: uuid.UUID) -> UserData:
-    """Load a target user's ``UserData`` for impersonation. Raises if not found."""
-    row = await execute_with_retry(functools.partial(_query_target_user, db, target_id))
+    row = await execute_with_retry(_query)
     if row is None:
-        raise ObjectNotFound(object_name="impersonation target user")
+        raise UserNotFound("Impersonation target user not found")
     role = UserRole(row.role)
     return UserData(
         user_id=row.uuid,
@@ -700,54 +701,38 @@ async def _load_target_user_data(db: ExtendedAsyncSAEngine, target_id: uuid.UUID
     )
 
 
-async def _resolve_impersonation(
-    request: web.Request,
-    db: ExtendedAsyncSAEngine,
-) -> tuple[UserData | None, UserData | None]:
-    """Resolve the ``X-BackendAI-Act-As`` header into (effective, trigger) users.
+async def _resolve_identity(request: web.Request, db: ExtendedAsyncSAEngine) -> RequestIdentity:
+    """Resolve the X-BackendAI-Act-As header into the request's effective/trigger users.
 
-    Without the header both identities are the authenticated caller. With it, the
-    caller must be a super admin and the whole request runs as the target user.
-
-    The mutual exclusion with ``owner_access_key`` is enforced at the delegation
-    authorization site (``check_if_requester_is_eligible_to_act_as_target_user``),
-    not here — the middleware must not inspect per-endpoint request bodies.
+    No header: both are the authenticated caller. With it, the caller must be a
+    super admin and the whole request runs as the target user (fail-closed).
     """
-    authenticated = _build_authenticated_user_data(request)
-    raw_target = request.headers.get(ACT_AS_HEADER)
+    caller = _user_data_from_auth_result(request)
+    raw_target = request.headers.get("X-BackendAI-Act-As")
     if not raw_target:
-        return authenticated, authenticated
+        return RequestIdentity(caller, caller)
 
-    if authenticated is None or not authenticated.is_superadmin:
-        raise InsufficientPrivilege(f"Only superadmin may use {ACT_AS_HEADER}")
+    if caller is None or not caller.is_superadmin:
+        raise InsufficientPrivilege("Only superadmin may use X-BackendAI-Act-As")
     try:
         target_id = uuid.UUID(raw_target)
     except ValueError as e:
-        raise InvalidAuthParameters(f"{ACT_AS_HEADER} must be a valid user UUID") from e
+        raise InvalidAuthParameters("X-BackendAI-Act-As must be a valid user UUID") from e
+    target = await _load_user_data(db, target_id)
+    return RequestIdentity(target, caller, impersonating=True)
 
-    target = await _load_target_user_data(db, target_id)
-    return target, authenticated
 
-
-def _setup_user_context(
-    request: web.Request,
-    effective_user: UserData | None,
-    trigger_user: UserData | None,
-) -> ExitStack:
+def _setup_user_context(request: web.Request, identity: RequestIdentity) -> ExitStack:
     stack = ExitStack()
 
-    if effective_user is not None:
-        stack.enter_context(with_user(effective_user))
+    if identity.effective_user is not None:
+        stack.enter_context(with_user(identity.effective_user))
         stack.enter_context(
-            with_log_context_fields({
-                "user_id": str(effective_user.user_id),
-            })
+            with_log_context_fields({"user_id": str(identity.effective_user.user_id)})
         )
-    if trigger_user is not None:
-        stack.enter_context(with_triggered_user(trigger_user))
-    # The header is already validated by _resolve_impersonation; its presence
-    # marks the whole request as impersonation (self-impersonation included).
-    if request.headers.get(ACT_AS_HEADER):
+    if identity.trigger_user is not None:
+        stack.enter_context(with_triggered_user(identity.trigger_user))
+    if identity.impersonating:
         stack.enter_context(with_impersonation())
 
     client_ip = extract_client_ip(request)
@@ -886,8 +871,8 @@ def build_auth_middleware(
         else:
             await _authenticate_via_hook(request, db, valkey_stat, hook_plugin_ctx)
 
-        effective_user, trigger_user = await _resolve_impersonation(request, db)
-        with _setup_user_context(request, effective_user, trigger_user):
+        identity = await _resolve_identity(request, db)
+        with _setup_user_context(request, identity):
             return await handler(request)
 
     return _middleware

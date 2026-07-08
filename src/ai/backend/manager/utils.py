@@ -24,12 +24,12 @@ from .models.user import UserRole, users
 def reject_owner_access_key_while_impersonating(owner_access_key: Any = None) -> None:
     """Reject ``owner_access_key`` delegation while impersonating (``X-BackendAI-Act-As``).
 
-    The two mechanisms delegate different things (policy vs. the acting subject),
-    so combining them yields an ambiguous executing subject (BEP-1058 §4.4).
-    Call this from every ``owner_access_key`` consumer, passing the raw request
-    field: when it is present (any value, even the caller's own key) and the
-    request carries the impersonation header — self-impersonation included — the
-    request is rejected. A ``None`` field is a no-op.
+    owner_access_key and impersonation delegate different things, so combining
+    them yields an ambiguous executing subject. Call this from every
+    owner_access_key consumer with the raw request field: when it is present
+    (any value, even the caller's own key) and the request carries the
+    impersonation header — self-impersonation included — the request is rejected.
+    A ``None`` field is a no-op.
     """
     if owner_access_key is None:
         return
@@ -45,13 +45,6 @@ def check_if_requester_is_eligible_to_act_as_target_user(
     target_role: UserRole,
     target_domain: str,
 ) -> bool:
-    # Defense-in-depth: any acting-on-behalf-of delegation (owner_access_key,
-    # owner_user_email) is refused while impersonating, regardless of read site.
-    if is_impersonating():
-        raise InvalidAPIParameters(
-            "Acting on behalf of another user is not allowed while impersonating "
-            "(X-BackendAI-Act-As)."
-        )
     if requester_role == UserRole.SUPERADMIN:
         pass
     elif requester_role == UserRole.ADMIN:
