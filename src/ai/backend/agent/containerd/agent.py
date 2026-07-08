@@ -400,6 +400,10 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         oci_spec["cpuset_mems"] = self._accel_spec.cpuset_mems
         oci_spec["memory_limit"] = self._accel_spec.memory_limit
         oci_spec["memory_swap"] = self._accel_spec.memory_swap
+        # /dev/shm sizing from the session's resource_opts (parity with Docker's ShmSize).
+        shmem = (self.kernel_config.get("resource_opts") or {}).get("shmem")
+        if shmem:
+            oci_spec["shmem"] = int(shmem)
         return ContainerdKernel(
             self.ownership_data,
             self.kernel_config["network_id"],

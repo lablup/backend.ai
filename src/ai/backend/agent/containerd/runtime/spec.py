@@ -39,7 +39,16 @@ _DEFAULT_CAPS = [
     "CAP_SYS_CHROOT",
     "CAP_KILL",
     "CAP_AUDIT_WRITE",
+    "CAP_IPC_LOCK",  # hugepages + RDMA (parity with DockerAgent CapAdd)
+    "CAP_SYS_NICE",  # NFS-based GPUDirect Storage
 ]
+
+# rlimits matching the Docker backend's Ulimits (nofile bumped high; memlock unlimited).
+_DEFAULT_RLIMITS: list[dict[str, Any]] = [
+    {"type": "RLIMIT_NOFILE", "hard": 1048576, "soft": 1048576},
+    {"type": "RLIMIT_MEMLOCK", "hard": 0xFFFFFFFFFFFFFFFF, "soft": 0xFFFFFFFFFFFFFFFF},
+]
+_DEFAULT_SHM_SIZE = 64 * 1024 * 1024  # 64 MiB, containerd/runc default
 
 # Mounts every Linux container needs (runc does not add these implicitly).
 _DEFAULT_MOUNTS: list[dict[str, Any]] = [
@@ -49,13 +58,21 @@ _DEFAULT_MOUNTS: list[dict[str, Any]] = [
      "options": ["nosuid", "strictatime", "mode=755", "size=65536k"]},
     {"destination": "/dev/pts", "type": "devpts", "source": "devpts",
      "options": ["nosuid", "noexec", "newinstance", "ptmxmode=0666", "mode=0620", "gid=5"]},
-    {"destination": "/dev/shm", "type": "tmpfs", "source": "shm",
-     "options": ["nosuid", "noexec", "nodev", "mode=1777", "size=65536k"]},
     {"destination": "/dev/mqueue", "type": "mqueue", "source": "mqueue",
      "options": ["nosuid", "noexec", "nodev"]},
     {"destination": "/sys", "type": "sysfs", "source": "sysfs",
      "options": ["nosuid", "noexec", "nodev", "ro"]},
 ]  # fmt: skip
+
+
+def _shm_mount(oci_spec: Mapping[str, Any]) -> dict[str, Any]:
+    size = int(oci_spec.get("shmem") or _DEFAULT_SHM_SIZE)
+    return {
+        "destination": "/dev/shm",
+        "type": "tmpfs",
+        "source": "shm",
+        "options": ["nosuid", "noexec", "nodev", "mode=1777", f"size={size}"],
+    }
 
 
 def _bind_mounts(oci_spec: Mapping[str, Any]) -> list[dict[str, Any]]:
@@ -171,10 +188,11 @@ def build_oci_runtime_spec(
                 "permitted": _DEFAULT_CAPS,
             },
             "noNewPrivileges": False,
+            "rlimits": _DEFAULT_RLIMITS,
         },
         "root": {"path": rootfs_path, "readonly": False},
         "hostname": hostname,
-        "mounts": [*_DEFAULT_MOUNTS, *_bind_mounts(oci_spec)],
+        "mounts": [*_DEFAULT_MOUNTS, _shm_mount(oci_spec), *_bind_mounts(oci_spec)],
         "linux": {
             "namespaces": namespaces,
             "devices": devices,

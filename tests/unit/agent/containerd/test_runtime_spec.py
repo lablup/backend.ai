@@ -82,6 +82,28 @@ class TestBuildOciRuntimeSpec:
         assert "memory" not in res
 
 
+class TestFidelity:
+    def test_extra_caps_for_hugepages_and_gpudirect(self) -> None:
+        spec = build_oci_runtime_spec(_oci(), command=["x"], rootfs_path="/r")
+        caps = spec["process"]["capabilities"]["bounding"]
+        assert "CAP_IPC_LOCK" in caps and "CAP_SYS_NICE" in caps
+
+    def test_rlimits_present(self) -> None:
+        spec = build_oci_runtime_spec(_oci(), command=["x"], rootfs_path="/r")
+        types = {r["type"] for r in spec["process"]["rlimits"]}
+        assert {"RLIMIT_NOFILE", "RLIMIT_MEMLOCK"} <= types
+
+    def test_shm_size_defaults(self) -> None:
+        spec = build_oci_runtime_spec(_oci(), command=["x"], rootfs_path="/r")
+        shm = [m for m in spec["mounts"] if m["destination"] == "/dev/shm"][0]
+        assert any(o.startswith("size=") for o in shm["options"])
+
+    def test_shm_size_from_resource_opts(self) -> None:
+        spec = build_oci_runtime_spec(_oci(shmem=134217728), command=["x"], rootfs_path="/r")
+        shm = [m for m in spec["mounts"] if m["destination"] == "/dev/shm"][0]
+        assert "size=134217728" in shm["options"]
+
+
 class TestNvidiaGpu:
     def test_hook_and_env_emitted_when_gpus_present(self) -> None:
         spec = build_oci_runtime_spec(_oci(gpus=["0", "3"]), command=["x"], rootfs_path="/r")
