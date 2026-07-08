@@ -13,7 +13,7 @@ from ai.backend.manager.repositories.idle_checker.types import IdleCheckerDefini
 
 
 @dataclass(frozen=True)
-class IdleCheckContext:
+class IdleCheckerDependencies:
     """I/O clients used by ``prepare``; filled in by the checker-logic stories."""
 
 
@@ -22,7 +22,7 @@ class IdleCheckerState:
 
 
 @dataclass(frozen=True)
-class PrepareRequest:
+class CheckerAssignment:
     """One checker definition and the sessions it must judge this tick."""
 
     definition: IdleCheckerDefinitionData
@@ -35,12 +35,12 @@ class IdleChecker[StateT: IdleCheckerState](ABC):
     @abstractmethod
     async def prepare(
         self,
-        context: IdleCheckContext,
-        requests: Sequence[PrepareRequest],
+        dependencies: IdleCheckerDependencies,
+        assignments: Sequence[CheckerAssignment],
     ) -> Mapping[IdleCheckerID, StateT]:
         """Called once per tick with every definition of this type.
 
-        Batch the I/O across all requests and return one state per definition;
+        Batch the I/O across all assignments and return one state per definition;
         capture everything check_idle needs into the states here.
         """
         raise NotImplementedError

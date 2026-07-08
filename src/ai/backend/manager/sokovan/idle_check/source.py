@@ -10,7 +10,10 @@ from ai.backend.common.identifier.idle_checker import IdleCheckerID
 from ai.backend.manager.data.idle_checker.types import IdleCheckSession
 from ai.backend.manager.repositories.idle_checker.repository import IdleCheckerRepository
 from ai.backend.manager.repositories.idle_checker.types import IdleCheckerDefinitionData
-from ai.backend.manager.sokovan.idle_check.checkers.base import IdleCheckContext, PrepareRequest
+from ai.backend.manager.sokovan.idle_check.checkers.base import (
+    CheckerAssignment,
+    IdleCheckerDependencies,
+)
 from ai.backend.manager.sokovan.idle_check.checkers.factory import checker_for
 from ai.backend.manager.sokovan.idle_check.types import (
     CheckerWithState,
@@ -26,11 +29,13 @@ class IdleCheckSource(
     ReconcilerSource[IdleCheckReconcileInfo, IdleCheckCategory, IdleCheckTargetStatuses]
 ):
     _repository: IdleCheckerRepository
-    _context: IdleCheckContext
+    _dependencies: IdleCheckerDependencies
 
-    def __init__(self, repository: IdleCheckerRepository, context: IdleCheckContext) -> None:
+    def __init__(
+        self, repository: IdleCheckerRepository, dependencies: IdleCheckerDependencies
+    ) -> None:
         self._repository = repository
-        self._context = context
+        self._dependencies = dependencies
 
     @override
     async def fetch_reconcile_info(
@@ -46,15 +51,15 @@ class IdleCheckSource(
             for bound in target.checkers:
                 definitions[bound.checker.checker_id] = bound.checker
                 sessions_by_checker[bound.checker.checker_id].append(target.session)
-        requests_by_type: defaultdict[CheckerType, list[PrepareRequest]] = defaultdict(list)
+        assignments_by_type: defaultdict[CheckerType, list[CheckerAssignment]] = defaultdict(list)
         for checker_id, definition in definitions.items():
-            requests_by_type[definition.checker_type].append(
-                PrepareRequest(
+            assignments_by_type[definition.checker_type].append(
+                CheckerAssignment(
                     definition=definition,
                     sessions=sessions_by_checker[checker_id],
                 )
             )
-        prepared_by_id = await self._prepare_checkers(requests_by_type)
+        prepared_by_id = await self._prepare_checkers(assignments_by_type)
         prepared_targets: list[PreparedTarget] = []
         for target in batch.targets:
             prepared_checkers: list[CheckerWithState] = []
@@ -74,15 +79,17 @@ class IdleCheckSource(
         return IdleCheckReconcileInfo(targets=prepared_targets, current_time=datetime.now(UTC))
 
     async def _prepare_checkers(
-        self, requests_by_type: Mapping[CheckerType, Sequence[PrepareRequest]]
+        self, assignments_by_type: Mapping[CheckerType, Sequence[CheckerAssignment]]
     ) -> dict[IdleCheckerID, CheckerWithState]:
         """The only I/O step besides the repository fetch: drive each type's batched prepare."""
         prepared_by_id: dict[IdleCheckerID, CheckerWithState] = {}
-        for checker_type, requests in requests_by_type.items():
+        for checker_type, assignments in assignments_by_type.items():
             checker = checker_for(checker_type)
             if checker is None:
                 continue
-            states = await checker.prepare(self._context, requests)
+            states = await checker.prepare(self._dependencies, assignments)
             for checker_id, state in states.items():
-                prepared_by_id[checker_id] = CheckerWithState(checker=checker, state=state)
+                prepared_by_id[checker_id] = CheckerWithState(
+                    checker_id=checker_id, checker=checker, state=state
+                )
         return prepared_by_id

@@ -8,15 +8,16 @@ from uuid import uuid4
 from ai.backend.common.identifier.idle_checker import IdleCheckerID
 from ai.backend.common.types import SessionId
 from ai.backend.manager.sokovan.idle_check.checkers.base import (
-    IdleCheckContext,
+    CheckerAssignment,
     IdleChecker,
+    IdleCheckerDependencies,
     IdleCheckerState,
-    PrepareRequest,
 )
 from ai.backend.manager.sokovan.idle_check.handlers.reconcile import IdleCheckReconcileHandler
 from ai.backend.manager.sokovan.idle_check.types import (
     CheckerWithState,
     IdleCheckReconcileInfo,
+    IdleVerdict,
     PreparedTarget,
 )
 
@@ -40,10 +41,10 @@ class RecordingChecker(IdleChecker[RecordingState]):
     @override
     async def prepare(
         self,
-        context: IdleCheckContext,
-        requests: Sequence[PrepareRequest],
+        dependencies: IdleCheckerDependencies,
+        assignments: Sequence[CheckerAssignment],
     ) -> Mapping[IdleCheckerID, RecordingState]:
-        return {request.definition.checker_id: RecordingState() for request in requests}
+        return {assignment.definition.checker_id: RecordingState() for assignment in assignments}
 
     @override
     def check_idle(self, session_id: SessionId, state: RecordingState) -> bool:
@@ -56,22 +57,22 @@ class TestIdleCheckReconcileHandler:
         session_id = SessionId(uuid4())
         first_checker = RecordingChecker(idle_session_ids=frozenset({session_id}))
         second_checker = RecordingChecker(idle_session_ids=frozenset({session_id}))
+        first_pair = CheckerWithState(
+            checker_id=IdleCheckerID(uuid4()), checker=first_checker, state=RecordingState()
+        )
+        second_pair = CheckerWithState(
+            checker_id=IdleCheckerID(uuid4()), checker=second_checker, state=RecordingState()
+        )
         reconcile_info = IdleCheckReconcileInfo(
-            targets=(
-                PreparedTarget(
-                    session_id=session_id,
-                    checkers=(
-                        CheckerWithState(checker=first_checker, state=RecordingState()),
-                        CheckerWithState(checker=second_checker, state=RecordingState()),
-                    ),
-                ),
-            ),
+            targets=(PreparedTarget(session_id=session_id, checkers=(first_pair, second_pair)),),
             current_time=_NOW,
         )
 
         result = await IdleCheckReconcileHandler().execute(reconcile_info)
 
-        assert result.idle_session_ids == [session_id]
+        assert result.verdicts == [
+            IdleVerdict(session_id=session_id, checker_id=first_pair.checker_id),
+        ]
         assert first_checker.checked_session_ids == [session_id]
         assert second_checker.checked_session_ids == []
 
@@ -84,8 +85,16 @@ class TestIdleCheckReconcileHandler:
                 PreparedTarget(
                     session_id=session_id,
                     checkers=(
-                        CheckerWithState(checker=first_checker, state=RecordingState()),
-                        CheckerWithState(checker=second_checker, state=RecordingState()),
+                        CheckerWithState(
+                            checker_id=IdleCheckerID(uuid4()),
+                            checker=first_checker,
+                            state=RecordingState(),
+                        ),
+                        CheckerWithState(
+                            checker_id=IdleCheckerID(uuid4()),
+                            checker=second_checker,
+                            state=RecordingState(),
+                        ),
                     ),
                 ),
             ),
@@ -94,6 +103,6 @@ class TestIdleCheckReconcileHandler:
 
         result = await IdleCheckReconcileHandler().execute(reconcile_info)
 
-        assert result.idle_session_ids == []
+        assert result.verdicts == []
         assert first_checker.checked_session_ids == [session_id]
         assert second_checker.checked_session_ids == [session_id]

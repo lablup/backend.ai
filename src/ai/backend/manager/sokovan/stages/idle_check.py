@@ -12,7 +12,7 @@ from ai.backend.manager.data.session.types import SchedulingResult, SessionStatu
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.repositories.idle_checker.repository import IdleCheckerRepository
 from ai.backend.manager.sokovan.idle_check.applier import IdleCheckApplier
-from ai.backend.manager.sokovan.idle_check.checkers.base import IdleCheckContext
+from ai.backend.manager.sokovan.idle_check.checkers.base import IdleCheckerDependencies
 from ai.backend.manager.sokovan.idle_check.handlers.reconcile import IdleCheckReconcileHandler
 from ai.backend.manager.sokovan.idle_check.source import IdleCheckSource
 from ai.backend.manager.sokovan.idle_check.types import (
@@ -49,7 +49,7 @@ def build_idle_check_stage(
     )
     stage = ReconcilerStage(
         handler=IdleCheckReconcileHandler(),
-        source=IdleCheckSource(idle_checker_repository, IdleCheckContext()),
+        source=IdleCheckSource(idle_checker_repository, IdleCheckerDependencies()),
         applier=IdleCheckApplier(),
         metadata=metadata,
     )

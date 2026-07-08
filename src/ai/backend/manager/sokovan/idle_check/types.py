@@ -8,6 +8,7 @@ from datetime import datetime
 from typing import Any, override
 from uuid import UUID
 
+from ai.backend.common.identifier.idle_checker import IdleCheckerID
 from ai.backend.common.types import SessionId
 from ai.backend.manager.data.reconciler.types import (
     BaseReconcilerCategory,
@@ -43,6 +44,7 @@ class IdleCheckTargetStatuses(BaseReconcilerTargetStatuses):
 class CheckerWithState:
     """A checker paired with the state it prepared for one definition."""
 
+    checker_id: IdleCheckerID
     checker: IdleChecker[Any]
     state: IdleCheckerState
 
@@ -96,13 +98,21 @@ class IdleCheckDecision(ReconcilerDecision):
         return self.handler_policy
 
 
+@dataclass(frozen=True)
+class IdleVerdict:
+    """One idle judgment: the session judged idle and the checker that judged it."""
+
+    session_id: SessionId
+    checker_id: IdleCheckerID
+
+
 @dataclass
 class IdleCheckResult(BaseReconcilerResult):
-    idle_session_ids: list[SessionId] = field(default_factory=list)
+    verdicts: list[IdleVerdict] = field(default_factory=list)
 
     @override
     def processed_count(self) -> int:
-        return len(self.idle_session_ids)
+        return len(self.verdicts)
 
     @override
     def failed_count(self) -> int:

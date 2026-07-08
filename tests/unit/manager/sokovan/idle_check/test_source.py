@@ -28,10 +28,10 @@ from ai.backend.manager.repositories.idle_checker.types import (
     IdleCheckTargetData,
 )
 from ai.backend.manager.sokovan.idle_check.checkers.base import (
-    IdleCheckContext,
+    CheckerAssignment,
     IdleChecker,
+    IdleCheckerDependencies,
     IdleCheckerState,
-    PrepareRequest,
 )
 from ai.backend.manager.sokovan.idle_check.source import IdleCheckSource
 from ai.backend.manager.sokovan.idle_check.types import IdleCheckCategory, IdleCheckTargetStatuses
@@ -61,17 +61,17 @@ class PrepareRecordingChecker(IdleChecker[PreparedState]):
     @override
     async def prepare(
         self,
-        context: IdleCheckContext,
-        requests: Sequence[PrepareRequest],
+        dependencies: IdleCheckerDependencies,
+        assignments: Sequence[CheckerAssignment],
     ) -> Mapping[IdleCheckerID, PreparedState]:
         self.prepare_calls.append([
             (
-                request.definition.checker_id,
-                [session.session_id for session in request.sessions],
+                assignment.definition.checker_id,
+                [session.session_id for session in assignment.sessions],
             )
-            for request in requests
+            for assignment in assignments
         ])
-        return {request.definition.checker_id: PreparedState() for request in requests}
+        return {assignment.definition.checker_id: PreparedState() for assignment in assignments}
 
     @override
     def check_idle(self, session_id: SessionId, state: PreparedState) -> bool:
@@ -105,7 +105,7 @@ def _target(session_id: SessionId, checkers: Sequence[BoundCheckerData]) -> Idle
 def _source(batch: IdleCheckBatchData) -> IdleCheckSource:
     repository = MagicMock()
     repository.fetch_idle_check_batch = AsyncMock(return_value=batch)
-    return IdleCheckSource(repository, IdleCheckContext())
+    return IdleCheckSource(repository, IdleCheckerDependencies())
 
 
 class TestIdleCheckSource:
