@@ -128,6 +128,5 @@ class TestSchedulingSequencer:
         result = await sequencer.sequence(scaling_group, system_snapshot, workloads)
 
         assert [w.access_key for w in result] == [
-            AccessKey(k)
-            for k in ("high-first", "high-second", "low-first", "low-second")
+            AccessKey(k) for k in ("high-first", "high-second", "low-first", "low-second")
         ]
