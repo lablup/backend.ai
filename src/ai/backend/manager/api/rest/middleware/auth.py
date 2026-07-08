@@ -24,7 +24,6 @@ import secrets
 import uuid
 from collections.abc import Awaitable, Callable, Mapping
 from contextlib import ExitStack
-from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any, Final
 from urllib.parse import urlparse
@@ -38,7 +37,7 @@ from dateutil.tz import tzutc
 
 from ai.backend.common.contexts.client_ip import with_client_ip
 from ai.backend.common.contexts.user import with_triggered_user, with_user
-from ai.backend.common.data.user.types import UserData, UserRole
+from ai.backend.common.data.user.types import RequesterIdentity, UserData, UserRole
 from ai.backend.common.exception import InvalidIpAddressValue
 from ai.backend.common.identifier.user import UserID
 from ai.backend.common.jwt.exceptions import JWTError
@@ -648,14 +647,6 @@ async def _authenticate_via_hook(
     _populate_auth_result(request, user_row, keypair_row)
 
     await valkey_stat.increment_keypair_query_count(access_key)
-
-
-@dataclass(frozen=True)
-class RequesterIdentity:
-    """The effective (scope) and trigger (caller) users resolved for a request."""
-
-    effective_user: UserData | None
-    trigger_user: UserData | None
 
 
 async def _load_user_data(db: ExtendedAsyncSAEngine, user_id: UserID) -> UserData:
