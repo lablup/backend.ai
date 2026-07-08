@@ -1747,6 +1747,27 @@ class RBACAdapter(BaseAdapter):
             )
             if condition is not None:
                 conditions.append(condition)
+        if f.scope_type is not None:
+            conditions.extend(
+                self._convert_rbac_element_type_filter(
+                    f.scope_type,
+                    equals_factory=EntityScopeConditions.by_scope_type_equals,
+                    not_equals_factory=EntityScopeConditions.by_scope_type_not_equals,
+                    in_factory=EntityScopeConditions.by_scope_type_in,
+                    not_in_factory=EntityScopeConditions.by_scope_type_not_in,
+                )
+            )
+        if f.scope_id is not None:
+            condition = self.convert_string_filter(
+                f.scope_id,
+                contains_factory=EntityScopeConditions.by_scope_id_contains,
+                equals_factory=EntityScopeConditions.by_scope_id_equals,
+                starts_with_factory=EntityScopeConditions.by_scope_id_starts_with,
+                ends_with_factory=EntityScopeConditions.by_scope_id_ends_with,
+                in_factory=EntityScopeConditions.by_scope_id_in,
+            )
+            if condition is not None:
+                conditions.append(condition)
         if f.AND:
             for sub in f.AND:
                 conditions.extend(self._convert_entity_filter(sub))
