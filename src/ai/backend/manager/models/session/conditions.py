@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     )
 
 from ai.backend.common.data.permission.types import ScopeType
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import SessionId, SessionTypes
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.permission.id import ScopeId
@@ -72,6 +73,13 @@ class SessionConditions:
     def by_scaling_group(scaling_group: str) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return SessionRow.scaling_group_name == scaling_group
+
+        return inner
+
+    @staticmethod
+    def by_resource_group_id(resource_group_id: ResourceGroupID) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return SessionRow.resource_group_id == resource_group_id
 
         return inner
 

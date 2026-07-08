@@ -272,17 +272,19 @@ class ScheduleDBSource:
                 yield session
                 await session.commit()
 
-    async def get_scheduling_data(self, scaling_group: str, spec: SchedulingSpec) -> SchedulingData:
+    async def get_scheduling_data(
+        self, resource_group_id: ResourceGroupID, spec: SchedulingSpec
+    ) -> SchedulingData:
         """
         Fetch all scheduling data from database in a single session.
         Raises ScalingGroupNotFound if scaling group doesn't exist.
         """
         async with self._begin_readonly_session_read_committed() as db_sess:
             # 1. Get scaling group
-            scaling_group_meta = await self._fetch_scaling_group(db_sess, scaling_group)
+            scaling_group_meta = await self._fetch_scaling_group(db_sess, resource_group_id)
 
             # 2. Get pending sessions
-            pending_sessions = await self._fetch_pending_sessions(db_sess, scaling_group)
+            pending_sessions = await self._fetch_pending_sessions(db_sess, scaling_group_meta.id)
             if not pending_sessions.sessions:
                 return SchedulingData(
                     scaling_group=scaling_group_meta,
@@ -293,11 +295,11 @@ class ScheduleDBSource:
                 )
 
             # 3. Get agents
-            agents = await self._fetch_agents(db_sess, scaling_group)
+            agents = await self._fetch_agents(db_sess, scaling_group_meta.id)
 
             # 4. Get snapshot data
             snapshot_data = await self._fetch_snapshot_data(
-                db_sess, scaling_group, pending_sessions, spec.known_slot_types
+                db_sess, scaling_group_meta.id, pending_sessions, spec.known_slot_types
             )
 
             return SchedulingData(
@@ -366,7 +368,7 @@ class ScheduleDBSource:
         )
 
     async def _fetch_scaling_group(
-        self, db_sess: SASession, scaling_group: str
+        self, db_sess: SASession, resource_group_id: ResourceGroupID
     ) -> ScalingGroupMeta:
         """
         Fetch scaling group metadata.
@@ -374,23 +376,25 @@ class ScheduleDBSource:
         """
         sg_result = await db_sess.execute(
             sa.select(
+                ScalingGroupRow.id,
                 ScalingGroupRow.name,
                 ScalingGroupRow.scheduler,
                 ScalingGroupRow.scheduler_opts,
-            ).where(ScalingGroupRow.name == scaling_group)
+            ).where(ScalingGroupRow.id == resource_group_id)
         )
         sg_row = sg_result.one_or_none()
         if not sg_row:
-            raise ScalingGroupNotFound(scaling_group)
+            raise ScalingGroupNotFound(str(resource_group_id))
 
         return ScalingGroupMeta(
+            id=sg_row.id,
             name=sg_row.name,
             scheduler=sg_row.scheduler,
             scheduler_opts=sg_row.scheduler_opts,
         )
 
     async def _fetch_pending_sessions(
-        self, db_sess: SASession, scaling_group: str
+        self, db_sess: SASession, resource_group_id: ResourceGroupID
     ) -> PendingSessions:
         """
         Fetch pending sessions with kernels using single JOIN query.
@@ -422,7 +426,7 @@ class ScheduleDBSource:
             .order_by(SessionRow.created_at.asc())
             .where(
                 sa.and_(
-                    SessionRow.scaling_group_name == scaling_group,
+                    SessionRow.resource_group_id == resource_group_id,
                     SessionRow.status == SessionStatus.PENDING,
                     KernelRow.status == KernelStatus.PENDING,
                 )
@@ -464,7 +468,9 @@ class ScheduleDBSource:
 
         return PendingSessions(sessions=list(sessions_map.values()))
 
-    async def _fetch_agents(self, db_sess: SASession, scaling_group: str) -> list[AgentMeta]:
+    async def _fetch_agents(
+        self, db_sess: SASession, resource_group_id: ResourceGroupID
+    ) -> list[AgentMeta]:
         """Fetch schedulable agent metadata in the scaling group."""
         agents_result = await db_sess.execute(
             sa.select(
@@ -472,11 +478,12 @@ class ScheduleDBSource:
                 AgentRow.addr,
                 AgentRow.architecture,
                 AgentRow.available_slots,
+                AgentRow.resource_group_id,
                 AgentRow.scaling_group,
             ).where(
                 sa.and_(
                     AgentRow.status == AgentStatus.ALIVE,
-                    AgentRow.scaling_group == scaling_group,
+                    AgentRow.resource_group_id == resource_group_id,
                     AgentRow.schedulable == sa.true(),
                 )
             )
@@ -490,6 +497,7 @@ class ScheduleDBSource:
                     addr=row.addr,
                     architecture=row.architecture,
                     available_slots=row.available_slots,
+                    resource_group_id=row.resource_group_id,
                     scaling_group=row.scaling_group,
                 )
             )
@@ -498,12 +506,12 @@ class ScheduleDBSource:
     async def _fetch_snapshot_data(
         self,
         db_sess: SASession,
-        scaling_group: str,
+        resource_group_id: ResourceGroupID,
         pending_sessions: PendingSessions,
         known_slot_types: Mapping[SlotName, SlotTypes],
     ) -> SnapshotData:
         """Fetch all snapshot data for system state."""
-        resource_occupancy = await self._fetch_kernel_occupancy(db_sess, scaling_group)
+        resource_occupancy = await self._fetch_kernel_occupancy(db_sess, resource_group_id)
 
         # Fetch resource policies for entities in pending sessions
         resource_policies = await self._fetch_resource_policies(
@@ -523,7 +531,7 @@ class ScheduleDBSource:
         )
 
     async def _fetch_kernel_occupancy(
-        self, db_sess: SASession, scaling_group: str
+        self, db_sess: SASession, resource_group_id: ResourceGroupID
     ) -> ResourceOccupancySnapshot:
         """Fetch kernel occupancy data from normalized resource_allocations table."""
         ra = ResourceAllocationRow.__table__
@@ -551,7 +559,7 @@ class ScheduleDBSource:
                 ra.join(k, ra.c.kernel_id == k.c.id).join(rst, ra.c.slot_name == rst.c.slot_name)
             )
             .where(
-                k.c.scaling_group == scaling_group,
+                k.c.resource_group_id == resource_group_id,
                 k.c.status.in_(all_resource_statuses),
                 ra.c.free_at.is_(None),
             )
@@ -1163,12 +1171,12 @@ class ScheduleDBSource:
 
         return force_terminated_sessions
 
-    async def get_all_scaling_groups(self) -> list[str]:
-        """Get all defined scaling groups."""
+    async def get_all_scaling_groups(self) -> list[ResourceGroupID]:
+        """Get ids of all defined scaling groups."""
         async with self._begin_readonly_session_read_committed() as session:
-            query = sa.select(ScalingGroupRow.name)
+            query = sa.select(ScalingGroupRow.id)
             result = await session.execute(query)
-            return [row.name for row in result.fetchall()]
+            return [row.id for row in result.fetchall()]
 
     async def get_terminating_sessions_by_ids(
         self,
@@ -1262,7 +1270,7 @@ class ScheduleDBSource:
                     ScalingGroupRow.scheduler_opts,
                 )
                 .select_from(SessionRow)
-                .join(ScalingGroupRow, SessionRow.scaling_group_name == ScalingGroupRow.name)
+                .join(ScalingGroupRow, SessionRow.resource_group_id == ScalingGroupRow.id)
                 .where(
                     SessionRow.id.in_(session_ids),
                     SessionRow.status == SessionStatus.PENDING,
@@ -3610,7 +3618,7 @@ class ScheduleDBSource:
 
     async def fetch_sessions_for_handler(
         self,
-        scaling_group: str,
+        resource_group_id: ResourceGroupID,
         session_statuses: list[SessionStatus],
         kernel_statuses: list[KernelStatus] | None,
     ) -> list[SessionWithKernels]:
@@ -3623,7 +3631,7 @@ class ScheduleDBSource:
         unified data representation across all handlers.
 
         Args:
-            scaling_group: The scaling group to filter by
+            resource_group_id: The scaling group id to filter by
             session_statuses: Session statuses to include
             kernel_statuses: If non-None, include sessions that have at least one
                            kernel in these statuses (simple filtering).
@@ -3636,7 +3644,7 @@ class ScheduleDBSource:
             stmt = (
                 sa.select(SessionRow)
                 .where(
-                    SessionRow.scaling_group_name == scaling_group,
+                    SessionRow.resource_group_id == resource_group_id,
                     SessionRow.status.in_(session_statuses),
                 )
                 .options(selectinload(SessionRow.kernels))
@@ -4231,7 +4239,7 @@ class ScheduleDBSource:
             querier = BatchQuerier(
                 pagination=NoPagination(),
                 conditions=[
-                    SessionConditions.by_scaling_group("default"),
+                    SessionConditions.by_resource_group_id(resource_group_id),
                     SessionConditions.by_statuses([SessionStatus.SCHEDULED]),
                 ],
                 orders=[SessionOrders.created_at()],
@@ -4376,7 +4384,7 @@ class ScheduleDBSource:
             querier = BatchQuerier(
                 pagination=NoPagination(),
                 conditions=[
-                    SessionConditions.by_scaling_group("default"),
+                    SessionConditions.by_resource_group_id(resource_group_id),
                     SessionConditions.by_statuses([SessionStatus.PREPARED]),
                 ],
                 orders=[SessionOrders.created_at()],

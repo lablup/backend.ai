@@ -11,6 +11,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from dataclasses import dataclass
 
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.manager.data.kernel.types import KernelInfo
 from ai.backend.manager.models.clauses import QueryCondition
 
@@ -42,11 +43,11 @@ class KernelObserver(ABC):
         raise NotImplementedError("Subclasses must implement name()")
 
     @abstractmethod
-    def get_query_condition(self, scaling_group: str) -> QueryCondition:
+    def get_query_condition(self, resource_group_id: ResourceGroupID) -> QueryCondition:
         """Get query condition for kernel filtering.
 
         Args:
-            scaling_group: The scaling group being processed
+            resource_group_id: The id of the scaling group being processed
 
         Returns:
             QueryCondition for filtering kernels to observe
@@ -56,13 +57,13 @@ class KernelObserver(ABC):
     @abstractmethod
     async def observe(
         self,
-        scaling_group: str,
+        resource_group_id: ResourceGroupID,
         kernels: Sequence[KernelInfo],
     ) -> ObservationResult:
         """Observe the given kernels without changing their state.
 
         Args:
-            scaling_group: The scaling group being processed
+            resource_group_id: The id of the scaling group being processed
             kernels: Kernels with full KernelInfo data
 
         Returns:

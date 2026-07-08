@@ -6,6 +6,7 @@ import logging
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, override
 
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.kernel.types import KernelInfo, KernelStatus
 from ai.backend.manager.defs import LockID
@@ -74,7 +75,7 @@ class SweepStaleKernelsKernelHandler(KernelLifecycleHandler):
     @override
     async def execute(
         self,
-        _scaling_group: str,
+        _resource_group_id: ResourceGroupID,
         kernels: Sequence[KernelInfo],
     ) -> KernelExecutionResult:
         """Sweep kernels with stale presence status.

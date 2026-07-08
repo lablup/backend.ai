@@ -6,6 +6,7 @@ import logging
 from collections.abc import Sequence
 from typing import override
 
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus, StatusTransitions, TransitionStatus
@@ -88,7 +89,7 @@ class SweepSessionsLifecycleHandler(SessionLifecycleHandler):
     @override
     async def execute(
         self,
-        _scaling_group: str,
+        _resource_group_id: ResourceGroupID,
         sessions: Sequence[SessionWithKernels],
     ) -> SessionExecutionResult:
         """Sweep stale sessions including those with pending timeout.
