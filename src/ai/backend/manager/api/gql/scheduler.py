@@ -9,10 +9,10 @@ import strawberry
 from strawberry import Info
 
 from ai.backend.common.dto.manager.v2.scheduler import (
-    DryRunKernelResourceInput,
-    DryRunScheduleInput,
-    DryRunSchedulePayload,
-    KernelDryRunResultInfo,
+    ComputeScheduleInput,
+    ComputeScheduleKernelResourceInput,
+    ComputeScheduleKernelResultInfo,
+    ComputeSchedulePayload,
     SchedulingBroadcastEventPayloadNode,
     SchedulingStatusDTO,
     UnschedulableReasonHintInfo,
@@ -162,13 +162,13 @@ async def scheduling_events_by_session(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
         description=(
-            "Per-kernel resource request for a scheduling dry-run. The image is "
+            "Per-kernel resource request for a compute-schedule. The image is "
             "optional when a resource-group default supplies it downstream."
         ),
     ),
-    name="DryRunKernelResourceInput",
+    name="ComputeScheduleKernelResourceInput",
 )
-class DryRunKernelResourceInputGQL(PydanticInputMixin[DryRunKernelResourceInput]):
+class ComputeScheduleKernelResourceInputGQL(PydanticInputMixin[ComputeScheduleKernelResourceInput]):
     image_id: strawberry.ID | None = None
     resources: list[ResourceSlotEntryInputGQL] | None = None
 
@@ -176,12 +176,12 @@ class DryRunKernelResourceInputGQL(PydanticInputMixin[DryRunKernelResourceInput]
 @gql_pydantic_input(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
-        description="Dry-run a session's scheduling against a resource group without provisioning.",
+        description="Compute a session's scheduling against a resource group without provisioning.",
     ),
-    name="DryRunScheduleInput",
+    name="ComputeScheduleInput",
 )
-class DryRunScheduleInputGQL(PydanticInputMixin[DryRunScheduleInput]):
-    kernels: list[DryRunKernelResourceInputGQL]
+class ComputeScheduleInputGQL(PydanticInputMixin[ComputeScheduleInput]):
+    kernels: list[ComputeScheduleKernelResourceInputGQL]
     cluster_mode: SessionClusterModeGQL
     resource_group_id: strawberry.ID
 
@@ -191,7 +191,7 @@ class DryRunScheduleInputGQL(PydanticInputMixin[DryRunScheduleInput]):
         added_version=NEXT_RELEASE_VERSION,
         description=(
             "What the caller could change so an unschedulable kernel would fit. "
-            "Present only when the kernel's dry-run did not succeed."
+            "Present only when the kernel could not be scheduled."
         ),
     ),
     model=UnschedulableReasonHintInfo,
@@ -206,14 +206,14 @@ class UnschedulableReasonHintGQL:
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
         description=(
-            "Dry-run outcome for a single kernel. Results correspond positionally "
+            "Compute-schedule outcome for a single kernel. Results correspond positionally "
             "to the requested kernels."
         ),
     ),
-    model=KernelDryRunResultInfo,
-    name="KernelDryRunResult",
+    model=ComputeScheduleKernelResultInfo,
+    name="ComputeScheduleKernelResult",
 )
-class KernelDryRunResultGQL:
+class ComputeScheduleKernelResultGQL:
     requested_slots: list[ResourceSlotEntryGQL]
     requested_architecture: str
     success: bool
@@ -223,28 +223,29 @@ class KernelDryRunResultGQL:
 @gql_pydantic_type(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
-        description="Result of a dry-run schedule request.",
+        description="Result of a compute-schedule request.",
     ),
-    model=DryRunSchedulePayload,
-    name="DryRunSchedulePayload",
+    model=ComputeSchedulePayload,
+    name="ComputeSchedulePayload",
 )
-class DryRunSchedulePayloadGQL:
-    dry_run_results: list[KernelDryRunResultGQL]
+class ComputeSchedulePayloadGQL:
+    results: list[ComputeScheduleKernelResultGQL]
 
 
 @gql_root_field(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
         description=(
-            "Dry-run a session's scheduling against a resource group without "
-            "provisioning. Returns per-kernel admission outcomes and, for kernels "
-            "that do not fit, hints on what to reduce."
+            "Compute whether a session could be created on a resource group, "
+            "without actually provisioning it. Checks each kernel's resource "
+            "request against the group's agents and returns per-kernel admission "
+            "outcomes, with hints on what to reduce for kernels that do not fit."
         ),
     )
 )  # type: ignore[misc]
-async def dry_run_schedule(
-    input: DryRunScheduleInputGQL,
+async def compute_schedule(
+    input: ComputeScheduleInputGQL,
     info: Info[StrawberryGQLContext],
-) -> DryRunSchedulePayloadGQL | None:
+) -> ComputeSchedulePayloadGQL | None:
     # Schema-only surface: the adapter wiring lands in a follow-up.
-    raise ServiceUnavailable("Dry-run schedule is not yet available.")
+    raise ServiceUnavailable("Compute schedule is not yet available.")

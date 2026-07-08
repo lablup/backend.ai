@@ -12,8 +12,8 @@ from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.dto.manager.v2.common import ResourceSlotEntryInfo
 
 __all__ = (
-    "DryRunSchedulePayload",
-    "KernelDryRunResultInfo",
+    "ComputeScheduleKernelResultInfo",
+    "ComputeSchedulePayload",
     "SchedulingBroadcastEventPayloadNode",
     "UnschedulableReasonHintInfo",
 )
@@ -48,7 +48,7 @@ class SchedulingBroadcastEventPayloadNode(BaseResponseModel):
 class UnschedulableReasonHintInfo(BaseResponseModel):
     """What the caller could change so an unschedulable kernel would fit.
 
-    Populated only when the kernel's dry-run ``success`` is False. Surfaces
+    Populated only when the kernel's ``success`` is False. Surfaces
     the user-actionable subset of the selector's remediation hint.
     """
 
@@ -62,8 +62,8 @@ class UnschedulableReasonHintInfo(BaseResponseModel):
     )
 
 
-class KernelDryRunResultInfo(BaseResponseModel):
-    """Dry-run outcome for a single kernel.
+class ComputeScheduleKernelResultInfo(BaseResponseModel):
+    """Compute-schedule outcome for a single kernel.
 
     Results correspond positionally to the requested kernels: the caller
     matches each result to its input by list index. ``reason_hint`` is
@@ -85,9 +85,9 @@ class KernelDryRunResultInfo(BaseResponseModel):
     )
 
 
-class DryRunSchedulePayload(BaseResponseModel):
-    """Result of a dry-run schedule request."""
+class ComputeSchedulePayload(BaseResponseModel):
+    """Result of a compute-schedule request."""
 
-    dry_run_results: list[KernelDryRunResultInfo] = Field(
-        description="Per-kernel dry-run outcomes, correlated to the request by list index.",
+    results: list[ComputeScheduleKernelResultInfo] = Field(
+        description="Per-kernel compute-schedule outcomes, correlated to the request by list index.",
     )

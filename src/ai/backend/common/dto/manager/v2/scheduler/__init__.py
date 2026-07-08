@@ -3,22 +3,22 @@ Scheduler DTOs v2 for Manager API.
 """
 
 from ai.backend.common.dto.manager.v2.scheduler.request import (
-    DryRunKernelResourceInput,
-    DryRunScheduleInput,
+    ComputeScheduleInput,
+    ComputeScheduleKernelResourceInput,
 )
 from ai.backend.common.dto.manager.v2.scheduler.response import (
-    DryRunSchedulePayload,
-    KernelDryRunResultInfo,
+    ComputeScheduleKernelResultInfo,
+    ComputeSchedulePayload,
     SchedulingBroadcastEventPayloadNode,
     SchedulingStatusDTO,
     UnschedulableReasonHintInfo,
 )
 
 __all__ = (
-    "DryRunKernelResourceInput",
-    "DryRunScheduleInput",
-    "DryRunSchedulePayload",
-    "KernelDryRunResultInfo",
+    "ComputeScheduleInput",
+    "ComputeScheduleKernelResourceInput",
+    "ComputeScheduleKernelResultInfo",
+    "ComputeSchedulePayload",
     "SchedulingBroadcastEventPayloadNode",
     "SchedulingStatusDTO",
     "UnschedulableReasonHintInfo",

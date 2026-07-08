@@ -1,5 +1,5 @@
 """
-Request DTOs for the dry-run schedule v2 API.
+Request DTOs for the compute-schedule v2 API.
 """
 
 from __future__ import annotations
@@ -13,13 +13,13 @@ from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.resource_group import ResourceGroupID
 
 __all__ = (
-    "DryRunKernelResourceInput",
-    "DryRunScheduleInput",
+    "ComputeScheduleInput",
+    "ComputeScheduleKernelResourceInput",
 )
 
 
-class DryRunKernelResourceInput(BaseRequestModel):
-    """Per-kernel resource inputs for a scheduling dry-run.
+class ComputeScheduleKernelResourceInput(BaseRequestModel):
+    """Per-kernel resource inputs for a compute-schedule request.
 
     Mirrors the scheduler's ``KernelResourceInput``: the requested resource
     slots plus an optional image whose architecture and resource-group
@@ -40,19 +40,19 @@ class DryRunKernelResourceInput(BaseRequestModel):
     )
 
 
-class DryRunScheduleInput(BaseRequestModel):
-    """Dry-run a session's scheduling against a resource group without provisioning.
+class ComputeScheduleInput(BaseRequestModel):
+    """Compute a session's scheduling against a resource group without provisioning.
 
     ``cluster_mode`` decides whether kernel slots are summed onto a single
     node (SINGLE_NODE) or placed individually (MULTI_NODE).
     """
 
-    kernels: list[DryRunKernelResourceInput] = Field(
+    kernels: list[ComputeScheduleKernelResourceInput] = Field(
         description="Per-kernel resource requests to test against the resource group.",
     )
     cluster_mode: ClusterModeEnum = Field(
         description="Cluster networking mode governing how kernel slots are placed.",
     )
     resource_group_id: ResourceGroupID = Field(
-        description="Target resource group to dry-run the scheduling against.",
+        description="Target resource group to compute the scheduling against.",
     )
