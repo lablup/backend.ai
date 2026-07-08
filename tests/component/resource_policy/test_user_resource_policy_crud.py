@@ -38,7 +38,7 @@ class TestUserResourcePolicyCreate:
         policy = result.user_resource_policy
         assert policy.name == name
         assert policy.max_vfolder_count == 20
-        assert policy.max_quota_scope_size.value == 1073741824
+        assert policy.max_quota_scope_size.expr == "1073741824"
         assert policy.max_session_count_per_model_session == 5
         assert policy.max_customized_image_count == 10
 

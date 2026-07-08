@@ -7,7 +7,6 @@ from uuid import UUID
 
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
-from ai.backend.common.dto.manager.v2.common import BinarySizeInfo
 from ai.backend.common.dto.manager.v2.deployment.request import DeploymentStrategyInput
 from ai.backend.common.dto.manager.v2.vfolder.request import (
     BulkDeleteVFoldersInput,
@@ -148,11 +147,6 @@ _VFOLDER_PAGINATION_SPEC = PaginationSpec(
 )
 
 
-def _to_binary_size_info(value: int) -> BinarySizeInfo:
-    """Convert bytes integer to BinarySizeInfo DTO."""
-    return BinarySizeInfo(value=value, display=f"{BinarySize(value):s}")
-
-
 def _build_policy_from_strategy_input(
     strategy_input: DeploymentStrategyInput | None,
 ) -> DeploymentPolicyConfig | None:
@@ -218,7 +212,9 @@ class VFolderAdapter(BaseAdapter):
                 creator_email=data.creator,
             ),
             quota=VFolderQuotaInfo(
-                max_size=_to_binary_size_info(data.max_size) if data.max_size is not None else None,
+                max_size=BinarySize.to_size_info(data.max_size)
+                if data.max_size is not None
+                else None,
                 max_files=data.max_files,
             ),
             unmanaged_path=data.unmanaged_path,
@@ -431,7 +427,7 @@ class VFolderAdapter(BaseAdapter):
             return None
         return VFolderUsageInfoDTO(
             num_files=usage.num_files,
-            used_bytes=_to_binary_size_info(usage.used_bytes),
+            used_bytes=BinarySize.to_size_info(usage.used_bytes),
         )
 
     async def delete(self, vfolder_id: UUID) -> DeleteVFolderPayload:

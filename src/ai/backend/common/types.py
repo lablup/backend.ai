@@ -177,6 +177,7 @@ __all__ = (
 if TYPE_CHECKING:
     from ai.backend.common.configs.redis import RedisConfig
     from ai.backend.common.data.vfolder.types import VFolderMountData
+    from ai.backend.common.dto.manager.v2.common import BinarySizeInfo
 
     from .docker import ImageRef
 
@@ -1077,6 +1078,21 @@ class BinarySize(int):
             raise ValueError("Unsupported scale unit.", suffix)
         value = self._quantize(self, maybe_multiplier)
         return f"{value:f}{suffix.lower()}".strip()
+
+    def to_bytes_str(self) -> str:
+        """Exact byte count as a base-10 string (e.g. '1073741824').
+
+        Distinct from ``str()`` ('1 GiB') and ``format(_, 's')`` ('1g'), which humanize.
+        """
+        return str(int(self))
+
+    @classmethod
+    def to_size_info(cls, value: int) -> BinarySizeInfo:
+        """Build the BinarySizeInfo DTO from a byte count (exact string + humanized display)."""
+        from ai.backend.common.dto.manager.v2.common import BinarySizeInfo
+
+        size = cls(value)
+        return BinarySizeInfo(expr=size.to_bytes_str(), display=f"{size:s}")
 
 
 def _validate_binary_size(v: Any) -> BinarySize:
