@@ -15,13 +15,16 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import json
 import logging
+import shutil
 import signal
 import struct
 import subprocess
 from collections.abc import Mapping, Sequence
 from decimal import Decimal
 from importlib.resources import files
+from io import StringIO
 from pathlib import Path
 from typing import Any, cast, override
 from uuid import UUID, uuid4
@@ -118,6 +121,32 @@ _CONTAINERD_TO_STATUS = {
     "paused": ContainerStatus.PAUSED,
     "pausing": ContainerStatus.PAUSED,
 }
+
+
+def _docker_seccomp_to_oci(profile: Mapping[str, Any]) -> dict[str, Any]:
+    """Convert a Docker-format seccomp profile (archMap + per-syscall includes/excludes) to the
+    OCI runtime-spec linux.seccomp shape (flat architectures; conditional includes/excludes are
+    dropped — the listed syscalls are simply allowed)."""
+    architectures: list[str] = []
+    for entry in profile.get("archMap", []):
+        architectures.append(entry["architecture"])
+        architectures.extend(entry.get("subArchitectures", []))
+    syscalls: list[dict[str, Any]] = []
+    for sc in profile.get("syscalls", []):
+        oci_sc: dict[str, Any] = {"names": sc["names"], "action": sc["action"]}
+        if sc.get("errnoRet") is not None:
+            oci_sc["errnoRet"] = sc["errnoRet"]
+        if sc.get("args"):
+            oci_sc["args"] = sc["args"]
+        syscalls.append(oci_sc)
+    oci: dict[str, Any] = {
+        "defaultAction": profile.get("defaultAction", "SCMP_ACT_ERRNO"),
+        "architectures": architectures,
+        "syscalls": syscalls,
+    }
+    if profile.get("defaultErrnoRet") is not None:
+        oci["defaultErrnoRet"] = profile["defaultErrnoRet"]
+    return oci
 
 
 def _registry_auth(registry_conf: ImageRegistry) -> dict[str, str] | None:
@@ -413,6 +442,32 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
     ) -> Mount:
         return Mount(type, Path(src), Path(target), MountPermission(perm), opts=opts)
 
+    async def _write_config_files(
+        self, resource_spec: KernelResourceSpec, environ: Mapping[str, str]
+    ) -> None:
+        """Write /home/config's environ.txt + resource.txt (+ *_base copies) that the
+        in-container runner and libbaihook read (parity with the Docker backend)."""
+        if self._scratch_dir is None:
+            return
+        config_dir = self._scratch_dir / "config"
+        env_lines = [f"{k}={v}" for k, v in environ.items()]
+        env_lines += [f"{k}={v}" for k, v in self._accel_spec.env.items()]
+        buf = StringIO()
+        resource_spec.write_to_file(buf)
+        for dev_type, device_alloc in resource_spec.allocations.items():
+            plugin = self.computers[dev_type].instance
+            for k, v in (await plugin.generate_resource_data(device_alloc)).items():
+                buf.write(f"{k}={v}\n")
+        resource_txt = buf.getvalue()
+
+        def _write() -> None:
+            (config_dir / "environ.txt").write_text("\n".join(env_lines) + "\n")
+            (config_dir / "resource.txt").write_text(resource_txt)
+            shutil.copyfile(config_dir / "environ.txt", config_dir / "environ_base.txt")
+            shutil.copyfile(config_dir / "resource.txt", config_dir / "resource_base.txt")
+
+        await asyncio.to_thread(_write)
+
     @override
     async def prepare_container(
         self,
@@ -421,6 +476,8 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         service_ports: list[ServicePort],
         cluster_info: ClusterInfo,
     ) -> ContainerdKernel:
+        # In-container config files (env + resource allocation) read by the runner/hooks.
+        await self._write_config_files(resource_spec, environ)
         # Build (but do NOT create) the container spec + kernel object. mount_krunner
         # (inherited) has populated resource_spec.mounts with the krunner bind mounts;
         # combine with process_mounts' vfolder mounts and inject them (plus env/labels)
@@ -465,6 +522,11 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         # kernel_host + host_ports, so surface host_ports = container_ports.
         for sport in service_ports:
             sport["host_ports"] = tuple(sport["container_ports"])
+        # seccomp hardening (skip under the jail sandbox, which does its own syscall filtering).
+        if self.local_config.container.sandbox_type != ContainerSandboxType.JAIL:
+            seccomp_path = self.resolve_krunner_filepath("runner/default-seccomp.json")
+            if seccomp_path.exists():
+                oci_spec["seccomp"] = _docker_seccomp_to_oci(json.loads(seccomp_path.read_text()))
         return ContainerdKernel(
             self.ownership_data,
             self.kernel_config["network_id"],

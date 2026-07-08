@@ -163,6 +163,7 @@ def build_oci_runtime_spec(
     devices, device_rules = _linux_devices(oci_spec)
     resources = _linux_resources(oci_spec, device_rules)
     hooks = _nvidia_hooks(oci_spec, env)  # mutates env with the NVIDIA_* vars the hook needs
+    seccomp = oci_spec.get("seccomp")
     namespaces: list[dict[str, Any]] = [
         {"type": "pid"},
         {"type": "ipc"},
@@ -202,4 +203,6 @@ def build_oci_runtime_spec(
     }
     if hooks is not None:
         spec["hooks"] = hooks
+    if seccomp is not None:
+        spec["linux"]["seccomp"] = seccomp
     return spec
