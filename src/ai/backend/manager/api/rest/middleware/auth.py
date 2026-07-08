@@ -40,6 +40,7 @@ from ai.backend.common.contexts.client_ip import with_client_ip
 from ai.backend.common.contexts.user import with_triggered_user, with_user
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.exception import InvalidIpAddressValue
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.jwt.exceptions import JWTError
 from ai.backend.common.plugin.hook import FIRST_COMPLETED, PASSED
 from ai.backend.common.types import ReadableCIDR
@@ -59,7 +60,7 @@ from ai.backend.manager.models.resource_policy import (
     keypair_resource_policies,
     user_resource_policies,
 )
-from ai.backend.manager.models.user import users
+from ai.backend.manager.models.user import UserRow, users
 from ai.backend.manager.models.utils import execute_with_retry
 
 if TYPE_CHECKING:
@@ -657,26 +658,22 @@ class RequesterIdentity:
     trigger_user: UserData | None
 
 
-async def _load_user_data(db: ExtendedAsyncSAEngine, user_id: uuid.UUID) -> UserData:
+async def _load_user_data(db: ExtendedAsyncSAEngine, user_id: UserID) -> UserData:
     """Load a user's ``UserData`` by UUID (impersonation target). Raises if not found."""
 
-    async def _query() -> Any:
-        async with db.begin_readonly() as conn:
-            query = sa.select(users.c.uuid, users.c.role, users.c.domain_name).where(
-                users.c.uuid == user_id
-            )
-            return (await conn.execute(query)).first()
+    async def _query() -> UserRow | None:
+        async with db.begin_readonly_session() as session:
+            return await session.scalar(sa.select(UserRow).where(UserRow.uuid == user_id))
 
     row = await execute_with_retry(_query)
-    if row is None:
+    if row is None or row.role is None or row.domain_name is None:
         raise UserNotFound("Impersonation target user not found")
-    role = UserRole(row.role)
     return UserData(
         user_id=row.uuid,
         is_authorized=True,
-        is_admin=role in (UserRole.ADMIN, UserRole.SUPERADMIN),
-        is_superadmin=role == UserRole.SUPERADMIN,
-        role=role,
+        is_admin=row.role in (UserRole.ADMIN, UserRole.SUPERADMIN),
+        is_superadmin=row.role == UserRole.SUPERADMIN,
+        role=row.role,
         domain_name=row.domain_name,
     )
 
@@ -705,7 +702,7 @@ async def _resolve_identity(request: web.Request, db: ExtendedAsyncSAEngine) -> 
     if caller is None or not caller.is_superadmin:
         raise InsufficientPrivilege("Only superadmin may use X-BackendAI-Act-As")
     try:
-        target_id = uuid.UUID(raw_target)
+        target_id = UserID(uuid.UUID(raw_target))
     except ValueError as e:
         raise InvalidAuthParameters("X-BackendAI-Act-As must be a valid user UUID") from e
     target = await _load_user_data(db, target_id)
