@@ -218,7 +218,12 @@ class ContainerdGrpcRuntime(OciRuntime):
             if topic == "/tasks/exit":
                 ev = task_events_pb2.TaskExit()
                 ev.ParseFromString(env.event.value)
-                yield TaskEvent("exit", ev.container_id, ev.exit_status)
+                # /tasks/exit also fires when an `exec`-ed process (health probe, in-container
+                # tool, etc.) exits; its ``id`` is the exec id. Only the main task's exit
+                # (id == container_id) means the kernel itself died — ignore exec exits, else a
+                # transient `exec` would tear the kernel down.
+                if ev.id == ev.container_id:
+                    yield TaskEvent("exit", ev.container_id, ev.exit_status)
             elif topic == "/tasks/oom":
                 ev_oom = task_events_pb2.TaskOOM()
                 ev_oom.ParseFromString(env.event.value)
