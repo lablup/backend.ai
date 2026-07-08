@@ -61,7 +61,6 @@ from ai.backend.manager.services.template.actions.list_cluster_templates import 
 from ai.backend.manager.services.template.actions.update_cluster_template import (
     UpdateClusterTemplateAction,
 )
-from ai.backend.manager.utils import reject_owner_access_key_while_impersonating
 
 if TYPE_CHECKING:
     from ai.backend.manager.services.group.processors import GroupProcessors
@@ -99,7 +98,6 @@ class ClusterTemplateHandler:
         req: RequestCtx,
     ) -> APIResponse:
         params = body.parsed
-        reject_owner_access_key_while_impersonating(params.owner_access_key)
         domain = params.domain or ctx.user_domain
         owner_access_key = params.owner_access_key
         log.info(
@@ -183,7 +181,6 @@ class ClusterTemplateHandler:
         req: RequestCtx,
     ) -> APIResponse:
         params = query.parsed
-        reject_owner_access_key_while_impersonating(params.owner_access_key)
         if params.format not in ("yaml", "json"):
             raise InvalidAPIParameters('format should be "yaml" or "json"')
         log.info(
@@ -211,7 +208,6 @@ class ClusterTemplateHandler:
     ) -> APIResponse:
         template_id = path.parsed.template_id
         params = body.parsed
-        reject_owner_access_key_while_impersonating(params.owner_access_key)
         log.info(
             "CLUSTER_TEMPLATE.PUT (ak:{0}/{1})",
             ctx.access_key,
@@ -247,7 +243,6 @@ class ClusterTemplateHandler:
     ) -> APIResponse:
         template_id = path.parsed.template_id
         params = query.parsed
-        reject_owner_access_key_while_impersonating(params.owner_access_key)
         log.info(
             "CLUSTER_TEMPLATE.DELETE (ak:{0}/{1})",
             ctx.access_key,

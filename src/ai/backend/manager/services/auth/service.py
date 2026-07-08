@@ -122,10 +122,7 @@ from ai.backend.manager.services.auth.actions.upload_ssh_keypair import (
     UploadSSHKeypairAction,
     UploadSSHKeypairActionResult,
 )
-from ai.backend.manager.utils import (
-    check_if_requester_is_eligible_to_act_as_target_user,
-    reject_owner_access_key_while_impersonating,
-)
+from ai.backend.manager.utils import check_if_requester_is_eligible_to_act_as_target_user
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -734,8 +731,6 @@ class AuthService:
         self, action: ResolveAccessKeyScopeAction
     ) -> ResolveAccessKeyScopeResult:
         requester_ak = AccessKey(action.requester_access_key)
-        # Value-independent: presence of owner_access_key during impersonation is rejected.
-        reject_owner_access_key_while_impersonating(action.owner_access_key)
         if (
             action.owner_access_key is None
             or action.owner_access_key == action.requester_access_key

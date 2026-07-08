@@ -107,7 +107,7 @@ authenticate (HMAC/JWT/hook) → resolve Act-As
 → push with_user(current) + with_triggered_user(trigger) → handler
 ```
 
-- Not superadmin / target not found / header set together with `owner_access_key` → reject the request (4.4, 4.6).
+- Not superadmin / target not found → reject the request (4.6).
 
 ### 4.3 Permission & scope semantics (why the change is minimal)
 
@@ -129,7 +129,7 @@ The two mechanisms **delegate different things**. They coexist.
 | impersonation | **the acting user itself** | the target | globally (context) |
 
 - **Do not integrate them.** owner_access_key runs with the requester's authority and merely borrows the target's policy — a distinct operation; this work switches the executing subject itself.
-- If a request sets both `X-BackendAI-Act-As` and `owner_access_key`, **reject it** (ambiguous executing subject).
+- **They coexist without any special rejection.** While impersonating, `current_user()` is the target, so an accompanying `owner_access_key` is evaluated against the **target's** authority. A regular-user target cannot delegate via owner_access_key (the existing service-validator `check_if_requester_is_eligible_to_act_as_target_user` already forbids it), so the combination is bounded by RBAC exactly like every other operation — no dedicated middleware/handler check is needed.
 
 ### 4.5 Audit model
 
@@ -158,7 +158,7 @@ Add one nullable `acted_as` column to `audit_logs` and split the actor record.
 
 ## 6. Implementation Plan
 
-1. **Context + middleware:** add `triggered_user()`/`with_triggered_user()` and clarify the `current_user` docstring (common); resolve `X-BackendAI-Act-As` (UUID) — in the middleware after authentication, check `is_superadmin` → load target UserData → push both contexts; reject the `owner_access_key` combination (manager auth). (The header handling itself is small.)
+1. **Context + middleware:** add `triggered_user()`/`with_triggered_user()` and clarify the `current_user` docstring (common); resolve `X-BackendAI-Act-As` (UUID) — in the middleware after authentication, check `is_superadmin` → load target UserData → push both contexts. (The header handling itself is small.)
 2. **Event-dispatcher propagation:** `common/events/dispatcher.py` propagates `triggered_user()` alongside `current_user()` into async handlers / background tasks (audit consistency for background work triggered during impersonation).
 3. **Audit:** the `acted_as` nullable column (Alembic, backfill existing rows) + the monitor recording `triggered_by`/`acted_as` separately + denial logging during impersonation.
 4. **Verification:** on a live server, confirm that a super admin impersonating a regular user is constrained to the target's permissions and that the audit records both actors (admin/non-admin).
@@ -171,7 +171,7 @@ Add one nullable `acted_as` column to `audit_logs` and split the actor record.
 | Signal | `X-BackendAI-Act-As` header (UUID only), resolved globally in the middleware after authentication (fail-closed) |
 | Permission semantics | While impersonating, `current_user()` = target's full UserData → RBAC bypass, scoping, and `my_*` all become actor-based automatically |
 | Eligibility | Superadmin only (middleware checks is_superadmin). Domain admins not allowed (different layer) |
-| owner_access_key | Coexist. Policy delegation vs. acting-user delegation — different delegation target. Reject if both set in one request |
+| owner_access_key | Coexist. Policy delegation vs. acting-user delegation — different delegation target. No special handling: under impersonation an accompanying owner_access_key is bounded by the target's RBAC authority |
 | Audit | `triggered_by` (existing, behavior unchanged) = trigger; new nullable `acted_as` = effective user (backfill existing rows; NULL for system triggers). Also log denials during impersonation |
 | Read/write | Impersonation is actor(target)-based for **both reads and writes**, `my_*` included; writes allowed within the target's permissions (bounded by RBAC) |
 | Correlation | Reuse existing `request_id`; no new id |
@@ -185,6 +185,7 @@ Add one nullable `acted_as` column to `audit_logs` and split the actor record.
 | 2026-07-08 | `acted_as` is nullable | `current_user()` is absent in system-triggered contexts (no user in context), so `acted_as` must allow NULL, mirroring `triggered_by`. Backfill existing rows from `triggered_by` |
 | 2026-07-08 | Eligibility is superadmin only | Allowing domain admins needs a domain-scope check (RBAC/service-validator), but act-as is decided in the middleware layer — different layers |
 | 2026-07-08 | Impersonation is actor(target)-based for both reads and writes | Natural since it is scoped through the single `current_user()`; writes allowed within the target's permissions |
+| 2026-07-08 | Drop the "reject when `X-BackendAI-Act-As` and `owner_access_key` are both set" rule | Under impersonation `current_user()` is the target, so an accompanying owner_access_key is already evaluated against the target's authority and bounded by RBAC (a regular-user target cannot delegate). A dedicated rejection was redundant and forced the middleware/handlers to know about a per-endpoint parameter |
 
 ## 8. Open Questions
 

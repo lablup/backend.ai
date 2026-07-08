@@ -5,7 +5,6 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
-from ai.backend.common.contexts.user import is_impersonating
 from ai.backend.common.types import AccessKey
 
 from .data.permission.types import EntityType, ScopeType
@@ -19,24 +18,6 @@ from .models.keypair import keypairs
 from .models.rbac_models.association_scopes_entities import AssociationScopesEntitiesRow
 from .models.resource_policy import keypair_resource_policies
 from .models.user import UserRole, users
-
-
-def reject_owner_access_key_while_impersonating(owner_access_key: Any = None) -> None:
-    """Reject ``owner_access_key`` delegation while impersonating (``X-BackendAI-Act-As``).
-
-    owner_access_key and impersonation delegate different things, so combining
-    them yields an ambiguous executing subject. Call this from every
-    owner_access_key consumer with the raw request field: when it is present
-    (any value, even the caller's own key) and the request carries the
-    impersonation header — self-impersonation included — the request is rejected.
-    A ``None`` field is a no-op.
-    """
-    if owner_access_key is None:
-        return
-    if is_impersonating():
-        raise InvalidAPIParameters(
-            "owner_access_key cannot be used while impersonating (X-BackendAI-Act-As)."
-        )
 
 
 def check_if_requester_is_eligible_to_act_as_target_user(

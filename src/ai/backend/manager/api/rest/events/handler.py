@@ -41,7 +41,6 @@ from ai.backend.manager.services.events.actions.resolve_group_for_events import 
 from ai.backend.manager.services.events.actions.resolve_session_for_events import (
     ResolveSessionForEventsAction,
 )
-from ai.backend.manager.utils import reject_owner_access_key_while_impersonating
 
 if TYPE_CHECKING:
     from ai.backend.common.events.fetcher import EventFetcher
@@ -89,7 +88,6 @@ class EventsHandler:
         scope = params.scope
         user_role = request["user"]["role"]
         user_uuid = user_ctx.user_uuid
-        reject_owner_access_key_while_impersonating(params.owner_access_key)
         access_key = params.owner_access_key
         if access_key is None:
             access_key = user_ctx.access_key

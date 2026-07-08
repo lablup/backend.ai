@@ -6,13 +6,9 @@ from typing import Any
 import pytest
 from aiohttp.test_utils import make_mocked_request
 
-from ai.backend.common.contexts.user import is_impersonating
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.manager.api.rest.middleware import auth as auth_mw
-from ai.backend.manager.api.rest.middleware.auth import (
-    _resolve_identity,
-    _setup_user_context,
-)
+from ai.backend.manager.api.rest.middleware.auth import _resolve_identity
 from ai.backend.manager.errors.auth import (
     InsufficientPrivilege,
     InvalidAuthParameters,
@@ -53,7 +49,6 @@ async def test_no_header_effective_equals_trigger() -> None:
     assert identity.effective_user is not None
     assert identity.effective_user == identity.trigger_user
     assert identity.effective_user.user_id == request["user"]["uuid"]
-    assert identity.impersonating is False
 
 
 async def test_regular_user_with_header_is_rejected() -> None:
@@ -81,7 +76,6 @@ async def test_superadmin_impersonates_target(monkeypatch: pytest.MonkeyPatch) -
     assert identity.effective_user.domain_name == "target-domain"
     assert identity.trigger_user.user_id == caller_id
     assert identity.trigger_user.is_superadmin
-    assert identity.impersonating is True
 
 
 async def test_nonexistent_target_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -99,22 +93,3 @@ async def test_invalid_uuid_header_is_rejected() -> None:
     request = _make_request(role=UserRole.SUPERADMIN, headers={ACT_AS_HEADER: "not-a-uuid"})
     with pytest.raises(InvalidAuthParameters):
         await _resolve_identity(request, db=None)  # type: ignore[arg-type]
-
-
-def test_setup_user_context_sets_impersonation_flag_when_header_present() -> None:
-    request = _make_request(role=UserRole.SUPERADMIN)
-    caller = _target_user(uuid.uuid4())
-    target = _target_user(uuid.uuid4())
-    identity = auth_mw.RequesterIdentity(target, caller, impersonating=True)
-    assert not is_impersonating()
-    with _setup_user_context(request, identity):
-        assert is_impersonating()
-    assert not is_impersonating()
-
-
-def test_setup_user_context_no_flag_without_impersonation() -> None:
-    request = _make_request(role=UserRole.USER)
-    caller = _target_user(uuid.uuid4())
-    identity = auth_mw.RequesterIdentity(caller, caller)
-    with _setup_user_context(request, identity):
-        assert not is_impersonating()

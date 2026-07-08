@@ -37,11 +37,7 @@ from dateutil.parser import parse as dtparse
 from dateutil.tz import tzutc
 
 from ai.backend.common.contexts.client_ip import with_client_ip
-from ai.backend.common.contexts.user import (
-    with_impersonation,
-    with_triggered_user,
-    with_user,
-)
+from ai.backend.common.contexts.user import with_triggered_user, with_user
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.exception import InvalidIpAddressValue
 from ai.backend.common.jwt.exceptions import JWTError
@@ -659,7 +655,6 @@ class RequesterIdentity:
 
     effective_user: UserData | None
     trigger_user: UserData | None
-    impersonating: bool = False
 
 
 async def _load_user_data(db: ExtendedAsyncSAEngine, user_id: uuid.UUID) -> UserData:
@@ -714,7 +709,7 @@ async def _resolve_identity(request: web.Request, db: ExtendedAsyncSAEngine) -> 
     except ValueError as e:
         raise InvalidAuthParameters("X-BackendAI-Act-As must be a valid user UUID") from e
     target = await _load_user_data(db, target_id)
-    return RequesterIdentity(target, caller, impersonating=True)
+    return RequesterIdentity(target, caller)
 
 
 def _setup_user_context(request: web.Request, identity: RequesterIdentity) -> ExitStack:
@@ -727,8 +722,6 @@ def _setup_user_context(request: web.Request, identity: RequesterIdentity) -> Ex
         )
     if identity.trigger_user is not None:
         stack.enter_context(with_triggered_user(identity.trigger_user))
-    if identity.impersonating:
-        stack.enter_context(with_impersonation())
 
     client_ip = extract_client_ip(request)
     if client_ip:
