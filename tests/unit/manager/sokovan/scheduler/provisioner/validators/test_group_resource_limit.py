@@ -5,6 +5,7 @@ from decimal import Decimal
 
 import pytest
 
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import AccessKey, ResourceSlot, SessionId, SlotQuantity
 from ai.backend.manager.data.sokovan import (
     ConcurrencySnapshot,
@@ -41,6 +42,7 @@ class TestGroupResourceLimitValidator:
             group_id=group_id,
             domain_name="default",
             scaling_group="default",
+            resource_group_id=ResourceGroupID(uuid.uuid4()),
         )
         snapshot = SystemSnapshot(
             total_capacity=ResourceSlot(cpu=Decimal("100"), mem=Decimal("100")),
@@ -79,6 +81,7 @@ class TestGroupResourceLimitValidator:
             group_id=group_id,
             domain_name="default",
             scaling_group="default",
+            resource_group_id=ResourceGroupID(uuid.uuid4()),
         )
         snapshot = SystemSnapshot(
             total_capacity=ResourceSlot(cpu=Decimal("100"), mem=Decimal("100")),
@@ -118,6 +121,7 @@ class TestGroupResourceLimitValidator:
             group_id=group_id,
             domain_name="default",
             scaling_group="default",
+            resource_group_id=ResourceGroupID(uuid.uuid4()),
         )
         snapshot = SystemSnapshot(
             total_capacity=ResourceSlot(cpu=Decimal("100"), mem=Decimal("100")),
@@ -159,6 +163,7 @@ class TestGroupResourceLimitValidator:
             group_id=group_id,
             domain_name="default",
             scaling_group="default",
+            resource_group_id=ResourceGroupID(uuid.uuid4()),
         )
         snapshot = SystemSnapshot(
             total_capacity=ResourceSlot(cpu=Decimal("100"), mem=Decimal("100")),

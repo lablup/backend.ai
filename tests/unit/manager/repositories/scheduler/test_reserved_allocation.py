@@ -73,6 +73,7 @@ class TestAllocateSessionsReservation:
         batch = make_allocation_batch(
             session_id=session_id,
             scaling_group_name=test_scaling_group_name,
+            resource_group_id=test_scaling_group_id,
             access_key=test_access_key,
             kernel_assignments=[(kernel_ids[0], test_agent_id, Decimal("2"), Decimal("4096"))],
         )
@@ -137,6 +138,7 @@ class TestAllocateSessionsReservation:
         batch = make_allocation_batch(
             session_id=session_id,
             scaling_group_name=test_scaling_group_name,
+            resource_group_id=test_scaling_group_id,
             access_key=test_access_key,
             kernel_assignments=[
                 (kernel_ids[0], test_agent_id, Decimal("2"), Decimal("4096")),
@@ -193,6 +195,7 @@ class TestAllocateSessionsReservation:
         batch = make_allocation_batch(
             session_id=session_id,
             scaling_group_name=test_scaling_group_name,
+            resource_group_id=test_scaling_group_id,
             access_key=test_access_key,
             kernel_assignments=[(kernel_ids[0], test_agent_id, Decimal("2"), Decimal("4096"))],
         )
@@ -243,6 +246,7 @@ class TestAllocateSessionsReservation:
         batch = make_allocation_batch(
             session_id=session_id,
             scaling_group_name=test_scaling_group_name,
+            resource_group_id=test_scaling_group_id,
             access_key=test_access_key,
             kernel_assignments=[(kernel_ids[0], test_agent_id, Decimal("2"), Decimal("4096"))],
         )
@@ -309,12 +313,14 @@ class TestAllocateSessionsReservation:
         batch_a = make_allocation_batch(
             session_id=session_a,
             scaling_group_name=test_scaling_group_name,
+            resource_group_id=test_scaling_group_id,
             access_key=test_access_key,
             kernel_assignments=[(kernels_a[0], test_agent_id, Decimal("3"), Decimal("4096"))],
         )
         batch_b = make_allocation_batch(
             session_id=session_b,
             scaling_group_name=test_scaling_group_name,
+            resource_group_id=test_scaling_group_id,
             access_key=test_access_key,
             kernel_assignments=[(kernels_b[0], test_agent_id, Decimal("3"), Decimal("4096"))],
         )
@@ -370,6 +376,7 @@ class TestReservedOnlyRelease:
         batch = make_allocation_batch(
             session_id=session_id,
             scaling_group_name=scaling_group_name,
+            resource_group_id=resource_group_id,
             access_key=access_key,
             kernel_assignments=[(kernel_ids[0], agent_id, cpu, mem)],
         )

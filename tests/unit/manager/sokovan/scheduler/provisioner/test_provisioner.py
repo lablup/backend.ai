@@ -74,6 +74,7 @@ def _create_scheduling_data_with_strategy(
         group_id=uuid.uuid4(),
         domain_name="default",
         scaling_group_name="test-sg",
+        resource_group_id=ResourceGroupID(uuid.uuid4()),
         session_type=SessionTypes.INTERACTIVE,
         cluster_mode=ClusterMode.SINGLE_NODE,
         priority=0,

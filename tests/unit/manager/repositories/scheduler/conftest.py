@@ -491,6 +491,7 @@ def make_allocation_batch(
     *,
     session_id: SessionId,
     scaling_group_name: str,
+    resource_group_id: ResourceGroupID,
     access_key: AccessKey,
     kernel_assignments: list[tuple[KernelId, str, Decimal, Decimal]],
 ) -> AllocationBatch:
@@ -507,6 +508,7 @@ def make_allocation_batch(
             agent_id=AgentId(agent_id),
             agent_addr=_AGENT_ADDR,
             scaling_group=scaling_group_name,
+            resource_group_id=resource_group_id,
         )
         for kernel_id, agent_id, _cpu, _mem in kernel_assignments
     ]
@@ -522,6 +524,7 @@ def make_allocation_batch(
         session_type=SessionTypes.INTERACTIVE,
         cluster_mode=ClusterMode.SINGLE_NODE,
         scaling_group=scaling_group_name,
+        resource_group_id=resource_group_id,
         kernel_allocations=kernel_allocations,
         agent_allocations=agent_allocations,
         access_key=access_key,

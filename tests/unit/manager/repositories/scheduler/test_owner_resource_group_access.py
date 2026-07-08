@@ -48,6 +48,7 @@ def _build_delegated_draft(
     *,
     owner_access_key: AccessKey,
     resource_group: str | None,
+    resource_group_id: ResourceGroupID | None = None,
 ) -> SessionSpecDraft:
     """Build a draft mirroring what the service layer hands to
     :meth:`ScheduleDBSource.fetch_session_spec_contexts` after resolving
@@ -64,6 +65,7 @@ def _build_delegated_draft(
         scope=SessionScopeDraft(
             domain_name=DomainName("default"),
             project_id=ProjectID(uuid.uuid4()),
+            resource_group_id=resource_group_id,
             resource_group_name=(ResourceGroupName(resource_group) if resource_group else None),
         ),
     )
@@ -89,9 +91,13 @@ class TestOwnerOnlyResourceGroupForDelegation:
         return AccessKey("AKIAOWNERONLY00000000")
 
     @pytest.fixture
-    def sample_accessible_rg(self) -> AllowedScalingGroup:
+    def rg_id(self) -> ResourceGroupID:
+        return ResourceGroupID(uuid.uuid4())
+
+    @pytest.fixture
+    def sample_accessible_rg(self, rg_id: ResourceGroupID) -> AllowedScalingGroup:
         return AllowedScalingGroup(
-            id=ResourceGroupID(uuid.uuid4()),
+            id=rg_id,
             name=ResourceGroupName(RG_NAME),
             is_private=False,
             scheduler_opts=ScalingGroupOpts(
@@ -105,6 +111,7 @@ class TestOwnerOnlyResourceGroupForDelegation:
     async def db_with_rg(
         self,
         database_connection: ExtendedAsyncSAEngine,
+        rg_id: ResourceGroupID,
     ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
         """Seed a single ``admin-only`` resource group row.
 
@@ -123,6 +130,7 @@ class TestOwnerOnlyResourceGroupForDelegation:
             async with database_connection.begin_session() as db_sess:
                 db_sess.add(
                     ScalingGroupRow(
+                        id=rg_id,
                         name=RG_NAME,
                         driver="static",
                         scheduler="fifo",
@@ -150,6 +158,7 @@ class TestOwnerOnlyResourceGroupForDelegation:
         db_with_rg: ExtendedAsyncSAEngine,
         sample_owner_access_key: AccessKey,
         sample_accessible_rg: AllowedScalingGroup,
+        rg_id: ResourceGroupID,
         case: RGAccessCase,
     ) -> None:
         """Two scenarios share one invariant: the RG access lookup is scoped
@@ -162,6 +171,7 @@ class TestOwnerOnlyResourceGroupForDelegation:
         draft = _build_delegated_draft(
             owner_access_key=sample_owner_access_key,
             resource_group=RG_NAME,
+            resource_group_id=rg_id,
         )
         allowed_rgs = [sample_accessible_rg] if case.owner_has_access else []
 

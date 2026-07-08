@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, Mock
 
 import pytest
 
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
@@ -71,6 +72,7 @@ def create_session_workload(
         group_id=group_id,
         domain_name=domain_name,
         scaling_group=scaling_group,
+        resource_group_id=ResourceGroupID(uuid.uuid4()),
         priority=priority,
         session_type=session_type,
         cluster_mode=cluster_mode,

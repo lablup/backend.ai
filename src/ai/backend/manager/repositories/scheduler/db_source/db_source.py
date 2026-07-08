@@ -313,7 +313,7 @@ class ScheduleDBSource:
     async def _fetch_scaling_group_with_slot_inventory(
         self,
         db_sess: SASession,
-        name: str,
+        resource_group_id: ResourceGroupID,
     ) -> _ScalingGroupWithSlotInventory:
         """Load a scaling group together with its per-RG slot inventory.
 
@@ -334,11 +334,11 @@ class ScheduleDBSource:
                     .selectinload(AgentRow.agent_resource_rows)
                     .selectinload(AgentResourceRow.slot_type_row)
                 )
-                .where(ScalingGroupRow.name == name)
+                .where(ScalingGroupRow.id == resource_group_id)
             )
         ).one_or_none()
         if sg_row is None:
-            raise ScalingGroupNotFound(f"Resource group {name} not found")
+            raise ScalingGroupNotFound(f"Resource group {resource_group_id} not found")
         active_slot_types: dict[SlotName, SlotTypes] = {
             SlotName(ar.slot_name): SlotTypes(ar.slot_type_row.slot_type)
             for agent in sg_row.agents
@@ -409,6 +409,7 @@ class ScheduleDBSource:
                 SessionRow.group_id,
                 SessionRow.domain_name,
                 SessionRow.scaling_group_name,
+                SessionRow.resource_group_id,
                 SessionRow.priority,
                 SessionRow.is_preemptible,
                 SessionRow.session_type,
@@ -446,6 +447,7 @@ class ScheduleDBSource:
                     group_id=row.group_id,
                     domain_name=row.domain_name,
                     scaling_group_name=row.scaling_group_name,
+                    resource_group_id=row.resource_group_id,
                     priority=row.priority,
                     is_preemptible=row.is_preemptible,
                     session_type=row.session_type,
@@ -1519,9 +1521,7 @@ class ScheduleDBSource:
         cycle between ``repositories.scheduler`` and the sokovan
         ``scheduling_controller`` subtree.
         """
-        resource_group_name = (
-            str(draft.scope.resource_group_name) if draft.scope.resource_group_name else None
-        )
+        resource_group_id = draft.scope.resource_group_id
         access_key = draft.identity.access_key
         user_uuid = draft.identity.user_uuid
         domain_name = str(draft.scope.domain_name) if draft.scope.domain_name else None
@@ -1535,29 +1535,27 @@ class ScheduleDBSource:
             resource_group_allow_fractional = False
             known_slot_types: Mapping[SlotName, SlotTypes] = {}
             slot_type_policy = await self._fetch_slot_type_policy(db_sess)
-            if resource_group_name:
+            if resource_group_id:
                 rg_bundle = await self._fetch_scaling_group_with_slot_inventory(
-                    db_sess, resource_group_name
+                    db_sess, resource_group_id
                 )
                 sg_row = rg_bundle.sg_row
                 known_slot_types = rg_bundle.active_slot_types
                 # Every production caller of ``enqueue_session_from_draft`` populates
-                # access_key/domain_name/project_id alongside resource_group_name; this
+                # access_key/domain_name/project_id alongside resource_group_id; this
                 # branch flags the contract violation rather than letting the RG
                 # access check silently degrade to fail-open.
                 if access_key is None or domain_name is None or project_id is None:
                     raise InternalServerError(
-                        "Unreachable: resource_group_name supplied without identity context",
+                        "Unreachable: resource_group_id supplied without identity context",
                     )
                 # The draft's access_key is the owner's for delegated sessions, so
                 # this check enforces RG access against the owner's allowlist.
                 allowed_rgs = await self._query_allowed_scaling_groups(
                     db_sess, domain_name, project_id, access_key
                 )
-                if resource_group_name not in {rg.name for rg in allowed_rgs}:
-                    raise InvalidAPIParameters(
-                        f"Resource group '{resource_group_name}' is not accessible"
-                    )
+                if sg_row.id not in {rg.id for rg in allowed_rgs}:
+                    raise InvalidAPIParameters(f"Resource group '{sg_row.name}' is not accessible")
                 network_info = ScalingGroupNetworkInfo(
                     use_host_network=sg_row.use_host_network,
                     wsproxy_addr=sg_row.wsproxy_addr,
@@ -2004,7 +2002,7 @@ class ScheduleDBSource:
 
         Session status is NOT changed here: the coordinator owns session status
         transitions. Only resource-assignment metadata (scaling_group_name,
-        agent_ids) is written on the session.
+        resource_group_id, agent_ids) is written on the session.
 
         Raises AgentResourceCapacityExceeded if any kernel cannot be reserved;
         the caller rolls back the whole batch transaction and retries next tick.
@@ -2031,6 +2029,7 @@ class ScheduleDBSource:
                     agent=kernel_alloc.agent_id,
                     agent_addr=kernel_alloc.agent_addr,
                     scaling_group=kernel_alloc.scaling_group,
+                    resource_group_id=kernel_alloc.resource_group_id,
                 )
             )
             if cast(CursorResult[Any], promoted).rowcount == 0:
@@ -2045,6 +2044,7 @@ class ScheduleDBSource:
             .where(SessionRow.id == allocation.session_id)
             .values(
                 scaling_group_name=allocation.scaling_group,
+                resource_group_id=allocation.resource_group_id,
                 agent_ids=allocation.unique_agent_ids(),
             )
         )

@@ -526,6 +526,7 @@ class SessionProvisioner:
                         agent_id=selected_agent.agent_id,
                         agent_addr=selected_agent.agent_addr,
                         scaling_group=selected_agent.scaling_group,
+                        resource_group_id=session_workload.resource_group_id,
                     )
                 )
 
@@ -536,6 +537,7 @@ class SessionProvisioner:
             session_type=session_workload.session_type,
             cluster_mode=session_workload.cluster_mode,
             scaling_group=session_workload.scaling_group,
+            resource_group_id=session_workload.resource_group_id,
             kernel_allocations=kernel_allocations,
             agent_allocations=agent_allocations,
             access_key=session_workload.access_key,
