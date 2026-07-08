@@ -532,10 +532,6 @@ class ContainerdAgent(
         return []
 
     @override
-    async def sync_container_lifecycles(self) -> None:
-        return
-
-    @override
     async def enumerate_containers(
         self,
         status_filter: frozenset[ContainerStatus] = frozenset(),
