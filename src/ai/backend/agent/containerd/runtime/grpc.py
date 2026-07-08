@@ -15,6 +15,7 @@ the snapshotter).
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import hashlib
 import json
@@ -446,6 +447,16 @@ class ContainerdGrpcRuntime(OciRuntime):
 
     @override
     async def remove_container(self, container_id: str) -> None:
+        # containerd rejects deleting a still-running task ("cannot delete a running process"),
+        # so SIGKILL the task and wait for it to actually exit before deletion. (Also required
+        # for HOSTFILE scratch: the loop mount can only be unmounted once the container's
+        # bind-mount of it is gone.)
+        await self.kill_container(container_id, signal=9)  # SIGKILL
+        for _ in range(100):  # up to ~10s
+            status = await self.container_status(container_id)
+            if status in (None, "stopped", "created", "unknown"):
+                break
+            await asyncio.sleep(0.1)
         # task -> container -> snapshot; each best-effort (already-gone is fine).
         for coro in (
             self._tasks_stub().Delete(

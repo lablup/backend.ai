@@ -1049,16 +1049,20 @@ class ContainerdAgent(
     ) -> None:
         await self._session_network.remove_container(str(kernel_id))
         # Tear down the scratch (skipped on restart, which reuses it). HOSTFILE must be
-        # unmounted (loop image) before removal; otherwise remove the directory tree.
-        if not restarting:
+        # unmounted (loop image) before removal; otherwise remove the directory tree. Best-effort:
+        # a teardown hiccup must not abort the clean event.
+        scratch_root = self.local_config.container.scratch_root
+        scratch_dir = scratch_root / str(kernel_id)
+        # Skip if already gone (clean_kernel may be re-invoked) so teardown stays idempotent.
+        if not restarting and scratch_dir.exists():
             scratch_type = self.local_config.container.scratch_type
-            scratch_root = self.local_config.container.scratch_root
-            if sys.platform.startswith("linux") and scratch_type == ScratchType.HOSTFILE:
-                await destroy_loop_filesystem(scratch_root, kernel_id)
-            else:
-                await asyncio.to_thread(
-                    shutil.rmtree, scratch_root / str(kernel_id), ignore_errors=True
-                )
+            try:
+                if sys.platform.startswith("linux") and scratch_type == ScratchType.HOSTFILE:
+                    await destroy_loop_filesystem(scratch_root, kernel_id)
+                else:
+                    await asyncio.to_thread(shutil.rmtree, scratch_dir, ignore_errors=True)
+            except Exception:
+                log.exception("clean_kernel(k:{}): scratch teardown failed", kernel_id)
 
     @override
     async def create_local_network(self, network_name: str) -> None:
