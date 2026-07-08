@@ -29,9 +29,9 @@ def test_triggered_user_none_when_unset() -> None:
 
 
 def test_triggered_user_inside_context() -> None:
-    u = _user()
-    with with_triggered_user(u):
-        assert triggered_user() == u
+    user = _user()
+    with with_triggered_user(user):
+        assert triggered_user() == user
     assert triggered_user() is None
 
 
