@@ -431,12 +431,16 @@ class TestCheckPresetsOccupiedSlots:
             "mem": Decimal("0"),
         })
         async with db.begin_session() as db_sess:
+            resource_group_id = await db_sess.scalar(
+                sa.select(ScalingGroupRow.id).where(ScalingGroupRow.name == scaling_group_name)
+            )
             agent = AgentRow(
                 id=agent_id,
                 status=status,
                 status_changed=datetime.now(tzutc()),
                 region="test-region",
                 scaling_group=scaling_group_name,
+                resource_group_id=resource_group_id,
                 schedulable=schedulable,
                 available_slots=_available,
                 occupied_slots=_occupied,
@@ -1028,6 +1032,7 @@ class TestCheckPresetsOccupiedSlots:
                 status_changed=datetime.now(tzutc()),
                 region="test-region",
                 scaling_group=test_scaling_group_name,
+                resource_group_id=test_scaling_group_id,
                 schedulable=True,
                 available_slots=ResourceSlot({
                     "cpu": Decimal("16"),
@@ -1561,12 +1566,16 @@ class TestCheckPresetsZeroValues:
             "mem": Decimal("0"),
         })
         async with db.begin_session() as db_sess:
+            resource_group_id = await db_sess.scalar(
+                sa.select(ScalingGroupRow.id).where(ScalingGroupRow.name == scaling_group_name)
+            )
             agent = AgentRow(
                 id=agent_id,
                 status=AgentStatus.ALIVE,
                 status_changed=datetime.now(tzutc()),
                 region="test-region",
                 scaling_group=scaling_group_name,
+                resource_group_id=resource_group_id,
                 schedulable=True,
                 available_slots=_available,
                 occupied_slots=_occupied,

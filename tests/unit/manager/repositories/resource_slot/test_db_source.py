@@ -97,10 +97,12 @@ class TestAgentResources:
         mem_capacity = Decimal("32768")
         mem_used = Decimal("4096")
         sg_name = str(uuid4())
+        sg_id = ResourceGroupID(uuid4())
         agent_id = str(uuid4())
         async with db.begin_session() as db_sess:
             db_sess.add(
                 ScalingGroupRow(
+                    id=sg_id,
                     name=sg_name,
                     driver="static",
                     driver_opts={},
@@ -116,6 +118,7 @@ class TestAgentResources:
                     status_changed=datetime.now(tzutc()),
                     region="test-region",
                     scaling_group=sg_name,
+                    resource_group_id=sg_id,
                     available_slots=ResourceSlot({SlotName("cpu"): "8"}),
                     occupied_slots=ResourceSlot({}),
                     addr="tcp://127.0.0.1:6001",
@@ -336,6 +339,7 @@ class TestAggregation:
                     status_changed=datetime.now(tzutc()),
                     region="test-region",
                     scaling_group=sg_name,
+                    resource_group_id=scaling_group_id,
                     available_slots=ResourceSlot({SlotName("cpu"): "8"}),
                     occupied_slots=ResourceSlot({}),
                     addr="tcp://127.0.0.1:6001",
@@ -723,6 +727,7 @@ class TestComputeActualAgentResourceUsage:
                     status_changed=datetime.now(tzutc()),
                     region="test-region",
                     scaling_group=sg_name,
+                    resource_group_id=scaling_group_id,
                     available_slots=ResourceSlot({SlotName("cpu"): "8"}),
                     occupied_slots=ResourceSlot({}),
                     addr="tcp://127.0.0.1:6001",

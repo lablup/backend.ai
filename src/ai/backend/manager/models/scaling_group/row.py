@@ -344,7 +344,11 @@ class ScalingGroupRow(Base):  # type: ignore[misc]
         back_populates="scaling_group",
         foreign_keys="[SessionRow.scaling_group_name]",
     )
-    agents: Mapped[list[AgentRow]] = relationship("AgentRow", back_populates="scaling_group_row")
+    agents: Mapped[list[AgentRow]] = relationship(
+        "AgentRow",
+        back_populates="scaling_group_row",
+        foreign_keys="[AgentRow.scaling_group]",
+    )
 
     sgroup_for_domains_rows: Mapped[list[ScalingGroupForDomainRow]] = relationship(
         "ScalingGroupForDomainRow",

@@ -136,6 +136,7 @@ async def system_session_seed(
                 status=AgentStatus.ALIVE,
                 region="local",
                 scaling_group=scaling_group_name,
+                resource_group_id=scaling_group_id,
                 available_slots=ResourceSlot(),
                 occupied_slots=ResourceSlot(),
                 addr="tcp://127.0.0.1:6001",

@@ -181,6 +181,7 @@ class TestPersistentNetworkNotRecreated:
                     status=AgentStatus.ALIVE,
                     region="local",
                     scaling_group=sg_name,
+                    resource_group_id=sg_id,
                     available_slots=ResourceSlot({
                         "cpu": Decimal("10"),
                         "mem": Decimal("10240"),

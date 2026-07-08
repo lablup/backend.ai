@@ -15,6 +15,7 @@ from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID, uuid4
 
 import pytest
+import sqlalchemy as sa
 from dateutil.tz import tzutc
 
 from ai.backend.common.auth import PublicKey
@@ -81,6 +82,7 @@ class ScalingGroupFixtureData:
     """Data from scaling_group fixture"""
 
     name: str
+    id: ResourceGroupID
 
 
 @dataclass
@@ -252,8 +254,10 @@ class TestAgentRepositoryDB:
     ) -> AsyncGenerator[ScalingGroupFixtureData, None]:
         """Create default scaling group in database"""
         name = str(uuid4())
+        scaling_group_id = ResourceGroupID(uuid4())
         async with db_with_cleanup.begin_session() as db_sess:
             scaling_group = ScalingGroupRow(
+                id=scaling_group_id,
                 name=name,
                 description="Test scaling group",
                 is_active=True,
@@ -265,7 +269,7 @@ class TestAgentRepositoryDB:
                 use_host_network=False,
             )
             db_sess.add(scaling_group)
-        yield ScalingGroupFixtureData(name=name)
+        yield ScalingGroupFixtureData(name=name, id=scaling_group_id)
 
     @pytest.fixture
     async def alive_agent(
@@ -282,6 +286,7 @@ class TestAgentRepositoryDB:
                 status_changed=datetime.now(tzutc()),
                 region="us-west-1",
                 scaling_group=scaling_group.name,
+                resource_group_id=scaling_group.id,
                 available_slots=ResourceSlot({SlotName("cpu"): 8.0}),
                 occupied_slots=ResourceSlot({}),
                 addr="tcp://192.168.1.100:6001",
@@ -313,6 +318,7 @@ class TestAgentRepositoryDB:
                 status_changed=datetime.now(tzutc()),
                 region="us-west-1",
                 scaling_group=scaling_group.name,
+                resource_group_id=scaling_group.id,
                 available_slots=ResourceSlot({SlotName("cpu"): 8.0}),
                 occupied_slots=ResourceSlot({}),
                 addr="tcp://192.168.1.100:6001",
@@ -357,6 +363,8 @@ class TestAgentRepositoryDB:
         self,
         agent_repository: AgentRepository,
         sample_agent_info: AgentInfo,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        scaling_group: ScalingGroupFixtureData,
     ) -> None:
         """Test sync_agent_heartbeat creates a new agent"""
         agent_id = AgentId("agent-new")
@@ -373,6 +381,11 @@ class TestAgentRepositoryDB:
         agent = await agent_repository.get_by_id(agent_id)
         assert agent.id == agent_id
         assert agent.status == AgentStatus.ALIVE
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            resource_group_id = await db_sess.scalar(
+                sa.select(AgentRow.resource_group_id).where(AgentRow.id == agent_id)
+            )
+        assert resource_group_id == scaling_group.id
 
     async def test_sync_agent_heartbeat_existing_agent_alive(
         self,
@@ -409,6 +422,51 @@ class TestAgentRepositoryDB:
         assert result.was_revived is True
         agent = await agent_repository.get_by_id(lost_agent.agent_id)
         assert agent.status == AgentStatus.ALIVE
+
+    async def test_sync_agent_heartbeat_scaling_group_change_updates_resource_group_id(
+        self,
+        agent_repository: AgentRepository,
+        alive_agent: AgentFixtureData,
+        sample_agent_info: AgentInfo,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> None:
+        """A heartbeat reporting a different scaling group updates both name and id columns"""
+        new_sgroup_name = str(uuid4())
+        new_sgroup_id = ResourceGroupID(uuid4())
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                ScalingGroupRow(
+                    id=new_sgroup_id,
+                    name=new_sgroup_name,
+                    description="Second scaling group",
+                    is_active=True,
+                    is_public=True,
+                    driver="static",
+                    driver_opts={},
+                    scheduler="fifo",
+                    scheduler_opts=ScalingGroupOpts(),
+                    use_host_network=False,
+                )
+            )
+        moved_agent_info = sample_agent_info.model_copy(update={"scaling_group": new_sgroup_name})
+        upsert_data = AgentHeartbeatUpsert.from_agent_info(
+            agent_id=alive_agent.agent_id,
+            agent_info=moved_agent_info,
+            heartbeat_received=datetime.now(tzutc()),
+        )
+
+        await agent_repository.sync_agent_heartbeat(alive_agent.agent_id, upsert_data)
+
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            row = (
+                await db_sess.execute(
+                    sa.select(AgentRow.scaling_group, AgentRow.resource_group_id).where(
+                        AgentRow.id == alive_agent.agent_id
+                    )
+                )
+            ).one()
+        assert row.scaling_group == new_sgroup_name
+        assert row.resource_group_id == new_sgroup_id
 
     async def test_sync_agent_heartbeat_scaling_group_not_found(
         self,
@@ -769,6 +827,7 @@ class TestAgentDBSourceKernelFiltering:
                 status_changed=datetime.now(tzutc()),
                 region="us-west-1",
                 scaling_group=scaling_group,
+                resource_group_id=test_scaling_group_id,
                 available_slots=ResourceSlot({SlotName("cpu"): 16.0}),
                 occupied_slots=ResourceSlot({}),
                 addr=f"tcp://{random_ip}:6001",
