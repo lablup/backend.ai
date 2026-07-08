@@ -17,7 +17,6 @@ from tenacity import (
     wait_fixed,
 )
 
-from ai.backend.common.types import BinarySize
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.storage.errors import ExternalStorageServiceError
 
@@ -258,7 +257,7 @@ class GPFSAPIClient:
         fileset_name: str,
         limit_bytes: int,
     ) -> None:
-        limit_str = str(limit_bytes)
+        limit_str = str(int(limit_bytes))
         body = {
             "operationType": "setQuota",
             "quotaType": GPFSQuotaType.FILESET,
@@ -277,7 +276,7 @@ class GPFSAPIClient:
             await self._wait_for_job_done([GPFSJob.from_dict(x) for x in data["jobs"]])
 
     async def remove_quota(self, fs_name: str, fileset_name: str) -> None:
-        await self.set_quota(fs_name, fileset_name, BinarySize(0))
+        await self.set_quota(fs_name, fileset_name, 0)
 
     async def create_fileset(
         self,
