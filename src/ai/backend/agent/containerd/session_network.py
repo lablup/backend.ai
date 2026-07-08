@@ -209,11 +209,11 @@ class ContainerdSessionNetwork:
     async def image_entrypoint(self, image_ref: str) -> list[str] | None:
         return await self._runtime.image_entrypoint(image_ref)
 
-    async def pull_image(self, image_ref: str) -> None:
-        await self._runtime.pull_image(image_ref)
+    async def pull_image(self, image_ref: str, *, auth: Mapping[str, str] | None = None) -> None:
+        await self._runtime.pull_image(image_ref, auth=auth)
 
-    async def push_image(self, image_ref: str) -> None:
-        await self._runtime.push_image(image_ref)
+    async def push_image(self, image_ref: str, *, auth: Mapping[str, str] | None = None) -> None:
+        await self._runtime.push_image(image_ref, auth=auth)
 
     async def remove_image(self, image_ref: str) -> None:
         await self._runtime.remove_image(image_ref)

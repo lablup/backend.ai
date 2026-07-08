@@ -416,16 +416,21 @@ class ContainerdGrpcRuntime(OciRuntime):
         entry = cfg.get("Entrypoint") or cfg.get("Cmd")
         return [str(x) for x in entry] if entry else None
 
+    @staticmethod
+    def _oci_registry(image_ref: str, auth: Mapping[str, str] | None) -> Any:
+        """An OCIRegistry ref with a basic-auth Authorization header when credentials given."""
+        resolver = registry_pb2.RegistryResolver()
+        if auth and (user := auth.get("username")) and (pw := auth.get("password")):
+            token = base64.b64encode(f"{user}:{pw}".encode()).decode()
+            resolver.headers["Authorization"] = f"Basic {token}"
+        return _containerd_any(registry_pb2.OCIRegistry(reference=image_ref, resolver=resolver))
+
     @override
     async def pull_image(self, image_ref: str, *, auth: Mapping[str, str] | None = None) -> None:
         # Pull server-side via the Transfer service: an OCIRegistry source streamed into an
         # ImageStore destination (which also unpacks into the snapshotter). Pure containerd
         # API — no ctr/nerdctl.
-        resolver = registry_pb2.RegistryResolver()
-        if auth and (user := auth.get("username")) and (pw := auth.get("password")):
-            token = base64.b64encode(f"{user}:{pw}".encode()).decode()
-            resolver.headers["Authorization"] = f"Basic {token}"
-        source = _containerd_any(registry_pb2.OCIRegistry(reference=image_ref, resolver=resolver))
+        source = self._oci_registry(image_ref, auth)
         destination = _containerd_any(
             imagestore_pb2.ImageStore(
                 name=image_ref,
@@ -438,10 +443,10 @@ class ContainerdGrpcRuntime(OciRuntime):
         )
 
     @override
-    async def push_image(self, image_ref: str) -> None:
+    async def push_image(self, image_ref: str, *, auth: Mapping[str, str] | None = None) -> None:
         # Reverse of pull: an ImageStore source pushed to an OCIRegistry destination.
         source = _containerd_any(imagestore_pb2.ImageStore(name=image_ref))
-        destination = _containerd_any(registry_pb2.OCIRegistry(reference=image_ref))
+        destination = self._oci_registry(image_ref, auth)
         await self._transfer_stub().Transfer(
             transfer_pb2.TransferRequest(source=source, destination=destination),
             metadata=self._md,

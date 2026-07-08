@@ -83,7 +83,9 @@ class OciRuntime(ABC):
     async def remove_image(self, image_ref: str) -> None: ...
 
     @abstractmethod
-    async def push_image(self, image_ref: str) -> None: ...
+    async def push_image(
+        self, image_ref: str, *, auth: Mapping[str, str] | None = None
+    ) -> None: ...
 
     @abstractmethod
     async def image_entrypoint(self, image_ref: str) -> list[str] | None:

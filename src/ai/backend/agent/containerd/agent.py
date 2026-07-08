@@ -100,6 +100,14 @@ _TODO = "containerd backend: not yet implemented (requires containerd gRPC clien
 _LOCAL_SUBNET = "172.30.0.0/24"
 
 
+def _registry_auth(registry_conf: ImageRegistry) -> dict[str, str] | None:
+    """Extract basic-auth credentials from the manager-provided registry config, if any."""
+    user, password = registry_conf.get("username"), registry_conf.get("password")
+    if user and password:
+        return {"username": user, "password": password}
+    return None
+
+
 def _uplink_for_ip(host_ip: str) -> str:
     """Resolve the local interface that owns ``host_ip`` (the VTEP address).
 
@@ -613,8 +621,10 @@ class ContainerdAgent(
         *,
         timeout_seconds: float | None,
     ) -> None:
-        # TODO: honor registry_conf auth + timeout_seconds via the Transfer RegistryResolver.
-        await self._session_network.pull_image(image_ref.canonical)
+        # TODO: honor timeout_seconds (Transfer has no per-call deadline knob yet).
+        await self._session_network.pull_image(
+            image_ref.canonical, auth=_registry_auth(registry_conf)
+        )
 
     @override
     async def push_image(
@@ -626,8 +636,10 @@ class ContainerdAgent(
     ) -> None:
         if image_ref.is_local:
             return
-        # TODO: honor registry_conf auth + timeout_seconds via the Transfer RegistryResolver.
-        await self._session_network.push_image(image_ref.canonical)
+        # TODO: honor timeout_seconds (Transfer has no per-call deadline knob yet).
+        await self._session_network.push_image(
+            image_ref.canonical, auth=_registry_auth(registry_conf)
+        )
 
     @override
     async def purge_images(self, request: PurgeImagesReq) -> PurgeImagesResp:

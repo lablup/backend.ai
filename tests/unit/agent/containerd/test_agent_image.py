@@ -23,11 +23,13 @@ class FakeFacade:
     async def image_exists(self, image_ref: str) -> bool:
         return self._exists
 
-    async def pull_image(self, image_ref: str) -> None:
+    async def pull_image(self, image_ref: str, *, auth: Any = None) -> None:
         self.pulled.append(image_ref)
+        self.pull_auth = auth
 
-    async def push_image(self, image_ref: str) -> None:
+    async def push_image(self, image_ref: str, *, auth: Any = None) -> None:
         self.pushed.append(image_ref)
+        self.push_auth = auth
 
     async def remove_image(self, image_ref: str) -> None:
         if self._remove_error:
@@ -166,6 +168,23 @@ class TestPullImage:
             cast(Any, FakeImageRef("cr.example/img:1")), cast(Any, {}), timeout_seconds=None
         )
         assert facade.pulled == ["cr.example/img:1"]
+
+    async def test_threads_registry_credentials(self) -> None:
+        facade = FakeFacade()
+        agent = _agent(facade)
+        reg = cast(Any, {"username": "u", "password": "p"})
+        await agent.pull_image(
+            cast(Any, FakeImageRef("cr.example/img:1")), reg, timeout_seconds=None
+        )
+        assert facade.pull_auth == {"username": "u", "password": "p"}
+
+    async def test_no_auth_without_credentials(self) -> None:
+        facade = FakeFacade()
+        agent = _agent(facade)
+        await agent.pull_image(
+            cast(Any, FakeImageRef("cr.example/img:1")), cast(Any, {}), timeout_seconds=None
+        )
+        assert facade.pull_auth is None
 
 
 class TestPushImage:
