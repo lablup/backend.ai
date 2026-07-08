@@ -123,12 +123,25 @@ _CONTAINERD_TO_STATUS = {
 }
 
 
-def _docker_seccomp_to_oci(profile: Mapping[str, Any]) -> dict[str, Any]:
+# Backend.AI arch name -> primary seccomp arch token (the archMap key to select).
+_SCMP_ARCH = {"x86_64": "SCMP_ARCH_X86_64", "aarch64": "SCMP_ARCH_AARCH64"}
+
+
+def _docker_seccomp_to_oci(
+    profile: Mapping[str, Any], *, arch: str = CURRENT_ARCH
+) -> dict[str, Any]:
     """Convert a Docker-format seccomp profile (archMap + per-syscall includes/excludes) to the
-    OCI runtime-spec linux.seccomp shape (flat architectures; conditional includes/excludes are
-    dropped — the listed syscalls are simply allowed)."""
+    OCI runtime-spec linux.seccomp shape (conditional includes/excludes are dropped — the listed
+    syscalls are simply allowed).
+
+    Only the host arch's entry (+ its compat sub-arches) is emitted: the full archMap lists arches
+    (e.g. SCMP_ARCH_LOONGARCH64) that the node's libseccomp may not know, and runc rejects the
+    whole profile if any architecture token is unrecognized."""
+    host_scmp = _SCMP_ARCH.get(arch)
     architectures: list[str] = []
     for entry in profile.get("archMap") or []:
+        if host_scmp is not None and entry.get("architecture") != host_scmp:
+            continue
         architectures.append(entry["architecture"])
         architectures.extend(entry.get("subArchitectures") or [])
     syscalls: list[dict[str, Any]] = []
