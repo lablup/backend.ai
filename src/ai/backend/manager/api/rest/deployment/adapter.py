@@ -74,7 +74,6 @@ from ai.backend.manager.data.deployment.types import (
     RouteTrafficStatus as ManagerRouteTrafficStatus,
 )
 from ai.backend.manager.data.deployment.upserter import DeploymentPolicyUpserter
-from ai.backend.manager.data.filter.adapter import BaseFilterAdapter
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.deployment import IncompleteRevisionData
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
@@ -86,6 +85,7 @@ from ai.backend.manager.models.endpoint.orders import DeploymentOrders
 from ai.backend.manager.models.routing.conditions import RouteConditions
 from ai.backend.manager.models.routing.orders import RouteOrders
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.repositories.base.filter_adapter import BaseFilterAdapter
 
 __all__ = (
     "AddRevisionAdapter",

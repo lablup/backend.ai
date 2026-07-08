@@ -10,9 +10,9 @@ from ai.backend.manager.api.adapter_options.pagination.pagination import (
     PaginationSpec,
     build_pagination,
 )
-from ai.backend.manager.data.filter.adapter import BaseFilterAdapter
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.repositories.base import BatchQuerier
+from ai.backend.manager.repositories.base.filter_adapter import BaseFilterAdapter
 
 if TYPE_CHECKING:
     from ai.backend.manager.services.processors import Processors
