@@ -106,7 +106,7 @@ def test_setup_user_context_sets_impersonation_flag_when_header_present() -> Non
     request = _make_request(role=UserRole.SUPERADMIN)
     caller = _user_data_from_auth_result(request)
     target = _target_user(uuid.uuid4())
-    identity = auth_mw.RequestIdentity(target, caller, impersonating=True)
+    identity = auth_mw.RequesterIdentity(target, caller, impersonating=True)
     assert not is_impersonating()
     with _setup_user_context(request, identity):
         assert is_impersonating()
@@ -116,6 +116,6 @@ def test_setup_user_context_sets_impersonation_flag_when_header_present() -> Non
 def test_setup_user_context_no_flag_without_impersonation() -> None:
     request = _make_request(role=UserRole.USER)
     caller = _user_data_from_auth_result(request)
-    identity = auth_mw.RequestIdentity(caller, caller)
+    identity = auth_mw.RequesterIdentity(caller, caller)
     with _setup_user_context(request, identity):
         assert not is_impersonating()

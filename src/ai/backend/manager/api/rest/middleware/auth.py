@@ -654,7 +654,7 @@ async def _authenticate_via_hook(
 
 
 @dataclass(frozen=True)
-class RequestIdentity:
+class RequesterIdentity:
     """The effective (scope) and trigger (caller) users resolved for a request."""
 
     effective_user: UserData | None
@@ -701,7 +701,7 @@ async def _load_user_data(db: ExtendedAsyncSAEngine, user_id: uuid.UUID) -> User
     )
 
 
-async def _resolve_identity(request: web.Request, db: ExtendedAsyncSAEngine) -> RequestIdentity:
+async def _resolve_identity(request: web.Request, db: ExtendedAsyncSAEngine) -> RequesterIdentity:
     """Resolve the X-BackendAI-Act-As header into the request's effective/trigger users.
 
     No header: both are the authenticated caller. With it, the caller must be a
@@ -710,7 +710,7 @@ async def _resolve_identity(request: web.Request, db: ExtendedAsyncSAEngine) -> 
     caller = _user_data_from_auth_result(request)
     raw_target = request.headers.get("X-BackendAI-Act-As")
     if not raw_target:
-        return RequestIdentity(caller, caller)
+        return RequesterIdentity(caller, caller)
 
     if caller is None or not caller.is_superadmin:
         raise InsufficientPrivilege("Only superadmin may use X-BackendAI-Act-As")
@@ -719,10 +719,10 @@ async def _resolve_identity(request: web.Request, db: ExtendedAsyncSAEngine) -> 
     except ValueError as e:
         raise InvalidAuthParameters("X-BackendAI-Act-As must be a valid user UUID") from e
     target = await _load_user_data(db, target_id)
-    return RequestIdentity(target, caller, impersonating=True)
+    return RequesterIdentity(target, caller, impersonating=True)
 
 
-def _setup_user_context(request: web.Request, identity: RequestIdentity) -> ExitStack:
+def _setup_user_context(request: web.Request, identity: RequesterIdentity) -> ExitStack:
     stack = ExitStack()
 
     if identity.effective_user is not None:
