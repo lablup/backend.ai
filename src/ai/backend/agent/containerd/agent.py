@@ -37,7 +37,7 @@ from ai.backend.agent.agent import (
     AbstractKernelCreationContext,
     ScanImagesResult,
 )
-from ai.backend.agent.config.unified import ContainerSandboxType
+from ai.backend.agent.config.unified import ContainerSandboxType, ScratchType
 from ai.backend.agent.docker.agent import (
     LDD_GLIBC_REGEX,
     LDD_MUSL_REGEX,
@@ -248,18 +248,49 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
 
     @override
     async def prepare_scratch(self) -> None:
-        # Create the per-kernel scratch dirs (config/ + work/). Full parity (tmpfs/loop
-        # scratch types, dotfile cloning) is a follow-up.
+        # Create the per-kernel scratch dirs (config/ + work/) and seed the default dotfiles.
+        # (tmpfs/loop scratch types remain a follow-up; containers run as root so no chown.)
         scratch_dir = (self.local_config.container.scratch_root / str(self._container_id)).resolve()
         config_dir = scratch_dir / "config"
         work_dir = scratch_dir / "work"
 
-        def _mkdirs() -> None:
+        def _prepare() -> None:
             config_dir.mkdir(parents=True, exist_ok=True)
             work_dir.mkdir(parents=True, exist_ok=True)
+            self._clone_dotfiles(work_dir)
 
-        await asyncio.to_thread(_mkdirs)
+        await asyncio.to_thread(_prepare)
         self._scratch_dir = scratch_dir
+
+    @staticmethod
+    def _clone_dotfiles(work_dir: Path) -> None:
+        """Seed the default shell/editor dotfiles + Jupyter branding into /home/work, matching
+        DockerAgent (files packaged in ai.backend.runner)."""
+
+        def _runner_file(name: str) -> Path:
+            return Path(str(files("ai.backend.runner").joinpath(name)))
+
+        jupyter_custom_dir = work_dir / ".jupyter" / "custom"
+        jupyter_custom_dir.mkdir(parents=True, exist_ok=True)
+        copies = [
+            ("jupyter-custom.css", jupyter_custom_dir / "custom.css"),
+            ("logo.svg", jupyter_custom_dir / "logo.svg"),
+            ("roboto.ttf", jupyter_custom_dir / "roboto.ttf"),
+            ("roboto-italic.ttf", jupyter_custom_dir / "roboto-italic.ttf"),
+            (".bashrc", work_dir / ".bashrc"),
+            (".bash_profile", work_dir / ".bash_profile"),
+            (".zshrc", work_dir / ".zshrc"),
+            (".vimrc", work_dir / ".vimrc"),
+            (".tmux.conf", work_dir / ".tmux.conf"),
+            (
+                "DO_NOT_STORE_PERSISTENT_FILES_HERE.md",
+                work_dir / "DO_NOT_STORE_PERSISTENT_FILES_HERE.md",
+            ),
+        ]
+        for src_name, dst in copies:
+            src = _runner_file(src_name)
+            if src.exists():
+                shutil.copy(src.resolve(), dst)
 
     @override
     async def get_intrinsic_mounts(self) -> Sequence[Mount]:
@@ -517,6 +548,9 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         shmem = (self.kernel_config.get("resource_opts") or {}).get("shmem")
         if shmem:
             oci_spec["shmem"] = int(shmem)
+        # MEMORY scratch type -> in-memory (tmpfs) /tmp. (LOOP scratch is a follow-up.)
+        if self.local_config.container.scratch_type == ScratchType.MEMORY:
+            oci_spec["tmpfs_tmp"] = True
         # Direct-IP model: kernel_host is the container's own IP, so each service is reachable
         # at its container port directly (no host-port mapping). The manager routes on
         # kernel_host + host_ports, so surface host_ports = container_ports.

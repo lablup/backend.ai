@@ -65,6 +65,20 @@ _DEFAULT_MOUNTS: list[dict[str, Any]] = [
 ]  # fmt: skip
 
 
+def _tmp_mounts(oci_spec: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """A tmpfs /tmp for the MEMORY scratch type (in-memory scratch); empty otherwise."""
+    if not oci_spec.get("tmpfs_tmp"):
+        return []
+    return [
+        {
+            "destination": "/tmp",
+            "type": "tmpfs",
+            "source": "tmpfs",
+            "options": ["nosuid", "nodev", "mode=1777"],
+        }
+    ]
+
+
 def _shm_mount(oci_spec: Mapping[str, Any]) -> dict[str, Any]:
     size = int(oci_spec.get("shmem") or _DEFAULT_SHM_SIZE)
     return {
@@ -193,7 +207,12 @@ def build_oci_runtime_spec(
         },
         "root": {"path": rootfs_path, "readonly": False},
         "hostname": hostname,
-        "mounts": [*_DEFAULT_MOUNTS, _shm_mount(oci_spec), *_bind_mounts(oci_spec)],
+        "mounts": [
+            *_DEFAULT_MOUNTS,
+            _shm_mount(oci_spec),
+            *_tmp_mounts(oci_spec),
+            *_bind_mounts(oci_spec),
+        ],
         "linux": {
             "namespaces": namespaces,
             "devices": devices,
