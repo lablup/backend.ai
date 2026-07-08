@@ -17,7 +17,8 @@ class IdleCheckReconcileHandler(ReconcilerHandler[IdleCheckReconcileInfo, IdleCh
     async def execute(self, reconcile_info: IdleCheckReconcileInfo) -> IdleCheckResult:
         verdicts: list[IdleVerdict] = []
         for target in reconcile_info.targets:
-            # First idle verdict in resolved order wins; at most one termination per session.
+            # Evaluate every checker so each idle verdict is recorded; a session may
+            # appear in multiple verdicts and termination marking dedups downstream.
             for checker_with_state in target.checkers:
                 if checker_with_state.check_idle(target.session_id):
                     verdicts.append(
@@ -26,7 +27,6 @@ class IdleCheckReconcileHandler(ReconcilerHandler[IdleCheckReconcileInfo, IdleCh
                             checker_id=checker_with_state.checker_id,
                         )
                     )
-                    break
         return IdleCheckResult(verdicts=verdicts)
 
     @override
