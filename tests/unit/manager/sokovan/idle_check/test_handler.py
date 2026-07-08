@@ -1,17 +1,17 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from typing import override
 from uuid import uuid4
 
+from ai.backend.common.identifier.idle_checker import IdleCheckerID
 from ai.backend.common.types import SessionId
-from ai.backend.manager.data.idle_checker.types import IdleCheckSession
-from ai.backend.manager.repositories.idle_checker.types import IdleCheckerDefinitionData
 from ai.backend.manager.sokovan.idle_check.checkers.base import (
     IdleCheckContext,
     IdleChecker,
     IdleCheckerState,
+    PrepareRequest,
 )
 from ai.backend.manager.sokovan.idle_check.handlers.reconcile import IdleCheckReconcileHandler
 from ai.backend.manager.sokovan.idle_check.types import (
@@ -41,10 +41,9 @@ class RecordingChecker(IdleChecker):
     async def prepare(
         self,
         context: IdleCheckContext,
-        checker: IdleCheckerDefinitionData,
-        sessions: Sequence[IdleCheckSession],
-    ) -> IdleCheckerState:
-        return RecordingState()
+        requests: Sequence[PrepareRequest],
+    ) -> Mapping[IdleCheckerID, IdleCheckerState]:
+        return {request.definition.checker_id: RecordingState() for request in requests}
 
     @override
     def check_idle(self, session_id: SessionId, state: IdleCheckerState) -> bool:

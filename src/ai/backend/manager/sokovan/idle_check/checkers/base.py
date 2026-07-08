@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
+from ai.backend.common.identifier.idle_checker import IdleCheckerID
 from ai.backend.common.types import SessionId
 from ai.backend.manager.data.idle_checker.types import IdleCheckSession
 from ai.backend.manager.repositories.idle_checker.types import IdleCheckerDefinitionData
@@ -20,6 +21,14 @@ class IdleCheckerState:
     """Marker for the state a checker prepares; each checker defines its own shape."""
 
 
+@dataclass(frozen=True)
+class PrepareRequest:
+    """One checker definition and the sessions it must judge this tick."""
+
+    definition: IdleCheckerDefinitionData
+    sessions: Sequence[IdleCheckSession]
+
+
 class IdleChecker(ABC):
     """Stateless per-``CheckerType`` judgment behavior."""
 
@@ -27,10 +36,13 @@ class IdleChecker(ABC):
     async def prepare(
         self,
         context: IdleCheckContext,
-        checker: IdleCheckerDefinitionData,
-        sessions: Sequence[IdleCheckSession],
-    ) -> IdleCheckerState:
-        """Batch-read runtime state; capture everything check_idle needs here."""
+        requests: Sequence[PrepareRequest],
+    ) -> Mapping[IdleCheckerID, IdleCheckerState]:
+        """Called once per tick with every definition of this type.
+
+        Batch the I/O across all requests and return one state per definition;
+        capture everything check_idle needs into the states here.
+        """
         raise NotImplementedError
 
     @abstractmethod
