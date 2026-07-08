@@ -14,7 +14,6 @@ from ai.backend.manager.repositories.idle_checker.repository import IdleCheckerR
 from ai.backend.manager.sokovan.idle_check.applier import IdleCheckApplier
 from ai.backend.manager.sokovan.idle_check.checkers.base import IdleCheckContext
 from ai.backend.manager.sokovan.idle_check.handlers.reconcile import IdleCheckReconcileHandler
-from ai.backend.manager.sokovan.idle_check.preparer import IdleCheckPreparer
 from ai.backend.manager.sokovan.idle_check.source import IdleCheckSource
 from ai.backend.manager.sokovan.idle_check.types import (
     IdleCheckCategory,
@@ -48,10 +47,9 @@ def build_idle_check_stage(
         lock_id=LockID.LOCKID_IDLE_CHECK_RECONCILE,
         transitions=transitions,
     )
-    preparer = IdleCheckPreparer(IdleCheckContext())
     stage = ReconcilerStage(
         handler=IdleCheckReconcileHandler(),
-        source=IdleCheckSource(idle_checker_repository, preparer),
+        source=IdleCheckSource(idle_checker_repository, IdleCheckContext()),
         applier=IdleCheckApplier(),
         metadata=metadata,
     )

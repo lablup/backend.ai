@@ -8,7 +8,7 @@ from uuid import uuid4
 
 import pytest
 
-import ai.backend.manager.sokovan.idle_check.preparer as idle_check_preparer
+import ai.backend.manager.sokovan.idle_check.source as idle_check_source
 from ai.backend.common.data.idle_checker.types import (
     CheckerType,
     IdleCheckerSpec,
@@ -33,7 +33,6 @@ from ai.backend.manager.sokovan.idle_check.checkers.base import (
     IdleCheckerState,
     PrepareRequest,
 )
-from ai.backend.manager.sokovan.idle_check.preparer import IdleCheckPreparer
 from ai.backend.manager.sokovan.idle_check.source import IdleCheckSource
 from ai.backend.manager.sokovan.idle_check.types import IdleCheckCategory, IdleCheckTargetStatuses
 
@@ -106,7 +105,7 @@ def _target(session_id: SessionId, checkers: Sequence[BoundCheckerData]) -> Idle
 def _source(batch: IdleCheckBatchData) -> IdleCheckSource:
     repository = MagicMock()
     repository.fetch_idle_check_batch = AsyncMock(return_value=batch)
-    return IdleCheckSource(repository, IdleCheckPreparer(IdleCheckContext()))
+    return IdleCheckSource(repository, IdleCheckContext())
 
 
 class TestIdleCheckSource:
@@ -124,7 +123,7 @@ class TestIdleCheckSource:
     ) -> dict[CheckerType, IdleChecker[Any]]:
         """Swap the static checker_for dispatch with a test-local registry."""
         registry: dict[CheckerType, IdleChecker[Any]] = {}
-        monkeypatch.setattr(idle_check_preparer, "checker_for", registry.get)
+        monkeypatch.setattr(idle_check_source, "checker_for", registry.get)
         return registry
 
     @pytest.fixture()
@@ -198,7 +197,7 @@ class TestIdleCheckSource:
             [(network_bound.checker.checker_id, [second_session_id])],
         ]
 
-    async def test_composes_prepared_targets_in_resolved_order(
+    async def test_composes_prepared_targets_per_session(
         self,
         source: IdleCheckSource,
         target_statuses: IdleCheckTargetStatuses,
