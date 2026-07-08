@@ -253,8 +253,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
             ),
         ]
         # The in-container agent socket (host<->container PID translation, jail status) for
-        # libbaihook/jail, bind-mounted directly (no socat relay). (lxcfs, /etc/localtime,
-        # coredump are follow-ups.)
+        # libbaihook/jail, bind-mounted directly (no socat relay).
         if self._agent_sock_path is not None:
             mounts.append(
                 Mount(
@@ -264,6 +263,34 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
                     MountPermission.READ_WRITE,
                 )
             )
+        # Timezone parity: /etc/localtime + /etc/timezone (read-only, if present on the host).
+        for tzfile in (Path("/etc/localtime"), Path("/etc/timezone")):
+            if tzfile.exists():
+                mounts.append(Mount(MountTypes.BIND, tzfile, tzfile, MountPermission.READ_ONLY))
+        # lxcfs: make cgroup-aware tools (free/nproc/top) report the container's limits, not the
+        # host's — only when lxcfs is installed on the node.
+        lxcfs_root = Path("/var/lib/lxcfs")
+        if lxcfs_root.is_dir():
+            mounts.extend(
+                Mount(
+                    MountTypes.BIND,
+                    proc_file,
+                    Path("/") / proc_file.relative_to(lxcfs_root),
+                    MountPermission.READ_WRITE,
+                )
+                for proc_file in (lxcfs_root / "proc").iterdir()
+                if proc_file.stat().st_size > 0
+            )
+            for rel in ("sys/devices/system/cpu", "sys/devices/system/cpu/online"):
+                if (lxcfs_root / rel).exists():
+                    mounts.append(
+                        Mount(
+                            MountTypes.BIND,
+                            lxcfs_root / rel,
+                            Path("/") / rel,
+                            MountPermission.READ_WRITE,
+                        )
+                    )
         return mounts
 
     @property
