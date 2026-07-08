@@ -12,7 +12,6 @@ from ai.backend.manager.api.rest.middleware import auth as auth_mw
 from ai.backend.manager.api.rest.middleware.auth import (
     _resolve_identity,
     _setup_user_context,
-    _user_data_from_auth_result,
 )
 from ai.backend.manager.errors.auth import (
     InsufficientPrivilege,
@@ -104,7 +103,7 @@ async def test_invalid_uuid_header_is_rejected() -> None:
 
 def test_setup_user_context_sets_impersonation_flag_when_header_present() -> None:
     request = _make_request(role=UserRole.SUPERADMIN)
-    caller = _user_data_from_auth_result(request)
+    caller = _target_user(uuid.uuid4())
     target = _target_user(uuid.uuid4())
     identity = auth_mw.RequesterIdentity(target, caller, impersonating=True)
     assert not is_impersonating()
@@ -115,7 +114,7 @@ def test_setup_user_context_sets_impersonation_flag_when_header_present() -> Non
 
 def test_setup_user_context_no_flag_without_impersonation() -> None:
     request = _make_request(role=UserRole.USER)
-    caller = _user_data_from_auth_result(request)
+    caller = _target_user(uuid.uuid4())
     identity = auth_mw.RequesterIdentity(caller, caller)
     with _setup_user_context(request, identity):
         assert not is_impersonating()

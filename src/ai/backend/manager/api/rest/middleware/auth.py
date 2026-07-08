@@ -662,21 +662,6 @@ class RequesterIdentity:
     impersonating: bool = False
 
 
-def _user_data_from_auth_result(request: web.Request) -> UserData | None:
-    """The authenticated caller's ``UserData``, reusing the auth-middleware result."""
-    user = request.get("user")
-    if not user or user.get("uuid") is None:
-        return None
-    return UserData(
-        user_id=user["uuid"],
-        is_authorized=request.get("is_authorized", False),
-        is_admin=request.get("is_admin", False),
-        is_superadmin=request.get("is_superadmin", False),
-        role=UserRole(user["role"]),
-        domain_name=user["domain_name"],
-    )
-
-
 async def _load_user_data(db: ExtendedAsyncSAEngine, user_id: uuid.UUID) -> UserData:
     """Load a user's ``UserData`` by UUID (impersonation target). Raises if not found."""
 
@@ -707,7 +692,17 @@ async def _resolve_identity(request: web.Request, db: ExtendedAsyncSAEngine) -> 
     No header: both are the authenticated caller. With it, the caller must be a
     super admin and the whole request runs as the target user (fail-closed).
     """
-    caller = _user_data_from_auth_result(request)
+    user = request.get("user")
+    caller: UserData | None = None
+    if user and user.get("uuid") is not None:
+        caller = UserData(
+            user_id=user["uuid"],
+            is_authorized=request.get("is_authorized", False),
+            is_admin=request.get("is_admin", False),
+            is_superadmin=request.get("is_superadmin", False),
+            role=UserRole(user["role"]),
+            domain_name=user["domain_name"],
+        )
     raw_target = request.headers.get("X-BackendAI-Act-As")
     if not raw_target:
         return RequesterIdentity(caller, caller)
