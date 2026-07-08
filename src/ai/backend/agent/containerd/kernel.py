@@ -2,8 +2,8 @@
 
 Mirrors the Docker kernel contract on containerd's native task model. REPL/service ops go
 through the code runner (network-based); file transfer and logs work off the host scratch
-mount + captured task stdout. Only session-to-image ``commit`` remains a TODO (it needs the
-containerd Diff/Content image-build flow).
+mount + captured task stdout; session-to-image commit builds the image over the containerd
+Diff/Content/Images services.
 """
 
 from __future__ import annotations
@@ -37,8 +37,6 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 _MAX_DOWNLOAD_SIZE = 1048576  # 1 MiB, matching the Docker backend
 _CONTAINER_HOME = PurePosixPath("/home/work")
-
-_TODO = "containerd backend: not yet implemented (requires containerd gRPC client)"
 
 
 class ContainerdKernel(AbstractKernel):
