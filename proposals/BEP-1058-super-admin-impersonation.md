@@ -59,7 +59,7 @@ For each area, separate **✅ what already exists** from **➕ what to add**.
 | ✅ | The audit `audit_logs` actor is a **single nullable column** `triggered_by` = `current_user().user_id` (`actions/monitors/audit_log.py`, `models/audit_log/row.py`) |
 | ✅ | Session-owner stamping: `assign_user_identity_rule.py` sets the session owner uuid from `current_user()` |
 | ✅ | Event propagation: `common/events/dispatcher.py` re-injects `current_user()` into async handlers |
-| ➕ | Add a **NOT NULL** `acted_as` column to `audit_logs` and redefine the meaning of `triggered_by` (4.5) |
+| ➕ | Add a **nullable** `acted_as` column to `audit_logs` and redefine the meaning of `triggered_by` (4.5) |
 | ➕ | The event dispatcher also propagates `triggered_user()` (background-audit consistency) |
 
 ### 3.5 Existing delegation (owner_access_key)
@@ -133,14 +133,15 @@ The two mechanisms **delegate different things**. They coexist.
 
 ### 4.5 Audit model
 
-Add one NOT NULL `acted_as` column to `audit_logs` and split the actor record.
+Add one nullable `acted_as` column to `audit_logs` and split the actor record.
 
-| Column | Meaning | Normal request | Impersonation |
-|--------|---------|----------------|---------------|
-| `triggered_by` (existing, nullable, behavior unchanged) | The person who triggered the request = `triggered_user()` | authenticated | super admin |
-| `acted_as` (new, NOT NULL) | The identity it actually ran as = `current_user()` | authenticated (= triggered_by) | target |
+| Column | Meaning | Normal request | Impersonation | System trigger |
+|--------|---------|----------------|---------------|----------------|
+| `triggered_by` (existing, nullable, behavior unchanged) | The person who triggered the request = `triggered_user()` | authenticated | super admin | NULL |
+| `acted_as` (new, nullable) | The identity it actually ran as = `current_user()` | authenticated (= triggered_by) | target | NULL |
 
 - The audit monitor reads `triggered_by` from `triggered_user()` and `acted_as` from `current_user()` — a change in one place, `audit_log.py`. The logic that fills `triggered_by` stays as-is.
+- `acted_as` is **nullable** because `current_user()` is absent in system-triggered contexts (background tasks / system-initiated actions with no user in context), exactly as `triggered_by` already is.
 - **Denied permission checks are also audited while impersonating** (key signal for super-admin debugging). To bound audit volume, denial logging applies only during impersonation (`triggered_user() != current_user()`).
 - No new correlation id; reuse the existing `request_id` (BEP-1035).
 
@@ -152,14 +153,14 @@ Add one NOT NULL `acted_as` column to `audit_logs` and split the actor record.
 ## 5. Migration / Compatibility
 
 - **Backward compatibility:** without the header, `triggered_user() == current_user()`, so `triggered_by` and `acted_as` hold the same value. Existing behavior and audit meaning are unchanged.
-- **DB:** add the `audit_logs.acted_as` NOT NULL column (Alembic). **Backfill existing rows from `triggered_by`** (historically caller == effective). Rows with no `triggered_by` follow the file's existing sentinel convention (`"(unknown)"`). Keep migrations idempotent when backporting (`alembic/README.md`).
+- **DB:** add the `audit_logs.acted_as` nullable column (Alembic). **Backfill existing rows from `triggered_by`** (historically caller == effective); rows with no `triggered_by` (system triggers) stay NULL. Keep migrations idempotent when backporting (`alembic/README.md`).
 - **No breaking changes.** The new accessor and header are additive; only the audit column is a schema change.
 
 ## 6. Implementation Plan
 
 1. **Context + middleware:** add `triggered_user()`/`with_triggered_user()` and clarify the `current_user` docstring (common); resolve `X-BackendAI-Act-As` (UUID) — in the middleware after authentication, check `is_superadmin` → load target UserData → push both contexts; reject the `owner_access_key` combination (manager auth). (The header handling itself is small.)
 2. **Event-dispatcher propagation:** `common/events/dispatcher.py` propagates `triggered_user()` alongside `current_user()` into async handlers / background tasks (audit consistency for background work triggered during impersonation).
-3. **Audit:** the `acted_as` NOT NULL column (Alembic, backfill existing rows) + the monitor recording `triggered_by`/`acted_as` separately + denial logging during impersonation.
+3. **Audit:** the `acted_as` nullable column (Alembic, backfill existing rows) + the monitor recording `triggered_by`/`acted_as` separately + denial logging during impersonation.
 4. **Verification:** on a live server, confirm that a super admin impersonating a regular user is constrained to the target's permissions and that the audit records both actors (admin/non-admin).
 
 ## 7. Decision Summary
@@ -171,7 +172,7 @@ Add one NOT NULL `acted_as` column to `audit_logs` and split the actor record.
 | Permission semantics | While impersonating, `current_user()` = target's full UserData → RBAC bypass, scoping, and `my_*` all become actor-based automatically |
 | Eligibility | Superadmin only (middleware checks is_superadmin). Domain admins not allowed (different layer) |
 | owner_access_key | Coexist. Policy delegation vs. acting-user delegation — different delegation target. Reject if both set in one request |
-| Audit | `triggered_by` (existing, behavior unchanged) = trigger; new NOT NULL `acted_as` = effective user (backfill existing rows). Also log denials during impersonation |
+| Audit | `triggered_by` (existing, behavior unchanged) = trigger; new nullable `acted_as` = effective user (backfill existing rows; NULL for system triggers). Also log denials during impersonation |
 | Read/write | Impersonation is actor(target)-based for **both reads and writes**, `my_*` included; writes allowed within the target's permissions (bounded by RBAC) |
 | Correlation | Reuse existing `request_id`; no new id |
 
@@ -181,7 +182,7 @@ Add one NOT NULL `acted_as` column to `audit_logs` and split the actor record.
 |------|----------|-----------|
 | 2026-07-08 | Trigger accessor named `triggered_user()` (not `request_user`) | Aligns with the audit column `triggered_by` |
 | 2026-07-08 | Keep the `current_user()` name (rename deferred) | Renaming to `acting_user()` would be a repo-wide mechanical change, conflicting with the "minimal, 3-chunk" implementation intent. Can be renamed later if desired |
-| 2026-07-08 | `acted_as` is NOT NULL | The actor must always be a present value. Backfill existing rows from `triggered_by` |
+| 2026-07-08 | `acted_as` is nullable | `current_user()` is absent in system-triggered contexts (no user in context), so `acted_as` must allow NULL, mirroring `triggered_by`. Backfill existing rows from `triggered_by` |
 | 2026-07-08 | Eligibility is superadmin only | Allowing domain admins needs a domain-scope check (RBAC/service-validator), but act-as is decided in the middleware layer — different layers |
 | 2026-07-08 | Impersonation is actor(target)-based for both reads and writes | Natural since it is scoped through the single `current_user()`; writes allowed within the target's permissions |
 
