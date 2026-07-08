@@ -9,7 +9,7 @@ from aiohttp.test_utils import make_mocked_request
 
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.manager.api.rest.middleware import auth as auth_mw
-from ai.backend.manager.api.rest.middleware.auth import _resolve_identity
+from ai.backend.manager.api.rest.middleware.auth import _resolve_requester_identity
 from ai.backend.manager.errors.auth import (
     InsufficientPrivilege,
     InvalidAuthParameters,
@@ -35,7 +35,7 @@ def _make_request(*, role: UserRole | None, headers: dict[str, str] | None = Non
 
 async def test_no_header_effective_equals_trigger() -> None:
     request = _make_request(role=UserRole.USER)
-    identity = await _resolve_identity(request, db=None)  # type: ignore[arg-type]
+    identity = await _resolve_requester_identity(request, db=None)  # type: ignore[arg-type]
     assert identity.effective_user is not None
     assert identity.effective_user == identity.trigger_user
     assert identity.effective_user.user_id == request["user"]["uuid"]
@@ -59,7 +59,7 @@ async def test_superadmin_impersonates_target(monkeypatch: pytest.MonkeyPatch) -
 
     request = _make_request(role=UserRole.SUPERADMIN, headers={ACT_AS_HEADER: str(target_id)})
     caller_id = request["user"]["uuid"]
-    identity = await _resolve_identity(request, db=None)  # type: ignore[arg-type]
+    identity = await _resolve_requester_identity(request, db=None)  # type: ignore[arg-type]
 
     assert identity.effective_user is not None and identity.trigger_user is not None
     assert identity.effective_user.user_id == target_id
@@ -95,7 +95,9 @@ class RejectCase:
         ),
     ],
 )
-async def test_resolve_identity_rejects(monkeypatch: pytest.MonkeyPatch, case: RejectCase) -> None:
+async def test_resolve_requester_identity_rejects(
+    monkeypatch: pytest.MonkeyPatch, case: RejectCase
+) -> None:
     if case.loader_error is not None:
 
         async def _fake_load(db: Any, user_id: uuid.UUID) -> UserData:
@@ -105,4 +107,4 @@ async def test_resolve_identity_rejects(monkeypatch: pytest.MonkeyPatch, case: R
 
     request = _make_request(role=case.role, headers={ACT_AS_HEADER: case.raw_target})
     with pytest.raises(case.expected):
-        await _resolve_identity(request, db=None)  # type: ignore[arg-type]
+        await _resolve_requester_identity(request, db=None)  # type: ignore[arg-type]

@@ -669,7 +669,9 @@ async def _load_user_data(db: ExtendedAsyncSAEngine, user_id: UserID) -> UserDat
     )
 
 
-async def _resolve_identity(request: web.Request, db: ExtendedAsyncSAEngine) -> RequesterIdentity:
+async def _resolve_requester_identity(
+    request: web.Request, db: ExtendedAsyncSAEngine
+) -> RequesterIdentity:
     """Resolve the X-BackendAI-Act-As header into the request's effective/trigger users.
 
     No header: both are the authenticated user. With it, the authenticated user
@@ -847,7 +849,7 @@ def build_auth_middleware(
         else:
             await _authenticate_via_hook(request, db, valkey_stat, hook_plugin_ctx)
 
-        identity = await _resolve_identity(request, db)
+        identity = await _resolve_requester_identity(request, db)
         with _setup_user_context(request, identity):
             return await handler(request)
 
