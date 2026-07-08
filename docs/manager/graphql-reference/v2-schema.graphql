@@ -4755,6 +4755,16 @@ type EntityConnection {
 input EntityFilter {
   entityType: RBACElementTypeFilter = null
   entityId: StringFilter = null
+
+  """
+  Added in 26.8.0. Filter by the type of scope the entity is registered in.
+  """
+  scopeType: RBACElementTypeFilter = null
+
+  """
+  Added in 26.8.0. Filter by the id of scope the entity is registered in.
+  """
+  scopeId: StringFilter = null
   AND: [EntityFilter!] = null
   OR: [EntityFilter!] = null
   NOT: [EntityFilter!] = null

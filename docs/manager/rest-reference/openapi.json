@@ -18014,6 +18014,28 @@
             ],
             "default": null
           },
+          "scope_type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RBACElementTypeFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "scope_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
           "AND": {
             "anyOf": [
               {

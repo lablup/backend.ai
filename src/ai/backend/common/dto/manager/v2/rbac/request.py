@@ -307,6 +307,8 @@ class EntityFilter(BaseRequestModel):
 
     entity_type: RBACElementTypeFilter | None = None
     entity_id: StringFilter | None = None
+    scope_type: RBACElementTypeFilter | None = None
+    scope_id: StringFilter | None = None
     AND: list[EntityFilter] | None = None
     OR: list[EntityFilter] | None = None
     NOT: list[EntityFilter] | None = None
