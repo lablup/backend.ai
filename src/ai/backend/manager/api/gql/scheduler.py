@@ -158,13 +158,6 @@ async def scheduling_events_by_session(
         event_hub.unregister_event_propagator(propagator.id())
 
 
-# ---------------------------------------------------------------------------
-# Dry-run schedule — probe a resource group's admission for a session's
-# kernels without provisioning. Powers the session-launcher live feedback,
-# so the query stays lightweight.
-# ---------------------------------------------------------------------------
-
-
 @gql_pydantic_input(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
@@ -206,7 +199,6 @@ class DryRunScheduleInputGQL(PydanticInputMixin[DryRunScheduleInput]):
 )
 class UnschedulableReasonHintGQL:
     required_reduction: list[ResourceSlotEntryGQL] | None
-    required_container_reduction: int | None
     available_archs: list[str] | None
 
 
