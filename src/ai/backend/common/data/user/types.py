@@ -37,11 +37,3 @@ class UserData:
         if "role" in data and isinstance(data["role"], str):
             data = {**data, "role": UserRole(data["role"])}
         return cls(**data)
-
-
-@dataclass(frozen=True)
-class RequesterIdentity:
-    """The effective (scope) and trigger (caller) users resolved for a request."""
-
-    effective_user: UserData | None
-    trigger_user: UserData | None

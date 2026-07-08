@@ -37,7 +37,7 @@ from dateutil.tz import tzutc
 
 from ai.backend.common.contexts.client_ip import with_client_ip
 from ai.backend.common.contexts.user import with_triggered_user, with_user
-from ai.backend.common.data.user.types import RequesterIdentity, UserData, UserRole
+from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.exception import InvalidIpAddressValue
 from ai.backend.common.identifier.user import UserID
 from ai.backend.common.jwt.exceptions import JWTError
@@ -669,49 +669,51 @@ async def _load_user_data(db: ExtendedAsyncSAEngine, user_id: UserID) -> UserDat
     )
 
 
-async def _resolve_requester_identity(
-    request: web.Request, db: ExtendedAsyncSAEngine
-) -> RequesterIdentity:
-    """Resolve the X-BackendAI-Act-As header into the request's effective/trigger users.
-
-    No header: both are the authenticated user. With it, the authenticated user
-    must be a super admin and the whole request runs as the target user (fail-closed).
-    """
+def _authenticated_user(request: web.Request) -> UserData | None:
+    """The authenticated caller's ``UserData``, built from the auth-middleware result."""
     user = request.get("user")
-    authenticated_user: UserData | None = None
-    if user and user.get("uuid") is not None:
-        authenticated_user = UserData(
-            user_id=user["uuid"],
-            is_authorized=request.get("is_authorized", False),
-            is_admin=request.get("is_admin", False),
-            is_superadmin=request.get("is_superadmin", False),
-            role=UserRole(user["role"]),
-            domain_name=user["domain_name"],
-        )
+    if not user or user.get("uuid") is None:
+        return None
+    return UserData(
+        user_id=user["uuid"],
+        is_authorized=request.get("is_authorized", False),
+        is_admin=request.get("is_admin", False),
+        is_superadmin=request.get("is_superadmin", False),
+        role=UserRole(user["role"]),
+        domain_name=user["domain_name"],
+    )
+
+
+async def _resolve_effective_user(
+    request: web.Request, db: ExtendedAsyncSAEngine, authenticated_user: UserData
+) -> UserData:
+    """The user the request runs as: the caller, or the X-BackendAI-Act-As target.
+
+    Without the header the caller is the effective user. With it, the caller must
+    be a super admin and the request runs as the target (fail-closed).
+    """
     raw_target = request.headers.get("X-BackendAI-Act-As")
     if not raw_target:
-        return RequesterIdentity(effective_user=authenticated_user, trigger_user=authenticated_user)
-
-    if authenticated_user is None or not authenticated_user.is_superadmin:
+        return authenticated_user
+    if not authenticated_user.is_superadmin:
         raise InsufficientPrivilege("Only superadmin may use X-BackendAI-Act-As")
     try:
         target_user_id = UserID(uuid.UUID(raw_target))
     except ValueError as e:
         raise InvalidAuthParameters("X-BackendAI-Act-As must be a valid user UUID") from e
-    target_user = await _load_user_data(db, target_user_id)
-    return RequesterIdentity(effective_user=target_user, trigger_user=authenticated_user)
+    return await _load_user_data(db, target_user_id)
 
 
-def _setup_user_context(request: web.Request, identity: RequesterIdentity) -> ExitStack:
+async def _setup_user_context(request: web.Request, db: ExtendedAsyncSAEngine) -> ExitStack:
     stack = ExitStack()
 
-    if identity.effective_user is not None:
-        stack.enter_context(with_user(identity.effective_user))
-        stack.enter_context(
-            with_log_context_fields({"user_id": str(identity.effective_user.user_id)})
-        )
-    if identity.trigger_user is not None:
-        stack.enter_context(with_triggered_user(identity.trigger_user))
+    authenticated_user = _authenticated_user(request)
+    if authenticated_user is not None:
+        # trigger = caller always; effective = caller, overridden by act-as impersonation.
+        effective_user = await _resolve_effective_user(request, db, authenticated_user)
+        stack.enter_context(with_triggered_user(authenticated_user))
+        stack.enter_context(with_user(effective_user))
+        stack.enter_context(with_log_context_fields({"user_id": str(effective_user.user_id)}))
 
     client_ip = extract_client_ip(request)
     if client_ip:
@@ -849,8 +851,7 @@ def build_auth_middleware(
         else:
             await _authenticate_via_hook(request, db, valkey_stat, hook_plugin_ctx)
 
-        identity = await _resolve_requester_identity(request, db)
-        with _setup_user_context(request, identity):
+        with await _setup_user_context(request, db):
             return await handler(request)
 
     return _middleware

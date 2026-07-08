@@ -7,9 +7,14 @@ from typing import Any
 import pytest
 from aiohttp.test_utils import make_mocked_request
 
+from ai.backend.common.contexts.user import current_user, triggered_user
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.manager.api.rest.middleware import auth as auth_mw
-from ai.backend.manager.api.rest.middleware.auth import _resolve_requester_identity
+from ai.backend.manager.api.rest.middleware.auth import (
+    _authenticated_user,
+    _resolve_effective_user,
+    _setup_user_context,
+)
 from ai.backend.manager.errors.auth import (
     InsufficientPrivilege,
     InvalidAuthParameters,
@@ -33,6 +38,21 @@ def _make_request(*, role: UserRole | None, headers: dict[str, str] | None = Non
     return request
 
 
+def _install_target_loader(monkeypatch: pytest.MonkeyPatch, target_id: uuid.UUID) -> None:
+    async def _fake_load(db: Any, user_id: uuid.UUID) -> UserData:
+        assert user_id == target_id
+        return UserData(
+            user_id=target_id,
+            is_authorized=True,
+            is_admin=False,
+            is_superadmin=False,
+            role=UserRole.USER,
+            domain_name="target-domain",
+        )
+
+    monkeypatch.setattr(auth_mw, "_load_user_data", _fake_load)
+
+
 @dataclass(frozen=True)
 class RejectCase:
     role: UserRole
@@ -42,40 +62,26 @@ class RejectCase:
     loader_error: type[Exception] | None = None
 
 
-class TestResolveRequesterIdentity:
-    async def test_no_header_effective_equals_trigger(self) -> None:
+class TestResolveEffectiveUser:
+    async def test_no_header_returns_authenticated_user(self) -> None:
         request = _make_request(role=UserRole.USER)
-        identity = await _resolve_requester_identity(request, db=None)  # type: ignore[arg-type]
-        assert identity.effective_user is not None
-        assert identity.effective_user == identity.trigger_user
-        assert identity.effective_user.user_id == request["user"]["uuid"]
+        caller = _authenticated_user(request)
+        assert caller is not None
+        effective = await _resolve_effective_user(request, None, caller)  # type: ignore[arg-type]
+        assert effective is caller
 
     async def test_superadmin_impersonates_target(self, monkeypatch: pytest.MonkeyPatch) -> None:
         target_id = uuid.uuid4()
-
-        async def _fake_load(db: Any, user_id: uuid.UUID) -> UserData:
-            assert user_id == target_id
-            return UserData(
-                user_id=target_id,
-                is_authorized=True,
-                is_admin=False,
-                is_superadmin=False,
-                role=UserRole.USER,
-                domain_name="target-domain",
-            )
-
-        monkeypatch.setattr(auth_mw, "_load_user_data", _fake_load)
+        _install_target_loader(monkeypatch, target_id)
 
         request = _make_request(role=UserRole.SUPERADMIN, headers={ACT_AS_HEADER: str(target_id)})
-        caller_id = request["user"]["uuid"]
-        identity = await _resolve_requester_identity(request, db=None)  # type: ignore[arg-type]
+        caller = _authenticated_user(request)
+        assert caller is not None
+        effective = await _resolve_effective_user(request, None, caller)  # type: ignore[arg-type]
 
-        assert identity.effective_user is not None and identity.trigger_user is not None
-        assert identity.effective_user.user_id == target_id
-        assert not identity.effective_user.is_superadmin
-        assert identity.effective_user.domain_name == "target-domain"
-        assert identity.trigger_user.user_id == caller_id
-        assert identity.trigger_user.is_superadmin
+        assert effective.user_id == target_id
+        assert not effective.is_superadmin
+        assert effective.domain_name == "target-domain"
 
     @pytest.mark.parametrize(
         "case",
@@ -105,5 +111,39 @@ class TestResolveRequesterIdentity:
             monkeypatch.setattr(auth_mw, "_load_user_data", _fake_load)
 
         request = _make_request(role=case.role, headers={ACT_AS_HEADER: case.raw_target})
+        caller = _authenticated_user(request)
+        assert caller is not None
         with pytest.raises(case.expected):
-            await _resolve_requester_identity(request, db=None)  # type: ignore[arg-type]
+            await _resolve_effective_user(request, None, caller)  # type: ignore[arg-type]
+
+
+class TestSetupUserContext:
+    async def test_no_header_current_equals_triggered(self) -> None:
+        request = _make_request(role=UserRole.USER)
+        caller_id = request["user"]["uuid"]
+        with await _setup_user_context(request, None):  # type: ignore[arg-type]
+            effective = current_user()
+            trigger = triggered_user()
+            assert effective is not None and trigger is not None
+            assert effective == trigger
+            assert effective.user_id == caller_id
+        assert current_user() is None
+        assert triggered_user() is None
+
+    async def test_impersonation_current_is_target_triggered_is_caller(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        target_id = uuid.uuid4()
+        _install_target_loader(monkeypatch, target_id)
+
+        request = _make_request(role=UserRole.SUPERADMIN, headers={ACT_AS_HEADER: str(target_id)})
+        caller_id = request["user"]["uuid"]
+        with await _setup_user_context(request, None):  # type: ignore[arg-type]
+            effective = current_user()
+            trigger = triggered_user()
+            assert effective is not None and trigger is not None
+            assert effective.user_id == target_id
+            assert trigger.user_id == caller_id
+            assert trigger.is_superadmin
+        assert current_user() is None
+        assert triggered_user() is None
