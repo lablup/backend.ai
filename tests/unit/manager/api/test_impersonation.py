@@ -32,17 +32,6 @@ def _make_request(*, role: UserRole | None, headers: dict[str, str] | None = Non
     return request
 
 
-def _target_user(user_id: uuid.UUID) -> UserData:
-    return UserData(
-        user_id=user_id,
-        is_authorized=True,
-        is_admin=False,
-        is_superadmin=False,
-        role=UserRole.USER,
-        domain_name="target-domain",
-    )
-
-
 async def test_no_header_effective_equals_trigger() -> None:
     request = _make_request(role=UserRole.USER)
     identity = await _resolve_identity(request, db=None)  # type: ignore[arg-type]
@@ -51,18 +40,19 @@ async def test_no_header_effective_equals_trigger() -> None:
     assert identity.effective_user.user_id == request["user"]["uuid"]
 
 
-async def test_regular_user_with_header_is_rejected() -> None:
-    request = _make_request(role=UserRole.USER, headers={ACT_AS_HEADER: str(uuid.uuid4())})
-    with pytest.raises(InsufficientPrivilege):
-        await _resolve_identity(request, db=None)  # type: ignore[arg-type]
-
-
 async def test_superadmin_impersonates_target(monkeypatch: pytest.MonkeyPatch) -> None:
     target_id = uuid.uuid4()
 
     async def _fake_load(db: Any, user_id: uuid.UUID) -> UserData:
         assert user_id == target_id
-        return _target_user(target_id)
+        return UserData(
+            user_id=target_id,
+            is_authorized=True,
+            is_admin=False,
+            is_superadmin=False,
+            role=UserRole.USER,
+            domain_name="target-domain",
+        )
 
     monkeypatch.setattr(auth_mw, "_load_user_data", _fake_load)
 
@@ -78,18 +68,38 @@ async def test_superadmin_impersonates_target(monkeypatch: pytest.MonkeyPatch) -
     assert identity.trigger_user.is_superadmin
 
 
-async def test_nonexistent_target_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
-    async def _fake_load(db: Any, user_id: uuid.UUID) -> UserData:
-        raise UserNotFound("Impersonation target user not found")
+@pytest.mark.parametrize(
+    ("role", "raw_target", "loader_error", "expected"),
+    [
+        pytest.param(
+            UserRole.USER, str(uuid.uuid4()), None, InsufficientPrivilege, id="regular-user"
+        ),
+        pytest.param(
+            UserRole.SUPERADMIN, "not-a-uuid", None, InvalidAuthParameters, id="invalid-uuid"
+        ),
+        pytest.param(
+            UserRole.SUPERADMIN,
+            str(uuid.uuid4()),
+            UserNotFound,
+            UserNotFound,
+            id="target-not-found",
+        ),
+    ],
+)
+async def test_resolve_identity_rejects(
+    monkeypatch: pytest.MonkeyPatch,
+    role: UserRole,
+    raw_target: str,
+    loader_error: type[Exception] | None,
+    expected: type[Exception],
+) -> None:
+    if loader_error is not None:
 
-    monkeypatch.setattr(auth_mw, "_load_user_data", _fake_load)
+        async def _fake_load(db: Any, user_id: uuid.UUID) -> UserData:
+            raise loader_error("Impersonation target user not found")
 
-    request = _make_request(role=UserRole.SUPERADMIN, headers={ACT_AS_HEADER: str(uuid.uuid4())})
-    with pytest.raises(UserNotFound):
-        await _resolve_identity(request, db=None)  # type: ignore[arg-type]
+        monkeypatch.setattr(auth_mw, "_load_user_data", _fake_load)
 
-
-async def test_invalid_uuid_header_is_rejected() -> None:
-    request = _make_request(role=UserRole.SUPERADMIN, headers={ACT_AS_HEADER: "not-a-uuid"})
-    with pytest.raises(InvalidAuthParameters):
+    request = _make_request(role=role, headers={ACT_AS_HEADER: raw_target})
+    with pytest.raises(expected):
         await _resolve_identity(request, db=None)  # type: ignore[arg-type]
