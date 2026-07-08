@@ -28,6 +28,14 @@ if TYPE_CHECKING:
 
 __all__ = ("ManagerAdminService",)
 
+# etcd keys backing the system announcement. The message and the enabled flag
+# are stored under separate keys so that disabling an announcement hides it
+# without discarding the message (re-enabling does not require retyping). The
+# flag key is a sibling of — not a child of — the message key to avoid
+# parent/child ambiguity when reading the message key.
+_ANNOUNCEMENT_MESSAGE_KEY = "manager/announcement"
+_ANNOUNCEMENT_ENABLED_KEY = "manager/announcement_enabled"
+
 
 @dataclass
 class ManagerAdminService:
@@ -82,23 +90,36 @@ class ManagerAdminService:
 
     async def get_announcement(self, action: GetAnnouncementAction) -> GetAnnouncementActionResult:
         """Get the current announcement from etcd."""
-        data = await self._etcd.get("manager/announcement")
-        if data is None:
+        message = await self._etcd.get(_ANNOUNCEMENT_MESSAGE_KEY)
+        if message is None:
             return GetAnnouncementActionResult(enabled=False, message="")
-        return GetAnnouncementActionResult(enabled=True, message=data)
+        enabled_flag = await self._etcd.get(_ANNOUNCEMENT_ENABLED_KEY)
+        # Announcements written before the enabled flag was introduced have no
+        # flag key; treat a stored message as enabled for backward compatibility.
+        enabled = enabled_flag != "false"
+        return GetAnnouncementActionResult(enabled=enabled, message=message)
 
     async def update_announcement(
         self, action: UpdateAnnouncementAction
     ) -> UpdateAnnouncementActionResult:
-        """Update the announcement in etcd."""
-        if action.enabled:
-            if not action.message:
-                raise InvalidAPIParameters(
-                    extra_msg="Empty message not allowed to enable announcement"
-                )
-            await self._etcd.put("manager/announcement", action.message)
-        else:
-            await self._etcd.delete("manager/announcement")
+        """Update the announcement in etcd.
+
+        The message is retained across enable/disable: disabling only flips the
+        enabled flag and keeps the stored message, so re-enabling does not
+        require retyping it. Enabling still requires a non-empty message; pass an
+        explicit empty message to clear the stored text.
+        """
+        if action.enabled and not action.message:
+            raise InvalidAPIParameters(
+                extra_msg="Empty message not allowed to enable announcement"
+            )
+        # Only touch the message when one is provided, so a disable request
+        # without a message preserves the existing text.
+        if action.message is not None:
+            await self._etcd.put(_ANNOUNCEMENT_MESSAGE_KEY, action.message)
+        await self._etcd.put(
+            _ANNOUNCEMENT_ENABLED_KEY, "true" if action.enabled else "false"
+        )
         return UpdateAnnouncementActionResult()
 
     async def perform_scheduler_ops(
