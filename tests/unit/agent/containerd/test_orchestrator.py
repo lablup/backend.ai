@@ -64,6 +64,11 @@ class FakeRuntime(OciRuntime):
         return []
 
     @override
+    async def subscribe_task_events(self) -> Any:
+        return
+        yield  # pragma: no cover
+
+    @override
     async def remove_image(self, image_ref: str) -> None:
         self.calls.append("remove_image")
 

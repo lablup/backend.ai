@@ -25,7 +25,7 @@ attach CNI into its netns after start (validated in BEP-1058/verification.md §5
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from collections.abc import Mapping, Sequence
+from collections.abc import AsyncIterator, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
@@ -62,6 +62,17 @@ class ContainerInfo:
     image: str
     labels: Mapping[str, str]
     status: str
+
+
+@dataclass(frozen=True)
+class TaskEvent:
+    """A container task lifecycle event from the runtime's event stream.
+
+    ``kind`` is 'start' | 'exit' | 'oom'; ``exit_code`` is meaningful for 'exit'."""
+
+    kind: str
+    container_id: str
+    exit_code: int = 0
 
 
 class OciRuntime(ABC):
@@ -155,6 +166,11 @@ class OciRuntime(ABC):
     @abstractmethod
     async def list_container_infos(self) -> Sequence[ContainerInfo]:
         """List containers with labels + image + task status (for restart reconciliation)."""
+
+    @abstractmethod
+    def subscribe_task_events(self) -> AsyncIterator[TaskEvent]:
+        """Stream container task lifecycle events (start/exit/oom) for real-time reconciliation.
+        The stream ends when the connection drops; the caller re-subscribes."""
 
     @abstractmethod
     async def container_pid(self, container_id: str) -> int | None:

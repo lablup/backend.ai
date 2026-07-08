@@ -30,7 +30,7 @@ DEST_DIR = REPO / "src/ai/backend/agent/containerd/_grpcapi"
 PKG_PATH = DEST_PKG.replace(".", "/")  # ai/backend/agent/containerd/_grpcapi
 
 # Services we need (+ their transitive api/types & protobuf deps are pulled in wholesale).
-SERVICES = ["containers", "tasks", "images", "snapshots", "content", "diff"]
+SERVICES = ["containers", "tasks", "images", "snapshots", "content", "diff", "events"]
 
 
 def _find_go_mod(*globs: str) -> Path:
@@ -99,6 +99,7 @@ def main() -> None:
         # not bundled and which we do not need.)
         targets = [
             *(pkg_root / "api/types").rglob("*.proto"),
+            *(pkg_root / "api/events").rglob("*.proto"),  # task lifecycle event payloads
             *(pkg_root / "protobuf").rglob("*.proto"),
             pkg_root / "gogoproto/gogo.proto",
             *[pkg_root / f"api/services/{s}/v1/{s}.proto" for s in SERVICES],

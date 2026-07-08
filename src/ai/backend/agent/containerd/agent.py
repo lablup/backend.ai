@@ -4,7 +4,7 @@ An independent agent backend parallel to DockerAgent, targeting containerd's nat
 gRPC/task model instead of the Docker daemon. The container/image lifecycle (scan/pull/push,
 create/start/destroy, resource limits, GPU/device injection, distro probe) runs over the
 containerd gRPC API with no nerdctl/ctr; cluster networking is delegated to the BEP-1058
-stack. Session-to-image ``commit`` is the remaining TODO.
+stack.
 
 Cluster networking is provided by the BEP-1058 runtime-neutral stack
 (``agent.network``): the SessionNetworkCoordinator handles per-session setup and the
@@ -14,6 +14,7 @@ ContainerNetworkProvisioner attaches each container's task PID via CNI.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import signal
 import subprocess
@@ -45,13 +46,20 @@ from ai.backend.agent.resources import (
     Mount,
     known_slot_types,
 )
-from ai.backend.agent.types import Container, KernelOwnershipData, MountInfo
+from ai.backend.agent.types import (
+    AgentEventData,
+    Container,
+    KernelOwnershipData,
+    LifecycleEvent,
+    MountInfo,
+)
 from ai.backend.common.arch import CURRENT_ARCH
 from ai.backend.common.data.image.types import InstalledImageInfo
 from ai.backend.common.docker import MAX_KERNELSPEC, MIN_KERNELSPEC, ImageRef, LabelName
 from ai.backend.common.dto.agent.response import PurgeImageResp, PurgeImagesResp
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.events.dispatcher import EventProducer
+from ai.backend.common.events.kernel import KernelLifecycleEventReason
 from ai.backend.common.exception import ImageNotAvailable, InvalidImageName, InvalidImageTag
 from ai.backend.common.json import dump_json_str
 from ai.backend.common.network.types import NetworkBackendKind, SessionNetMeta
@@ -87,7 +95,7 @@ from .oci import (
     translate_creation_config,
 )
 from .runtime.grpc import ContainerdGrpcRuntime, container_log_path
-from .runtime.interface import OciRuntime
+from .runtime.interface import OciRuntime, TaskEvent
 from .session_network import (
     ContainerdSessionNetwork,
     build_containerd_session_network,
@@ -95,7 +103,6 @@ from .session_network import (
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
-_TODO = "containerd backend: not yet implemented (requires containerd gRPC client)"
 # Placeholder subnet for a single-node BRIDGE session; the bridge backend allocates the
 # real node-local /24 per session and ignores this value (SessionNetMeta requires a subnet).
 _LOCAL_SUBNET = "172.30.0.0/24"
@@ -482,6 +489,7 @@ class ContainerdAgent(
     _runtime: OciRuntime
     _session_network: ContainerdSessionNetwork
     _host_ip: str
+    _event_monitor_task: asyncio.Task[None] | None
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
@@ -489,6 +497,7 @@ class ContainerdAgent(
         # containerd gRPC client (no nerdctl/ctr CLI). The agent owns it and injects it into
         # the network facade; opened in __ainit__.
         self._runtime = ContainerdGrpcRuntime(namespace="backend-ai")
+        self._event_monitor_task = None
         # Cluster networking is delegated to the BEP-1058 agent.network stack via a
         # (verified) facade; the kernel-creation lifecycle will drive it. The vxlan uplink
         # must be the interface carrying this node's VTEP (host_ip) — deriving it from the
@@ -508,9 +517,65 @@ class ContainerdAgent(
     async def __ainit__(self) -> None:
         await super().__ainit__()
         await self._session_network.open()
+        # Real-time container-death/OOM detection via the containerd event stream (the
+        # equivalent of DockerAgent.monitor_docker_events); the periodic reconciler is the
+        # safety net.
+        self._event_monitor_task = asyncio.create_task(self._monitor_task_events())
         # Advertise this node's VTEP so the manager can pre-seed session membership and
         # eliminate the peer-publish race for multi-node overlays (BEP-1058).
         await publish_vtep(self.etcd, str(self.id), self._host_ip)
+
+    @override
+    async def shutdown(self, stop_signal: signal.Signals) -> None:
+        if self._event_monitor_task is not None:
+            self._event_monitor_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await self._event_monitor_task
+        await super().shutdown(stop_signal)
+
+    async def _monitor_task_events(self) -> None:
+        """Consume the containerd task event stream, re-subscribing on drop."""
+        while True:
+            try:
+                async for ev in self._runtime.subscribe_task_events():
+                    await self._handle_task_event(ev)
+                log.info("containerd event stream ended; re-subscribing")
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                log.exception("containerd event monitor failed; retrying")
+            await asyncio.sleep(1.0)
+
+    async def _handle_task_event(self, ev: TaskEvent) -> None:
+        try:
+            kernel_id = KernelId(UUID(ev.container_id))
+        except ValueError:
+            return
+        kernel_obj = self.kernel_registry.get(kernel_id)
+        if kernel_obj is None:
+            return  # not a live kernel of ours
+        session_id = kernel_obj.session_id
+        match ev.kind:
+            case "exit":
+                reason = kernel_obj.termination_reason or KernelLifecycleEventReason.SELF_TERMINATED
+                await self.inject_container_lifecycle_event(
+                    kernel_id,
+                    session_id,
+                    LifecycleEvent.CLEAN,
+                    reason,
+                    container_id=ContainerId(ev.container_id),
+                    exit_code=ev.exit_code,
+                )
+            case "oom":
+                await kernel_obj.notify_event(AgentEventData(type="oom", data={}))
+            case "start":
+                await self.inject_container_lifecycle_event(
+                    kernel_id,
+                    session_id,
+                    LifecycleEvent.START,
+                    KernelLifecycleEventReason.NEW_CONTAINER_STARTED,
+                    container_id=ContainerId(ev.container_id),
+                )
 
     # execute is inherited from AbstractAgent: it delegates to kernel_obj.execute (the code
     # runner's ZMQ REPL), which is runtime-agnostic. No override needed.

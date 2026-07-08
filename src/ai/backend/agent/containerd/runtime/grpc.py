@@ -19,13 +19,14 @@ import base64
 import hashlib
 import json
 import logging
-from collections.abc import Mapping, Sequence
+from collections.abc import AsyncIterator, Mapping, Sequence
 from pathlib import Path
 from typing import Any, override
 
 import grpc
 from google.protobuf import any_pb2
 
+from ai.backend.agent.containerd._grpcapi.api.events import task_pb2 as task_events_pb2
 from ai.backend.agent.containerd._grpcapi.api.services.containers.v1 import (
     containers_pb2,
     containers_pb2_grpc,
@@ -35,6 +36,10 @@ from ai.backend.agent.containerd._grpcapi.api.services.content.v1 import (
     content_pb2_grpc,
 )
 from ai.backend.agent.containerd._grpcapi.api.services.diff.v1 import diff_pb2, diff_pb2_grpc
+from ai.backend.agent.containerd._grpcapi.api.services.events.v1 import (
+    events_pb2,
+    events_pb2_grpc,
+)
 from ai.backend.agent.containerd._grpcapi.api.services.images.v1 import images_pb2, images_pb2_grpc
 from ai.backend.agent.containerd._grpcapi.api.services.snapshots.v1 import (
     snapshots_pb2,
@@ -51,6 +56,7 @@ from ai.backend.agent.containerd.runtime.interface import (
     ContainerInfo,
     ImageInfo,
     OciRuntime,
+    TaskEvent,
     TaskHandle,
 )
 from ai.backend.agent.containerd.runtime.spec import build_oci_runtime_spec
@@ -115,6 +121,7 @@ class ContainerdGrpcRuntime(OciRuntime):
     _snapshots: snapshots_pb2_grpc.SnapshotsStub | None
     _transfer: transfer_pb2_grpc.TransferStub | None
     _diff: diff_pb2_grpc.DiffStub | None
+    _events: events_pb2_grpc.EventsStub | None
     _rootfs: dict[str, list[mount_pb2.Mount]]
 
     def __init__(self, *, address: str = DEFAULT_ADDRESS, namespace: str = "backend-ai") -> None:
@@ -128,6 +135,7 @@ class ContainerdGrpcRuntime(OciRuntime):
         self._snapshots = None
         self._transfer = None
         self._diff = None
+        self._events = None
         self._rootfs: dict[str, list[mount_pb2.Mount]] = {}
 
     @override
@@ -143,6 +151,7 @@ class ContainerdGrpcRuntime(OciRuntime):
         self._snapshots = snapshots_pb2_grpc.SnapshotsStub(self._channel)
         self._transfer = transfer_pb2_grpc.TransferStub(self._channel)
         self._diff = diff_pb2_grpc.DiffStub(self._channel)
+        self._events = events_pb2_grpc.EventsStub(self._channel)
 
     @override
     async def close(self) -> None:
@@ -151,7 +160,7 @@ class ContainerdGrpcRuntime(OciRuntime):
             self._channel = None
             self._containers = self._tasks = None
             self._images = self._content = self._snapshots = None
-            self._transfer = self._diff = None
+            self._transfer = self._diff = self._events = None
 
     @property
     def _md(self) -> list[tuple[str, str]]:
@@ -191,6 +200,32 @@ class ContainerdGrpcRuntime(OciRuntime):
         if self._diff is None:
             raise RuntimeError("ContainerdGrpcRuntime is not open (call open() first)")
         return self._diff
+
+    def _events_stub(self) -> events_pb2_grpc.EventsStub:
+        if self._events is None:
+            raise RuntimeError("ContainerdGrpcRuntime is not open (call open() first)")
+        return self._events
+
+    @override
+    async def subscribe_task_events(self) -> AsyncIterator[TaskEvent]:
+        # Subscribe to the runtime's whole event stream and surface the task lifecycle ones.
+        # The event's container_id IS our container id (== kernel id), so no name lookup.
+        async for env in self._events_stub().Subscribe(
+            events_pb2.SubscribeRequest(), metadata=self._md
+        ):
+            topic = env.topic
+            if topic == "/tasks/exit":
+                ev = task_events_pb2.TaskExit()
+                ev.ParseFromString(env.event.value)
+                yield TaskEvent("exit", ev.container_id, ev.exit_status)
+            elif topic == "/tasks/oom":
+                ev_oom = task_events_pb2.TaskOOM()
+                ev_oom.ParseFromString(env.event.value)
+                yield TaskEvent("oom", ev_oom.container_id)
+            elif topic == "/tasks/start":
+                ev_start = task_events_pb2.TaskStart()
+                ev_start.ParseFromString(env.event.value)
+                yield TaskEvent("start", ev_start.container_id)
 
     async def _write_content(self, data: bytes, media_type: str) -> dict[str, Any]:
         """Write a blob to the content store and return its OCI descriptor dict."""
