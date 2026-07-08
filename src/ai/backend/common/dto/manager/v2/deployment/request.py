@@ -35,7 +35,6 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
     AccessTokenOrderField,
     AutoScalingRuleOrderField,
     DeploymentOrderField,
-    IntOrPercent,
     OrderDirection,
     ReplicaOrderField,
     RevisionOrderField,
@@ -49,6 +48,7 @@ from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.resource_group import ResourceGroupName
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.common.identifier.vfolder import VFolderUUID
+from ai.backend.common.schema.deployment import IntOrPercent
 from ai.backend.common.types import (
     AutoScalingMetricSource,
     ClusterMode,

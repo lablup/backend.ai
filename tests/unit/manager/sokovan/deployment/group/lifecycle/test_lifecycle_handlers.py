@@ -2,14 +2,13 @@ import uuid
 from datetime import UTC, datetime
 from uuid import UUID
 
-from ai.backend.common.dto.manager.v2.deployment.types import IntOrPercent
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.identifier.replica_group import ReplicaGroupID
+from ai.backend.common.schema.deployment import IntOrPercent, ReplicaGroupRolloutSpec
 from ai.backend.manager.data.deployment.types import (
     DeploymentHandlerOptions,
     ReplicaGroupLifecycle,
-    ReplicaGroupRolloutSpec,
     ReplicaGroupScalingStatus,
 )
 from ai.backend.manager.data.reconciler.types import HandlerOutcome

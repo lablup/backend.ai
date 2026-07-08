@@ -18,7 +18,6 @@ from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.data.permission.types import RBACElementType
-from ai.backend.common.dto.manager.v2.deployment.types import IntOrPercent
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.identifier.domain import DomainID
@@ -28,6 +27,7 @@ from ai.backend.common.identifier.replica_group import ReplicaGroupID
 from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.common.identifier.vfolder import VFolderUUID
+from ai.backend.common.schema.deployment import BlueGreenSpec, IntOrPercent, RollingUpdateSpec
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
@@ -57,11 +57,7 @@ from ai.backend.manager.errors.deployment import DeploymentRevisionNotFound
 from ai.backend.manager.errors.service import DeploymentPolicyNotFound
 from ai.backend.manager.models.agent import AgentRow, AgentStatus
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
-from ai.backend.manager.models.deployment_policy import (
-    BlueGreenSpec,
-    DeploymentPolicyRow,
-    RollingUpdateSpec,
-)
+from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain import DomainRow

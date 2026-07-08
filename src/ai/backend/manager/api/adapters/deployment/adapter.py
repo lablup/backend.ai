@@ -150,6 +150,7 @@ from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.identifier.runtime_variant_preset import RuntimeVariantPresetID
 from ai.backend.common.model_service_start_command_compat import to_legacy_start_command
+from ai.backend.common.schema.deployment import BlueGreenSpec, RollingUpdateSpec
 from ai.backend.manager.api.adapter_options.deployment.options import (
     deployment_options_from_input,
     deployment_options_to_info,
@@ -201,7 +202,6 @@ from ai.backend.manager.data.runtime_variant_preset.types import RuntimeVariantP
 from ai.backend.manager.errors.deployment import DeploymentRevisionNotFound
 from ai.backend.manager.errors.service import EndpointTokenNotFound
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUpdateSpec
 from ai.backend.manager.models.deployment_policy.conditions import DeploymentPolicyConditions
 from ai.backend.manager.models.deployment_policy.row import DeploymentPolicyRow
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow

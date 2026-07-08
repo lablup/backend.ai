@@ -1,30 +1,122 @@
-"""Deployment strategy specs (pydantic schemas), kept separate from the ORM row. Each strategy
-decides the group its revision rolls out into and how traffic promotes to it; I/O are plain
-data dataclasses with no side effects."""
+"""Deployment strategy schemas and the plain value types they operate on, shared between the
+manager and its data layer. The specs are pydantic schema definitions usable as pydantic column
+types (persisted as JSON on ORM rows); the value dataclasses carry the I/O of the strategy
+methods with no side effects."""
 
 from __future__ import annotations
 
 import math
 from abc import abstractmethod
+from dataclasses import dataclass
+from datetime import datetime
 from typing import override
 
 from pydantic import Field, model_validator
 
-from ai.backend.common.dto.manager.v2.deployment.types import IntOrPercent
 from ai.backend.common.types import BackendAISchema
-from ai.backend.manager.data.deployment.types import (
-    ReplicaGroupRolloutSpec,
-    TargetGroupSpec,
-    TrafficStep,
-    TrafficStepInput,
-)
 
 __all__ = (
     "BlueGreenSpec",
     "CanarySpec",
     "DeploymentStrategySchema",
+    "IntOrPercent",
+    "ReplicaGroupRolloutSpec",
     "RollingUpdateSpec",
+    "TargetGroupSpec",
+    "TrafficStep",
+    "TrafficStepInput",
 )
+
+
+class IntOrPercent(BackendAISchema):
+    """A rolling-update budget value: either an absolute count or a percentage.
+
+    Exactly one of ``count`` or ``percent`` must be provided (oneOf semantics).
+
+    - ``{"count": 2}``        — absolute replica count
+    - ``{"percent": 0.25}``   — fraction of desired replicas (0.0-1.0)
+    """
+
+    count: int | None = Field(default=None, ge=0)
+    percent: float | None = Field(default=None, ge=0.0, le=1.0)
+
+    @model_validator(mode="after")
+    def _validate_one_of(self) -> IntOrPercent:
+        has_count = self.count is not None
+        has_percent = self.percent is not None
+        if has_count == has_percent:
+            raise ValueError("Exactly one of 'count' or 'percent' must be provided.")
+        return self
+
+    @property
+    def is_count(self) -> bool:
+        return self.count is not None
+
+    @property
+    def is_percent(self) -> bool:
+        return self.percent is not None
+
+    @property
+    def is_zero(self) -> bool:
+        if self.count is not None:
+            return self.count == 0
+        return self.percent == 0.0
+
+
+class ReplicaGroupRolloutSpec(BackendAISchema):
+    """Per-group rollout step config snapshot from the deployment strategy at
+    DEPLOYING_INITIALIZING; bounds how fast routes move toward the group's desired counts."""
+
+    max_surge: IntOrPercent
+    max_unavailable: IntOrPercent
+
+    def resolve_max_surge(self, total: int) -> int:
+        """Extra target replicas allowed above the goal (rounds up for percentages)."""
+        return self._resolve(self.max_surge, total, round_up=True)
+
+    def resolve_max_unavailable(self, total: int) -> int:
+        """Replicas allowed unavailable below the goal (rounds down for percentages)."""
+        return self._resolve(self.max_unavailable, total, round_up=False)
+
+    @staticmethod
+    def _resolve(value: IntOrPercent, total: int, *, round_up: bool) -> int:
+        if value.count is not None:
+            return value.count
+        result = total * (value.percent or 0.0)
+        return math.ceil(result) if round_up else math.floor(result)
+
+
+@dataclass(frozen=True)
+class TargetGroupSpec:
+    """How the deploying revision's target group is chosen. ``use_primary_group`` True rolls out
+    in place into the deployment's primary group (rolling) — the setup reads that group at creation
+    time and creates a fresh one if none exists yet. When False, a fresh group is always created
+    (blue-green/canary).
+
+    No traffic weight here: a freshly rolled-out group serves no traffic until PROMOTING shifts
+    it over, so PROVISIONING creates it at weight 0 and leaves a reused group's weight untouched."""
+
+    use_primary_group: bool
+    rollout: ReplicaGroupRolloutSpec
+
+
+@dataclass(frozen=True)
+class TrafficStepInput:
+    """Current traffic split + timing for one PROMOTING tick (step is relative to current)."""
+
+    target_traffic_weight: int
+    serving_traffic_weight: int
+    last_changed_at: datetime
+    now: datetime
+
+
+@dataclass(frozen=True)
+class TrafficStep:
+    """The next traffic split (target/serving) and whether promotion is complete."""
+
+    target_traffic_weight: int
+    serving_traffic_weight: int
+    completed: bool
 
 
 class DeploymentStrategySchema(BackendAISchema):
