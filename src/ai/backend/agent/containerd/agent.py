@@ -433,6 +433,11 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         shmem = (self.kernel_config.get("resource_opts") or {}).get("shmem")
         if shmem:
             oci_spec["shmem"] = int(shmem)
+        # Direct-IP model: kernel_host is the container's own IP, so each service is reachable
+        # at its container port directly (no host-port mapping). The manager routes on
+        # kernel_host + host_ports, so surface host_ports = container_ports.
+        for sport in service_ports:
+            sport["host_ports"] = tuple(sport["container_ports"])
         return ContainerdKernel(
             self.ownership_data,
             self.kernel_config["network_id"],
@@ -673,10 +678,6 @@ class ContainerdAgent(
         metadata: KernelRegistrySaveMetadata,
     ) -> None:
         pass
-
-    @override
-    def get_public_service_ports(self, service_ports: list[ServicePort]) -> list[ServicePort]:
-        return []
 
     @override
     async def enumerate_containers(
