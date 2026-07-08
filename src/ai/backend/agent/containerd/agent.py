@@ -578,8 +578,12 @@ class ContainerdAgent(
 
     @override
     async def __ainit__(self) -> None:
-        await super().__ainit__()
+        # Open the runtime BEFORE super().__ainit__(): the base initializer runs the initial
+        # scan_images, which queries the containerd runtime. Open it directly (the session
+        # network shares the same instance; its open() below is then a no-op).
+        await self._runtime.open()
         await self._session_network.open()
+        await super().__ainit__()
         # Real-time container-death/OOM detection via the containerd event stream (the
         # equivalent of DockerAgent.monitor_docker_events); the periodic reconciler is the
         # safety net.
