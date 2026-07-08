@@ -672,13 +672,13 @@ async def _load_user_data(db: ExtendedAsyncSAEngine, user_id: UserID) -> UserDat
 async def _resolve_identity(request: web.Request, db: ExtendedAsyncSAEngine) -> RequesterIdentity:
     """Resolve the X-BackendAI-Act-As header into the request's effective/trigger users.
 
-    No header: both are the authenticated caller. With it, the caller must be a
-    super admin and the whole request runs as the target user (fail-closed).
+    No header: both are the authenticated user. With it, the authenticated user
+    must be a super admin and the whole request runs as the target user (fail-closed).
     """
     user = request.get("user")
-    caller: UserData | None = None
+    authenticated_user: UserData | None = None
     if user and user.get("uuid") is not None:
-        caller = UserData(
+        authenticated_user = UserData(
             user_id=user["uuid"],
             is_authorized=request.get("is_authorized", False),
             is_admin=request.get("is_admin", False),
@@ -688,16 +688,16 @@ async def _resolve_identity(request: web.Request, db: ExtendedAsyncSAEngine) -> 
         )
     raw_target = request.headers.get("X-BackendAI-Act-As")
     if not raw_target:
-        return RequesterIdentity(caller, caller)
+        return RequesterIdentity(effective_user=authenticated_user, trigger_user=authenticated_user)
 
-    if caller is None or not caller.is_superadmin:
+    if authenticated_user is None or not authenticated_user.is_superadmin:
         raise InsufficientPrivilege("Only superadmin may use X-BackendAI-Act-As")
     try:
-        target_id = UserID(uuid.UUID(raw_target))
+        target_user_id = UserID(uuid.UUID(raw_target))
     except ValueError as e:
         raise InvalidAuthParameters("X-BackendAI-Act-As must be a valid user UUID") from e
-    target = await _load_user_data(db, target_id)
-    return RequesterIdentity(target, caller)
+    target_user = await _load_user_data(db, target_user_id)
+    return RequesterIdentity(effective_user=target_user, trigger_user=authenticated_user)
 
 
 def _setup_user_context(request: web.Request, identity: RequesterIdentity) -> ExitStack:
