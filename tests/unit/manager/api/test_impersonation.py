@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from dataclasses import dataclass
 from typing import Any
 
 import pytest
@@ -68,38 +69,40 @@ async def test_superadmin_impersonates_target(monkeypatch: pytest.MonkeyPatch) -
     assert identity.trigger_user.is_superadmin
 
 
+@dataclass(frozen=True)
+class RejectCase:
+    role: UserRole
+    raw_target: str
+    expected: type[Exception]
+    # Fake loader raises this so the target-not-found path can be exercised; None skips it.
+    loader_error: type[Exception] | None = None
+
+
 @pytest.mark.parametrize(
-    ("role", "raw_target", "loader_error", "expected"),
+    "case",
     [
         pytest.param(
-            UserRole.USER, str(uuid.uuid4()), None, InsufficientPrivilege, id="regular-user"
+            RejectCase(UserRole.USER, str(uuid.uuid4()), InsufficientPrivilege), id="regular-user"
         ),
         pytest.param(
-            UserRole.SUPERADMIN, "not-a-uuid", None, InvalidAuthParameters, id="invalid-uuid"
+            RejectCase(UserRole.SUPERADMIN, "not-a-uuid", InvalidAuthParameters), id="invalid-uuid"
         ),
         pytest.param(
-            UserRole.SUPERADMIN,
-            str(uuid.uuid4()),
-            UserNotFound,
-            UserNotFound,
+            RejectCase(
+                UserRole.SUPERADMIN, str(uuid.uuid4()), UserNotFound, loader_error=UserNotFound
+            ),
             id="target-not-found",
         ),
     ],
 )
-async def test_resolve_identity_rejects(
-    monkeypatch: pytest.MonkeyPatch,
-    role: UserRole,
-    raw_target: str,
-    loader_error: type[Exception] | None,
-    expected: type[Exception],
-) -> None:
-    if loader_error is not None:
+async def test_resolve_identity_rejects(monkeypatch: pytest.MonkeyPatch, case: RejectCase) -> None:
+    if case.loader_error is not None:
 
         async def _fake_load(db: Any, user_id: uuid.UUID) -> UserData:
-            raise loader_error("Impersonation target user not found")
+            raise case.loader_error("Impersonation target user not found")
 
         monkeypatch.setattr(auth_mw, "_load_user_data", _fake_load)
 
-    request = _make_request(role=role, headers={ACT_AS_HEADER: raw_target})
-    with pytest.raises(expected):
+    request = _make_request(role=case.role, headers={ACT_AS_HEADER: case.raw_target})
+    with pytest.raises(case.expected):
         await _resolve_identity(request, db=None)  # type: ignore[arg-type]
