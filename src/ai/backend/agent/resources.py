@@ -175,7 +175,7 @@ class KernelResourceSpec:
         mounts_str = ",".join(map(str, self.mounts))
         slots_str = dump_json_str({k: str(v) for k, v in self.slots.items()})
         unified_devices_str = dump_json_str([
-            [str(device_name), str(slot_name)] for device_name, slot_name in self.unified_devices
+            (str(device_name), str(slot_name)) for device_name, slot_name in self.unified_devices
         ])
 
         resource_str = ""
@@ -285,7 +285,7 @@ class KernelResourceSpec:
         o["allocations"] = serialized_allocations
         o["mounts"] = list(map(str, self.mounts))
         o["unified_devices"] = [
-            [str(device_name), str(slot_name)] for device_name, slot_name in self.unified_devices
+            (str(device_name), str(slot_name)) for device_name, slot_name in self.unified_devices
         ]
         return o
 
