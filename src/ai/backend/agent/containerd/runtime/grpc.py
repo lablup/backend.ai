@@ -392,6 +392,18 @@ class ContainerdGrpcRuntime(OciRuntime):
         return True
 
     @override
+    async def image_digest(self, image_ref: str) -> str | None:
+        try:
+            resp = await self._images_stub().Get(
+                images_pb2.GetImageRequest(name=image_ref), metadata=self._md
+            )
+        except grpc.aio.AioRpcError as e:
+            if e.code() is grpc.StatusCode.NOT_FOUND:
+                return None
+            raise
+        return str(resp.image.target.digest)
+
+    @override
     async def list_images(self) -> Sequence[str]:
         resp = await self._images_stub().List(images_pb2.ListImagesRequest(), metadata=self._md)
         return [img.name for img in resp.images]

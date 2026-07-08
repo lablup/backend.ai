@@ -614,7 +614,8 @@ class ContainerdAgent(
 
     @override
     def get_cgroup_version(self) -> str:
-        return "2"
+        # cgroup v2 exposes a unified hierarchy marked by /sys/fs/cgroup/cgroup.controllers.
+        return "2" if Path("/sys/fs/cgroup/cgroup.controllers").exists() else "1"
 
     @override
     async def extract_image_command(self, image: str) -> list[str] | None:
@@ -690,14 +691,14 @@ class ContainerdAgent(
     async def check_image(
         self, image_ref: ImageRef, image_id: str, auto_pull: AutoPullBehavior
     ) -> bool:
-        # Returns True if a pull is needed. (TODO: DIGEST freshness check needs the local
-        # image id; treated as up-to-date when present for now.)
-        exists = await self._session_network.image_exists(image_ref.canonical)
-        if exists:
-            return False
-        if auto_pull in (AutoPullBehavior.DIGEST, AutoPullBehavior.TAG):
-            return True
-        raise ImageNotAvailable(image_ref)
+        # Returns True if a pull is needed.
+        local_digest = await self._session_network.image_digest(image_ref.canonical)
+        if local_digest is None:  # not present locally
+            if auto_pull in (AutoPullBehavior.DIGEST, AutoPullBehavior.TAG):
+                return True
+            raise ImageNotAvailable(image_ref)
+        # Present: for DIGEST auto-pull, re-pull when the local digest is stale.
+        return auto_pull is AutoPullBehavior.DIGEST and local_digest != image_id
 
     @override
     async def init_kernel_context(

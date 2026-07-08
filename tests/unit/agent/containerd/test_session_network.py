@@ -108,6 +108,10 @@ class FakeRuntime(OciRuntime):
         return True
 
     @override
+    async def image_digest(self, image_ref: str) -> str | None:
+        return "sha256:x"
+
+    @override
     async def pull_image(
         self, image_ref: str, *, auth: Mapping[str, str] | None = None
     ) -> None: ...

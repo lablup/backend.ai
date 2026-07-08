@@ -221,6 +221,9 @@ class ContainerdSessionNetwork:
     async def image_exists(self, image_ref: str) -> bool:
         return await self._runtime.image_exists(image_ref)
 
+    async def image_digest(self, image_ref: str) -> str | None:
+        return await self._runtime.image_digest(image_ref)
+
     async def kill_container(self, container_id: str, *, signal: int) -> None:
         await self._runtime.kill_container(container_id, signal=signal)
 

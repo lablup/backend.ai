@@ -4,6 +4,7 @@ from typing import Any, cast
 
 import pytest
 
+import ai.backend.agent.containerd.agent as agent_mod
 from ai.backend.agent.containerd.agent import ContainerdAgent
 from ai.backend.agent.containerd.runtime.interface import ContainerInfo, ImageInfo
 from ai.backend.common.docker import LabelName
@@ -22,6 +23,9 @@ class FakeFacade:
 
     async def image_exists(self, image_ref: str) -> bool:
         return self._exists
+
+    async def image_digest(self, image_ref: str) -> str | None:
+        return "sha256:local" if self._exists else None
 
     async def pull_image(self, image_ref: str, *, auth: Any = None) -> None:
         self.pulled.append(image_ref)
@@ -259,8 +263,13 @@ class TestEnumerateContainers:
         # stopped -> EXITED; filtering to RUNNING excludes it
         assert await agent.enumerate_containers(frozenset({ContainerStatus.RUNNING})) == []
 
-    def test_cgroup_version_is_v2(self) -> None:
+    def test_cgroup_version_detected(self, monkeypatch: Any) -> None:
+        monkeypatch.setattr(
+            agent_mod.Path, "exists", lambda self: "cgroup.controllers" in str(self)
+        )
         assert _agent(FakeFacade()).get_cgroup_version() == "2"
+        monkeypatch.setattr(agent_mod.Path, "exists", lambda self: False)
+        assert _agent(FakeFacade()).get_cgroup_version() == "1"
 
 
 class TestCheckImage:
@@ -278,3 +287,18 @@ class TestCheckImage:
         agent = _agent(FakeFacade(exists=False))
         with pytest.raises(ImageNotAvailable):
             await agent.check_image(cast(Any, FakeImageRef("i")), "id", AutoPullBehavior.NONE)
+
+    async def test_digest_mismatch_needs_pull(self) -> None:
+        # present locally (digest "sha256:local") but requested a different digest
+        agent = _agent(FakeFacade(exists=True))
+        need = await agent.check_image(
+            cast(Any, FakeImageRef("i")), "sha256:remote", AutoPullBehavior.DIGEST
+        )
+        assert need is True
+
+    async def test_digest_match_no_pull(self) -> None:
+        agent = _agent(FakeFacade(exists=True))
+        need = await agent.check_image(
+            cast(Any, FakeImageRef("i")), "sha256:local", AutoPullBehavior.DIGEST
+        )
+        assert need is False

@@ -80,6 +80,11 @@ class OciRuntime(ABC):
     async def image_exists(self, image_ref: str) -> bool: ...
 
     @abstractmethod
+    async def image_digest(self, image_ref: str) -> str | None:
+        """Return the local image's content digest (its manifest/index digest), or None if
+        the image is not present."""
+
+    @abstractmethod
     async def pull_image(
         self, image_ref: str, *, auth: Mapping[str, str] | None = None
     ) -> None: ...
