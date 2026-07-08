@@ -1,10 +1,13 @@
 """Unit tests for ContainerdAgent image methods (facade injected via __new__)."""
 
+import struct
+from types import SimpleNamespace
 from typing import Any, cast
 
 import pytest
 
 import ai.backend.agent.containerd.agent as agent_mod
+from ai.backend.agent.config.unified import ContainerSandboxType
 from ai.backend.agent.containerd.agent import ContainerdAgent
 from ai.backend.agent.containerd.runtime.interface import ContainerInfo, ImageInfo
 from ai.backend.common.docker import LabelName
@@ -302,3 +305,34 @@ class TestCheckImage:
             cast(Any, FakeImageRef("i")), "sha256:local", AutoPullBehavior.DIGEST
         )
         assert need is False
+
+
+class TestAgentSocket:
+    def _agent_with_sandbox(self, jail: bool) -> Any:
+        agent = _agent(FakeFacade())
+        st = ContainerSandboxType.JAIL if jail else ContainerSandboxType.DOCKER
+        agent.local_config = cast(Any, SimpleNamespace(container=SimpleNamespace(sandbox_type=st)))
+        return agent
+
+    async def test_is_jail_enabled_reply(self) -> None:
+        on = await self._agent_with_sandbox(True)._agent_sock_reply([b"is-jail-enabled"])
+        assert on == [struct.pack("i", 0), struct.pack("i", 1)]
+        off = await self._agent_with_sandbox(False)._agent_sock_reply([b"is-jail-enabled"])
+        assert off == [struct.pack("i", 0), struct.pack("i", 0)]
+
+    async def test_pid_translation_reply(self, monkeypatch: Any) -> None:
+        async def fake_h2c(container_id: str, host_pid: int) -> int:
+            return 42
+
+        monkeypatch.setattr("ai.backend.agent.containerd.agent.host_pid_to_container_pid", fake_h2c)
+        agent = self._agent_with_sandbox(False)
+        reply = await agent._agent_sock_reply([
+            b"host-pid-to-container-pid",
+            b"cid",
+            struct.pack("i", 1000),
+        ])
+        assert reply == [struct.pack("i", 0), struct.pack("i", 42)]
+
+    async def test_invalid_action(self) -> None:
+        reply = await self._agent_with_sandbox(False)._agent_sock_reply([b"bogus"])
+        assert reply[0] == struct.pack("i", -2)

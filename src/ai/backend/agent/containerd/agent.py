@@ -17,6 +17,7 @@ import asyncio
 import contextlib
 import logging
 import signal
+import struct
 import subprocess
 from collections.abc import Mapping, Sequence
 from decimal import Decimal
@@ -25,11 +26,15 @@ from pathlib import Path
 from typing import Any, cast, override
 from uuid import UUID, uuid4
 
+import zmq
+import zmq.asyncio
+
 from ai.backend.agent.agent import (
     AbstractAgent,
     AbstractKernelCreationContext,
     ScanImagesResult,
 )
+from ai.backend.agent.config.unified import ContainerSandboxType
 from ai.backend.agent.docker.agent import (
     LDD_GLIBC_REGEX,
     LDD_MUSL_REGEX,
@@ -53,6 +58,7 @@ from ai.backend.agent.types import (
     LifecycleEvent,
     MountInfo,
 )
+from ai.backend.agent.utils import container_pid_to_host_pid, host_pid_to_container_pid
 from ai.backend.common.arch import CURRENT_ARCH
 from ai.backend.common.data.image.types import InstalledImageInfo
 from ai.backend.common.docker import MAX_KERNELSPEC, MIN_KERNELSPEC, ImageRef, LabelName
@@ -148,6 +154,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
     _scratch_dir: Path | None
     _pending_spec: Any
     _accel_spec: AcceleratorSpec
+    _agent_sock_path: Path | None
 
     def __init__(
         self,
@@ -161,6 +168,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         restarting: bool = False,
         *,
         session_network: ContainerdSessionNetwork,
+        agent_sock_path: Path | None = None,
     ) -> None:
         super().__init__(
             ownership_data,
@@ -173,6 +181,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
             restarting=restarting,
         )
         self._session_network = session_network
+        self._agent_sock_path = agent_sock_path
         self._net_meta = None
         self._container_id = str(kernel_config["kernel_id"])
         self._session_id = str(kernel_config["session_id"])
@@ -229,7 +238,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         # /home/config and work/ (RW) at /home/work. prepare_scratch created them.
         # (lxcfs, /etc/localtime, coredump, domain-socket proxies are follow-ups.)
         scratch_dir = (self.local_config.container.scratch_root / str(self._container_id)).resolve()
-        return [
+        mounts = [
             Mount(
                 MountTypes.BIND,
                 scratch_dir / "config",
@@ -243,6 +252,19 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
                 MountPermission.READ_WRITE,
             ),
         ]
+        # The in-container agent socket (host<->container PID translation, jail status) for
+        # libbaihook/jail, bind-mounted directly (no socat relay). (lxcfs, /etc/localtime,
+        # coredump are follow-ups.)
+        if self._agent_sock_path is not None:
+            mounts.append(
+                Mount(
+                    MountTypes.BIND,
+                    self._agent_sock_path,
+                    Path("/opt/kernel/agent.sock"),
+                    MountPermission.READ_WRITE,
+                )
+            )
+        return mounts
 
     @property
     @override
@@ -490,6 +512,8 @@ class ContainerdAgent(
     _session_network: ContainerdSessionNetwork
     _host_ip: str
     _event_monitor_task: asyncio.Task[None] | None
+    _agent_sock_path: Path
+    _agent_sock_task: asyncio.Task[None] | None
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
@@ -498,6 +522,13 @@ class ContainerdAgent(
         # the network facade; opened in __ainit__.
         self._runtime = ContainerdGrpcRuntime(namespace="backend-ai")
         self._event_monitor_task = None
+        # In-container helpers (libbaihook LD_PRELOAD hook, jail) talk back to the agent over
+        # a per-agent socket for host<->container PID translation + jail status. Bind ZMQ REP
+        # directly on this ipc:// UNIX socket and bind-mount it into each container as
+        # /opt/kernel/agent.sock — no socat relay / TCP hop (cf. DockerAgent).
+        ipc_base_path = self.local_config.agent.ipc_base_path
+        self._agent_sock_path = ipc_base_path / "container" / f"agent.{self.id}.sock"
+        self._agent_sock_task = None
         # Cluster networking is delegated to the BEP-1058 agent.network stack via a
         # (verified) facade; the kernel-creation lifecycle will drive it. The vxlan uplink
         # must be the interface carrying this node's VTEP (host_ip) — deriving it from the
@@ -521,17 +552,68 @@ class ContainerdAgent(
         # equivalent of DockerAgent.monitor_docker_events); the periodic reconciler is the
         # safety net.
         self._event_monitor_task = asyncio.create_task(self._monitor_task_events())
+        self._agent_sock_task = asyncio.create_task(self._handle_agent_socket())
         # Advertise this node's VTEP so the manager can pre-seed session membership and
         # eliminate the peer-publish race for multi-node overlays (BEP-1058).
         await publish_vtep(self.etcd, str(self.id), self._host_ip)
 
     @override
     async def shutdown(self, stop_signal: signal.Signals) -> None:
-        if self._event_monitor_task is not None:
-            self._event_monitor_task.cancel()
-            with contextlib.suppress(asyncio.CancelledError):
-                await self._event_monitor_task
+        for task in (self._event_monitor_task, self._agent_sock_task):
+            if task is not None:
+                task.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await task
         await super().shutdown(stop_signal)
+
+    async def _handle_agent_socket(self) -> None:
+        """Serve the in-container helper socket (host<->container PID translation, jail
+        status) as a ZMQ REP over an ipc:// UNIX socket. Re-binds on error."""
+        zmq_ctx = zmq.asyncio.Context()
+        endpoint = f"ipc://{self._agent_sock_path}"
+        await asyncio.to_thread(self._agent_sock_path.parent.mkdir, parents=True, exist_ok=True)
+        try:
+            while True:
+                sock = zmq_ctx.socket(zmq.REP)
+                try:
+                    sock.bind(endpoint)
+                    self._agent_sock_path.chmod(0o777)  # in-container (non-root) user connects
+                    while True:
+                        msg = await sock.recv_multipart()
+                        if not msg:
+                            break
+                        await sock.send_multipart(await self._agent_sock_reply(msg))
+                except asyncio.CancelledError:
+                    raise
+                except Exception:
+                    log.exception("agent socket handler error; re-binding")
+                finally:
+                    sock.close(linger=0)
+                await asyncio.sleep(1.0)
+        finally:
+            zmq_ctx.term()
+
+    async def _agent_sock_reply(self, msg: list[bytes]) -> list[bytes]:
+        try:
+            match msg[0]:
+                case b"host-pid-to-container-pid":
+                    container_id = msg[1].decode()
+                    host_pid = struct.unpack("i", msg[2])[0]
+                    cpid = await host_pid_to_container_pid(container_id, host_pid)
+                    return [struct.pack("i", 0), struct.pack("i", int(cpid))]
+                case b"container-pid-to-host-pid":
+                    container_id = msg[1].decode()
+                    cpid = struct.unpack("i", msg[2])[0]
+                    hpid = await container_pid_to_host_pid(container_id, cpid)
+                    return [struct.pack("i", 0), struct.pack("i", int(hpid))]
+                case b"is-jail-enabled":
+                    enabled = self.local_config.container.sandbox_type == ContainerSandboxType.JAIL
+                    return [struct.pack("i", 0), struct.pack("i", 1 if enabled else 0)]
+                case _:
+                    return [struct.pack("i", -2), b"Invalid action"]
+        except Exception as e:
+            log.exception("agent socket action failed")
+            return [struct.pack("i", -1), str(e).encode()]
 
     async def _monitor_task_events(self) -> None:
         """Consume the containerd task event stream, re-subscribing on drop."""
@@ -782,6 +864,7 @@ class ContainerdAgent(
             self.computers,
             restarting=restarting,
             session_network=self._session_network,
+            agent_sock_path=self._agent_sock_path,
         )
 
     @override
