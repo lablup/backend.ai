@@ -14,7 +14,7 @@ serializer artifacts, not user intent — writes now use ``exclude_unset``
 dumps so intentional explicit nulls survive from here on.
 
 Revision ID: 2ec0aa5a19cf
-Revises: e9a1c77b42d0
+Revises: c05f9465a9cd
 Create Date: 2026-07-07 14:37:50.082414
 
 """
@@ -23,7 +23,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "2ec0aa5a19cf"
-down_revision = "e9a1c77b42d0"
+down_revision = "c05f9465a9cd"
 branch_labels = None
 depends_on = None
 # Part of: NEXT_RELEASE_VERSION
