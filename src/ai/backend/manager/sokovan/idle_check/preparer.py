@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 
 from ai.backend.common.data.idle_checker.types import CheckerType
 from ai.backend.common.identifier.idle_checker import IdleCheckerID
@@ -41,14 +41,7 @@ class IdleCheckPreparer:
                     sessions=sessions_by_checker[checker_id],
                 )
             )
-        prepared_by_id: dict[IdleCheckerID, CheckerWithState] = {}
-        for checker_type, requests in requests_by_type.items():
-            checker = checker_for(checker_type)
-            if checker is None:
-                continue
-            states = await checker.prepare(self._context, requests)
-            for checker_id, state in states.items():
-                prepared_by_id[checker_id] = CheckerWithState(checker=checker, state=state)
+        prepared_by_id = await self._prepare_checkers(requests_by_type)
         prepared_targets: list[PreparedTarget] = []
         for target in batch.targets:
             prepared_checkers = [
@@ -65,3 +58,17 @@ class IdleCheckPreparer:
                 )
             )
         return prepared_targets
+
+    async def _prepare_checkers(
+        self, requests_by_type: Mapping[CheckerType, Sequence[PrepareRequest]]
+    ) -> dict[IdleCheckerID, CheckerWithState]:
+        """The only I/O step: drive each checker type's batched prepare."""
+        prepared_by_id: dict[IdleCheckerID, CheckerWithState] = {}
+        for checker_type, requests in requests_by_type.items():
+            checker = checker_for(checker_type)
+            if checker is None:
+                continue
+            states = await checker.prepare(self._context, requests)
+            for checker_id, state in states.items():
+                prepared_by_id[checker_id] = CheckerWithState(checker=checker, state=state)
+        return prepared_by_id
