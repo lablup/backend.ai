@@ -1,6 +1,7 @@
 """Unit tests for ContainerdAgent image methods (facade injected via __new__)."""
 
 import struct
+from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, cast
 
@@ -76,6 +77,9 @@ class _FakeRuntime:
 def _agent(facade: FakeFacade) -> ContainerdAgent:
     agent = ContainerdAgent.__new__(ContainerdAgent)
     agent._session_network = cast(Any, facade)
+    agent.local_config = cast(
+        Any, SimpleNamespace(container=SimpleNamespace(scratch_root=Path("/tmp/bai-scratch")))
+    )
     return agent
 
 

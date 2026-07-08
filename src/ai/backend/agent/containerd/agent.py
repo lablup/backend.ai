@@ -826,6 +826,16 @@ class ContainerdAgent(
                 kernel_id = KernelId(UUID(raw_kid))
             except ValueError:
                 continue
+            # backend_obj mimics the Docker container-inspect shape the (shared) cpu/mem compute
+            # plugins read in restore_from_container: a /home/config mount whose source holds
+            # resource.txt. Point it at this kernel's scratch config dir so allocation restore on
+            # agent restart works without a containerd-specific restore path.
+            config_source = str(
+                (self.local_config.container.scratch_root / raw_kid / "config").resolve()
+            )
+            backend_obj = {
+                "HostConfig": {"Mounts": [{"Target": "/home/config", "Source": config_source}]}
+            }
             result.append((
                 kernel_id,
                 Container(
@@ -834,7 +844,7 @@ class ContainerdAgent(
                     image=ci.image,
                     labels=dict(ci.labels),
                     ports=[],
-                    backend_obj=ci,
+                    backend_obj=backend_obj,
                 ),
             ))
         return result
