@@ -19,7 +19,6 @@ import functools
 import hashlib
 import hmac
 import ipaddress
-import json
 import logging
 import secrets
 import uuid
@@ -72,7 +71,6 @@ log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 # Impersonation signal (BEP-1058): a super admin may run a request under a
 # target user's permission context by supplying the target's UUID here.
 ACT_AS_HEADER: Final = "X-BackendAI-Act-As"
-_OWNER_ACCESS_KEY_PARAM: Final = "owner_access_key"
 
 _whois_timezone_info: Final = {
     "A": 1 * 3600,
@@ -698,20 +696,6 @@ async def _load_target_user_data(db: ExtendedAsyncSAEngine, target_id: uuid.UUID
     )
 
 
-async def _request_has_owner_access_key(request: web.Request) -> bool:
-    """Detect the delegation signal ``owner_access_key`` in the query string or JSON body."""
-    if request.query.get(_OWNER_ACCESS_KEY_PARAM):
-        return True
-    if request.content_type == "application/json" and request.can_read_body:
-        try:
-            body = await request.json()
-        except (json.JSONDecodeError, ValueError):
-            return False
-        if isinstance(body, dict) and body.get(_OWNER_ACCESS_KEY_PARAM):
-            return True
-    return False
-
-
 async def _resolve_impersonation(
     request: web.Request,
     db: ExtendedAsyncSAEngine,
@@ -720,6 +704,10 @@ async def _resolve_impersonation(
 
     Without the header both identities are the authenticated caller. With it, the
     caller must be a super admin and the whole request runs as the target user.
+
+    The mutual exclusion with ``owner_access_key`` is enforced at the delegation
+    authorization site (``check_if_requester_is_eligible_to_act_as_target_user``),
+    not here — the middleware must not inspect per-endpoint request bodies.
     """
     authenticated = _build_authenticated_user_data(request)
     raw_target = request.headers.get(ACT_AS_HEADER)
@@ -728,10 +716,6 @@ async def _resolve_impersonation(
 
     if authenticated is None or not authenticated.is_superadmin:
         raise InsufficientPrivilege(f"Only superadmin may use {ACT_AS_HEADER}")
-    if await _request_has_owner_access_key(request):
-        raise InvalidAuthParameters(
-            f"{ACT_AS_HEADER} cannot be combined with {_OWNER_ACCESS_KEY_PARAM}"
-        )
     try:
         target_id = uuid.UUID(raw_target)
     except ValueError as e:

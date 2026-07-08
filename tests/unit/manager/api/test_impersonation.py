@@ -96,14 +96,3 @@ async def test_invalid_uuid_header_is_rejected() -> None:
     request = _make_request(role=UserRole.SUPERADMIN, headers={ACT_AS_HEADER: "not-a-uuid"})
     with pytest.raises(InvalidAuthParameters):
         await _resolve_impersonation(request, db=None)  # type: ignore[arg-type]
-
-
-@pytest.mark.asyncio
-async def test_header_with_owner_access_key_query_is_rejected() -> None:
-    request = _make_request(
-        role=UserRole.SUPERADMIN,
-        headers={ACT_AS_HEADER: str(uuid.uuid4())},
-        query="owner_access_key=AKIATEST",
-    )
-    with pytest.raises(InvalidAuthParameters):
-        await _resolve_impersonation(request, db=None)  # type: ignore[arg-type]

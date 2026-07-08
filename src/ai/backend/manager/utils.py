@@ -5,6 +5,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
+from ai.backend.common.contexts.user import current_user, triggered_user
 from ai.backend.common.types import AccessKey
 
 from .data.permission.types import EntityType, ScopeType
@@ -20,12 +21,28 @@ from .models.resource_policy import keypair_resource_policies
 from .models.user import UserRole, users
 
 
+def _reject_owner_access_key_while_impersonating() -> None:
+    """Reject ``owner_access_key`` delegation while a super admin is impersonating.
+
+    The two mechanisms delegate different things (policy vs. the acting subject),
+    so combining them yields an ambiguous executing subject (BEP-1058 §4.4).
+    Impersonation is active when the effective and trigger users differ.
+    """
+    effective = current_user()
+    trigger = triggered_user()
+    if effective is not None and trigger is not None and effective.user_id != trigger.user_id:
+        raise InvalidAPIParameters(
+            "owner_access_key cannot be combined with impersonation (X-BackendAI-Act-As)."
+        )
+
+
 def check_if_requester_is_eligible_to_act_as_target_user(
     requester_role: UserRole,
     requester_domain: str,
     target_role: UserRole,
     target_domain: str,
 ) -> bool:
+    _reject_owner_access_key_while_impersonating()
     if requester_role == UserRole.SUPERADMIN:
         pass
     elif requester_role == UserRole.ADMIN:
