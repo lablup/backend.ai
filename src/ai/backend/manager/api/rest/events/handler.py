@@ -35,13 +35,13 @@ from ai.backend.manager.errors.common import GenericForbidden
 from ai.backend.manager.errors.resource import NoCurrentTaskContext
 from ai.backend.manager.exceptions import InvalidArgument
 from ai.backend.manager.models.user import UserRole
-from ai.backend.manager.utils import reject_owner_access_key_while_impersonating
 from ai.backend.manager.services.events.actions.resolve_group_for_events import (
     ResolveGroupForEventsAction,
 )
 from ai.backend.manager.services.events.actions.resolve_session_for_events import (
     ResolveSessionForEventsAction,
 )
+from ai.backend.manager.utils import reject_owner_access_key_while_impersonating
 
 if TYPE_CHECKING:
     from ai.backend.common.events.fetcher import EventFetcher

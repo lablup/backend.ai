@@ -43,7 +43,6 @@ from ai.backend.common.json import load_json
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.dto.context import RequestCtx, UserContext
 from ai.backend.manager.errors.api import InvalidAPIParameters
-from ai.backend.manager.utils import reject_owner_access_key_while_impersonating
 from ai.backend.manager.services.group.actions.resolve_project_id_by_name import (
     ResolveProjectIdByNameAction,
 )
@@ -63,6 +62,7 @@ from ai.backend.manager.services.template.actions.list_task_templates import (
 from ai.backend.manager.services.template.actions.update_task_template import (
     UpdateTaskTemplateAction,
 )
+from ai.backend.manager.utils import reject_owner_access_key_while_impersonating
 
 if TYPE_CHECKING:
     from ai.backend.manager.services.group.processors import GroupProcessors

@@ -4,6 +4,7 @@ import uuid
 from typing import Any
 
 import pytest
+from aiohttp.test_utils import make_mocked_request
 
 from ai.backend.common.contexts.user import is_impersonating
 from ai.backend.common.data.user.types import UserData, UserRole
@@ -23,8 +24,6 @@ ACT_AS_HEADER = "X-BackendAI-Act-As"
 
 
 def _make_request(*, role: UserRole | None, headers: dict[str, str] | None = None) -> Any:
-    from aiohttp.test_utils import make_mocked_request
-
     request = make_mocked_request("GET", "/v2/foo", headers=headers or {})
     if role is not None:
         request["is_authorized"] = True
