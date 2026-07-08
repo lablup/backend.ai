@@ -76,10 +76,10 @@ class SchedulingSequencer:
         for workload in workloads:
             priority_workloads[workload.priority].append(workload)
 
-        ordered_workloads = []
+        result: list[SessionWorkload] = []
         for priority in sorted(priority_workloads.keys(), reverse=True):
-            ordered_workloads.extend(priority_workloads[priority])
-
-        return await self._workload_sequencer.sequence(
-            resource_group, system_snapshot, ordered_workloads
-        )
+            workloads = await self._workload_sequencer.sequence(
+                resource_group, system_snapshot, priority_workloads[priority]
+            )
+            result.extend(workloads)
+        return result
