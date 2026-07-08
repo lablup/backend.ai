@@ -128,6 +128,7 @@ BEP numbers start from 1000.
 | [1055](BEP-1055-preemption-scheduler-mechanics.md) | Preemption Scheduler Mechanics | HyeokJin Kim | Draft |
 | [1056](BEP-1056-scope-linked-metric-catalog.md) | Scope-Linked Metric Catalog & Dashboards | HyeokJin Kim | Draft |
 | [1057](BEP-1057-agent-re-architecture.md) | Agent Re-architecture | HyeokJin Kim | Draft |
+| [1058](BEP-1058-super-admin-impersonation.md) | Super-Admin User Impersonation | HyeokJin Kim | Draft |
 | _next_ | _(reserve your number here)_ | | |
 
 ## File Structure
