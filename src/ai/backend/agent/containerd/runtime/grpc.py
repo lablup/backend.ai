@@ -34,6 +34,7 @@ from ai.backend.agent.containerd._grpcapi.api.services.content.v1 import (
     content_pb2,
     content_pb2_grpc,
 )
+from ai.backend.agent.containerd._grpcapi.api.services.diff.v1 import diff_pb2, diff_pb2_grpc
 from ai.backend.agent.containerd._grpcapi.api.services.images.v1 import images_pb2, images_pb2_grpc
 from ai.backend.agent.containerd._grpcapi.api.services.snapshots.v1 import (
     snapshots_pb2,
@@ -44,7 +45,7 @@ from ai.backend.agent.containerd._grpcapi.api.services.transfer.v1 import (
     transfer_pb2,
     transfer_pb2_grpc,
 )
-from ai.backend.agent.containerd._grpcapi.api.types import mount_pb2
+from ai.backend.agent.containerd._grpcapi.api.types import descriptor_pb2, mount_pb2
 from ai.backend.agent.containerd._grpcapi.api.types.transfer import imagestore_pb2, registry_pb2
 from ai.backend.agent.containerd.runtime.interface import (
     ContainerInfo,
@@ -72,6 +73,9 @@ _NAMESPACE_HEADER = "containerd-namespace"
 _RUNC_RUNTIME = "io.containerd.runc.v2"
 _SNAPSHOTTER = "overlayfs"
 _SPEC_TYPE_URL = "types.containerd.io/opencontainers/runtime-spec/1/Spec"
+_LAYER_MEDIA_TYPE = "application/vnd.oci.image.layer.v1.tar"  # uncompressed -> digest == diff_id
+_CONFIG_MEDIA_TYPE = "application/vnd.oci.image.config.v1+json"
+_MANIFEST_MEDIA_TYPE = "application/vnd.oci.image.manifest.v1+json"
 _INDEX_MEDIA_TYPES = frozenset({
     "application/vnd.oci.image.index.v1+json",
     "application/vnd.docker.distribution.manifest.list.v2+json",
@@ -110,6 +114,7 @@ class ContainerdGrpcRuntime(OciRuntime):
     _content: content_pb2_grpc.ContentStub | None
     _snapshots: snapshots_pb2_grpc.SnapshotsStub | None
     _transfer: transfer_pb2_grpc.TransferStub | None
+    _diff: diff_pb2_grpc.DiffStub | None
     _rootfs: dict[str, list[mount_pb2.Mount]]
 
     def __init__(self, *, address: str = DEFAULT_ADDRESS, namespace: str = "backend-ai") -> None:
@@ -122,6 +127,7 @@ class ContainerdGrpcRuntime(OciRuntime):
         self._content = None
         self._snapshots = None
         self._transfer = None
+        self._diff = None
         self._rootfs: dict[str, list[mount_pb2.Mount]] = {}
 
     @override
@@ -136,6 +142,7 @@ class ContainerdGrpcRuntime(OciRuntime):
         self._content = content_pb2_grpc.ContentStub(self._channel)
         self._snapshots = snapshots_pb2_grpc.SnapshotsStub(self._channel)
         self._transfer = transfer_pb2_grpc.TransferStub(self._channel)
+        self._diff = diff_pb2_grpc.DiffStub(self._channel)
 
     @override
     async def close(self) -> None:
@@ -143,7 +150,8 @@ class ContainerdGrpcRuntime(OciRuntime):
             await self._channel.close()
             self._channel = None
             self._containers = self._tasks = None
-            self._images = self._content = self._snapshots = self._transfer = None
+            self._images = self._content = self._snapshots = None
+            self._transfer = self._diff = None
 
     @property
     def _md(self) -> list[tuple[str, str]]:
@@ -178,6 +186,103 @@ class ContainerdGrpcRuntime(OciRuntime):
         if self._transfer is None:
             raise RuntimeError("ContainerdGrpcRuntime is not open (call open() first)")
         return self._transfer
+
+    def _diff_stub(self) -> diff_pb2_grpc.DiffStub:
+        if self._diff is None:
+            raise RuntimeError("ContainerdGrpcRuntime is not open (call open() first)")
+        return self._diff
+
+    async def _write_content(self, data: bytes, media_type: str) -> dict[str, Any]:
+        """Write a blob to the content store and return its OCI descriptor dict."""
+        digest = "sha256:" + hashlib.sha256(data).hexdigest()
+        ref = f"commit-{digest[7:19]}"
+
+        async def _requests() -> Any:
+            yield content_pb2.WriteContentRequest(
+                action=content_pb2.WriteAction.WRITE,
+                ref=ref,
+                total=len(data),
+                expected=digest,
+                offset=0,
+                data=data,
+            )
+            yield content_pb2.WriteContentRequest(
+                action=content_pb2.WriteAction.COMMIT,
+                ref=ref,
+                total=len(data),
+                expected=digest,
+                offset=len(data),
+            )
+
+        async for _resp in self._content_stub().Write(_requests(), metadata=self._md):
+            pass
+        return {"mediaType": media_type, "digest": digest, "size": len(data)}
+
+    @override
+    async def commit_container(
+        self,
+        container_id: str,
+        *,
+        base_image_ref: str,
+        target_ref: str,
+        labels: Mapping[str, str] | None = None,
+    ) -> None:
+        # 1. The container's rootfs (active snapshot, incl. the user's changes).
+        mounts = (
+            await self._snapshots_stub().Mounts(
+                snapshots_pb2.MountsRequest(snapshotter=_SNAPSHOTTER, key=container_id),
+                metadata=self._md,
+            )
+        ).mounts
+        # 2. Diff the whole rootfs into one uncompressed layer (its digest == the diff_id).
+        layer = (
+            await self._diff_stub().Diff(
+                diff_pb2.DiffRequest(
+                    left=[],
+                    right=list(mounts),
+                    media_type=_LAYER_MEDIA_TYPE,
+                    ref=f"commit-{container_id}",
+                ),
+                metadata=self._md,
+            )
+        ).diff
+        # 3. New config = the base image config with a single-layer rootfs + merged labels.
+        _chain, base_config = await self._resolve_image(base_image_ref)
+        config = dict(base_config)
+        config["rootfs"] = {"type": "layers", "diff_ids": [layer.digest]}
+        cfg = dict(config.get("config") or {})
+        cfg["Labels"] = {**(cfg.get("Labels") or {}), **(labels or {})}
+        config["config"] = cfg
+        config_desc = await self._write_content(json.dumps(config).encode(), _CONFIG_MEDIA_TYPE)
+        # 4. New manifest referencing the config + the single layer.
+        manifest = {
+            "schemaVersion": 2,
+            "mediaType": _MANIFEST_MEDIA_TYPE,
+            "config": config_desc,
+            "layers": [
+                {"mediaType": _LAYER_MEDIA_TYPE, "digest": layer.digest, "size": layer.size}
+            ],
+        }
+        manifest_desc = await self._write_content(
+            json.dumps(manifest).encode(), _MANIFEST_MEDIA_TYPE
+        )
+        # 5. Register the image pointing at the manifest.
+        target = descriptor_pb2.Descriptor(
+            media_type=_MANIFEST_MEDIA_TYPE,
+            digest=manifest_desc["digest"],
+            size=manifest_desc["size"],
+        )
+        image = images_pb2.Image(name=target_ref, target=target)
+        try:
+            await self._images_stub().Create(
+                images_pb2.CreateImageRequest(image=image), metadata=self._md
+            )
+        except grpc.aio.AioRpcError as e:
+            if e.code() is not grpc.StatusCode.ALREADY_EXISTS:
+                raise
+            await self._images_stub().Update(
+                images_pb2.UpdateImageRequest(image=image), metadata=self._md
+            )
 
     # --- image content helpers (read the manifest chain to resolve the rootfs) ---
 

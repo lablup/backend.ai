@@ -162,6 +162,12 @@ class FakeRuntime(OciRuntime):
         self.calls.append(f"kill:{container_id}:{signal}")
 
     @override
+    async def commit_container(
+        self, container_id: str, *, base_image_ref: str, target_ref: str, labels: Any = None
+    ) -> None:
+        self.calls.append("commit_container")
+
+    @override
     async def remove_container(self, container_id: str) -> None:
         self.calls.append(f"remove:{container_id}")
 

@@ -11,6 +11,7 @@ from __future__ import annotations
 import asyncio
 import io
 import json
+import logging
 import os
 import stat
 import tarfile
@@ -18,7 +19,7 @@ from collections.abc import Mapping
 from pathlib import Path, PurePosixPath
 from typing import Any, override
 
-from ai.backend.agent.containerd.runtime.grpc import container_log_path
+from ai.backend.agent.containerd.runtime.grpc import ContainerdGrpcRuntime, container_log_path
 from ai.backend.agent.errors.kernel import KernelRunnerNotInitializedError
 from ai.backend.agent.kernel import (
     AbstractCodeRunner,
@@ -28,7 +29,11 @@ from ai.backend.agent.types import AgentEventData, KernelOwnershipData
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.dto.agent.response import CodeCompletionResp
 from ai.backend.common.events.dispatcher import EventProducer
+from ai.backend.common.lock import FileLock
 from ai.backend.common.types import CommitStatus, KernelId, SessionId
+from ai.backend.logging import BraceStyleAdapter
+
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 _MAX_DOWNLOAD_SIZE = 1048576  # 1 MiB, matching the Docker backend
 _CONTAINER_HOME = PurePosixPath("/home/work")
@@ -164,7 +169,32 @@ class ContainerdKernel(AbstractKernel):
         filename: str | None = None,
         extra_labels: dict[str, str] | None = None,
     ) -> None:
-        raise NotImplementedError(_TODO)
+        # Commit the container's rootfs into a new local image via the containerd Diff +
+        # Content + Images services (a short-lived runtime client to the local socket).
+        lock_path = self._commit_lock_path(kernel_id, subdir)
+        target_ref = canonical or f"localhost/committed-{kernel_id}:latest"
+        await asyncio.to_thread(lock_path.parent.mkdir, parents=True, exist_ok=True)
+        try:
+            async with FileLock(path=lock_path, timeout=0.1, remove_when_unlock=True):
+                runtime = ContainerdGrpcRuntime(namespace="backend-ai")
+                await runtime.open()
+                try:
+                    await runtime.commit_container(
+                        str(self.data["container_id"]),
+                        base_image_ref=self.image.canonical,
+                        target_ref=target_ref,
+                        labels=extra_labels or {},
+                    )
+                finally:
+                    await runtime.close()
+            if filename:
+                # Exporting the committed image to a downloadable OCI archive is a follow-up
+                # (needs the Transfer export path); the image is committed to the store above.
+                log.warning(
+                    "commit(k:{}): file export ({}) not yet implemented", kernel_id, filename
+                )
+        except TimeoutError:
+            log.warning("commit(k:{}): already being committed", kernel_id)
 
     @override
     async def get_service_apps(self) -> dict[str, Any]:

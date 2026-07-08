@@ -30,7 +30,7 @@ DEST_DIR = REPO / "src/ai/backend/agent/containerd/_grpcapi"
 PKG_PATH = DEST_PKG.replace(".", "/")  # ai/backend/agent/containerd/_grpcapi
 
 # Services we need (+ their transitive api/types & protobuf deps are pulled in wholesale).
-SERVICES = ["containers", "tasks", "images", "snapshots", "content"]
+SERVICES = ["containers", "tasks", "images", "snapshots", "content", "diff"]
 
 
 def _find_go_mod(*globs: str) -> Path:

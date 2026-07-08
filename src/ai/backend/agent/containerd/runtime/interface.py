@@ -135,6 +135,19 @@ class OciRuntime(ABC):
     async def remove_container(self, container_id: str) -> None:
         """Remove the task + container (force)."""
 
+    @abstractmethod
+    async def commit_container(
+        self,
+        container_id: str,
+        *,
+        base_image_ref: str,
+        target_ref: str,
+        labels: Mapping[str, str] | None = None,
+    ) -> None:
+        """Commit a container's rootfs into a new local image ``target_ref`` (a flattened
+        single-layer image derived from the base image's config), via Diff + Content +
+        Images.Create."""
+
     # --- introspection ---
     @abstractmethod
     async def list_containers(self) -> Sequence[str]: ...
