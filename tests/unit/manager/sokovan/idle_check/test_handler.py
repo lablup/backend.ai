@@ -15,8 +15,8 @@ from ai.backend.manager.sokovan.idle_check.checkers.base import (
 )
 from ai.backend.manager.sokovan.idle_check.handlers.reconcile import IdleCheckReconcileHandler
 from ai.backend.manager.sokovan.idle_check.types import (
+    CheckerWithState,
     IdleCheckReconcileInfo,
-    PreparedChecker,
     PreparedTarget,
 )
 
@@ -61,8 +61,8 @@ class TestIdleCheckReconcileHandler:
                 PreparedTarget(
                     session_id=session_id,
                     checkers=(
-                        PreparedChecker(checker=first_checker, state=RecordingState()),
-                        PreparedChecker(checker=second_checker, state=RecordingState()),
+                        CheckerWithState(checker=first_checker, state=RecordingState()),
+                        CheckerWithState(checker=second_checker, state=RecordingState()),
                     ),
                 ),
             ),
@@ -84,8 +84,8 @@ class TestIdleCheckReconcileHandler:
                 PreparedTarget(
                     session_id=session_id,
                     checkers=(
-                        PreparedChecker(checker=first_checker, state=RecordingState()),
-                        PreparedChecker(checker=second_checker, state=RecordingState()),
+                        CheckerWithState(checker=first_checker, state=RecordingState()),
+                        CheckerWithState(checker=second_checker, state=RecordingState()),
                     ),
                 ),
             ),

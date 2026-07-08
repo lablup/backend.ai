@@ -40,7 +40,7 @@ class IdleCheckTargetStatuses(BaseReconcilerTargetStatuses):
 
 
 @dataclass(frozen=True)
-class PreparedChecker:
+class CheckerWithState:
     """A checker paired with the state it prepared for one definition."""
 
     checker: IdleChecker
@@ -55,7 +55,7 @@ class PreparedTarget:
     """One session and its judgment-ready checkers, in resolved order."""
 
     session_id: SessionId
-    checkers: Sequence[PreparedChecker]
+    checkers: Sequence[CheckerWithState]
 
 
 @dataclass

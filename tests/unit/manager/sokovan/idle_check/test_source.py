@@ -52,9 +52,9 @@ class PreparedState(IdleCheckerState):
 
 
 class PrepareRecordingChecker(IdleChecker):
-    """Records each prepare call as ((checker_id, session_ids), ...) per batch."""
+    """Records each prepare call as [(checker_id, session_ids), ...] per batch."""
 
-    prepare_calls: list[tuple[tuple[IdleCheckerID, tuple[SessionId, ...]], ...]]
+    prepare_calls: list[list[tuple[IdleCheckerID, list[SessionId]]]]
 
     def __init__(self) -> None:
         self.prepare_calls = []
@@ -65,15 +65,13 @@ class PrepareRecordingChecker(IdleChecker):
         context: IdleCheckContext,
         requests: Sequence[PrepareRequest],
     ) -> Mapping[IdleCheckerID, IdleCheckerState]:
-        self.prepare_calls.append(
-            tuple(
-                (
-                    request.definition.checker_id,
-                    tuple(session.session_id for session in request.sessions),
-                )
-                for request in requests
+        self.prepare_calls.append([
+            (
+                request.definition.checker_id,
+                [session.session_id for session in request.sessions],
             )
-        )
+            for request in requests
+        ])
         return {request.definition.checker_id: PreparedState() for request in requests}
 
     @override
@@ -101,7 +99,7 @@ def _target(session_id: SessionId, checkers: Sequence[BoundCheckerData]) -> Idle
             created_at=datetime(2026, 1, 1, tzinfo=UTC),
             starts_at=None,
         ),
-        checkers=tuple(checkers),
+        checkers=checkers,
     )
 
 
@@ -189,13 +187,13 @@ class TestIdleCheckSource:
         await source.fetch_reconcile_info(IdleCheckCategory.IDLE, target_statuses)
 
         assert lifetime_checker.prepare_calls == [
-            (
-                (lifetime_bound.checker.checker_id, (first_session_id, second_session_id)),
-                (second_lifetime_bound.checker.checker_id, (second_session_id,)),
-            ),
+            [
+                (lifetime_bound.checker.checker_id, [first_session_id, second_session_id]),
+                (second_lifetime_bound.checker.checker_id, [second_session_id]),
+            ],
         ]
         assert network_checker.prepare_calls == [
-            ((network_bound.checker.checker_id, (second_session_id,)),),
+            [(network_bound.checker.checker_id, [second_session_id])],
         ]
 
     async def test_composes_prepared_targets_in_resolved_order(
@@ -220,5 +218,5 @@ class TestIdleCheckSource:
             lifetime_checker,
             network_checker,
         ]
-        # The same checker definition prepares once; its PreparedChecker is shared.
+        # The same checker definition prepares once; its CheckerWithState is shared.
         assert reconcile_info.targets[0].checkers[0] is second_target.checkers[0]

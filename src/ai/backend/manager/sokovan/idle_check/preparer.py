@@ -14,7 +14,7 @@ from ai.backend.manager.repositories.idle_checker.types import (
 )
 from ai.backend.manager.sokovan.idle_check.checkers.base import IdleCheckContext, PrepareRequest
 from ai.backend.manager.sokovan.idle_check.checkers.factory import checker_for
-from ai.backend.manager.sokovan.idle_check.types import PreparedChecker, PreparedTarget
+from ai.backend.manager.sokovan.idle_check.types import CheckerWithState, PreparedTarget
 
 
 class IdleCheckPreparer:
@@ -38,24 +38,24 @@ class IdleCheckPreparer:
             requests_by_type[definition.checker_type].append(
                 PrepareRequest(
                     definition=definition,
-                    sessions=tuple(sessions_by_checker[checker_id]),
+                    sessions=sessions_by_checker[checker_id],
                 )
             )
-        prepared_by_id: dict[IdleCheckerID, PreparedChecker] = {}
+        prepared_by_id: dict[IdleCheckerID, CheckerWithState] = {}
         for checker_type, requests in requests_by_type.items():
             checker = checker_for(checker_type)
             if checker is None:
                 continue
             states = await checker.prepare(self._context, requests)
             for checker_id, state in states.items():
-                prepared_by_id[checker_id] = PreparedChecker(checker=checker, state=state)
+                prepared_by_id[checker_id] = CheckerWithState(checker=checker, state=state)
         prepared_targets: list[PreparedTarget] = []
         for target in batch.targets:
-            prepared_checkers = tuple(
+            prepared_checkers = [
                 prepared_by_id[bound.checker.checker_id]
                 for bound in target.checkers
                 if bound.checker.checker_id in prepared_by_id
-            )
+            ]
             if not prepared_checkers:
                 continue
             prepared_targets.append(

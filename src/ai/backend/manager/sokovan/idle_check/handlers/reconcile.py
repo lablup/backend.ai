@@ -15,8 +15,8 @@ class IdleCheckReconcileHandler(ReconcilerHandler[IdleCheckReconcileInfo, IdleCh
         idle_session_ids: list[SessionId] = []
         for target in reconcile_info.targets:
             # First idle verdict in resolved order wins; at most one termination per session.
-            for prepared_checker in target.checkers:
-                if prepared_checker.check_idle(target.session_id):
+            for checker_with_state in target.checkers:
+                if checker_with_state.check_idle(target.session_id):
                     idle_session_ids.append(target.session_id)
                     break
         return IdleCheckResult(idle_session_ids=idle_session_ids)
