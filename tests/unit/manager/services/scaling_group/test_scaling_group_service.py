@@ -17,6 +17,7 @@ from ai.backend.common.types import AccessKey, AgentSelectionStrategy, ResourceS
 from ai.backend.manager.data.deployment.types import DeploymentOptions
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.scaling_group.types import (
+    FairShareScalingGroupSpec,
     ScalingGroupData,
     ScalingGroupDriverConfig,
     ScalingGroupListResult,
@@ -40,7 +41,6 @@ from ai.backend.manager.models.scaling_group import (
     ScalingGroupOpts,
     ScalingGroupRow,
 )
-from ai.backend.manager.models.scaling_group.types import FairShareScalingGroupSpec
 from ai.backend.manager.registry import check_scaling_group
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.repositories.base.creator import BulkCreator, Creator

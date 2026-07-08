@@ -17,6 +17,7 @@ from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import AgentSelectionStrategy, ResourceSlot, SessionTypes, SlotQuantity
 from ai.backend.manager.data.deployment.types import DeploymentOptions
 from ai.backend.manager.data.scaling_group.types import (
+    FairShareScalingGroupSpec,
     ResourceInfo,
     ScalingGroupData,
     ScalingGroupDriverConfig,
@@ -30,7 +31,6 @@ from ai.backend.manager.data.scaling_group.types import (
 from ai.backend.manager.data.session.options import DefaultSessionOptions
 from ai.backend.manager.errors.fair_share import InvalidResourceWeightError
 from ai.backend.manager.errors.resource import ScalingGroupNotFound
-from ai.backend.manager.models.scaling_group.types import FairShareScalingGroupSpec
 from ai.backend.manager.repositories.scaling_group import ScalingGroupRepository
 from ai.backend.manager.services.scaling_group.actions.update_fair_share_spec import (
     ResourceWeightInput,

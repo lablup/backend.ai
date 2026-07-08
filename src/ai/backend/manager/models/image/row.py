@@ -59,6 +59,7 @@ from ai.backend.manager.data.image.types import (
     ImageType,
     KVPair,
     ResourceLimit,
+    Resources,
 )
 from ai.backend.manager.data.permission.permission_defs import ImagePermission
 from ai.backend.manager.data.permission.types import EntityType
@@ -143,9 +144,6 @@ def _apply_loading_option(
             case RelationLoadingOption.REGISTRY:
                 query_stmt = query_stmt.options(joinedload(ImageRow.registry_row))
     return query_stmt
-
-
-type Resources = dict[SlotName, dict[str, Any]]
 
 
 def _get_container_registry_join_condition() -> sa.sql.elements.ColumnElement[Any]:

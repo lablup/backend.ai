@@ -5,7 +5,7 @@ from __future__ import annotations
 from ai.backend.manager.data.fair_share import (
     FairShareSpec,
 )
-from ai.backend.manager.models.scaling_group.types import FairShareScalingGroupSpec
+from ai.backend.manager.data.scaling_group.types import FairShareScalingGroupSpec
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     BulkUpserter,

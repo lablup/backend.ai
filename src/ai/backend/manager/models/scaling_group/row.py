@@ -41,7 +41,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.data.deployment.types import DeploymentOptions
 from ai.backend.manager.data.permission.permission_defs import ScalingGroupPermission
-from ai.backend.manager.data.scaling_group.types import ScalingGroupData
+from ai.backend.manager.data.scaling_group.types import FairShareScalingGroupSpec, ScalingGroupData
 from ai.backend.manager.data.session.options import DefaultSessionOptions
 from ai.backend.manager.models.base import (
     GUID,
@@ -60,7 +60,6 @@ from ai.backend.manager.models.rbac import (
     get_predefined_roles_in_scope,
 )
 from ai.backend.manager.models.rbac.context import ClientContext
-from ai.backend.manager.models.scaling_group.types import FairShareScalingGroupSpec
 from ai.backend.manager.models.types import QueryCondition
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
