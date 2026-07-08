@@ -120,8 +120,10 @@ class TestIdleCheckReconcileHandler:
         result = await IdleCheckReconcileHandler().execute(reconcile_info)
 
         assert result.verdicts == [
-            IdleVerdict(session_id=session_id, checker_id=idle_pair.checker_id),
-            IdleVerdict(session_id=session_id, checker_id=second_idle_pair.checker_id),
+            IdleVerdict(
+                session_id=session_id,
+                checker_ids=[idle_pair.checker_id, second_idle_pair.checker_id],
+            ),
         ]
         assert idle_checker.checked_session_ids == [session_id]
         assert active_checker.checked_session_ids == [session_id]

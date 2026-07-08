@@ -100,10 +100,10 @@ class IdleCheckDecision(ReconcilerDecision):
 
 @dataclass(frozen=True)
 class IdleVerdict:
-    """One idle judgment: the session judged idle and the checker that judged it."""
+    """One session judged idle and every checker that judged it so."""
 
     session_id: SessionId
-    checker_id: IdleCheckerID
+    checker_ids: Sequence[IdleCheckerID]
 
 
 @dataclass
