@@ -134,7 +134,7 @@ class ScheduleSessionsLifecycleHandler(SessionLifecycleHandler):
         # Delegate to Provisioner with pre-fetched data
         provision_time = await self._repository.get_db_now()
         schedule_result = await self._provisioner.schedule_scaling_group(
-            scheduling_data.scaling_group.name, scheduling_data, provision_time
+            scheduling_data, provision_time
         )
         scheduled_ids = set(schedule_result.scheduled_session_ids)
         failure_map = {

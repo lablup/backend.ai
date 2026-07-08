@@ -163,21 +163,21 @@ class SchedulingController:
         5. Broadcast PENDING + ask the coordinator to schedule.
         6. ``POST_ENQUEUE_SESSION`` hook notification.
         """
-        rg_name = str(draft.scope.resource_group_name) if draft.scope.resource_group_name else ""
+        rg_id = draft.scope.resource_group_id
 
         allowed_vfolder_types = list(
             await self._config_provider.legacy_etcd_config_loader.get_vfolder_types()
         )
 
         with self._metric_observer.measure_phase(
-            "scheduling_controller", rg_name, "spec_fetch_contexts"
+            "scheduling_controller", rg_id, "spec_fetch_contexts"
         ):
             fetched = await self._repository.fetch_session_spec_contexts(draft)
 
         # Vfolder mounts are resolved separately (storage-manager RPC / etcd),
         # kept out of the context fetch so resource-only callers can skip them.
         with self._metric_observer.measure_phase(
-            "scheduling_controller", rg_name, "vfolder_mount_resolution"
+            "scheduling_controller", rg_id, "vfolder_mount_resolution"
         ):
             vfolder_mounts_by_role = await self._repository.resolve_vfolder_mounts_by_role(
                 draft,
@@ -204,7 +204,7 @@ class SchedulingController:
         )
 
         with self._metric_observer.measure_phase(
-            "scheduling_controller", rg_name, "spec_preparation"
+            "scheduling_controller", rg_id, "spec_preparation"
         ):
             spec = await self._spec_preparer.prepare(draft, prep_ctx)
 
@@ -220,12 +220,10 @@ class SchedulingController:
         if hook_result.status != PASSED:
             raise RejectedByHook.from_hook_result(hook_result)
 
-        with self._metric_observer.measure_phase(
-            "scheduling_controller", rg_name, "spec_validation"
-        ):
+        with self._metric_observer.measure_phase("scheduling_controller", rg_id, "spec_validation"):
             self._spec_validator.validate(spec, val_ctx)
 
-        with self._metric_observer.measure_phase("scheduling_controller", rg_name, "enqueue"):
+        with self._metric_observer.measure_phase("scheduling_controller", rg_id, "enqueue"):
             session_id = await self._repository.enqueue_session_from_spec(spec)
 
         log.info(

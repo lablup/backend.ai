@@ -282,9 +282,7 @@ class TestScheduleScalingGroup:
         # (In production, coordinator opens the scope before calling provisioner)
         provision_time = datetime.now(tzutc())
         with RecorderContext[SessionId].scope("test-provisioning", entity_ids=session_ids):
-            await test_provisioner.schedule_scaling_group(
-                "test-sg", scheduling_data, provision_time
-            )
+            await test_provisioner.schedule_scaling_group(scheduling_data, provision_time)
 
         # Then: The selector for the specified strategy was used
         used_selector = mock_selector_pool[strategy]

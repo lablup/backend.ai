@@ -298,7 +298,6 @@ class TestProvisionerAllocation:
             workload,
             agents,
             selection_config,
-            "default",
             provisioner._default_agent_selector,
         )
 
@@ -378,7 +377,6 @@ class TestProvisionerAllocation:
             workload,
             agents,
             selection_config,
-            "default",
             provisioner._default_agent_selector,
         )
 
@@ -444,7 +442,6 @@ class TestProvisionerAllocation:
                 workload,
                 agents,
                 selection_config,
-                "default",
                 provisioner._default_agent_selector,
             )
 
@@ -532,7 +529,6 @@ class TestProvisionerAllocation:
             workload,
             agents,
             selection_config,
-            "default",
             provisioner._default_agent_selector,
         )
 
@@ -566,7 +562,6 @@ class TestProvisionerAllocation:
             workload,
             agents,
             selection_config,
-            "default",
             provisioner._default_agent_selector,
         )
 
@@ -599,7 +594,6 @@ class TestProvisionerAllocation:
                 workload,
                 agents,
                 selection_config,
-                "default",
                 provisioner._default_agent_selector,
             )
 
@@ -627,7 +621,6 @@ class TestProvisionerAllocation:
             workload,
             agents,
             selection_config,
-            "default",
             provisioner._default_agent_selector,
         )
 
@@ -676,7 +669,6 @@ class TestProvisionerAllocation:
             workload,
             agents_session1,
             selection_config,
-            "default",
             provisioner._default_agent_selector,
         )
 
@@ -713,7 +705,6 @@ class TestProvisionerAllocation:
             workload,
             agents,
             selection_config,
-            "default",
             provisioner._default_agent_selector,
         )
 
