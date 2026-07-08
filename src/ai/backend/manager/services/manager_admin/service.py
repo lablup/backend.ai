@@ -110,16 +110,12 @@ class ManagerAdminService:
         explicit empty message to clear the stored text.
         """
         if action.enabled and not action.message:
-            raise InvalidAPIParameters(
-                extra_msg="Empty message not allowed to enable announcement"
-            )
+            raise InvalidAPIParameters(extra_msg="Empty message not allowed to enable announcement")
         # Only touch the message when one is provided, so a disable request
         # without a message preserves the existing text.
         if action.message is not None:
             await self._etcd.put(_ANNOUNCEMENT_MESSAGE_KEY, action.message)
-        await self._etcd.put(
-            _ANNOUNCEMENT_ENABLED_KEY, "true" if action.enabled else "false"
-        )
+        await self._etcd.put(_ANNOUNCEMENT_ENABLED_KEY, "true" if action.enabled else "false")
         return UpdateAnnouncementActionResult()
 
     async def perform_scheduler_ops(
