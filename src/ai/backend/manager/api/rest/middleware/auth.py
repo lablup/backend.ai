@@ -662,7 +662,7 @@ async def _load_user_data(db: ExtendedAsyncSAEngine, user_id: UserID) -> UserDat
     """Load a user's ``UserData`` by UUID (impersonation target). Raises if not found."""
 
     async def _query() -> UserRow | None:
-        async with db.begin_readonly_session() as session:
+        async with db.begin_readonly_session_read_committed() as session:
             return await session.scalar(sa.select(UserRow).where(UserRow.uuid == user_id))
 
     row = await execute_with_retry(_query)
