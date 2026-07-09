@@ -3408,7 +3408,6 @@ class GQLMetricMiddleware:
                 operation_type=operation_type,
                 field_name=field_name,
                 parent_type=parent_type,
-                operation_name=operation_name,
                 error_code=error_code,
                 success=error is None,
                 duration=duration,
