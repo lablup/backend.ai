@@ -7,8 +7,11 @@ and the appropriate selector is chosen based on that value.
 
 from __future__ import annotations
 
+import uuid
+
 import pytest
 
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import (
     AgentSelectionStrategy,
 )
@@ -128,6 +131,7 @@ class TestSchedulingDataPath:
         scheduler_opts = ScalingGroupOpts(agent_selection_strategy=strategy)
 
         scaling_group_meta = ScalingGroupMeta(
+            id=ResourceGroupID(uuid.uuid4()),
             name="test-sg",
             scheduler="fifo",
             scheduler_opts=scheduler_opts,

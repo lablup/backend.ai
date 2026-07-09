@@ -3,6 +3,7 @@ from decimal import Decimal
 
 import pytest
 
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import AccessKey, ResourceSlot, SessionId, SlotQuantity
 from ai.backend.manager.data.sokovan import (
     ConcurrencySnapshot,
@@ -77,6 +78,7 @@ class TestFIFOSequencer:
                 group_id=uuid.uuid4(),
                 domain_name="default",
                 scaling_group="default",
+                resource_group_id=ResourceGroupID(uuid.uuid4()),
                 priority=0,
             ),
             SessionWorkload(
@@ -87,6 +89,7 @@ class TestFIFOSequencer:
                 group_id=uuid.uuid4(),
                 domain_name="default",
                 scaling_group="default",
+                resource_group_id=ResourceGroupID(uuid.uuid4()),
                 priority=0,
             ),
             SessionWorkload(
@@ -97,6 +100,7 @@ class TestFIFOSequencer:
                 group_id=uuid.uuid4(),
                 domain_name="default",
                 scaling_group="default",
+                resource_group_id=ResourceGroupID(uuid.uuid4()),
                 priority=0,
             ),
         ]
@@ -167,6 +171,7 @@ class TestFIFOSequencer:
                 group_id=uuid.uuid4(),
                 domain_name="default",
                 scaling_group="default",
+                resource_group_id=ResourceGroupID(uuid.uuid4()),
                 priority=0,
             ),
             SessionWorkload(
@@ -177,6 +182,7 @@ class TestFIFOSequencer:
                 group_id=uuid.uuid4(),
                 domain_name="default",
                 scaling_group="default",
+                resource_group_id=ResourceGroupID(uuid.uuid4()),
                 priority=0,
             ),
         ]

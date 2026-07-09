@@ -8,10 +8,12 @@ Test Scenarios:
 
 from __future__ import annotations
 
+import uuid
 from unittest.mock import AsyncMock
 
 import pytest
 
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import KernelId
 from ai.backend.manager.data.kernel.types import KernelInfo, KernelStatus
 from ai.backend.manager.sokovan.scheduler.handlers.kernel.sweep_stale_kernels import (
@@ -56,7 +58,7 @@ class TestSweepStaleKernelsKernelHandler:
         mock_terminator.check_stale_kernels.return_value = []
 
         # Act
-        result = await handler.execute("default", running_kernels_multiple)
+        result = await handler.execute(ResourceGroupID(uuid.uuid4()), running_kernels_multiple)
 
         # Assert
         assert len(result.successes) == len(running_kernels_multiple)
@@ -82,7 +84,7 @@ class TestSweepStaleKernelsKernelHandler:
         mock_terminator.check_stale_kernels.return_value = [dead_kernel_id]
 
         # Act
-        result = await handler.execute("default", running_kernels_multiple)
+        result = await handler.execute(ResourceGroupID(uuid.uuid4()), running_kernels_multiple)
 
         # Assert
         assert len(result.failures) == 1
@@ -107,7 +109,7 @@ class TestSweepStaleKernelsKernelHandler:
         mock_terminator.check_stale_kernels.return_value = dead_kernel_ids
 
         # Act
-        result = await handler.execute("default", running_kernels_multiple)
+        result = await handler.execute(ResourceGroupID(uuid.uuid4()), running_kernels_multiple)
 
         # Assert
         assert len(result.failures) == len(running_kernels_multiple)
@@ -129,7 +131,7 @@ class TestSweepStaleKernelsKernelHandler:
         Then: Returns empty result without calling terminator
         """
         # Act
-        result = await handler.execute("default", [])
+        result = await handler.execute(ResourceGroupID(uuid.uuid4()), [])
 
         # Assert
         assert len(result.successes) == 0
@@ -154,7 +156,7 @@ class TestSweepStaleKernelsKernelHandler:
         mock_terminator.check_stale_kernels.return_value = []
 
         # Act
-        result = await handler.execute("default", [running_kernel])
+        result = await handler.execute(ResourceGroupID(uuid.uuid4()), [running_kernel])
 
         # Assert
         assert len(result.successes) == 1
@@ -178,7 +180,7 @@ class TestSweepStaleKernelsKernelHandler:
         mock_terminator.check_stale_kernels.return_value = [dead_kernel_id]
 
         # Act
-        result = await handler.execute("default", [running_kernel])
+        result = await handler.execute(ResourceGroupID(uuid.uuid4()), [running_kernel])
 
         # Assert
         assert len(result.failures) == 1
@@ -204,7 +206,7 @@ class TestSweepStaleKernelsKernelHandler:
 
         # Act & Assert
         with pytest.raises(RuntimeError, match="Valkey connection failed"):
-            await handler.execute("default", [running_kernel])
+            await handler.execute(ResourceGroupID(uuid.uuid4()), [running_kernel])
 
     async def test_mixed_results_correct_categorization(
         self,
@@ -226,7 +228,7 @@ class TestSweepStaleKernelsKernelHandler:
         mock_terminator.check_stale_kernels.return_value = dead_kernel_ids
 
         # Act
-        result = await handler.execute("default", running_kernels_five)
+        result = await handler.execute(ResourceGroupID(uuid.uuid4()), running_kernels_five)
 
         # Assert
         assert len(result.failures) == 2
@@ -259,7 +261,7 @@ class TestSweepStaleKernelsKernelHandler:
         mock_terminator.check_stale_kernels.return_value = []
 
         # Act
-        result = await handler.execute("default", [running_kernel])
+        result = await handler.execute(ResourceGroupID(uuid.uuid4()), [running_kernel])
 
         # Assert
         assert len(result.successes) == 1
@@ -282,7 +284,7 @@ class TestSweepStaleKernelsKernelHandler:
         mock_terminator.check_stale_kernels.return_value = [dead_kernel_id]
 
         # Act
-        result = await handler.execute("default", running_kernels_multiple)
+        result = await handler.execute(ResourceGroupID(uuid.uuid4()), running_kernels_multiple)
 
         # Assert - All entries should have from_status = RUNNING
         for failure in result.failures:

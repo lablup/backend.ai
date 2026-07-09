@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import AgentId, ResourceSlot
 
 
@@ -13,4 +14,5 @@ class AgentMeta:
     addr: str
     architecture: str
     available_slots: ResourceSlot
+    resource_group_id: ResourceGroupID
     scaling_group: str
