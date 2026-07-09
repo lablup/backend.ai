@@ -127,7 +127,7 @@ async def session_processors(
     )
     service = SessionService(args)
     real_single_entity_validator = SingleEntityActionRBACValidator(
-        rbac_permission_repo, MagicMock()
+        rbac_permission_repo, MagicMock(), MagicMock()
     )
     real_bulk_validator = BulkActionRBACValidator(rbac_permission_repo, MagicMock())
     return SessionProcessors(

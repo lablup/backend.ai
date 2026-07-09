@@ -227,7 +227,8 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
         reporter_hub = ReporterHub(ReporterHubArgs(reporters=action_reporters))
         reporter_monitor = ReporterMonitor(reporter_hub)
         prometheus_monitor = PrometheusMonitor()
-        audit_log_monitor = AuditLogMonitor(setup_input.repositories.audit_log.repository)
+        audit_log_repository = setup_input.repositories.audit_log.repository
+        audit_log_monitor = AuditLogMonitor(audit_log_repository)
 
         ssh_key_validator = SSHKeyValidator()
 
@@ -264,9 +265,11 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
         permission_controller_repository = setup_input.repositories.permission_controller.repository
         config_provider = setup_input.config_provider
         rbac_validators = RBACValidators(
-            scope=ScopeActionRBACValidator(permission_controller_repository, config_provider),
+            scope=ScopeActionRBACValidator(
+                permission_controller_repository, config_provider, audit_log_repository
+            ),
             single_entity=SingleEntityActionRBACValidator(
-                permission_controller_repository, config_provider
+                permission_controller_repository, config_provider, audit_log_repository
             ),
             bulk=BulkActionRBACValidator(permission_controller_repository, config_provider),
         )

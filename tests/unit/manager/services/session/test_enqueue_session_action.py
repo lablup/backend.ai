@@ -130,7 +130,7 @@ class TestEnqueueSessionOwnerDelegation:
     ) -> None:
         repository = AsyncMock(spec=PermissionControllerRepository)
         repository.check_permission_with_scope_chain.return_value = permission_granted
-        validator = ScopeActionRBACValidator(repository, MagicMock())
+        validator = ScopeActionRBACValidator(repository, MagicMock(), MagicMock())
 
         action = _make_action(
             user_id=enqueue_on_behalf.caller_id,

@@ -60,6 +60,7 @@ class TestAuditLogService:
             entity_id="session-123",
             request_id="req-456",
             triggered_by="user-789",
+            acted_as="user-789",
             duration=timedelta(seconds=1),
         )
 
@@ -87,6 +88,7 @@ class TestAuditLogService:
                 entity_id=sample_audit_log_data.entity_id,
                 request_id=sample_audit_log_data.request_id,
                 triggered_by=sample_audit_log_data.triggered_by,
+                acted_as=sample_audit_log_data.acted_as,
                 duration=sample_audit_log_data.duration,
             )
         )

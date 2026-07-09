@@ -4,6 +4,7 @@ import uuid
 
 from ai.backend.common.contexts.user import (
     current_user,
+    is_impersonating,
     triggered_user,
     with_triggered_user,
     with_user,
@@ -11,8 +12,39 @@ from ai.backend.common.contexts.user import (
 from ai.backend.common.data.user.types import UserData, UserRole
 
 
+def _user(is_superadmin: bool = False) -> UserData:
+    return UserData(
+        user_id=uuid.uuid4(),
+        is_authorized=True,
+        is_admin=is_superadmin,
+        is_superadmin=is_superadmin,
+        role=UserRole.SUPERADMIN if is_superadmin else UserRole.USER,
+        domain_name="default",
+    )
+
+
 def test_triggered_user_none_when_unset() -> None:
     assert triggered_user() is None
+
+
+def test_is_impersonating_true_when_trigger_differs_from_effective() -> None:
+    target = _user()
+    super_admin = _user(is_superadmin=True)
+    with with_user(target), with_triggered_user(super_admin):
+        assert is_impersonating() is True
+
+
+def test_is_impersonating_false_when_trigger_equals_effective() -> None:
+    user = _user()
+    with with_user(user), with_triggered_user(user):
+        assert is_impersonating() is False
+
+
+def test_is_impersonating_false_when_context_unset() -> None:
+    assert is_impersonating() is False
+    with with_user(_user()):
+        # Only the effective user is set (no trigger) — not impersonation.
+        assert is_impersonating() is False
 
 
 def test_triggered_user_inside_context() -> None:
