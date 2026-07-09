@@ -210,24 +210,22 @@ class AppConfigFragmentDBSource:
 
     @app_config_fragment_db_source_resilience.apply()
     async def list_visible_fragments_bulk(
-        self, config_names: list[str], scope: AppConfigScopeArguments
+        self, config_names: list[str], scope: AppConfigScopeArguments | None = None
     ) -> list[AppConfigFragmentData]:
-        """Visible fragments for several ``config_names`` at once, in a single query.
+        """Visible fragments for several ``config_names`` in one query, ordered by ascending ``rank``.
 
-        Selects the requested names AND any one of the principal's visible scopes (public,
-        its domain, or its own user). The scope filter is name-independent, so it is a single
-        OR group AND-combined with the name membership. Merge priority (``rank``) lives on the
-        joined allow-list entry; the result is always ordered by ascending ``rank`` so the
-        caller can group by name (each name's subset stays rank-ordered) and deep-merge each
-        name's fragments in order.
+        ``public`` always contributes; a ``scope`` additionally admits its domain and user
+        overlay, while ``scope=None`` (anonymous) sees only ``public``. Rank-ordered so the
+        caller can group by name and deep-merge each name's fragments in order.
         """
         if not config_names:
             return []
-        scope_visibility = [
-            AppConfigFragmentConditions.by_public_visibility(),
-            AppConfigFragmentConditions.by_domain_visibility(str(scope.domain_id)),
-            AppConfigFragmentConditions.by_user_visibility(str(scope.user_id)),
-        ]
+        scope_visibility = [AppConfigFragmentConditions.by_public_visibility()]
+        if scope is not None:
+            scope_visibility += [
+                AppConfigFragmentConditions.by_domain_visibility(str(scope.domain_id)),
+                AppConfigFragmentConditions.by_user_visibility(str(scope.user_id)),
+            ]
         querier = BatchQuerier(
             pagination=NoPagination(),
             conditions=[
