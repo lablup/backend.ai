@@ -68,7 +68,9 @@ class TestGQLMetricMiddlewareSyncResolver:
         assert call_kwargs["duration"] >= 0
         assert call_kwargs["field_name"] == "test_field"
         assert call_kwargs["parent_type"] == "Query"
-        assert call_kwargs["operation_name"] == "TestQuery"
+        # operation_name is client-controlled and must not be forwarded as a metric
+        # label (BA-6802): it would create unbounded time-series cardinality.
+        assert "operation_name" not in call_kwargs
 
     def test_sync_resolver_backend_ai_error(
         self,
@@ -120,7 +122,7 @@ class TestGQLMetricMiddlewareSyncResolver:
         middleware.resolve(sync_resolver, None, resolve_info)
 
         call_kwargs = metric_observer.observe_request.call_args.kwargs
-        assert call_kwargs["operation_name"] == "anonymous"
+        assert "operation_name" not in call_kwargs
 
 
 class TestGQLMetricMiddlewareAsyncAnonymousOperation:
@@ -140,7 +142,7 @@ class TestGQLMetricMiddlewareAsyncAnonymousOperation:
         await middleware.resolve(async_resolver, None, resolve_info)
 
         call_kwargs = metric_observer.observe_request.call_args.kwargs
-        assert call_kwargs["operation_name"] == "anonymous"
+        assert "operation_name" not in call_kwargs
 
 
 class TestGQLMetricMiddlewareAsyncResolver:
