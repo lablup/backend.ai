@@ -411,6 +411,7 @@ from .runtime_variant_preset import (
     runtime_variant_presets,
 )
 from .scheduler import (
+    compute_schedule,
     scheduling_events_by_session,
 )
 from .scheduling_handler import scheduling_handlers
@@ -526,6 +527,7 @@ class Query:
     admin_resource_groups = admin_resource_groups
     admin_resource_group_v2 = admin_resource_group_v2
     scheduling_handlers = scheduling_handlers
+    compute_schedule = compute_schedule
     admin_allowed_resource_groups_for_domain_v2 = admin_allowed_resource_groups_for_domain_v2
     admin_allowed_resource_groups_for_project_v2 = admin_allowed_resource_groups_for_project_v2
     admin_allowed_domains_for_resource_group_v2 = admin_allowed_domains_for_resource_group_v2

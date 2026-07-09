@@ -2131,6 +2131,48 @@ type ComputePlugins {
   entries: [ComputePluginEntry!]!
 }
 
+"""
+Added in 26.8.0. Compute a session's scheduling against a resource group without provisioning.
+"""
+input ComputeScheduleInput {
+  kernels: [ComputeScheduleKernelResourceInput!]!
+  clusterMode: SessionClusterMode!
+  resourceGroupId: ID!
+}
+
+"""
+Added in 26.8.0. Per-kernel resource request for a compute-schedule. The image is optional when a resource-group default supplies it downstream.
+"""
+input ComputeScheduleKernelResourceInput {
+  imageId: ID = null
+  resources: [ResourceSlotEntryInput!] = null
+}
+
+"""
+Added in 26.8.0. Compute-schedule outcome for a single kernel. Results correspond positionally to the requested kernels.
+"""
+type ComputeScheduleKernelResult {
+  """Resource slots resolved for this kernel after applying defaults."""
+  requestedSlots: [ResourceSlotEntry!]!
+
+  """Architecture resolved for this kernel."""
+  requestedArchitecture: String!
+
+  """Whether this kernel could be scheduled onto a target node."""
+  success: Boolean!
+
+  """What to change so the kernel would fit. Null when success is True."""
+  reasonHint: UnschedulableReasonHint
+}
+
+"""Added in 26.8.0. Result of a compute-schedule request."""
+type ComputeSchedulePayload {
+  """
+  Per-kernel compute-schedule outcomes, correlated to the request by list index.
+  """
+  results: [ComputeScheduleKernelResult!]!
+}
+
 extend type ComputeSessionNode implements Node @key(fields: "id") {
   """The Globally Unique ID of this object"""
   id: ID!
@@ -9620,6 +9662,11 @@ type Query {
   schedulingHandlers: [SchedulingHandlerNode!]
 
   """
+  Added in 26.8.0. Compute whether a session could be created on a resource group, without actually provisioning it. Checks each kernel's resource request against the group's agents and returns per-kernel admission outcomes, with hints on what to reduce for kernels that do not fit.
+  """
+  computeSchedule(input: ComputeScheduleInput!): ComputeSchedulePayload
+
+  """
   Added in 26.4.2. Get allowed resource groups for a domain (admin only).
   """
   adminAllowedResourceGroupsForDomainV2(domainName: String!): AllowedResourceGroupsPayload
@@ -13388,6 +13435,17 @@ Added in 25.15.0. Payload returned after storage namespace unregistration.
 type UnregisterStorageNamespacePayload {
   """ID of the unregistered storage namespace"""
   id: UUID!
+}
+
+"""
+Added in 26.8.0. What the caller could change so an unschedulable kernel would fit. Present only when the kernel could not be scheduled.
+"""
+type UnschedulableReasonHint {
+  """Subtract these slots to fit the best-fitting node."""
+  requiredReduction: [ResourceSlotEntry!]
+
+  """Architectures that actually exist among the scheduling targets."""
+  availableArchs: [String!]
 }
 
 """
