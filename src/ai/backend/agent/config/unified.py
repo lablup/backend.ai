@@ -780,6 +780,28 @@ class CommonAgentConfig(BaseConfigSchema):
             example=ConfigExample(local="./var/lib/backend.ai", prod="/var/lib/backend.ai"),
         ),
     ]
+    network_helper_socket: Annotated[
+        str | None,
+        Field(
+            default=None,
+            validation_alias=AliasChoices("network-helper-socket", "network_helper_socket"),
+            serialization_alias="network-helper-socket",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Unix socket path of the privileged network helper (BEP-1058). When set, the "
+                "containerd agent delegates all CAP_NET_ADMIN/CAP_SYS_ADMIN container networking "
+                "to the helper over this socket and needs no network privilege itself. When unset "
+                "(the default), the agent performs container networking in-process, which requires "
+                "the agent process to hold those capabilities. Only used by the containerd backend."
+            ),
+            added_version="25.12.0",
+            example=ConfigExample(
+                local="/tmp/backend.ai/net-helper.sock",
+                prod="/run/backend.ai/net-helper.sock",
+            ),
+        ),
+    ]
     mount_path: Annotated[
         AutoDirectoryPath | None,
         Field(

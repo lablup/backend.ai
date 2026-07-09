@@ -688,12 +688,15 @@ class ContainerdAgent(
         # hard-coded eth0.
         container_cfg = self.local_config.container
         self._host_ip = str(container_cfg.advertised_host or container_cfg.bind_host)
+        # When a privileged network helper is configured, delegate all CAP_NET_ADMIN/
+        # CAP_SYS_ADMIN host networking to it so this agent process needs no such privilege.
         self._session_network = build_containerd_session_network(
             self.etcd,
             agent_id=str(self.id),
             host_ip=self._host_ip,
             uplink=_uplink_for_ip(self._host_ip),
             runtime=self._runtime,
+            helper_socket=self.local_config.agent.network_helper_socket,
         )
 
     @override

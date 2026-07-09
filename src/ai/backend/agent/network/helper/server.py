@@ -1,0 +1,282 @@
+"""Privileged network helper daemon (BEP-1058).
+
+This is the ONLY component that holds CAP_NET_ADMIN + CAP_SYS_ADMIN. The unprivileged
+agent connects over a unix socket and sends semantic verbs (``protocol.py``); the helper
+derives every side-effecting value itself and performs the native veth/bridge/netns work
+that would otherwise force the whole agent to run privileged.
+
+Trust model (why a compromised agent stays contained):
+
+- **Peer auth**: the socket is 0600 and every connection is checked with SO_PEERCRED;
+  only the configured agent uid may drive the helper.
+- **No caller-supplied targets**: the agent sends only ``session_id`` / ``container_id``.
+  The helper derives device names/subnets from the session it set up and re-resolves the
+  container PID from containerd (authoritative) — never trusting a PID/netns/argv/config
+  from the agent (closes the argv-injection and PID-TOCTOU classes; see ``netns.py``).
+- **Per-session serialization**: one asyncio.Lock per session serializes
+  setup/attach/detach/teardown so concurrent requests cannot race the device registry.
+
+Only setup/teardown/attach/detach are exposed; there is no generic "run command" verb.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import logging
+import os
+import socket
+import struct
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, cast
+
+from ai.backend.agent.network.cni import CniAttacher, plan_to_invocations
+from ai.backend.agent.network.helper import netns as netns_mod
+from ai.backend.agent.network.helper import policy
+from ai.backend.agent.network.helper.protocol import (
+    HelperOp,
+    HelperRequest,
+    HelperResponse,
+    ProtocolError,
+)
+from ai.backend.common.network.types import Member, NetworkBackendKind, SessionNetMeta
+from ai.backend.logging import BraceStyleAdapter
+
+if TYPE_CHECKING:
+    from ai.backend.agent.containerd.runtime.interface import OciRuntime
+    from ai.backend.agent.network.cni import CniRunner
+    from ai.backend.agent.plugin.network_v2 import AbstractNetworkAgentPluginV2
+
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+
+# Capability bit numbers we care about (linux/capability.h).
+_CAP_NAMES = {12: "CAP_NET_ADMIN", 21: "CAP_SYS_ADMIN", 0: "CAP_CHOWN", 1: "CAP_DAC_OVERRIDE"}
+
+
+def _self_effective_caps() -> str:
+    """Decode this process's effective capability set for a startup log line, so the
+    operator can confirm the helper holds only the intended (network) capabilities."""
+    try:
+        with Path("/proc/self/status").open() as f:
+            for line in f:
+                if line.startswith("CapEff:"):
+                    bits = int(line.split()[1], 16)
+                    held = [name for bit, name in _CAP_NAMES.items() if bits & (1 << bit)]
+                    others = bits & ~sum(1 << b for b in _CAP_NAMES)
+                    tail = "" if not others else f" (+{others.bit_count()} more)"
+                    return f"CapEff=0x{bits:x} [{','.join(held) or 'none'}]{tail}"
+    except OSError:
+        pass
+    return "CapEff=?"
+
+
+class HelperError(RuntimeError):
+    """A request could not be served. The message returned to the agent is generic;
+    the privileged detail is logged helper-side only."""
+
+
+class _SessionEntry:
+    meta: SessionNetMeta
+    backend: AbstractNetworkAgentPluginV2[Any]
+    attached: dict[str, Any]  # container_id -> EndpointPlan (kept for detach)
+
+    def __init__(self, meta: SessionNetMeta, backend: AbstractNetworkAgentPluginV2[Any]) -> None:
+        self.meta = meta
+        self.backend = backend
+        self.attached = {}
+
+
+class NetworkHelperServer:
+    _socket_path: str
+    _allowed_uid: int
+    _agent_id: str
+    _host_ip: str
+    _runtime: OciRuntime
+    _attacher: CniAttacher
+    _backends: dict[str, AbstractNetworkAgentPluginV2[Any]]
+    _sessions: dict[str, _SessionEntry]
+    _locks: dict[str, asyncio.Lock]
+
+    def __init__(
+        self,
+        *,
+        socket_path: str,
+        allowed_uid: int,
+        agent_id: str,
+        host_ip: str,
+        runtime: OciRuntime,
+        cni_runner: CniRunner,
+        backends: dict[str, AbstractNetworkAgentPluginV2[Any]],
+    ) -> None:
+        self._socket_path = socket_path
+        self._allowed_uid = allowed_uid
+        self._agent_id = agent_id
+        self._host_ip = host_ip
+        self._runtime = runtime
+        self._attacher = CniAttacher(cni_runner)
+        self._backends = backends
+        self._sessions = {}
+        self._locks = {}
+
+    def _lock(self, session_id: str) -> asyncio.Lock:
+        lock = self._locks.get(session_id)
+        if lock is None:
+            lock = asyncio.Lock()
+            self._locks[session_id] = lock
+        return lock
+
+    async def serve_forever(self) -> None:
+        await self._runtime.open()
+        sock_path = Path(self._socket_path)
+        if sock_path.exists():
+            sock_path.unlink()
+        server = await asyncio.start_unix_server(self._handle_conn, path=self._socket_path)
+        sock_path.chmod(0o600)
+        log.info(
+            "network helper listening on {} (agent uid={})", self._socket_path, self._allowed_uid
+        )
+        log.info("running as uid={} with {}", os.getuid(), _self_effective_caps())
+        async with server:
+            await server.serve_forever()
+
+    def _peer_uid(self, writer: asyncio.StreamWriter) -> int:
+        sock = writer.get_extra_info("socket")
+        creds = sock.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED, struct.calcsize("3i"))
+        _pid, uid, _gid = struct.unpack("3i", creds)
+        return int(uid)
+
+    async def _handle_conn(
+        self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
+    ) -> None:
+        try:
+            uid = self._peer_uid(writer)
+            if uid != self._allowed_uid:
+                log.warning("rejecting connection from uid {} (allowed {})", uid, self._allowed_uid)
+                writer.write(HelperResponse(ok=False, error="unauthorized").encode())
+                await writer.drain()
+                return
+            line = await reader.readline()
+            if not line:
+                return
+            resp = await self._dispatch(line)
+            writer.write(resp.encode())
+            await writer.drain()
+        except Exception:
+            log.exception("helper connection handler failed")
+            try:
+                writer.write(HelperResponse(ok=False, error="internal error").encode())
+                await writer.drain()
+            except Exception:
+                pass
+        finally:
+            writer.close()
+
+    async def _dispatch(self, line: bytes) -> HelperResponse:
+        try:
+            req = HelperRequest.decode(line)
+            session_id = policy.validate_session_id(req.session_id)
+        except (ProtocolError, policy.PolicyViolation) as e:
+            return HelperResponse(ok=False, error=str(e))
+        async with self._lock(session_id):
+            try:
+                match req.op:
+                    case HelperOp.SETUP_SESSION:
+                        await self._setup(session_id, req.network_config or {})
+                        return HelperResponse(ok=True)
+                    case HelperOp.TEARDOWN_SESSION:
+                        await self._teardown(session_id)
+                        return HelperResponse(ok=True)
+                    case HelperOp.ATTACH_CONTAINER:
+                        assigned = await self._attach(session_id, req.container_id)
+                        return HelperResponse(ok=True, assigned=assigned)
+                    case HelperOp.DETACH_CONTAINER:
+                        await self._detach(session_id, req.container_id)
+                        return HelperResponse(ok=True)
+            except (policy.PolicyViolation, netns_mod.NetnsError, HelperError) as e:
+                return HelperResponse(ok=False, error=str(e))
+            except Exception:
+                log.exception("helper op {} failed for session {}", req.op, session_id)
+                return HelperResponse(ok=False, error="operation failed")
+
+    def _resolve_backend(self, backend: NetworkBackendKind) -> AbstractNetworkAgentPluginV2[Any]:
+        try:
+            return self._backends[str(backend)]
+        except KeyError:
+            raise HelperError("unsupported backend") from None
+
+    async def _setup(self, session_id: str, raw_config: dict[str, Any]) -> None:
+        cfg = policy.validate_network_config(raw_config)
+        meta = SessionNetMeta(
+            session_id=session_id,
+            subnet=cfg.subnet or "",
+            backend=cfg.backend,
+            mtu=cfg.mtu,
+            vni=cfg.vni,
+        )
+        backend = self._resolve_backend(cfg.backend)
+        self_member = Member(
+            agent_id=self._agent_id,
+            host_ip=self._host_ip,
+            vtep_ip=self._host_ip if cfg.backend is NetworkBackendKind.VXLAN else None,
+            ip_range=None,
+        )
+        await backend.setup_session_network(meta, self_member)
+        self._sessions[session_id] = _SessionEntry(meta, backend)
+
+    async def _teardown(self, session_id: str) -> None:
+        entry = self._sessions.pop(session_id, None)
+        self._locks.pop(session_id, None)
+        if entry is not None:
+            await entry.backend.teardown_session_network(session_id)
+
+    async def _attach(self, session_id: str, container_id: str | None) -> dict[str, str]:
+        if container_id is None:
+            raise policy.PolicyViolation("attach requires container_id")
+        container_id = policy.validate_container_id(container_id)
+        entry = self._sessions.get(session_id)
+        if entry is None:
+            raise HelperError("attach before setup")
+        # Authoritative PID resolution from containerd — the agent's view is never trusted.
+        pid = await self._runtime.container_pid(container_id)
+        if pid is None:
+            raise HelperError("no running task for container")
+        pinned = netns_mod.open_container_netns(pid)
+        try:
+            # Re-confirm the PID<->container binding still holds after pinning, so a
+            # PID reused between resolution and pin cannot slip through.
+            pid2 = await self._runtime.container_pid(container_id)
+            if pid2 != pid or not netns_mod.pidfd_alive(pinned.pidfd):
+                raise netns_mod.NetnsError("container task changed during attach")
+            # The plan (bridge/subnet CNI config) is derived helper-side from the session
+            # meta; the bridge backend ignores kernel_config/cluster_info.
+            plan = await entry.backend.attach_endpoint(
+                cast(Any, {}), cast(Any, {}), meta=entry.meta
+            )
+            # The native attacher moves the veth by PID (``ip link set ... netns <pid>``),
+            # so it needs the ``/proc/<pid>/ns/net`` form, not the pinned-fd path. The pin
+            # above already validated this is a live, non-host container netns; we keep the
+            # pidfd open across the attach so a vanished process is still detectable.
+            assigned = await self._attacher.attach(
+                plan, container_id=container_id, netns=f"/proc/{pid}/ns/net"
+            )
+            entry.attached[container_id] = plan
+            return {str(role): ip for role, ip in assigned.items()}
+        finally:
+            pinned.close()
+
+    async def _detach(self, session_id: str, container_id: str | None) -> None:
+        if container_id is None:
+            raise policy.PolicyViolation("detach requires container_id")
+        container_id = policy.validate_container_id(container_id)
+        entry = self._sessions.get(session_id)
+        if entry is None:
+            return
+        plan = entry.attached.pop(container_id, None)
+        if plan is None:
+            return
+        # Detach only needs the host-side veth removal + IPAM release; it does not enter
+        # the (possibly already-gone) container netns, so no netns handle is required.
+        for inv in reversed(plan_to_invocations(plan)):
+            await self._attacher._runner(
+                "DEL", ifname=inv.ifname, netns="", container_id=container_id, config=inv.config
+            )
