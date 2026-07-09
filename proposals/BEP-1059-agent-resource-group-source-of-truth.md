@@ -53,6 +53,7 @@ For each area, separate **✅ what already exists** from **➕ what to add**.
 | ✅ | Upsert overwrites `scaling_group` (string) + `resource_group_id` (FK) every beat. `scaling_group` is in **both** `insert_fields` and `update_fields` — `repositories/agent/db_source/db_source.py:106-133`, `data/agent/types.py:127,147` |
 | ✅ | `from_state_comparison` sets `need_resource_slot_update=True` on a group change — `data/agent/types.py:206` |
 | ➕ | Restrict the heartbeat to updating **only the agent's status/resources**, never the group: drop `scaling_group`/`resource_group_id` from `update_fields`; keep them in `insert_fields` (first-registration seed) |
+| ➕ | Add `scaling_groups.is_default` (at most one default; partial unique index). First-registration resolution falls back to the default group when the config name is null or unresolvable (warn on an unresolvable explicit name) |
 
 ### 2.3 API — group change (superadmin)
 
@@ -96,12 +97,22 @@ responsible for session cleanup.
   admin API, not by editing config.
 - Consequently, the manager updates only the agent's status/resources on a heartbeat and
   ignores the self-reported group.
-- **Config field change:** remove agent config `scaling-group`, introduce new
+- **Config field change:** remove agent config `scaling-group`, introduce new **nullable**
   `initial_resource_group_name` (immediate swap, no deprecation period). The config holds the
   human-known **resource-group name** — the UUID is hard to know up front and treating config
   as an id is inappropriate. The manager **resolves name → `resource_group_id` at INSERT**
   (reusing the existing `_resolve_scaling_group_id` path). Because the config is name-based,
   it is independent of the in-flight id migration.
+- **Default resource group + fallback (first registration only):** add an `is_default` flag
+  to `scaling_groups`, with **at most one** default enforced by a partial unique index
+  (`WHERE is_default`); a minimum of one is **not** guaranteed. At first registration the
+  manager resolves the config name; if the name is **null or does not resolve**, it falls back
+  to the `is_default` group. An unresolvable *explicit* name also falls back but **logs a
+  warning** (a null name is the normal zero-config path and needs no warning). If there is no
+  default group and no usable name, registration fails with a clear error. Setting `is_default`
+  on a group clears the previous default in the same transaction. Fixtures designate one
+  default group. This keeps the agent registering reliably (heartbeat is event-based, so a
+  hard failure would just leave the agent invisible) while topology stays DB-authoritative.
 
 ### 3.2 Remove the RPC push (decision #3)
 
@@ -174,13 +185,16 @@ The flip closes the deploy-time bug in both cases:
   manager resolves name → id at INSERT. However, `data/agent/types.py`'s
   `from_state_comparison` already sets `need_resource_slot_update` on a group change, so its
   interaction needs review.
+- **Schema:** add `scaling_groups.is_default` with a partial unique index (`WHERE is_default`)
+  so at most one group is default; fixtures mark one group as the default.
 
 ## 4. Decision Summary
 
 | Decision | Content |
 |----------|---------|
 | Source of truth | The manager DB is authoritative. The heartbeat updates only the agent's status/resources, never the group |
-| Config field | Remove agent `scaling-group` → new `initial_resource_group_name` (**name**-based, resolved to id at INSERT). **Fail-fast breaking change** (old config fails at startup) |
+| Config field | Remove agent `scaling-group` → new **nullable** `initial_resource_group_name` (**name**-based, resolved to id at INSERT). **Fail-fast breaking change** (old config fails at startup) |
+| Default resource group | New `scaling_groups.is_default` (at most one; partial unique index; min not guaranteed). First registration falls back to the default when the config name is null/unresolvable — an unresolvable explicit name still falls back but logs a warning; no default + no usable name → registration fails |
 | First-registration definition | Seed config only when no row exists (INSERT). Redeploy (UPDATE) keeps the DB value — intended |
 | Heartbeat | Ignore the self-reported group (drop `scaling_group`/`resource_group_id` from `update_fields`, keep in `insert_fields`) |
 | RPC removal | Delete `registry.update_scaling_group` + the agent `agent.toml` rewrite (compensation debt) |
@@ -194,8 +208,11 @@ The flip closes the deploy-time bug in both cases:
 
 ## 5. Open Questions
 
-- No blocking open questions at this time. Implementation details such as the exact
-  endpoint / GraphQL naming of the new v2 API are settled in the implementation PR.
+- Whether `is_default` should also drive **session** default-group selection (a session that
+  omits a group currently just picks the first allowed candidate, `registry.py:2022`). Out of
+  scope for this BEP; possible follow-up.
+- Other implementation details, such as the exact endpoint / GraphQL naming of the new v2 API,
+  are settled in the implementation PR.
 
 > Items decided and moved to the Decision Summary / body: ModifyAgent default policy
 > (terminate), `force`-unset behavior, config swap (name-based + fail-fast breaking, resolved
