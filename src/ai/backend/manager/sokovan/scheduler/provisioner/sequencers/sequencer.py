@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from collections import defaultdict
 from collections.abc import Sequence
 
 from ai.backend.manager.sokovan.data import SessionWorkload, SystemSnapshot
@@ -71,10 +72,14 @@ class SchedulingSequencer:
         :param workloads: A sequence of SessionWorkload objects to order.
         :return: A sequence of SessionWorkload objects ordered by priority and the sequencer's logic.
         """
-        priorities = {s.priority for s in workloads}
-        top_priority = max(priorities)
-        filtered_workloads = [*filter(lambda s: s.priority == top_priority, workloads)]
+        priority_workloads: defaultdict[int, list[SessionWorkload]] = defaultdict(list)
+        for workload in workloads:
+            priority_workloads[workload.priority].append(workload)
 
-        return await self._workload_sequencer.sequence(
-            resource_group, system_snapshot, filtered_workloads
-        )
+        result: list[SessionWorkload] = []
+        for priority in sorted(priority_workloads.keys(), reverse=True):
+            sequenced = await self._workload_sequencer.sequence(
+                resource_group, system_snapshot, priority_workloads[priority]
+            )
+            result.extend(sequenced)
+        return result
