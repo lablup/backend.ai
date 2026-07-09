@@ -104,9 +104,10 @@ class TestResolveEffectiveUser:
     )
     async def test_rejects(self, monkeypatch: pytest.MonkeyPatch, case: RejectCase) -> None:
         if case.loader_error is not None:
+            error_cls = case.loader_error
 
             async def _fake_load(db: Any, user_id: uuid.UUID) -> UserData:
-                raise case.loader_error("Impersonation target user not found")
+                raise error_cls("Impersonation target user not found")
 
             monkeypatch.setattr(auth_mw, "_load_user_data", _fake_load)
 

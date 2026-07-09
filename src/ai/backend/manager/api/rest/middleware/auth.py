@@ -654,7 +654,10 @@ async def _load_user_data(db: ExtendedAsyncSAEngine, user_id: UserID) -> UserDat
 
     async def _query() -> UserRow | None:
         async with db.begin_readonly_session_read_committed() as session:
-            return await session.scalar(sa.select(UserRow).where(UserRow.uuid == user_id))
+            row: UserRow | None = await session.scalar(
+                sa.select(UserRow).where(UserRow.uuid == user_id)
+            )
+            return row
 
     row = await execute_with_retry(_query)
     if row is None or row.role is None or row.domain_name is None:
