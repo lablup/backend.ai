@@ -49,7 +49,8 @@ from ai.backend.manager.models.scaling_group import (
     ScalingGroupRow,
 )
 from ai.backend.manager.models.user.row import UserRow
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, create_async_engine
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.db.engine import create_async_engine
 from ai.backend.manager.repositories.scaling_group.repository import ScalingGroupRepository
 from ai.backend.manager.services.scaling_group.processors import ScalingGroupProcessors
 from ai.backend.manager.services.scaling_group.service import ScalingGroupService

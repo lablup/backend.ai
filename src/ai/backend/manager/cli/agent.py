@@ -57,7 +57,7 @@ def ping(cli_ctx: CLIContext, agent_id: str, alembic_config: str, timeout: float
 
     from ai.backend.common.auth import PublicKey, SecretKey
     from ai.backend.manager.agent_cache import AgentRPCCache
-    from ai.backend.manager.models.utils import create_async_engine
+    from ai.backend.manager.repositories.db.engine import create_async_engine
 
     async def _impl() -> None:
         bootstrap_config = await cli_ctx.get_bootstrap_config()
