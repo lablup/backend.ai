@@ -693,10 +693,11 @@ class EventProducer:
         # Capture current request_id and other metadata
         request_id = current_request_id()
         user = current_user()
+        triggered = triggered_user()
         metadata = MessageMetadata(
             request_id=request_id,
             user=user,
-            triggered_user=triggered_user(),
+            triggered_user=triggered,
         )
         raw_event = MessagePayload(
             name=event.event_name(),
@@ -719,10 +720,11 @@ class EventProducer:
         # Capture current request_id and other metadata
         request_id = current_request_id()
         user = current_user()
+        triggered = triggered_user()
         metadata = MessageMetadata(
             request_id=request_id,
             user=user,
-            triggered_user=triggered_user(),
+            triggered_user=triggered,
         )
         raw_event = MessagePayload(
             name=event.event_name(),
@@ -744,10 +746,11 @@ class EventProducer:
         # Capture current request_id and other metadata
         request_id = current_request_id()
         user = current_user()
+        triggered = triggered_user()
         metadata = MessageMetadata(
             request_id=request_id,
             user=user,
-            triggered_user=triggered_user(),
+            triggered_user=triggered,
         )
         # I want to receive MessagePayload as an argument in anycast and broadcast, but changing it would require changes in other places, so I'll leave it as is for now.
         raw_event = MessagePayload(
@@ -777,10 +780,11 @@ class EventProducer:
         # Capture current request_id and other metadata
         request_id = current_request_id()
         user = current_user()
+        triggered = triggered_user()
         metadata = MessageMetadata(
             request_id=request_id,
             user=user,
-            triggered_user=triggered_user(),
+            triggered_user=triggered,
         )
 
         # Convert events to BroadcastPayload objects
