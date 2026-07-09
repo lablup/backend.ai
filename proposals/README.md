@@ -129,6 +129,7 @@ BEP numbers start from 1000.
 | [1056](BEP-1056-scope-linked-metric-catalog.md) | Scope-Linked Metric Catalog & Dashboards | HyeokJin Kim | Draft |
 | [1057](BEP-1057-agent-re-architecture.md) | Agent Re-architecture | HyeokJin Kim | Draft |
 | [1058](BEP-1058-super-admin-impersonation.md) | Super-Admin User Impersonation | HyeokJin Kim | Draft |
+| [1059](BEP-1059-agent-resource-group-source-of-truth.md) | Agent↔Resource Group Source of Truth | HyeokJin Kim | Draft |
 | _next_ | _(reserve your number here)_ | | |
 
 ## File Structure
