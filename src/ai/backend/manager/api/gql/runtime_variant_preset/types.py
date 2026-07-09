@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import StrEnum
-from typing import Self
+from typing import TYPE_CHECKING, Annotated, Self
 from uuid import UUID
 
+import strawberry
+from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.dto.manager.v2.runtime_variant_preset.request import (
@@ -52,6 +54,7 @@ from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
 from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
     UIOption as UIOptionDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import StringFilter as StringFilterGQL
 from ai.backend.manager.api.gql.base import UUIDFilter as UUIDFilterGQL
 from ai.backend.manager.api.gql.decorators import (
@@ -66,6 +69,10 @@ from ai.backend.manager.api.gql.decorators import (
     gql_pydantic_type,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
+from ai.backend.manager.api.gql.types import StrawberryGQLContext
+
+if TYPE_CHECKING:
+    from ai.backend.manager.api.gql.runtime_variant.types import RuntimeVariantGQL
 
 
 @gql_enum(
@@ -228,6 +235,24 @@ class RuntimeVariantPresetGQL(PydanticNodeMixin[NodeDTO]):
     updated_at: datetime | None = gql_field(
         description="Timestamp of the last modification to this preset."
     )
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="The runtime variant this preset belongs to, resolved via DataLoader. Fetch its name and other attributes in a single query alongside the preset list.",
+        )
+    )  # type: ignore[misc]
+    async def runtime_variant(
+        self,
+        info: Info[StrawberryGQLContext],
+    ) -> (
+        Annotated[
+            RuntimeVariantGQL,
+            strawberry.lazy("ai.backend.manager.api.gql.runtime_variant.types"),
+        ]
+        | None
+    ):
+        return await info.context.data_loaders.runtime_variant_loader.load(self.runtime_variant_id)
 
 
 RuntimeVariantPresetEdge = Edge[RuntimeVariantPresetGQL]

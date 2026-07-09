@@ -17638,6 +17638,11 @@ type RuntimeVariantPreset implements Node
 
   """Timestamp of the last modification to this preset."""
   updatedAt: DateTime
+
+  """
+  Added in 26.8.0. The runtime variant this preset belongs to, resolved via DataLoader. Fetch its name and other attributes in a single query alongside the preset list.
+  """
+  runtimeVariant: RuntimeVariant
 }
 
 """Added in 26.4.2. Paginated list of runtime variant presets."""
