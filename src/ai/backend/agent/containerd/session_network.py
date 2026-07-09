@@ -251,27 +251,26 @@ def build_containerd_session_network(
     agent_id: str,
     host_ip: str,
     uplink: str = "eth0",
-    cni_path: str = "/opt/cni/bin",
     runtime: OciRuntime | None = None,
     cni_runner: CniRunner | None = None,
     backends: Mapping[str, AbstractNetworkAgentPluginV2[Any]] | None = None,
 ) -> ContainerdSessionNetwork:
     """Assemble a ContainerdSessionNetwork with default real collaborators.
 
-    Defaults: the native containerd gRPC runtime client, CniPluginRunner exec'ing CNI
-    plugins under ``cni_path``, and both the vxlan (multi-node overlay) and bridge
-    (single-node local) backends on ``uplink``. Any collaborator can be overridden (used by
-    ContainerdAgent, and injectable in tests). Additional backends (host-gw / wireguard) are
-    registered here as they land.
+    Defaults: the native containerd gRPC runtime client, the native veth/bridge attach
+    runner (host-native iproute2/iptables — no ``/opt/cni/bin`` dependency), and both the
+    vxlan (multi-node overlay) and bridge (single-node local) backends on ``uplink``. Any
+    collaborator can be overridden (used by ContainerdAgent, and injectable in tests).
+    Additional backends (host-gw / wireguard) are registered here as they land.
     """
     # Lazy imports: keep this facade module decoupled from the concrete runtime/backend.
     from ai.backend.agent.containerd.runtime.grpc import ContainerdGrpcRuntime
     from ai.backend.agent.network.backends.bridge import BridgeNetworkPlugin
     from ai.backend.agent.network.backends.vxlan import VxlanNetworkPlugin
-    from ai.backend.agent.network.cni_runner import CniPluginRunner
+    from ai.backend.agent.network.native_attacher import NativeBridgeAttachRunner
 
     runtime = runtime or ContainerdGrpcRuntime(namespace="backend-ai")
-    cni_runner = cni_runner or CniPluginRunner(cni_path=cni_path)
+    cni_runner = cni_runner or NativeBridgeAttachRunner()
     if backends is None:
         backends = {
             str(NetworkBackendKind.VXLAN): VxlanNetworkPlugin({}, {}, uplink=uplink),
