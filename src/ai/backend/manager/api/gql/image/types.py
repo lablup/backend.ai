@@ -11,7 +11,7 @@ import uuid
 from collections.abc import Iterable
 from datetime import datetime
 from enum import StrEnum
-from typing import Any, Self, cast, override
+from typing import TYPE_CHECKING, Annotated, Any, Self, cast, override
 
 import strawberry
 from strawberry import Info
@@ -41,6 +41,7 @@ from ai.backend.common.dto.manager.v2.image.types import (
     ImageResourceLimitGQLInfo,
     ImageTagInfo,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import ImageID
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
@@ -66,6 +67,9 @@ from ai.backend.manager.api.gql.pydantic_compat import (
 )
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 from ai.backend.manager.models.image.conditions import ImageAliasConditions
+
+if TYPE_CHECKING:
+    from ai.backend.manager.api.gql.container_registry.types import ContainerRegistryGQL
 
 # =============================================================================
 # Enums
@@ -275,10 +279,27 @@ class ImageV2GQL(PydanticNodeMixin[ImageNode]):
         description="Permission info for the current user. May be null.", default=None
     )
 
-    # Registry (ContainerRegistryNode connection to be added later)
     registry_id: uuid.UUID = gql_field(
         description="UUID of the container registry where this image is stored."
     )
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="The container registry where this image is stored, resolved via DataLoader. Fetch the registry's attributes in a single query instead of a separate containerRegistries lookup.",
+        )
+    )  # type: ignore[misc]
+    async def registry(
+        self,
+        info: Info[StrawberryGQLContext],
+    ) -> (
+        Annotated[
+            ContainerRegistryGQL,
+            strawberry.lazy("ai.backend.manager.api.gql.container_registry.types"),
+        ]
+        | None
+    ):
+        return await info.context.data_loaders.container_registry_loader.load(self.registry_id)
 
     @gql_added_field(
         BackendAIGQLMeta(

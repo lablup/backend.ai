@@ -7889,6 +7889,11 @@ type ImageV2 implements Node
   registryId: UUID!
 
   """
+  Added in 26.8.0. The container registry where this image is stored, resolved via DataLoader. Fetch the registry's attributes in a single query instead of a separate containerRegistries lookup.
+  """
+  registry: ContainerRegistryV2
+
+  """
   Added in 26.3.0. Timestamp of the most recent session created with this image. Returns null if the image has never been used.
   """
   lastUsed: DateTime
