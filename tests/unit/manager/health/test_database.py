@@ -10,7 +10,8 @@ from ai.backend.common.typed_validators import HostPortPair
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.manager.config.unified import DatabaseConfig
 from ai.backend.manager.health.database import DatabaseHealthChecker
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, connect_database
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.db.engine import connect_database
 
 
 @pytest.fixture

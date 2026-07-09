@@ -268,7 +268,7 @@ def clear_history(cli_ctx: CLIContext, retention: str, vacuum_full: bool) -> Non
     from ai.backend.manager.models.error_logs import error_logs
     from ai.backend.manager.models.kernel import kernels
     from ai.backend.manager.models.session import SessionRow
-    from ai.backend.manager.models.utils import connect_database, vacuum_db
+    from ai.backend.manager.repositories.db.engine import connect_database, vacuum_db
 
     from .context import redis_ctx
 
