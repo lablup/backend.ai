@@ -150,3 +150,4 @@ class TestPushBackgroundTaskEvents:
 
         sse.send.assert_awaited()  # the event was streamed to the client
         event_hub.unregister_event_propagator.assert_called_once()
+        assert propagator._closed is True  # the propagator was closed on exit
