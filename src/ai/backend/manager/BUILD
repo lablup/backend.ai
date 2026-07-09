@@ -9,15 +9,79 @@ python_sources(
     ],
 )
 
-visibility_private_component(
-    allowed_dependents=[
-        "//src/ai/backend/testutils/**",
-    ],
-    allowed_dependencies=[
+# Per-layer dependency direction (bottom -> top): data -> views -> models.
+# Each rule set is self-contained: the upper-layer denies come first, then the same
+# base allowances as the default set. Paths starting with "/" are relative to this
+# (manager) directory; "//" is relative to the build root.
+__dependencies_rules__(
+    # data: must not depend on views, models, repositories, services, api.
+    (
+        "/data/**",
+        "!/views/**",
+        "!/models/**",
+        "!/repositories/**",
+        "!/services/**",
+        "!/api/**",
+        "/**",
         "//src/ai/backend/common/**",
         "//src/ai/backend/cli/**",
         "//src/ai/backend/logging/**",
-    ],
+        "//reqs#*",
+        "//stubs/**",
+        "!*",
+    ),
+    # views: must not depend on models, repositories, services, api.
+    (
+        "/views/**",
+        "!/models/**",
+        "!/repositories/**",
+        "!/services/**",
+        "!/api/**",
+        "/**",
+        "//src/ai/backend/common/**",
+        "//src/ai/backend/cli/**",
+        "//src/ai/backend/logging/**",
+        "//reqs#*",
+        "//stubs/**",
+        "!*",
+    ),
+    # models: may depend on views/data; must not depend on repositories, services, api.
+    (
+        "/models/**",
+        "!/repositories/**",
+        "!/services/**",
+        "!/api/**",
+        "/**",
+        "//src/ai/backend/common/**",
+        "//src/ai/backend/cli/**",
+        "//src/ai/backend/logging/**",
+        "//reqs#*",
+        "//stubs/**",
+        "!*",
+    ),
+    # default: every other file in the component (matches the old macro behavior).
+    (
+        "*",
+        "/**",
+        "//src/ai/backend/common/**",
+        "//src/ai/backend/cli/**",
+        "//src/ai/backend/logging/**",
+        "//reqs#*",
+        "//stubs/**",
+        "!*",
+    ),
+)
+
+# Who may import the manager component (equivalent to visibility_private_component).
+__dependents_rules__(
+    (
+        {"type": "*"},
+        "/**",  # code within this component may import itself
+        "//src/ai/backend/testutils/**",  # allowed extra dependents
+        "//tests/**",  # tests may import the source files
+        "//plugins/**",  # external plugins may import the source files
+        "!*",  # no one else may import the source files
+    )
 )
 
 python_distribution(
