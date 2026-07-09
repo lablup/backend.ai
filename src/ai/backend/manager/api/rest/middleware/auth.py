@@ -709,16 +709,19 @@ async def _resolve_effective_user(
     return await _load_user_data(db, target_user_id)
 
 
-async def _setup_user_context(request: web.Request, db: ExtendedAsyncSAEngine) -> ExitStack:
+def _setup_user_context(
+    request: web.Request,
+    effective_user: UserData | None,
+    trigger_user: UserData | None,
+) -> ExitStack:
+    """Push the already-resolved identities into the context (no I/O)."""
     stack = ExitStack()
 
-    authenticated_user = _authenticated_user(request)
-    if authenticated_user is not None:
-        # trigger = caller always; effective = caller, overridden by act-as impersonation.
-        effective_user = await _resolve_effective_user(request, db, authenticated_user)
-        stack.enter_context(with_triggered_user(authenticated_user))
+    if effective_user is not None:
         stack.enter_context(with_user(effective_user))
         stack.enter_context(with_log_context_fields({"user_id": str(effective_user.user_id)}))
+    if trigger_user is not None:
+        stack.enter_context(with_triggered_user(trigger_user))
 
     client_ip = extract_client_ip(request)
     if client_ip:
@@ -856,7 +859,14 @@ def build_auth_middleware(
         else:
             await _authenticate_via_hook(request, db, valkey_stat, hook_plugin_ctx)
 
-        with await _setup_user_context(request, db):
+        # Resolve identities (DB touched here), then push them into the context.
+        authenticated_user = _authenticated_user(request)
+        effective_user = (
+            await _resolve_effective_user(request, db, authenticated_user)
+            if authenticated_user is not None
+            else None
+        )
+        with _setup_user_context(request, effective_user, authenticated_user):
             return await handler(request)
 
     return _middleware

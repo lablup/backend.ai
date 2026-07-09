@@ -119,32 +119,32 @@ class TestResolveEffectiveUser:
 
 
 class TestSetupUserContext:
-    async def test_no_header_current_equals_triggered(self) -> None:
+    def test_pushes_effective_as_current_and_trigger_as_triggered(self) -> None:
         request = _make_request(role=UserRole.USER)
-        caller_id = request["user"]["uuid"]
-        with await _setup_user_context(request, None):  # type: ignore[arg-type]
-            effective = current_user()
-            trigger = triggered_user()
-            assert effective is not None and trigger is not None
-            assert effective == trigger
-            assert effective.user_id == caller_id
+        effective = UserData(
+            user_id=uuid.uuid4(),
+            is_authorized=True,
+            is_admin=False,
+            is_superadmin=False,
+            role=UserRole.USER,
+            domain_name="target-domain",
+        )
+        trigger = UserData(
+            user_id=uuid.uuid4(),
+            is_authorized=True,
+            is_admin=True,
+            is_superadmin=True,
+            role=UserRole.SUPERADMIN,
+            domain_name="default",
+        )
+        with _setup_user_context(request, effective, trigger):
+            assert current_user() == effective
+            assert triggered_user() == trigger
         assert current_user() is None
         assert triggered_user() is None
 
-    async def test_impersonation_current_is_target_triggered_is_caller(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        target_id = uuid.uuid4()
-        _install_target_loader(monkeypatch, target_id)
-
-        request = _make_request(role=UserRole.SUPERADMIN, headers={ACT_AS_HEADER: str(target_id)})
-        caller_id = request["user"]["uuid"]
-        with await _setup_user_context(request, None):  # type: ignore[arg-type]
-            effective = current_user()
-            trigger = triggered_user()
-            assert effective is not None and trigger is not None
-            assert effective.user_id == target_id
-            assert trigger.user_id == caller_id
-            assert trigger.is_superadmin
-        assert current_user() is None
-        assert triggered_user() is None
+    def test_none_identities_push_nothing(self) -> None:
+        request = _make_request(role=None)
+        with _setup_user_context(request, None, None):
+            assert current_user() is None
+            assert triggered_user() is None
