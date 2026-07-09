@@ -37,8 +37,9 @@ from ai.backend.manager.models.resource_slot import (
 )
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, create_async_engine
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.registry import AgentRegistry
+from ai.backend.manager.repositories.db.engine import create_async_engine
 from ai.backend.testutils.db import with_tables
 
 
