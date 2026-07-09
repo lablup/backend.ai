@@ -18,6 +18,9 @@ from ai.backend.manager.models.scopes import SearchScope
 from ai.backend.manager.repositories.app_config_fragment.db_source import (
     AppConfigFragmentDBSource,
 )
+from ai.backend.manager.repositories.app_config_fragment.types import (
+    AppConfigScopeArguments,
+)
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     BulkCreator,
@@ -103,3 +106,15 @@ class AppConfigFragmentRepository:
         purgers: Sequence[Purger[AppConfigFragmentRow]],
     ) -> AppConfigFragmentBulkResult:
         return await self._db_source.bulk_purge(purgers)
+
+    @app_config_fragment_repository_resilience.apply()
+    async def list_visible_fragments(
+        self, config_name: str, scope: AppConfigScopeArguments
+    ) -> list[AppConfigFragmentData]:
+        return await self._db_source.list_visible_fragments(config_name, scope)
+
+    @app_config_fragment_repository_resilience.apply()
+    async def list_visible_fragments_bulk(
+        self, config_names: list[str], scope: AppConfigScopeArguments
+    ) -> list[AppConfigFragmentData]:
+        return await self._db_source.list_visible_fragments_bulk(config_names, scope)

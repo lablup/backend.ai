@@ -31,6 +31,7 @@ from ai.backend.manager.repositories.app_config_fragment.repository import (
     AppConfigFragmentRepository,
 )
 from ai.backend.manager.repositories.app_config_fragment.types import (
+    AppConfigScopeArguments,
     DomainAppConfigFragmentSearchScope,
     UserAppConfigFragmentSearchScope,
 )
@@ -569,3 +570,137 @@ class TestBulkPurge:
         assert [f.index for f in result.failed] == [1]
         with pytest.raises(AppConfigFragmentNotFound):
             await repository.get_by_id(two_fragments[0].id)
+
+
+class TestVisibilityConditions:
+    async def test_public_visibility_selects_only_public(
+        self,
+        repository: AppConfigFragmentRepository,
+        fragments_across_scopes: list[AppConfigFragmentData],
+    ) -> None:
+        result = await repository.admin_search(
+            BatchQuerier(
+                pagination=OffsetPagination(limit=10, offset=0),
+                conditions=[AppConfigFragmentConditions.by_public_visibility()],
+            )
+        )
+        # Visibility is scope-only (name-independent): every public fragment, any name.
+        expected = {
+            f.id for f in fragments_across_scopes if f.scope_type is AppConfigScopeType.PUBLIC
+        }
+        assert {item.id for item in result.items} == expected
+
+    async def test_domain_visibility_selects_only_that_domain(
+        self,
+        repository: AppConfigFragmentRepository,
+        fragments_across_scopes: list[AppConfigFragmentData],
+    ) -> None:
+        result = await repository.admin_search(
+            BatchQuerier(
+                pagination=OffsetPagination(limit=10, offset=0),
+                conditions=[AppConfigFragmentConditions.by_domain_visibility(_DOMAIN_ID)],
+            )
+        )
+        expected = {
+            f.id
+            for f in fragments_across_scopes
+            if f.scope_type is AppConfigScopeType.DOMAIN and f.scope_id == _DOMAIN_ID
+        }
+        assert {item.id for item in result.items} == expected
+
+    async def test_user_visibility_selects_only_that_user(
+        self,
+        repository: AppConfigFragmentRepository,
+        fragments_across_scopes: list[AppConfigFragmentData],
+    ) -> None:
+        result = await repository.admin_search(
+            BatchQuerier(
+                pagination=OffsetPagination(limit=10, offset=0),
+                conditions=[AppConfigFragmentConditions.by_user_visibility(_USER_ID)],
+            )
+        )
+        expected = {
+            f.id
+            for f in fragments_across_scopes
+            if f.scope_type is AppConfigScopeType.USER and f.scope_id == _USER_ID
+        }
+        assert {item.id for item in result.items} == expected
+
+
+class TestApplicableFragments:
+    async def test_one_query_returns_public_domain_user_rank_ordered(
+        self,
+        repository: AppConfigFragmentRepository,
+        fragments_across_scopes: list[AppConfigFragmentData],
+    ) -> None:
+        applicable = await repository.list_visible_fragments(
+            "theme",
+            AppConfigScopeArguments(domain_id=DomainID(_DOMAIN_UUID), user_id=UserID(_USER_UUID)),
+        )
+        # public + the caller's domain + the caller's own user fragment, ordered by the
+        # allow-list entries' ranks (scope-type defaults: public < domain < user).
+        expected = [
+            f
+            for f in fragments_across_scopes
+            if f.config_name == "theme"
+            and (
+                f.scope_type is AppConfigScopeType.PUBLIC
+                or (f.scope_type is AppConfigScopeType.DOMAIN and f.scope_id == _DOMAIN_ID)
+                or (f.scope_type is AppConfigScopeType.USER and f.scope_id == _USER_ID)
+            )
+        ]
+        assert [f.id for f in applicable] == [f.id for f in expected]
+        assert [f.scope_type for f in applicable] == [
+            AppConfigScopeType.PUBLIC,
+            AppConfigScopeType.DOMAIN,
+            AppConfigScopeType.USER,
+        ]
+
+    async def test_unknown_config_name_returns_empty(
+        self,
+        repository: AppConfigFragmentRepository,
+        fragments_across_scopes: list[AppConfigFragmentData],
+    ) -> None:
+        applicable = await repository.list_visible_fragments(
+            "unregistered",
+            AppConfigScopeArguments(domain_id=DomainID(_DOMAIN_UUID), user_id=UserID(_USER_UUID)),
+        )
+        assert applicable == []
+
+    async def test_bulk_returns_visible_fragments_for_all_names_ordered(
+        self,
+        repository: AppConfigFragmentRepository,
+        fragments_across_scopes: list[AppConfigFragmentData],
+    ) -> None:
+        applicable = await repository.list_visible_fragments_bulk(
+            ["theme", "menu"],
+            AppConfigScopeArguments(domain_id=DomainID(_DOMAIN_UUID), user_id=UserID(_USER_UUID)),
+        )
+        # public + the caller's domain + the caller's own user fragment, for both names.
+        expected = {
+            f.id
+            for f in fragments_across_scopes
+            if f.config_name in ("theme", "menu")
+            and (
+                f.scope_type is AppConfigScopeType.PUBLIC
+                or (f.scope_type is AppConfigScopeType.DOMAIN and f.scope_id == _DOMAIN_ID)
+                or (f.scope_type is AppConfigScopeType.USER and f.scope_id == _USER_ID)
+            )
+        }
+        assert {f.id for f in applicable} == expected
+        # Rank-ordered globally, so each config_name's subset stays rank-ordered
+        # (public < domain < user) for the caller to group by name and deep-merge in order.
+        for name in ("theme", "menu"):
+            ranks = [f.scope_type.default_rank() for f in applicable if f.config_name == name]
+            assert ranks == sorted(ranks)
+
+    async def test_bulk_empty_names_returns_empty(
+        self,
+        repository: AppConfigFragmentRepository,
+        fragments_across_scopes: list[AppConfigFragmentData],
+    ) -> None:
+        applicable = await repository.list_visible_fragments_bulk(
+            [],
+            AppConfigScopeArguments(domain_id=DomainID(_DOMAIN_UUID), user_id=UserID(_USER_UUID)),
+        )
+        assert applicable == []
