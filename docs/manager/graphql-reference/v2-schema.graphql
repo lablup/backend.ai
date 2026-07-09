@@ -9211,6 +9211,21 @@ type ProjectUsageBucket implements Node {
   usageCapacityRatio: ResourceSlot
 
   """
+  Added in 26.8.0. The project entity this usage bucket belongs to.
+  """
+  project: ProjectV2
+
+  """
+  Added in 26.8.0. The domain entity this usage bucket belongs to.
+  """
+  domain: DomainV2
+
+  """
+  Added in 26.8.0. The resource group this usage was recorded in.
+  """
+  resourceGroup: ResourceGroup
+
+  """
   Added in 26.1.0. User usage buckets belonging to this project. Returns paginated user-level usage history for all users in this project within the same scaling group.
   """
   userUsageBuckets(filter: UserUsageBucketFilter = null, orderBy: [UserUsageBucketOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserUsageBucketConnection
