@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, override
 
 from ai.backend.common.dependencies import NonMonitorableDependencyProvider
 from ai.backend.common.types import QueueSentinel
-from ai.backend.manager.models.health import report_manager_status
+from ai.backend.manager.repositories.manager_admin.health import report_manager_status
 
 if TYPE_CHECKING:
     from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient

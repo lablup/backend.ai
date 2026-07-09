@@ -101,6 +101,7 @@ from ai.backend.common.types import (
 from ai.backend.common.utils import str_to_timedelta
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.clients.appproxy.types import CreateEndpointRequestBody
+from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.image.types import ImageIdentifier
@@ -174,7 +175,6 @@ from .models.session import (
     SessionRow,
     handle_session_exception,
 )
-from .models.storage import StorageSessionManager
 from .models.user import UserRow
 from .models.utils import (
     ExtendedAsyncSAEngine,

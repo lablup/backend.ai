@@ -120,7 +120,6 @@ from ai.backend.manager.models.utils import (
     ExtendedAsyncSAEngine,
     sql_json_merge,
 )
-from ai.backend.manager.models.vfolder import prepare_vfolder_mounts
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     execute_batch_querier,
@@ -171,6 +170,7 @@ from ai.backend.manager.repositories.scheduler.types.snapshot import ResourcePol
 from ai.backend.manager.repositories.scheduling_history import (
     SessionSchedulingHistoryCreatorSpec,
 )
+from ai.backend.manager.repositories.vfolder.mount import prepare_vfolder_mounts
 from ai.backend.manager.types import UserScope
 
 from .types import KeypairConcurrencyData

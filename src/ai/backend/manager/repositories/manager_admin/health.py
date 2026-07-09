@@ -24,9 +24,10 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 __all__: tuple[str, ...] = (
     "RedisObjectConnectionInfo",
     "SQLAlchemyConnectionInfo",
-    "_get_connnection_info",
+    "ConnectionInfoOfProcess",
     "get_sqlalchemy_connection_info",
     "report_manager_status",
+    "get_manager_db_cxn_status",
 )
 
 _sqlalchemy_pool_type_names = (
@@ -40,10 +41,6 @@ _sqlalchemy_pool_type_names = (
 )
 
 MANAGER_STATUS_KEY = "manager.status"
-
-
-def _get_connection_status_key(node_id: str, pid: int) -> str:
-    return f"{MANAGER_STATUS_KEY}.{node_id}:{pid}"
 
 
 class SQLAlchemyConnectionInfo(BackendAISchema):

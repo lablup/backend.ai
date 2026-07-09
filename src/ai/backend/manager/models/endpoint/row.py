@@ -12,14 +12,13 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Self,
-    cast,
 )
 from uuid import UUID, uuid4
 
 import sqlalchemy as sa
 import yarl
 from sqlalchemy.exc import NoResultFound
-from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import (
     Mapped,
     contains_eager,
@@ -39,14 +38,8 @@ from ai.backend.common.types import (
     AutoScalingMetricSource,
     ClusterMode,
     ResourceSlot,
-    VFolderID,
-    VFolderMount,
-    VFolderMountOptions,
-    VFolderMountRequest,
-    VFolderUsageMode,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
 from ai.backend.manager.data.deployment.scale import (
     AutoScalingAction,
     AutoScalingCondition,
@@ -77,7 +70,6 @@ from ai.backend.manager.data.model_serving.types import (
     EndpointTokenData,
     ScalingState,
 )
-from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.models.base import (
     GUID,
@@ -87,9 +79,6 @@ from ai.backend.manager.models.base import (
     StrEnumType,
 )
 from ai.backend.manager.models.routing import RouteStatus
-from ai.backend.manager.models.storage import StorageSessionManager
-from ai.backend.manager.models.vfolder import prepare_vfolder_mounts
-from ai.backend.manager.types import MountOptionModel, UserScope
 
 if TYPE_CHECKING:
     from ai.backend.manager.data.deployment.creator import DeploymentCreator
@@ -107,7 +96,6 @@ __all__ = (
     "EndpointLifecycle",
     "EndpointRow",
     "EndpointTokenRow",
-    "ModelServiceHelper",
 )
 
 
@@ -1233,76 +1221,3 @@ class EndpointAutoScalingRuleRow(Base):  # type: ignore[misc]
         """
         for column_name, value in modifier.fields_to_update().items():
             setattr(self, column_name, value)
-
-
-class ModelServiceHelper:
-    @staticmethod
-    async def check_extra_mounts(
-        conn: AsyncConnection,
-        legacy_etcd_loader: LegacyEtcdLoader,
-        storage_manager: StorageSessionManager,
-        model_id: UUID,
-        model_mount_destination: str,
-        extra_mounts: dict[UUID, MountOptionModel],
-        user_scope: UserScope,
-        resource_policy: dict[str, Any],
-    ) -> Sequence[VFolderMount]:
-        """
-        check if user is allowed to access every folders eagering to mount (other than model VFolder)
-        on general session creation lifecycle this check will be completed by `enqueue_session()` function,
-        which is not covered by the validation procedure (`create_session(dry_run=True)` call at the bottom part of `create()` API)
-        so we have to manually cover this part here.
-        """
-        if model_id in extra_mounts:
-            raise InvalidAPIParameters(
-                "Same VFolder appears on both model specification and VFolder mount"
-            )
-
-        mount_requests = [
-            VFolderMountRequest(
-                ref=folder_id,
-                dst_path=options.mount_destination,
-                options=VFolderMountOptions(
-                    permission=options.permission,
-                    subpath=options.subpath,
-                ),
-            )
-            for folder_id, options in extra_mounts.items()
-        ]
-        allowed_vfolder_types = await legacy_etcd_loader.get_vfolder_types()
-        vfolder_mounts = await prepare_vfolder_mounts(
-            conn,
-            storage_manager,
-            allowed_vfolder_types,
-            user_scope,
-            resource_policy,
-            mount_requests,
-        )
-
-        for vfolder in vfolder_mounts:
-            if str(vfolder.kernel_path) == model_mount_destination:
-                raise InvalidAPIParameters(
-                    "extra_mounts.mount_destination conflicts with model_mount_destination config. Make sure not to shadow value defined at model_mount_destination as a mount destination of extra VFolders."
-                )
-            if vfolder.usage_mode == VFolderUsageMode.MODEL:
-                raise InvalidAPIParameters(
-                    "MODEL type VFolders cannot be added as a part of extra_mounts folder"
-                )
-
-        return vfolder_mounts
-
-    @staticmethod
-    async def _listdir(
-        storage_manager: StorageSessionManager,
-        proxy_name: str,
-        volume_name: str,
-        vfid: VFolderID,
-        relpath: str,
-    ) -> dict[str, Any]:
-        manager_facing_client = storage_manager.get_manager_facing_client(proxy_name)
-        result = await manager_facing_client.list_files(
-            volume_name,
-            str(vfid),
-            relpath,
-        )
-        return cast(dict[str, Any], result)

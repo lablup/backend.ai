@@ -18,11 +18,6 @@ from ai.backend.common.types import (
     VFolderHostPermission,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.clients.storage_proxy.session_manager import (
-    StorageProxyInfo,
-    StorageSessionManager,
-    VolumeInfo,
-)  # For compatibility with existing code
 from ai.backend.manager.data.permission.permission_defs import StorageHostPermission
 
 from .rbac import (
@@ -39,12 +34,6 @@ from .resource_policy import KeyPairResourcePolicyRow
 from .user import UserRow
 
 # Left this for compatibility with existing code
-__all__ = (
-    "StorageProxyInfo",
-    "StorageSessionManager",
-    "VolumeInfo",
-)
-
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 

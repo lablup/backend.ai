@@ -24,6 +24,7 @@ from ai.backend.common.types import (
     VFolderHostPermissionMap,
     VFolderID,
 )
+from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.group.types import ProjectResourceInfo
 from ai.backend.manager.data.kernel.types import KernelStatus
@@ -82,7 +83,6 @@ from ai.backend.manager.models.rbac_models.permission.permission import Permissi
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.resource_policy import keypair_resource_policies
-from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import (
     ACTIVE_USER_STATUSES,
     UserRole,

@@ -12,13 +12,13 @@ from ai.backend.common.exception import (
     InvalidAPIParameters,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.models.resource_usage import (
     ProjectResourceUsage,
     parse_resource_usage_groups,
     parse_total_resource_group,
 )
-from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.repositories.group.repositories import GroupRepositories
 from ai.backend.manager.repositories.group.repository import GroupRepository
 from ai.backend.manager.services.group.actions.assign_users_to_project import (
