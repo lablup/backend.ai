@@ -9,7 +9,8 @@ from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 # Register all models so SQLAlchemy's global configure_mappers() can resolve every
 # row's string relationships regardless of which models a test shard happens to import.
 from ai.backend.manager.models.base import ensure_all_tables_registered
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, create_async_engine
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.db.engine import create_async_engine
 
 ensure_all_tables_registered()
 

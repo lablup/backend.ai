@@ -7,7 +7,8 @@ from typing import override
 from ai.backend.common.health_checker import ServiceHealthChecker
 from ai.backend.manager.config.unified import ManagerUnifiedConfig
 from ai.backend.manager.health.database import DatabaseHealthChecker
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, connect_database
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.db.engine import connect_database
 
 from .base import InfrastructureDependency
 
