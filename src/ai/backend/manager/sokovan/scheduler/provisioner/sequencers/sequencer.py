@@ -78,8 +78,8 @@ class SchedulingSequencer:
 
         result: list[SessionWorkload] = []
         for priority in sorted(priority_workloads.keys(), reverse=True):
-            workloads = await self._workload_sequencer.sequence(
+            sequenced = await self._workload_sequencer.sequence(
                 resource_group, system_snapshot, priority_workloads[priority]
             )
-            result.extend(workloads)
+            result.extend(sequenced)
         return result
