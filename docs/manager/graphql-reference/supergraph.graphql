@@ -21032,6 +21032,26 @@ type UserUsageBucket implements Node
   Added in 26.2.0. Usage ratio against total available capacity for each resource. Calculated as resource_usage divided by capacity_snapshot. Represents the fraction of total capacity consumed (resource-seconds / resource). The result is in seconds, where 86400 means full utilization for one day. Values can exceed this if usage exceeds capacity.
   """
   usageCapacityRatio: ResourceSlot
+
+  """
+  Added in 26.8.0. The user entity this usage bucket belongs to.
+  """
+  user: UserV2
+
+  """
+  Added in 26.8.0. The project entity this usage bucket belongs to.
+  """
+  project: ProjectV2
+
+  """
+  Added in 26.8.0. The domain entity this usage bucket belongs to.
+  """
+  domain: DomainV2
+
+  """
+  Added in 26.8.0. The resource group this usage was recorded in.
+  """
+  resourceGroup: ResourceGroup
 }
 
 """
