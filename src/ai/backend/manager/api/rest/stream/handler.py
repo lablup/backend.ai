@@ -655,7 +655,7 @@ async def handle_kernel_terminating(
     """Cleanup callback invoked by StreamCleanupEventHandler."""
     stream_key = kernel.id
     cancelled_tasks: list[asyncio.Task[Any]] = []
-    for sock in app_ctx.stream_stdin_socks[stream_key]:
+    for sock in app_ctx.stream_stdin_socks.get(stream_key, ()):
         sock.close()
     for handler in list(app_ctx.stream_pty_handlers.get(stream_key, [])):
         handler.cancel()
@@ -668,6 +668,11 @@ async def handle_kernel_terminating(
         cancelled_tasks.append(handler)
     if cancelled_tasks:
         await asyncio.gather(*cancelled_tasks, return_exceptions=True)
+    # Drop the per-kernel entries so these defaultdicts stay bounded as kernels churn.
+    app_ctx.stream_pty_handlers.pop(stream_key, None)
+    app_ctx.stream_execute_handlers.pop(stream_key, None)
+    app_ctx.stream_proxy_handlers.pop(stream_key, None)
+    app_ctx.stream_stdin_socks.pop(stream_key, None)
 
 
 async def stream_conn_tracker_gc(
