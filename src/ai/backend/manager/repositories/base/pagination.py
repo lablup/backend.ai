@@ -24,17 +24,6 @@ class QueryPagination(ABC):
     select statement with appropriate pagination logic.
     """
 
-    @property
-    @abstractmethod
-    def uses_window_function(self) -> bool:
-        """Whether this pagination uses window function for total_count.
-
-        Returns:
-            True if window function should be added to main query (Offset),
-            False if separate count query should be used (Cursor).
-        """
-        raise NotImplementedError
-
     @abstractmethod
     def apply(self, query: sa.sql.Select[Any]) -> sa.sql.Select[Any]:
         """Apply pagination to a SQLAlchemy select statement."""
@@ -51,6 +40,25 @@ class QueryPagination(ABC):
 
         Returns:
             _PageInfoResult containing sliced rows and pagination flags
+        """
+
+        raise NotImplementedError
+
+    @abstractmethod
+    def attach_count(self, query: sa.sql.Select[Any]) -> sa.sql.Select[Any]:
+        """Attach a total_count column to the data query if this strategy folds
+        counting into the data query; otherwise return the query unchanged.
+        """
+
+        raise NotImplementedError
+
+    @abstractmethod
+    def count_from_rows(self, rows: list[Row[Any]]) -> int | None:
+        """Derive total_count from the fetched rows.
+
+        Returns:
+            The total count if derivable from the rows, or None to signal the
+            caller must execute a separate count query.
         """
 
         raise NotImplementedError
@@ -74,11 +82,6 @@ class NoPagination(QueryPagination):
     Useful for internal operations like scheduler batch processing.
     """
 
-    @property
-    @override
-    def uses_window_function(self) -> bool:
-        return False
-
     @override
     def apply(self, query: sa.sql.Select[Any]) -> sa.sql.Select[Any]:
         """No pagination applied - returns query unchanged."""
@@ -94,6 +97,16 @@ class NoPagination(QueryPagination):
             has_next_page=False,
             has_previous_page=False,
         )
+
+    @override
+    def attach_count(self, query: sa.sql.Select[Any]) -> sa.sql.Select[Any]:
+        """No count column needed - all rows are returned."""
+        return query
+
+    @override
+    def count_from_rows(self, rows: list[Row[Any]]) -> int | None:
+        """All matching rows are returned, so the count is simply len(rows)."""
+        return len(rows)
 
 
 @dataclass
@@ -111,11 +124,6 @@ class OffsetPagination(QueryPagination):
 
     offset: int = 0
     """Number of items to skip from the beginning (must be non-negative)."""
-
-    @property
-    @override
-    def uses_window_function(self) -> bool:
-        return True
 
     @override
     def apply(self, query: sa.sql.Select[Any]) -> sa.sql.Select[Any]:
@@ -138,9 +146,42 @@ class OffsetPagination(QueryPagination):
             has_previous_page=has_previous_page,
         )
 
+    @override
+    def attach_count(self, query: sa.sql.Select[Any]) -> sa.sql.Select[Any]:
+        """Fold the total count into the data query via a window function."""
+        return query.add_columns(sa.func.count().over().label("total_count"))
+
+    @override
+    def count_from_rows(self, rows: list[Row[Any]]) -> int | None:
+        """Read the window-function count from the rows.
+
+        Returns None when there are no rows (the window column is absent), so the
+        caller falls back to a separate count query.
+        """
+        if rows:
+            total_count: int = rows[0].total_count
+            return total_count
+        return None
+
+
+class CursorPagination(QueryPagination):
+    """Shared count strategy for cursor-based pagination.
+
+    total_count comes from a separate count query: a window count would be wrong
+    because the data query fetches LIMIT N+1 rows for page detection.
+    """
+
+    @override
+    def attach_count(self, query: sa.sql.Select[Any]) -> sa.sql.Select[Any]:
+        return query
+
+    @override
+    def count_from_rows(self, rows: list[Row[Any]]) -> int | None:
+        return None
+
 
 @dataclass
-class CursorForwardPagination(QueryPagination):
+class CursorForwardPagination(CursorPagination):
     """
     Cursor-based forward pagination using first and after.
 
@@ -160,11 +201,6 @@ class CursorForwardPagination(QueryPagination):
 
     cursor_condition: QueryCondition | None = None
     """Optional QueryCondition for cursor position. If None, starts from the beginning."""
-
-    @property
-    @override
-    def uses_window_function(self) -> bool:
-        return False
 
     @override
     def apply(self, query: sa.sql.Select[Any]) -> sa.sql.Select[Any]:
@@ -197,7 +233,7 @@ class CursorForwardPagination(QueryPagination):
 
 
 @dataclass
-class CursorBackwardPagination(QueryPagination):
+class CursorBackwardPagination(CursorPagination):
     """
     Cursor-based backward pagination using last and before.
 
@@ -217,11 +253,6 @@ class CursorBackwardPagination(QueryPagination):
 
     cursor_condition: QueryCondition | None = None
     """Optional QueryCondition for cursor position. If None, starts from the end."""
-
-    @property
-    @override
-    def uses_window_function(self) -> bool:
-        return False
 
     @override
     def apply(self, query: sa.sql.Select[Any]) -> sa.sql.Select[Any]:
