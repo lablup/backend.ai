@@ -3382,6 +3382,11 @@ type ContainerRegistryV2 implements Node
 
   """Extra metadata for the container registry"""
   extra: JSON
+
+  """
+  Added in 26.8.0. Container images stored in this registry. Returns a paginated connection scoped to this registry, so the registry->images relationship can be traversed directly on the node instead of a separate containerRegistryImagesV2 query.
+  """
+  images(filter: ImageV2Filter = null, orderBy: [ImageV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ImageV2Connection
 }
 
 """Added in 26.4.2. Paginated connection for container registries."""
