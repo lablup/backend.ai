@@ -19,6 +19,7 @@ from ai.backend.manager.actions.action import (
 )
 from ai.backend.manager.actions.monitors.audit_log import AuditLogMonitor
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
+from ai.backend.manager.actions.monitors.reporter import ReporterMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import ActionOperationType, OperationStatus
 from ai.backend.manager.repositories.audit_log import AuditLogCreatorSpec
@@ -291,3 +292,99 @@ class TestAuditLogMonitorActorIdentities:
         spec = self._recorded_spec(mock_audit_log_repository)
         assert spec.triggered_by is None
         assert spec.acted_as is None
+
+
+class TestReporterMonitorActorIdentities:
+    """ReporterMonitor records triggered_by (the caller) and acted_as (the effective/acting
+    subject) separately, mirroring the audit-log monitor; they diverge only during
+    impersonation."""
+
+    @pytest.fixture
+    def reporter_hub(self) -> MagicMock:
+        hub = MagicMock()
+        hub.report_started = AsyncMock(return_value=None)
+        hub.report_finished = AsyncMock(return_value=None)
+        return hub
+
+    @pytest.fixture
+    def reporter_monitor(self, reporter_hub: MagicMock) -> ReporterMonitor:
+        return ReporterMonitor(reporter_hub)
+
+    @staticmethod
+    def _action() -> MockAction:
+        return MockAction(id="1", type=_MOCK_ACTION_TYPE, operation=_MOCK_OPERATION_TYPE)
+
+    @staticmethod
+    def _meta() -> BaseActionTriggerMeta:
+        return BaseActionTriggerMeta(action_id=uuid4(), started_at=datetime.now(tz=UTC))
+
+    @staticmethod
+    def _result() -> ProcessResult:
+        now = datetime.now(tz=UTC)
+        return ProcessResult(
+            meta=BaseActionResultMeta(
+                action_id=uuid4(),
+                entity_id="1",
+                status=OperationStatus.SUCCESS,
+                description="Success",
+                started_at=now,
+                ended_at=now,
+                duration=timedelta(seconds=0.0),
+                error_code=None,
+            ),
+        )
+
+    async def test_started_message_records_both_identities_under_impersonation(
+        self,
+        reporter_monitor: ReporterMonitor,
+        reporter_hub: MagicMock,
+    ) -> None:
+        target = _make_user(uuid4())
+        super_admin = _make_user(uuid4(), is_superadmin=True)
+
+        with with_user(target), with_triggered_user(super_admin):
+            await reporter_monitor.prepare(self._action(), self._meta())
+
+        message = reporter_hub.report_started.call_args.args[0]
+        assert message.triggered_by == str(super_admin.user_id)
+        assert message.acted_as == target.user_id
+
+    async def test_finished_message_records_both_identities_under_impersonation(
+        self,
+        reporter_monitor: ReporterMonitor,
+        reporter_hub: MagicMock,
+    ) -> None:
+        target = _make_user(uuid4())
+        super_admin = _make_user(uuid4(), is_superadmin=True)
+
+        with with_user(target), with_triggered_user(super_admin):
+            await reporter_monitor.done(self._action(), self._result())
+
+        message = reporter_hub.report_finished.call_args.args[0]
+        assert message.triggered_by == str(super_admin.user_id)
+        assert message.acted_as == target.user_id
+
+    async def test_normal_context_triggered_by_equals_acted_as(
+        self,
+        reporter_monitor: ReporterMonitor,
+        reporter_hub: MagicMock,
+    ) -> None:
+        user = _make_user(uuid4())
+
+        with with_user(user), with_triggered_user(user):
+            await reporter_monitor.done(self._action(), self._result())
+
+        message = reporter_hub.report_finished.call_args.args[0]
+        assert message.triggered_by == str(user.user_id)
+        assert message.acted_as == user.user_id
+
+    async def test_system_trigger_records_both_none(
+        self,
+        reporter_monitor: ReporterMonitor,
+        reporter_hub: MagicMock,
+    ) -> None:
+        await reporter_monitor.done(self._action(), self._result())
+
+        message = reporter_hub.report_finished.call_args.args[0]
+        assert message.triggered_by is None
+        assert message.acted_as is None

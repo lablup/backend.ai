@@ -16,6 +16,7 @@ class StartedActionMessage:
     entity_id: str | uuid.UUID | None
     request_id: str | None
     triggered_by: str | None
+    acted_as: uuid.UUID | None
     entity_type: EntityType
     operation_type: ActionOperationType
     created_at: datetime
@@ -30,6 +31,7 @@ class FinishedActionMessage:
     entity_id: str | uuid.UUID | None  # TODO: Make this required?
     request_id: str | None
     triggered_by: str | None
+    acted_as: uuid.UUID | None
     entity_type: EntityType
     operation_type: ActionOperationType
     status: OperationStatus
