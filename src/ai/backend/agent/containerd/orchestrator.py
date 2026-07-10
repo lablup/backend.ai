@@ -102,6 +102,14 @@ class ContainerdKernelOrchestrator:
             container_id, meta=meta, kernel_config=kernel_config, cluster_info=cluster_info
         )
 
+    async def detach(self, container_id: str, *, plan: EndpointPlan, task_pid: int) -> None:
+        """Detach the container's network only (host veth removal + IPAM/MASQ release).
+
+        Used by the two-phase agent lifecycle (destroy=kill, then clean=remove): the kill
+        already stopped the task, so clean detaches with the attach-time plan before the
+        container is removed. Without this, host-local IPAM addresses and NAT rules leak."""
+        await self._network.detach(plan, container_id=container_id, task_pid=task_pid)
+
     async def terminate(
         self,
         container_id: str,
@@ -111,6 +119,6 @@ class ContainerdKernelOrchestrator:
         signal: int = signal_module.SIGKILL,
     ) -> None:
         # reverse order: detach network first, then tear down the runtime
-        await self._network.detach(plan, container_id=container_id, task_pid=task_pid)
+        await self.detach(container_id, plan=plan, task_pid=task_pid)
         await self._runtime.kill_container(container_id, signal=signal)
         await self._runtime.remove_container(container_id)

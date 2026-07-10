@@ -1116,9 +1116,9 @@ class ContainerdAgent(
         kernel_id: KernelId,
         container_id: ContainerId | None,
     ) -> None:
-        # Stop the container's task (force). Removal happens in clean_kernel.
-        # NOTE: proper CNI detach needs the per-kernel EndpointPlan; tracking it across
-        # destroy/clean is a follow-up (removing the container drops its netns).
+        # Stop the container's task (force). Network detach + container removal happen in
+        # clean_kernel -> remove_container, which replays the attach-time EndpointPlan (kept
+        # per container in the session network) to release the host veth / IPAM / MASQ.
         await self._session_network.kill_container(str(kernel_id), signal=signal.SIGKILL)
 
     @override

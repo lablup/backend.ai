@@ -260,8 +260,30 @@ class TestLaunchTerminate:
             )
             assert result.handle.pid == 9001
             assert runner.calls == [("ADD", "/proc/9001/ns/net")]
+            assert "c1" in facade._attachments  # plan kept for later detach
         finally:
             await facade.teardown_session("s1")
+
+    async def test_remove_after_launch_detaches_network(self) -> None:
+        # The clean/remove phase must replay the attach-time plan as a DEL so the host veth,
+        # IPAM address and MASQ rule are released (otherwise they leak across the node).
+        etcd, backend, runner, rt = FakeEtcd(), RecordingBackend(), RecordingRunner(), FakeRuntime()
+        facade = _facade(etcd, backend, runner, runtime=rt)
+        meta = await facade.ensure_session("s1", _VXLAN_NC)
+        await facade.launch_container(
+            "s1",
+            "c1",
+            image_ref="img",
+            command=[],
+            oci_spec={},
+            meta=meta,
+            kernel_config=cast(Any, {}),
+            cluster_info=cast(Any, {}),
+        )
+        await facade.remove_container("c1")
+        assert ("ADD", "/proc/9001/ns/net") in runner.calls
+        assert ("DEL", "/proc/9001/ns/net") in runner.calls  # detach replayed on remove
+        assert "c1" not in facade._attachments  # bookkeeping cleared
 
 
 class TestSplitAndTeardown:

@@ -77,6 +77,11 @@ class ContainerdSessionNetwork:
     # Tracks container<->session so the last kernel's removal deterministically tears the
     # session network down (otherwise overlay devices + etcd members leak).
     _tracker: SessionContainerTracker
+    # container_id -> (session_id, attach plan, task_pid): the network detach inputs captured
+    # at attach time, so the clean/remove phase can release the host veth + IPAM + MASQ even
+    # though it is a separate lifecycle call from attach. Without it those host-side resources
+    # leak (the container's netns removal only reclaims the container-side veth).
+    _attachments: dict[str, tuple[str, EndpointPlan, int]]
 
     def __init__(
         self,
@@ -101,6 +106,7 @@ class ContainerdSessionNetwork:
         self._coordinators = {}
         self._orchestrators = {}
         self._tracker = SessionContainerTracker()
+        self._attachments = {}
 
     async def open(self) -> None:
         """Open the runtime client (e.g. establish the containerd gRPC channel)."""
@@ -175,6 +181,7 @@ class ContainerdSessionNetwork:
             cluster_info=cluster_info,
         )
         self._tracker.track(session_id, container_id)
+        self._attachments[container_id] = (session_id, result.plan, result.handle.pid)
         return result
 
     async def create_container(
@@ -202,9 +209,11 @@ class ContainerdSessionNetwork:
         cluster_info: ClusterInfo,
     ) -> LaunchResult:
         """Start the container + attach CNI — maps to AbstractAgent.start_container."""
-        return await self._orchestrators[session_id].start_and_attach(
+        result = await self._orchestrators[session_id].start_and_attach(
             container_id, meta=meta, kernel_config=kernel_config, cluster_info=cluster_info
         )
+        self._attachments[container_id] = (session_id, result.plan, result.handle.pid)
+        return result
 
     async def terminate_container(
         self, session_id: str, container_id: str, *, plan: EndpointPlan, task_pid: int
@@ -233,6 +242,20 @@ class ContainerdSessionNetwork:
         await self._runtime.kill_container(container_id, signal=signal)
 
     async def remove_container(self, container_id: str) -> None:
+        # Detach the container's network first, using the plan captured at attach: this frees
+        # the host veth, releases the host-local IPAM address, and removes the egress MASQ rule
+        # when the last container of the subnet leaves. Removing the container reclaims only the
+        # container-side veth (via netns teardown), so skipping detach leaks host-side state.
+        # Best-effort: a detach hiccup must not block container removal (or session teardown).
+        attachment = self._attachments.pop(container_id, None)
+        if attachment is not None:
+            session_id, plan, task_pid = attachment
+            orchestrator = self._orchestrators.get(session_id)
+            if orchestrator is not None:
+                try:
+                    await orchestrator.detach(container_id, plan=plan, task_pid=task_pid)
+                except Exception:
+                    log.exception("network detach failed for container {}", container_id)
         await self._runtime.remove_container(container_id)
         scope = self._tracker.untrack(container_id)
         if scope is not None:
