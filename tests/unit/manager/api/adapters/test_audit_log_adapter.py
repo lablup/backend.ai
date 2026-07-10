@@ -14,7 +14,8 @@ _SUPERADMIN = str(uuid.uuid4())
 _TARGET = str(uuid.uuid4())
 
 
-def _make_data(*, triggered_by: str | None, acted_as: str | None) -> AuditLogData:
+def _create_audit_log_data(*, triggered_by: str | None, acted_as: str | None) -> AuditLogData:
+    """Create a minimal AuditLogData for testing adapter conversion."""
     return AuditLogData(
         id=uuid.uuid4(),
         action_id=uuid.uuid4(),
@@ -31,20 +32,27 @@ def _make_data(*, triggered_by: str | None, acted_as: str | None) -> AuditLogDat
     )
 
 
-class TestAuditLogReadExposesActedAs:
-    def test_data_to_node_maps_acted_as(self) -> None:
-        # Impersonation: trigger and effective identities differ.
-        data = _make_data(triggered_by=_SUPERADMIN, acted_as=_TARGET)
+class TestDataToNode:
+    """Tests for AuditLogAdapter._data_to_node conversion."""
+
+    def test_acted_as_mapped_during_impersonation(self) -> None:
+        """Diverging trigger and effective identities should both map onto the node."""
+        data = _create_audit_log_data(triggered_by=_SUPERADMIN, acted_as=_TARGET)
         node = AuditLogAdapter._data_to_node(data)
         assert node.triggered_by == _SUPERADMIN
         assert node.acted_as == _TARGET
 
-    def test_data_to_node_preserves_null_acted_as(self) -> None:
-        # System trigger: both are None.
-        data = _make_data(triggered_by=None, acted_as=None)
+    def test_null_acted_as_preserved(self) -> None:
+        """A system-triggered row (both identities None) should keep acted_as None."""
+        data = _create_audit_log_data(triggered_by=None, acted_as=None)
         node = AuditLogAdapter._data_to_node(data)
         assert node.acted_as is None
 
-    def test_export_report_includes_acted_as(self) -> None:
+
+class TestExportReportFields:
+    """Tests for the audit-log export report field set."""
+
+    def test_acted_as_included(self) -> None:
+        """acted_as should be an exported audit-log field."""
         keys = {f.key for f in AUDIT_LOG_FIELDS}
         assert "acted_as" in keys
