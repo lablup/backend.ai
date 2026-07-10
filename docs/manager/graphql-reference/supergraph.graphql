@@ -1812,9 +1812,9 @@ type AuditLogV2 implements Node
   triggeredBy: String
 
   """
-  Added in 26.8.0. UUID string of the effective (acting) user the action ran as. Differs from triggered_by only while a super admin is impersonating a target.
+  Added in 26.8.0. UUID of the effective (acting) user the action ran as. Differs from triggered_by only while a super admin is impersonating a target.
   """
-  actedAs: String
+  actedAs: UUID
 
   """Human-readable description of the operation."""
   description: String!

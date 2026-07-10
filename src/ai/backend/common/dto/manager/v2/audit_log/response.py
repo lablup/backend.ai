@@ -30,10 +30,10 @@ class AuditLogNode(BaseResponseModel):
     triggered_by: str | None = Field(
         default=None, description="UUID string of the user who triggered the action"
     )
-    acted_as: str | None = Field(
+    acted_as: UUID | None = Field(
         default=None,
         description=(
-            "UUID string of the effective (acting) user the action ran as. "
+            "UUID of the effective (acting) user the action ran as. "
             "Differs from triggered_by only while a super admin is impersonating a target."
         ),
     )

@@ -59,11 +59,11 @@ class AuditLogV2GQL(PydanticNodeMixin[AuditLogNode]):
     triggered_by: str | None = gql_field(
         description="UUID string of the user who triggered the action."
     )
-    acted_as: str | None = gql_added_field(
+    acted_as: UUID | None = gql_added_field(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
             description=(
-                "UUID string of the effective (acting) user the action ran as. "
+                "UUID of the effective (acting) user the action ran as. "
                 "Differs from triggered_by only while a super admin is impersonating a target."
             ),
         ),
@@ -120,11 +120,7 @@ class AuditLogV2GQL(PydanticNodeMixin[AuditLogNode]):
     ):
         if self.acted_as is None:
             return None
-        try:
-            user_uuid = UUID(self.acted_as)
-        except ValueError:
-            return None
-        user_data = await info.context.data_loaders.user_loader.load(user_uuid)
+        user_data = await info.context.data_loaders.user_loader.load(self.acted_as)
         if user_data is None:
             return None
         return user_data
