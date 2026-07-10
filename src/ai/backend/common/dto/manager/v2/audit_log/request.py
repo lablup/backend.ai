@@ -7,7 +7,7 @@ from typing import Self
 from pydantic import Field, model_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
-from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter
+from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.rbac.types import EntityTypeScope, UUIDScope
 
 from .types import AuditLogOrderField, AuditLogStatus, OrderDirection
@@ -43,6 +43,9 @@ class AuditLogFilter(BaseRequestModel):
     operation: StringFilter | None = Field(default=None, description="Operation filter")
     status: AuditLogStatusFilter | None = Field(default=None, description="Status filter")
     triggered_by: StringFilter | None = Field(default=None, description="Triggered-by filter")
+    acted_as: UUIDFilter | None = Field(
+        default=None, description="Acted-as (effective/acting user UUID) filter"
+    )
     created_at: DateTimeFilter | None = Field(
         default=None, description="Filter logs by created_at datetime"
     )

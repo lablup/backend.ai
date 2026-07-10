@@ -1729,6 +1729,18 @@
             "default": null,
             "description": "Triggered-by filter"
           },
+          "acted_as": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Acted-as (effective/acting user UUID) filter"
+          },
           "created_at": {
             "anyOf": [
               {
@@ -1893,6 +1905,75 @@
           }
         },
         "title": "AuditLogStatusFilter",
+        "type": "object"
+      },
+      "UUIDFilter": {
+        "description": "Filter for UUID fields supporting equality and set operations.\n\nProvides UUID matching with equals/not_equals and in/not_in operations.",
+        "properties": {
+          "equals": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exact UUID match",
+            "title": "Equals"
+          },
+          "in": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "UUID is in list",
+            "title": "In"
+          },
+          "not_equals": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Not equals UUID",
+            "title": "Not Equals"
+          },
+          "not_in": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "UUID is not in list",
+            "title": "Not In"
+          }
+        },
+        "title": "UUIDFilter",
         "type": "object"
       },
       "AdminSearchAuditLogsInput": {
@@ -3999,75 +4080,6 @@
           }
         },
         "title": "NullableDateTimeFilter",
-        "type": "object"
-      },
-      "UUIDFilter": {
-        "description": "Filter for UUID fields supporting equality and set operations.\n\nProvides UUID matching with equals/not_equals and in/not_in operations.",
-        "properties": {
-          "equals": {
-            "anyOf": [
-              {
-                "format": "uuid",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Exact UUID match",
-            "title": "Equals"
-          },
-          "in": {
-            "anyOf": [
-              {
-                "items": {
-                  "format": "uuid",
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "UUID is in list",
-            "title": "In"
-          },
-          "not_equals": {
-            "anyOf": [
-              {
-                "format": "uuid",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Not equals UUID",
-            "title": "Not Equals"
-          },
-          "not_in": {
-            "anyOf": [
-              {
-                "items": {
-                  "format": "uuid",
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "UUID is not in list",
-            "title": "Not In"
-          }
-        },
-        "title": "UUIDFilter",
         "type": "object"
       },
       "AdminSearchDeploymentsInput": {

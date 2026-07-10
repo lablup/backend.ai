@@ -175,6 +175,14 @@ class AuditLogAdapter(BaseAdapter):
             )
             if condition is not None:
                 conditions.append(condition)
+        if f.acted_as is not None:
+            condition = self.convert_uuid_filter(
+                f.acted_as,
+                equals_factory=AuditLogConditions.by_acted_as_equals,
+                in_factory=AuditLogConditions.by_acted_as_in,
+            )
+            if condition is not None:
+                conditions.append(condition)
         if f.status is not None:
             self._apply_status_filter(f.status, conditions)
         if f.created_at is not None:
