@@ -63,13 +63,3 @@ def with_triggered_user(user: UserData) -> Iterator[None]:
         yield
     finally:
         _triggered_user_var.reset(token)
-
-
-def is_impersonating() -> bool:
-    """
-    Return True while a super admin is impersonating another user, i.e. the trigger
-    (requesting) user and the effective (acting) user are both set and differ.
-    """
-    trigger = triggered_user()
-    acting = current_user()
-    return trigger is not None and acting is not None and trigger.user_id != acting.user_id
