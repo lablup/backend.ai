@@ -10,6 +10,7 @@ SessionNetworkCoordinator's job and happens once before any container launch.
 
 from __future__ import annotations
 
+import contextlib
 import signal as signal_module
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -81,6 +82,8 @@ class ContainerdKernelOrchestrator:
         in place. Attaching after start would race krunner's network-dependent init (REPL bind,
         SSH, peer lookup)."""
         handle = await self._runtime.create_task(container_id)
+        # attach is atomic (it rolls back its own partial ADDs on failure), so a failure here
+        # leaves the network clean and the created task is reclaimed by the normal clean path.
         plan, endpoint_ips = await self._network.attach(
             kernel_config,
             cluster_info,
@@ -88,7 +91,15 @@ class ContainerdKernelOrchestrator:
             container_id=container_id,
             task_pid=handle.pid,
         )
-        await self._runtime.start_task(container_id)
+        try:
+            await self._runtime.start_task(container_id)
+        except Exception:
+            # The network is fully attached but the task failed to start. The caller only records
+            # the plan once this method returns, so it cannot detach for us — undo the attach here
+            # so the host veth / IPAM lease / MASQ rule do not leak. Best-effort; re-raise.
+            with contextlib.suppress(Exception):
+                await self._network.detach(plan, container_id=container_id, task_pid=handle.pid)
+            raise
         return LaunchResult(handle=handle, plan=plan, endpoint_ips=endpoint_ips)
 
     async def launch(

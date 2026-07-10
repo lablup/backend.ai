@@ -1,6 +1,8 @@
 from collections.abc import Mapping, Sequence
 from typing import Any, cast, override
 
+import pytest
+
 from ai.backend.agent.containerd.orchestrator import ContainerdKernelOrchestrator
 from ai.backend.agent.containerd.runtime.interface import OciRuntime, TaskHandle
 from ai.backend.agent.network.provisioner import ContainerNetworkProvisioner
@@ -160,6 +162,15 @@ class _FixedPlanBackend:
         return _plan()
 
 
+class _StartFailRuntime(FakeRuntime):
+    """FakeRuntime whose start_task fails, to exercise the post-attach cleanup path."""
+
+    @override
+    async def start_task(self, container_id: str) -> None:
+        self.calls.append("start_task")
+        raise RuntimeError("start failed")
+
+
 class TestLaunch:
     async def test_order_create_task_then_attach_then_start(self) -> None:
         events: list[str] = []
@@ -182,6 +193,25 @@ class TestLaunch:
         # network attach happened against the task's PID netns
         assert runner.calls == [("ADD", "/proc/4242/ns/net")]
         assert result.handle.pid == 4242
+
+    async def test_start_task_failure_detaches_the_attached_network(self) -> None:
+        # attach succeeds, then start_task fails. The caller records the plan only on success, so
+        # the orchestrator must detach here or the host veth / IPAM / MASQ would leak.
+        runtime = _StartFailRuntime(pid=4242)
+        runner = RecordingNetworkRunner()
+        orch = _orchestrator(runtime, runner)
+        with pytest.raises(RuntimeError):
+            await orch.launch(
+                "c1",
+                image_ref="img",
+                command=["sleep", "600"],
+                oci_spec={},
+                meta=_META,
+                kernel_config=cast(KernelCreationConfig, {}),
+                cluster_info=cast(ClusterInfo, {}),
+            )
+        assert ("ADD", "/proc/4242/ns/net") in runner.calls
+        assert ("DEL", "/proc/4242/ns/net") in runner.calls  # attach undone on start failure
 
     async def test_terminate_detaches_before_runtime_teardown(self) -> None:
         runtime = FakeRuntime(pid=4242)

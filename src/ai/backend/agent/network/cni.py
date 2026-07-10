@@ -9,6 +9,7 @@ supplies the container's netns and a real runner. Everything here is pure/testab
 
 from __future__ import annotations
 
+import contextlib
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from typing import Any
@@ -61,20 +62,39 @@ class CniAttacher:
     ) -> dict[NetworkRole, str]:
         """Apply the plan's CNI chain, returning the assigned IP per interface role
         (parsed from each CNI ADD result). The LOCAL IP is the host-reachable address the
-        agent uses to reach the kernel; the OVERLAY IP is for cross-node kernel traffic."""
+        agent uses to reach the kernel; the OVERLAY IP is for cross-node kernel traffic.
+
+        Atomic: if any ADD fails, the ADDs already applied are rolled back (DEL, reverse order)
+        before re-raising, so a partial attach never leaves a dangling veth / IPAM lease / MASQ
+        rule that no later detach would reclaim (the caller only records the plan once attach
+        returns successfully)."""
         assigned: dict[NetworkRole, str] = {}
-        for inv in plan_to_invocations(plan):
-            result = await self._runner(
-                "ADD",
-                ifname=inv.ifname,
-                netns=netns,
-                container_id=container_id,
-                config=inv.config,
-            )
-            ip = _first_ip(result)
-            if ip is not None:
-                assigned[inv.role] = ip
-        return assigned
+        applied: list[CniInvocation] = []
+        try:
+            for inv in plan_to_invocations(plan):
+                result = await self._runner(
+                    "ADD",
+                    ifname=inv.ifname,
+                    netns=netns,
+                    container_id=container_id,
+                    config=inv.config,
+                )
+                applied.append(inv)
+                ip = _first_ip(result)
+                if ip is not None:
+                    assigned[inv.role] = ip
+            return assigned
+        except Exception:
+            for inv in reversed(applied):
+                with contextlib.suppress(Exception):
+                    await self._runner(
+                        "DEL",
+                        ifname=inv.ifname,
+                        netns=netns,
+                        container_id=container_id,
+                        config=inv.config,
+                    )
+            raise
 
     async def detach(self, plan: EndpointPlan, *, container_id: str, netns: str) -> None:
         # tear down in reverse order of attach
