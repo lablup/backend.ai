@@ -153,6 +153,10 @@ layer differ.
   ([BEP-1055](BEP-1055-preemption-scheduler-mechanics.md) / BA-3058). The reschedule path in
   this BEP is therefore **implemented after** that state lands; for now it is only considered
   in the design. Until then, the terminate policy is the primary implementation target.
+- **Multi-node overlay network re-join (additional work required):** a multi-node session
+  binds its kernels through a Docker Swarm overlay network (`bai-multinode-{session_id}`)
+  created per session by the manager. When reschedule recreates a kernel on a different agent,
+  **work is required to re-join** that overlay network.
 - **No grace window.** Since the heartbeat no longer moves agents, the "a transient config
   error kills live sessions" risk is gone, and `force` is an immediate-transition model, so a
   timer-based grace period is unnecessary.
