@@ -16,6 +16,8 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
+from ai.backend.agent.containerd.runtime.cdi import CDI_DEFAULT_DIRS, inject_cdi_devices
+
 OCI_VERSION = "1.1.0"
 _TYPE_URL = "types.containerd.io/opencontainers/runtime-spec/1/Spec"
 
@@ -187,6 +189,7 @@ def build_oci_runtime_spec(
     cwd: str = "/",
     hostname: str = "",
     network_ns_path: str | None = None,
+    cdi_dirs: Sequence[str] = CDI_DEFAULT_DIRS,
 ) -> dict[str, Any]:
     """Assemble the OCI runtime spec (runc config.json) for ``Container.spec``.
 
@@ -196,7 +199,6 @@ def build_oci_runtime_spec(
     env = [f"{k}={v}" for k, v in (oci_spec.get("env") or {}).items()]
     devices, device_rules = _linux_devices(oci_spec)
     resources = _linux_resources(oci_spec, device_rules)
-    hooks = _nvidia_hooks(oci_spec, env)  # mutates env with the NVIDIA_* vars the hook needs
     seccomp = oci_spec.get("seccomp")
     namespaces: list[dict[str, Any]] = [
         {"type": "pid"},
@@ -240,8 +242,25 @@ def build_oci_runtime_spec(
             "cgroupsPath": f"/{_CGROUP_PARENT}/{oci_spec.get('labels', {}).get('ai.backend.kernel-id', '')}",
         },
     }
-    if hooks is not None:
-        spec["hooks"] = hooks
     if seccomp is not None:
         spec["linux"]["seccomp"] = seccomp
+    _inject_gpus(spec, oci_spec, cdi_dirs)
     return spec
+
+
+def _inject_gpus(
+    spec: dict[str, Any], oci_spec: Mapping[str, Any], cdi_dirs: Sequence[str]
+) -> None:
+    """Wire requested NVIDIA GPUs into the assembled runtime spec. Prefer CDI (declarative,
+    vendor-neutral; per-device isolation comes from the injected device nodes, not an env var);
+    fall back to the nvidia-container-toolkit prestart hook + NVIDIA_VISIBLE_DEVICES when the host
+    has no CDI spec for the requested devices."""
+    gpus = oci_spec.get("gpus")
+    if not gpus:
+        return
+    if inject_cdi_devices(spec, [f"nvidia.com/gpu={g}" for g in gpus], dirs=cdi_dirs):
+        return
+    hooks = _nvidia_hooks(oci_spec, spec["process"]["env"])
+    if hooks is not None:
+        for name, entries in hooks.items():
+            spec.setdefault("hooks", {}).setdefault(name, []).extend(entries)
