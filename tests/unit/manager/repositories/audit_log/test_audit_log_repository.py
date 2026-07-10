@@ -74,6 +74,7 @@ class TestAuditLogRepository:
                     entity_id=None,
                     request_id=None,
                     triggered_by=None,
+                    acted_as=None,
                     duration=None,
                 )
             )
@@ -104,6 +105,7 @@ class TestAuditLogRepository:
                     entity_id=None,
                     request_id=None,
                     triggered_by=None,
+                    acted_as=None,
                     duration=None,
                 )
             )
@@ -133,6 +135,7 @@ class TestAuditLogRepository:
                     entity_id=None,
                     request_id=None,
                     triggered_by=None,
+                    acted_as=None,
                     duration=None,
                 )
             )
@@ -166,6 +169,7 @@ class TestAuditLogRepository:
                 entity_id=None,
                 request_id=None,
                 triggered_by=None,
+                acted_as=None,
                 duration=None,
             )
             creator = Creator(
@@ -179,6 +183,7 @@ class TestAuditLogRepository:
                     entity_id=data.entity_id,
                     request_id=data.request_id,
                     triggered_by=data.triggered_by,
+                    acted_as=data.acted_as,
                     duration=data.duration,
                 )
             )
