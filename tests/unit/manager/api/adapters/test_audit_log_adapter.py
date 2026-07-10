@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from ai.backend.manager.actions.types import OperationStatus
 from ai.backend.manager.api.adapters.audit_log.adapter import AuditLogAdapter
@@ -20,7 +20,7 @@ def _make_data(*, triggered_by: str | None, acted_as: str | None) -> AuditLogDat
         action_id=uuid.uuid4(),
         entity_type="vfolder",
         operation="search",
-        created_at=datetime(2026, 7, 10, tzinfo=timezone.utc),
+        created_at=datetime(2026, 7, 10, tzinfo=UTC),
         description="test",
         status=OperationStatus.SUCCESS,
         entity_id="entity-1",

@@ -469,11 +469,6 @@ type AuditLogNode implements Node {
   """Added in 25.12.0, User ID that triggered the action"""
   triggered_by: String
 
-  """
-  Effective (acting) user ID the action ran as; differs from triggered_by only during super-admin impersonation
-  """
-  acted_as: String
-
   """Description of the AuditLog"""
   description: String!
 
