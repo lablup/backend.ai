@@ -651,11 +651,17 @@ class TestApplicableFragments:
                 or (f.scope_type is AppConfigScopeType.USER and f.scope_id == _USER_ID)
             )
         ]
-        assert [f.id for f in applicable] == [f.id for f in expected]
-        assert [f.scope_type for f in applicable] == [
+        assert [vf.data.id for vf in applicable] == [f.id for f in expected]
+        assert [vf.data.scope_type for vf in applicable] == [
             AppConfigScopeType.PUBLIC,
             AppConfigScopeType.DOMAIN,
             AppConfigScopeType.USER,
+        ]
+        # each visible layer carries its allow-list read_access tier (scope-type defaults)
+        assert [vf.read_access for vf in applicable] == [
+            AppConfigScopeType.PUBLIC.default_read_access(),
+            AppConfigScopeType.DOMAIN.default_read_access(),
+            AppConfigScopeType.USER.default_read_access(),
         ]
 
     async def test_unknown_config_name_returns_empty(
@@ -689,11 +695,15 @@ class TestApplicableFragments:
                 or (f.scope_type is AppConfigScopeType.USER and f.scope_id == _USER_ID)
             )
         }
-        assert {f.id for f in applicable} == expected
+        assert {vf.data.id for vf in applicable} == expected
         # Rank-ordered globally, so each config_name's subset stays rank-ordered
         # (public < domain < user) for the caller to group by name and deep-merge in order.
         for name in ("theme", "menu"):
-            ranks = [f.scope_type.default_rank() for f in applicable if f.config_name == name]
+            ranks = [
+                vf.data.scope_type.default_rank()
+                for vf in applicable
+                if vf.data.config_name == name
+            ]
             assert ranks == sorted(ranks)
 
     async def test_bulk_empty_names_returns_empty(

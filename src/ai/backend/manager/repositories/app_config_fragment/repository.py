@@ -12,6 +12,7 @@ from ai.backend.manager.data.app_config_fragment.types import (
     AppConfigFragmentBulkResult,
     AppConfigFragmentData,
     AppConfigFragmentSearchResult,
+    VisibleFragment,
 )
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
 from ai.backend.manager.models.scopes import SearchScope
@@ -110,5 +111,5 @@ class AppConfigFragmentRepository:
     @app_config_fragment_repository_resilience.apply()
     async def list_visible_fragments_bulk(
         self, config_names: list[str], scope: AppConfigScopeArguments | None = None
-    ) -> list[AppConfigFragmentData]:
+    ) -> list[VisibleFragment]:
         return await self._db_source.list_visible_fragments_bulk(config_names, scope)

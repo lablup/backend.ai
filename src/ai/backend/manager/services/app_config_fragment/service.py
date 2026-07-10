@@ -2,12 +2,13 @@ from __future__ import annotations
 
 from typing import cast
 
-from ai.backend.common.data.app_config.types import AppConfigScopeType
+from ai.backend.common.data.app_config.types import AppConfigAccessLevel, AppConfigScopeType
 from ai.backend.common.data.user.types import UserData
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
 from ai.backend.manager.data.app_config_fragment.types import (
     AppConfigFragmentBulkItemError,
     AppConfigFragmentBulkResult,
+    AppConfigFragmentData,
 )
 from ai.backend.manager.errors.app_config import (
     AppConfigFragmentNotFound,
@@ -134,14 +135,40 @@ class AppConfigFragmentService:
             has_previous_page=result.has_previous_page,
         )
 
+    async def _filter_readable(
+        self, requester: UserData | None, items: list[AppConfigFragmentData]
+    ) -> list[AppConfigFragmentData]:
+        """Drop fragments whose layer ``read_access`` the ``requester`` does not satisfy.
+
+        The tier per ``(config_name, scope_type)`` is looked up once and cached. Note this
+        gates the returned page only; ``total_count`` still reflects the visible-scope match
+        count before the read_access filter (paginated counts are not re-derived here).
+        """
+        cache: dict[tuple[str, AppConfigScopeType], AppConfigAccessLevel | None] = {}
+        readable: list[AppConfigFragmentData] = []
+        for item in items:
+            key = (item.config_name, item.scope_type)
+            if key not in cache:
+                entry = await self._allow_list_repository.by_config_and_scope(
+                    item.config_name, item.scope_type
+                )
+                cache[key] = entry.read_access if entry is not None else None
+            read_access = cache[key]
+            if read_access is not None and read_access.is_satisfied_by(
+                requester, item.scope_type, item.scope_id
+            ):
+                readable.append(item)
+        return readable
+
     async def scoped_search(
         self, action: ScopedSearchAppConfigFragmentAction
     ) -> ScopedSearchAppConfigFragmentActionResult:
         targets = list(action.targets())
         scopes = [t.to_search_scope() for t in targets]
         result = await self._repository.scoped_search(action.querier, scopes)
+        readable = await self._filter_readable(action.requester, result.items)
         return ScopedSearchAppConfigFragmentActionResult(
-            data=result.items,
+            data=readable,
             total_count=result.total_count,
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,

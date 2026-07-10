@@ -68,11 +68,19 @@ class AppConfigService:
 
         With a principal ``scope`` the merge overlays the caller's domain and user fragments
         on top of ``public``; with ``scope=None`` (anonymous, pre-login) only ``public``
-        fragments contribute.
+        fragments contribute. Each visible layer is additionally gated by its ``read_access``
+        tier — a layer the ``requester`` may not read is dropped before merging.
         """
-        fragments = await self._fragment_repository.list_visible_fragments_bulk(
+        visible = await self._fragment_repository.list_visible_fragments_bulk(
             [action.config_name], action.scope
         )
+        fragments = [
+            vf.data
+            for vf in visible
+            if vf.read_access.is_satisfied_by(
+                action.requester, vf.data.scope_type, vf.data.scope_id
+            )
+        ]
         app_config = AppConfigData(
             config_name=action.config_name,
             fragments=fragments,
@@ -89,19 +97,27 @@ class AppConfigService:
         One entry per requested ``config_name``, in request order — a name repeated in the
         input is repeated in the output (each position resolves independently, never
         collapsed). With ``scope=None`` (anonymous, pre-login) only ``public`` fragments
-        contribute to every entry.
+        contribute to every entry. Each visible layer is additionally gated by its
+        ``read_access`` tier — a layer the ``requester`` may not read is dropped before merging.
         """
-        fragments = await self._fragment_repository.list_visible_fragments_bulk(
+        visible = await self._fragment_repository.list_visible_fragments_bulk(
             action.config_names, action.scope
         )
+        fragments = [
+            vf.data
+            for vf in visible
+            if vf.read_access.is_satisfied_by(
+                action.requester, vf.data.scope_type, vf.data.scope_id
+            )
+        ]
         app_configs: list[AppConfigData] = []
         for config_name in action.config_names:
-            visible = [fragment for fragment in fragments if fragment.config_name == config_name]
+            subset = [fragment for fragment in fragments if fragment.config_name == config_name]
             app_configs.append(
                 AppConfigData(
                     config_name=config_name,
-                    fragments=visible,
-                    merged_config=_merge_configs(visible),
+                    fragments=subset,
+                    merged_config=_merge_configs(subset),
                 )
             )
         user_id = action.scope.user_id if action.scope is not None else None

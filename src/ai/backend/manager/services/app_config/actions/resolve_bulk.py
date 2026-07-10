@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.permission.types import RBACElementType, ScopeType
+from ai.backend.common.data.user.types import UserData
 from ai.backend.common.identifier.user import UserID
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.app_config.types import AppConfigData
@@ -21,11 +22,13 @@ class ResolveBulkAppConfigAction(AppConfigScopeAction):
 
     ``scope`` carries the resolving principal ``(user, domain)``. When it is ``None`` — the
     anonymous, pre-login read — only ``public``-scope fragments contribute and the action is
-    a ``GLOBAL`` read attributable to no user.
+    a ``GLOBAL`` read attributable to no user. ``requester`` is the caller checked against
+    each layer's ``read_access`` tier (``None`` for the anonymous read → public layers only).
     """
 
     config_names: list[str]
     scope: AppConfigScopeArguments | None = None
+    requester: UserData | None = None
 
     @override
     @classmethod

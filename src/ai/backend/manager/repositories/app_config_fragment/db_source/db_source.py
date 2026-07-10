@@ -17,6 +17,7 @@ from ai.backend.manager.data.app_config_fragment.types import (
     AppConfigFragmentBulkResult,
     AppConfigFragmentData,
     AppConfigFragmentSearchResult,
+    VisibleFragment,
 )
 from ai.backend.manager.errors.app_config import (
     AppConfigFragmentNotFound,
@@ -203,7 +204,7 @@ class AppConfigFragmentDBSource:
     @app_config_fragment_db_source_resilience.apply()
     async def list_visible_fragments_bulk(
         self, config_names: list[str], scope: AppConfigScopeArguments | None = None
-    ) -> list[AppConfigFragmentData]:
+    ) -> list[VisibleFragment]:
         """Visible fragments for several ``config_names`` at once, in a single query.
 
         Selects the requested names AND any one of the visible scopes. ``public`` always
@@ -214,7 +215,9 @@ class AppConfigFragmentDBSource:
         The scope filter is name-independent, so it is a single OR group AND-combined with the
         name membership. Merge priority (``rank``) lives on the joined allow-list entry; the
         result is always ordered by ascending ``rank`` so the caller can group by name (each
-        name's subset stays rank-ordered) and deep-merge each name's fragments in order.
+        name's subset stays rank-ordered) and deep-merge each name's fragments in order. Each
+        fragment is paired with its layer's ``read_access`` tier (also from the joined entry)
+        so the service can drop layers the reader may not see before merging.
         """
         if not config_names:
             return []
@@ -233,8 +236,9 @@ class AppConfigFragmentDBSource:
             orders=[AppConfigAllowListRow.rank.asc()],
         )
         # Join each fragment to its allow-list entry (indexed ``(config_name, scope_type)`` FK
-        # pair), which carries the merge ``rank`` the result is ordered by.
-        selector = sa.select(AppConfigFragmentRow).join(
+        # pair), which carries the merge ``rank`` the result is ordered by and the
+        # ``read_access`` tier the reader is checked against.
+        selector = sa.select(AppConfigFragmentRow, AppConfigAllowListRow.read_access).join(
             AppConfigAllowListRow,
             sa.and_(
                 AppConfigAllowListRow.config_name == AppConfigFragmentRow.config_name,
@@ -243,4 +247,10 @@ class AppConfigFragmentDBSource:
         )
         async with self._ops.read_ops() as r:
             result = await r.batch_query_in_global(selector, querier)
-            return [row.AppConfigFragmentRow.to_data() for row in result.rows]
+            return [
+                VisibleFragment(
+                    data=row.AppConfigFragmentRow.to_data(),
+                    read_access=row.read_access,
+                )
+                for row in result.rows
+            ]

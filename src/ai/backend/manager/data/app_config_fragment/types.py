@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
-from ai.backend.common.data.app_config.types import AppConfigScopeType
+from ai.backend.common.data.app_config.types import AppConfigAccessLevel, AppConfigScopeType
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
 
 
@@ -19,6 +19,19 @@ class AppConfigFragmentData:
     config: dict[str, Any]
     created_at: datetime
     updated_at: datetime
+
+
+@dataclass(frozen=True)
+class VisibleFragment:
+    """A visible fragment paired with its layer's ``read_access`` tier.
+
+    The read query joins each fragment to its ``(config_name, scope_type)`` allow-list entry;
+    ``read_access`` is carried alongside so the service can drop layers the reader's tier does
+    not satisfy before merging (read authorization).
+    """
+
+    data: AppConfigFragmentData
+    read_access: AppConfigAccessLevel
 
 
 @dataclass(frozen=True)

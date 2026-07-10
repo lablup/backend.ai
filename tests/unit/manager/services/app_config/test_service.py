@@ -10,11 +10,15 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from ai.backend.common.data.app_config.types import AppConfigScopeType
+from ai.backend.common.data.app_config.types import AppConfigAccessLevel, AppConfigScopeType
+from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
 from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.user import UserID
-from ai.backend.manager.data.app_config_fragment.types import AppConfigFragmentData
+from ai.backend.manager.data.app_config_fragment.types import (
+    AppConfigFragmentData,
+    VisibleFragment,
+)
 from ai.backend.manager.repositories.app_config_fragment.repository import (
     AppConfigFragmentRepository,
 )
@@ -30,7 +34,44 @@ _DOMAIN_ID = DomainID(uuid.uuid4())
 _NOW = datetime.now(UTC)
 _SCOPE = AppConfigScopeArguments(domain_id=_DOMAIN_ID, user_id=_USER_ID)
 
+# The caller behind _SCOPE: a regular user who owns the _USER_ID scope (satisfies the
+# default read_access tiers — public, authenticated, and its own user layer).
+_REQUESTER = UserData(
+    user_id=_USER_ID,
+    is_authorized=True,
+    is_admin=False,
+    is_superadmin=False,
+    role=UserRole.USER,
+    domain_name="default",
+)
+_SUPERADMIN = UserData(
+    user_id=UserID(uuid.uuid4()),
+    is_authorized=True,
+    is_admin=True,
+    is_superadmin=True,
+    role=UserRole.SUPERADMIN,
+    domain_name="default",
+)
+
 FragmentFactory = Callable[[str, dict[str, Any], AppConfigScopeType, str], AppConfigFragmentData]
+
+
+def _visible(
+    *fragments: AppConfigFragmentData,
+    read_access: AppConfigAccessLevel | None = None,
+) -> list[VisibleFragment]:
+    """Wrap fragments as the read query now yields them — each paired with a ``read_access``
+    tier (the scope-type default unless overridden), which the service filters against.
+    """
+    return [
+        VisibleFragment(
+            data=f,
+            read_access=read_access
+            if read_access is not None
+            else f.scope_type.default_read_access(),
+        )
+        for f in fragments
+    ]
 
 
 @pytest.fixture
@@ -80,11 +121,11 @@ class TestAppConfigService:
         )
         user = make_fragment("theme", {"theme": "dark"}, AppConfigScopeType.USER, str(_USER_ID))
         mock_fragment_repository.list_visible_fragments_bulk = AsyncMock(
-            return_value=[public, user]
+            return_value=_visible(public, user)
         )
 
         result = await service.resolve_app_config(
-            ResolveAppConfigAction(config_name="theme", scope=_SCOPE)
+            ResolveAppConfigAction(config_name="theme", scope=_SCOPE, requester=_REQUESTER)
         )
 
         assert result.app_config.config_name == "theme"
@@ -116,11 +157,11 @@ class TestAppConfigService:
             str(_USER_ID),
         )
         mock_fragment_repository.list_visible_fragments_bulk = AsyncMock(
-            return_value=[public, user]
+            return_value=_visible(public, user)
         )
 
         result = await service.resolve_app_config(
-            ResolveAppConfigAction(config_name="ui", scope=_SCOPE)
+            ResolveAppConfigAction(config_name="ui", scope=_SCOPE, requester=_REQUESTER)
         )
 
         # The user's shorter nav list fully replaces public's — no trailing "about"/"contact".
@@ -132,10 +173,10 @@ class TestAppConfigService:
     async def test_resolve_empty_yields_none_merged_config(
         self, service: AppConfigService, mock_fragment_repository: MagicMock
     ) -> None:
-        mock_fragment_repository.list_visible_fragments_bulk = AsyncMock(return_value=[])
+        mock_fragment_repository.list_visible_fragments_bulk = AsyncMock(return_value=_visible())
 
         result = await service.resolve_app_config(
-            ResolveAppConfigAction(config_name="unknown", scope=_SCOPE)
+            ResolveAppConfigAction(config_name="unknown", scope=_SCOPE, requester=_REQUESTER)
         )
 
         # No contributing fragment -> None (unconfigured), not an empty {}.
@@ -157,11 +198,13 @@ class TestAppConfigService:
         )
         menu_public = make_fragment("menu", {"items": ["a"]}, AppConfigScopeType.PUBLIC, "")
         mock_fragment_repository.list_visible_fragments_bulk = AsyncMock(
-            return_value=[theme_public, theme_user, menu_public]
+            return_value=_visible(theme_public, theme_user, menu_public)
         )
 
         result = await service.resolve_app_config_bulk(
-            ResolveBulkAppConfigAction(config_names=["theme", "menu", "unknown"], scope=_SCOPE)
+            ResolveBulkAppConfigAction(
+                config_names=["theme", "menu", "unknown"], scope=_SCOPE, requester=_REQUESTER
+            )
         )
 
         # One AppConfigData per requested name, in request order.
@@ -183,10 +226,14 @@ class TestAppConfigService:
         # A config_name repeated in the request must be repeated in the output — each
         # position resolves independently, never collapsed into a single entry.
         theme = make_fragment("theme", {"theme": "dark"}, AppConfigScopeType.PUBLIC, "")
-        mock_fragment_repository.list_visible_fragments_bulk = AsyncMock(return_value=[theme])
+        mock_fragment_repository.list_visible_fragments_bulk = AsyncMock(
+            return_value=_visible(theme)
+        )
 
         result = await service.resolve_app_config_bulk(
-            ResolveBulkAppConfigAction(config_names=["theme", "theme"], scope=_SCOPE)
+            ResolveBulkAppConfigAction(
+                config_names=["theme", "theme"], scope=_SCOPE, requester=_REQUESTER
+            )
         )
 
         assert [c.config_name for c in result.app_configs] == ["theme", "theme"]
@@ -204,7 +251,9 @@ class TestAppConfigService:
         public = make_fragment(
             "theme", {"theme": "light", "lang": "en"}, AppConfigScopeType.PUBLIC, "public"
         )
-        mock_fragment_repository.list_visible_fragments_bulk = AsyncMock(return_value=[public])
+        mock_fragment_repository.list_visible_fragments_bulk = AsyncMock(
+            return_value=_visible(public)
+        )
 
         result = await service.resolve_app_config(ResolveAppConfigAction(config_name="theme"))
 
@@ -215,3 +264,62 @@ class TestAppConfigService:
         mock_fragment_repository.list_visible_fragments_bulk.assert_called_once_with(
             ["theme"], None
         )
+
+    async def test_resolve_drops_layer_the_requester_cannot_read(
+        self,
+        service: AppConfigService,
+        mock_fragment_repository: MagicMock,
+        make_fragment: FragmentFactory,
+    ) -> None:
+        # An admin has locked one layer to admin-only reads (non-default read_access): a
+        # regular caller sees it in scope but must not read it — it is dropped before merge.
+        public = make_fragment("theme", {"theme": "light"}, AppConfigScopeType.PUBLIC, "")
+        locked = make_fragment("theme", {"theme": "secret"}, AppConfigScopeType.USER, str(_USER_ID))
+        mock_fragment_repository.list_visible_fragments_bulk = AsyncMock(
+            return_value=_visible(public) + _visible(locked, read_access=AppConfigAccessLevel.ADMIN)
+        )
+
+        result = await service.resolve_app_config(
+            ResolveAppConfigAction(config_name="theme", scope=_SCOPE, requester=_REQUESTER)
+        )
+
+        assert result.app_config.fragments == [public]
+        assert result.app_config.merged_config == {"theme": "light"}
+
+    async def test_resolve_superadmin_reads_every_layer(
+        self,
+        service: AppConfigService,
+        mock_fragment_repository: MagicMock,
+        make_fragment: FragmentFactory,
+    ) -> None:
+        # A superadmin satisfies every tier, so an admin-locked layer still contributes.
+        public = make_fragment("theme", {"theme": "light"}, AppConfigScopeType.PUBLIC, "")
+        locked = make_fragment("theme", {"theme": "secret"}, AppConfigScopeType.USER, str(_USER_ID))
+        mock_fragment_repository.list_visible_fragments_bulk = AsyncMock(
+            return_value=_visible(public) + _visible(locked, read_access=AppConfigAccessLevel.ADMIN)
+        )
+
+        result = await service.resolve_app_config(
+            ResolveAppConfigAction(config_name="theme", scope=_SCOPE, requester=_SUPERADMIN)
+        )
+
+        assert result.app_config.fragments == [public, locked]
+        assert result.app_config.merged_config == {"theme": "secret"}
+
+    async def test_resolve_public_drops_non_public_readable_layer(
+        self,
+        service: AppConfigService,
+        mock_fragment_repository: MagicMock,
+        make_fragment: FragmentFactory,
+    ) -> None:
+        # Pre-login (requester=None): a layer whose read_access is above ``public`` — even a
+        # public-scope fragment an admin raised to authenticated-only — is not readable.
+        locked = make_fragment("theme", {"theme": "secret"}, AppConfigScopeType.PUBLIC, "")
+        mock_fragment_repository.list_visible_fragments_bulk = AsyncMock(
+            return_value=_visible(locked, read_access=AppConfigAccessLevel.AUTHENTICATED)
+        )
+
+        result = await service.resolve_app_config(ResolveAppConfigAction(config_name="theme"))
+
+        assert result.app_config.fragments == []
+        assert result.app_config.merged_config is None

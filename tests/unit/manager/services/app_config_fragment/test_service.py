@@ -353,6 +353,8 @@ class TestAppConfigFragmentService:
                     UserAppConfigFragmentTarget(user_id=UserID(_USER_UUID)),
                 ],
                 querier=querier,
+                # the owner of the returned user-scope fragment satisfies its read_access
+                requester=_user(),
             )
         )
 
@@ -363,6 +365,31 @@ class TestAppConfigFragmentService:
         assert called_querier is querier
         assert called_scopes[0].domain_id == domain_id
         assert called_scopes[1].user_id == _USER_UUID
+
+    async def test_scoped_search_drops_fragment_the_requester_cannot_read(
+        self, service: AppConfigFragmentService, mock_repository: MagicMock
+    ) -> None:
+        # The page holds a user-scope fragment (default read_access=owner); a caller who is
+        # not its owner (and not admin) must not see it — it is filtered from the results.
+        fragment = _fragment(config_name="theme")  # user scope, owned by _USER_UUID
+        mock_repository.scoped_search = AsyncMock(
+            return_value=AppConfigFragmentSearchResult(
+                items=[fragment],
+                total_count=1,
+                has_next_page=False,
+                has_previous_page=False,
+            )
+        )
+
+        result = await service.scoped_search(
+            ScopedSearchAppConfigFragmentAction(
+                items=[UserAppConfigFragmentTarget(user_id=UserID(_OTHER_UUID))],
+                querier=BatchQuerier(pagination=OffsetPagination(limit=10, offset=0)),
+                requester=_user(_OTHER_UUID),
+            )
+        )
+
+        assert result.data == []
 
     # --- update (loads fragment, then authorizes) ---
 

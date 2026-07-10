@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.permission.types import EntityType, RBACElementType
+from ai.backend.common.data.user.types import UserData
 from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.user import UserID
 from ai.backend.manager.actions.action.bulk import BaseBulkAction, BaseBulkActionResult
@@ -54,10 +55,15 @@ class UserAppConfigFragmentTarget(SearchableActionTarget):
 
 @dataclass
 class ScopedSearchAppConfigFragmentAction(BaseBulkAction[SearchableActionTarget]):
-    """Scoped path: search the fragments under the given domain/user scope targets."""
+    """Scoped path: search the fragments under the given domain/user scope targets.
+
+    ``requester`` is the caller each returned fragment is gated against by its layer's
+    ``read_access`` tier (``None`` = anonymous → ``public``-readable layers only).
+    """
 
     items: list[SearchableActionTarget]
     querier: BatchQuerier
+    requester: UserData | None = None
 
     @override
     def entity_id(self) -> str | None:

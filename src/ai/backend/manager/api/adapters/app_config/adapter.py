@@ -197,7 +197,9 @@ class AppConfigAdapter(BaseAdapter):
             for user_id in (input.scope.user or [])
         ]
         action_result = await self._processors.app_config_fragment.scoped_search.wait_for_complete(
-            ScopedSearchAppConfigFragmentAction(items=targets, querier=querier)
+            ScopedSearchAppConfigFragmentAction(
+                items=targets, querier=querier, requester=current_user()
+            )
         )
         return SearchAppConfigFragmentPayload(
             items=[self._fragment_to_node(item) for item in action_result.data],
@@ -216,6 +218,7 @@ class AppConfigAdapter(BaseAdapter):
                 scope=AppConfigScopeArguments(
                     domain_id=DomainID(input.domain_id), user_id=UserID(input.user_id)
                 ),
+                requester=current_user(),
             )
         )
         return ResolveAppConfigPayload(
@@ -223,10 +226,11 @@ class AppConfigAdapter(BaseAdapter):
         )
 
     async def resolve_public(self, config_name: str) -> ResolveAppConfigPayload:
-        # Anonymous, pre-login read: no principal (``scope=None``), so only public fragments
-        # contribute. Reuses the standard resolve action rather than a separate public one.
+        # Anonymous, pre-login read: no principal (``scope=None``) and no ``requester``, so
+        # only public, public-readable fragments contribute. Reuses the standard resolve
+        # action rather than a separate public one.
         action_result = await self._processors.app_config.resolve_app_config.wait_for_complete(
-            ResolveAppConfigAction(config_name=config_name)
+            ResolveAppConfigAction(config_name=config_name, requester=None)
         )
         return ResolveAppConfigPayload(
             app_config=self._app_config_to_node(action_result.app_config)
