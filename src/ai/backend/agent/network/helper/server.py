@@ -192,6 +192,12 @@ class NetworkHelperServer:
                     case HelperOp.DETACH_CONTAINER:
                         await self._detach(session_id, req.container_id)
                         return HelperResponse(ok=True)
+                    case HelperOp.ADD_PEER | HelperOp.DEL_PEER:
+                        await self._peer(session_id, req)
+                        return HelperResponse(ok=True)
+                    case HelperOp.ADD_ENDPOINT | HelperOp.DEL_ENDPOINT:
+                        await self._endpoint(session_id, req)
+                        return HelperResponse(ok=True)
             except (policy.PolicyViolation, netns_mod.NetnsError, HelperError) as e:
                 return HelperResponse(ok=False, error=str(e))
             except Exception:
@@ -280,3 +286,32 @@ class NetworkHelperServer:
             await self._attacher._runner(
                 "DEL", ifname=inv.ifname, netns="", container_id=container_id, config=inv.config
             )
+
+    def _require_session(self, session_id: str) -> _SessionEntry:
+        entry = self._sessions.get(session_id)
+        if entry is None:
+            raise HelperError("peer/endpoint programming before session setup")
+        return entry
+
+    async def _peer(self, session_id: str, req: HelperRequest) -> None:
+        """Program (ADD_PEER) or remove (DEL_PEER) a peer VTEP's overlay forwarding. The
+        Member carries only the validated VTEP; the backend uses nothing else here."""
+        entry = self._require_session(session_id)
+        vtep_ip = policy.validate_ipv4(req.vtep_ip, what="vtep_ip")
+        peer = Member(agent_id="", host_ip=vtep_ip, vtep_ip=vtep_ip, ip_range=None)
+        if req.op is HelperOp.ADD_PEER:
+            await entry.backend.add_peer(session_id, peer)
+        else:
+            await entry.backend.del_peer(session_id, peer)
+
+    async def _endpoint(self, session_id: str, req: HelperRequest) -> None:
+        """Program (ADD_ENDPOINT) or remove (DEL_ENDPOINT) a remote container endpoint's
+        unicast FDB + ARP entry."""
+        entry = self._require_session(session_id)
+        ip = policy.validate_ipv4(req.ip, what="endpoint ip")
+        mac = policy.validate_mac(req.mac)
+        vtep_ip = policy.validate_ipv4(req.vtep_ip, what="vtep_ip")
+        if req.op is HelperOp.ADD_ENDPOINT:
+            await entry.backend.add_endpoint(session_id, ip=ip, mac=mac, vtep_ip=vtep_ip)
+        else:
+            await entry.backend.del_endpoint(session_id, ip=ip, mac=mac, vtep_ip=vtep_ip)

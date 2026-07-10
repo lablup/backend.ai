@@ -124,11 +124,35 @@ class HelperBackendProxy(AbstractNetworkAgentPluginV2["AbstractKernel"]):
 
     @override
     async def add_peer(self, session_id: str, peer: Member) -> None:
-        pass
+        if peer.vtep_ip is None:
+            return  # non-overlay peer (bridge/host-gw): nothing to program on the overlay
+        await self._client.call(
+            HelperRequest(op=HelperOp.ADD_PEER, session_id=session_id, vtep_ip=peer.vtep_ip)
+        )
 
     @override
     async def del_peer(self, session_id: str, peer: Member) -> None:
-        pass
+        if peer.vtep_ip is None:
+            return
+        await self._client.call(
+            HelperRequest(op=HelperOp.DEL_PEER, session_id=session_id, vtep_ip=peer.vtep_ip)
+        )
+
+    @override
+    async def add_endpoint(self, session_id: str, *, ip: str, mac: str, vtep_ip: str) -> None:
+        await self._client.call(
+            HelperRequest(
+                op=HelperOp.ADD_ENDPOINT, session_id=session_id, ip=ip, mac=mac, vtep_ip=vtep_ip
+            )
+        )
+
+    @override
+    async def del_endpoint(self, session_id: str, *, ip: str, mac: str, vtep_ip: str) -> None:
+        await self._client.call(
+            HelperRequest(
+                op=HelperOp.DEL_ENDPOINT, session_id=session_id, ip=ip, mac=mac, vtep_ip=vtep_ip
+            )
+        )
 
     @override
     async def attach_endpoint(

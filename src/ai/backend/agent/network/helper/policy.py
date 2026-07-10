@@ -26,6 +26,7 @@ from ai.backend.common.network.types import NetworkBackendKind
 # a UUID-ish token; container_id is a containerd id (hex) or a kernel UUID.
 _SESSION_ID_RE = re.compile(r"\A[A-Za-z0-9][A-Za-z0-9._-]{0,127}\Z")
 _CONTAINER_ID_RE = re.compile(r"\A[A-Za-z0-9][A-Za-z0-9._-]{0,127}\Z")
+_MAC_RE = re.compile(r"\A[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}\Z")
 
 # The helper only ever operates on RFC1918 space; a manager-provided subnet outside
 # it is rejected outright (defence in depth — the bridge backend derives its own
@@ -62,6 +63,22 @@ def validate_session_id(value: str) -> str:
 def validate_container_id(value: str) -> str:
     if not _CONTAINER_ID_RE.match(value):
         raise PolicyViolation("invalid container_id")
+    return value
+
+
+def validate_ipv4(value: str | None, *, what: str) -> str:
+    if value is None:
+        raise PolicyViolation(f"missing {what}")
+    try:
+        ipaddress.IPv4Address(value)
+    except ValueError as e:
+        raise PolicyViolation(f"invalid {what}") from e
+    return value
+
+
+def validate_mac(value: str | None) -> str:
+    if value is None or not _MAC_RE.match(value):
+        raise PolicyViolation("invalid mac")
     return value
 
 

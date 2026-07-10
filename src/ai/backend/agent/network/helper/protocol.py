@@ -26,6 +26,13 @@ class HelperOp(enum.StrEnum):
     TEARDOWN_SESSION = "teardown_session"
     ATTACH_CONTAINER = "attach_container"
     DETACH_CONTAINER = "detach_container"
+    # Multi-node overlay (vxlan): program peer VTEP + remote-endpoint FDB/ARP. The agent's
+    # coordinator drives these off its etcd membership/endpoint watch; only the privileged
+    # ``bridge fdb`` / ``ip neigh`` execution is delegated here.
+    ADD_PEER = "add_peer"
+    DEL_PEER = "del_peer"
+    ADD_ENDPOINT = "add_endpoint"
+    DEL_ENDPOINT = "del_endpoint"
 
 
 class ProtocolError(RuntimeError):
@@ -43,6 +50,11 @@ class HelperRequest:
     session_id: str
     container_id: str | None = None
     network_config: dict[str, Any] | None = None
+    # Overlay peer/endpoint programming (ADD_PEER/DEL_PEER carry vtep_ip; ADD_ENDPOINT/
+    # DEL_ENDPOINT carry ip + mac + vtep_ip). Opaque values the helper still validates.
+    vtep_ip: str | None = None
+    ip: str | None = None
+    mac: str | None = None
 
     def encode(self) -> bytes:
         payload: dict[str, Any] = {"op": str(self.op), "session_id": self.session_id}
@@ -50,6 +62,10 @@ class HelperRequest:
             payload["container_id"] = self.container_id
         if self.network_config is not None:
             payload["network_config"] = self.network_config
+        for key in ("vtep_ip", "ip", "mac"):
+            value = getattr(self, key)
+            if value is not None:
+                payload[key] = value
         return json.dumps(payload, separators=(",", ":")).encode() + b"\n"
 
     @classmethod
@@ -73,11 +89,18 @@ class HelperRequest:
         network_config = data.get("network_config")
         if network_config is not None and not isinstance(network_config, dict):
             raise ProtocolError("network_config must be an object")
+        fields: dict[str, str | None] = {}
+        for key in ("vtep_ip", "ip", "mac"):
+            value = data.get(key)
+            if value is not None and not isinstance(value, str):
+                raise ProtocolError(f"{key} must be a string")
+            fields[key] = value
         return cls(
             op=op,
             session_id=session_id,
             container_id=container_id,
             network_config=network_config,
+            **fields,
         )
 
 
