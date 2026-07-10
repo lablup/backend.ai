@@ -70,6 +70,20 @@ class SessionNetworkCoordinator:
         """Bring up this node's data plane for the session, publish membership, apply
         existing peers, and begin watching for membership changes."""
         await self._backend.setup_session_network(meta, self_member)
+        await self._begin(meta, self_member)
+
+    async def resume(self, meta: SessionNetMeta, self_member: Member) -> None:
+        """Re-attach to a session whose data plane survived an agent restart.
+
+        Identical to `start` except the backend adopts the running devices instead of rebuilding
+        them. The membership republish and the reconciles are what make this necessary rather than
+        optional: without them the restarted node stops reacting to peers joining or leaving, and
+        cross-node overlay traffic silently stops following the cluster."""
+        await self._backend.adopt_session_network(meta, self_member)
+        await self._begin(meta, self_member)
+
+    async def _begin(self, meta: SessionNetMeta, self_member: Member) -> None:
+        """Publish membership, apply what is already published, and start watching."""
         await self._write_member(meta.session_id, self_member)
         self._applied[meta.session_id] = {}
         self._applied_endpoints[meta.session_id] = {}

@@ -16,6 +16,7 @@ config — so it holds no CAP_NET_ADMIN / CAP_SYS_ADMIN.
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Callable, Sequence
 from typing import TYPE_CHECKING, Any, override
 
 from ai.backend.agent.network.caps import probe_caps
@@ -24,6 +25,7 @@ from ai.backend.agent.network.helper.protocol import (
     HelperRequest,
     HelperResponse,
 )
+from ai.backend.agent.network.port_forward import PortForward
 from ai.backend.agent.plugin.network_v2 import AbstractNetworkAgentPluginV2
 from ai.backend.common.network.types import (
     AgentNetworkCaps,
@@ -117,6 +119,14 @@ class HelperBackendProxy(AbstractNetworkAgentPluginV2["AbstractKernel"]):
                 network_config=_network_config_from_meta(meta),
             )
         )
+
+    @override
+    async def adopt_session_network(self, meta: SessionNetMeta, self_member: Member) -> None:
+        # Nothing to do: the helper is a daemon that outlives the agent, so it still holds this
+        # session's devices, attach plans and backend state. (A helper restart loses them, and the
+        # agent's next peer/endpoint call is refused with "before session setup" — helper-side
+        # recovery is not implemented.)
+        return
 
     @override
     async def teardown_session_network(self, session_id: str) -> None:
@@ -228,3 +238,68 @@ class HelperProvisioner:
                 container_id=container_id,
             )
         )
+
+
+# Any valid identifier; LIST_PORTS is node-wide, so the helper only uses it as a lock key.
+_LIST_LOCK_KEY = "list-ports"
+
+
+class HelperPortForwarder:
+    """Same shape as ``PortForwarder``, but the iptables work happens in the helper.
+
+    The container's address is deliberately not sent: the helper DNATs to the LOCAL address it
+    assigned at attach. So ``install`` drops the ``container_ip`` its argument carries — that is
+    the agent's belief, not a fact the helper is willing to act on.
+    """
+
+    _client: HelperClient
+    # container_id -> session_id; the helper's session lock and its attach record are keyed by it
+    _session_of: Callable[[str], str | None]
+
+    def __init__(self, client: HelperClient, session_of: Callable[[str], str | None]) -> None:
+        self._client = client
+        self._session_of = session_of
+
+    def _session_for(self, container_id: str) -> str:
+        session_id = self._session_of(container_id)
+        if session_id is None:
+            raise HelperClientError(f"no session known for container {container_id}")
+        return session_id
+
+    async def install(self, forwards: Sequence[PortForward]) -> None:
+        if not forwards:
+            return
+        container_id = forwards[0].container_id
+        await self._client.call(
+            HelperRequest(
+                op=HelperOp.PUBLISH_PORTS,
+                session_id=self._session_for(container_id),
+                container_id=container_id,
+                ports=tuple((f.host_port, f.container_port) for f in forwards),
+            )
+        )
+
+    async def remove_container(self, container_id: str) -> list[int]:
+        # The helper finds the rules by their container tag, so an unknown session is not fatal:
+        # fall back to the container id as the lock key rather than leak the rules.
+        session_id = self._session_of(container_id) or container_id
+        resp = await self._client.call(
+            HelperRequest(
+                op=HelperOp.UNPUBLISH_PORTS,
+                session_id=session_id,
+                container_id=container_id,
+            )
+        )
+        return list(resp.host_ports or ())
+
+    async def list_forwards(self, *, container_id: str | None = None) -> list[PortForward]:
+        resp = await self._client.call(
+            HelperRequest(op=HelperOp.LIST_PORTS, session_id=_LIST_LOCK_KEY)
+        )
+        forwards = [
+            PortForward(container_id=cid, host_port=hp, container_ip=ip, container_port=cp)
+            for cid, hp, ip, cp in (resp.forwards or ())
+        ]
+        if container_id is None:
+            return forwards
+        return [f for f in forwards if f.container_id == container_id]

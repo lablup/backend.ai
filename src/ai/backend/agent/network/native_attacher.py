@@ -22,6 +22,10 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
+from ai.backend.agent.errors.network import (
+    NetworkStateStoreConflict,
+    SubnetAddressPoolExhausted,
+)
 from ai.backend.logging import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -55,21 +59,77 @@ def _veth_name(container_id: str, ifname: str, side: str) -> str:
     return "bai" + hashlib.sha1(f"{container_id}/{ifname}/{side}".encode()).hexdigest()[:11]
 
 
-class HostLocalIpam:
-    """File-backed per-subnet IP allocator (mimics the CNI host-local plugin's store).
+# One IPAM per store, per process — see HostLocalIpam's docstring.
+_ipams: dict[Path, HostLocalIpam] = {}
 
-    State lives under ``<state_dir>/<subnet>/<ip>`` files whose content is the owning
-    ``<container_id>/<ifname>``; allocation is idempotent per owner and survives restarts."""
+
+def get_host_local_ipam(state_dir: Path | None = None) -> HostLocalIpam:
+    """The process-wide IPAM owning ``state_dir``. Construct the class directly only in tests,
+    where each case owns its own store."""
+    resolved = state_dir if state_dir is not None else _DEFAULT_IPAM_STATE_DIR
+    if (existing := _ipams.get(resolved)) is not None:
+        return existing
+    ipam = HostLocalIpam(resolved)
+    _ipams[resolved] = ipam
+    return ipam
+
+
+class HostLocalIpam:
+    """Per-subnet IP allocator, journalled to disk (the CNI host-local plugin's store layout).
+
+    The authoritative state is in memory; ``<state_dir>/<subnet>/<ip>`` — a file whose content is
+    the owning ``<container_id>/<ifname>`` — is its journal, replayed once per subnet on first
+    touch so allocations survive an agent restart. Allocation is idempotent per owner.
+
+    A store has one writer per node and one owner per process (`get_host_local_ipam`), so no
+    locking beyond the in-process mutex is needed or attempted: a second writer would already be
+    deleting and recreating this node's bridges. An address that exists on disk while the owner
+    believes it free means that has happened, and raises rather than being allocated around.
+    See `ai.backend.agent.network.local_subnet` for the same design, stated at length."""
 
     _dir: Path
     _lock: asyncio.Lock
+    # subnet dir -> {owner -> ip}, authoritative once the subnet has been replayed
+    _owners: dict[Path, dict[str, str]]
 
     def __init__(self, state_dir: Path) -> None:
         self._dir = state_dir
         self._lock = asyncio.Lock()
+        self._owners = {}
 
     def _subnet_dir(self, subnet: str) -> Path:
         return self._dir / subnet.replace("/", "_")
+
+    def _replay(self, d: Path) -> dict[str, str]:
+        """Rebuild owner -> ip from the journal. An owner recorded at two addresses (only possible
+        in a store written by an older, racy runner) resolves deterministically to the first by
+        sorted file name — the same first-wins-by-name rule as LocalSubnetAllocator._replay,
+        instead of the previous iteration-order nondeterminism."""
+        if not d.is_dir():
+            return {}
+        owners: dict[str, str] = {}
+        for f in sorted(d.iterdir(), key=lambda p: p.name):
+            if f.is_file():
+                owners.setdefault(f.read_text().strip(), f.name)
+        return owners
+
+    async def _owners_of(self, d: Path) -> dict[str, str]:
+        if (loaded := self._owners.get(d)) is not None:
+            return loaded
+        replayed = await asyncio.to_thread(self._replay, d)
+        self._owners[d] = replayed
+        return replayed
+
+    def _write_claim(self, d: Path, ip: str, owner: str) -> None:
+        d.mkdir(parents=True, exist_ok=True)
+        try:
+            with (d / ip).open("x") as f:
+                f.write(owner)
+        except FileExistsError as e:
+            raise NetworkStateStoreConflict(
+                f"address {ip} exists on disk but is free in memory (store: {d}) — "
+                f"another writer owns this node's network"
+            ) from e
 
     async def allocate(
         self, subnet: str, container_id: str, ifname: str, *, reserve: Sequence[str]
@@ -77,42 +137,47 @@ class HostLocalIpam:
         owner = f"{container_id}/{ifname}"
         async with self._lock:
             d = self._subnet_dir(subnet)
-            await asyncio.to_thread(d.mkdir, parents=True, exist_ok=True)
+            owners = await self._owners_of(d)
+            if (existing := owners.get(owner)) is not None:
+                return existing  # idempotent re-ADD
+            used = set(owners.values()) | set(reserve)
+            for host in ipaddress.ip_network(subnet).hosts():
+                ip = str(host)
+                if ip in used:
+                    continue
+                # Journal before the caller wires up the veth, and only then commit to memory.
+                await asyncio.to_thread(self._write_claim, d, ip, owner)
+                owners[owner] = ip
+                return ip
+            raise SubnetAddressPoolExhausted(f"no free address left in {subnet}")
 
-            def _alloc() -> str:
-                existing = {f.name: f.read_text().strip() for f in d.iterdir() if f.is_file()}
-                for ip, holder in existing.items():
-                    if holder == owner:
-                        return ip  # idempotent re-ADD
-                used = set(existing) | set(reserve)
-                for host in ipaddress.ip_network(subnet).hosts():
-                    ip = str(host)
-                    if ip not in used:
-                        (d / ip).write_text(owner)
-                        return ip
-                raise RuntimeError(f"no free address left in {subnet}")
+    def subnets(self) -> list[str]:
+        """Every subnet the journal holds records for, as the CIDR string it was keyed by."""
+        if not self._dir.is_dir():
+            return []
+        return [d.name.replace("_", "/") for d in self._dir.iterdir() if d.is_dir()]
 
-            return await asyncio.to_thread(_alloc)
+    async def owners(self, subnet: str) -> dict[str, str]:
+        """``{container_id/ifname: ip}`` for one subnet. Restart recovery diffs the owners against
+        the live containers to reclaim addresses (and their host veths) left by containers that
+        died while the agent was down."""
+        async with self._lock:
+            return dict(await self._owners_of(self._subnet_dir(subnet)))
 
     async def release(self, subnet: str, container_id: str, ifname: str) -> int:
         """Release this owner's address; return the number of addresses still allocated."""
         owner = f"{container_id}/{ifname}"
         async with self._lock:
             d = self._subnet_dir(subnet)
-
-            def _release() -> int:
-                remaining = 0
-                if d.is_dir():
-                    for f in d.iterdir():
-                        if not f.is_file():
-                            continue
-                        if f.read_text().strip() == owner:
-                            f.unlink(missing_ok=True)
-                        else:
-                            remaining += 1
-                return remaining
-
-            return await asyncio.to_thread(_release)
+            owners = await self._owners_of(d)
+            ip = owners.get(owner)
+            if ip is None:
+                return len(owners)
+            # Drop the record first: a failed unlink must not leave memory handing the address
+            # out again while the journal still names this owner.
+            await asyncio.to_thread((d / ip).unlink, True)
+            del owners[owner]
+            return len(owners)
 
 
 class NativeBridgeAttachRunner:
@@ -121,7 +186,8 @@ class NativeBridgeAttachRunner:
     _ipam: HostLocalIpam
 
     def __init__(self, *, ipam_state_dir: Path = _DEFAULT_IPAM_STATE_DIR) -> None:
-        self._ipam = HostLocalIpam(ipam_state_dir)
+        # The process-wide owner: every agent this runtime hosts shares one node-local IP space.
+        self._ipam = get_host_local_ipam(ipam_state_dir)
 
     async def __call__(
         self,

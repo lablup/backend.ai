@@ -16,16 +16,21 @@ Each backend is instantiated per session with the backend the manager selected.
 
 from __future__ import annotations
 
+import json
 import logging
 from collections.abc import Callable, Mapping
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
+from ai.backend.agent.containerd.oci import SESSION_ID_LABEL
 from ai.backend.agent.containerd.orchestrator import ContainerdKernelOrchestrator, LaunchResult
 from ai.backend.agent.containerd.runtime.interface import OciRuntime
 from ai.backend.agent.containerd.session_tracker import SessionContainerTracker, TeardownScope
 from ai.backend.agent.network.cni import CniRunner
 from ai.backend.agent.network.coordinator import SessionNetworkCoordinator
+from ai.backend.agent.network.local_subnet import LocalSubnetAllocator
+from ai.backend.agent.network.native_attacher import HostLocalIpam
 from ai.backend.agent.network.provisioner import ContainerNetworkProvisioner
+from ai.backend.common.network.keys import endpoint_key, session_meta_key
 from ai.backend.common.network.types import (
     EndpointPlan,
     Member,
@@ -80,8 +85,13 @@ class ContainerdSessionNetwork:
     # container_id -> (session_id, attach plan, task_pid): the network detach inputs captured
     # at attach time, so the clean/remove phase can release the host veth + IPAM + MASQ even
     # though it is a separate lifecycle call from attach. Without it those host-side resources
-    # leak (the container's netns removal only reclaims the container-side veth).
+    # leak (the container's netns removal only reclaims the container-side veth). Rebuilt from
+    # ground truth by `recover` after a restart.
     _attachments: dict[str, tuple[str, EndpointPlan, int]]
+    # The durable journals this process owns, and so may reconcile on restart. Both are None when
+    # a privileged helper owns the host state (it keeps its own records and outlives the agent).
+    _local_subnets: LocalSubnetAllocator | None
+    _ipam: HostLocalIpam | None
 
     def __init__(
         self,
@@ -93,6 +103,8 @@ class ContainerdSessionNetwork:
         cni_runner: CniRunner,
         backends: Mapping[str, AbstractNetworkAgentPluginV2[Any]],
         provisioner_factory: Callable[[AbstractNetworkAgentPluginV2[Any]], Any] | None = None,
+        local_subnets: LocalSubnetAllocator | None = None,
+        ipam: HostLocalIpam | None = None,
     ) -> None:
         self._etcd = etcd
         self._agent_id = agent_id
@@ -107,6 +119,8 @@ class ContainerdSessionNetwork:
         self._orchestrators = {}
         self._tracker = SessionContainerTracker()
         self._attachments = {}
+        self._local_subnets = local_subnets
+        self._ipam = ipam
 
     async def open(self) -> None:
         """Open the runtime client (e.g. establish the containerd gRPC channel)."""
@@ -114,6 +128,173 @@ class ContainerdSessionNetwork:
 
     async def close(self) -> None:
         await self._runtime.close()
+
+    # --- restart recovery -------------------------------------------------------------------
+
+    async def recover(self) -> None:
+        """Rebuild this node's session-network state from ground truth after an agent restart.
+
+        Every field below is process memory that a restart empties, while the resources they
+        name — bridges, veths, IPAM leases, MASQ rules, etcd members — outlive the process. So a
+        restarted agent that skipped this would resume its kernels with no way to detach them
+        (`remove_container` finds no attachment), no way to tear their session down (the tracker
+        is empty), and no reaction to peers joining or leaving (no coordinator, no watch).
+
+        Ground truth is the containerd labels (which container belongs to which session) plus the
+        manager's etcd records (the session's meta, and each endpoint's overlay IP). Nothing is
+        read back from this process's own prior state, because there is none.
+
+        Finally the durable journals are reconciled against the live containers: a session or a
+        container that died while the agent was down still holds its /24 block, its address and
+        its host veth, and only this pass can give them back.
+        """
+        live = await self._live_containers()
+        metas: dict[str, SessionNetMeta] = {}
+        for session_id in sorted(set(live.values())):
+            meta = await self._read_session_meta(session_id)
+            if meta is None:
+                # The manager dropped the session's meta while we were down; its containers are
+                # orphans that clean_kernel will remove. Leave them untracked rather than guess.
+                log.warning("no network meta for live session {}; not resuming", session_id)
+                continue
+            try:
+                await self._resume_session(session_id, meta)
+            except Exception:
+                log.exception("failed to resume session network for {}", session_id)
+                continue
+            metas[session_id] = meta
+
+        for container_id, session_id in live.items():
+            meta = metas.get(session_id)
+            if meta is None:
+                continue
+            self._tracker.track(session_id, container_id)
+            try:
+                attachment = await self._recover_attachment(container_id, session_id, meta)
+            except Exception:
+                # one container's plan re-derivation failing (e.g. its overlay endpoint dropped
+                # from etcd) must not abort recovery for the rest; it stays tracked but detach-less,
+                # and its host leftovers are reclaimed as orphans on a later clean.
+                log.exception("failed to recover attachment for container {}", container_id)
+                continue
+            if attachment is not None:
+                self._attachments[container_id] = attachment
+
+        await self._reclaim_orphans(live)
+
+    async def _live_containers(self) -> dict[str, str]:
+        """``{container_id: session_id}`` for every container this node still runs for us."""
+        live: dict[str, str] = {}
+        for info in await self._runtime.list_container_infos():
+            if session_id := info.labels.get(SESSION_ID_LABEL):
+                live[info.id] = session_id
+        return live
+
+    async def _read_session_meta(self, session_id: str) -> SessionNetMeta | None:
+        raw = await self._etcd.get(session_meta_key(session_id))
+        if not raw:
+            return None
+        return session_net_meta_from_network_config(session_id, json.loads(raw))
+
+    async def _read_overlay_ip(self, session_id: str, container_id: str) -> str | None:
+        raw = await self._etcd.get(endpoint_key(session_id, container_id))
+        if not raw:
+            return None
+        ip = json.loads(raw).get("ip")
+        return str(ip) if ip else None
+
+    async def _resume_session(self, session_id: str, meta: SessionNetMeta) -> None:
+        backend = self._resolve_backend(meta)
+        coordinator = SessionNetworkCoordinator(self._etcd, backend, self._agent_id)
+        orchestrator = ContainerdKernelOrchestrator(self._runtime, self._make_provisioner(backend))
+        # resume, not start: the devices are up and carrying this session's traffic.
+        await coordinator.resume(meta, self._self_member(meta))
+        self._coordinators[session_id] = coordinator
+        self._orchestrators[session_id] = orchestrator
+
+    async def _recover_attachment(
+        self, container_id: str, session_id: str, meta: SessionNetMeta
+    ) -> tuple[str, EndpointPlan, int] | None:
+        """Reconstruct the detach inputs captured at attach time.
+
+        The plan is re-derived rather than stored: `attach_endpoint` is a function of the session
+        meta and the manager-assigned overlay IP, both of which are durable in etcd, and its
+        node-local /24 comes from the journal, which is idempotent per session. The task PID is
+        asked of containerd. So the plan a restarted agent detaches with is the same plan the
+        pre-restart agent attached with.
+        """
+        pid = await self._runtime.container_pid(container_id)
+        if pid is None:
+            return None  # no live task; the host-side leftovers are reclaimed as an orphan
+        backend = self._resolve_backend(meta)
+        kernel_config: dict[str, Any] = {}
+        if overlay_ip := await self._read_overlay_ip(session_id, container_id):
+            kernel_config["cluster_network_ip"] = overlay_ip
+        plan = await backend.attach_endpoint(cast(Any, kernel_config), cast(Any, {}), meta=meta)
+        return (session_id, plan, pid)
+
+    async def _reclaim_orphans(self, live: Mapping[str, str]) -> None:
+        """Give back what the journals still hold for containers and sessions that are gone.
+
+        Both are keyed off the *live* ground truth (containers by id, sessions by the ids those
+        containers carry), never off which sessions successfully resumed: a session whose meta the
+        manager dropped, or whose resume raised, is still live if its containers are — reclaiming
+        its /24 would free a block whose bridge is up, and the next session to take it would delete
+        that live bridge. A block is reclaimed only when no live container names its session.
+
+        Both journals are None under a privileged helper: it owns the host state and its own
+        records, and it outlives the agent, so there is nothing here to reclaim.
+        """
+        if self._ipam is not None:
+            await self._reclaim_orphan_addresses(self._ipam, frozenset(live))
+        if self._local_subnets is not None:
+            await self._reclaim_orphan_subnets(self._local_subnets, frozenset(live.values()))
+
+    async def _reclaim_orphan_addresses(
+        self, ipam: HostLocalIpam, live_containers: frozenset[str]
+    ) -> None:
+        """Release host-local addresses (and their host veths) owned by dead containers.
+
+        The journal names each owner as ``<container_id>/<ifname>``, and the host veth's name is a
+        pure function of that pair, so the DEL needs nothing the journal does not already hold.
+        Only host-local addresses are journalled, and those are always the LOCAL (NAT) attachment,
+        so reconstructing its config from the subnet reproduces what attach emitted.
+        """
+        for subnet in ipam.subnets():
+            for owner, ip in (await ipam.owners(subnet)).items():
+                container_id, _, ifname = owner.partition("/")
+                if not ifname or container_id in live_containers:
+                    continue
+                config = {"ipam": {"type": "host-local", "subnet": subnet}, "ipMasq": True}
+                try:
+                    await self._cni_runner(
+                        "DEL", ifname=ifname, netns="", container_id=container_id, config=config
+                    )
+                except Exception:
+                    log.exception("failed to reclaim address of dead container {}", container_id)
+                else:
+                    log.info("reclaimed address {} of dead container {}", ip, container_id)
+
+    async def _reclaim_orphan_subnets(
+        self, allocator: LocalSubnetAllocator, live_sessions: frozenset[str]
+    ) -> None:
+        """Release node-local /24 blocks whose session has no live container on this node.
+
+        Only the block is reclaimed, not the session's devices: naming them needs the meta the
+        manager may already have deleted, and a leftover device is cleared by name by the next
+        `setup_session_network` that reuses it. A leaked block would never come back — the pool
+        holds 256.
+        """
+        for session_id in await allocator.sessions():
+            if session_id in live_sessions:
+                continue
+            try:
+                await allocator.release(session_id)
+            except Exception:
+                # one failed release must not abort the sweep and strand the rest
+                log.exception("failed to reclaim subnet block of dead session {}", session_id)
+            else:
+                log.info("reclaimed node-local subnet block of dead session {}", session_id)
 
     def _resolve_backend(self, meta: SessionNetMeta) -> AbstractNetworkAgentPluginV2[Any]:
         try:
@@ -152,6 +333,12 @@ class ContainerdSessionNetwork:
         self._coordinators[session_id] = coordinator
         self._orchestrators[session_id] = orchestrator
         return meta
+
+    def session_of(self, container_id: str) -> str | None:
+        """The session a live container belongs to, from the attach record (rebuilt by `recover`
+        after a restart). The helper's port verbs need it to reach the right session lock."""
+        attachment = self._attachments.get(container_id)
+        return attachment[0] if attachment is not None else None
 
     async def teardown_session(self, session_id: str) -> None:
         coordinator = self._coordinators.pop(session_id, None)
@@ -296,7 +483,11 @@ def build_containerd_session_network(
     from ai.backend.agent.containerd.runtime.grpc import ContainerdGrpcRuntime
     from ai.backend.agent.network.backends.bridge import BridgeNetworkPlugin
     from ai.backend.agent.network.backends.vxlan import VxlanNetworkPlugin
-    from ai.backend.agent.network.native_attacher import NativeBridgeAttachRunner
+    from ai.backend.agent.network.local_subnet import get_local_subnet_allocator
+    from ai.backend.agent.network.native_attacher import (
+        NativeBridgeAttachRunner,
+        get_host_local_ipam,
+    )
 
     runtime = runtime or ContainerdGrpcRuntime(namespace="backend-ai")
     cni_runner = cni_runner or NativeBridgeAttachRunner()
@@ -306,6 +497,10 @@ def build_containerd_session_network(
     # needs no network privilege: the backend becomes a proxy and the per-container
     # provisioner RPCs the helper. See ai.backend.agent.network.helper.
     make_provisioner: Callable[[AbstractNetworkAgentPluginV2[Any]], Any] | None = None
+    # Journals this process may reconcile on restart; left None under a helper, which owns the
+    # host state, keeps its own records, and outlives the agent.
+    owned_local_subnets: LocalSubnetAllocator | None = None
+    owned_ipam: HostLocalIpam | None = None
     if helper_socket is not None:
         from ai.backend.agent.network.helper.client import (
             HelperBackendProxy,
@@ -324,11 +519,20 @@ def build_containerd_session_network(
             return HelperProvisioner(client)
 
         make_provisioner = _helper_provisioner_factory
-    elif backends is None:
-        backends = {
-            str(NetworkBackendKind.VXLAN): VxlanNetworkPlugin({}, {}, uplink=uplink),
-            str(NetworkBackendKind.BRIDGE): BridgeNetworkPlugin({}, {}, uplink=uplink),
-        }
+    else:
+        # The process-wide owner of the node-local pool: shared by both backends here (they carve
+        # their LOCAL /24 out of the same pool) and by every other agent this runtime hosts.
+        owned_local_subnets = get_local_subnet_allocator()
+        owned_ipam = get_host_local_ipam()
+        if backends is None:
+            backends = {
+                str(NetworkBackendKind.VXLAN): VxlanNetworkPlugin(
+                    {}, {}, uplink=uplink, local_subnets=owned_local_subnets
+                ),
+                str(NetworkBackendKind.BRIDGE): BridgeNetworkPlugin(
+                    {}, {}, uplink=uplink, local_subnets=owned_local_subnets
+                ),
+            }
     return ContainerdSessionNetwork(
         etcd,
         agent_id=agent_id,
@@ -337,4 +541,6 @@ def build_containerd_session_network(
         cni_runner=cni_runner,
         backends=backends,
         provisioner_factory=make_provisioner,
+        local_subnets=owned_local_subnets,
+        ipam=owned_ipam,
     )

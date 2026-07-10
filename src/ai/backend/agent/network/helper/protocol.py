@@ -33,11 +33,59 @@ class HelperOp(enum.StrEnum):
     DEL_PEER = "del_peer"
     ADD_ENDPOINT = "add_endpoint"
     DEL_ENDPOINT = "del_endpoint"
+    # Host-port ingress: publish a container's service ports on host ports (DNAT), and withdraw
+    # them. The agent sends only the port pairing; the DNAT destination is the LOCAL address the
+    # helper itself assigned at attach, so a lying agent cannot redirect a host port anywhere else.
+    PUBLISH_PORTS = "publish_ports"
+    UNPUBLISH_PORTS = "unpublish_ports"
+    # Node-wide: every published port, so a restarted agent can take them back out of its port
+    # pool. Read-only, and the agent installed them all in the first place.
+    LIST_PORTS = "list_ports"
 
 
 class ProtocolError(RuntimeError):
     """Malformed frame or unknown/typed field — a client that violates the wire
     contract. Never carries privileged detail back to the caller."""
+
+
+def _decode_ports(raw: Any) -> tuple[tuple[int, int], ...] | None:
+    """Shape-check only; the *values* are the policy layer's business."""
+    if raw is None:
+        return None
+    if not isinstance(raw, list):
+        raise ProtocolError("ports must be an array")
+    pairs: list[tuple[int, int]] = []
+    for pair in raw:
+        if not isinstance(pair, list) or len(pair) != 2:
+            raise ProtocolError("each port entry must be a [host_port, container_port] pair")
+        host_port, container_port = pair
+        if not isinstance(host_port, int) or not isinstance(container_port, int):
+            raise ProtocolError("ports must be integers")
+        pairs.append((host_port, container_port))
+    return tuple(pairs)
+
+
+def _decode_forwards(raw: Any) -> tuple[tuple[str, int, str, int], ...] | None:
+    if raw is None:
+        return None
+    if not isinstance(raw, list):
+        raise ProtocolError("forwards must be an array")
+    out: list[tuple[str, int, str, int]] = []
+    for entry in raw:
+        if not isinstance(entry, list) or len(entry) != 4:
+            raise ProtocolError(
+                "each forward must be [container_id, host_port, ip, container_port]"
+            )
+        container_id, host_port, ip, container_port = entry
+        if not (
+            isinstance(container_id, str)
+            and isinstance(host_port, int)
+            and isinstance(ip, str)
+            and isinstance(container_port, int)
+        ):
+            raise ProtocolError("malformed forward entry")
+        out.append((container_id, host_port, ip, container_port))
+    return tuple(out)
 
 
 @dataclass(frozen=True)
@@ -55,6 +103,9 @@ class HelperRequest:
     vtep_ip: str | None = None
     ip: str | None = None
     mac: str | None = None
+    # PUBLISH_PORTS only: the (host_port, container_port) pairing the agent's port pool produced.
+    # No destination address travels with it — see HelperOp.PUBLISH_PORTS.
+    ports: tuple[tuple[int, int], ...] | None = None
 
     def encode(self) -> bytes:
         payload: dict[str, Any] = {"op": str(self.op), "session_id": self.session_id}
@@ -62,6 +113,8 @@ class HelperRequest:
             payload["container_id"] = self.container_id
         if self.network_config is not None:
             payload["network_config"] = self.network_config
+        if self.ports is not None:
+            payload["ports"] = [list(pair) for pair in self.ports]
         for key in ("vtep_ip", "ip", "mac"):
             value = getattr(self, key)
             if value is not None:
@@ -100,6 +153,7 @@ class HelperRequest:
             session_id=session_id,
             container_id=container_id,
             network_config=network_config,
+            ports=_decode_ports(data.get("ports")),
             **fields,
         )
 
@@ -107,16 +161,24 @@ class HelperRequest:
 @dataclass(frozen=True)
 class HelperResponse:
     """Result of one request. ``assigned`` maps a NetworkRole name to the assigned
-    IP (only for ATTACH). ``error`` is a short, non-privileged reason string."""
+    IP (only for ATTACH). ``host_ports`` are the ports UNPUBLISH_PORTS withdrew, so the agent can
+    return them to its pool. ``error`` is a short, non-privileged reason string."""
 
     ok: bool
     assigned: dict[str, str] | None = None
+    host_ports: tuple[int, ...] | None = None
+    # LIST_PORTS: (container_id, host_port, container_ip, container_port) per published rule.
+    forwards: tuple[tuple[str, int, str, int], ...] | None = None
     error: str | None = None
 
     def encode(self) -> bytes:
         payload: dict[str, Any] = {"ok": self.ok}
         if self.assigned is not None:
             payload["assigned"] = self.assigned
+        if self.host_ports is not None:
+            payload["host_ports"] = list(self.host_ports)
+        if self.forwards is not None:
+            payload["forwards"] = [list(f) for f in self.forwards]
         if self.error is not None:
             payload["error"] = self.error
         return json.dumps(payload, separators=(",", ":")).encode() + b"\n"
@@ -132,5 +194,16 @@ class HelperResponse:
         assigned = data.get("assigned")
         if assigned is not None and not isinstance(assigned, dict):
             raise ProtocolError("assigned must be an object")
+        raw_ports = data.get("host_ports")
+        if raw_ports is not None and not (
+            isinstance(raw_ports, list) and all(isinstance(p, int) for p in raw_ports)
+        ):
+            raise ProtocolError("host_ports must be an array of integers")
         error = data.get("error")
-        return cls(ok=bool(data["ok"]), assigned=assigned, error=error)
+        return cls(
+            ok=bool(data["ok"]),
+            assigned=assigned,
+            host_ports=tuple(raw_ports) if raw_ports is not None else None,
+            forwards=_decode_forwards(data.get("forwards")),
+            error=error,
+        )

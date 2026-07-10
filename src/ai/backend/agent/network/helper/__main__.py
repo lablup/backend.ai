@@ -1,17 +1,31 @@
 """Entry point for the privileged network helper daemon (BEP-1058).
 
-Run as a systemd service with only the needed capabilities, e.g.
+Capabilities needed (all four, for the reasons noted):
+
+- CAP_NET_ADMIN   — iproute2 / iptables: bridges, veth, FDB/ARP, the service DNAT rules
+- CAP_SYS_ADMIN   — enter a container's network namespace (setns) to attach its interface
+- CAP_SYS_PTRACE  — open ``/proc/<pid>/ns/net`` of a container whose task runs as root, when the
+                    helper itself runs as a non-root uid (omitting it fails "cannot open container
+                    netns")
+- CAP_DAC_READ_SEARCH — read those same ``/proc/<pid>`` entries across the uid boundary
+
+Run as a systemd service scoped to exactly those:
 
     [Service]
-    AmbientCapabilities=CAP_NET_ADMIN CAP_SYS_ADMIN
-    CapabilityBoundingSet=CAP_NET_ADMIN CAP_SYS_ADMIN
+    User=backendai-agent
+    AmbientCapabilities=CAP_NET_ADMIN CAP_SYS_ADMIN CAP_SYS_PTRACE CAP_DAC_READ_SEARCH
+    CapabilityBoundingSet=CAP_NET_ADMIN CAP_SYS_ADMIN CAP_SYS_PTRACE CAP_DAC_READ_SEARCH
     NoNewPrivileges=yes
     ExecStart=/usr/bin/python -m ai.backend.agent.network.helper ...
 
-For local development, launch it with just those caps via ``setpriv``:
+For local development, ``setpriv`` drops to the agent's uid while keeping those caps ambient. Two
+gotchas: ``--bounding-set`` tokens need the ``+`` prefix (unlike ``--ambient-caps``, a bare name
+is "bad capability string"), and dropping to the agent uid with ``--reuid`` is what makes the
+socket owned by — and so connectable by — the agent (a root-owned 0600 socket is not):
 
-    sudo setpriv --ambient-caps +net_admin,+sys_admin \
-        --bounding-set net_admin,sys_admin --inh-caps +net_admin,+sys_admin \
+    CAPS=+net_admin,+sys_admin,+sys_ptrace,+dac_read_search
+    sudo setpriv --reuid "$AGENT_UID" --regid "$AGENT_GID" --clear-groups \
+        --ambient-caps "$CAPS" --bounding-set "$CAPS" --inh-caps "$CAPS" \
         -- ./py -m ai.backend.agent.network.helper
 
 Configuration comes from environment variables so the launcher stays trivial:
@@ -37,6 +51,7 @@ from ai.backend.agent.containerd.runtime.grpc import ContainerdGrpcRuntime
 from ai.backend.agent.network.backends.bridge import BridgeNetworkPlugin
 from ai.backend.agent.network.backends.vxlan import VxlanNetworkPlugin
 from ai.backend.agent.network.helper.server import NetworkHelperServer
+from ai.backend.agent.network.local_subnet import get_local_subnet_allocator
 from ai.backend.agent.network.native_attacher import NativeBridgeAttachRunner
 from ai.backend.common import config as common_config
 from ai.backend.common.network.types import NetworkBackendKind
@@ -79,9 +94,16 @@ async def _amain() -> None:
     Path(socket_path).parent.mkdir(parents=True, exist_ok=True)
 
     runtime = ContainerdGrpcRuntime(namespace=ctrd_ns)
+    # This helper is the node's single owner of every privileged network op, so it is also the
+    # single owner of the node-local pool both backends carve their LOCAL /24 out of.
+    local_subnets = get_local_subnet_allocator()
     backends = {
-        str(NetworkBackendKind.VXLAN): VxlanNetworkPlugin({}, {}, uplink=uplink),
-        str(NetworkBackendKind.BRIDGE): BridgeNetworkPlugin({}, {}, uplink=uplink),
+        str(NetworkBackendKind.VXLAN): VxlanNetworkPlugin(
+            {}, {}, uplink=uplink, local_subnets=local_subnets
+        ),
+        str(NetworkBackendKind.BRIDGE): BridgeNetworkPlugin(
+            {}, {}, uplink=uplink, local_subnets=local_subnets
+        ),
     }
     server = NetworkHelperServer(
         socket_path=socket_path,

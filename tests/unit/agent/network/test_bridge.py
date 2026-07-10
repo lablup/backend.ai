@@ -1,9 +1,11 @@
 from collections.abc import Sequence
+from pathlib import Path
 from typing import Any, cast
 
 import pytest
 
 from ai.backend.agent.network.backends.bridge import BridgeNetworkPlugin
+from ai.backend.agent.network.local_subnet import LocalSubnetAllocator
 from ai.backend.common.network.types import (
     EndpointPlan,
     Member,
@@ -29,6 +31,9 @@ def _meta(session_id: str) -> SessionNetMeta:
     )
 
 
+_SELF = Member(agent_id="a1", host_ip="10.0.0.1")
+
+
 class _Runner:
     def __init__(self) -> None:
         self.calls: list[list[str]] = []
@@ -40,6 +45,14 @@ class _Runner:
 @pytest.fixture
 def plugin() -> BridgeNetworkPlugin:
     return BridgeNetworkPlugin({}, {}, runner=_Runner())
+
+
+def _restarted_plugin(state_dir: Path) -> BridgeNetworkPlugin:
+    """A plugin as a fresh agent process would build it: a brand-new allocator whose only memory
+    of prior sessions is the on-disk store."""
+    return BridgeNetworkPlugin(
+        {}, {}, runner=_Runner(), local_subnets=LocalSubnetAllocator(state_dir)
+    )
 
 
 class TestBridgeAttach:
@@ -67,6 +80,17 @@ class TestBridgeAttach:
         b = await plugin.attach_endpoint(cast(Any, {}), cast(Any, {}), meta=_meta("s2"))
         assert _subnet(a) != _subnet(b)
 
+    async def test_subnet_survives_an_agent_restart(
+        self, plugin: BridgeNetworkPlugin, local_subnet_state_dir: Path
+    ) -> None:
+        held = _subnet(await plugin.attach_endpoint(cast(Any, {}), cast(Any, {}), meta=_meta("s1")))
+
+        restarted = _restarted_plugin(local_subnet_state_dir)
+        survivor = await restarted.attach_endpoint(cast(Any, {}), cast(Any, {}), meta=_meta("s1"))
+        newcomer = await restarted.attach_endpoint(cast(Any, {}), cast(Any, {}), meta=_meta("s2"))
+        assert _subnet(survivor) == held
+        assert _subnet(newcomer) != held
+
 
 class TestBridgeLifecycle:
     async def test_no_overlay_peer_ops(self, plugin: BridgeNetworkPlugin) -> None:
@@ -86,3 +110,17 @@ class TestBridgeLifecycle:
     async def test_teardown_unknown_session_is_noop(self, plugin: BridgeNetworkPlugin) -> None:
         await plugin.teardown_session_network("never-seen")
         assert cast(_Runner, plugin._runner).calls == []
+
+    async def test_setup_after_restart_spares_a_live_session_bridge(
+        self, plugin: BridgeNetworkPlugin, local_subnet_state_dir: Path
+    ) -> None:
+        # setup_session_network clears a stale device of the new session's bridge name. With a
+        # process-local index the post-restart session would reclaim index 0 and delete bailo0 —
+        # the live pre-restart session's bridge, cutting its containers off the network.
+        await plugin.attach_endpoint(cast(Any, {}), cast(Any, {}), meta=_meta("live"))
+        live_bridge = await plugin._bridge("live")
+
+        restarted = _restarted_plugin(local_subnet_state_dir)
+        await restarted.setup_session_network(_meta("newcomer"), _SELF)
+        deleted = [c[-1] for c in cast(_Runner, restarted._runner).calls if "del" in c]
+        assert live_bridge not in deleted

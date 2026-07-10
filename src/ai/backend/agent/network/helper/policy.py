@@ -40,6 +40,14 @@ _PRIVATE_POOLS = (
 _VNI_MIN, _VNI_MAX = 1, (1 << 24) - 1  # VXLAN VNI is 24-bit
 _MTU_MIN, _MTU_MAX = 576, 9000
 
+# A published host port must be unprivileged: the helper runs as root, so a lying agent asking to
+# publish on 22 or 443 would hijack the node's own SSH or TLS listener. Container ports are the
+# far side of the DNAT and can be anything the image listens on.
+_MIN_HOST_PORT = 1024
+_MAX_PORT = 65535
+# A kernel exposes a handful of services; a huge list would just be a way to flood the ruleset.
+_MAX_PUBLISHED_PORTS = 64
+
 
 class PolicyViolation(RuntimeError):
     """The agent sent an identifier or network parameter outside the allowed set.
@@ -63,6 +71,33 @@ def validate_session_id(value: str) -> str:
 def validate_container_id(value: str) -> str:
     if not _CONTAINER_ID_RE.match(value):
         raise PolicyViolation("invalid container_id")
+    return value
+
+
+def validate_port_pairs(
+    value: tuple[tuple[int, int], ...] | None,
+) -> tuple[tuple[int, int], ...]:
+    """Bound the agent-supplied (host_port, container_port) pairing.
+
+    This is the trust boundary for host-port ingress. The destination address is never taken from
+    the agent (the helper uses the LOCAL address it assigned at attach), so the only thing the
+    agent can influence is *which* host port is redirected — hence the unprivileged-port floor and
+    the duplicate check. The worst a lying agent achieves is publishing its own container on some
+    other unprivileged port of the node.
+    """
+    if not value:
+        raise PolicyViolation("missing ports")
+    if len(value) > _MAX_PUBLISHED_PORTS:
+        raise PolicyViolation("too many ports")
+    seen: set[int] = set()
+    for host_port, container_port in value:
+        if not (_MIN_HOST_PORT <= host_port <= _MAX_PORT):
+            raise PolicyViolation("host port out of range")
+        if not (1 <= container_port <= _MAX_PORT):
+            raise PolicyViolation("container port out of range")
+        if host_port in seen:
+            raise PolicyViolation("duplicate host port")
+        seen.add(host_port)
     return value
 
 

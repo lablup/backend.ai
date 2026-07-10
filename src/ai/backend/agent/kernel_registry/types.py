@@ -63,7 +63,14 @@ class KernelRecoveryData(BackendAISchema):
     # daemon at runtime, so they stay None there; kept backward-compatible via defaults.
     container_id: str | None = Field(default=None, description="Runtime container id, if pinned")
     kernel_host: str | None = Field(
-        default=None, description="Host-reachable address for the kernel's REPL, if pinned"
+        default=None, description="Advertised address the manager routes to, if pinned"
+    )
+    repl_host: str | None = Field(
+        default=None,
+        description=(
+            "Node-local address the agent dials the REPL at, if pinned. Distinct from kernel_host: "
+            "containerd gives the container a private LOCAL address and publishes only its services."
+        ),
     )
 
     @classmethod
@@ -129,6 +136,7 @@ class KernelRecoveryData(BackendAISchema):
             # containerd reconstructs the code runner + log path from these, so they must persist.
             container_id=kernel.data["container_id"],
             kernel_host=kernel.data["kernel_host"],
+            repl_host=kernel.data.get("repl_host"),
         )
 
     def to_containerd_kernel(self) -> ContainerdKernel:
@@ -150,5 +158,6 @@ class KernelRecoveryData(BackendAISchema):
                 "domain_socket_proxies": self.domain_socket_proxies,
                 "container_id": self.container_id,
                 "kernel_host": self.kernel_host,
+                "repl_host": self.repl_host,
             },
         )

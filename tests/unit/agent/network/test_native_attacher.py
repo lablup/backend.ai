@@ -1,15 +1,21 @@
 """Unit tests for the native veth/bridge attach runner (BEP-1058)."""
 
+import asyncio
 from pathlib import Path
 from typing import Any
 
 import pytest
 
 import ai.backend.agent.network.native_attacher as na
+from ai.backend.agent.errors.network import (
+    NetworkStateStoreConflict,
+    SubnetAddressPoolExhausted,
+)
 from ai.backend.agent.network.native_attacher import (
     HostLocalIpam,
     NativeBridgeAttachRunner,
     _veth_name,
+    get_host_local_ipam,
 )
 
 _NETNS = "/proc/4242/ns/net"
@@ -58,6 +64,73 @@ class TestHostLocalIpam:
         # freed address is reusable
         reused = await ipam.allocate("172.30.1.0/24", "cidB", "eth0", reserve=["172.30.1.1"])
         assert reused == "172.30.1.2"
+
+    async def test_pool_exhaustion_raises(self, tmp_path: Path) -> None:
+        ipam = HostLocalIpam(tmp_path)
+        # /30 has exactly two hosts; the gateway takes one
+        await ipam.allocate("10.0.0.0/30", "cidA", "eth0", reserve=["10.0.0.1"])
+        with pytest.raises(SubnetAddressPoolExhausted):
+            await ipam.allocate("10.0.0.0/30", "cidB", "eth0", reserve=["10.0.0.1"])
+
+
+class TestHostLocalIpamJournal:
+    async def test_allocation_survives_a_restart(self, tmp_path: Path) -> None:
+        held = await HostLocalIpam(tmp_path).allocate(
+            "172.30.1.0/24", "cidA", "eth0", reserve=["172.30.1.1"]
+        )
+
+        restarted = HostLocalIpam(tmp_path)  # fresh process, same on-disk journal
+        assert (
+            await restarted.allocate("172.30.1.0/24", "cidA", "eth0", reserve=["172.30.1.1"])
+            == held
+        )
+        newcomer = await restarted.allocate("172.30.1.0/24", "cidB", "eth0", reserve=["172.30.1.1"])
+        assert newcomer != held  # the survivor's address is not handed out again
+
+    async def test_release_survives_a_restart(self, tmp_path: Path) -> None:
+        held = await HostLocalIpam(tmp_path).allocate(
+            "172.30.1.0/24", "cidA", "eth0", reserve=["172.30.1.1"]
+        )
+        await HostLocalIpam(tmp_path).release("172.30.1.0/24", "cidA", "eth0")
+        reused = await HostLocalIpam(tmp_path).allocate(
+            "172.30.1.0/24", "cidB", "eth0", reserve=["172.30.1.1"]
+        )
+        assert reused == held
+
+    async def test_an_address_appearing_behind_the_owner_raises(self, tmp_path: Path) -> None:
+        # The store has one writer per node; a record the owner believes free means a second one.
+        ipam = HostLocalIpam(tmp_path)
+        await ipam.allocate("172.30.1.0/24", "cidA", "eth0", reserve=["172.30.1.1"])
+
+        subnet_dir = tmp_path / "172.30.1.0_24"
+        (subnet_dir / "172.30.1.3").write_text("written-by-someone-else")
+
+        with pytest.raises(NetworkStateStoreConflict):
+            await ipam.allocate("172.30.1.0/24", "cidB", "eth0", reserve=["172.30.1.1"])
+        assert (subnet_dir / "172.30.1.3").read_text() == "written-by-someone-else"
+
+
+class TestHostLocalIpamOwnership:
+    """Each agent builds its own NativeBridgeAttachRunner, but one node has one IP space: the
+    runners must resolve the same IPAM or two agents would hand out the same address."""
+
+    def test_one_ipam_per_store(self, tmp_path: Path) -> None:
+        assert get_host_local_ipam(tmp_path) is get_host_local_ipam(tmp_path)
+
+    def test_runners_over_one_store_share_an_ipam(self, tmp_path: Path) -> None:
+        primary = NativeBridgeAttachRunner(ipam_state_dir=tmp_path)
+        auxiliary = NativeBridgeAttachRunner(ipam_state_dir=tmp_path)
+        assert primary._ipam is auxiliary._ipam
+
+    async def test_concurrent_agents_never_share_an_address(self, tmp_path: Path) -> None:
+        primary = NativeBridgeAttachRunner(ipam_state_dir=tmp_path)._ipam
+        auxiliary = NativeBridgeAttachRunner(ipam_state_dir=tmp_path)._ipam
+
+        ips = await asyncio.gather(
+            primary.allocate("172.30.1.0/24", "cidA", "eth0", reserve=["172.30.1.1"]),
+            auxiliary.allocate("172.30.1.0/24", "cidB", "eth0", reserve=["172.30.1.1"]),
+        )
+        assert len(set(ips)) == 2
 
 
 class _RunRecorder:

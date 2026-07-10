@@ -38,7 +38,13 @@ from ai.backend.agent.network.helper.protocol import (
     HelperResponse,
     ProtocolError,
 )
-from ai.backend.common.network.types import Member, NetworkBackendKind, SessionNetMeta
+from ai.backend.agent.network.port_forward import PortForwarder, forwards_for
+from ai.backend.common.network.types import (
+    Member,
+    NetworkBackendKind,
+    NetworkRole,
+    SessionNetMeta,
+)
 from ai.backend.logging import BraceStyleAdapter
 
 if TYPE_CHECKING:
@@ -79,11 +85,15 @@ class _SessionEntry:
     meta: SessionNetMeta
     backend: AbstractNetworkAgentPluginV2[Any]
     attached: dict[str, Any]  # container_id -> EndpointPlan (kept for detach)
+    # container_id -> the LOCAL address the helper itself assigned. The only address a published
+    # host port may be DNAT'd to; never taken from the agent.
+    local_ips: dict[str, str]
 
     def __init__(self, meta: SessionNetMeta, backend: AbstractNetworkAgentPluginV2[Any]) -> None:
         self.meta = meta
         self.backend = backend
         self.attached = {}
+        self.local_ips = {}
 
 
 class NetworkHelperServer:
@@ -93,6 +103,7 @@ class NetworkHelperServer:
     _host_ip: str
     _runtime: OciRuntime
     _attacher: CniAttacher
+    _forwarder: PortForwarder
     _backends: dict[str, AbstractNetworkAgentPluginV2[Any]]
     _sessions: dict[str, _SessionEntry]
     _locks: dict[str, asyncio.Lock]
@@ -107,6 +118,7 @@ class NetworkHelperServer:
         runtime: OciRuntime,
         cni_runner: CniRunner,
         backends: dict[str, AbstractNetworkAgentPluginV2[Any]],
+        forwarder: PortForwarder | None = None,
     ) -> None:
         self._socket_path = socket_path
         self._allowed_uid = allowed_uid
@@ -114,6 +126,7 @@ class NetworkHelperServer:
         self._host_ip = host_ip
         self._runtime = runtime
         self._attacher = CniAttacher(cni_runner)
+        self._forwarder = forwarder or PortForwarder()
         self._backends = backends
         self._sessions = {}
         self._locks = {}
@@ -198,6 +211,13 @@ class NetworkHelperServer:
                     case HelperOp.ADD_ENDPOINT | HelperOp.DEL_ENDPOINT:
                         await self._endpoint(session_id, req)
                         return HelperResponse(ok=True)
+                    case HelperOp.PUBLISH_PORTS:
+                        await self._publish_ports(session_id, req)
+                        return HelperResponse(ok=True)
+                    case HelperOp.UNPUBLISH_PORTS:
+                        return HelperResponse(ok=True, host_ports=await self._unpublish_ports(req))
+                    case HelperOp.LIST_PORTS:
+                        return HelperResponse(ok=True, forwards=await self._list_ports())
             except (policy.PolicyViolation, netns_mod.NetnsError, HelperError) as e:
                 return HelperResponse(ok=False, error=str(e))
             except Exception:
@@ -277,17 +297,60 @@ class NetworkHelperServer:
                 plan, container_id=container_id, netns=f"/proc/{pid}/ns/net"
             )
             entry.attached[container_id] = plan
+            if (local_ip := assigned.get(NetworkRole.LOCAL)) is not None:
+                entry.local_ips[container_id] = local_ip
             return {str(role): ip for role, ip in assigned.items()}
         finally:
             pinned.close()
+
+    async def _publish_ports(self, session_id: str, req: HelperRequest) -> None:
+        """DNAT the agent-chosen host ports to this container's LOCAL address.
+
+        The address is the helper's own record from attach, not something the agent sent: that is
+        what keeps a compromised agent from pointing one of the node's ports at an arbitrary host.
+        """
+        if req.container_id is None:
+            raise policy.PolicyViolation("publish requires container_id")
+        container_id = policy.validate_container_id(req.container_id)
+        ports = policy.validate_port_pairs(req.ports)
+        entry = self._sessions.get(session_id)
+        if entry is None:
+            raise HelperError("publish before setup")
+        local_ip = entry.local_ips.get(container_id)
+        if local_ip is None:
+            raise HelperError("publish before attach")
+        await self._forwarder.install(forwards_for(container_id, local_ip, ports))
+
+    async def _unpublish_ports(self, req: HelperRequest) -> tuple[int, ...]:
+        """Withdraw every rule tagged with this container, returning the host ports it held.
+
+        Needs no session entry: the rules name their own container, so this works after a helper
+        restart too, when nothing in memory remembers the attach.
+        """
+        if req.container_id is None:
+            raise policy.PolicyViolation("unpublish requires container_id")
+        container_id = policy.validate_container_id(req.container_id)
+        return tuple(await self._forwarder.remove_container(container_id))
+
+    async def _list_ports(self) -> tuple[tuple[str, int, str, int], ...]:
+        """Every published port on this node, read back from the rules themselves."""
+        return tuple(
+            (f.container_id, f.host_port, f.container_ip, f.container_port)
+            for f in await self._forwarder.list_forwards()
+        )
 
     async def _detach(self, session_id: str, container_id: str | None) -> None:
         if container_id is None:
             raise policy.PolicyViolation("detach requires container_id")
         container_id = policy.validate_container_id(container_id)
+        # Withdraw first, and unconditionally: a DNAT rule outliving its container would send the
+        # next holder of that host port at an address that is about to disappear. Keyed by the
+        # container's own tag, so it holds even if this helper never saw the attach.
+        await self._forwarder.remove_container(container_id)
         entry = self._sessions.get(session_id)
         if entry is None:
             return
+        entry.local_ips.pop(container_id, None)
         plan = entry.attached.pop(container_id, None)
         if plan is None:
             return

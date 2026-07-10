@@ -12,6 +12,7 @@ import ai.backend.agent.containerd.agent as agent_mod
 from ai.backend.agent.config.unified import ContainerSandboxType
 from ai.backend.agent.containerd.agent import ContainerdAgent
 from ai.backend.agent.containerd.runtime.interface import ContainerInfo, ImageInfo
+from ai.backend.agent.network.port_forward import PortForward
 from ai.backend.common.docker import LabelName
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.exception import ImageNotAvailable
@@ -89,12 +90,20 @@ class _FakeRuntime:
         self.removed = True
 
 
-def _agent(facade: FakeFacade) -> ContainerdAgent:
+class _NoForwards:
+    async def list_forwards(self, **kwargs: Any) -> list[PortForward]:
+        return []
+
+
+def _agent(facade: FakeFacade, *, port_forwarder: Any = None) -> ContainerdAgent:
     agent = ContainerdAgent.__new__(ContainerdAgent)
     agent._session_network = cast(Any, facade)
     agent.local_config = cast(
         Any, SimpleNamespace(container=SimpleNamespace(scratch_root=Path("/tmp/bai-scratch")))
     )
+    # In production this is the local PortForwarder, or the helper proxy when privilege is split;
+    # either way the agent always has one.
+    agent._port_forwarder = cast(Any, port_forwarder or _NoForwards())
     return agent
 
 
@@ -289,6 +298,39 @@ class TestEnumerateContainers:
         assert str(got_kid) == kid
         assert container.status is ContainerStatus.RUNNING
         assert container.id == kid
+
+    async def test_reports_published_ports_so_a_restart_reclaims_them(self) -> None:
+        # the DNAT rules are the only record of a live kernel's host ports; without reporting them
+        # the restarted agent would hand one of them to the next kernel
+        kid = "33333333-3333-3333-3333-333333333333"
+        infos = [
+            ContainerInfo(id=kid, image="img:1", status="running",
+                          labels={"ai.backend.kernel-id": kid}),
+        ]  # fmt: skip
+
+        class _Forwarder:
+            async def list_forwards(self, **kwargs: Any) -> list[PortForward]:
+                return [
+                    PortForward(kid, 30001, "172.30.1.7", 2000),
+                    PortForward(kid, 30003, "172.30.1.7", 8070),
+                    PortForward("someone-else", 30099, "172.30.1.9", 8070),
+                ]
+
+        agent = _agent(FakeFacade(), port_forwarder=_Forwarder())
+        agent._runtime = cast(Any, self._runtime_with(infos))
+        _kid, container = (await agent.enumerate_containers())[0]
+        assert sorted(p.host_port for p in container.ports) == [30001, 30003]
+
+    async def test_reports_no_ports_when_nothing_is_published(self) -> None:
+        kid = "44444444-4444-4444-4444-444444444444"
+        infos = [
+            ContainerInfo(id=kid, image="img:1", status="running",
+                          labels={"ai.backend.kernel-id": kid}),
+        ]  # fmt: skip
+        agent = _agent(FakeFacade())
+        agent._runtime = cast(Any, self._runtime_with(infos))
+        _kid, container = (await agent.enumerate_containers())[0]
+        assert container.ports == []
 
     async def test_status_filter_excludes(self) -> None:
         kid = "22222222-2222-2222-2222-222222222222"

@@ -57,6 +57,17 @@ class AbstractNetworkAgentPluginV2[TKernel: AbstractKernel](AbstractPlugin, meta
         raise NotImplementedError
 
     @abstractmethod
+    async def adopt_session_network(self, meta: SessionNetMeta, self_member: Member) -> None:
+        """Re-attach this backend to a session whose data plane is already up.
+
+        Called instead of `setup_session_network` when an agent restarts onto containers that
+        survived it. It restores whatever per-session bookkeeping the backend keeps, and must
+        NOT touch host devices: `setup_session_network` deletes and recreates them by name, so
+        running it here would cut the surviving containers off the network.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
     async def teardown_session_network(self, session_id: str) -> None:
         """Tear down all host-level state for the session. Must be idempotent."""
         raise NotImplementedError

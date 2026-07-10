@@ -81,7 +81,10 @@ class ContainerdKernel(AbstractKernel):
             self.kernel_id,
             self.session_id,
             event_producer,
-            kernel_host=self.data["kernel_host"],
+            # the container's own LOCAL address: the agent is on this node and the host is that
+            # bridge's gateway, so the REPL needs no published port. kernel_host is the agent's
+            # advertised address, for consumers that are not on this node.
+            kernel_host=self.data.get("repl_host") or self.data["kernel_host"],
             repl_in_port=self.data["repl_in_port"],
             repl_out_port=self.data["repl_out_port"],
             exec_timeout=0,

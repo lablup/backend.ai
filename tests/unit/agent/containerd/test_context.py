@@ -6,13 +6,16 @@ injection so the lifecycle methods can be tested in isolation against a fake fac
 
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any, cast
+from typing import Any, cast, override
+
+import pytest
 
 from ai.backend.agent.config.unified import ScratchType
 from ai.backend.agent.containerd.agent import ContainerdKernelCreationContext
 from ai.backend.agent.containerd.oci import AcceleratorSpec
 from ai.backend.agent.containerd.orchestrator import LaunchResult
 from ai.backend.agent.containerd.runtime.interface import TaskHandle
+from ai.backend.agent.port_pool import PortPool
 from ai.backend.agent.resources import Mount
 from ai.backend.common.network.types import (
     AttachKind,
@@ -77,7 +80,22 @@ class FakeFacade:
         )
 
 
-def _context(facade: FakeFacade) -> ContainerdKernelCreationContext:
+_ADVERTISED_HOST = "10.0.0.1"
+
+
+class FakePortForwarder:
+    """Records the DNAT rules the context asks for."""
+
+    def __init__(self) -> None:
+        self.installed: list[Any] = []
+
+    async def install(self, forwards: Any) -> None:
+        self.installed.extend(forwards)
+
+
+def _context(
+    facade: FakeFacade, *, port_forwarder: FakePortForwarder | None = None
+) -> ContainerdKernelCreationContext:
     ctx = ContainerdKernelCreationContext.__new__(ContainerdKernelCreationContext)
     ctx._session_network = cast(Any, facade)
     ctx._session_id = "sess-abc"
@@ -90,6 +108,17 @@ def _context(facade: FakeFacade) -> ContainerdKernelCreationContext:
         image_ref="img:1", oci_spec={}, command=["/opt/kernel/entrypoint.sh"]
     )
     ctx.kernel_config = cast(Any, {})
+    ctx._port_forwarder = cast(Any, port_forwarder)
+    # what _reserve_host_ports would have produced: one service port, no REPL port
+    ctx._host_port_map = [(30003, 8070)]
+    ctx._port_pool = PortPool((30000, 30010), 0.0)
+    ctx._port_pool.discard(30003)  # _reserve_host_ports had acquired it
+    ctx.local_config = cast(
+        Any,
+        SimpleNamespace(
+            container=SimpleNamespace(advertised_host=_ADVERTISED_HOST, bind_host="0.0.0.0")
+        ),
+    )
     return ctx
 
 
@@ -193,27 +222,80 @@ class TestScratchAndMounts:
 
 
 class TestStartContainer:
-    async def test_single_node_bridge_uses_cni_path_and_local_ip(self) -> None:
+    async def test_single_node_bridge_uses_cni_path_and_publishes_ports(self) -> None:
         # single-node: apply_network synthesizes a bridge meta, then start goes through the
-        # SAME create_container + start_and_attach CNI path; kernel_host = the LOCAL IP.
+        # SAME create_container + start_and_attach CNI path.
         facade = FakeFacade()
-        ctx = _context(facade)
+        ctx = _context(facade, port_forwarder=FakePortForwarder())
         await ctx.apply_network(cast(Any, {}))
         result = await ctx.start_container(cast(Any, None), [], None, [], cast(Any, {}))
         assert facade.started == [("sess-abc", "kern-123")]
-        assert result["kernel_host"] == "172.30.1.2"  # LOCAL bridge IP
+        assert result["kernel_host"] == _ADVERTISED_HOST
         assert result["task_pid"] == 555
 
-    async def test_starts_and_reports_local_host(self) -> None:
+    async def test_kernel_host_is_the_agent_advertised_address(self) -> None:
+        # NOT the LOCAL IP: that is a node-local NAT address, and the manager hands kernel_host to
+        # an AppProxy that may run on any host. NOT the overlay IP either: that is reachable only
+        # between kernels.
         facade = FakeFacade()
-        ctx = _context(facade)
+        ctx = _context(facade, port_forwarder=FakePortForwarder())
         await ctx.apply_network(cast(Any, {"network_config": _VXLAN_NC}))
         result = await ctx.start_container(cast(Any, None), [], None, [], cast(Any, {}))
         assert facade.started == [("sess-abc", "kern-123")]
-        # kernel_host is the LOCAL IP (host-reachable), not the overlay IP
-        assert result["kernel_host"] == "172.30.1.2"
+        assert result["kernel_host"] == _ADVERTISED_HOST
+        assert result["kernel_host"] != "172.30.1.2"
         assert result["task_pid"] == 555
         assert result["container_id"] == "kern-123"
+
+    async def test_the_repl_is_dialled_directly_not_published(self) -> None:
+        # the agent is on this node, so the REPL needs no host port and no DNAT; publishing it
+        # would also make the agent's own dial depend on route_localnet when it advertises 127.0.0.1
+        ctx = _context(FakeFacade(), port_forwarder=FakePortForwarder())
+        await ctx.apply_network(cast(Any, {"network_config": _VXLAN_NC}))
+        result = await ctx.start_container(cast(Any, None), [], None, [], cast(Any, {}))
+        assert result["repl_host"] == "172.30.1.2"  # the container's own LOCAL address
+        assert (result["repl_in_port"], result["repl_out_port"]) == ctx.repl_ports  # 2000/2001
+        assert result["host_ports"] == [30003]  # only the service port
+
+    async def test_only_service_ports_are_dnatd_to_the_container(self) -> None:
+        forwarder = FakePortForwarder()
+        ctx = _context(FakeFacade(), port_forwarder=forwarder)
+        await ctx.apply_network(cast(Any, {"network_config": _VXLAN_NC}))
+        await ctx.start_container(cast(Any, None), [], None, [], cast(Any, {}))
+        assert [(f.host_port, f.container_port) for f in forwarder.installed] == [(30003, 8070)]
+        assert {f.container_ip for f in forwarder.installed} == {"172.30.1.2"}
+
+    async def test_a_missing_publisher_fails_loudly(self) -> None:
+        # publishing silently is the one outcome we cannot allow: the kernel would come up with
+        # every service unreachable, and nothing would say so.
+        ctx = _context(FakeFacade(), port_forwarder=None)
+        await ctx.apply_network(cast(Any, {"network_config": _VXLAN_NC}))
+        with pytest.raises(RuntimeError):
+            await ctx.start_container(cast(Any, None), [], None, [], cast(Any, {}))
+
+    async def test_a_start_failure_releases_the_reserved_host_ports(self) -> None:
+        # _reserve_host_ports (in prepare) took the port from the pool; if start fails it was never
+        # published, so nothing in iptables reclaims it — start_container must release it here or it
+        # leaks from the pool until the agent restarts.
+        class _FailingFacade(FakeFacade):
+            @override
+            async def start_and_attach_container(self, *a: Any, **k: Any) -> Any:
+                raise RuntimeError("container failed to start")
+
+        ctx = _context(_FailingFacade(), port_forwarder=FakePortForwarder())
+        await ctx.apply_network(cast(Any, {"network_config": _VXLAN_NC}))
+        before = len(ctx._port_pool)
+        with pytest.raises(RuntimeError):
+            await ctx.start_container(cast(Any, None), [], None, [], cast(Any, {}))
+        assert len(ctx._port_pool) == before + 1  # 30003 returned to the pool
+
+    async def test_a_successful_start_does_not_release_the_pool(self) -> None:
+        # the published launch releases via clean_kernel later; releasing here too would double-free
+        ctx = _context(FakeFacade(), port_forwarder=FakePortForwarder())
+        await ctx.apply_network(cast(Any, {"network_config": _VXLAN_NC}))
+        before = len(ctx._port_pool)
+        await ctx.start_container(cast(Any, None), [], None, [], cast(Any, {}))
+        assert len(ctx._port_pool) == before  # unchanged: still held
 
 
 class TestAcceleratorAllocation:

@@ -1,8 +1,10 @@
 from collections.abc import Sequence
+from pathlib import Path
 from typing import cast
 
 import pytest
 
+from ai.backend.agent.errors.network import OverlayAddressNotAssigned
 from ai.backend.agent.network.backends.vxlan import (
     OVERLAY_IFNAME,
     VxlanNetworkPlugin,
@@ -19,6 +21,7 @@ from ai.backend.agent.network.backends.vxlan import (
     vxlan_dev,
     vxlan_link_add_args,
 )
+from ai.backend.agent.network.local_subnet import LocalSubnetAllocator
 from ai.backend.common.network.types import (
     Member,
     NetworkBackendKind,
@@ -123,26 +126,23 @@ class TestCommandBuilders:
 
 
 class TestCNIConfig:
-    def test_overlay_config_binds_session_bridge_and_subnet(self) -> None:
-        conf = overlay_cni_config(_META)
+    def test_overlay_config_binds_session_bridge_and_uses_static_ipam(self) -> None:
+        conf = overlay_cni_config(_META, ip="10.128.5.7")
         assert conf["type"] == "bridge"
         assert conf["bridge"] == "baibr4097"
-        assert conf["ipam"]["subnet"] == "10.128.5.0/24"
-        assert conf["ipam"]["type"] == "host-local"
         assert conf["mtu"] == 1450
         assert conf["ipMasq"] is False
-
-    def test_overlay_config_uses_static_ipam_when_ip_assigned(self) -> None:
-        conf = overlay_cni_config(_META, ip="10.128.5.7")
-        # central endpoint IP -> static IPAM (disjoint across nodes), not host-local
+        # central endpoint IP -> static IPAM (disjoint across nodes)
         assert conf["ipam"]["type"] == "static"
         assert conf["ipam"]["addresses"] == [{"address": "10.128.5.7/24"}]
         # deterministic MAC pinned so peers' FDB/ARP (programmed to the same mac_for_ip) match
         assert conf["mac"] == "02:42:0a:80:05:07"
 
-    def test_overlay_config_omits_mac_without_static_ip(self) -> None:
-        # host-local fallback has no pre-programmed ARP to match, so no MAC is pinned
-        assert "mac" not in overlay_cni_config(_META)
+    def test_overlay_config_requires_a_manager_assigned_ip(self) -> None:
+        # the overlay subnet is stretched cluster-wide; a node cannot pick locally without
+        # colliding, so a missing assignment must fail loudly rather than fall back to host-local
+        with pytest.raises(OverlayAddressNotAssigned):
+            overlay_cni_config(_META)
 
     def test_local_config_is_gateway_with_masq(self) -> None:
         conf = local_cni_config("s1", bridge="bailo4097", subnet="172.30.0.0/24")
@@ -239,11 +239,11 @@ class TestSetupTeardown:
 
 
 class TestLocalSubnetAllocation:
-    def test_idempotent_per_session_and_distinct_across_sessions(self) -> None:
+    async def test_idempotent_per_session_and_distinct_across_sessions(self) -> None:
         plugin = _plugin(Recorder())
-        a1 = plugin._alloc_local_subnet("sA")
-        a2 = plugin._alloc_local_subnet("sA")
-        b = plugin._alloc_local_subnet("sB")
+        a1 = await plugin._local_subnet("sA")
+        a2 = await plugin._local_subnet("sA")
+        b = await plugin._local_subnet("sB")
         assert a1 == a2  # idempotent
         assert a1 != b  # distinct sessions -> distinct node-local subnets
         assert a1.startswith("172.30.") and b.startswith("172.30.")
@@ -251,11 +251,25 @@ class TestLocalSubnetAllocation:
     async def test_local_subnet_freed_on_teardown(self) -> None:
         plugin = _plugin(Recorder())
         await plugin.setup_session_network(_META, _SELF)
-        first = plugin._alloc_local_subnet("s1")
+        first = await plugin._local_subnet("s1")
         await plugin.teardown_session_network("s1")
         # after teardown the block is reusable by a new session
-        reused = plugin._alloc_local_subnet("s-new")
+        reused = await plugin._local_subnet("s-new")
         assert reused == first
+
+    async def test_subnet_survives_an_agent_restart(self, local_subnet_state_dir: Path) -> None:
+        # A restart drops every in-memory allocation. A surviving session must keep its subnet,
+        # and a new session must not be handed the block that session still holds — otherwise
+        # two live sessions share a /24 (bridge isolation + the per-subnet MASQ refcount break).
+        plugin = _plugin(Recorder())
+        held = await plugin._local_subnet("survivor")
+
+        # a fresh agent process: a brand-new allocator over the same on-disk store
+        restarted = VxlanNetworkPlugin(
+            {}, {}, runner=Recorder(), local_subnets=LocalSubnetAllocator(local_subnet_state_dir)
+        )
+        assert await restarted._local_subnet("survivor") == held
+        assert await restarted._local_subnet("newcomer") != held
 
 
 class TestPeers:
@@ -323,14 +337,18 @@ class TestAttachEndpoint:
     async def test_returns_local_default_route_and_overlay(self) -> None:
         rec = Recorder()
         plugin = _plugin(rec)
+        # vxlan is multi-node: the manager always assigns a cluster-unique overlay IP
         plan = await plugin.attach_endpoint(
-            cast(KernelCreationConfig, {}), cast(ClusterInfo, {}), meta=_META
+            cast(KernelCreationConfig, {"cluster_network_ip": "10.128.5.7"}),
+            cast(ClusterInfo, {}),
+            meta=_META,
         )
         overlay = plan.overlay()
         assert overlay is not None
         assert overlay.interface_name == OVERLAY_IFNAME
         assert overlay.cni_config is not None
         assert overlay.cni_config["bridge"] == "baibr4097"
+        assert overlay.cni_config["ipam"]["type"] == "static"
         local = plan.local()
         assert local.is_default_route is True
         assert local.role is NetworkRole.LOCAL

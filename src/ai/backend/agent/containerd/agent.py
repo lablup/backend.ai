@@ -47,6 +47,7 @@ from ai.backend.agent.docker.agent import (
     known_glibc_distros,
 )
 from ai.backend.agent.errors import UnsupportedResource
+from ai.backend.agent.errors.resources import PortPoolExhaustedError
 from ai.backend.agent.kernel import AbstractKernel
 from ai.backend.agent.kernel_registry.adapter import (
     KernelRecoveryDataAdapter,
@@ -63,6 +64,9 @@ from ai.backend.agent.kernel_registry.pickle.creator import (
 from ai.backend.agent.kernel_registry.recovery.base_recovery import BaseKernelRegistryRecovery
 from ai.backend.agent.kernel_registry.writer.types import KernelRegistrySaveMetadata
 from ai.backend.agent.network.caps import publish_vtep
+from ai.backend.agent.network.helper.client import HelperClient, HelperPortForwarder
+from ai.backend.agent.network.port_forward import PortForwarder, PortPublisher, forwards_for
+from ai.backend.agent.port_pool import PortPool
 from ai.backend.agent.resources import (
     AbstractComputePlugin,
     ComputerContext,
@@ -77,6 +81,7 @@ from ai.backend.agent.types import (
     KernelOwnershipData,
     LifecycleEvent,
     MountInfo,
+    Port,
 )
 from ai.backend.agent.utils import container_pid_to_host_pid, host_pid_to_container_pid
 from ai.backend.common.arch import CURRENT_ARCH
@@ -259,6 +264,12 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
     _pending_spec: Any
     _accel_spec: AcceleratorSpec
     _agent_sock_path: Path | None
+    _port_pool: PortPool
+    _port_forwarder: PortPublisher | None
+    # (host_port, container_port) for the REPL and every service port, captured at reserve time and
+    # turned into DNAT rules once the container's address is known.
+    _host_port_map: list[tuple[int, int]]
+    _repl_host_ports: tuple[int, ...]
 
     def __init__(
         self,
@@ -273,6 +284,8 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         *,
         session_network: ContainerdSessionNetwork,
         agent_sock_path: Path | None = None,
+        port_pool: PortPool,
+        port_forwarder: PortPublisher | None = None,
     ) -> None:
         super().__init__(
             ownership_data,
@@ -293,6 +306,10 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         self._pending_spec = None
         self._scratch_dir = None
         self._accel_spec = AcceleratorSpec()
+        self._port_pool = port_pool
+        self._port_forwarder = port_forwarder
+        self._host_port_map = []
+        self._repl_host_ports = ()
 
     @override
     async def get_extra_envs(self) -> Mapping[str, str]:
@@ -597,6 +614,32 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
 
         await asyncio.to_thread(_write)
 
+    def _reserve_host_ports(self, service_ports: list[ServicePort]) -> None:
+        """Acquire a host port for each *service* container port, recording the pairing.
+
+        Only services are published. The REPL is not: the agent is on this node, so it reaches the
+        container's LOCAL address directly (the host is that bridge's gateway) — no host port, no
+        DNAT, and no dependence on ``route_localnet`` when the agent's advertised address is a
+        loopback one. Services are a different matter: an AppProxy may run on any host, so they
+        must be reachable at the agent's advertised address.
+        """
+        needed = sum(len(sp["container_ports"]) for sp in service_ports)
+        if needed > len(self._port_pool):
+            raise PortPoolExhaustedError(
+                f"Container ports are not sufficiently available. "
+                f"(needed: {needed}, remaining: {self._port_pool.remaining()})"
+            )
+        self._host_port_map = []
+        # No sshd special case: the manager only builds a cluster SSH port mapping for HOST-network
+        # sessions, and those never reach this backend.
+        for sport in service_ports:
+            host_ports: list[int] = []
+            for container_port in sport["container_ports"]:
+                host_port = self._port_pool.acquire()
+                host_ports.append(host_port)
+                self._host_port_map.append((host_port, container_port))
+            sport["host_ports"] = tuple(host_ports)
+
     @override
     async def prepare_container(
         self,
@@ -653,11 +696,11 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         # MEMORY scratch type -> in-memory (tmpfs) /tmp.
         if self.local_config.container.scratch_type == ScratchType.MEMORY:
             oci_spec["tmpfs_tmp"] = True
-        # Direct-IP model: kernel_host is the container's own IP, so each service is reachable
-        # at its container port directly (no host-port mapping). The manager routes on
-        # kernel_host + host_ports, so surface host_ports = container_ports.
-        for sport in service_ports:
-            sport["host_ports"] = tuple(sport["container_ports"])
+        # The LOCAL bridge is a node-local NAT subnet, so the container's address is private and
+        # unroutable off this node — an AppProxy may run on any host. Publish each service (and the
+        # REPL, which the agent itself dials at kernel_host) on a host port, DNAT'd to the container
+        # once its address is known at start. Same contract as the Docker backend's PortBindings.
+        self._reserve_host_ports(service_ports)
         # seccomp hardening (skip under the jail sandbox, which does its own syscall filtering).
         if self.local_config.container.sandbox_type != ContainerSandboxType.JAIL:
             seccomp_path = self.resolve_krunner_filepath("runner/default-seccomp.json")
@@ -691,44 +734,73 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         command = [KRUNNER_ENTRYPOINT, *cmdargs]
         if self._net_meta is None:
             raise RuntimeError("apply_network must run before start_container (no net meta)")
-        await self._session_network.create_container(
-            self._session_id,
-            self._container_id,
-            image_ref=spec.image_ref,
-            command=command,
-            oci_spec=spec.oci_spec,
+        # _reserve_host_ports (in prepare_container) already took host ports from the pool. Any
+        # failure here means they were never published — publish is atomic, so nothing survives in
+        # iptables for clean_kernel to reclaim from — so release them right here, mirroring the
+        # Docker backend's _rollback_container_creation. A published launch releases via clean_kernel
+        # instead, and `published` keeps the two paths from double-releasing.
+        published = False
+        try:
+            await self._session_network.create_container(
+                self._session_id,
+                self._container_id,
+                image_ref=spec.image_ref,
+                command=command,
+                oci_spec=spec.oci_spec,
+            )
+            # Start + attach the CNI chain (bridge for single-node, +overlay for multi-node).
+            result = await self._session_network.start_and_attach_container(
+                self._session_id,
+                self._container_id,
+                meta=self._net_meta,
+                kernel_config=self.kernel_config,
+                cluster_info=cluster_info,
+            )
+            task_pid = result.handle.pid
+            container_ip = result.local_ip
+            if container_ip is None:
+                raise RuntimeError("the LOCAL attachment yielded no address; cannot publish ports")
+            # Publish the services on host ports. kernel_host is what the manager hands to an
+            # AppProxy that may run on any host, so it must be the agent's advertised address: the
+            # OVERLAY IP is reachable only between kernels, and the LOCAL IP only from this node.
+            await self._publish_ports(container_ip)
+            published = True
+        except Exception:
+            if not published:
+                self._port_pool.release_many([hp for hp, _ in self._host_port_map])
+            raise
+        kernel_host = str(
+            self.local_config.container.advertised_host or self.local_config.container.bind_host
         )
-        # Start + attach the CNI chain (bridge for single-node, +overlay for multi-node);
-        # kernel_host = the LOCAL bridge IP (see below).
-        result = await self._session_network.start_and_attach_container(
-            self._session_id,
-            self._container_id,
-            meta=self._net_meta,
-            kernel_config=self.kernel_config,
-            cluster_info=cluster_info,
-        )
-        task_pid = result.handle.pid
-        # The agent reaches the kernel's REPL over the LOCAL interface (the host is that
-        # bridge's gateway); the OVERLAY IP is only reachable between kernels, not from the
-        # host, so it must NOT be used as kernel_host.
-        kernel_host = result.local_ip or "127.0.0.1"
-        # REPL ports are the krunner intrinsic, container-internal ports (self.repl_ports);
-        # the agent connects to them directly at kernel_host (the container's bridge/overlay
-        # IP), so no host-port mapping is needed (cf. DockerAgent's container_network_info
-        # path). stdin/stdout ports are legacy and unused (0), matching DockerAgent.
+        # The REPL is agent-to-container on this node, so it is dialled at the container's own
+        # address (see _reserve_host_ports). repl_host travels in the kernel's data and is what the
+        # code runner connects to; kernel_host is for everyone else.
         repl_in_port, repl_out_port = self.repl_ports
         return {
             "container_id": self._container_id,
             "task_pid": task_pid,
             "kernel_host": kernel_host,
+            "repl_host": container_ip,
             "repl_in_port": repl_in_port,
             "repl_out_port": repl_out_port,
             "stdin_port": 0,  # legacy
             "stdout_port": 0,  # legacy
-            "host_ports": [],
+            "host_ports": [host_port for host_port, _ in self._host_port_map],
             "domain_socket_proxies": [],
             "block_service_ports": False,
         }
+
+    async def _publish_ports(self, container_ip: str) -> None:
+        """DNAT the reserved host ports at the container.
+
+        Under a privileged helper the publisher is a proxy: it sends only the port pairing, and the
+        helper DNATs to the LOCAL address it assigned itself — `container_ip` never leaves here.
+        """
+        if self._port_forwarder is None:
+            raise RuntimeError("no port publisher; the kernel's services would be unreachable")
+        await self._port_forwarder.install(
+            forwards_for(self._container_id, container_ip, self._host_port_map)
+        )
 
     # mount_krunner is inherited from AbstractKernelCreationContext: it populates
     # resource_spec.mounts (via get_runner_mount) and LD_PRELOAD — runtime-agnostic. The
@@ -744,6 +816,7 @@ class ContainerdAgent(
     _event_monitor_task: asyncio.Task[None] | None
     _agent_sock_path: Path
     _agent_sock_task: asyncio.Task[None] | None
+    _port_forwarder: PortPublisher
     _kernel_recovery: BaseKernelRegistryRecovery
     _kernel_recovery_adapter: KernelRecoveryDataAdapter
 
@@ -777,6 +850,15 @@ class ContainerdAgent(
             uplink=_uplink_for_ip(self._host_ip),
             runtime=self._runtime,
             helper_socket=self.local_config.agent.network_helper_socket,
+        )
+        # Host-port ingress is an iptables (CAP_NET_ADMIN) op, so only the process that owns the
+        # host's networking may install it: this agent when it runs privileged, the helper when
+        # privilege is separated. Either way the kernel's services get published.
+        helper_socket = self.local_config.agent.network_helper_socket
+        self._port_forwarder = (
+            PortForwarder()
+            if helper_socket is None
+            else HelperPortForwarder(HelperClient(helper_socket), self._session_network.session_of)
         )
         # Restart recovery (parity with DockerAgent): the container-based loader/writer keep each
         # kernel's recovery.json in its scratch (resource.txt / environ.txt are already written at
@@ -818,6 +900,11 @@ class ContainerdAgent(
         # network shares the same instance; its open() below is then a no-op).
         await self._runtime.open()
         await self._session_network.open()
+        # Rebuild the session-network state (attach plans, container<->session tracking, per-session
+        # coordinators) for containers that outlived the previous agent process, and reconcile the
+        # durable network journals against them. Must precede the kernel-registry recovery below,
+        # so a kernel is never resumed before the network it is attached to.
+        await self._session_network.recover()
         # Migrate any legacy pickle-based recovery into per-scratch recovery.json before the base
         # initializer loads the registry from it (parity with DockerAgent). Needs the runtime open
         # so the container-based loader can enumerate live containers.
@@ -957,6 +1044,11 @@ class ContainerdAgent(
         # Reconcile live kernels from containerd: every container carrying the kernel-id label
         # is one of ours (the containerd instance is per-node/per-agent). Lets the agent
         # recover running kernels across a restart.
+        #
+        # The published ports come back from the DNAT rules, which name their container. Reporting
+        # them lets the base agent take them out of the port pool again — otherwise a restarted
+        # agent would hand a live kernel's host port to the next one.
+        published = await self._published_ports_by_container()
         result: list[tuple[KernelId, Container]] = []
         for ci in await self._runtime.list_container_infos():
             raw_kid = ci.labels.get(KERNEL_ID_LABEL)
@@ -986,11 +1078,25 @@ class ContainerdAgent(
                     status=status,
                     image=ci.image,
                     labels=dict(ci.labels),
-                    ports=[],
+                    ports=published.get(ci.id, []),
                     backend_obj=backend_obj,
                 ),
             ))
         return result
+
+    async def _published_ports_by_container(self) -> dict[str, list[Port]]:
+        """``{container_id: [Port(...)]}`` read back from the DNAT rules that publish them."""
+        try:
+            forwards = await self._port_forwarder.list_forwards()
+        except Exception:
+            log.exception("could not read published ports; the port pool may leak")
+            return {}
+        published: dict[str, list[Port]] = {}
+        for forward in forwards:
+            published.setdefault(forward.container_id, []).append(
+                Port(forward.container_ip, forward.container_port, forward.host_port)
+            )
+        return published
 
     @override
     async def resolve_image_distro(self, image: ImageConfig) -> str:
@@ -1161,6 +1267,8 @@ class ContainerdAgent(
             restarting=restarting,
             session_network=self._session_network,
             agent_sock_path=self._agent_sock_path,
+            port_pool=self.port_pool,
+            port_forwarder=self._port_forwarder,
         )
 
     @override
@@ -1181,6 +1289,17 @@ class ContainerdAgent(
         container_id: ContainerId | None,
         restarting: bool,
     ) -> None:
+        # Withdraw the published ports before the container goes: a stale DNAT rule would send the
+        # next holder of that host port's traffic at an address that no longer exists. The rules
+        # are tagged with the container id, so this needs no bookkeeping of our own — and it works
+        # just as well after a restart, when nothing in memory remembers the kernel. Must precede
+        # remove_container, which drops the attach record the helper's session lock is keyed by.
+        try:
+            released = await self._port_forwarder.remove_container(str(kernel_id))
+        except Exception:
+            log.exception("clean_kernel(k:{}): withdrawing published ports failed", kernel_id)
+        else:
+            self.port_pool.release_many(released)
         await self._session_network.remove_container(str(kernel_id))
         # Tear down the scratch (skipped on restart, which reuses it). HOSTFILE must be
         # unmounted (loop image) before removal; otherwise remove the directory tree. Best-effort:

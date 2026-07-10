@@ -15,8 +15,10 @@ import logging
 from collections.abc import Awaitable, Callable, Sequence
 from typing import Any, override
 
+from ai.backend.agent.errors.network import OverlayAddressNotAssigned
 from ai.backend.agent.kernel import AbstractKernel
 from ai.backend.agent.network.caps import probe_caps
+from ai.backend.agent.network.local_subnet import LocalSubnetAllocator, get_local_subnet_allocator
 from ai.backend.agent.plugin.network_v2 import AbstractNetworkAgentPluginV2
 from ai.backend.common.network.types import (
     AgentNetworkCaps,
@@ -111,16 +113,16 @@ def neigh_del_args(vni: int, ip: str) -> list[str]:
 # --- pure CNI config assembly ---
 
 
-def _overlay_ipam(meta: SessionNetMeta, ip: str | None) -> dict[str, Any]:
-    """Static IPAM with the manager-assigned endpoint IP when available, else host-local.
+def _overlay_ipam(meta: SessionNetMeta, ip: str) -> dict[str, Any]:
+    """Static IPAM at the manager-assigned endpoint IP.
 
-    The static path is the BEP-1058 default for multi-node: a central per-endpoint IP
-    (from the manager's ``endpoints/`` table) is disjoint across nodes by construction,
-    unlike per-node host-local which hands every node the same first address on the
-    stretched overlay subnet (cross-node collision). Host-local remains the fallback for
-    single-node / not-yet-assigned cases."""
-    if ip is None:
-        return {"type": "host-local", "subnet": meta.subnet}
+    The overlay subnet is stretched across every node in the session, so the address MUST come
+    from the manager's central ``endpoints/`` table — which hands each endpoint a disjoint IP by
+    construction. A per-node host-local pick would give every node the same first address and
+    collide across the tunnel. There is no local fallback: this backend is multi-node only (the
+    single-node path uses the bridge backend), and the manager assigns an endpoint IP to every
+    kernel that has an agent, so a missing IP here is a control-plane bug, not a fallback case —
+    the caller raises rather than silently attach a colliding address."""
     prefixlen = ipaddress.ip_network(meta.subnet).prefixlen
     return {"type": "static", "addresses": [{"address": f"{ip}/{prefixlen}"}]}
 
@@ -128,10 +130,15 @@ def _overlay_ipam(meta: SessionNetMeta, ip: str | None) -> dict[str, Any]:
 def overlay_cni_config(meta: SessionNetMeta, ip: str | None = None) -> dict[str, Any]:
     """CNI 'bridge' config attaching the container to this session's overlay bridge.
 
-    With ``ip`` set, uses static IPAM at the manager-assigned address; otherwise falls back
-    to host-local confined to the session subnet."""
+    ``ip`` is the manager-assigned overlay address and is required: without it the container
+    cannot be given a cluster-unique address on the stretched overlay (see _overlay_ipam)."""
     if meta.vni is None:
         raise ValueError(f"overlay_cni_config requires a vxlan meta with a VNI: {meta}")
+    if ip is None:
+        raise OverlayAddressNotAssigned(
+            f"no manager-assigned overlay IP for session {meta.session_id}; "
+            "cannot attach to the stretched overlay without a cluster-unique address"
+        )
     config: dict[str, Any] = {
         "cniVersion": "1.0.0",
         "name": f"bai-overlay-{meta.session_id}",
@@ -203,7 +210,7 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
     _uplink: str
     _local_pool_prefix: str
     _sessions: dict[str, SessionNetMeta]
-    _local_subnets: dict[str, str]
+    _local_subnets: LocalSubnetAllocator
 
     def __init__(
         self,
@@ -213,30 +220,27 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         uplink: str = "eth0",
         runner: Runner | None = None,
         local_pool_prefix: str = "172.30",
+        local_subnets: LocalSubnetAllocator | None = None,
     ) -> None:
         super().__init__(plugin_config, local_config)
         self._uplink = uplink
         self._runner = runner or _run_command
         self._local_pool_prefix = local_pool_prefix
         self._sessions = {}
-        self._local_subnets = {}
+        # Defaults to the store's single process-wide owner, which is also what the bridge backend
+        # resolves: both carve their LOCAL /24 out of the same node-local pool, so one owner keeps
+        # their indices from colliding on a subnet.
+        self._local_subnets = local_subnets or get_local_subnet_allocator()
 
-    def _alloc_local_subnet(self, session_id: str) -> str:
-        """Assign a node-local /24 for the session's LOCAL/egress bridge (idempotent).
+    async def _local_subnet(self, session_id: str) -> str:
+        """The node-local /24 for the session's LOCAL/egress bridge (idempotent, durable).
 
         Node-local (behind NAT, never stretched across nodes), so it needs no cross-node
         coordination and cannot collide with another node's LOCAL subnet. TODO: use a
         larger pool / smaller blocks if >256 concurrent sessions per node are expected.
         """
-        if (existing := self._local_subnets.get(session_id)) is not None:
-            return existing
-        used = set(self._local_subnets.values())
-        for i in range(256):
-            candidate = f"{self._local_pool_prefix}.{i}.0/24"
-            if candidate not in used:
-                self._local_subnets[session_id] = candidate
-                return candidate
-        raise RuntimeError("node-local LOCAL subnet pool exhausted (>256 sessions/node)")
+        index = await self._local_subnets.allocate(session_id)
+        return f"{self._local_pool_prefix}.{index}.0/24"
 
     @override
     async def init(self, context: Any = None) -> None:
@@ -283,9 +287,18 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         self._sessions[meta.session_id] = meta
 
     @override
+    async def adopt_session_network(self, meta: SessionNetMeta, self_member: Member) -> None:
+        if meta.backend is not NetworkBackendKind.VXLAN or meta.vni is None:
+            raise ValueError(f"VxlanNetworkPlugin requires a vxlan meta with a VNI: {meta}")
+        # Devices are already up and carrying traffic; only the bookkeeping add_peer/add_endpoint
+        # read is missing. The LOCAL subnet index is re-claimed from the journal by attach_endpoint,
+        # which is idempotent per session.
+        self._sessions[meta.session_id] = meta
+
+    @override
     async def teardown_session_network(self, session_id: str) -> None:
         meta = self._sessions.pop(session_id, None)
-        self._local_subnets.pop(session_id, None)
+        await self._local_subnets.release(session_id)
         if meta is None or meta.vni is None:
             return
         # delete the overlay bridge/vxlan and the per-session LOCAL bridge; ignore missing
@@ -356,7 +369,7 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
                     cni_config=local_cni_config(
                         meta.session_id,
                         bridge=local_bridge_dev(meta.vni) if meta.vni is not None else "bailo0",
-                        subnet=self._alloc_local_subnet(meta.session_id),
+                        subnet=await self._local_subnet(meta.session_id),
                     ),
                 ),
                 NetworkAttachSpec(

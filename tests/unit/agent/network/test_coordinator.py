@@ -1,7 +1,7 @@
 import asyncio
 import json
 from collections.abc import AsyncIterator
-from typing import Any, cast
+from typing import Any, cast, override
 
 from ai.backend.agent.network.coordinator import SessionNetworkCoordinator
 from ai.backend.common.etcd import AbstractKVStore
@@ -71,6 +71,7 @@ class _BlockingWatchEtcd(FakeEtcd):
     """A FakeEtcd whose watch never yields and never returns, so the coordinator's watch task
     stays live until it is cancelled — lets us assert stop() actually awaits the cancellation."""
 
+    @override
     async def watch_prefix(self, prefix: str, **kwargs: Any) -> AsyncIterator[None]:
         await asyncio.Event().wait()  # blocks forever (until cancelled)
         yield  # pragma: no cover  (makes this an async generator)

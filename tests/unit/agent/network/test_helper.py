@@ -84,17 +84,39 @@ def _short_socket_path() -> str:
     return f"/tmp/bai-nh-test-{os.getpid()}.sock"
 
 
+class _RecordingForwarder:
+    """Stands in for the real iptables PortForwarder inside the helper."""
+
+    def __init__(self) -> None:
+        self.installed: list[Any] = []
+        self.removed: list[str] = []
+
+    async def install(self, forwards: Any) -> None:
+        self.installed.extend(forwards)
+
+    async def remove_container(self, container_id: str) -> list[int]:
+        self.removed.append(container_id)
+        return sorted(f.host_port for f in self.installed if f.container_id == container_id)
+
+    async def list_forwards(self, *, container_id: str | None = None) -> list[Any]:
+        if container_id is None:
+            return list(self.installed)
+        return [f for f in self.installed if f.container_id == container_id]
+
+
 class _Harness:
-    def __init__(self, runtime: _StubRuntime | None = None) -> None:
+    def __init__(self, runtime: _StubRuntime | None = None, cni_runner: Any = None) -> None:
         self.backend = _StubBackend()
+        self.forwarder = _RecordingForwarder()
         self.server = NetworkHelperServer(
             socket_path=_short_socket_path(),
             allowed_uid=os.getuid(),
             agent_id="i-test",
             host_ip="127.0.0.1",
             runtime=cast(Any, runtime or _StubRuntime()),
-            cni_runner=_noop_cni,
+            cni_runner=cni_runner or _noop_cni,
             backends=cast(Any, {"bridge": self.backend, "vxlan": self.backend}),
+            forwarder=cast(Any, self.forwarder),
         )
         self._task: asyncio.Task[None] | None = None
 
@@ -327,3 +349,90 @@ class TestHelperProvisioner:
         )
         await prov.attach(cast(Any, {}), cast(Any, {}), meta=meta, container_id="c2", task_pid=1)
         assert client.requests[0].ip is None
+
+
+_NC = {"backend": "bridge", "subnet": "172.30.0.0/24"}
+_LOCAL_IP = "172.30.0.5"
+
+
+async def _publish(h: _Harness, ports: tuple[tuple[int, int], ...]) -> None:
+    await h.client().call(
+        HelperRequest(op=HelperOp.PUBLISH_PORTS, session_id="s1", container_id="c1", ports=ports)
+    )
+
+
+class TestPublishPorts:
+    """Host-port ingress under privilege separation: the agent chooses the ports, the helper
+    chooses the destination."""
+
+    async def _setup(self, h: _Harness, *, attached: bool = True) -> None:
+        await h.client().call(
+            HelperRequest(op=HelperOp.SETUP_SESSION, session_id="s1", network_config=_NC)
+        )
+        if attached:
+            # what a successful ATTACH_CONTAINER records; re-testing attach here would only
+            # re-test netns pinning, which has its own tests
+            h.server._sessions["s1"].local_ips["c1"] = _LOCAL_IP
+
+    async def test_publishes_to_the_address_the_helper_assigned(self) -> None:
+        async with _Harness() as h:
+            await self._setup(h)
+            await _publish(h, ((30001, 8070),))
+            assert [(f.host_port, f.container_port) for f in h.forwarder.installed] == [
+                (30001, 8070)
+            ]
+            # the destination is the helper's own attach record, never anything the agent sent
+            assert {f.container_ip for f in h.forwarder.installed} == {_LOCAL_IP}
+
+    async def test_publish_before_attach_is_refused(self) -> None:
+        async with _Harness() as h:
+            await self._setup(h, attached=False)
+            with pytest.raises(HelperClientError):
+                await _publish(h, ((30001, 8070),))
+            assert h.forwarder.installed == []
+
+    async def test_a_privileged_host_port_is_refused(self) -> None:
+        # the helper runs as root: publishing on 22 would hijack the node's own sshd
+        async with _Harness() as h:
+            await self._setup(h)
+            with pytest.raises(HelperClientError):
+                await _publish(h, ((22, 22),))
+            assert h.forwarder.installed == []
+
+    async def test_a_duplicate_host_port_is_refused(self) -> None:
+        async with _Harness() as h:
+            await self._setup(h)
+            with pytest.raises(HelperClientError):
+                await _publish(h, ((30001, 8070), (30001, 7681)))
+            assert h.forwarder.installed == []
+
+    async def test_unpublish_returns_the_host_ports_and_needs_no_session(self) -> None:
+        async with _Harness() as h:
+            await self._setup(h)
+            await _publish(h, ((30001, 8070), (30002, 7681)))
+            # a session the helper never heard of: the rules still name their own container
+            resp = await h.client().call(
+                HelperRequest(op=HelperOp.UNPUBLISH_PORTS, session_id="c1", container_id="c1")
+            )
+            assert sorted(resp.host_ports or ()) == [30001, 30002]
+            assert h.forwarder.removed == ["c1"]
+
+    async def test_detach_withdraws_the_published_ports(self) -> None:
+        # a DNAT rule outliving its container would point the next holder of that host port at
+        # an address that is gone
+        async with _Harness() as h:
+            await self._setup(h)
+            await _publish(h, ((30001, 8070),))
+            await h.client().call(
+                HelperRequest(op=HelperOp.DETACH_CONTAINER, session_id="s1", container_id="c1")
+            )
+            assert h.forwarder.removed == ["c1"]
+
+    async def test_list_ports_reports_every_published_rule(self) -> None:
+        async with _Harness() as h:
+            await self._setup(h)
+            await _publish(h, ((30001, 8070),))
+            resp = await h.client().call(
+                HelperRequest(op=HelperOp.LIST_PORTS, session_id="list-ports")
+            )
+            assert resp.forwards == (("c1", 30001, _LOCAL_IP, 8070),)
