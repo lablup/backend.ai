@@ -200,21 +200,21 @@ class AppConfigFragmentDBSource:
                 has_previous_page=result.has_previous_page,
             )
 
-    async def _list_visible_fragments(
-        self,
-        config_names: Sequence[str],
-        scope: AppConfigScopeArguments,
+    @app_config_fragment_db_source_resilience.apply()
+    async def list_visible_fragments_bulk(
+        self, config_names: list[str], scope: AppConfigScopeArguments
     ) -> list[AppConfigFragmentData]:
-        """Visible fragments for ``config_names`` in one query, ascending allow-list ``rank``.
+        """Visible fragments for several ``config_names`` at once, in a single query.
 
         Selects the requested names AND any one of the principal's visible scopes (public,
         its domain, or its own user). The scope filter is name-independent, so it is a single
         OR group AND-combined with the name membership. Merge priority (``rank``) lives on the
         joined allow-list entry; the result is always ordered by ascending ``rank`` so the
-        caller can group by name and deep-merge each name's fragments in order (a global rank
-        sort keeps each name's subset rank-ordered too). Shared by the single- and bulk-name
-        public methods, which own the resilience policy.
+        caller can group by name (each name's subset stays rank-ordered) and deep-merge each
+        name's fragments in order.
         """
+        if not config_names:
+            return []
         scope_visibility = [
             AppConfigFragmentConditions.by_public_visibility(),
             AppConfigFragmentConditions.by_domain_visibility(str(scope.domain_id)),
@@ -240,27 +240,3 @@ class AppConfigFragmentDBSource:
         async with self._ops.read_ops() as r:
             result = await r.batch_query_in_global(selector, querier)
             return [row.AppConfigFragmentRow.to_data() for row in result.rows]
-
-    @app_config_fragment_db_source_resilience.apply()
-    async def list_visible_fragments(
-        self, config_name: str, scope: AppConfigScopeArguments
-    ) -> list[AppConfigFragmentData]:
-        """Fragments visible to ``scope`` for one ``config_name``, rank-ordered, in one query.
-
-        Each ``(config_name, scope_type, scope_id)`` is unique, so the result is bounded
-        (one per scope_type), ready to deep-merge in ``rank`` order.
-        """
-        return await self._list_visible_fragments([config_name], scope)
-
-    @app_config_fragment_db_source_resilience.apply()
-    async def list_visible_fragments_bulk(
-        self, config_names: list[str], scope: AppConfigScopeArguments
-    ) -> list[AppConfigFragmentData]:
-        """Visible fragments for several ``config_names`` at once, in a single query.
-
-        The bulk form of :meth:`list_visible_fragments`: rank-ordered, so the caller groups
-        by name (each name's subset stays rank-ordered) and deep-merges each in order.
-        """
-        if not config_names:
-            return []
-        return await self._list_visible_fragments(config_names, scope)

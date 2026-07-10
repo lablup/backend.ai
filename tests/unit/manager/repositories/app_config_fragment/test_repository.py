@@ -633,8 +633,8 @@ class TestApplicableFragments:
         repository: AppConfigFragmentRepository,
         fragments_across_scopes: list[AppConfigFragmentData],
     ) -> None:
-        applicable = await repository.list_visible_fragments(
-            "theme",
+        applicable = await repository.list_visible_fragments_bulk(
+            ["theme"],
             AppConfigScopeArguments(domain_id=DomainID(_DOMAIN_UUID), user_id=UserID(_USER_UUID)),
         )
         # public + the caller's domain + the caller's own user fragment, ordered by the
@@ -661,8 +661,8 @@ class TestApplicableFragments:
         repository: AppConfigFragmentRepository,
         fragments_across_scopes: list[AppConfigFragmentData],
     ) -> None:
-        applicable = await repository.list_visible_fragments(
-            "unregistered",
+        applicable = await repository.list_visible_fragments_bulk(
+            ["unregistered"],
             AppConfigScopeArguments(domain_id=DomainID(_DOMAIN_UUID), user_id=UserID(_USER_UUID)),
         )
         assert applicable == []
