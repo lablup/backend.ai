@@ -9210,19 +9210,13 @@ type ProjectUsageBucket implements Node {
   """
   usageCapacityRatio: ResourceSlot
 
-  """
-  Added in 26.8.0. The project entity this usage bucket belongs to.
-  """
+  """Added in 26.8.0. The project entity this usage bucket belongs to."""
   project: ProjectV2
 
-  """
-  Added in 26.8.0. The domain entity this usage bucket belongs to.
-  """
+  """Added in 26.8.0. The domain entity this usage bucket belongs to."""
   domain: DomainV2
 
-  """
-  Added in 26.8.0. The resource group this usage was recorded in.
-  """
+  """Added in 26.8.0. The resource group this usage was recorded in."""
   resourceGroup: ResourceGroup
 
   """
