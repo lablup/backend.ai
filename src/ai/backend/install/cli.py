@@ -86,7 +86,10 @@ from .types import Accelerator, CliArgs, EndpointProtocol, FrontendMode, Install
     "--frontend-mode",
     type=click.Choice([m.value for m in FrontendMode], case_sensitive=False),
     default=FrontendMode.PORT.value,
-    help="App-proxy frontend mode: 'port' (default) or 'wildcard'.",
+    help=(
+        "App-proxy frontend mode: 'port' (default), 'wildcard', or 'traefik' "
+        "(delegates the dataplane to a Traefik container in the halfstack)."
+    ),
 )
 @click.option(
     "--use-wildcard-binding",

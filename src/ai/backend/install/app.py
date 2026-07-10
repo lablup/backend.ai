@@ -41,6 +41,7 @@ from .types import (
     Accelerator,
     CliArgs,
     DistInfo,
+    FrontendMode,
     InstallInfo,
     InstallModes,
     InstallVariable,
@@ -425,6 +426,16 @@ class InstallReport(Static):
                     )
                 )
             with TabPane("App-Proxy Workers", id="appproxy-worker"):
+                if service.frontend_mode == FrontendMode.TRAEFIK:
+                    traefik_note = """
+                **Traefik frontend**: the HTTP worker delegates its dataplane to the
+                Traefik container which already runs as part of the halfstack
+                (compose profile `traefik`). Its dashboard is at
+                <http://127.0.0.1:8080>; proxied apps are served on ports
+                10205-10300. The TCP worker keeps the port-based frontend.
+                """
+                else:
+                    traefik_note = ""
                 yield Markdown(
                     textwrap.dedent(
                         f"""
@@ -439,6 +450,7 @@ class InstallReport(Static):
                 $ cd {self.install_info.base_path.resolve()}
                 $ ./backend.ai app-proxy worker start-server -f app-proxy-worker-tcp.toml --debug
                 ```
+                {traefik_note}
                 """
                     )
                 )

@@ -49,6 +49,7 @@ class Platform(enum.StrEnum):
 class FrontendMode(enum.StrEnum):
     PORT = "port"
     WILDCARD = "wildcard"
+    TRAEFIK = "traefik"
 
 
 class EndpointProtocol(enum.StrEnum):
@@ -238,6 +239,8 @@ class ServiceConfig:
     harbor: HarborOptions | None = None
     # Optional dedicated SFTP agent, multi-agent per node (None when disabled).
     sftp_agent: SftpAgentOptions | None = None
+    # The app-proxy worker frontend dataplane mode chosen at install time.
+    frontend_mode: FrontendMode = FrontendMode.PORT
 
 
 @dataclasses.dataclass

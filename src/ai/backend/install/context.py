@@ -81,6 +81,18 @@ PASSPHRASE_CHARACTER_POOL: Final[list[str]] = (
     + ["*$./"]
 )
 
+# Traefik dataplane for the app-proxy "traefik" frontend mode. The API port
+# matches the "traefik" entrypoint in configs/traefik/traefik.halfstack.yml
+# and the published container port; the worker reconciles routes against
+# http://127.0.0.1:<port>. The port range matches the portproxy_* entrypoints.
+TRAEFIK_API_PORT: Final[int] = 8080
+TRAEFIK_PORT_RANGE: Final[tuple[int, int]] = (10205, 10300)
+APPPROXY_TRAEFIK_PLUGIN_VERSION: Final[str] = "0.0.5"
+APPPROXY_TRAEFIK_PLUGIN_REPO: Final[str] = "lablup/backend.ai-appproxy-worker-traefik"
+# Placeholder substituted with the actual marker directory in both the copied
+# compose file and the Traefik static configuration.
+TRAEFIK_MARKER_DIR_PLACEHOLDER: Final[str] = "/__APPPROXY_MARKER_DIR__"
+
 
 class PostGuide(enum.Enum):
     UPDATE_ETC_HOSTS = 10
@@ -188,6 +200,7 @@ class Context(metaclass=ABCMeta):
             appproxy_tcp_worker_addr=ServerAddr(HostPortPair(public_facing_address, 10202)),
             harbor=harbor,
             sftp_agent=sftp_agent,
+            frontend_mode=self.install_variable.frontend_mode,
         )
         return InstallInfo(
             version=self.dist_info.version,
@@ -574,6 +587,8 @@ class Context(metaclass=ABCMeta):
                 ("8120:2379", f"{self.install_info.halfstack_config.etcd_addr[0].bind.port}:2379"),
             ],
         )
+        if self.install_variable.frontend_mode == FrontendMode.TRAEFIK:
+            await self.prepare_traefik_assets(dst_compose_path)
         sudo = " ".join(self.docker_sudo)
         profile_args_list: list[str] = []
         if self.install_variable.enable_observability:
@@ -583,6 +598,8 @@ class Context(metaclass=ABCMeta):
             profile_args_list.append("--profile telemetry")
         if self.install_variable.enable_storage:
             profile_args_list.append("--profile storage")
+        if self.install_variable.frontend_mode == FrontendMode.TRAEFIK:
+            profile_args_list.append("--profile traefik")
         profile_args = " ".join(profile_args_list)
         compose_file_arg = "-f docker-compose.halfstack.current.yml"
         await self.run_shell(
@@ -593,6 +610,45 @@ class Context(metaclass=ABCMeta):
         {sudo} docker compose {compose_file_arg} {profile_args} ps
         """,
             cwd=self.install_info.base_path,
+        )
+
+    @property
+    def traefik_marker_dir(self) -> Path:
+        """Last-used-time marker directory shared between the app-proxy worker
+        (host process) and the Traefik container."""
+        return self.install_info.base_path / "volumes" / "traefik" / "marker"
+
+    async def prepare_traefik_assets(self, compose_path: Path) -> None:
+        """Prepare the Traefik container assets before ``compose up`` starts
+        the "traefik" profile: the static configuration, the appproxy Traefik
+        plugin, and the last-used-time marker directory.
+
+        The marker directory is mounted into the container at the same
+        absolute path as on the host because the coordinator hands the
+        worker's marker path verbatim to the Traefik plugin.
+        """
+        self.log_header("Preparing the Traefik assets (app-proxy traefik frontend)...")
+        marker_dir = self.traefik_marker_dir
+        marker_dir.mkdir(parents=True, exist_ok=True)
+        src_config_path = self.copy_config("traefik.yml")
+        dst_config_path = src_config_path.with_name("traefik.halfstack.current.yml")
+        src_config_path.rename(dst_config_path)
+        self.sed_in_place(dst_config_path, TRAEFIK_MARKER_DIR_PLACEHOLDER, str(marker_dir))
+        self.sed_in_place(compose_path, TRAEFIK_MARKER_DIR_PLACEHOLDER, str(marker_dir))
+        plugin_root = marker_dir.parent
+        plugin_url = (
+            f"https://github.com/{APPPROXY_TRAEFIK_PLUGIN_REPO}/releases/download/"
+            f"{APPPROXY_TRAEFIK_PLUGIN_VERSION}/appproxy-traefik-plugin.tar.gz"
+        )
+        # The plugin repository currently requires authenticated access, so
+        # fall back to the GitHub CLI (developer credentials) when the
+        # anonymous download fails.
+        await self.run_shell(
+            f'curl -fsSL "{plugin_url}" | tar xz -C "{plugin_root}" || '
+            f'gh release download "{APPPROXY_TRAEFIK_PLUGIN_VERSION}" '
+            f'--repo "{APPPROXY_TRAEFIK_PLUGIN_REPO}" '
+            f"--pattern appproxy-traefik-plugin.tar.gz --output - "
+            f'| tar xz -C "{plugin_root}"',
         )
 
     async def load_fixtures(self) -> None:
@@ -1250,6 +1306,20 @@ class Context(metaclass=ABCMeta):
             announce_addr_table["host"] = public_facing_address
             announce_addr_table["port"] = service.appproxy_coordinator_addr.bind.port
             data["proxy_coordinator"]["announce_addr"] = announce_addr_table  # type: ignore[index]
+            if frontend_mode == FrontendMode.TRAEFIK:
+                # Publish routing rules to etcd (namespace "traefik") for the
+                # Traefik dataplane; its etcd provider watches
+                # traefik/worker_<authority>.
+                data["proxy_coordinator"]["enable_traefik"] = True  # type: ignore[index]
+                traefik_etcd_addr_table = tomlkit.inline_table()
+                traefik_etcd_addr_table["host"] = halfstack.etcd_addr[0].face.host
+                traefik_etcd_addr_table["port"] = halfstack.etcd_addr[0].face.port
+                traefik_etcd_table = tomlkit.table()
+                traefik_etcd_table["namespace"] = "traefik"
+                traefik_etcd_table["addr"] = traefik_etcd_addr_table
+                traefik_table = tomlkit.table()
+                traefik_table["etcd"] = traefik_etcd_table
+                data["proxy_coordinator"]["traefik"] = traefik_table  # type: ignore[index]
         with coord_conf.open("w") as fp:
             tomlkit.dump(data, fp)
 
@@ -1313,6 +1383,22 @@ class Context(metaclass=ABCMeta):
                     wildcard_table["advertised_port"] = advertised_port
                     wildcard_table.add(tomlkit.nl())  # Add newline before next section
                     data["proxy_worker"]["wildcard_domain"] = wildcard_table  # type: ignore[index]
+            elif frontend_mode == FrontendMode.TRAEFIK:
+                # Delegate the dataplane to the halfstack Traefik container
+                # (compose profile "traefik"); the worker only reconciles
+                # routes through the Traefik API at 127.0.0.1:<api_port>.
+                if "port_proxy" in data["proxy_worker"]:  # type: ignore[operator]
+                    del data["proxy_worker"]["port_proxy"]
+                traefik_port_proxy_table = tomlkit.table()
+                traefik_port_proxy_table["advertised_host"] = public_facing_address
+                traefik_port_proxy_table["port_range"] = list(TRAEFIK_PORT_RANGE)
+                traefik_table = tomlkit.table()
+                traefik_table["api_port"] = TRAEFIK_API_PORT
+                # Traefik-internal routing sub-mode (port-based entrypoints).
+                traefik_table["frontend_mode"] = "port"
+                traefik_table["last_used_time_marker_directory"] = str(self.traefik_marker_dir)
+                traefik_table["port_proxy"] = traefik_port_proxy_table
+                data["proxy_worker"]["traefik"] = traefik_table  # type: ignore[index]
             else:
                 # update port_proxy.advertised_host
                 data["proxy_worker"]["port_proxy"]["advertised_host"] = public_facing_address  # type: ignore[index]
