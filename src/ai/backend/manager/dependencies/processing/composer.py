@@ -227,8 +227,7 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
         reporter_hub = ReporterHub(ReporterHubArgs(reporters=action_reporters))
         reporter_monitor = ReporterMonitor(reporter_hub)
         prometheus_monitor = PrometheusMonitor()
-        audit_log_repository = setup_input.repositories.audit_log.repository
-        audit_log_monitor = AuditLogMonitor(audit_log_repository)
+        audit_log_monitor = AuditLogMonitor(setup_input.repositories.audit_log.repository)
 
         ssh_key_validator = SSHKeyValidator()
 
