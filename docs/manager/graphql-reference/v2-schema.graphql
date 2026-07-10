@@ -1301,6 +1301,11 @@ type AuditLogV2 implements Node {
   The user who triggered this audit log entry, resolved from triggered_by UUID.
   """
   user: UserV2
+
+  """
+  Added in 26.8.0. The effective (acting) user the action ran as, resolved from acted_as UUID. Differs from user only while a super admin is impersonating a target.
+  """
+  actor: UserV2
 }
 
 """Added in 26.3.0. Connection type for paginated audit log results."""

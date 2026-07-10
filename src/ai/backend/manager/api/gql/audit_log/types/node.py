@@ -99,6 +99,36 @@ class AuditLogV2GQL(PydanticNodeMixin[AuditLogNode]):
             return None
         return user_data
 
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "The effective (acting) user the action ran as, resolved from acted_as UUID. "
+                "Differs from user only while a super admin is impersonating a target."
+            ),
+        )
+    )  # type: ignore[misc]
+    async def actor(
+        self,
+        info: Info[StrawberryGQLContext],
+    ) -> (
+        Annotated[
+            UserV2GQL,
+            strawberry.lazy("ai.backend.manager.api.gql.user.types.node"),
+        ]
+        | None
+    ):
+        if self.acted_as is None:
+            return None
+        try:
+            user_uuid = UUID(self.acted_as)
+        except ValueError:
+            return None
+        user_data = await info.context.data_loaders.user_loader.load(user_uuid)
+        if user_data is None:
+            return None
+        return user_data
+
     @classmethod
     @override
     async def resolve_nodes(  # type: ignore[override]
