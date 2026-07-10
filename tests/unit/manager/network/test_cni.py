@@ -305,6 +305,40 @@ class TestCreateNetwork:
             options={"forced_backend": "vxlan", "member_agents": ["a1", "a2"]},
         )
         assert "network/session/s1/members/a1" in etcd.store
+
+    async def test_partial_failure_rolls_back_and_retry_reuses_block(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        opts = {
+            "forced_backend": "vxlan",
+            "endpoints": [{"container_id": "k1", "agent_id": "a1"}],
+        }
+        # First create fails mid-way (after subnet + VNI + meta are claimed, during endpoint
+        # assignment). Everything claimed must be rolled back.
+        calls = {"n": 0}
+        real_assign = plugin._endpoint_allocator.assign
+
+        async def flaky_assign(*args: Any, **kwargs: Any) -> tuple[str, str]:
+            calls["n"] += 1
+            if calls["n"] == 1:
+                raise RuntimeError("boom")
+            return await real_assign(*args, **kwargs)
+
+        monkeypatch.setattr(plugin._endpoint_allocator, "assign", flaky_assign)
+
+        with pytest.raises(RuntimeError):
+            await plugin.create_network(identifier="s1", options=opts)
+        # every session key deleted, and the subnet + VNI blocks released (not leaked)
+        assert not any(k.startswith("network/session/s1/") for k in etcd.store)
+        assert not any(k.startswith("network/ipam/allocated/") for k in etcd.store)
+        assert not any(k.startswith("network/ipam/vni/") for k in etcd.store)
+
+        # a retry re-acquires the SAME first block/VNI rather than consuming fresh ones
+        info = await plugin.create_network(identifier="s1", options=opts)
+        assert info.options["subnet"] == "10.128.0.0/24"  # first block, reused
+        assert info.options["vni"] == 4096  # first VNI, reused
         # a2 falls back to self-publish + watch convergence (no seed written)
         assert "network/session/s1/members/a2" not in etcd.store
 

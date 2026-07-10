@@ -10,6 +10,7 @@ itself is realized by the agent-side v2 plugins (see BEP-1058/agent-plugin-v2.md
 from __future__ import annotations
 
 import json
+import logging
 import uuid
 from collections.abc import Mapping
 from typing import Any, override
@@ -25,6 +26,7 @@ from ai.backend.common.network.keys import (
     session_prefix,
 )
 from ai.backend.common.network.types import Member, NetworkBackendKind
+from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.errors.network import NetworkBackendMismatch
 from ai.backend.manager.network.ipam import (
     EndpointAllocator,
@@ -32,6 +34,8 @@ from ai.backend.manager.network.ipam import (
     VNIAllocator,
 )
 from ai.backend.manager.plugin.network import AbstractNetworkManagerPlugin, NetworkInfo
+
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 _DEFAULT_MTU = 1500
 
@@ -99,40 +103,71 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         await self._require_members_cni_capable(member_agents)
         backend = await self._select_backend(member_agents, forced_backend)
         # Size the session subnet to hold every endpoint (removes the fixed-/24 254 cap).
+        # A failure to acquire the subnet claims nothing, so it needs no rollback; every
+        # subsequent claim (VNI, endpoint IPs, meta/member keys) is undone on any failure so a
+        # partial create never leaks a block/VNI or lets a retry consume fresh ones.
         subnet = await self._subnet_allocator.acquire(session_id, host_count=max(len(endpoints), 1))
-        vni = (
-            await self._vni_allocator.acquire(session_id)
-            if backend is NetworkBackendKind.VXLAN
-            else None
-        )
-        mtu = int(self.plugin_config.get("mtu") or _DEFAULT_MTU)
+        vni: int | None = None
+        try:
+            if backend is NetworkBackendKind.VXLAN:
+                vni = await self._vni_allocator.acquire(session_id)
+            mtu = int(self.plugin_config.get("mtu") or _DEFAULT_MTU)
 
-        meta: dict[str, Any] = {
-            "subnet": subnet,
-            "vni": vni,
-            "backend": str(backend),
-            "mtu": mtu,
-        }
-        await etcd.put(session_meta_key(session_id), json.dumps(meta), scope=ConfigScopes.GLOBAL)
-        # Assign each endpoint a disjoint overlay IP and record it under endpoints/ (the
-        # coordinator programs FDB/ARP from there). Returned map is threaded per-kernel by
-        # the launcher into KernelCreationConfig["cluster_network_ip"].
-        endpoint_ips: dict[str, str] = {}
-        for endpoint in endpoints:
-            container_id = str(endpoint["container_id"])
-            ip, _mac = await self._endpoint_allocator.assign(
-                session_id, container_id, subnet, agent_id=str(endpoint["agent_id"])
+            meta: dict[str, Any] = {
+                "subnet": subnet,
+                "vni": vni,
+                "backend": str(backend),
+                "mtu": mtu,
+            }
+            await etcd.put(
+                session_meta_key(session_id), json.dumps(meta), scope=ConfigScopes.GLOBAL
             )
-            endpoint_ips[container_id] = ip
-        # Pre-seed the membership table so each agent's reconcile-at-start finds every
-        # peer's VTEP already present, instead of racing the etcd watch that delivers a
-        # peer's self-published member (which can lag a fast worker's cross-node startup).
-        # VXLAN only: the member's tunnel endpoint is the agent's published VTEP. Agents
-        # whose VTEP is not yet published are skipped — they fall back to self-publish +
-        # watch convergence (no regression).
-        if backend is NetworkBackendKind.VXLAN:
-            await self._preseed_members(session_id, member_agents)
-        return NetworkInfo(network_id=session_id, options={**meta, "endpoint_ips": endpoint_ips})
+            # Assign each endpoint a disjoint overlay IP and record it under endpoints/ (the
+            # coordinator programs FDB/ARP from there). Returned map is threaded per-kernel by
+            # the launcher into KernelCreationConfig["cluster_network_ip"].
+            endpoint_ips: dict[str, str] = {}
+            for endpoint in endpoints:
+                container_id = str(endpoint["container_id"])
+                ip, _mac = await self._endpoint_allocator.assign(
+                    session_id, container_id, subnet, agent_id=str(endpoint["agent_id"])
+                )
+                endpoint_ips[container_id] = ip
+            # Pre-seed the membership table so each agent's reconcile-at-start finds every
+            # peer's VTEP already present, instead of racing the etcd watch that delivers a
+            # peer's self-published member (which can lag a fast worker's cross-node startup).
+            # VXLAN only: the member's tunnel endpoint is the agent's published VTEP. Agents
+            # whose VTEP is not yet published are skipped — they fall back to self-publish +
+            # watch convergence (no regression).
+            if backend is NetworkBackendKind.VXLAN:
+                await self._preseed_members(session_id, member_agents)
+            return NetworkInfo(
+                network_id=session_id, options={**meta, "endpoint_ips": endpoint_ips}
+            )
+        except Exception:
+            await self._rollback_create(session_id, subnet, vni)
+            raise
+
+    async def _rollback_create(self, session_id: str, subnet: str, vni: int | None) -> None:
+        """Undo a partially-created session network: release the VNI and subnet blocks and
+        delete every key written under the session (meta / endpoints / ipam / members). Each
+        step is best-effort and idempotent (deletes of absent keys are no-ops) so cleanup runs
+        to completion regardless of how far create_network got before failing."""
+        etcd = self._require_etcd()
+        try:
+            await etcd.delete_prefix(
+                session_prefix(session_id).rstrip("/"), scope=ConfigScopes.GLOBAL
+            )
+        except Exception:
+            log.exception("rollback: failed to delete session keys for {}", session_id)
+        if vni is not None:
+            try:
+                await self._vni_allocator.release(vni)
+            except Exception:
+                log.exception("rollback: failed to release VNI {} for {}", vni, session_id)
+        try:
+            await self._subnet_allocator.release(subnet)
+        except Exception:
+            log.exception("rollback: failed to release subnet {} for {}", subnet, session_id)
 
     async def _preseed_members(self, session_id: str, member_agents: list[str]) -> None:
         etcd = self._require_etcd()
