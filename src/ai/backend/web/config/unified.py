@@ -568,7 +568,7 @@ class ServiceConfig(BaseConfigSchema):
                 "in user settings. The light/dark theme mode selector is always available "
                 "regardless of this flag."
             ),
-            added_version="26.7.0",
+            added_version="26.8.0",
             example=ConfigExample(local="false", prod="false"),
         ),
     ]

@@ -153,7 +153,7 @@
   # Allow users to select a theme (family) and customize its primary color in
   # user settings. The light/dark theme mode selector is always available
   # regardless of this flag.
-  # Added in 26.7.0
+  # Added in 26.8.0
   allow-theme-mode = false
   # Prefix for educational application names. Used to identify and filter
   # applications meant for educational environments. Leave empty to disable
