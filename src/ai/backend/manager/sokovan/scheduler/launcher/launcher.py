@@ -283,6 +283,15 @@ class SessionLauncher:
                 ),
             }
 
+            # cluster_hostname -> assigned IP for the whole session (all kernels, all agents), so
+            # a backend without built-in cluster DNS can write /etc/hosts for peer resolution.
+            # Only populated where the manager pre-assigns IPs (overlay sessions).
+            cluster_hosts: dict[str, str] = {}
+            for kernel in session.kernels:
+                hostname = kernel.cluster_hostname or f"{kernel.cluster_role}{kernel.cluster_idx}"
+                if (ip := network_setup.endpoint_ips.get(str(kernel.kernel_id))) is not None:
+                    cluster_hosts[hostname] = ip
+
             # Group kernels by agent to minimize RPC calls
             kernels_by_agent: defaultdict[AgentId, list[KernelBindingData]] = defaultdict(list)
             for kernel in session.kernels:
@@ -402,6 +411,7 @@ class SessionLauncher:
                     "network_config": network_setup.network_config,
                     "ssh_keypair": ssh_keypair,
                     "cluster_ssh_port_mapping": network_setup.cluster_ssh_port_mapping,
+                    "cluster_hosts": cluster_hosts,
                 }
 
                 # Create the kernels using connection pool

@@ -1802,6 +1802,11 @@ class ClusterInfo(TypedDict):
     network_config: Mapping[str, Any]
     ssh_keypair: ClusterSSHKeyPair | None
     cluster_ssh_port_mapping: ClusterSSHPortMapping | None
+    cluster_hosts: NotRequired[Mapping[str, str]]
+    """cluster_hostname -> IP for every kernel in the session (BEP-1058 central IPAM). Lets a
+    backend that has no built-in cluster DNS (containerd) resolve peer hostnames by writing
+    /etc/hosts. Populated for overlay sessions where the manager pre-assigns IPs; absent
+    otherwise (single-node bridge falls back to node-local IPAM with no static mapping)."""
 
 
 class ClusterSSHKeyPair(TypedDict):

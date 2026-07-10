@@ -448,6 +448,20 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
             self._session_id, network_config
         )
 
+    def _prepare_etc_hosts(self, cluster_info: ClusterInfo) -> Mount | None:
+        """Write an /etc/hosts carrying every cluster peer's ``hostname -> IP`` (BEP-1058 central
+        IPAM) and return a bind mount for it, so hostname-based cluster workloads (MPI/torchrun)
+        resolve peers. Returns None when there is no mapping to inject — single-node bridge
+        sessions use node-local IPAM with no manager-assigned addresses."""
+        cluster_hosts = cluster_info.get("cluster_hosts") or {}
+        if not cluster_hosts or self._scratch_dir is None:
+            return None
+        lines = ["127.0.0.1\tlocalhost", "::1\tlocalhost ip6-localhost ip6-loopback"]
+        lines += [f"{ip}\t{hostname}" for hostname, ip in cluster_hosts.items()]
+        hosts_file = self._scratch_dir / "config" / "hosts"
+        hosts_file.write_text("\n".join(lines) + "\n")
+        return Mount(MountTypes.BIND, hosts_file, Path("/etc/hosts"), MountPermission.READ_ONLY)
+
     @override
     async def prepare_ssh(self, cluster_info: ClusterInfo) -> None:
         # Provision the cluster SSH material into config/ssh (mounted at /home/config/ssh)
@@ -580,6 +594,10 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
     ) -> ContainerdKernel:
         # In-container config files (env + resource allocation) read by the runner/hooks.
         await self._write_config_files(resource_spec, environ)
+        # containerd/runc (unlike Docker) neither synthesizes /etc/hosts nor provides cluster DNS,
+        # so inject peer hostname -> IP resolution for cluster sessions.
+        if (hosts_mount := self._prepare_etc_hosts(cluster_info)) is not None:
+            self._oci_mounts.append(hosts_mount)
         # Build (but do NOT create) the container spec + kernel object. mount_krunner
         # (inherited) has populated resource_spec.mounts with the krunner bind mounts;
         # combine with process_mounts' vfolder mounts and inject them (plus env/labels)
