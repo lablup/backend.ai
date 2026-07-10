@@ -39248,7 +39248,7 @@
     },
     "/v2/app-config-fragments/": {
       "post": {
-        "operationId": "v2/app-config-fragments.admin_create",
+        "operationId": "v2/app-config-fragments.create",
         "tags": [
           "v2/app-config-fragments"
         ],
@@ -39272,7 +39272,7 @@
           }
         },
         "parameters": [],
-        "description": "Create a fragment at any scope (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Create a fragment; authorized by the layer's write_access tier (auth required).\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/app-config-fragments/search": {
@@ -39362,7 +39362,7 @@
         "description": "Get a fragment by id (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       },
       "patch": {
-        "operationId": "v2/app-config-fragments.admin_update",
+        "operationId": "v2/app-config-fragments.update",
         "tags": [
           "v2/app-config-fragments"
         ],
@@ -39395,10 +39395,10 @@
             }
           }
         ],
-        "description": "Update a fragment's config document by id (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Update a fragment's config; authorized by the layer's write_access tier (auth required).\n\n**Preconditions:**\n* User privilege required.\n"
       },
       "delete": {
-        "operationId": "v2/app-config-fragments.admin_purge",
+        "operationId": "v2/app-config-fragments.purge",
         "tags": [
           "v2/app-config-fragments"
         ],
@@ -39422,7 +39422,7 @@
             }
           }
         ],
-        "description": "Purge a fragment by id (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Purge a fragment by id; authorized by the layer's write_access tier (auth required).\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/app-config-allow-list/": {
