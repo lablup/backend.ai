@@ -7888,9 +7888,7 @@ type ImageV2 implements Node
   """UUID of the container registry where this image is stored."""
   registryId: UUID!
 
-  """
-  Added in 26.8.0. The container registry where this image is stored, resolved via DataLoader. Fetch the registry's attributes in a single query instead of a separate containerRegistries lookup.
-  """
+  """Added in 26.8.0. The container registry where this image is stored."""
   registry: ContainerRegistryV2
 
   """

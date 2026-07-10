@@ -286,7 +286,7 @@ class ImageV2GQL(PydanticNodeMixin[ImageNode]):
     @gql_added_field(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
-            description="The container registry where this image is stored, resolved via DataLoader. Fetch the registry's attributes in a single query instead of a separate containerRegistries lookup.",
+            description="The container registry where this image is stored.",
         )
     )  # type: ignore[misc]
     async def registry(
