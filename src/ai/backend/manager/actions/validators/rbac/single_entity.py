@@ -75,7 +75,6 @@ class SingleEntityActionRBACValidator(SingleEntityActionValidator):
     async def _audit_denial(
         self, action: BaseSingleEntityAction, meta: BaseActionTriggerMeta
     ) -> None:
-        # Best-effort: a failed audit write must never mask the original denial.
         trigger = triggered_user()
         acting = current_user()
         try:
@@ -88,10 +87,10 @@ class SingleEntityActionRBACValidator(SingleEntityActionValidator):
                         created_at=meta.started_at,
                         description=(
                             f"Permission denied: {action.operation_type()} "
-                            f"on {action.entity_type()} ({action.entity_id() or BLANK_ID})"
+                            f"on {action.entity_type()} ({action.target_entity_id() or BLANK_ID})"
                         ),
                         status=OperationStatus.ERROR,
-                        entity_id=action.entity_id() or BLANK_ID,
+                        entity_id=action.target_entity_id() or BLANK_ID,
                         request_id=current_request_id() or BLANK_ID,
                         triggered_by=str(trigger.user_id) if trigger else None,
                         acted_as=str(acting.user_id) if acting else None,

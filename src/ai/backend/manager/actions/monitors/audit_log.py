@@ -24,8 +24,6 @@ class AuditLogMonitor(ActionMonitor):
         self._repository = repository
 
     async def _generate_log(self, action: BaseAction, result: ProcessResult) -> None:
-        # triggered_by = the caller who triggered the request; acted_as = the effective
-        # (acting) subject. They differ only while a super admin is impersonating.
         trigger = triggered_user()
         acting = current_user()
         data = AuditLogData(

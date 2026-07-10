@@ -73,7 +73,6 @@ class ScopeActionRBACValidator(ScopeActionValidator):
             )
 
     async def _audit_denial(self, action: BaseScopeAction, meta: BaseActionTriggerMeta) -> None:
-        # Best-effort: a failed audit write must never mask the original denial.
         trigger = triggered_user()
         acting = current_user()
         try:
@@ -86,10 +85,10 @@ class ScopeActionRBACValidator(ScopeActionValidator):
                         created_at=meta.started_at,
                         description=(
                             f"Permission denied: {action.operation_type()} "
-                            f"on {action.entity_type()} ({action.entity_id() or BLANK_ID})"
+                            f"on {action.entity_type()} at {action.target_element().to_str()}"
                         ),
                         status=OperationStatus.ERROR,
-                        entity_id=action.entity_id() or BLANK_ID,
+                        entity_id=action.target_element().element_id or BLANK_ID,
                         request_id=current_request_id() or BLANK_ID,
                         triggered_by=str(trigger.user_id) if trigger else None,
                         acted_as=str(acting.user_id) if acting else None,
