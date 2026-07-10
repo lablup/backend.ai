@@ -1119,6 +1119,17 @@
         "title": "UpdateAppConfigFragmentInput",
         "type": "object"
       },
+      "AppConfigAccessLevel": {
+        "description": "Minimum principal tier allowed to read or write a config layer (BEP-1052).\n\nOrdered least → most privileged: ``public`` < ``authenticated`` < ``owner`` < ``admin``.\nStored per ``(config_name, scope_type)`` on the allow-list — once for read, once for\nwrite — so read-enablement and write-authorization are independent concerns. The\nallow-list row's existence no longer implies write access: it only registers the layer\nand its merge ``rank`` (the read side), while ``write_access`` decides who may write.\n\n``owner`` is resolved relative to the fragment's scope: the user itself for ``user``\nscope, the domain admin for ``domain``. ``admin`` (superadmin) always satisfies any tier.",
+        "enum": [
+          "public",
+          "authenticated",
+          "owner",
+          "admin"
+        ],
+        "title": "AppConfigAccessLevel",
+        "type": "string"
+      },
       "CreateAppConfigAllowListInput": {
         "description": "Input for registering a new app config allow-list entry.",
         "properties": {
@@ -1145,6 +1156,30 @@
             "default": null,
             "description": "Merge rank applied to fragments under this entry (low to high; higher wins). Defaults to the scope type's default rank (public=100, domain=200, user=300).",
             "title": "Rank"
+          },
+          "read_access": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AppConfigAccessLevel"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Minimum principal tier allowed to read the fragments under this entry. Defaults to the scope type's default (public=public, domain=authenticated, user=owner)."
+          },
+          "write_access": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AppConfigAccessLevel"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Minimum principal tier allowed to write the fragments under this entry. Defaults to the scope type's default (public=admin, domain=admin, user=owner)."
           }
         },
         "required": [
@@ -1405,7 +1440,7 @@
         "type": "object"
       },
       "UpdateAppConfigAllowListInput": {
-        "description": "Input for updating an app config allow-list entry.\n\nOnly ``rank`` is updatable — the identity pair (``config_name``, ``scope_type``)\nis immutable (purge and recreate to change it).",
+        "description": "Input for updating an app config allow-list entry.\n\n``rank`` and the access tiers (``read_access`` / ``write_access``) are updatable — the\nidentity pair (``config_name``, ``scope_type``) is immutable (purge and recreate to\nchange it).",
         "properties": {
           "id": {
             "description": "App config allow-list entry id to update.",
@@ -1425,6 +1460,30 @@
             "default": null,
             "description": "New merge rank applied to fragments under this entry (low to high; higher wins). Omit to leave unchanged.",
             "title": "Rank"
+          },
+          "read_access": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AppConfigAccessLevel"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "New minimum principal tier allowed to read the fragments under this entry. Omit to leave unchanged."
+          },
+          "write_access": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AppConfigAccessLevel"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "New minimum principal tier allowed to write the fragments under this entry. Omit to leave unchanged."
           }
         },
         "required": [
