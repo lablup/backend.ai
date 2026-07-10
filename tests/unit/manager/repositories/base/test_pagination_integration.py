@@ -13,6 +13,7 @@ from ai.backend.manager.repositories.base import (
     BatchQuerier,
     CursorBackwardPagination,
     CursorForwardPagination,
+    NoPagination,
     OffsetPagination,
     QueryCondition,
     execute_batch_querier,
@@ -84,6 +85,25 @@ def _make_cursor_condition_backward(table: sa.Table, cursor_id: int) -> QueryCon
         return table.c.id < cursor_id
 
     return condition
+
+
+class _ExecuteCountingSession:
+    """Wraps a session/connection to count execute() calls.
+
+    execute_batch_querier only ever calls db_sess.execute(), so counting those
+    calls lets us assert how many round-trips (data query, count query) run.
+    """
+
+    inner: Any
+    execute_count: int
+
+    def __init__(self, inner: Any) -> None:
+        self.inner = inner
+        self.execute_count = 0
+
+    async def execute(self, *args: Any, **kwargs: Any) -> Any:
+        self.execute_count += 1
+        return await self.inner.execute(*args, **kwargs)
 
 
 class TestOffsetPagination:
@@ -409,3 +429,105 @@ class TestEdgeCases:
         assert result.total_count == 100
         assert result.has_previous_page is False
         assert result.has_next_page is False
+
+
+class TestNoPagination:
+    """Tests for NoPagination - returns all rows, total_count == len(rows)."""
+
+    async def test_returns_all_rows_without_count_query(
+        self,
+        pagination_test_db: tuple[AsyncConnection, sa.Table],
+    ) -> None:
+        """total_count equals len(rows) and no separate count query is executed."""
+        conn, test_items = pagination_test_db
+
+        query = _make_base_query(test_items).order_by(test_items.c.id.asc())
+        querier = BatchQuerier(pagination=NoPagination())
+        spy = _ExecuteCountingSession(conn)
+
+        result = await execute_batch_querier(spy, query, querier)  # type: ignore[arg-type]
+
+        assert len(result.rows) == 100
+        assert result.total_count == 100  # == len(rows)
+        assert result.has_previous_page is False
+        assert result.has_next_page is False
+        assert spy.execute_count == 1  # data query only, zero count queries
+
+    async def test_with_filter_counts_only_matching_rows(
+        self,
+        pagination_test_db: tuple[AsyncConnection, sa.Table],
+    ) -> None:
+        """With a filter, total_count still equals len(rows) and runs no count query."""
+        conn, test_items = pagination_test_db
+
+        def filter_condition() -> sa.sql.expression.ColumnElement[bool]:
+            return test_items.c.id > 50
+
+        query = _make_base_query(test_items).order_by(test_items.c.id.asc())
+        querier = BatchQuerier(pagination=NoPagination(), conditions=[filter_condition])
+        spy = _ExecuteCountingSession(conn)
+
+        result = await execute_batch_querier(spy, query, querier)  # type: ignore[arg-type]
+
+        assert len(result.rows) == 50
+        assert result.total_count == 50
+        assert spy.execute_count == 1  # zero count queries
+
+
+class TestCountQueryExecution:
+    """Verify how many DB round-trips each strategy makes for total_count."""
+
+    async def test_offset_with_results_uses_window_no_count_query(
+        self,
+        pagination_test_db: tuple[AsyncConnection, sa.Table],
+    ) -> None:
+        """Offset with rows folds the count into the data query (single round-trip)."""
+        conn, test_items = pagination_test_db
+
+        query = _make_base_query(test_items).order_by(test_items.c.id.asc())
+        querier = BatchQuerier(pagination=OffsetPagination(limit=10, offset=0))
+        spy = _ExecuteCountingSession(conn)
+
+        result = await execute_batch_querier(spy, query, querier)  # type: ignore[arg-type]
+
+        assert result.total_count == 100
+        assert spy.execute_count == 1  # window function, no separate count query
+
+    async def test_offset_empty_falls_back_to_count_query(
+        self,
+        pagination_test_db: tuple[AsyncConnection, sa.Table],
+    ) -> None:
+        """Offset with empty rows falls back to a separate count query."""
+        conn, test_items = pagination_test_db
+
+        query = _make_base_query(test_items).order_by(test_items.c.id.asc())
+        querier = BatchQuerier(pagination=OffsetPagination(limit=10, offset=200))
+        spy = _ExecuteCountingSession(conn)
+
+        result = await execute_batch_querier(spy, query, querier)  # type: ignore[arg-type]
+
+        assert result.rows == []
+        assert result.total_count == 100  # resolved via the fallback count query
+        assert spy.execute_count == 2  # empty data query + count query
+
+    async def test_cursor_forward_runs_separate_count_query(
+        self,
+        pagination_test_db: tuple[AsyncConnection, sa.Table],
+    ) -> None:
+        """Cursor pagination always runs a separate count query."""
+        conn, test_items = pagination_test_db
+
+        query = _make_base_query(test_items)
+        querier = BatchQuerier(
+            pagination=CursorForwardPagination(
+                first=10,
+                cursor_order=test_items.c.id.asc(),
+                cursor_condition=None,
+            )
+        )
+        spy = _ExecuteCountingSession(conn)
+
+        result = await execute_batch_querier(spy, query, querier)  # type: ignore[arg-type]
+
+        assert result.total_count == 100
+        assert spy.execute_count == 2  # data query + separate count query
