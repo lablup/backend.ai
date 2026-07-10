@@ -8,7 +8,7 @@ from yarl import URL
 from ai.backend.client.v2.base_client import BackendAIAuthClient
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.domains_v2.app_config_allow_list import V2AppConfigAllowListClient
-from ai.backend.common.data.app_config.types import AppConfigScopeType
+from ai.backend.common.data.app_config.types import AppConfigAccessLevel, AppConfigScopeType
 from ai.backend.common.dto.manager.v2.app_config_allow_list.request import (
     CreateAppConfigAllowListInput,
     SearchAppConfigAllowListInput,
@@ -47,6 +47,8 @@ def _node_payload(entry_id: str, config_name: str) -> dict[str, str | int]:
         "config_name": config_name,
         "scope_type": "domain",
         "rank": 200,
+        "read_access": "authenticated",
+        "write_access": "admin",
         "created_at": "2026-01-01T00:00:00+00:00",
         "updated_at": "2026-01-02T00:00:00+00:00",
     }
@@ -77,6 +79,8 @@ class TestAdminCreate:
         assert result.app_config_allow_list.config_name == "theme"
         assert result.app_config_allow_list.scope_type == AppConfigScopeType.DOMAIN
         assert result.app_config_allow_list.rank == 200
+        assert result.app_config_allow_list.read_access == AppConfigAccessLevel.AUTHENTICATED
+        assert result.app_config_allow_list.write_access == AppConfigAccessLevel.ADMIN
 
 
 class TestAdminSearch:
@@ -135,7 +139,11 @@ class TestAdminUpdate:
 
         result = await client.admin_update(
             entry_id,
-            UpdateAppConfigAllowListInput(id=entry_id, rank=250),
+            UpdateAppConfigAllowListInput(
+                id=entry_id,
+                rank=250,
+                write_access=AppConfigAccessLevel.OWNER,
+            ),
         )
 
         call_args = mock_session.request.call_args
@@ -143,6 +151,9 @@ class TestAdminUpdate:
         assert str(call_args[0][1]).endswith(f"/v2/app-config-allow-list/{entry_id}")
         assert isinstance(result, UpdateAppConfigAllowListPayload)
         assert result.app_config_allow_list.rank == 250
+        # response access tiers round-trip through the typed response model
+        assert result.app_config_allow_list.read_access == AppConfigAccessLevel.AUTHENTICATED
+        assert result.app_config_allow_list.write_access == AppConfigAccessLevel.ADMIN
 
 
 class TestAdminPurge:

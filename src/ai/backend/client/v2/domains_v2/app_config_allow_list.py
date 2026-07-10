@@ -27,7 +27,7 @@ class V2AppConfigAllowListClient(BaseDomainClient):
 
     Mirrors the REST v2 surface introduced in BA-6546. All calls require
     super-admin privileges; the entity supports create, get, search, update
-    (rank only), and purge.
+    (rank and read/write access tiers), and purge.
     """
 
     async def admin_create(
@@ -67,7 +67,7 @@ class V2AppConfigAllowListClient(BaseDomainClient):
         app_config_allow_list_id: UUID,
         request: UpdateAppConfigAllowListInput,
     ) -> UpdateAppConfigAllowListPayload:
-        """Update an app config allow-list entry's rank by ID (superadmin only)."""
+        """Update an app config allow-list entry's rank / access tiers by ID (superadmin only)."""
         return await self._client.typed_request(
             "PATCH",
             f"{_PATH}/{app_config_allow_list_id}",

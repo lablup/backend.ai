@@ -8,7 +8,7 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
-from ai.backend.common.data.app_config.types import AppConfigScopeType
+from ai.backend.common.data.app_config.types import AppConfigAccessLevel, AppConfigScopeType
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter
 from ai.backend.common.dto.manager.v2.app_config_allow_list.types import (
     AppConfigAllowListOrderField,
@@ -44,13 +44,29 @@ class CreateAppConfigAllowListInput(BaseRequestModel):
             "Defaults to the scope type's default rank (public=100, domain=200, user=300)."
         ),
     )
+    read_access: AppConfigAccessLevel | None = Field(
+        default=None,
+        description=(
+            "Minimum principal tier allowed to read the fragments under this entry. "
+            "Defaults to the scope type's default (public=public, domain=authenticated, "
+            "user=owner)."
+        ),
+    )
+    write_access: AppConfigAccessLevel | None = Field(
+        default=None,
+        description=(
+            "Minimum principal tier allowed to write the fragments under this entry. "
+            "Defaults to the scope type's default (public=admin, domain=admin, user=owner)."
+        ),
+    )
 
 
 class UpdateAppConfigAllowListInput(BaseRequestModel):
     """Input for updating an app config allow-list entry.
 
-    Only ``rank`` is updatable — the identity pair (``config_name``, ``scope_type``)
-    is immutable (purge and recreate to change it).
+    ``rank`` and the access tiers (``read_access`` / ``write_access``) are updatable — the
+    identity pair (``config_name``, ``scope_type``) is immutable (purge and recreate to
+    change it).
     """
 
     id: UUID = Field(description="App config allow-list entry id to update.")
@@ -59,6 +75,20 @@ class UpdateAppConfigAllowListInput(BaseRequestModel):
         description=(
             "New merge rank applied to fragments under this entry (low to high; "
             "higher wins). Omit to leave unchanged."
+        ),
+    )
+    read_access: AppConfigAccessLevel | None = Field(
+        default=None,
+        description=(
+            "New minimum principal tier allowed to read the fragments under this entry. "
+            "Omit to leave unchanged."
+        ),
+    )
+    write_access: AppConfigAccessLevel | None = Field(
+        default=None,
+        description=(
+            "New minimum principal tier allowed to write the fragments under this entry. "
+            "Omit to leave unchanged."
         ),
     )
 

@@ -13,7 +13,7 @@ from ai.backend.client.cli.v2.helpers import (
     parse_order_options,
     print_result,
 )
-from ai.backend.common.data.app_config.types import AppConfigScopeType
+from ai.backend.common.data.app_config.types import AppConfigAccessLevel, AppConfigScopeType
 
 
 @click.group()
@@ -38,7 +38,31 @@ def app_config_allow_list() -> None:
         "Defaults to the scope type's default rank (public=100, domain=200, user=300)."
     ),
 )
-def create(config_name: str, scope_type: str, rank: int | None) -> None:
+@click.option(
+    "--read-access",
+    default=None,
+    type=click.Choice([level.value for level in AppConfigAccessLevel]),
+    help=(
+        "Minimum principal tier allowed to read the fragments under this entry. "
+        "Defaults to the scope type's default (public=public, domain=authenticated, user=owner)."
+    ),
+)
+@click.option(
+    "--write-access",
+    default=None,
+    type=click.Choice([level.value for level in AppConfigAccessLevel]),
+    help=(
+        "Minimum principal tier allowed to write the fragments under this entry. "
+        "Defaults to the scope type's default (public=admin, domain=admin, user=owner)."
+    ),
+)
+def create(
+    config_name: str,
+    scope_type: str,
+    rank: int | None,
+    read_access: str | None,
+    write_access: str | None,
+) -> None:
     """Register a new app config allow-list entry."""
     from ai.backend.common.dto.manager.v2.app_config_allow_list.request import (
         CreateAppConfigAllowListInput,
@@ -52,6 +76,12 @@ def create(config_name: str, scope_type: str, rank: int | None) -> None:
                     config_name=config_name,
                     scope_type=AppConfigScopeType(scope_type),
                     rank=rank,
+                    read_access=(
+                        AppConfigAccessLevel(read_access) if read_access is not None else None
+                    ),
+                    write_access=(
+                        AppConfigAccessLevel(write_access) if write_access is not None else None
+                    ),
                 )
             )
             print_result(result)
@@ -160,12 +190,38 @@ def search(
 @click.argument("app_config_allow_list_id", type=click.UUID)
 @click.option(
     "--rank",
-    required=True,
+    default=None,
     type=int,
-    help=("New merge rank applied to fragments under this entry (low to high; higher wins)."),
+    help=(
+        "New merge rank applied to fragments under this entry (low to high; higher wins). "
+        "Omit to leave unchanged."
+    ),
 )
-def update(app_config_allow_list_id: uuid.UUID, rank: int) -> None:
-    """Update an app config allow-list entry's rank by ID."""
+@click.option(
+    "--read-access",
+    default=None,
+    type=click.Choice([level.value for level in AppConfigAccessLevel]),
+    help=(
+        "New minimum principal tier allowed to read the fragments under this entry. "
+        "Omit to leave unchanged."
+    ),
+)
+@click.option(
+    "--write-access",
+    default=None,
+    type=click.Choice([level.value for level in AppConfigAccessLevel]),
+    help=(
+        "New minimum principal tier allowed to write the fragments under this entry. "
+        "Omit to leave unchanged."
+    ),
+)
+def update(
+    app_config_allow_list_id: uuid.UUID,
+    rank: int | None,
+    read_access: str | None,
+    write_access: str | None,
+) -> None:
+    """Update an app config allow-list entry's rank / access tiers by ID."""
     from ai.backend.common.dto.manager.v2.app_config_allow_list.request import (
         UpdateAppConfigAllowListInput,
     )
@@ -175,7 +231,16 @@ def update(app_config_allow_list_id: uuid.UUID, rank: int) -> None:
         try:
             result = await registry.app_config_allow_list.admin_update(
                 app_config_allow_list_id,
-                UpdateAppConfigAllowListInput(id=app_config_allow_list_id, rank=rank),
+                UpdateAppConfigAllowListInput(
+                    id=app_config_allow_list_id,
+                    rank=rank,
+                    read_access=(
+                        AppConfigAccessLevel(read_access) if read_access is not None else None
+                    ),
+                    write_access=(
+                        AppConfigAccessLevel(write_access) if write_access is not None else None
+                    ),
+                ),
             )
             print_result(result)
         finally:

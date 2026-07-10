@@ -92,6 +92,8 @@ class AppConfigAllowListAdapter(BaseAdapter):
                 config_name=input.config_name,
                 scope_type=AppConfigScopeType(input.scope_type.value),
                 rank=input.rank,
+                read_access=input.read_access,
+                write_access=input.write_access,
             )
         )
         action_result = await self._processors.app_config_allow_list.create.wait_for_complete(
@@ -164,6 +166,16 @@ class AppConfigAllowListAdapter(BaseAdapter):
                     if input.rank is not None
                     else OptionalState.nop()
                 ),
+                read_access=(
+                    OptionalState.update(input.read_access)
+                    if input.read_access is not None
+                    else OptionalState.nop()
+                ),
+                write_access=(
+                    OptionalState.update(input.write_access)
+                    if input.write_access is not None
+                    else OptionalState.nop()
+                ),
             ),
             pk_value=AppConfigAllowListID(input.id),
         )
@@ -190,6 +202,8 @@ class AppConfigAllowListAdapter(BaseAdapter):
             config_name=data.config_name,
             scope_type=AppConfigScopeTypeDTO(data.scope_type.value),
             rank=data.rank,
+            read_access=data.read_access,
+            write_access=data.write_access,
             created_at=data.created_at,
             updated_at=data.updated_at,
         )

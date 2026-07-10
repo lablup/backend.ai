@@ -11,7 +11,7 @@ from uuid import UUID
 from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
-from ai.backend.common.data.app_config.types import AppConfigScopeType
+from ai.backend.common.data.app_config.types import AppConfigAccessLevel, AppConfigScopeType
 from ai.backend.common.dto.manager.v2.app_config_allow_list.request import (
     AppConfigAllowListFilter as AppConfigAllowListFilterDTO,
 )
@@ -102,6 +102,18 @@ class AppConfigAllowListGQL(PydanticNodeMixin[AppConfigAllowListNode]):
             description=(
                 "Merge rank applied to fragments under this entry (low to high; higher wins)."
             ),
+        ),
+    )
+    read_access: AppConfigAccessLevel = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Minimum principal tier allowed to read the fragments under this entry.",
+        ),
+    )
+    write_access: AppConfigAccessLevel = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Minimum principal tier allowed to write the fragments under this entry.",
         ),
     )
     created_at: datetime = gql_field(description="Creation timestamp (UTC).")
@@ -254,6 +266,27 @@ class CreateAppConfigAllowListInputGQL(PydanticInputMixin[CreateAppConfigAllowLi
         ),
         default=None,
     )
+    read_access: AppConfigAccessLevel | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Minimum principal tier allowed to read the fragments under this entry. "
+                "Defaults to the scope type's default (public=public, domain=authenticated, "
+                "user=owner)."
+            ),
+        ),
+        default=None,
+    )
+    write_access: AppConfigAccessLevel | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Minimum principal tier allowed to write the fragments under this entry. "
+                "Defaults to the scope type's default (public=admin, domain=admin, user=owner)."
+            ),
+        ),
+        default=None,
+    )
 
 
 @gql_pydantic_type(
@@ -272,7 +305,7 @@ class CreateAppConfigAllowListPayloadGQL(PydanticOutputMixin[CreateAppConfigAllo
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        description="Input for updating an app config allow-list entry (rank only).",
+        description="Input for updating an app config allow-list entry (rank / access tiers).",
         added_version=NEXT_RELEASE_VERSION,
     ),
     name="UpdateAppConfigAllowListInput",
@@ -283,6 +316,20 @@ class UpdateAppConfigAllowListInputGQL(PydanticInputMixin[UpdateAppConfigAllowLi
         description=(
             "New merge rank applied to fragments under this entry (low to high; higher "
             "wins). Omit to leave unchanged."
+        ),
+        default=None,
+    )
+    read_access: AppConfigAccessLevel | None = gql_field(
+        description=(
+            "New minimum principal tier allowed to read the fragments under this entry. "
+            "Omit to leave unchanged."
+        ),
+        default=None,
+    )
+    write_access: AppConfigAccessLevel | None = gql_field(
+        description=(
+            "New minimum principal tier allowed to write the fragments under this entry. "
+            "Omit to leave unchanged."
         ),
         default=None,
     )

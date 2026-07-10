@@ -609,6 +609,13 @@ type AllowedResourceGroupsPayload {
   items: [String!]!
 }
 
+enum AppConfigAccessLevel {
+  PUBLIC
+  AUTHENTICATED
+  OWNER
+  ADMIN
+}
+
 """
 Added in 26.7.0. Permission to write config fragments for one config name at one scope type.
 """
@@ -626,6 +633,16 @@ type AppConfigAllowList implements Node {
   Added in 26.8.0. Merge rank applied to fragments under this entry (low to high; higher wins).
   """
   rank: Int!
+
+  """
+  Added in 26.8.0. Minimum principal tier allowed to read the fragments under this entry.
+  """
+  readAccess: AppConfigAccessLevel!
+
+  """
+  Added in 26.8.0. Minimum principal tier allowed to write the fragments under this entry.
+  """
+  writeAccess: AppConfigAccessLevel!
 
   """Creation timestamp (UTC)."""
   createdAt: DateTime!
@@ -2345,6 +2362,16 @@ input CreateAppConfigAllowListInput {
   Added in 26.8.0. Merge rank applied to fragments under this entry (low to high; higher wins). Defaults to the scope type's default rank (public=100, domain=200, user=300).
   """
   rank: Int = null
+
+  """
+  Added in 26.8.0. Minimum principal tier allowed to read the fragments under this entry. Defaults to the scope type's default (public=public, domain=authenticated, user=owner).
+  """
+  readAccess: AppConfigAccessLevel = null
+
+  """
+  Added in 26.8.0. Minimum principal tier allowed to write the fragments under this entry. Defaults to the scope type's default (public=admin, domain=admin, user=owner).
+  """
+  writeAccess: AppConfigAccessLevel = null
 }
 
 """Added in 26.7.0. Payload for app config allow-list entry creation."""
@@ -13512,7 +13539,7 @@ input UpdateAllowedResourceGroupsForProjectInput {
 }
 
 """
-Added in 26.8.0. Input for updating an app config allow-list entry (rank only).
+Added in 26.8.0. Input for updating an app config allow-list entry (rank / access tiers).
 """
 input UpdateAppConfigAllowListInput {
   """App config allow-list entry id to update."""
@@ -13522,6 +13549,16 @@ input UpdateAppConfigAllowListInput {
   New merge rank applied to fragments under this entry (low to high; higher wins). Omit to leave unchanged.
   """
   rank: Int = null
+
+  """
+  New minimum principal tier allowed to read the fragments under this entry. Omit to leave unchanged.
+  """
+  readAccess: AppConfigAccessLevel = null
+
+  """
+  New minimum principal tier allowed to write the fragments under this entry. Omit to leave unchanged.
+  """
+  writeAccess: AppConfigAccessLevel = null
 }
 
 """Added in 26.8.0. Payload for app config allow-list entry update."""
