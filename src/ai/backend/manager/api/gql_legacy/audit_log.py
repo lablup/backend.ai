@@ -68,6 +68,13 @@ class AuditLogNode(graphene.ObjectType):  # type: ignore[misc]
     triggered_by = graphene.String(
         required=False, description="Added in 25.12.0, User ID that triggered the action"
     )
+    acted_as = graphene.String(
+        required=False,
+        description=(
+            "Effective (acting) user ID the action ran as; "
+            "differs from triggered_by only during super-admin impersonation"
+        ),
+    )
     description = graphene.String(required=True, description="Description of the AuditLog")
     duration = graphene.String(
         required=False, description="Duration taken to perform the operation"
@@ -82,6 +89,7 @@ class AuditLogNode(graphene.ObjectType):  # type: ignore[misc]
         "created_at": ("created_at", dtparse),
         "request_id": ("request_id", None),
         "triggered_by": ("triggered_by", None),
+        "acted_as": ("acted_as", None),
         "description": ("description", None),
         "duration": ("duration", lambda duration: timedelta(seconds=float(duration))),
         "status": ("status", OperationStatus),
@@ -95,6 +103,7 @@ class AuditLogNode(graphene.ObjectType):  # type: ignore[misc]
         "created_at": ("created_at", None),
         "request_id": ("request_id", None),
         "triggered_by": ("triggered_by", None),
+        "acted_as": ("acted_as", None),
         "description": ("description", None),
         "duration": ("duration", None),
         "status": ("status", None),
@@ -112,6 +121,7 @@ class AuditLogNode(graphene.ObjectType):  # type: ignore[misc]
             action_id=row.action_id,
             request_id=row.request_id,
             triggered_by=row.triggered_by,
+            acted_as=row.acted_as,
             description=row.description,
             duration=row.duration,
             status=row.status,

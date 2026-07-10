@@ -13,8 +13,10 @@ from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.dto.manager.v2.audit_log.response import AuditLogNode
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    gql_added_field,
     gql_connection_type,
     gql_enum,
     gql_field,
@@ -56,6 +58,16 @@ class AuditLogV2GQL(PydanticNodeMixin[AuditLogNode]):
     request_id: str | None = gql_field(description="Request ID that triggered this operation.")
     triggered_by: str | None = gql_field(
         description="UUID string of the user who triggered the action."
+    )
+    acted_as: str | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "UUID string of the effective (acting) user the action ran as. "
+                "Differs from triggered_by only while a super admin is impersonating a target."
+            ),
+        ),
+        default=None,
     )
     description: str = gql_field(description="Human-readable description of the operation.")
     duration: str | None = gql_field(

@@ -30,6 +30,13 @@ class AuditLogNode(BaseResponseModel):
     triggered_by: str | None = Field(
         default=None, description="UUID string of the user who triggered the action"
     )
+    acted_as: str | None = Field(
+        default=None,
+        description=(
+            "UUID string of the effective (acting) user the action ran as. "
+            "Differs from triggered_by only while a super admin is impersonating a target."
+        ),
+    )
     description: str = Field(description="Human-readable description of the operation")
     duration: str | None = Field(default=None, description="Duration of the operation as a string")
     status: AuditLogStatus = Field(description="Status of the operation")

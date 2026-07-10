@@ -84,6 +84,13 @@ AUDIT_LOG_FIELDS: list[ExportFieldDef] = [
         column=AuditLogRow.triggered_by,
     ),
     ExportFieldDef(
+        key="acted_as",
+        name="Acted As",
+        description="Effective user the action ran as (differs during impersonation)",
+        field_type=ExportFieldType.STRING,
+        column=AuditLogRow.acted_as,
+    ),
+    ExportFieldDef(
         key="duration",
         name="Duration",
         description="Duration of the operation",
