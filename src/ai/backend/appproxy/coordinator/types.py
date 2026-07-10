@@ -170,20 +170,21 @@ class CircuitManager:
             self,
             _event_handler,
         )
-        evt = AppProxyCircuitCreatedEvent(
-            authority,
-            [SerializableCircuit(**circuit.dump_model())],
-        )
-        await self.event_producer.broadcast_event(evt)
         try:
-            async with asyncio.timeout(15.0):
-                await worker_ready_evt.wait()
-        except TimeoutError as e:
-            raise ServiceUnavailable(
-                "E10001: Proxy worker not responding", extra_data={"worker": authority}
-            ) from e
-
-        self.event_dispatcher.unsubscribe(worker_ready_event_handler)
+            evt = AppProxyCircuitCreatedEvent(
+                authority,
+                [SerializableCircuit(**circuit.dump_model())],
+            )
+            await self.event_producer.broadcast_event(evt)
+            try:
+                async with asyncio.timeout(15.0):
+                    await worker_ready_evt.wait()
+            except TimeoutError as e:
+                raise ServiceUnavailable(
+                    "E10001: Proxy worker not responding", extra_data={"worker": authority}
+                ) from e
+        finally:
+            self.event_dispatcher.unsubscribe(worker_ready_event_handler)
 
     async def update_circuit_routes(self, circuit: Circuit, old_routes: list[RouteInfo]) -> None:
         # Single-circuit entry point still exists for callers that don't
