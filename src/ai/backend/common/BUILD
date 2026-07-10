@@ -22,7 +22,7 @@ __dependencies_rules__(
         "//stubs/**",
         "!*",
     ),
-    # default: every other file in the component (matches the old macro behavior).
+    # default: every other file in the component.
     (
         "*",
         "/**",

@@ -9,13 +9,9 @@ python_sources(
     ],
 )
 
-# Per-layer dependency direction (bottom -> top): data -> views -> models.
 # Each rule set is self-contained: the upper-layer denies come first, then the same
 # base allowances as the default set. Paths starting with "/" are relative to this
 # (manager) directory; "//" is relative to the build root.
-# All three layers are additionally forbidden from importing config / config_legacy /
-# clients. The one exception is models/alembic, whose historical migration scripts
-# import from config_legacy (and may import config).
 __dependencies_rules__(
     # data: must not depend on views, models, repositories, services, api, config, clients.
     (
@@ -56,7 +52,7 @@ __dependencies_rules__(
     ),
     # models/alembic: exception to the models rule below — migration scripts may import
     # config / config_legacy. Must be listed BEFORE the general models rule so its more
-    # specific selector wins. Still forbidden from repositories, services, api, clients.
+    # specific selector wins.
     (
         "/models/alembic/**",
         "!/repositories/**",
@@ -89,7 +85,7 @@ __dependencies_rules__(
         "//stubs/**",
         "!*",
     ),
-    # default: every other file in the component (matches the old macro behavior).
+    # default: every other file in the component.
     (
         "*",
         "/**",
