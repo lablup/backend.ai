@@ -191,6 +191,14 @@ usage() {
   echo "  ${LWHITE}--configure-ha${NC}"
   echo "    Configure HA dev environment."
   echo "    (default: false)"
+  echo ""
+  echo "  ${LWHITE}--app-proxy-frontend MODE${NC}"
+  echo "    The frontend dataplane of the app-proxy worker."
+  echo "    \"port\" serves proxied apps directly from the worker process, while"
+  echo "    \"traefik\" delegates them to a Traefik container in the halfstack"
+  echo "    (started via the \"traefik\" compose profile with the appproxy"
+  echo "    Traefik plugin). Not supported together with --configure-ha."
+  echo "    (default: port)"
 }
 
 show_error() {
@@ -240,6 +248,11 @@ show_guide() {
   show_note "How to run Backend.AI app-proxy:"
   echo "  > ${WHITE}./backend.ai app-proxy-coordinator start-server --debug${NC}"
   echo "  > ${WHITE}./backend.ai app-proxy-worker start-server --debug${NC}"
+  if [ "$APPPROXY_FRONTEND" = "traefik" ]; then
+    echo "  The app-proxy worker is configured with the traefik frontend."
+    echo "  The Traefik container already runs as part of the halfstack"
+    echo "  (compose profile \"traefik\"); its dashboard is at ${WHITE}http://127.0.0.1:${TRAEFIK_API_PORT}${NC}."
+  fi
   echo "  ${LRED}DO NOT source env-local-*.sh in the shell where you run the web server"
   echo "  to prevent misbehavior of the client used inside the web server.${NC}"
   show_info "How to run your first code:"
@@ -391,7 +404,9 @@ ACCOUNT_MANAGER_PORT="8099"
 WEBSERVER_PORT="8090"
 APPPROXY_COORDINATOR_PORT="10200"
 APPPROXY_WORKER_PORT="10201"
-APPPROXY_IMPL="port"  # frontend server mode ("port" or "traefik")
+APPPROXY_FRONTEND="port"  # frontend server mode ("port" or "traefik")
+APPPROXY_TRAEFIK_PLUGIN_VERSION="0.0.5"
+TRAEFIK_API_PORT="8080"
 WSPROXY_PORT="5050"
 AGENT_RPC_PORT="6011"
 AGENT_WATCHER_PORT="6019"
@@ -444,8 +459,11 @@ while [ $# -gt 0 ]; do
     --app-proxy-coordinator-port=*)  APPPROXY_COORDINATOR_PORT="${1#*=}" ;;
     --app-proxy-worker-port)         APPPROXY_WORKER_PORT=$2; shift ;;
     --app-proxy-worker-port=*)       APPPROXY_WORKER_PORT="${1#*=}" ;;
-    --app-proxy-impl)                APPPROXY_IMPL=$2; shift ;;
-    --app-proxy-impl=*)              APPPROXY_IMPL="${1#*=}" ;;
+    --app-proxy-frontend)            APPPROXY_FRONTEND=$2; shift ;;
+    --app-proxy-frontend=*)          APPPROXY_FRONTEND="${1#*=}" ;;
+    # legacy alias of --app-proxy-frontend
+    --app-proxy-impl)                APPPROXY_FRONTEND=$2; shift ;;
+    --app-proxy-impl=*)              APPPROXY_FRONTEND="${1#*=}" ;;
     --agent-rpc-port)       AGENT_RPC_PORT=$2; shift ;;
     --agent-rpc-port=*)     AGENT_RPC_PORT="${1#*=}" ;;
     --agent-watcher-port)   AGENT_WATCHER_PORT=$2; shift ;;
@@ -467,6 +485,18 @@ while [ $# -gt 0 ]; do
   shift
 done
 
+case $APPPROXY_FRONTEND in
+  port|traefik) ;;
+  *)
+    echo "Invalid --app-proxy-frontend value: ${APPPROXY_FRONTEND} (must be \"port\" or \"traefik\")"
+    echo "Run '$0 --help' for usage."
+    exit 1
+esac
+if [ "$APPPROXY_FRONTEND" = "traefik" ] && [ $CONFIGURE_HA -eq 1 ]; then
+  echo "--app-proxy-frontend=traefik is not supported together with --configure-ha yet."
+  exit 1
+fi
+
 # Build the docker compose --profile flags from the ENABLE_* booleans now,
 # right after argument parsing, so every code path (including Codespaces
 # post-create that skips setup_environment) sees a consistent value.
@@ -479,6 +509,9 @@ elif [ $ENABLE_TELEMETRY -eq 1 ]; then
 fi
 if [ $ENABLE_STORAGE -eq 1 ]; then
   HALFSTACK_PROFILE_ARGS="${HALFSTACK_PROFILE_ARGS} --profile storage"
+fi
+if [ "$APPPROXY_FRONTEND" = "traefik" ]; then
+  HALFSTACK_PROFILE_ARGS="${HALFSTACK_PROFILE_ARGS} --profile traefik"
 fi
 
 if [ "$CURRENT_BRANCH" = "main" ]; then
@@ -1067,6 +1100,40 @@ setup_environment() {
   mkdir -p "${HALFSTACK_VOLUME_PATH}/etcd-data"
   mkdir -p "${HALFSTACK_VOLUME_PATH}/redis-data"
 
+  if [ "$APPPROXY_FRONTEND" = "traefik" ]; then
+    # Prepare the Traefik container assets before `compose up` starts the
+    # "traefik" profile: the static configuration, the appproxy Traefik
+    # plugin, and the last-used-time marker directory. The marker directory
+    # must be mounted into the container at the same absolute path as on the
+    # host because the coordinator hands the worker's marker path verbatim to
+    # the Traefik plugin.
+    show_info "Preparing Traefik assets for the app-proxy traefik frontend..."
+    APPPROXY_MARKER_DIR="${ROOT_PATH}/volumes/traefik/marker"
+    mkdir -p "${APPPROXY_MARKER_DIR}"
+    cp configs/traefik/traefik.halfstack.yml ./traefik.halfstack.current.yml
+    sed_inplace "s@/__APPPROXY_MARKER_DIR__@${APPPROXY_MARKER_DIR}@g" ./traefik.halfstack.current.yml
+    sed_inplace "s@/__APPPROXY_MARKER_DIR__@${APPPROXY_MARKER_DIR}@g" "docker-compose.halfstack.current.yml"
+    APPPROXY_TRAEFIK_PLUGIN_URL="https://github.com/lablup/backend.ai-appproxy-worker-traefik/releases/download/${APPPROXY_TRAEFIK_PLUGIN_VERSION}/appproxy-traefik-plugin.tar.gz"
+    if ! curl -fsSL "${APPPROXY_TRAEFIK_PLUGIN_URL}" | tar xz -C "${HALFSTACK_VOLUME_PATH}/traefik" 2>/dev/null; then
+      # The plugin repository currently requires authenticated access;
+      # fall back to the GitHub CLI which uses the developer's credentials.
+      if command -v gh >/dev/null 2>&1 \
+        && gh release download "${APPPROXY_TRAEFIK_PLUGIN_VERSION}" \
+             --repo lablup/backend.ai-appproxy-worker-traefik \
+             --pattern "appproxy-traefik-plugin.tar.gz" --output - 2>/dev/null \
+           | tar xz -C "${HALFSTACK_VOLUME_PATH}/traefik"; then
+        :
+      else
+        show_error "Failed to download the appproxy Traefik plugin."
+        echo "The plugin repository may require access permission. Download"
+        echo "appproxy-traefik-plugin.tar.gz from"
+        echo "  https://github.com/lablup/backend.ai-appproxy-worker-traefik/releases/tag/${APPPROXY_TRAEFIK_PLUGIN_VERSION}"
+        echo "and extract it into ${HALFSTACK_VOLUME_PATH}/traefik/, then re-run."
+        exit 1
+      fi
+    fi
+  fi
+
   $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" $HALFSTACK_PROFILE_ARGS pull
 
   show_info "Pre-pulling frequently used kernel images..."
@@ -1166,6 +1233,36 @@ configure_backendai() {
   sed_inplace "s/api_secret = \"some_api_secret\"/api_secret = \"${APPPROXY_API_SECRET}\"/" ./app-proxy-worker.toml
   sed_inplace "s/jwt_secret = \"some_jwt_secret\"/jwt_secret = \"${APPPROXY_JWT_SECRET}\"/" ./app-proxy-worker.toml
   sed_inplace "s/secret = \"some_permit_hash_secret\"/secret = \"${APPPROXY_PERMIT_HASH_SECRET}\"/" ./app-proxy-worker.toml
+
+  if [ "$APPPROXY_FRONTEND" = "traefik" ]; then
+    # Delegate the worker dataplane to the halfstack Traefik container
+    # (started above via the "traefik" compose profile). The coordinator
+    # publishes routing rules to etcd (namespace "traefik") which the Traefik
+    # etcd provider watches; the worker only reconciles routes through the
+    # Traefik API published at 127.0.0.1:${TRAEFIK_API_PORT}.
+    APPPROXY_MARKER_DIR="${ROOT_PATH}/volumes/traefik/marker"
+    sed_inplace "s/^allow_unauthorized_configure_request = true/allow_unauthorized_configure_request = true\\
+enable_traefik = true/" ./app-proxy-coordinator.toml
+    cat >> ./app-proxy-coordinator.toml <<EOF
+
+[proxy_coordinator.traefik.etcd]
+namespace = "traefik"
+addr = { host = "127.0.0.1", port = ${ETCD_PORT} }
+EOF
+    # The leftover [proxy_worker.port_proxy] table is ignored in traefik mode.
+    sed_inplace "s/^frontend_mode = \"port\"/frontend_mode = \"traefik\"/" ./app-proxy-worker.toml
+    cat >> ./app-proxy-worker.toml <<EOF
+
+[proxy_worker.traefik]
+api_port = ${TRAEFIK_API_PORT}
+frontend_mode = "port"
+last_used_time_marker_directory = "${APPPROXY_MARKER_DIR}"
+
+[proxy_worker.traefik.port_proxy]
+advertised_host = "127.0.0.1"
+port_range = [10205, 10300]
+EOF
+  fi
 
   # In HA mode the app-proxy components must reach Redis through Sentinel (nothing
   # listens on the standalone REDIS_PORT). Comment out the standalone `addr` and

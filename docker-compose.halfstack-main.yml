@@ -268,6 +268,33 @@ services:
       timeout: 3s
       retries: 10
 
+  backendai-half-traefik:
+    # Traefik dataplane for the app-proxy worker's traefik frontend mode.
+    # Enabled only via `install-dev.sh --app-proxy-frontend=traefik`
+    # (docker compose --profile traefik). The static configuration and the
+    # appproxy traefik plugin are prepared by install-dev.sh before `up`.
+    image: traefik:v3.7
+    restart: unless-stopped
+    profiles: ["traefik"]
+    networks:
+      - half
+    ports:
+      - "8080:8080"                # traefik API entrypoint (worker calls 127.0.0.1:8080)
+      - "10205-10300:10205-10300"  # portproxy_* entrypoints
+    volumes:
+      - "./traefik.halfstack.current.yml:/etc/traefik/traefik.yml:ro"
+      - "./volumes/traefik/plugins-local:/plugins-local:ro"
+      # The coordinator hands the worker's marker path verbatim to the traefik
+      # plugin, so the directory must be visible inside the container at the
+      # same absolute path as on the host. install-dev.sh substitutes the
+      # placeholder with the actual repository path.
+      - "./volumes/traefik/marker:/__APPPROXY_MARKER_DIR__"
+    healthcheck:
+      test: ["CMD", "traefik", "healthcheck", "--ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
 networks:
   half:
 
