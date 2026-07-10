@@ -31,6 +31,6 @@ class IdleCheckApplier(
 ):
     @override
     async def apply(self, apply_input: _IdleCheckApplyInput) -> None:
-        # Placeholder: marking result.verdicts' sessions TERMINATING via
+        # Placeholder: marking result.reports' sessions TERMINATING via
         # SchedulingController.mark_sessions_for_termination lands in a follow-up.
         pass

@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from typing import Any
 
+from ai.backend.common.data.idle_checker.types import CheckerType
 from ai.backend.common.events.event_types.schedule.anycast import (
     DoReconcileProcessEvent,
     DoReconcileProcessIfNeededEvent,
@@ -12,7 +14,7 @@ from ai.backend.manager.data.session.types import SchedulingResult, SessionStatu
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.repositories.idle_checker.repository import IdleCheckerRepository
 from ai.backend.manager.sokovan.idle_check.applier import IdleCheckApplier
-from ai.backend.manager.sokovan.idle_check.checkers.base import IdleCheckerDependencies
+from ai.backend.manager.sokovan.idle_check.checkers.base import IdleChecker
 from ai.backend.manager.sokovan.idle_check.handlers.reconcile import IdleCheckReconcileHandler
 from ai.backend.manager.sokovan.idle_check.source import IdleCheckSource
 from ai.backend.manager.sokovan.idle_check.types import (
@@ -47,9 +49,10 @@ def build_idle_check_stage(
         lock_id=LockID.LOCKID_IDLE_CHECK_RECONCILE,
         transitions=transitions,
     )
+    checkers: Mapping[CheckerType, IdleChecker[Any]] = {}
     stage = ReconcilerStage(
-        handler=IdleCheckReconcileHandler(),
-        source=IdleCheckSource(idle_checker_repository, IdleCheckerDependencies()),
+        handler=IdleCheckReconcileHandler(checkers),
+        source=IdleCheckSource(idle_checker_repository),
         applier=IdleCheckApplier(),
         metadata=metadata,
     )

@@ -1,4 +1,4 @@
-"""Idle checker contract: prepare (I/O, Source phase) + check_idle (pure)."""
+"""Idle checker contract: prepare (batched I/O) + judge (pure), driven by the reconcile handler."""
 
 from __future__ import annotations
 
@@ -13,15 +13,6 @@ from ai.backend.manager.repositories.idle_checker.types import IdleCheckerDefini
 
 
 @dataclass(frozen=True)
-class IdleCheckerDependencies:
-    """I/O clients used by ``prepare``; filled in by the checker-logic stories."""
-
-
-class IdleCheckerState:
-    """Marker for the state a checker prepares; each checker defines its own shape."""
-
-
-@dataclass(frozen=True)
 class CheckerAssignment:
     """One checker definition and the sessions it must judge this tick."""
 
@@ -29,23 +20,34 @@ class CheckerAssignment:
     sessions: Sequence[IdleCheckSession]
 
 
-class IdleChecker[StateT: IdleCheckerState](ABC):
-    """Stateless per-``CheckerType`` judgment behavior over its own state type."""
+@dataclass(frozen=True)
+class IdleJudgment:
+    """One session's judgment from one checker definition."""
+
+    session_id: SessionId
+    is_idle: bool
+    message: str
+
+
+class IdleChecker[StateT](ABC):
+    """Per-``CheckerType`` behavior; ``StateT`` is one session's judgment material.
+
+    Concrete checkers receive the I/O clients ``prepare`` needs via their constructors.
+    """
 
     @abstractmethod
     async def prepare(
         self,
-        dependencies: IdleCheckerDependencies,
         assignments: Sequence[CheckerAssignment],
-    ) -> Mapping[IdleCheckerID, StateT]:
+    ) -> Mapping[IdleCheckerID, Mapping[SessionId, StateT]]:
         """Called once per tick with every definition of this type.
 
-        Batch the I/O across all assignments and return one state per definition;
-        capture everything check_idle needs into the states here.
+        Batch the I/O across all assignments (session ids key the Valkey/DB reads) and
+        bake everything ``judge`` needs into per-session states.
         """
         raise NotImplementedError
 
     @abstractmethod
-    def check_idle(self, session_id: SessionId, state: StateT) -> bool:
-        """Judge one session from prepared state alone; True means idle."""
+    def judge(self, session_states: Mapping[SessionId, StateT]) -> Sequence[IdleJudgment]:
+        """Judge one definition's sessions from prepared states alone; no I/O."""
         raise NotImplementedError

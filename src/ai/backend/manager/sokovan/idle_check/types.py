@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, override
+from typing import override
 from uuid import UUID
 
 from ai.backend.common.identifier.idle_checker import IdleCheckerID
@@ -17,7 +17,7 @@ from ai.backend.manager.data.reconciler.types import (
 )
 from ai.backend.manager.data.session.options import HandlerPolicyResolver
 from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.sokovan.idle_check.checkers.base import IdleChecker, IdleCheckerState
+from ai.backend.manager.repositories.idle_checker.types import IdleCheckBatchData
 from ai.backend.manager.sokovan.reconciler.base import (
     BaseReconcilerInfo,
     BaseReconcilerKind,
@@ -40,34 +40,14 @@ class IdleCheckTargetStatuses(BaseReconcilerTargetStatuses):
     session_statuses: frozenset[SessionStatus]
 
 
-@dataclass(frozen=True)
-class CheckerWithState:
-    """A checker paired with the state it prepared for one definition."""
-
-    checker_id: IdleCheckerID
-    checker: IdleChecker[Any]
-    state: IdleCheckerState
-
-    def check_idle(self, session_id: SessionId) -> bool:
-        return self.checker.check_idle(session_id, self.state)
-
-
-@dataclass(frozen=True)
-class PreparedTarget:
-    """One session and its judgment-ready checkers, in resolved order."""
-
-    session_id: SessionId
-    checkers: Sequence[CheckerWithState]
-
-
 @dataclass
 class IdleCheckReconcileInfo(BaseReconcilerInfo):
-    targets: Sequence[PreparedTarget]
+    batch: IdleCheckBatchData
     current_time: datetime
 
     @override
     def entity_ids(self) -> Sequence[UUID]:
-        return [target.session_id for target in self.targets]
+        return [target.session.session_id for target in self.batch.targets]
 
     @override
     def now(self) -> datetime:
@@ -99,20 +79,28 @@ class IdleCheckDecision(ReconcilerDecision):
 
 
 @dataclass(frozen=True)
-class IdleVerdict:
-    """One session judged idle and every checker that judged it so."""
+class IdleReason:
+    """One checker's grounds for judging a session idle."""
+
+    checker_id: IdleCheckerID
+    message: str
+
+
+@dataclass(frozen=True)
+class IdleCheckReport:
+    """One session judged idle and every checker's reason for it."""
 
     session_id: SessionId
-    checker_ids: Sequence[IdleCheckerID]
+    reasons: Sequence[IdleReason]
 
 
 @dataclass
 class IdleCheckResult(BaseReconcilerResult):
-    verdicts: list[IdleVerdict] = field(default_factory=list)
+    reports: list[IdleCheckReport] = field(default_factory=list)
 
     @override
     def processed_count(self) -> int:
-        return len(self.verdicts)
+        return len(self.reports)
 
     @override
     def failed_count(self) -> int:
