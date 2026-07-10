@@ -14,7 +14,7 @@ from ai.backend.agent.containerd.runtime.interface import ContainerInfo, ImageIn
 from ai.backend.common.docker import LabelName
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.exception import ImageNotAvailable
-from ai.backend.common.types import AutoPullBehavior, ContainerStatus
+from ai.backend.common.types import AutoPullBehavior, ContainerStatus, ImageCanonical
 
 
 class FakeFacade:
@@ -152,7 +152,7 @@ class TestScanImages:
         agent.images = cast(Any, {})
         result = await agent.scan_images()
         assert set(result.scanned_images) == {"cr.backend.ai/stable/python:3.10-ubuntu20.04"}
-        info = result.scanned_images["cr.backend.ai/stable/python:3.10-ubuntu20.04"]
+        info = result.scanned_images[ImageCanonical("cr.backend.ai/stable/python:3.10-ubuntu20.04")]
         assert info.digest == "sha256:aaa"
         assert info.architecture == "x86_64"  # amd64 -> x86_64 alias applied
 
@@ -229,10 +229,12 @@ class TestPurgeImages:
 
 
 class TestCgroupPath:
-    def test_containerd_systemd_scope(self) -> None:
+    def test_cgroup_path_matches_spec_cgroups_path(self) -> None:
+        # get_cgroup_path must point at the cgroup the OCI spec actually creates
+        # (linux.cgroupsPath = /backend-ai/<id>), not the runtime's driver default.
         agent = _agent(FakeFacade())
         path = agent.get_cgroup_path("memory", "abc123")
-        assert str(path) == "/sys/fs/cgroup/system.slice/containerd-abc123.scope"
+        assert str(path) == "/sys/fs/cgroup/backend-ai/abc123"
 
 
 class TestEnumerateContainers:
@@ -271,11 +273,10 @@ class TestEnumerateContainers:
         assert await agent.enumerate_containers(frozenset({ContainerStatus.RUNNING})) == []
 
     def test_cgroup_version_detected(self, monkeypatch: Any) -> None:
-        monkeypatch.setattr(
-            agent_mod.Path, "exists", lambda self: "cgroup.controllers" in str(self)
-        )
+        target = "ai.backend.agent.containerd.agent.Path.exists"
+        monkeypatch.setattr(target, lambda self: "cgroup.controllers" in str(self))
         assert _agent(FakeFacade()).get_cgroup_version() == "2"
-        monkeypatch.setattr(agent_mod.Path, "exists", lambda self: False)
+        monkeypatch.setattr(target, lambda self: False)
         assert _agent(FakeFacade()).get_cgroup_version() == "1"
 
 

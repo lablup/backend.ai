@@ -39,6 +39,7 @@ from ai.backend.agent.agent import (
     ScanImagesResult,
 )
 from ai.backend.agent.config.unified import ContainerSandboxType, ScratchType
+from ai.backend.agent.containerd.runtime.spec import container_cgroup_fs_path
 from ai.backend.agent.docker.agent import (
     LDD_GLIBC_REGEX,
     LDD_MUSL_REGEX,
@@ -916,9 +917,11 @@ class ContainerdAgent(
 
     @override
     def get_cgroup_path(self, controller: str, container_id: str) -> Path:
-        # cgroup v2 unified hierarchy with the systemd driver (nerdctl/containerd default).
-        # TODO: read the actual driver/slice from containerd instead of assuming systemd v2.
-        return Path("/sys/fs/cgroup") / "system.slice" / f"containerd-{container_id}.scope"
+        # The container's cgroup path is set explicitly in the OCI spec (runtime/spec.py sets
+        # ``linux.cgroupsPath`` from this same derivation), so we know exactly where it lives
+        # regardless of the runtime's cgroup driver. container_id == kernel_id here (see
+        # __init__), which is what the spec keys the cgroup on. cgroup v2 unified hierarchy.
+        return container_cgroup_fs_path(container_id)
 
     @override
     def get_cgroup_version(self) -> str:

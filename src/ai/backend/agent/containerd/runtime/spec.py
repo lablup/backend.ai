@@ -13,6 +13,7 @@ runtime client; this module only shapes the spec.
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
+from pathlib import Path
 from typing import Any
 
 OCI_VERSION = "1.1.0"
@@ -22,6 +23,20 @@ _TYPE_URL = "types.containerd.io/opencontainers/runtime-spec/1/Spec"
 # libraries at container start, driven by the NVIDIA_VISIBLE_DEVICES env it reads from the
 # spec. This is what nerdctl/docker's `--gpus` ultimately wires up.
 _NVIDIA_HOOK_PATH = "/usr/bin/nvidia-container-runtime-hook"
+
+# We set each container's cgroup path explicitly (``linux.cgroupsPath`` below), so the cgroup
+# lives at a deterministic location we control instead of the runtime's driver-specific default
+# (``system.slice/containerd-<id>.scope`` for systemd, ``/<id>`` for cgroupfs). Both the spec
+# writer and the stats reader (agent.get_cgroup_path) derive from this one constant so they can
+# never drift apart. Assumes the cgroup v2 unified hierarchy.
+_CGROUP_PARENT = "backend-ai"
+_CGROUP_ROOT = "/sys/fs/cgroup"
+
+
+def container_cgroup_fs_path(kernel_id: str) -> Path:
+    """On-disk cgroup path for a container, matching the ``cgroupsPath`` set in the OCI spec."""
+    return Path(_CGROUP_ROOT) / _CGROUP_PARENT / kernel_id
+
 
 # Minimal default capability set (runc's default bounded set for non-privileged).
 _DEFAULT_CAPS = [
@@ -125,8 +140,13 @@ def _nvidia_hooks(oci_spec: Mapping[str, Any], env: list[str]) -> dict[str, Any]
     gpus = oci_spec.get("gpus")
     if not gpus:
         return None
-    if not any(e.startswith("NVIDIA_VISIBLE_DEVICES=") for e in env):
-        env.append("NVIDIA_VISIBLE_DEVICES=" + ",".join(str(g) for g in gpus))
+    # The allocation is authoritative: override any NVIDIA_VISIBLE_DEVICES the image baked in
+    # (commonly ``all``) so the hook injects ONLY the allocated GPUs. Otherwise a session that
+    # requested one GPU would see every GPU on a multi-GPU node — the Docker backend avoids this
+    # because its DeviceRequests select devices at the daemon level, so we must enforce it here
+    # to keep per-device isolation on par across backends.
+    env[:] = [e for e in env if not e.startswith("NVIDIA_VISIBLE_DEVICES=")]
+    env.append("NVIDIA_VISIBLE_DEVICES=" + ",".join(str(g) for g in gpus))
     if not any(e.startswith("NVIDIA_DRIVER_CAPABILITIES=") for e in env):
         env.append("NVIDIA_DRIVER_CAPABILITIES=all")
     return {
@@ -217,7 +237,7 @@ def build_oci_runtime_spec(
             "namespaces": namespaces,
             "devices": devices,
             "resources": resources,
-            "cgroupsPath": f"/backend-ai/{oci_spec.get('labels', {}).get('ai.backend.kernel-id', '')}",
+            "cgroupsPath": f"/{_CGROUP_PARENT}/{oci_spec.get('labels', {}).get('ai.backend.kernel-id', '')}",
         },
     }
     if hooks is not None:

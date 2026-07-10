@@ -1,4 +1,10 @@
-from ai.backend.agent.containerd.runtime.spec import OCI_VERSION, build_oci_runtime_spec
+from pathlib import Path
+
+from ai.backend.agent.containerd.runtime.spec import (
+    OCI_VERSION,
+    build_oci_runtime_spec,
+    container_cgroup_fs_path,
+)
 
 
 def _oci(**over: object) -> dict[str, object]:
@@ -61,6 +67,15 @@ class TestBuildOciRuntimeSpec:
         spec = build_oci_runtime_spec(_oci(), command=["x"], rootfs_path="/r")
         assert spec["linux"]["cgroupsPath"] == "/backend-ai/kern-1"
 
+    def test_cgroup_fs_path_matches_spec_cgroups_path(self) -> None:
+        # The stats reader (agent.get_cgroup_path -> container_cgroup_fs_path) must resolve to the
+        # exact cgroup the spec tells the runtime to create; otherwise utilization reads the wrong
+        # (or a nonexistent) cgroup. This locks the two derivations together.
+        spec = build_oci_runtime_spec(_oci(), command=["x"], rootfs_path="/r")
+        assert container_cgroup_fs_path("kern-1") == Path("/sys/fs/cgroup") / str(
+            spec["linux"]["cgroupsPath"]
+        ).lstrip("/")
+
     def test_cpu_and_memory_limits_emitted(self) -> None:
         spec = build_oci_runtime_spec(
             _oci(
@@ -116,11 +131,13 @@ class TestNvidiaGpu:
         spec = build_oci_runtime_spec(_oci(), command=["x"], rootfs_path="/r")
         assert "hooks" not in spec
 
-    def test_respects_preexisting_visible_devices(self) -> None:
+    def test_allocation_overrides_preexisting_visible_devices(self) -> None:
+        # The allocation is authoritative: an image that bakes in NVIDIA_VISIBLE_DEVICES
+        # (commonly "all") must not leak GPUs the session was not allocated.
         spec = build_oci_runtime_spec(
-            _oci(gpus=["0"], env={"NVIDIA_VISIBLE_DEVICES": "GPU-uuid"}),
+            _oci(gpus=["0"], env={"NVIDIA_VISIBLE_DEVICES": "all"}),
             command=["x"],
             rootfs_path="/r",
         )
         vis = [e for e in spec["process"]["env"] if e.startswith("NVIDIA_VISIBLE_DEVICES=")]
-        assert vis == ["NVIDIA_VISIBLE_DEVICES=GPU-uuid"]  # not overwritten
+        assert vis == ["NVIDIA_VISIBLE_DEVICES=0"]  # allocated GPUs win, image "all" dropped
