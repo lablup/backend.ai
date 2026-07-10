@@ -78,10 +78,8 @@ def _build_validators(
     permission_repo = PermissionControllerRepository(database_engine)
     return ActionValidators(
         rbac=RBACValidators(
-            scope=ScopeActionRBACValidator(permission_repo, config_provider, MagicMock()),
-            single_entity=SingleEntityActionRBACValidator(
-                permission_repo, config_provider, MagicMock()
-            ),
+            scope=ScopeActionRBACValidator(permission_repo, config_provider),
+            single_entity=SingleEntityActionRBACValidator(permission_repo, config_provider),
             bulk=BulkActionRBACValidator(permission_repo, config_provider),
         ),
     )

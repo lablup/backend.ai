@@ -78,11 +78,9 @@ def model_serving_processors(
         action_monitors=[],
         validators=ActionValidators(
             rbac=RBACValidators(
-                scope=ScopeActionRBACValidator(
-                    permission_controller_repo, MagicMock(), MagicMock()
-                ),
+                scope=ScopeActionRBACValidator(permission_controller_repo, MagicMock()),
                 single_entity=SingleEntityActionRBACValidator(
-                    permission_controller_repo, MagicMock(), MagicMock()
+                    permission_controller_repo, MagicMock()
                 ),
                 bulk=BulkActionRBACValidator(permission_controller_repo, MagicMock()),
             ),
@@ -103,11 +101,9 @@ def auto_scaling_processors(
         action_monitors=[],
         validators=ActionValidators(
             rbac=RBACValidators(
-                scope=ScopeActionRBACValidator(
-                    permission_controller_repo, MagicMock(), MagicMock()
-                ),
+                scope=ScopeActionRBACValidator(permission_controller_repo, MagicMock()),
                 single_entity=SingleEntityActionRBACValidator(
-                    permission_controller_repo, MagicMock(), MagicMock()
+                    permission_controller_repo, MagicMock()
                 ),
                 bulk=BulkActionRBACValidator(permission_controller_repo, MagicMock()),
             ),
@@ -148,11 +144,9 @@ def deployment_processors(
         action_monitors=[],
         validators=ActionValidators(
             rbac=RBACValidators(
-                scope=ScopeActionRBACValidator(
-                    permission_controller_repo, MagicMock(), MagicMock()
-                ),
+                scope=ScopeActionRBACValidator(permission_controller_repo, MagicMock()),
                 single_entity=SingleEntityActionRBACValidator(
-                    permission_controller_repo, MagicMock(), MagicMock()
+                    permission_controller_repo, MagicMock()
                 ),
                 bulk=BulkActionRBACValidator(permission_controller_repo, MagicMock()),
             ),
