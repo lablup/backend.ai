@@ -72,6 +72,19 @@ class AppConfigFragmentConditions:
 
     by_config_name_in = staticmethod(make_string_in_factory(AppConfigFragmentRow.config_name))
 
+    @staticmethod
+    def by_config_names(config_names: Sequence[str]) -> QueryCondition:
+        """Fragments whose ``config_name`` is one of ``config_names``.
+
+        The plain-name membership filter the merged read AND-combines with a visibility
+        filter — kept separate from the ``by_*_visibility`` scope builders.
+        """
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return AppConfigFragmentRow.config_name.in_(list(config_names))
+
+        return inner
+
     # --- scope_type enum filters ---
 
     @staticmethod
@@ -108,6 +121,41 @@ class AppConfigFragmentConditions:
     def by_scope_id_equals(scope_id: str) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return AppConfigFragmentRow.scope_id == scope_id
+
+        return inner
+
+    # --- per-scope visibility filters (one scope_type each), independent of config_name ---
+
+    @staticmethod
+    def by_public_visibility() -> QueryCondition:
+        """The ``public`` scope (public has no per-entity scope_id)."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return AppConfigFragmentRow.scope_type == AppConfigScopeType.PUBLIC
+
+        return inner
+
+    @staticmethod
+    def by_domain_visibility(domain: str) -> QueryCondition:
+        """The ``domain`` scope for ``domain``."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return sa.and_(
+                AppConfigFragmentRow.scope_type == AppConfigScopeType.DOMAIN,
+                AppConfigFragmentRow.scope_id == domain,
+            )
+
+        return inner
+
+    @staticmethod
+    def by_user_visibility(user_id: str) -> QueryCondition:
+        """The ``user`` scope for ``user_id``."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return sa.and_(
+                AppConfigFragmentRow.scope_type == AppConfigScopeType.USER,
+                AppConfigFragmentRow.scope_id == user_id,
+            )
 
         return inner
 
