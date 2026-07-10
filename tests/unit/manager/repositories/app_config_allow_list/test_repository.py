@@ -8,7 +8,7 @@ from collections.abc import AsyncGenerator
 import pytest
 import sqlalchemy as sa
 
-from ai.backend.common.data.app_config.types import AppConfigScopeType
+from ai.backend.common.data.app_config.types import AppConfigAccessLevel, AppConfigScopeType
 from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.common.identifier.app_config_allow_list import AppConfigAllowListID
 from ai.backend.manager.data.app_config_allow_list.types import (
@@ -195,6 +195,59 @@ class TestRankAssignment:
         assert (await repository.get_by_id(created.id)).rank == 250
 
 
+class TestAccessLevelAssignment:
+    @pytest.mark.parametrize(
+        ("scope_type", "expected_read", "expected_write"),
+        [
+            (AppConfigScopeType.PUBLIC, AppConfigAccessLevel.PUBLIC, AppConfigAccessLevel.ADMIN),
+            (
+                AppConfigScopeType.DOMAIN,
+                AppConfigAccessLevel.AUTHENTICATED,
+                AppConfigAccessLevel.ADMIN,
+            ),
+            (AppConfigScopeType.USER, AppConfigAccessLevel.OWNER, AppConfigAccessLevel.OWNER),
+        ],
+    )
+    async def test_access_defaults_by_scope_type(
+        self,
+        repository: AppConfigAllowListRepository,
+        definition_repository: AppConfigDefinitionRepository,
+        scope_type: AppConfigScopeType,
+        expected_read: AppConfigAccessLevel,
+        expected_write: AppConfigAccessLevel,
+    ) -> None:
+        await _register(definition_repository, "theme")
+        created = await _create_entry(repository, "theme", scope_type)
+        assert created.read_access is expected_read
+        assert created.write_access is expected_write
+        # persisted, not just returned
+        fetched = await repository.get_by_id(created.id)
+        assert fetched.read_access is expected_read
+        assert fetched.write_access is expected_write
+
+    async def test_explicit_access_overrides_default(
+        self,
+        repository: AppConfigAllowListRepository,
+        definition_repository: AppConfigDefinitionRepository,
+    ) -> None:
+        await _register(definition_repository, "theme")
+        # a public layer that only admins may read, overriding the world-readable default
+        created = await repository.create(
+            Creator(
+                spec=AppConfigAllowListCreatorSpec(
+                    config_name="theme",
+                    scope_type=AppConfigScopeType.PUBLIC,
+                    read_access=AppConfigAccessLevel.ADMIN,
+                    write_access=AppConfigAccessLevel.ADMIN,
+                )
+            )
+        )
+        assert created.read_access is AppConfigAccessLevel.ADMIN
+        fetched = await repository.get_by_id(created.id)
+        assert fetched.read_access is AppConfigAccessLevel.ADMIN
+        assert fetched.write_access is AppConfigAccessLevel.ADMIN
+
+
 class TestUpdate:
     async def test_update_changes_rank(
         self,
@@ -212,6 +265,29 @@ class TestUpdate:
         # identity fields are untouched
         assert updated.config_name == existing_entry.config_name
         assert updated.scope_type is existing_entry.scope_type
+
+    async def test_update_changes_access_levels(
+        self,
+        repository: AppConfigAllowListRepository,
+        existing_entry: AppConfigAllowListData,
+    ) -> None:
+        # existing_entry is ("theme", PUBLIC) -> default read=public, write=admin.
+        updated = await repository.update(
+            Updater(
+                spec=AppConfigAllowListUpdaterSpec(
+                    read_access=OptionalState.update(AppConfigAccessLevel.AUTHENTICATED),
+                    write_access=OptionalState.update(AppConfigAccessLevel.OWNER),
+                ),
+                pk_value=existing_entry.id,
+            )
+        )
+        assert updated.read_access is AppConfigAccessLevel.AUTHENTICATED
+        assert updated.write_access is AppConfigAccessLevel.OWNER
+        fetched = await repository.get_by_id(existing_entry.id)
+        assert fetched.read_access is AppConfigAccessLevel.AUTHENTICATED
+        assert fetched.write_access is AppConfigAccessLevel.OWNER
+        # rank left untouched
+        assert fetched.rank == existing_entry.rank
 
     async def test_update_missing_raises(self, repository: AppConfigAllowListRepository) -> None:
         with pytest.raises(AppConfigAllowListNotFound):
