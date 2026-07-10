@@ -547,6 +547,37 @@
         "title": "AdminSearchAgentsInput",
         "type": "object"
       },
+      "ResolveAppConfigInput": {
+        "description": "Input for resolving the merged AppConfig for one ``(user, config_name)``.\n\n``user_id`` must match the authenticated caller (enforced by the adapter until an RBAC\nvalidator is in place).",
+        "properties": {
+          "config_name": {
+            "description": "Config name to resolve the merged view for.",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Config Name",
+            "type": "string"
+          },
+          "domain_id": {
+            "description": "The resolving user's domain id.",
+            "format": "uuid",
+            "title": "Domain Id",
+            "type": "string"
+          },
+          "user_id": {
+            "description": "The resolving user's id (must be the caller).",
+            "format": "uuid",
+            "title": "User Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "config_name",
+          "domain_id",
+          "user_id"
+        ],
+        "title": "ResolveAppConfigInput",
+        "type": "object"
+      },
       "AppConfigScopeType": {
         "description": "Scope at which an app config fragment is written (BEP-1052).\n\nThe single definition shared across the data, DTO, GraphQL, and API layers.",
         "enum": [
@@ -556,6 +587,537 @@
         ],
         "title": "AppConfigScopeType",
         "type": "string"
+      },
+      "CreateAppConfigFragmentInput": {
+        "description": "Input for creating a new app config fragment at a given scope (superadmin only).",
+        "properties": {
+          "config_name": {
+            "description": "Registered config name (FK to app_config_definitions).",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Config Name",
+            "type": "string"
+          },
+          "scope_type": {
+            "$ref": "#/components/schemas/AppConfigScopeType",
+            "description": "Scope the fragment is written at (public | domain | user)."
+          },
+          "scope_id": {
+            "description": "Scope identifier: 'public' for public, the domain name, or the user id.",
+            "title": "Scope Id",
+            "type": "string"
+          },
+          "config": {
+            "additionalProperties": true,
+            "description": "The fragment's JSON config document.",
+            "title": "Config",
+            "type": "object"
+          }
+        },
+        "required": [
+          "config_name",
+          "scope_type",
+          "scope_id",
+          "config"
+        ],
+        "title": "CreateAppConfigFragmentInput",
+        "type": "object"
+      },
+      "AppConfigFragmentFilter": {
+        "description": "Filter for app config fragment search.",
+        "properties": {
+          "config_name": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by config name."
+          },
+          "scope_type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AppConfigScopeTypeFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by scope type."
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DateTimeFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by creation datetime."
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DateTimeFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by last update datetime."
+          }
+        },
+        "title": "AppConfigFragmentFilter",
+        "type": "object"
+      },
+      "AppConfigFragmentOrder": {
+        "description": "Order specifier for app config fragment search.",
+        "properties": {
+          "field": {
+            "$ref": "#/components/schemas/AppConfigFragmentOrderField",
+            "description": "Field to order by."
+          },
+          "direction": {
+            "$ref": "#/components/schemas/OrderDirection",
+            "default": "ASC",
+            "description": "Order direction."
+          }
+        },
+        "required": [
+          "field"
+        ],
+        "title": "AppConfigFragmentOrder",
+        "type": "object"
+      },
+      "AppConfigFragmentOrderField": {
+        "enum": [
+          "config_name",
+          "scope_type",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "AppConfigFragmentOrderField",
+        "type": "string"
+      },
+      "AppConfigScopeTypeFilter": {
+        "description": "Filter for the scope_type enum field.",
+        "properties": {
+          "equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AppConfigScopeType"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exact scope type match."
+          },
+          "in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/AppConfigScopeType"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Match any of the provided scope types.",
+            "title": "In"
+          },
+          "not_equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AppConfigScopeType"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exclude exact scope type match."
+          },
+          "not_in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/AppConfigScopeType"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exclude any of the provided scope types.",
+            "title": "Not In"
+          }
+        },
+        "title": "AppConfigScopeTypeFilter",
+        "type": "object"
+      },
+      "DateTimeFilter": {
+        "description": "Filter for datetime fields supporting range and equality operations.",
+        "properties": {
+          "before": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Before this datetime (exclusive)",
+            "title": "Before"
+          },
+          "after": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "After this datetime (exclusive)",
+            "title": "After"
+          },
+          "equals": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exact datetime match",
+            "title": "Equals"
+          },
+          "not_equals": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Not equal to this datetime",
+            "title": "Not Equals"
+          }
+        },
+        "title": "DateTimeFilter",
+        "type": "object"
+      },
+      "SearchAppConfigFragmentInput": {
+        "description": "Input for paginated app config fragment search (superadmin only).",
+        "properties": {
+          "filter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AppConfigFragmentFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter conditions."
+          },
+          "order": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/AppConfigFragmentOrder"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Order specifiers, applied in sequence.",
+            "title": "Order"
+          },
+          "first": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor-forward page size.",
+            "title": "First"
+          },
+          "after": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor-forward start cursor.",
+            "title": "After"
+          },
+          "last": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor-backward page size.",
+            "title": "Last"
+          },
+          "before": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor-backward end cursor.",
+            "title": "Before"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Offset-based: maximum number of results.",
+            "title": "Limit"
+          },
+          "offset": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Offset-based: number of results to skip.",
+            "title": "Offset"
+          }
+        },
+        "title": "SearchAppConfigFragmentInput",
+        "type": "object"
+      },
+      "AppConfigFragmentScope": {
+        "description": "Scope for a scoped fragment search — OR across all domain/user items.\n\nRaises if every category is empty.",
+        "properties": {
+          "domain": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Domain ids whose fragments to search.",
+            "title": "Domain"
+          },
+          "user": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "User ids whose fragments to search.",
+            "title": "User"
+          }
+        },
+        "title": "AppConfigFragmentScope",
+        "type": "object"
+      },
+      "ScopedSearchAppConfigFragmentInput": {
+        "description": "Input for a scoped fragment search keyed by domain/user scope (OR-combined).",
+        "properties": {
+          "scope": {
+            "$ref": "#/components/schemas/AppConfigFragmentScope",
+            "description": "Scope (OR across all items)."
+          },
+          "order": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/AppConfigFragmentOrder"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Order specifiers, applied in sequence.",
+            "title": "Order"
+          },
+          "first": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor-forward page size.",
+            "title": "First"
+          },
+          "after": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor-forward start cursor.",
+            "title": "After"
+          },
+          "last": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor-backward page size.",
+            "title": "Last"
+          },
+          "before": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor-backward end cursor.",
+            "title": "Before"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Offset-based: maximum number of results.",
+            "title": "Limit"
+          },
+          "offset": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Offset-based: number of results to skip.",
+            "title": "Offset"
+          }
+        },
+        "required": [
+          "scope"
+        ],
+        "title": "ScopedSearchAppConfigFragmentInput",
+        "type": "object"
+      },
+      "UpdateAppConfigFragmentInput": {
+        "description": "Input for updating an app config fragment's config document.",
+        "properties": {
+          "config": {
+            "additionalProperties": true,
+            "description": "The replacement JSON config document.",
+            "title": "Config",
+            "type": "object"
+          }
+        },
+        "required": [
+          "config"
+        ],
+        "title": "UpdateAppConfigFragmentInput",
+        "type": "object"
       },
       "CreateAppConfigAllowListInput": {
         "description": "Input for registering a new app config allow-list entry.",
@@ -724,132 +1286,6 @@
         ],
         "title": "AppConfigAllowListOrderField",
         "type": "string"
-      },
-      "AppConfigScopeTypeFilter": {
-        "description": "Filter for the scope_type enum field.",
-        "properties": {
-          "equals": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/AppConfigScopeType"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Exact scope type match."
-          },
-          "in": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/AppConfigScopeType"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Match any of the provided scope types.",
-            "title": "In"
-          },
-          "not_equals": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/AppConfigScopeType"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Exclude exact scope type match."
-          },
-          "not_in": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/AppConfigScopeType"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Exclude any of the provided scope types.",
-            "title": "Not In"
-          }
-        },
-        "title": "AppConfigScopeTypeFilter",
-        "type": "object"
-      },
-      "DateTimeFilter": {
-        "description": "Filter for datetime fields supporting range and equality operations.",
-        "properties": {
-          "before": {
-            "anyOf": [
-              {
-                "format": "date-time",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Before this datetime (exclusive)",
-            "title": "Before"
-          },
-          "after": {
-            "anyOf": [
-              {
-                "format": "date-time",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "After this datetime (exclusive)",
-            "title": "After"
-          },
-          "equals": {
-            "anyOf": [
-              {
-                "format": "date-time",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Exact datetime match",
-            "title": "Equals"
-          },
-          "not_equals": {
-            "anyOf": [
-              {
-                "format": "date-time",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Not equal to this datetime",
-            "title": "Not Equals"
-          }
-        },
-        "title": "DateTimeFilter",
-        "type": "object"
       },
       "SearchAppConfigAllowListInput": {
         "description": "Input for paginated app config allow-list search.",
@@ -38696,6 +39132,238 @@
         ],
         "parameters": [],
         "description": "Retrieve aggregate resource capacity/usage across all agents (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/app-config/resolve": {
+      "post": {
+        "operationId": "v2/app-config.resolve",
+        "tags": [
+          "v2/app-config"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolveAppConfigInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Resolve the merged AppConfig for one (user, config_name) (auth required).\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/app-config/public/{config_name}": {
+      "get": {
+        "operationId": "v2/app-config.resolve_public",
+        "tags": [
+          "v2/app-config"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "parameters": [
+          {
+            "name": "config_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Resolve the merged AppConfig from public fragments only (anonymous)."
+      }
+    },
+    "/v2/app-config-fragments/": {
+      "post": {
+        "operationId": "v2/app-config-fragments.admin_create",
+        "tags": [
+          "v2/app-config-fragments"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAppConfigFragmentInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Create a fragment at any scope (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/app-config-fragments/search": {
+      "post": {
+        "operationId": "v2/app-config-fragments.admin_search",
+        "tags": [
+          "v2/app-config-fragments"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchAppConfigFragmentInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Search fragments across all scopes with pagination (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/app-config-fragments/scoped-search": {
+      "post": {
+        "operationId": "v2/app-config-fragments.scoped_search",
+        "tags": [
+          "v2/app-config-fragments"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScopedSearchAppConfigFragmentInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Search the fragments visible to the calling principal (auth required).\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/app-config-fragments/{fragment_id}": {
+      "get": {
+        "operationId": "v2/app-config-fragments.admin_get",
+        "tags": [
+          "v2/app-config-fragments"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "fragment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Get a fragment by id (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      },
+      "patch": {
+        "operationId": "v2/app-config-fragments.admin_update",
+        "tags": [
+          "v2/app-config-fragments"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAppConfigFragmentInput"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "fragment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Update a fragment's config document by id (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      },
+      "delete": {
+        "operationId": "v2/app-config-fragments.admin_purge",
+        "tags": [
+          "v2/app-config-fragments"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "fragment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Purge a fragment by id (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/v2/app-config-allow-list/": {
