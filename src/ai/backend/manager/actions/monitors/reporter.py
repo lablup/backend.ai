@@ -1,13 +1,12 @@
-from typing import Final, override
+from typing import override
 
 from ai.backend.common.contexts.request_id import current_request_id
 from ai.backend.common.contexts.user import current_user
 from ai.backend.manager.actions.action import BaseAction, BaseActionTriggerMeta, ProcessResult
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
+from ai.backend.manager.actions.types import BLANK_ID
 from ai.backend.manager.reporters.base import FinishedActionMessage, StartedActionMessage
 from ai.backend.manager.reporters.hub import ReporterHub
-
-_BLANK_ID: Final[str] = "(unknown)"
 
 
 class ReporterMonitor(ActionMonitor):
@@ -38,7 +37,7 @@ class ReporterMonitor(ActionMonitor):
             action_id=result.meta.action_id,
             action_type=action.spec().type(),
             entity_id=result.meta.entity_id,
-            request_id=current_request_id() or _BLANK_ID,
+            request_id=current_request_id() or BLANK_ID,
             triggered_by=str(user.user_id) if user else None,
             entity_type=action.entity_type(),
             operation_type=action.operation_type(),
