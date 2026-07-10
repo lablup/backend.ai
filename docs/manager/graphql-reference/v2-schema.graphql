@@ -6647,19 +6647,15 @@ type ModelDeployment implements Node {
   """
   scalingState: ScalingState!
 
-  """
-  Added in 26.4.3. The current active revision of this deployment, resolved via DataLoader.
-  """
+  """Added in 26.4.3. The current active revision of this deployment."""
   currentRevision: ModelRevision
 
   """
-  Added in 26.4.3. The revision currently being deployed (in progress, not yet active), resolved via DataLoader.
+  Added in 26.4.3. The revision currently being deployed (in progress, not yet active).
   """
   deployingRevision: ModelRevision
 
-  """
-  Added in 26.4.3. The user who created this deployment, resolved via DataLoader.
-  """
+  """Added in 26.4.3. The user who created this deployment."""
   creator: UserV2
 
   """Added in 25.19.0. Deployment policy configuration."""
@@ -6701,25 +6697,19 @@ type ModelDeploymentEdge {
 Added in 25.19.0. Contains metadata information for a model deployment including its name, status, tags, and timestamps. Also provides access to the associated project and domain.
 """
 type ModelDeploymentMetadata {
-  """
-  Added in 26.4.4. The resource group this deployment runs in, resolved via DataLoader.
-  """
+  """Added in 26.4.4. The resource group this deployment runs in."""
   resourceGroup: ResourceGroup
 
   """The project of this entity."""
   project: GroupNode @deprecated(reason: "Use project_v2 instead.")
 
-  """
-  Added in 26.4.3. The project this deployment belongs to, resolved via DataLoader.
-  """
+  """Added in 26.4.3. The project this deployment belongs to."""
   projectV2: ProjectV2
 
   """The domain of this entity."""
   domain: DomainNode @deprecated(reason: "Use domain_v2 instead.")
 
-  """
-  Added in 26.4.3. The domain this deployment belongs to, resolved via DataLoader.
-  """
+  """Added in 26.4.3. The domain this deployment belongs to."""
   domainV2: DomainV2
   projectId: ID!
   domainName: String!
@@ -6961,9 +6951,7 @@ type ModelReplica implements Node {
   """
   session: ComputeSessionNode @deprecated(reason: "Use session_v2 instead.")
 
-  """
-  Added in 26.4.3. The compute session running this replica, resolved via DataLoader.
-  """
+  """Added in 26.4.3. The compute session running this replica."""
   sessionV2: SessionV2
 
   """The revision of this entity."""
@@ -7041,19 +7029,15 @@ type ModelRevision implements Node {
   """The image of this entity."""
   image: ImageNode @deprecated(reason: "Use image_v2 instead.")
 
-  """
-  Added in 26.4.3. The container image used by this revision, resolved via DataLoader.
-  """
+  """Added in 26.4.3. The container image used by this revision."""
   imageV2: ImageV2
 
   """
-  Added in 26.4.4. The deployment-level preset that produced this revision, resolved via DataLoader. ``None`` when the revision was created without a preset, when the originating preset row has since been deleted (SET NULL FK), or for legacy rows that predate this field.
+  Added in 26.4.4. The deployment-level preset that produced this revision. ``None`` when the revision was created without a preset, when the originating preset row has since been deleted (SET NULL FK), or for legacy rows that predate this field.
   """
   revisionPreset: DeploymentRevisionPreset
 
-  """
-  Added in 26.4.4. The parent deployment owning this revision, resolved via DataLoader.
-  """
+  """Added in 26.4.4. The parent deployment owning this revision."""
   deployment: ModelDeployment
 
   """Added in 26.4.2. Resource slot allocations for this revision."""
@@ -11976,9 +11960,7 @@ type Route implements Node {
   """
   session: ID @deprecated(reason: "Use session_v2 instead.")
 
-  """
-  Added in 26.4.3. The compute session associated with this route, resolved via DataLoader.
-  """
+  """Added in 26.4.3. The compute session associated with this route."""
   sessionV2: SessionV2
 
   """The revision associated with the route."""
@@ -12258,7 +12240,7 @@ type RuntimeVariantPreset implements Node {
   updatedAt: DateTime
 
   """
-  Added in 26.8.0. The runtime variant this preset belongs to, resolved via DataLoader. Fetch its name and other attributes in a single query alongside the preset list.
+  Added in 26.8.0. The runtime variant this preset belongs to. Fetch its name and other attributes in a single query alongside the preset list.
   """
   runtimeVariant: RuntimeVariant
 }
@@ -12320,9 +12302,7 @@ enum RuntimeVariantPresetOrderField {
 Added in 26.4.4. A runtime variant preset value materialised on a revision.
 """
 type RuntimeVariantPresetValue {
-  """
-  The runtime variant preset this value is bound to, resolved via DataLoader.
-  """
+  """The runtime variant preset this value is bound to."""
   preset: RuntimeVariantPreset
 
   """Runtime variant preset ID."""
