@@ -12,7 +12,7 @@ from typing import Any, cast
 import pytest
 
 from ai.backend.common.etcd import AsyncEtcd
-from ai.backend.common.network.types import NetworkBackendKind
+from ai.backend.common.network.types import NetworkBackendKind, mac_for_ip
 from ai.backend.manager.errors.network import (
     NetworkBackendMismatch,
     NetworkPoolExhausted,
@@ -24,7 +24,6 @@ from ai.backend.manager.network.ipam import (
     SubnetAllocator,
     VNIAllocator,
     _prefix_for_hosts,
-    mac_for_ip,
 )
 
 

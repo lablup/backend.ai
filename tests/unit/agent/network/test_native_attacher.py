@@ -98,6 +98,34 @@ class TestNativeAttachStatic:
         # static IPAM: no bridge gateway address, no MASQUERADE
         assert "addr replace" not in flat
         assert "MASQUERADE" not in flat
+        # no mac in config -> the NIC keeps its kernel-assigned (random) address
+        assert "link set baimulti0 address" not in flat
+
+    async def test_add_static_pins_mac_when_config_carries_one(
+        self, tmp_path: Path, monkeypatch: Any
+    ) -> None:
+        # Overlay endpoints carry a deterministic MAC (mac_for_ip); the NIC must own it,
+        # set while down (before `up`), so peers' pre-programmed FDB/ARP resolves to it.
+        rec = _RunRecorder(existing={"baimulti4097"})
+        monkeypatch.setattr(na, "_run", rec)
+        runner = NativeBridgeAttachRunner(ipam_state_dir=tmp_path)
+        await runner(
+            "ADD",
+            ifname="baimulti0",
+            netns=_NETNS,
+            container_id="cid",
+            config={**_STATIC_CFG, "mac": "02:42:0a:80:05:07"},
+        )
+        flat = rec.flat()
+        set_mac = (
+            "nsenter --net=/proc/4242/ns/net -- ip link set baimulti0 address 02:42:0a:80:05:07"
+        )
+        assert set_mac in flat
+        # MAC is applied before the link is brought up
+        lines = flat.splitlines()
+        assert lines.index(set_mac) < lines.index(
+            "nsenter --net=/proc/4242/ns/net -- ip link set baimulti0 up"
+        )
 
 
 class TestNativeAttachLocal:

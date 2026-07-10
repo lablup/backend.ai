@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING
 from urllib.parse import quote
 
 from ai.backend.common.network.keys import endpoint_key, session_ipam_key
+from ai.backend.common.network.types import mac_for_ip
 from ai.backend.manager.errors.network import NetworkPoolExhausted, VNIPoolExhausted
 
 if TYPE_CHECKING:
@@ -85,17 +86,6 @@ class SubnetAllocator:
 
     async def release(self, subnet: str) -> None:
         await self._etcd.delete(f"{_ALLOCATED_PREFIX}/{quote(subnet, safe='')}")
-
-
-def mac_for_ip(ip: str) -> str:
-    """Derive a stable, locally-administered unicast MAC from an IPv4 address.
-
-    Uses the ``02:42:`` prefix (locally-administered, unicast — the same convention
-    Docker uses) followed by the four IPv4 octets, so the MAC is unique per endpoint IP
-    and deterministic (both the CNI attach and the peers' ARP tables agree without a
-    round-trip)."""
-    octets = ipaddress.IPv4Address(ip).packed
-    return "02:42:" + ":".join(f"{b:02x}" for b in octets)
 
 
 class EndpointAllocator:

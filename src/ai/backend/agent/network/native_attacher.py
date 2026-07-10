@@ -178,6 +178,11 @@ class NativeBridgeAttachRunner:
             await _run(["ip", "link", "set", host_veth, "up"])
             ns = ["nsenter", "--net=" + netns, "--"]
             await _run(ns + ["ip", "link", "set", tmp_veth, "name", ifname])
+            # Pin the NIC's MAC when the config specifies one (overlay endpoints): peers program
+            # FDB/ARP to this exact address, so the container NIC must own it or inbound unicast
+            # is dropped. Set while the link is down, before bringing it up.
+            if mac := config.get("mac"):
+                await _run(ns + ["ip", "link", "set", ifname, "address", str(mac)])
             await _run(ns + ["ip", "addr", "add", f"{ip}/{prefix}", "dev", ifname])
             await _run(ns + ["ip", "link", "set", ifname, "up"])
             await _run(ns + ["ip", "link", "set", "lo", "up"], check=False)

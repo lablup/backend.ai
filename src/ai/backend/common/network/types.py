@@ -7,10 +7,25 @@ proposals/BEP-1058 and its sub-documents `control-plane.md` and `agent-plugin-v2
 
 from __future__ import annotations
 
+import ipaddress
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Any
+
+
+def mac_for_ip(ip: str) -> str:
+    """Derive a stable, locally-administered unicast MAC from an IPv4 address.
+
+    Uses the ``02:42:`` prefix (locally-administered, unicast — the same convention Docker
+    uses) followed by the four IPv4 octets, so the MAC is unique per endpoint IP and
+    deterministic. This is the SINGLE source of truth both sides share: the manager programs
+    peers' FDB/ARP to this MAC and the agent sets the container's overlay NIC to the same
+    MAC, so they agree without a round-trip. If they diverged, a peer's unicast frame
+    (dst=02:42:...) would not match the container NIC's address and be dropped.
+    """
+    octets = ipaddress.IPv4Address(ip).packed
+    return "02:42:" + ":".join(f"{b:02x}" for b in octets)
 
 
 class NetworkBackendKind(StrEnum):

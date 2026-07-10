@@ -27,6 +27,7 @@ from ai.backend.common.network.types import (
     NetworkBackendKind,
     NetworkRole,
     SessionNetMeta,
+    mac_for_ip,
 )
 from ai.backend.common.types import ClusterInfo, KernelCreationConfig
 from ai.backend.logging import BraceStyleAdapter
@@ -131,7 +132,7 @@ def overlay_cni_config(meta: SessionNetMeta, ip: str | None = None) -> dict[str,
     to host-local confined to the session subnet."""
     if meta.vni is None:
         raise ValueError(f"overlay_cni_config requires a vxlan meta with a VNI: {meta}")
-    return {
+    config: dict[str, Any] = {
         "cniVersion": "1.0.0",
         "name": f"bai-overlay-{meta.session_id}",
         "type": "bridge",
@@ -141,6 +142,14 @@ def overlay_cni_config(meta: SessionNetMeta, ip: str | None = None) -> dict[str,
         "mtu": meta.mtu,
         "ipam": _overlay_ipam(meta, ip),
     }
+    # Pin the overlay NIC's MAC to the same deterministic address the manager programs into
+    # every peer's FDB/ARP (mac_for_ip). Without this the veth gets a random MAC, so a peer's
+    # unicast frame (dst=02:42:<ip>) arriving over the tunnel would not match the container
+    # NIC and be dropped — breaking cross-node overlay traffic. Only meaningful with a static
+    # (manager-assigned) IP; host-local fallback has no pre-programmed ARP to match.
+    if ip is not None:
+        config["mac"] = mac_for_ip(ip)
+    return config
 
 
 def local_bridge_dev(vni: int) -> str:

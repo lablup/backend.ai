@@ -137,6 +137,12 @@ class TestCNIConfig:
         # central endpoint IP -> static IPAM (disjoint across nodes), not host-local
         assert conf["ipam"]["type"] == "static"
         assert conf["ipam"]["addresses"] == [{"address": "10.128.5.7/24"}]
+        # deterministic MAC pinned so peers' FDB/ARP (programmed to the same mac_for_ip) match
+        assert conf["mac"] == "02:42:0a:80:05:07"
+
+    def test_overlay_config_omits_mac_without_static_ip(self) -> None:
+        # host-local fallback has no pre-programmed ARP to match, so no MAC is pinned
+        assert "mac" not in overlay_cni_config(_META)
 
     def test_local_config_is_gateway_with_masq(self) -> None:
         conf = local_cni_config("s1", bridge="bailo4097", subnet="172.30.0.0/24")
