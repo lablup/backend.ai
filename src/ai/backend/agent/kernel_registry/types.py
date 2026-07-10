@@ -12,7 +12,12 @@ from ai.backend.common.docker import ImageRef
 from ai.backend.common.types import AgentId, BackendAISchema, KernelId, ServicePort, SessionTypes
 
 if TYPE_CHECKING:
+    from ai.backend.agent.containerd.kernel import ContainerdKernel
     from ai.backend.agent.docker.kernel import DockerKernel
+
+# The containerd kernel carries no network_driver; recovery persists a placeholder to satisfy
+# the shared schema (it is dropped again by to_containerd_kernel and never consumed).
+_CONTAINERD_NETWORK_DRIVER_PLACEHOLDER = "bridge"
 
 
 class KernelRecoveryData(BackendAISchema):
@@ -53,6 +58,13 @@ class KernelRecoveryData(BackendAISchema):
     )
     resource_spec: KernelResourceSpec = Field(description="Resource specifications for the kernel")
     environ: Mapping[str, str] = Field(description="Environment variables for the kernel")
+    # Optional runtime handles some backends (containerd) need to reconstruct a live kernel:
+    # the container id and the host-reachable REPL address. Docker re-derives these from the
+    # daemon at runtime, so they stay None there; kept backward-compatible via defaults.
+    container_id: str | None = Field(default=None, description="Runtime container id, if pinned")
+    kernel_host: str | None = Field(
+        default=None, description="Host-reachable address for the kernel's REPL, if pinned"
+    )
 
     @classmethod
     def from_docker_kernel(cls, kernel: DockerKernel) -> Self:
@@ -92,5 +104,51 @@ class KernelRecoveryData(BackendAISchema):
                 "repl_out_port": self.repl_out_port,
                 "block_service_ports": self.block_service_ports,
                 "domain_socket_proxies": self.domain_socket_proxies,
+            },
+        )
+
+    @classmethod
+    def from_containerd_kernel(cls, kernel: ContainerdKernel) -> Self:
+        return cls(
+            id=kernel.kernel_id,
+            agent_id=kernel.agent_id,
+            image_ref=kernel.image,
+            session_type=kernel.session_type,
+            ownership_data=kernel.ownership_data,
+            network_id=kernel.network_id,
+            version=kernel.version,
+            # containerd has no network_driver; persist a placeholder for the shared schema.
+            network_driver=_CONTAINERD_NETWORK_DRIVER_PLACEHOLDER,
+            resource_spec=kernel.resource_spec,
+            service_ports=kernel.service_ports,
+            environ=kernel.environ,
+            block_service_ports=kernel.data.get("block_service_ports", False),
+            domain_socket_proxies=kernel.data.get("domain_socket_proxies", []),
+            repl_in_port=kernel.data["repl_in_port"],
+            repl_out_port=kernel.data["repl_out_port"],
+            # containerd reconstructs the code runner + log path from these, so they must persist.
+            container_id=kernel.data["container_id"],
+            kernel_host=kernel.data["kernel_host"],
+        )
+
+    def to_containerd_kernel(self) -> ContainerdKernel:
+        from ai.backend.agent.containerd.kernel import ContainerdKernel
+
+        return ContainerdKernel(
+            ownership_data=self.ownership_data,
+            network_id=self.network_id,
+            image=self.image_ref,
+            version=self.version,
+            agent_config={},
+            resource_spec=self.resource_spec,
+            service_ports=self.service_ports,
+            environ=self.environ,
+            data={
+                "repl_in_port": self.repl_in_port,
+                "repl_out_port": self.repl_out_port,
+                "block_service_ports": self.block_service_ports,
+                "domain_socket_proxies": self.domain_socket_proxies,
+                "container_id": self.container_id,
+                "kernel_host": self.kernel_host,
             },
         )

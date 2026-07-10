@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import MutableMapping
+from collections.abc import Callable, MutableMapping
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, override
 
@@ -28,9 +28,13 @@ class ContainerBasedKernelRegistryLoader(AbstractKernelRegistryLoader):
         self,
         scratch_root: Path,
         agent: AbstractAgent[Any, Any],
+        kernel_factory: Callable[[KernelRecoveryData], AbstractKernel] | None = None,
     ) -> None:
         self._scratch_root = scratch_root
         self._agent = agent
+        # Which concrete kernel to reconstruct from the recovery data. Defaults to the docker
+        # kernel to preserve existing behavior; the containerd agent passes to_containerd_kernel.
+        self._kernel_factory = kernel_factory or (lambda d: d.to_docker_kernel())
 
     async def _load_kernel_recovery_from_scratch(self, config_path: Path) -> KernelRecoveryData:
         config = ScratchConfig(config_path)
@@ -70,7 +74,7 @@ class ContainerBasedKernelRegistryLoader(AbstractKernelRegistryLoader):
                 continue
             try:
                 recovery_data = await self._load_kernel_recovery_from_scratch(config_path)
-                result[kernel_id] = recovery_data.to_docker_kernel()
+                result[kernel_id] = self._kernel_factory(recovery_data)
             except (KernelRegistryNotFound, KernelRegistryLoadError):
                 log.warning(
                     "Failed to load kernel recovery data for kernel id {} from scratch path {}",

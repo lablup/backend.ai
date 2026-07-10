@@ -8,6 +8,7 @@ import pytest
 
 from ai.backend.agent.kernel_registry.types import KernelRecoveryData
 from ai.backend.agent.resources import KernelResourceSpec
+from ai.backend.agent.scratch.types import KernelRecoveryScratchData
 from ai.backend.agent.types import KernelOwnershipData
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.types import AgentId, KernelId, ResourceSlot, SessionId, SessionTypes
@@ -134,3 +135,82 @@ class TestKernelRecoveryDataFromDockerKernel:
 
         with pytest.raises(KeyError, match="repl_out_port"):
             KernelRecoveryData.from_docker_kernel(mock_docker_kernel)
+
+
+@pytest.fixture
+def mock_containerd_kernel(
+    mock_resource_spec: KernelResourceSpec,
+) -> MagicMock:
+    """Mock ContainerdKernel: like docker but no network_driver, and data carries the runtime
+    handles (container_id, kernel_host) containerd needs to reconstruct a live kernel."""
+    kernel_id = KernelId(uuid.uuid4())
+    session_id = SessionId(uuid.uuid4())
+    agent_id = AgentId("test-agent")
+    kernel = MagicMock()
+    kernel.kernel_id = kernel_id
+    kernel.agent_id = agent_id
+    kernel.image = ImageRef(
+        name="python",
+        project="stable",
+        tag="3.10-ubuntu22.04",
+        registry="cr.backend.ai",
+        architecture="x86_64",
+        is_local=False,
+    )
+    kernel.session_type = SessionTypes.INTERACTIVE
+    kernel.ownership_data = KernelOwnershipData(
+        kernel_id=kernel_id, session_id=session_id, agent_id=agent_id
+    )
+    kernel.network_id = str(uuid.uuid4())
+    kernel.version = 1
+    kernel.resource_spec = mock_resource_spec
+    kernel.service_ports = []
+    kernel.environ = {}
+    kernel.data = {
+        "block_service_ports": False,
+        "domain_socket_proxies": [],
+        "repl_in_port": 2000,
+        "repl_out_port": 2001,
+        "container_id": str(kernel_id),
+        "kernel_host": "172.30.1.5",
+    }
+    return kernel
+
+
+class TestKernelRecoveryDataContainerd:
+    def test_from_containerd_kernel_captures_runtime_handles(
+        self, mock_containerd_kernel: Any
+    ) -> None:
+        result = KernelRecoveryData.from_containerd_kernel(mock_containerd_kernel)
+        assert result.container_id == mock_containerd_kernel.data["container_id"]
+        assert result.kernel_host == "172.30.1.5"
+        assert result.repl_in_port == 2000
+        # containerd has no network_driver; a placeholder is persisted for the shared schema
+        assert result.network_driver == "bridge"
+
+    def test_from_containerd_kernel_missing_container_id_raises(
+        self, mock_containerd_kernel: Any
+    ) -> None:
+        del mock_containerd_kernel.data["container_id"]
+        with pytest.raises(KeyError, match="container_id"):
+            KernelRecoveryData.from_containerd_kernel(mock_containerd_kernel)
+
+    def test_to_containerd_kernel_restores_data_keys(self, mock_containerd_kernel: Any) -> None:
+        recovery = KernelRecoveryData.from_containerd_kernel(mock_containerd_kernel)
+        kernel = recovery.to_containerd_kernel()
+        # the runtime handles the code runner + log path need must survive the round trip
+        assert kernel.data["container_id"] == mock_containerd_kernel.data["container_id"]
+        assert kernel.data["kernel_host"] == "172.30.1.5"
+        assert kernel.data["repl_in_port"] == 2000
+        assert kernel.data["repl_out_port"] == 2001
+
+    def test_scratch_round_trip_preserves_runtime_handles(
+        self, mock_containerd_kernel: Any, mock_resource_spec: KernelResourceSpec
+    ) -> None:
+        # recovery.json (KernelRecoveryScratchData) must carry container_id + kernel_host, else
+        # they are lost across restart and the kernel cannot be reconstructed.
+        recovery = KernelRecoveryData.from_containerd_kernel(mock_containerd_kernel)
+        scratch = KernelRecoveryScratchData.from_kernel_recovery_data(recovery)
+        restored = scratch.to_kernel_recovery_data(mock_resource_spec, {})
+        assert restored.container_id == recovery.container_id
+        assert restored.kernel_host == "172.30.1.5"

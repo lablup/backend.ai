@@ -48,6 +48,19 @@ from ai.backend.agent.docker.agent import (
 )
 from ai.backend.agent.errors import UnsupportedResource
 from ai.backend.agent.kernel import AbstractKernel
+from ai.backend.agent.kernel_registry.adapter import (
+    KernelRecoveryDataAdapter,
+    KernelRecoveryDataAdapterTarget,
+)
+from ai.backend.agent.kernel_registry.container.creator import (
+    ContainerBasedKernelRegistryCreatorArgs,
+    ContainerBasedLoaderWriterCreator,
+)
+from ai.backend.agent.kernel_registry.pickle.creator import (
+    PickleBasedKernelRegistryCreatorArgs,
+    PickleBasedLoaderWriterCreator,
+)
+from ai.backend.agent.kernel_registry.recovery.base_recovery import BaseKernelRegistryRecovery
 from ai.backend.agent.kernel_registry.writer.types import KernelRegistrySaveMetadata
 from ai.backend.agent.network.caps import publish_vtep
 from ai.backend.agent.resources import (
@@ -731,6 +744,8 @@ class ContainerdAgent(
     _event_monitor_task: asyncio.Task[None] | None
     _agent_sock_path: Path
     _agent_sock_task: asyncio.Task[None] | None
+    _kernel_recovery: BaseKernelRegistryRecovery
+    _kernel_recovery_adapter: KernelRecoveryDataAdapter
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
@@ -763,6 +778,38 @@ class ContainerdAgent(
             runtime=self._runtime,
             helper_socket=self.local_config.agent.network_helper_socket,
         )
+        # Restart recovery (parity with DockerAgent): the container-based loader/writer keep each
+        # kernel's recovery.json in its scratch (resource.txt / environ.txt are already written at
+        # creation), so a restarted agent reconstructs its live kernels from the running
+        # containers instead of losing them. The containerd loader rebuilds ContainerdKernels.
+        scratch_root = self.local_config.container.scratch_root
+        pickle_creator = PickleBasedLoaderWriterCreator.create(
+            PickleBasedKernelRegistryCreatorArgs(
+                scratch_root=scratch_root,
+                ipc_base_path=self.local_config.agent.ipc_base_path,
+                var_base_path=self.local_config.agent.var_base_path,
+                agent_class=self.agent_class,
+                agent_id=self.id,
+                local_instance_id=self.local_instance_id,
+            ),
+        )
+        container_creator = ContainerBasedLoaderWriterCreator(
+            ContainerBasedKernelRegistryCreatorArgs(
+                scratch_root=scratch_root,
+                agent=self,
+                kernel_factory=lambda d: d.to_containerd_kernel(),
+            )
+        )
+        container_loader = container_creator.create_loader()
+        container_writer = container_creator.create_writer()
+        self._kernel_recovery = BaseKernelRegistryRecovery(
+            loader=container_loader,
+            writers=[pickle_creator.create_writer(), container_writer],
+        )
+        self._kernel_recovery_adapter = KernelRecoveryDataAdapter(
+            pickle_creator.create_loader(),
+            [KernelRecoveryDataAdapterTarget(container_loader, container_writer)],
+        )
 
     @override
     async def __ainit__(self) -> None:
@@ -771,6 +818,10 @@ class ContainerdAgent(
         # network shares the same instance; its open() below is then a no-op).
         await self._runtime.open()
         await self._session_network.open()
+        # Migrate any legacy pickle-based recovery into per-scratch recovery.json before the base
+        # initializer loads the registry from it (parity with DockerAgent). Needs the runtime open
+        # so the container-based loader can enumerate live containers.
+        await self._kernel_recovery_adapter.adapt_recovery_data()
         await super().__ainit__()
         # Real-time container-death/OOM detection via the containerd event stream (the
         # equivalent of DockerAgent.monitor_docker_events); the periodic reconciler is the
@@ -888,7 +939,7 @@ class ContainerdAgent(
 
     @override
     async def _load_kernel_registry_from_recovery(self) -> dict[KernelId, AbstractKernel]:
-        return {}
+        return dict(await self._kernel_recovery.load_kernel_registry())
 
     @override
     async def _write_kernel_registry_to_recovery(
@@ -896,7 +947,7 @@ class ContainerdAgent(
         kernel_registry: Mapping[KernelId, AbstractKernel],
         metadata: KernelRegistrySaveMetadata,
     ) -> None:
-        pass
+        await self._kernel_recovery.save_kernel_registry(dict(kernel_registry), metadata)
 
     @override
     async def enumerate_containers(

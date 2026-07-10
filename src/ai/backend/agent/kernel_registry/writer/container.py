@@ -32,12 +32,18 @@ class ContainerBasedKernelRegistryWriter(AbstractKernelRegistryWriter):
         self,
         kernel: AbstractKernel,
     ) -> KernelRecoveryData | None:
+        from ai.backend.agent.containerd.kernel import ContainerdKernel
         from ai.backend.agent.docker.kernel import DockerKernel
 
         match kernel:
             case DockerKernel():
                 try:
                     return KernelRecoveryData.from_docker_kernel(kernel)
+                except KeyError as e:
+                    raise KernelRecoveryDataParseError from e
+            case ContainerdKernel():
+                try:
+                    return KernelRecoveryData.from_containerd_kernel(kernel)
                 except KeyError as e:
                     raise KernelRecoveryDataParseError from e
             case _:

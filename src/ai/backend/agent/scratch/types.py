@@ -31,6 +31,9 @@ class KernelRecoveryScratchData(BackendAISchema):
     service_ports: list[ServicePort]
     repl_in_port: int
     repl_out_port: int
+    # Optional runtime handles (containerd); None for backends that re-derive them (docker).
+    container_id: str | None = None
+    kernel_host: str | None = None
 
     @classmethod
     def from_kernel_recovery_data(
@@ -51,6 +54,8 @@ class KernelRecoveryScratchData(BackendAISchema):
             service_ports=data.service_ports,
             repl_in_port=data.repl_in_port,
             repl_out_port=data.repl_out_port,
+            container_id=data.container_id,
+            kernel_host=data.kernel_host,
         )
 
     def to_kernel_recovery_data(
@@ -72,6 +77,8 @@ class KernelRecoveryScratchData(BackendAISchema):
             service_ports=self.service_ports,
             repl_in_port=self.repl_in_port,
             repl_out_port=self.repl_out_port,
+            container_id=self.container_id,
+            kernel_host=self.kernel_host,
             resource_spec=resource_spec,
             environ=environ,
         )
