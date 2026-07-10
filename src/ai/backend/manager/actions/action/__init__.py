@@ -19,7 +19,6 @@ from .rbac import (
     build_operation_description,
 )
 from .rbac_admin_page import (
-    DomainAdminPageGetRBACAction,
     ProjectAdminPageGetRBACAction,
 )
 from .rbac_model_deployment import (
@@ -94,7 +93,6 @@ RBAC_ACTION_REGISTRY: tuple[type[BaseRBACAction], ...] = (
     ProjectSoftDeleteRBACAction,
     ProjectHardDeleteRBACAction,
     ProjectAdminPageGetRBACAction,
-    DomainAdminPageGetRBACAction,
     SessionCreateRBACAction,
     SessionGetRBACAction,
     SessionSearchRBACAction,

@@ -1,8 +1,8 @@
 """RBAC action declarations for admin-page access control element types.
 
-These are pseudo-entities that gate visibility of the project/domain admin
-pages. They carry only a READ operation and are not enforced at runtime like
-CRUD actions; they exist so that the permission matrix exposes an assignable
+These are pseudo-entities that gate visibility of the project admin page.
+They carry only a READ operation and are not enforced at runtime like CRUD
+actions; they exist so that the permission matrix exposes an assignable
 operation for custom roles.
 """
 
@@ -31,20 +31,3 @@ class ProjectAdminPageGetRBACAction(BaseRBACAction):
     @override
     def permission_scope(cls) -> RBACElementType:
         return RBACElementType.PROJECT
-
-
-class DomainAdminPageGetRBACAction(BaseRBACAction):
-    @classmethod
-    @override
-    def action_name(cls) -> RBACActionName:
-        return RBACActionName.GET
-
-    @classmethod
-    @override
-    def required_permission(cls) -> RBACRequiredPermission:
-        return RBACRequiredPermission(RBACElementType.DOMAIN_ADMIN_PAGE, OperationType.READ)
-
-    @classmethod
-    @override
-    def permission_scope(cls) -> RBACElementType:
-        return RBACElementType.DOMAIN
