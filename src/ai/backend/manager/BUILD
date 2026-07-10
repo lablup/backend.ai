@@ -13,8 +13,11 @@ python_sources(
 # Each rule set is self-contained: the upper-layer denies come first, then the same
 # base allowances as the default set. Paths starting with "/" are relative to this
 # (manager) directory; "//" is relative to the build root.
+# All three layers are additionally forbidden from importing config / config_legacy /
+# clients. The one exception is models/alembic, whose historical migration scripts
+# import from config_legacy (and may import config).
 __dependencies_rules__(
-    # data: must not depend on views, models, repositories, services, api.
+    # data: must not depend on views, models, repositories, services, api, config, clients.
     (
         "/data/**",
         "!/views/**",
@@ -22,6 +25,9 @@ __dependencies_rules__(
         "!/repositories/**",
         "!/services/**",
         "!/api/**",
+        "!/config/**",
+        "!/config_legacy.py",
+        "!/clients/**",
         "/**",
         "//src/ai/backend/common/**",
         "//src/ai/backend/cli/**",
@@ -30,13 +36,16 @@ __dependencies_rules__(
         "//stubs/**",
         "!*",
     ),
-    # views: must not depend on models, repositories, services, api.
+    # views: must not depend on models, repositories, services, api, config, clients.
     (
         "/views/**",
         "!/models/**",
         "!/repositories/**",
         "!/services/**",
         "!/api/**",
+        "!/config/**",
+        "!/config_legacy.py",
+        "!/clients/**",
         "/**",
         "//src/ai/backend/common/**",
         "//src/ai/backend/cli/**",
@@ -45,12 +54,33 @@ __dependencies_rules__(
         "//stubs/**",
         "!*",
     ),
-    # models: may depend on views/data; must not depend on repositories, services, api.
+    # models/alembic: exception to the models rule below — migration scripts may import
+    # config / config_legacy. Must be listed BEFORE the general models rule so its more
+    # specific selector wins. Still forbidden from repositories, services, api, clients.
+    (
+        "/models/alembic/**",
+        "!/repositories/**",
+        "!/services/**",
+        "!/api/**",
+        "!/clients/**",
+        "/**",
+        "//src/ai/backend/common/**",
+        "//src/ai/backend/cli/**",
+        "//src/ai/backend/logging/**",
+        "//reqs#*",
+        "//stubs/**",
+        "!*",
+    ),
+    # models: may depend on views/data; must not depend on repositories, services, api,
+    # config, clients.
     (
         "/models/**",
         "!/repositories/**",
         "!/services/**",
         "!/api/**",
+        "!/config/**",
+        "!/config_legacy.py",
+        "!/clients/**",
         "/**",
         "//src/ai/backend/common/**",
         "//src/ai/backend/cli/**",
