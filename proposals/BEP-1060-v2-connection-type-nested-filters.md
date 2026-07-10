@@ -91,15 +91,14 @@ follows it.
 |--------|-------|-----------------------------|-----------------------|
 | Prisma | `some` / `every` / `none` | true (documented; also raised as counter-intuitive) | `none: {…}`; existence via `some: {}` / `none: {}` |
 | PostGraphile (connection-filter) | `some` / `every` / `none` | true | `none: {…}` |
-| Hasura | implicit-some (nested `where` = "any") | (no `every`) | `_not: {condition}` |
 
 - **The `some`/`every`/`none` trio matches the established Prisma/PostGraphile convention** →
   Decision 1 adopts it.
-- The "`every` is true on an empty collection" behavior is the same in these systems (Prisma
-  documents it explicitly).
-- **"has a child and all match"** (non-empty `every`) is expressed in all three systems without a
-  dedicated shorthand, by combining **`some: {}` + `every: {…}`**. This BEP likewise adopts that
-  idiom rather than adding a shorthand.
+- The "`every` is true on an empty collection" behavior is the same in both (Prisma documents it
+  explicitly).
+- **"has a child and all match"** (non-empty `every`) is expressed in both without a dedicated
+  shorthand, by combining **`some: {}` + `every: {…}`**. This BEP likewise adopts that idiom rather
+  than adding a shorthand.
 
 ### Decision 1 — Shape: explicit `some` / `every` / `none`
 
@@ -110,7 +109,7 @@ matching-mode fields, each carrying the child entity's own filter:
 {Relation}NestedFilter:
   some:  {Child}Filter   # the parent has at least one child matching all conditions
   every: {Child}Filter   # every child of the parent matches all conditions
-  none:  {Child}Filter   # the parent has no child matching any condition
+  none:  {Child}Filter   # the parent has no child matching all conditions
 ```
 
 - All three fields are optional. When more than one is given, they combine with **AND**.
@@ -183,7 +182,7 @@ by `ImageV2Filter.alias` ("at least one alias matching"):
 |-------|---------------------------|
 | `some` | "Matches parents with **at least one** {child} satisfying all conditions." |
 | `every` | "Matches parents where **every** {child} satisfies all conditions (**also true when the parent has no {child}**)." |
-| `none` | "Matches parents with **no** {child} satisfying any condition." |
+| `none` | "Matches parents with **no** {child} satisfying all conditions." |
 
 The `every` description must carry the "also true when there are no {child}" clause so the behavior
 is discoverable from the schema alone.
@@ -193,18 +192,26 @@ is discoverable from the schema alone.
 Applies the convention above to filter deployments by their routes. No existing implicit-some field
 exists for deployment replicas, so this is greenfield — it starts directly in the new shape.
 
+**Prerequisite — extend `ReplicaFilter` with `health_status`.** The motivating "no healthy replica"
+query requires filtering on route health, but the current `ReplicaFilter` exposes only `status` and
+`traffic_status` — it has no `health_status` field (unlike `RouteFilter`, which does). So this
+application also adds `health_status` to `ReplicaFilter` (mirroring `RouteFilter.health_status`); the
+condition factory `RouteConditions.by_health_statuses` already exists and is reused.
+
 | Layer | Change |
 |-------|--------|
-| DTO (`common/dto/manager/v2/deployment/request.py`) | Add `ReplicaNestedFilter { some, every, none: ReplicaFilter }`; embed as `DeploymentFilter.replicas`. Reuse the existing `ReplicaFilter` for inner conditions. |
-| GQL (`api/gql/deployment/types/deployment.py`) | Add `ReplicaNestedFilterGQL` (schema name `ReplicaNestedFilter`) and the `DeploymentFilter.replicas` field, `added_version = NEXT_RELEASE_VERSION`, with the Decision-3 descriptions. |
-| Adapter (`api/adapters/deployment/adapter.py`, `_convert_deployment_filter`) | Add a `replicas` branch. Build the inner route predicates by **reusing `_convert_replica_filter`**, then map `some` → `by_replica_exists(preds)`, `none` → `negate_conditions([by_replica_exists(preds)])`, `every` → `negate_conditions([by_replica_exists(per-child-negated preds)])`. |
+| DTO (`common/dto/manager/v2/deployment/request.py`) | Add `ReplicaNestedFilter { some, every, none: ReplicaFilter }`; embed as `DeploymentFilter.replicas`. Add `health_status` to `ReplicaFilter` (mirroring `RouteFilter`) so the "healthy" query is expressible. |
+| GQL (`api/gql/deployment/types/deployment.py`) | Add `ReplicaNestedFilterGQL` (schema name `ReplicaNestedFilter`) and the `DeploymentFilter.replicas` field, `added_version = NEXT_RELEASE_VERSION`, with the Decision-3 descriptions; add the matching `health_status` field on the replica filter GQL type. |
+| Adapter (`api/adapters/deployment/adapter.py`, `_convert_deployment_filter`) | Add a `replicas` branch. Build the inner route predicates by **reusing `_convert_replica_filter`** (extended to translate `health_status` via the existing `RouteConditions.by_health_statuses`), then map `some` → `by_replica_exists(preds)`, `none` → `negate_conditions([by_replica_exists(preds)])`, `every` → `negate_conditions([by_replica_exists(per-child-negated preds)])`. |
 | Conditions (`models/condition_utils.py`, `models/endpoint/conditions.py`) | Add the shared `make_correlated_exists(child_row, correlate_row, join_predicate)` builder + `DeploymentConditions.by_replica_exists` = that builder bound to `RoutingRow.endpoint == EndpointRow.id` (FK `routings.endpoint → endpoints.id`). |
 
 The join key is the existing FK: `RoutingRow.endpoint` → `endpoints.id`. The `EXISTS` correlates on
 `EndpointRow`, mirroring rbac's `.correlate(RoleRow)`.
 
-REST v2, the Client SDK, and the CLI pick up the new DTO field automatically as the shared schema;
-no behavior specific to those layers is required.
+REST v2 and the Client SDK share the DTO, so they pick up the new field with no filter-specific work.
+The **CLI does not** — its deployment search commands build `DeploymentFilter` from an explicit set of
+Click options (`client/cli/v2/{admin,my}/deployment.py`), so exposing `replicas` on the CLI requires
+adding a dedicated `--replicas-*` option group. That CLI work is part of this application's scope.
 
 ## Migration / Compatibility
 
@@ -223,10 +230,13 @@ no behavior specific to those layers is required.
 ## Implementation Plan
 
 1. **Convention + first application (this BEP's scope, one Story)**
+   - Add `health_status` to `ReplicaFilter` (DTO + GQL) so the "healthy" query is expressible
    - `ReplicaNestedFilter` DTO + `DeploymentFilter.replicas` embed
    - shared `make_correlated_exists` builder + `DeploymentConditions.by_replica_exists`
-   - Adapter `replicas` branch (some/every/none mapping), reusing `_convert_replica_filter`
+   - Adapter `replicas` branch (some/every/none mapping), extending `_convert_replica_filter` to
+     translate `health_status` via the existing `RouteConditions.by_health_statuses`
    - GQL `ReplicaNestedFilterGQL` + field (Decision-3 descriptions)
+   - CLI `--replicas-*` option group on the deployment search commands
    - Tests: `some` / `every` (incl. the zero-replica true case) / `none`, plus combination with the
      top-level `AND` / `OR` / `NOT`
 2. **Retrofit existing precedents (follow-up Stories under BA-6818)**
@@ -239,7 +249,7 @@ no behavior specific to those layers is required.
 | Date | Decision | Rationale |
 |------|----------|-----------|
 | 2026-07-10 | Shape = explicit `some`/`every`/`none` | implicit-some cannot express `every`/`none` — the operational queries driving BA-6818; matches the established Prisma/PostGraphile convention |
-| 2026-07-10 | Non-empty `every` uses `some: {}` + `every: {…}`, no dedicated shorthand | Prisma, PostGraphile, and Hasura all recommend the same idiom |
+| 2026-07-10 | Non-empty `every` uses `some: {}` + `every: {…}`, no dedicated shorthand | Prisma and PostGraphile both expose this idiom |
 | 2026-07-10 | Shared `make_correlated_exists(child_row, correlate_row, join_predicate)` builder + per-entity binding (`by_replica_exists`) | Keeps correlated-`EXISTS` construction in one place while exposing a domain name per entity |
 | 2026-07-10 | some/every/none → EXISTS/NOT EXISTS mapping lives in the adapter | Keeps the conditions layer to one new symbol per entity, reusing `negate_conditions` |
 | 2026-07-10 | New `some/every/none` field name = **plural to-many relation** (e.g. `aliases`, `replicas`); the existing singular implicit-some field is only `@deprecated` | GraphQL forbids duplicate field names + preserves backward compatibility + consistent naming |
@@ -257,4 +267,3 @@ no behavior specific to those layers is required.
 - [BEP-1008: RBAC](BEP-1008-RBAC.md) — role → user/scope nested filter precedent
 - [Prisma — Relation queries (some/every/none)](https://www.prisma.io/docs/orm/prisma-client/queries/relation-queries) — de-facto standard for to-many filters; `every` on empty collections
 - [PostGraphile connection-filter — Filtering](https://www.graphile.org/postgraphile/filtering/) — one-to-many `some`/`every`/`none`
-- [Hasura — Filter based on nested objects](https://hasura.io/docs/2.0/queries/postgres/filters/using-nested-objects/) — implicit-some + `_not` (none)
