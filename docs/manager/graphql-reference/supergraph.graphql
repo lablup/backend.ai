@@ -1695,6 +1695,11 @@ type AuditLogNode implements Node
   """Added in 25.12.0, User ID that triggered the action"""
   triggered_by: String
 
+  """
+  Effective (acting) user ID the action ran as; differs from triggered_by only during super-admin impersonation
+  """
+  acted_as: String
+
   """Description of the AuditLog"""
   description: String!
 
@@ -1810,6 +1815,11 @@ type AuditLogV2 implements Node
 
   """UUID string of the user who triggered the action."""
   triggeredBy: String
+
+  """
+  Added in 26.8.0. UUID string of the effective (acting) user the action ran as. Differs from triggered_by only while a super admin is impersonating a target.
+  """
+  actedAs: String
 
   """Human-readable description of the operation."""
   description: String!
