@@ -145,7 +145,7 @@ class Route(PydanticNodeMixin[RouteNodeDTO]):
     @gql_added_field(
         BackendAIGQLMeta(
             added_version="26.4.3",
-            description="The compute session associated with this route, resolved via DataLoader.",
+            description="The compute session associated with this route.",
         )
     )  # type: ignore[misc]
     async def session_v2(

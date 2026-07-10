@@ -243,9 +243,7 @@ class RuntimeVariantPresetValueGQL:
     preset_id: UUID = gql_field(description="The preset this value is bound to.")
     value: str = gql_field(description="Value bound to the preset.")
 
-    @gql_field(
-        description="The runtime variant preset this value is bound to, resolved via DataLoader."
-    )  # type: ignore[misc]
+    @gql_field(description="The runtime variant preset this value is bound to.")  # type: ignore[misc]
     async def preset(
         self, info: Info[StrawberryGQLContext]
     ) -> (
@@ -592,7 +590,7 @@ class ModelRevision(PydanticNodeMixin[RevisionNodeDTO]):
     @gql_added_field(
         BackendAIGQLMeta(
             added_version="26.4.3",
-            description="The container image used by this revision, resolved via DataLoader.",
+            description="The container image used by this revision.",
         )
     )  # type: ignore[misc]
     async def image_v2(
@@ -612,8 +610,8 @@ class ModelRevision(PydanticNodeMixin[RevisionNodeDTO]):
         BackendAIGQLMeta(
             added_version="26.4.4",
             description=(
-                "The deployment-level preset that produced this revision, "
-                "resolved via DataLoader. ``None`` when the revision was "
+                "The deployment-level preset that produced this revision. "
+                "``None`` when the revision was "
                 "created without a preset, when the originating preset row "
                 "has since been deleted (SET NULL FK), or for legacy rows "
                 "that predate this field."
@@ -636,7 +634,7 @@ class ModelRevision(PydanticNodeMixin[RevisionNodeDTO]):
     @gql_added_field(
         BackendAIGQLMeta(
             added_version="26.4.4",
-            description="The parent deployment owning this revision, resolved via DataLoader.",
+            description="The parent deployment owning this revision.",
         )
     )  # type: ignore[misc]
     async def deployment(

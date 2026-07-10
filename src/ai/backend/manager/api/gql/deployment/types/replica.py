@@ -239,7 +239,7 @@ class ModelReplica(PydanticNodeMixin[ReplicaNodeDTO]):
     @gql_added_field(
         BackendAIGQLMeta(
             added_version="26.4.3",
-            description="The compute session running this replica, resolved via DataLoader.",
+            description="The compute session running this replica.",
         )
     )  # type: ignore[misc]
     async def session_v2(

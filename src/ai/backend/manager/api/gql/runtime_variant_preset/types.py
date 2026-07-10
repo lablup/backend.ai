@@ -239,7 +239,7 @@ class RuntimeVariantPresetGQL(PydanticNodeMixin[NodeDTO]):
     @gql_added_field(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
-            description="The runtime variant this preset belongs to, resolved via DataLoader. Fetch its name and other attributes in a single query alongside the preset list.",
+            description="The runtime variant this preset belongs to. Fetch its name and other attributes in a single query alongside the preset list.",
         )
     )  # type: ignore[misc]
     async def runtime_variant(

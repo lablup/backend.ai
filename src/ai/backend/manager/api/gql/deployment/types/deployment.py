@@ -239,7 +239,7 @@ class ModelDeploymentMetadata:
     @gql_added_field(
         BackendAIGQLMeta(
             added_version="26.4.4",
-            description="The resource group this deployment runs in, resolved via DataLoader.",
+            description="The resource group this deployment runs in.",
         )
     )  # type: ignore[misc]
     async def resource_group(
@@ -265,7 +265,7 @@ class ModelDeploymentMetadata:
     @gql_added_field(
         BackendAIGQLMeta(
             added_version="26.4.3",
-            description="The project this deployment belongs to, resolved via DataLoader.",
+            description="The project this deployment belongs to.",
         )
     )  # type: ignore[misc]
     async def project_v2(
@@ -291,7 +291,7 @@ class ModelDeploymentMetadata:
     @gql_added_field(
         BackendAIGQLMeta(
             added_version="26.4.3",
-            description="The domain this deployment belongs to, resolved via DataLoader.",
+            description="The domain this deployment belongs to.",
         )
     )  # type: ignore[misc]
     async def domain_v2(
@@ -352,7 +352,7 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
     @gql_added_field(
         BackendAIGQLMeta(
             added_version="26.4.3",
-            description="The current active revision of this deployment, resolved via DataLoader.",
+            description="The current active revision of this deployment.",
         )
     )  # type: ignore[misc]
     async def current_revision(self, info: Info[StrawberryGQLContext]) -> ModelRevision | None:
@@ -365,7 +365,7 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
     @gql_added_field(
         BackendAIGQLMeta(
             added_version="26.4.3",
-            description="The revision currently being deployed (in progress, not yet active), resolved via DataLoader.",
+            description="The revision currently being deployed (in progress, not yet active).",
         )
     )  # type: ignore[misc]
     async def deploying_revision(self, info: Info[StrawberryGQLContext]) -> ModelRevision | None:
@@ -378,7 +378,7 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
     @gql_added_field(
         BackendAIGQLMeta(
             added_version="26.4.3",
-            description="The user who created this deployment, resolved via DataLoader.",
+            description="The user who created this deployment.",
         )
     )  # type: ignore[misc]
     async def creator(
