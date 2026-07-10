@@ -82,6 +82,32 @@ def validate_mac(value: str | None) -> str:
     return value
 
 
+def validate_overlay_ip(value: str | None, subnet: str) -> str:
+    """Validate an agent-supplied overlay endpoint IP: a real IPv4 confined to the session's
+    own subnet (and not the network/broadcast address).
+
+    This is the trust boundary for the manager-assigned static overlay address the agent
+    relays. Confining it to the session subnet bounds the blast radius: the agent can only
+    address its own session's isolated overlay (a separate VNI + subnet), never another
+    session's fabric or the host — the worst a lying agent achieves is misconfiguring its own
+    container's connectivity. The MAC is derived from this IP server-side (mac_for_ip), so the
+    agent cannot forge a MAC independently of the (validated) IP."""
+    validate_ipv4(value, what="overlay ip")
+    addr = ipaddress.IPv4Address(value)
+    try:
+        net = ipaddress.ip_network(subnet, strict=False)
+    except ValueError as e:
+        raise PolicyViolation("invalid subnet") from e
+    if (
+        not isinstance(net, ipaddress.IPv4Network)
+        or addr not in net
+        or addr == net.network_address
+        or addr == net.broadcast_address
+    ):
+        raise PolicyViolation("overlay ip outside session subnet")
+    return str(value)
+
+
 def _validate_subnet(subnet: str) -> str:
     try:
         net = ipaddress.ip_network(subnet, strict=False)

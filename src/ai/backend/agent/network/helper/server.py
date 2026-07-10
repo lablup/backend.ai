@@ -187,7 +187,7 @@ class NetworkHelperServer:
                         await self._teardown(session_id)
                         return HelperResponse(ok=True)
                     case HelperOp.ATTACH_CONTAINER:
-                        assigned = await self._attach(session_id, req.container_id)
+                        assigned = await self._attach(session_id, req.container_id, req.ip)
                         return HelperResponse(ok=True, assigned=assigned)
                     case HelperOp.DETACH_CONTAINER:
                         await self._detach(session_id, req.container_id)
@@ -235,13 +235,24 @@ class NetworkHelperServer:
         if entry is not None:
             await entry.backend.teardown_session_network(session_id)
 
-    async def _attach(self, session_id: str, container_id: str | None) -> dict[str, str]:
+    async def _attach(
+        self, session_id: str, container_id: str | None, overlay_ip: str | None
+    ) -> dict[str, str]:
         if container_id is None:
             raise policy.PolicyViolation("attach requires container_id")
         container_id = policy.validate_container_id(container_id)
         entry = self._sessions.get(session_id)
         if entry is None:
             raise HelperError("attach before setup")
+        # The manager-assigned overlay IP (multi-node vxlan) is agent-supplied, so validate it is
+        # confined to THIS session's subnet before trusting it; None (single node) keeps the
+        # host-local fallback. attach_endpoint reads it from kernel_config["cluster_network_ip"];
+        # the deterministic MAC is derived from it server-side (overlay_cni_config).
+        kernel_config: dict[str, Any] = {}
+        if overlay_ip is not None:
+            kernel_config["cluster_network_ip"] = policy.validate_overlay_ip(
+                overlay_ip, entry.meta.subnet
+            )
         # Authoritative PID resolution from containerd — the agent's view is never trusted.
         pid = await self._runtime.container_pid(container_id)
         if pid is None:
@@ -253,10 +264,10 @@ class NetworkHelperServer:
             pid2 = await self._runtime.container_pid(container_id)
             if pid2 != pid or not netns_mod.pidfd_alive(pinned.pidfd):
                 raise netns_mod.NetnsError("container task changed during attach")
-            # The plan (bridge/subnet CNI config) is derived helper-side from the session
-            # meta; the bridge backend ignores kernel_config/cluster_info.
+            # The plan (bridge/subnet CNI config) is derived helper-side from the session meta;
+            # the overlay's static IP (+ derived MAC) comes from the validated kernel_config.
             plan = await entry.backend.attach_endpoint(
-                cast(Any, {}), cast(Any, {}), meta=entry.meta
+                cast(Any, kernel_config), cast(Any, {}), meta=entry.meta
             )
             # The native attacher moves the veth by PID (``ip link set ... netns <pid>``),
             # so it needs the ``/proc/<pid>/ns/net`` form, not the pinned-fd path. The pin

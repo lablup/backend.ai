@@ -14,11 +14,19 @@ from typing import Any, cast
 
 import pytest
 
-from ai.backend.agent.network.helper.client import HelperClient, HelperClientError
-from ai.backend.agent.network.helper.policy import PolicyViolation, validate_network_config
+from ai.backend.agent.network.helper.client import (
+    HelperClient,
+    HelperClientError,
+    HelperProvisioner,
+)
+from ai.backend.agent.network.helper.policy import (
+    PolicyViolation,
+    validate_network_config,
+    validate_overlay_ip,
+)
 from ai.backend.agent.network.helper.protocol import HelperOp, HelperRequest, HelperResponse
 from ai.backend.agent.network.helper.server import NetworkHelperServer
-from ai.backend.common.network.types import EndpointPlan
+from ai.backend.common.network.types import EndpointPlan, NetworkBackendKind, SessionNetMeta
 
 
 class _StubBackend:
@@ -29,6 +37,7 @@ class _StubBackend:
         self.teardown_calls: list[str] = []
         self.peers: list[tuple[str, str, str | None]] = []  # (op, session_id, vtep_ip)
         self.endpoints: list[tuple[str, str, str, str, str]] = []  # (op, sid, ip, mac, vtep)
+        self.attach_kernel_configs: list[Any] = []  # kernel_config each attach_endpoint received
 
     async def setup_session_network(self, meta: Any, self_member: Any) -> None:
         self.setup_calls.append(meta.session_id)
@@ -51,6 +60,7 @@ class _StubBackend:
     async def attach_endpoint(
         self, kernel_config: Any, cluster_info: Any, *, meta: Any
     ) -> EndpointPlan:
+        self.attach_kernel_configs.append(kernel_config)
         return EndpointPlan(attachments=[])
 
 
@@ -127,6 +137,26 @@ class TestPolicy:
         cfg = validate_network_config({"backend": "bridge", "subnet": "172.30.5.0/24"})
         assert cfg.subnet == "172.30.5.0/24"
 
+    def test_overlay_ip_accepts_in_subnet_host(self) -> None:
+        assert validate_overlay_ip("10.0.0.5", "10.0.0.0/24") == "10.0.0.5"
+
+    def test_overlay_ip_rejects_out_of_subnet(self) -> None:
+        # confinement to the session subnet is the trust boundary — a foreign address is refused
+        with pytest.raises(PolicyViolation):
+            validate_overlay_ip("10.9.9.9", "10.0.0.0/24")
+
+    def test_overlay_ip_rejects_network_and_broadcast(self) -> None:
+        with pytest.raises(PolicyViolation):
+            validate_overlay_ip("10.0.0.0", "10.0.0.0/24")
+        with pytest.raises(PolicyViolation):
+            validate_overlay_ip("10.0.0.255", "10.0.0.0/24")
+
+    def test_overlay_ip_rejects_garbage_and_none(self) -> None:
+        with pytest.raises(PolicyViolation):
+            validate_overlay_ip("not-an-ip", "10.0.0.0/24")
+        with pytest.raises(PolicyViolation):
+            validate_overlay_ip(None, "10.0.0.0/24")
+
 
 class TestHelperRpc:
     async def test_setup_dispatches_to_backend(self) -> None:
@@ -188,6 +218,19 @@ class TestHelperRpc:
             )
         )
 
+    async def test_attach_rejects_overlay_ip_outside_session_subnet(self) -> None:
+        # An agent-supplied overlay IP is validated against the session subnet BEFORE any netns
+        # work; a foreign address is refused and never reaches the backend attach.
+        async with _Harness(runtime=_StubRuntime(pid=None)) as h:
+            await self._setup_vxlan(h, "sess-ip")
+            with pytest.raises(HelperClientError):
+                await h.client().call(
+                    HelperRequest(
+                        HelperOp.ATTACH_CONTAINER, "sess-ip", container_id="c1", ip="10.9.9.9"
+                    )
+                )
+            assert h.backend.attach_kernel_configs == []  # rejected before building the plan
+
     async def test_add_peer_dispatches_vtep(self) -> None:
         async with _Harness() as h:
             await self._setup_vxlan(h, "sess-p")
@@ -235,3 +278,52 @@ class TestHelperRpc:
                 await h.client().call(
                     HelperRequest(HelperOp.ADD_PEER, "no-session", vtep_ip="192.168.1.9")
                 )
+
+
+class _RecordingClient:
+    """Captures the requests HelperProvisioner sends, returning a benign ATTACH response."""
+
+    def __init__(self) -> None:
+        self.requests: list[HelperRequest] = []
+
+    async def call(self, req: HelperRequest) -> HelperResponse:
+        self.requests.append(req)
+        return HelperResponse(ok=True, assigned={})
+
+
+class TestHelperProvisioner:
+    async def test_attach_forwards_manager_overlay_ip(self) -> None:
+        # The agent relays the manager-assigned cluster_network_ip to the helper so a multi-node
+        # container attaches at its central, disjoint overlay address (the helper re-validates it).
+        client = _RecordingClient()
+        prov = HelperProvisioner(cast(Any, client))
+        meta = SessionNetMeta(
+            session_id="s1",
+            subnet="10.0.0.0/24",
+            backend=NetworkBackendKind.VXLAN,
+            mtu=1500,
+            vni=100,
+        )
+        await prov.attach(
+            cast(Any, {"cluster_network_ip": "10.0.0.5"}),
+            cast(Any, {}),
+            meta=meta,
+            container_id="c1",
+            task_pid=1,
+        )
+        assert client.requests[0].op is HelperOp.ATTACH_CONTAINER
+        assert client.requests[0].ip == "10.0.0.5"
+
+    async def test_attach_sends_no_ip_for_single_node(self) -> None:
+        # Single-node sessions have no manager overlay IP; the helper keeps its host-local path.
+        client = _RecordingClient()
+        prov = HelperProvisioner(cast(Any, client))
+        meta = SessionNetMeta(
+            session_id="s2",
+            subnet="10.0.1.0/24",
+            backend=NetworkBackendKind.BRIDGE,
+            mtu=1500,
+            vni=None,
+        )
+        await prov.attach(cast(Any, {}), cast(Any, {}), meta=meta, container_id="c2", task_pid=1)
+        assert client.requests[0].ip is None

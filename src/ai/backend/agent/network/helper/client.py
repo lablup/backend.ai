@@ -192,11 +192,18 @@ class HelperProvisioner:
         container_id: str,
         task_pid: int,
     ) -> tuple[EndpointPlan, dict[NetworkRole, str]]:
+        # Relay the manager-assigned overlay IP (present for multi-node vxlan sessions) so the
+        # helper attaches the container at its central, disjoint address instead of a per-node
+        # host-local one. The helper re-validates it is within the session subnet; None (single
+        # node) leaves the helper on its host-local fallback. The MAC is derived from the IP
+        # helper-side, so it is not sent.
+        overlay_ip = kernel_config.get("cluster_network_ip")
         resp = await self._client.call(
             HelperRequest(
                 op=HelperOp.ATTACH_CONTAINER,
                 session_id=meta.session_id,
                 container_id=container_id,
+                ip=overlay_ip,
             )
         )
         self._session_of[container_id] = meta.session_id
