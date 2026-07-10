@@ -17,6 +17,7 @@ import asyncio
 import contextlib
 import json
 import logging
+import platform
 import shutil
 import signal
 import struct
@@ -39,7 +40,7 @@ from ai.backend.agent.agent import (
     ScanImagesResult,
 )
 from ai.backend.agent.config.unified import ContainerSandboxType, ScratchType
-from ai.backend.agent.containerd.runtime.spec import container_cgroup_fs_path
+from ai.backend.agent.containerd.runtime.spec import _DEFAULT_CAPS, container_cgroup_fs_path
 from ai.backend.agent.docker.agent import (
     LDD_GLIBC_REGEX,
     LDD_MUSL_REGEX,
@@ -128,19 +129,62 @@ _CONTAINERD_TO_STATUS = {
 
 # Backend.AI arch name -> primary seccomp arch token (the archMap key to select).
 _SCMP_ARCH = {"x86_64": "SCMP_ARCH_X86_64", "aarch64": "SCMP_ARCH_AARCH64"}
+# Backend.AI arch name -> Go arch name. Docker's per-syscall includes/excludes gate on the Go
+# arch name (e.g. "amd64", "ppc64le"), NOT the SCMP token used by archMap.
+_GO_ARCH = {"x86_64": "amd64", "aarch64": "arm64"}
+
+
+def _kernel_ge(min_kernel: str) -> bool:
+    """True if the running host kernel is at least ``min_kernel`` (e.g. '4.8')."""
+
+    def parse(v: str) -> tuple[int, ...]:
+        return tuple(int(x) for x in v.split("-", 1)[0].split(".")[:2])
+
+    try:
+        return parse(platform.release()) >= parse(min_kernel)
+    except ValueError:
+        return True  # unparseable -> match Docker's default (modern kernels satisfy minKernel)
+
+
+def _seccomp_rule_applies(
+    sc: Mapping[str, Any], *, go_arch: str | None, caps: frozenset[str]
+) -> bool:
+    """Evaluate a Docker seccomp rule's includes/excludes against this container's arch,
+    capability set and the host kernel — mirroring Docker's runtime evaluation. Without this we
+    would unconditionally allow cap-gated syscalls (bpf, ptrace, open_by_handle_at, ...) the
+    container was never granted the capability for, loosening the sandbox versus DockerAgent."""
+    inc = sc.get("includes") or {}
+    exc = sc.get("excludes") or {}
+    if (arches := inc.get("arches")) and (go_arch is None or go_arch not in arches):
+        return False
+    if (arches := exc.get("arches")) and go_arch is not None and go_arch in arches:
+        return False
+    if (inc_caps := inc.get("caps")) and not all(c in caps for c in inc_caps):
+        return False
+    if (exc_caps := exc.get("caps")) and any(c in caps for c in exc_caps):
+        return False
+    if (mk := inc.get("minKernel")) and not _kernel_ge(mk):
+        return False
+    exc_min_kernel = exc.get("minKernel")
+    return not (exc_min_kernel and _kernel_ge(exc_min_kernel))
 
 
 def _docker_seccomp_to_oci(
-    profile: Mapping[str, Any], *, arch: str = CURRENT_ARCH
+    profile: Mapping[str, Any],
+    *,
+    arch: str = CURRENT_ARCH,
+    caps: frozenset[str] = frozenset(_DEFAULT_CAPS),
 ) -> dict[str, Any]:
     """Convert a Docker-format seccomp profile (archMap + per-syscall includes/excludes) to the
-    OCI runtime-spec linux.seccomp shape (conditional includes/excludes are dropped — the listed
-    syscalls are simply allowed).
+    OCI runtime-spec linux.seccomp shape. Per-syscall includes/excludes are evaluated against the
+    container's ``caps``/``arch`` and the host kernel (see _seccomp_rule_applies) so cap-gated
+    syscalls stay gated — matching how Docker resolves the profile at container creation.
 
     Only the host arch's entry (+ its compat sub-arches) is emitted: the full archMap lists arches
     (e.g. SCMP_ARCH_LOONGARCH64) that the node's libseccomp may not know, and runc rejects the
     whole profile if any architecture token is unrecognized."""
     host_scmp = _SCMP_ARCH.get(arch)
+    go_arch = _GO_ARCH.get(arch)
     architectures: list[str] = []
     for entry in profile.get("archMap") or []:
         if host_scmp is not None and entry.get("architecture") != host_scmp:
@@ -149,6 +193,8 @@ def _docker_seccomp_to_oci(
         architectures.extend(entry.get("subArchitectures") or [])
     syscalls: list[dict[str, Any]] = []
     for sc in profile.get("syscalls") or []:
+        if not _seccomp_rule_applies(sc, go_arch=go_arch, caps=caps):
+            continue
         oci_sc: dict[str, Any] = {"names": sc["names"], "action": sc["action"]}
         if sc.get("errnoRet") is not None:
             oci_sc["errnoRet"] = sc["errnoRet"]
@@ -967,9 +1013,14 @@ class ContainerdAgent(
         *,
         timeout_seconds: float | None,
     ) -> None:
-        # TODO: honor timeout_seconds (Transfer has no per-call deadline knob yet).
-        await self._session_network.pull_image(
-            image_ref.canonical, auth=_registry_auth(registry_conf)
+        # The containerd Transfer service has no per-call deadline, so bound it here: on
+        # timeout wait_for cancels the transfer coroutine (parity with the Docker backend,
+        # which passes timeout= to the pull). ``None`` means wait indefinitely.
+        await asyncio.wait_for(
+            self._session_network.pull_image(
+                image_ref.canonical, auth=_registry_auth(registry_conf)
+            ),
+            timeout_seconds,
         )
 
     @override
@@ -982,9 +1033,15 @@ class ContainerdAgent(
     ) -> None:
         if image_ref.is_local:
             return
-        # TODO: honor timeout_seconds (Transfer has no per-call deadline knob yet).
-        await self._session_network.push_image(
-            image_ref.canonical, auth=_registry_auth(registry_conf)
+        # Sentinel means "unspecified" -> no deadline (parity with the Docker backend, which
+        # then omits the timeout arg). The Transfer service has no per-call deadline, so bound
+        # it with wait_for; None waits indefinitely.
+        timeout = None if isinstance(timeout_seconds, Sentinel) else timeout_seconds
+        await asyncio.wait_for(
+            self._session_network.push_image(
+                image_ref.canonical, auth=_registry_auth(registry_conf)
+            ),
+            timeout,
         )
 
     @override

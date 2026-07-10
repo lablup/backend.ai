@@ -1,5 +1,6 @@
 """Unit tests for ContainerdAgent image methods (facade injected via __new__)."""
 
+import asyncio
 import struct
 from pathlib import Path
 from types import SimpleNamespace
@@ -18,9 +19,16 @@ from ai.backend.common.types import AutoPullBehavior, ContainerStatus, ImageCano
 
 
 class FakeFacade:
-    def __init__(self, *, exists: bool = True, remove_error: str | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        exists: bool = True,
+        remove_error: str | None = None,
+        hang: bool = False,
+    ) -> None:
         self._exists = exists
         self._remove_error = remove_error
+        self._hang = hang
         self.pulled: list[str] = []
         self.pushed: list[str] = []
         self.removed: list[str] = []
@@ -32,10 +40,14 @@ class FakeFacade:
         return "sha256:local" if self._exists else None
 
     async def pull_image(self, image_ref: str, *, auth: Any = None) -> None:
+        if self._hang:
+            await asyncio.sleep(10)
         self.pulled.append(image_ref)
         self.pull_auth = auth
 
     async def push_image(self, image_ref: str, *, auth: Any = None) -> None:
+        if self._hang:
+            await asyncio.sleep(10)
         self.pushed.append(image_ref)
         self.push_auth = auth
 
@@ -197,6 +209,13 @@ class TestPullImage:
         )
         assert facade.pull_auth is None
 
+    async def test_honors_timeout(self) -> None:
+        agent = _agent(FakeFacade(hang=True))
+        with pytest.raises(TimeoutError):
+            await agent.pull_image(
+                cast(Any, FakeImageRef("cr.example/img:1")), cast(Any, {}), timeout_seconds=0.05
+            )
+
 
 class TestPushImage:
     async def test_pushes_non_local(self) -> None:
@@ -210,6 +229,13 @@ class TestPushImage:
         agent = _agent(facade)
         await agent.push_image(cast(Any, FakeImageRef("local/img", is_local=True)), cast(Any, {}))
         assert facade.pushed == []
+
+    async def test_honors_timeout(self) -> None:
+        agent = _agent(FakeFacade(hang=True))
+        with pytest.raises(TimeoutError):
+            await agent.push_image(
+                cast(Any, FakeImageRef("cr.example/img:1")), cast(Any, {}), timeout_seconds=0.05
+            )
 
 
 class TestPurgeImages:
@@ -371,3 +397,78 @@ class TestSeccompConversion:
         )
         assert oci["architectures"] == ["SCMP_ARCH_X86_64", "SCMP_ARCH_X86"]
         assert oci["syscalls"] == [{"names": ["read", "write"], "action": "SCMP_ACT_ALLOW"}]
+
+    def test_includes_caps_gate_on_container_caps(self) -> None:
+        # Cap-gated rules must be dropped unless the container holds the capability, matching how
+        # Docker resolves the profile — otherwise privileged syscalls leak into the sandbox.
+        profile = {
+            "defaultAction": "SCMP_ACT_ERRNO",
+            "archMap": [{"architecture": "SCMP_ARCH_X86_64", "subArchitectures": None}],
+            "syscalls": [
+                {"names": ["chown"], "action": "SCMP_ACT_ALLOW"},  # unconditional
+                {
+                    "names": ["bpf"],
+                    "action": "SCMP_ACT_ALLOW",
+                    "includes": {"caps": ["CAP_SYS_ADMIN"]},
+                },
+                {
+                    "names": ["kept"],
+                    "action": "SCMP_ACT_ALLOW",
+                    "includes": {"caps": ["CAP_CHOWN"]},
+                },
+            ],
+        }
+        oci = agent_mod._docker_seccomp_to_oci(
+            profile, arch="x86_64", caps=frozenset({"CAP_CHOWN"})
+        )
+        names = [n for sc in oci["syscalls"] for n in sc["names"]]
+        assert "chown" in names  # unconditional
+        assert "kept" in names  # CAP_CHOWN held -> included
+        assert "bpf" not in names  # CAP_SYS_ADMIN absent -> dropped
+
+    def test_excludes_caps_drop_rule_when_cap_held(self) -> None:
+        profile = {
+            "defaultAction": "SCMP_ACT_ERRNO",
+            "archMap": [{"architecture": "SCMP_ARCH_X86_64"}],
+            "syscalls": [
+                {
+                    "names": ["clone"],
+                    "action": "SCMP_ACT_ALLOW",
+                    "excludes": {"caps": ["CAP_SYS_ADMIN"]},
+                }
+            ],
+        }
+        oci = agent_mod._docker_seccomp_to_oci(
+            profile, arch="x86_64", caps=frozenset({"CAP_SYS_ADMIN"})
+        )
+        assert oci["syscalls"] == []
+
+    def test_arches_gate_rule(self) -> None:
+        profile = {
+            "defaultAction": "SCMP_ACT_ERRNO",
+            "archMap": [{"architecture": "SCMP_ARCH_X86_64"}],
+            "syscalls": [
+                {
+                    "names": ["sync_file_range2"],
+                    "action": "SCMP_ACT_ALLOW",
+                    "includes": {"arches": ["ppc64le"]},
+                }
+            ],
+        }
+        oci = agent_mod._docker_seccomp_to_oci(profile, arch="x86_64", caps=frozenset())
+        assert oci["syscalls"] == []  # ppc64le-only rule dropped on x86_64
+
+    def test_minkernel_kept_when_host_satisfies(self) -> None:
+        profile = {
+            "defaultAction": "SCMP_ACT_ERRNO",
+            "archMap": [{"architecture": "SCMP_ARCH_X86_64"}],
+            "syscalls": [
+                {
+                    "names": ["ptrace"],
+                    "action": "SCMP_ACT_ALLOW",
+                    "includes": {"minKernel": "2.6"},
+                }
+            ],
+        }
+        oci = agent_mod._docker_seccomp_to_oci(profile, arch="x86_64", caps=frozenset())
+        assert [n for sc in oci["syscalls"] for n in sc["names"]] == ["ptrace"]
