@@ -182,8 +182,8 @@ class CircuitManager:
             raise ServiceUnavailable(
                 "E10001: Proxy worker not responding", extra_data={"worker": authority}
             ) from e
-
-        self.event_dispatcher.unsubscribe(worker_ready_event_handler)
+        finally:
+            self.event_dispatcher.unsubscribe(worker_ready_event_handler)
 
     async def update_circuit_routes(self, circuit: Circuit, old_routes: list[RouteInfo]) -> None:
         # Single-circuit entry point still exists for callers that don't
