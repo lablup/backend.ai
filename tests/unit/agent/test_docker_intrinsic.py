@@ -4,12 +4,14 @@ import asyncio
 from collections.abc import Generator
 from contextlib import contextmanager
 from dataclasses import dataclass
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from ai.backend.agent.alloc_map import DiscretePropertyAllocMap
 from ai.backend.agent.docker.intrinsic import (
     ContainerNetStat,
     CPUPlugin,
@@ -17,6 +19,7 @@ from ai.backend.agent.docker.intrinsic import (
     read_proc_net_dev,
 )
 from ai.backend.agent.stats import StatModes
+from ai.backend.common.types import DeviceId, DeviceName, SlotName
 
 
 class BaseDockerIntrinsicTest:
@@ -610,3 +613,35 @@ class TestReadProcNetDev:
         """Raises OSError when /proc/[pid]/net/dev does not exist."""
         with pytest.raises(OSError):
             read_proc_net_dev(999999999)
+
+
+class TestMemoryRestoreFromContainer:
+    """restore_from_container must be backend-agnostic: it reads our own resource record
+    (resource.txt) rather than a Docker-specific HostConfig.Memory, so the containerd backend
+    (which has no HostConfig) can restore allocations on agent restart."""
+
+    async def test_reads_resource_spec_not_hostconfig(self, monkeypatch: Any) -> None:
+        plugin = MemoryPlugin.__new__(MemoryPlugin)
+        # No HostConfig["Memory"] here: reading it (the old behavior) would KeyError.
+        container = MagicMock()
+        container.backend_obj = {"HostConfig": {"Mounts": []}}
+        alloc = {DeviceId("root"): Decimal(2 * 2**30)}
+        spec = MagicMock()
+        spec.allocations = {DeviceName("mem"): {SlotName("mem"): alloc}}
+        monkeypatch.setattr(
+            "ai.backend.agent.docker.intrinsic.get_resource_spec_from_container",
+            AsyncMock(return_value=spec),
+        )
+        alloc_map = MagicMock(spec=DiscretePropertyAllocMap)
+        await plugin.restore_from_container(container, alloc_map)
+        alloc_map.apply_allocation.assert_called_once_with({SlotName("mem"): alloc})
+
+    async def test_noop_when_resource_spec_missing(self, monkeypatch: Any) -> None:
+        plugin = MemoryPlugin.__new__(MemoryPlugin)
+        monkeypatch.setattr(
+            "ai.backend.agent.docker.intrinsic.get_resource_spec_from_container",
+            AsyncMock(return_value=None),
+        )
+        alloc_map = MagicMock(spec=DiscretePropertyAllocMap)
+        await plugin.restore_from_container(MagicMock(), alloc_map)
+        alloc_map.apply_allocation.assert_not_called()

@@ -1067,9 +1067,15 @@ class MemoryPlugin(AbstractComputePlugin):
             raise InvalidArgumentError(
                 f"Expected DiscretePropertyAllocMap, got {type(alloc_map).__name__}"
             )
-        memory_limit = container.backend_obj["HostConfig"]["Memory"]
+        # Restore from our own resource record (resource.txt) rather than a Docker-specific
+        # HostConfig.Memory field, mirroring the CPU plugin above. This keeps allocation restore
+        # backend-agnostic: the containerd backend has no Docker HostConfig, so reading
+        # HostConfig["Memory"] would KeyError and break agent restart while kernels are running.
+        resource_spec = await get_resource_spec_from_container(container.backend_obj)
+        if resource_spec is None:
+            return
         alloc_map.apply_allocation({
-            SlotName("mem"): {DeviceId("root"): memory_limit},
+            SlotName("mem"): resource_spec.allocations[DeviceName("mem")][SlotName("mem")],
         })
 
     @override
