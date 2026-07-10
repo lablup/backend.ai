@@ -10,7 +10,7 @@ Existing rows are backfilled with the per-scope-type default policy
 user: read=owner/write=owner).
 
 Revision ID: 3e7b1d9c4a25
-Revises: 7f2b9c4d1a83
+Revises: a3c1d8e5b294
 Create Date: 2026-07-10
 
 """
@@ -20,7 +20,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "3e7b1d9c4a25"
-down_revision = "7f2b9c4d1a83"
+down_revision = "a3c1d8e5b294"
 # Part of: NEXT_RELEASE_VERSION
 branch_labels = None
 depends_on = None
