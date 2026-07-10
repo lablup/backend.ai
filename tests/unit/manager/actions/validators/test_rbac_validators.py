@@ -16,11 +16,11 @@ from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import override
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import MagicMock
 
 import pytest
 
-from ai.backend.common.contexts.user import with_triggered_user, with_user
+from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.permission.types import (
     EntityType,
     OperationType,
@@ -35,7 +35,7 @@ from ai.backend.manager.actions.action.bulk import BaseBulkAction
 from ai.backend.manager.actions.action.scope import BaseScopeAction
 from ai.backend.manager.actions.action.single_entity import BaseSingleEntityAction
 from ai.backend.manager.actions.action.types import ActionTarget, FieldData
-from ai.backend.manager.actions.types import ActionOperationType, OperationStatus
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.validator.bulk import DeniedEntity
 from ai.backend.manager.actions.validators.rbac.bulk import BulkActionRBACValidator
 from ai.backend.manager.actions.validators.rbac.legacy import (
@@ -277,13 +277,6 @@ def single_entity_action() -> _VfolderUpdateAction:
 
 
 @pytest.fixture
-def audit_log_repository() -> MagicMock:
-    repo = MagicMock()
-    repo.create = AsyncMock(return_value=None)
-    return repo
-
-
-@pytest.fixture
 async def db_with_rbac_tables(
     database_connection: ExtendedAsyncSAEngine,
 ) -> AsyncIterator[ExtendedAsyncSAEngine]:
@@ -406,7 +399,7 @@ class TestScopeActionRBACValidator:
         superadmin_user: UserData,
     ) -> None:
         # No permission rows seeded; bypass must succeed regardless.
-        validator = ScopeActionRBACValidator(repository, MagicMock(), MagicMock())
+        validator = ScopeActionRBACValidator(repository, MagicMock())
         with with_user(superadmin_user):
             await validator.validate(scope_action, trigger_meta)
 
@@ -416,7 +409,7 @@ class TestScopeActionRBACValidator:
         scope_action: _ProjectCreateAction,
         trigger_meta: BaseActionTriggerMeta,
     ) -> None:
-        validator = ScopeActionRBACValidator(repository, MagicMock(), MagicMock())
+        validator = ScopeActionRBACValidator(repository, MagicMock())
         with pytest.raises(UnreachableError):
             await validator.validate(scope_action, trigger_meta)
 
@@ -427,7 +420,7 @@ class TestScopeActionRBACValidator:
         trigger_meta: BaseActionTriggerMeta,
         regular_user_with_project_create: UserData,
     ) -> None:
-        validator = ScopeActionRBACValidator(repository, MagicMock(), MagicMock())
+        validator = ScopeActionRBACValidator(repository, MagicMock())
         with with_user(regular_user_with_project_create):
             await validator.validate(scope_action, trigger_meta)
 
@@ -438,50 +431,10 @@ class TestScopeActionRBACValidator:
         trigger_meta: BaseActionTriggerMeta,
         regular_user_without_permission: UserData,
     ) -> None:
-        validator = ScopeActionRBACValidator(repository, MagicMock(), MagicMock())
+        validator = ScopeActionRBACValidator(repository, MagicMock())
         with with_user(regular_user_without_permission):
             with pytest.raises(NotEnoughPermission):
                 await validator.validate(scope_action, trigger_meta)
-
-    async def test_denial_during_impersonation_records_audit(
-        self,
-        repository: PermissionControllerRepository,
-        scope_action: _ProjectCreateAction,
-        trigger_meta: BaseActionTriggerMeta,
-        regular_user_without_permission: UserData,
-        superadmin_user: UserData,
-        audit_log_repository: MagicMock,
-    ) -> None:
-        validator = ScopeActionRBACValidator(repository, MagicMock(), audit_log_repository)
-        # Super admin (trigger) impersonates a permission-less target (effective).
-        with with_user(regular_user_without_permission), with_triggered_user(superadmin_user):
-            with pytest.raises(NotEnoughPermission):
-                await validator.validate(scope_action, trigger_meta)
-
-        audit_log_repository.create.assert_called_once()
-        spec = audit_log_repository.create.call_args.args[0].spec
-        assert spec.status == OperationStatus.ERROR
-        assert spec.triggered_by == str(superadmin_user.user_id)
-        assert spec.acted_as == str(regular_user_without_permission.user_id)
-
-    async def test_denial_without_impersonation_does_not_record_audit(
-        self,
-        repository: PermissionControllerRepository,
-        scope_action: _ProjectCreateAction,
-        trigger_meta: BaseActionTriggerMeta,
-        regular_user_without_permission: UserData,
-        audit_log_repository: MagicMock,
-    ) -> None:
-        validator = ScopeActionRBACValidator(repository, MagicMock(), audit_log_repository)
-        # Normal request: trigger == effective, so no denial audit is written.
-        with (
-            with_user(regular_user_without_permission),
-            with_triggered_user(regular_user_without_permission),
-        ):
-            with pytest.raises(NotEnoughPermission):
-                await validator.validate(scope_action, trigger_meta)
-
-        audit_log_repository.create.assert_not_called()
 
 
 class TestSingleEntityActionRBACValidator:
@@ -492,7 +445,7 @@ class TestSingleEntityActionRBACValidator:
         trigger_meta: BaseActionTriggerMeta,
         superadmin_user: UserData,
     ) -> None:
-        validator = SingleEntityActionRBACValidator(repository, MagicMock(), MagicMock())
+        validator = SingleEntityActionRBACValidator(repository, MagicMock())
         with with_user(superadmin_user):
             await validator.validate(single_entity_action, trigger_meta)
 
@@ -502,7 +455,7 @@ class TestSingleEntityActionRBACValidator:
         single_entity_action: _VfolderUpdateAction,
         trigger_meta: BaseActionTriggerMeta,
     ) -> None:
-        validator = SingleEntityActionRBACValidator(repository, MagicMock(), MagicMock())
+        validator = SingleEntityActionRBACValidator(repository, MagicMock())
         with pytest.raises(UnreachableError):
             await validator.validate(single_entity_action, trigger_meta)
 
@@ -513,7 +466,7 @@ class TestSingleEntityActionRBACValidator:
         trigger_meta: BaseActionTriggerMeta,
         regular_user_with_vfolder_update: UserData,
     ) -> None:
-        validator = SingleEntityActionRBACValidator(repository, MagicMock(), MagicMock())
+        validator = SingleEntityActionRBACValidator(repository, MagicMock())
         with with_user(regular_user_with_vfolder_update):
             await validator.validate(single_entity_action, trigger_meta)
 
@@ -524,50 +477,10 @@ class TestSingleEntityActionRBACValidator:
         trigger_meta: BaseActionTriggerMeta,
         regular_user_without_permission: UserData,
     ) -> None:
-        validator = SingleEntityActionRBACValidator(repository, MagicMock(), MagicMock())
+        validator = SingleEntityActionRBACValidator(repository, MagicMock())
         with with_user(regular_user_without_permission):
             with pytest.raises(NotEnoughPermission):
                 await validator.validate(single_entity_action, trigger_meta)
-
-    async def test_denial_during_impersonation_records_audit(
-        self,
-        repository: PermissionControllerRepository,
-        single_entity_action: _VfolderUpdateAction,
-        trigger_meta: BaseActionTriggerMeta,
-        regular_user_without_permission: UserData,
-        superadmin_user: UserData,
-        audit_log_repository: MagicMock,
-    ) -> None:
-        validator = SingleEntityActionRBACValidator(repository, MagicMock(), audit_log_repository)
-        # Super admin (trigger) impersonates a permission-less target (effective).
-        with with_user(regular_user_without_permission), with_triggered_user(superadmin_user):
-            with pytest.raises(NotEnoughPermission):
-                await validator.validate(single_entity_action, trigger_meta)
-
-        audit_log_repository.create.assert_called_once()
-        spec = audit_log_repository.create.call_args.args[0].spec
-        assert spec.status == OperationStatus.ERROR
-        assert spec.triggered_by == str(superadmin_user.user_id)
-        assert spec.acted_as == str(regular_user_without_permission.user_id)
-
-    async def test_denial_without_impersonation_does_not_record_audit(
-        self,
-        repository: PermissionControllerRepository,
-        single_entity_action: _VfolderUpdateAction,
-        trigger_meta: BaseActionTriggerMeta,
-        regular_user_without_permission: UserData,
-        audit_log_repository: MagicMock,
-    ) -> None:
-        validator = SingleEntityActionRBACValidator(repository, MagicMock(), audit_log_repository)
-        # Normal request: trigger == effective, so no denial audit is written.
-        with (
-            with_user(regular_user_without_permission),
-            with_triggered_user(regular_user_without_permission),
-        ):
-            with pytest.raises(NotEnoughPermission):
-                await validator.validate(single_entity_action, trigger_meta)
-
-        audit_log_repository.create.assert_not_called()
 
 
 class TestLegacySingleEntityActionRBACValidator:
