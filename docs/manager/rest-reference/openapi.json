@@ -29164,6 +29164,18 @@
             "default": null,
             "description": "Filter audit logs by the user or system that triggered the action. Use this to export audit logs initiated by a specific actor."
           },
+          "acted_as": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter audit logs by the effective/acting user UUID the action ran as (differs from triggered_by only during super-admin impersonation)."
+          },
           "request_id": {
             "anyOf": [
               {
