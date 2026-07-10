@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.app_config.types import AppConfigScopeType
+from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.identifier.app_config_allow_list import AppConfigAllowListID
 from ai.backend.common.metrics.metric import DomainType, LayerType
@@ -20,10 +22,14 @@ from ai.backend.manager.data.app_config_allow_list.types import (
     AppConfigAllowListSearchResult,
 )
 from ai.backend.manager.errors.app_config import AppConfigAllowListNotFound
+from ai.backend.manager.models.app_config_allow_list.conditions import (
+    AppConfigAllowListConditions,
+)
 from ai.backend.manager.models.app_config_allow_list.row import AppConfigAllowListRow
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     Creator,
+    OffsetPagination,
     Purger,
     Querier,
     Updater,
@@ -93,6 +99,30 @@ class AppConfigAllowListDBSource:
             if result is None:
                 raise AppConfigAllowListNotFound("App config allow-list entry not found")
             return result.row.to_data()
+
+    @app_config_allow_list_db_source_resilience.apply()
+    async def by_config_and_scope(
+        self, config_name: str, scope_type: AppConfigScopeType
+    ) -> AppConfigAllowListData | None:
+        """The allow-list entry for the unique ``(config_name, scope_type)`` pair, or ``None``.
+
+        Used by write/read authorization to read the layer's access tiers.
+        """
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=1, offset=0),
+            conditions=[
+                AppConfigAllowListConditions.by_config_name_equals(
+                    StringMatchSpec(config_name, case_insensitive=False, negated=False)
+                ),
+                AppConfigAllowListConditions.by_scope_type_equals(scope_type),
+            ],
+        )
+        async with self._ops.read_ops() as r:
+            result = await r.batch_query_in_global(sa.select(AppConfigAllowListRow), querier)
+            if not result.rows:
+                return None
+            data: AppConfigAllowListData = result.rows[0].AppConfigAllowListRow.to_data()
+            return data
 
     @app_config_allow_list_db_source_resilience.apply()
     async def search(self, querier: BatchQuerier) -> AppConfigAllowListSearchResult:

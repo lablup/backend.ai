@@ -30,12 +30,12 @@ class V2AppConfigFragmentHandler:
     def __init__(self, *, adapter: AppConfigAdapter) -> None:
         self._adapter = adapter
 
-    async def admin_create(
+    async def create(
         self,
         body: BodyParam[CreateAppConfigFragmentInput],
     ) -> APIResponse:
-        """Create a fragment at any scope (superadmin only)."""
-        result = await self._adapter.admin_create(body.parsed)
+        """Create a fragment; authorized by the layer's write_access tier (auth required)."""
+        result = await self._adapter.create(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.CREATED, response_model=result)
 
     async def admin_get(
@@ -46,25 +46,23 @@ class V2AppConfigFragmentHandler:
         result = await self._adapter.admin_get(AppConfigFragmentID(path.parsed.fragment_id))
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
-    async def admin_update(
+    async def update(
         self,
         path: PathParam[AppConfigFragmentIdPathParam],
         body: BodyParam[UpdateAppConfigFragmentInput],
     ) -> APIResponse:
-        """Update a fragment's config document by id (superadmin only)."""
-        result = await self._adapter.admin_update(
+        """Update a fragment's config; authorized by the layer's write_access tier (auth required)."""
+        result = await self._adapter.update(
             AppConfigFragmentID(path.parsed.fragment_id), body.parsed
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
-    async def admin_purge(
+    async def purge(
         self,
         path: PathParam[AppConfigFragmentIdPathParam],
     ) -> APIResponse:
-        """Purge a fragment by id (superadmin only)."""
-        result = await self._adapter.admin_purge(
-            PurgeAppConfigFragmentInput(id=path.parsed.fragment_id)
-        )
+        """Purge a fragment by id; authorized by the layer's write_access tier (auth required)."""
+        result = await self._adapter.purge(PurgeAppConfigFragmentInput(id=path.parsed.fragment_id))
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def admin_search(

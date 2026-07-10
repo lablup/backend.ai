@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.identifier.app_config_allow_list import AppConfigAllowListID
 from ai.backend.common.metrics.metric import DomainType, LayerType
@@ -62,6 +63,12 @@ class AppConfigAllowListRepository:
     @app_config_allow_list_repository_resilience.apply()
     async def get_by_id(self, allow_list_id: AppConfigAllowListID) -> AppConfigAllowListData:
         return await self._db_source.get_by_id(allow_list_id)
+
+    @app_config_allow_list_repository_resilience.apply()
+    async def by_config_and_scope(
+        self, config_name: str, scope_type: AppConfigScopeType
+    ) -> AppConfigAllowListData | None:
+        return await self._db_source.by_config_and_scope(config_name, scope_type)
 
     @app_config_allow_list_repository_resilience.apply()
     async def search(self, querier: BatchQuerier) -> AppConfigAllowListSearchResult:

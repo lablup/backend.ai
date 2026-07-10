@@ -99,17 +99,16 @@ class AppConfigAdapter(BaseAdapter):
 
     # --- admin fragment CRUD ---
 
-    async def admin_create(
-        self, input: CreateAppConfigFragmentInput
-    ) -> CreateAppConfigFragmentPayload:
+    async def create(self, input: CreateAppConfigFragmentInput) -> CreateAppConfigFragmentPayload:
         spec = AppConfigFragmentCreatorSpec(
             config_name=input.config_name,
             scope_type=AppConfigScopeType(input.scope_type.value),
             scope_id=input.scope_id,
             config=input.config,
         )
+        # Authorization is enforced in the service against the layer's write_access tier.
         action_result = await self._processors.app_config_fragment.create.wait_for_complete(
-            CreateAppConfigFragmentAction(creator_spec=spec)
+            CreateAppConfigFragmentAction(creator_spec=spec, requester=current_user())
         )
         return CreateAppConfigFragmentPayload(
             app_config_fragment=self._fragment_to_node(action_result.fragment),
@@ -121,30 +120,28 @@ class AppConfigAdapter(BaseAdapter):
         )
         return self._fragment_to_node(action_result.fragment)
 
-    async def admin_update(
+    async def update(
         self, fragment_id: AppConfigFragmentID, input: UpdateAppConfigFragmentInput
     ) -> UpdateAppConfigFragmentPayload:
         updater = Updater(
             spec=AppConfigFragmentUpdaterSpec(config=OptionalState.update(input.config)),
             pk_value=fragment_id,
         )
-        # No allow-list gate: a fragment row exists only while its entry does (FK with
-        # cascade), so an existing fragment is always writable at its own scope.
+        # Authorization is enforced in the service: it loads the fragment and checks the
+        # caller against the layer's write_access tier before updating.
         action_result = await self._processors.app_config_fragment.update.wait_for_complete(
-            UpdateAppConfigFragmentAction(updater=updater)
+            UpdateAppConfigFragmentAction(updater=updater, requester=current_user())
         )
         return UpdateAppConfigFragmentPayload(
             app_config_fragment=self._fragment_to_node(action_result.fragment),
         )
 
-    async def admin_purge(
-        self, input: PurgeAppConfigFragmentInput
-    ) -> PurgeAppConfigFragmentPayload:
+    async def purge(self, input: PurgeAppConfigFragmentInput) -> PurgeAppConfigFragmentPayload:
         fragment_id = AppConfigFragmentID(input.id)
         purger = Purger(row_class=AppConfigFragmentRow, pk_value=fragment_id)
-        # No allow-list gate — see ``admin_update``.
+        # Authorization is enforced in the service — see ``update``.
         action_result = await self._processors.app_config_fragment.purge.wait_for_complete(
-            PurgeAppConfigFragmentAction(purger=purger)
+            PurgeAppConfigFragmentAction(purger=purger, requester=current_user())
         )
         return PurgeAppConfigFragmentPayload(id=action_result.fragment.id)
 

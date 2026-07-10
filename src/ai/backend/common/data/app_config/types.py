@@ -5,6 +5,7 @@ from __future__ import annotations
 import enum
 
 from ai.backend.common.data.permission.types import ScopeType
+from ai.backend.common.data.user.types import UserData
 
 __all__ = ("AppConfigScopeType", "AppConfigAccessLevel")
 
@@ -26,6 +27,39 @@ class AppConfigAccessLevel(enum.StrEnum):
     AUTHENTICATED = "authenticated"
     OWNER = "owner"
     ADMIN = "admin"
+
+    def is_satisfied_by(
+        self, user: UserData | None, scope_type: AppConfigScopeType, scope_id: str
+    ) -> bool:
+        """Whether ``user`` meets this access tier for a fragment at ``(scope_type, scope_id)``.
+
+        Anonymous (``user is None``) satisfies only ``public``. A superadmin satisfies every
+        tier. ``owner`` is instance-relative: the user itself for ``user`` scope, a domain
+        admin for ``domain`` scope; ``public`` scope has no owner.
+        """
+        if user is None:
+            return self is AppConfigAccessLevel.PUBLIC
+        if user.is_superadmin:
+            return True
+        match self:
+            case AppConfigAccessLevel.PUBLIC:
+                return True
+            case AppConfigAccessLevel.AUTHENTICATED:
+                return user.is_authorized
+            case AppConfigAccessLevel.OWNER:
+                match scope_type:
+                    case AppConfigScopeType.USER:
+                        return str(user.user_id) == scope_id
+                    case AppConfigScopeType.DOMAIN:
+                        # NOTE: assumes a domain fragment's scope_id holds the domain *name*
+                        # (matching UserData.domain_name). Not exercised by the default policy
+                        # (domain write defaults to ADMIN); verify when domain-owner writes land.
+                        return user.is_admin and user.domain_name == scope_id
+                    case AppConfigScopeType.PUBLIC:
+                        return False
+            case AppConfigAccessLevel.ADMIN:
+                # superadmin already returned True above; no one else satisfies ADMIN
+                return False
 
 
 class AppConfigScopeType(enum.StrEnum):

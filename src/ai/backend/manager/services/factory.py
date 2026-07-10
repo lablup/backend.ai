@@ -194,6 +194,7 @@ def create_services(args: ServiceArgs) -> Services:
         ),
         app_config_fragment=AppConfigFragmentService(
             repository=repositories.app_config_fragment.repository,
+            allow_list_repository=repositories.app_config_allow_list.repository,
         ),
         domain=DomainService(repositories.domain.repository),
         dotfile=DotfileService(

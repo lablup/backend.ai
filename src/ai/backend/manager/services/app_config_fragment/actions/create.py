@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.permission.types import RBACElementType, ScopeType
+from ai.backend.common.data.user.types import UserData
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.app_config_fragment.types import (
     AppConfigFragmentData,
@@ -28,6 +29,7 @@ class CreateAppConfigFragmentAction(AppConfigFragmentScopeAction):
     """
 
     creator_spec: AppConfigFragmentCreatorSpec
+    requester: UserData | None = None
 
     @override
     @classmethod

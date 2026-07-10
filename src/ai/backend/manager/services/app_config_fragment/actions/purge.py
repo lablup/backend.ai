@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.common.data.user.types import UserData
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.app_config_fragment.types import AppConfigFragmentData
 from ai.backend.manager.data.permission.types import RBACElementRef
@@ -26,6 +27,7 @@ class PurgeAppConfigFragmentAction(AppConfigFragmentSingleEntityAction):
     """
 
     purger: Purger[AppConfigFragmentRow]
+    requester: UserData | None = None
 
     @override
     @classmethod
