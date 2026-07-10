@@ -35,9 +35,10 @@ def _plan() -> EndpointPlan:
 class FakeRuntime(OciRuntime):
     """Records the runtime call order; returns a fixed task PID."""
 
-    def __init__(self, pid: int = 4242) -> None:
+    def __init__(self, pid: int = 4242, events: list[str] | None = None) -> None:
         self.calls: list[str] = []
         self._pid = pid
+        self._events = events  # optional shared ordering log (runtime + network interleaved)
 
     @override
     async def image_exists(self, image_ref: str) -> bool:
@@ -97,9 +98,17 @@ class FakeRuntime(OciRuntime):
         self.calls.append("create_container")
 
     @override
-    async def start_container(self, container_id: str) -> TaskHandle:
-        self.calls.append("start_container")
+    async def create_task(self, container_id: str) -> TaskHandle:
+        self.calls.append("create_task")
+        if self._events is not None:
+            self._events.append("create_task")
         return TaskHandle(container_id=container_id, pid=self._pid)
+
+    @override
+    async def start_task(self, container_id: str) -> None:
+        self.calls.append("start_task")
+        if self._events is not None:
+            self._events.append("start_task")
 
     @override
     async def kill_container(self, container_id: str, *, signal: int) -> None:
@@ -125,13 +134,16 @@ class FakeRuntime(OciRuntime):
 
 
 class RecordingNetworkRunner:
-    def __init__(self) -> None:
+    def __init__(self, events: list[str] | None = None) -> None:
         self.calls: list[tuple[str, str]] = []
+        self._events = events
 
     async def __call__(
         self, command: str, *, ifname: str, netns: str, container_id: str, config: Any
     ) -> None:
         self.calls.append((command, netns))
+        if self._events is not None:
+            self._events.append(f"attach:{command}")
 
 
 def _orchestrator(
@@ -150,8 +162,9 @@ class _FixedPlanBackend:
 
 class TestLaunch:
     async def test_order_create_task_then_attach_then_start(self) -> None:
-        runtime = FakeRuntime(pid=4242)
-        runner = RecordingNetworkRunner()
+        events: list[str] = []
+        runtime = FakeRuntime(pid=4242, events=events)
+        runner = RecordingNetworkRunner(events=events)
         orch = _orchestrator(runtime, runner)
         result = await orch.launch(
             "c1",
@@ -162,8 +175,10 @@ class TestLaunch:
             kernel_config=cast(KernelCreationConfig, {}),
             cluster_info=cast(ClusterInfo, {}),
         )
-        # runtime creates + starts the container BEFORE the network attaches
-        assert runtime.calls == ["create_container", "start_container"]
+        # The task is created, THEN the network attaches, THEN the task starts (execs the user
+        # command) — so the container process begins with its network already in place.
+        assert events == ["create_task", "attach:ADD", "start_task"]
+        assert runtime.calls == ["create_container", "create_task", "start_task"]
         # network attach happened against the task's PID netns
         assert runner.calls == [("ADD", "/proc/4242/ns/net")]
         assert result.handle.pid == 4242
@@ -197,6 +212,6 @@ class TestSplitLifecycle:
             kernel_config=cast(KernelCreationConfig, {}),
             cluster_info=cast(ClusterInfo, {}),
         )
-        assert runtime.calls == ["create_container", "start_container"]
+        assert runtime.calls == ["create_container", "create_task", "start_task"]
         assert runner.calls == [("ADD", "/proc/4242/ns/net")]
         assert result.handle.pid == 4242

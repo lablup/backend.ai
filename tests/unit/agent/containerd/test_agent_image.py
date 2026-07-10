@@ -76,7 +76,10 @@ class _FakeRuntime:
     async def create_container(self, container_id: str, **kwargs: Any) -> None:
         self.created = True
 
-    async def start_container(self, container_id: str) -> Any:
+    async def create_task(self, container_id: str) -> Any:
+        return None
+
+    async def start_task(self, container_id: str) -> None:
         return None
 
     async def container_status(self, container_id: str) -> str | None:

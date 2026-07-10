@@ -158,9 +158,13 @@ class FakeRuntime(OciRuntime):
         self.calls.append(f"create:{container_id}:{image_ref}")
 
     @override
-    async def start_container(self, container_id: str) -> TaskHandle:
-        self.calls.append(f"start:{container_id}")
+    async def create_task(self, container_id: str) -> TaskHandle:
+        self.calls.append(f"create_task:{container_id}")
         return TaskHandle(container_id=container_id, pid=9001)
+
+    @override
+    async def start_task(self, container_id: str) -> None:
+        self.calls.append(f"start_task:{container_id}")
 
     @override
     async def kill_container(self, container_id: str, *, signal: int) -> None:
@@ -308,7 +312,7 @@ class TestSplitAndTeardown:
             result = await facade.start_and_attach_container(
                 "s1", "c1", meta=meta, kernel_config=cast(Any, {}), cluster_info=cast(Any, {})
             )
-            assert rt.calls == ["create:c1:img", "start:c1"]
+            assert rt.calls == ["create:c1:img", "create_task:c1", "start_task:c1"]
             assert runner.calls == [("ADD", "/proc/9001/ns/net")]
             assert result.handle.pid == 9001
         finally:

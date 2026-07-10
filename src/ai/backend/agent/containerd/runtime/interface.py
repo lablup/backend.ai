@@ -18,8 +18,11 @@ network namespace, exposed as ``TaskHandle.pid`` (the network layer derives
 a runtime with the network subsystem; neither side references the other.
 
 Lifecycle model: a container is created with an **isolated, empty network namespace** (only
-loopback) and then started; the running task's PID is returned so the network layer can
-attach CNI into its netns after start (validated in BEP-1058/verification.md §5).
+loopback). Its task is then created (``create_task``) — the init process and namespaces exist
+but the user command has not exec'd yet ('created' state — the task's PID is returned here) —
+the network layer attaches CNI into that netns, and only then is the task started
+(``start_task``). Attaching in the created window (rather than after start) means the user
+process begins with its network already in place, closing the attach-after-start race.
 """
 
 from __future__ import annotations
@@ -136,8 +139,16 @@ class OciRuntime(ABC):
         compatibility and is otherwise "none")."""
 
     @abstractmethod
-    async def start_container(self, container_id: str) -> TaskHandle:
-        """Start the container's task and return its handle (incl. PID)."""
+    async def create_task(self, container_id: str) -> TaskHandle:
+        """Create the container's task (containerd Tasks.Create) and return its handle
+        (incl. PID). The task is in the 'created' state: its init process and namespaces —
+        including the network namespace — exist, but the user command has not exec'd yet.
+        The network layer attaches CNI to ``/proc/{pid}/ns/net`` in this window; ``start_task``
+        then resumes execution, so the process starts with its network already present."""
+
+    @abstractmethod
+    async def start_task(self, container_id: str) -> None:
+        """Start (exec) the previously created task (containerd Tasks.Start)."""
 
     @abstractmethod
     async def kill_container(self, container_id: str, *, signal: int) -> None: ...

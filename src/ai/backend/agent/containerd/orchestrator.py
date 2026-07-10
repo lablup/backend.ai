@@ -74,8 +74,13 @@ class ContainerdKernelOrchestrator:
         kernel_config: KernelCreationConfig,
         cluster_info: ClusterInfo,
     ) -> LaunchResult:
-        """Start the (already created) container's task, then attach CNI to its netns."""
-        handle = await self._runtime.start_container(container_id)
+        """Create the (already-created container's) task, attach CNI to its netns, then start it.
+
+        The attach happens while the task is in the 'created' state — its netns exists but the
+        user command has not exec'd — so the container process begins with its network already
+        in place. Attaching after start would race krunner's network-dependent init (REPL bind,
+        SSH, peer lookup)."""
+        handle = await self._runtime.create_task(container_id)
         plan, endpoint_ips = await self._network.attach(
             kernel_config,
             cluster_info,
@@ -83,6 +88,7 @@ class ContainerdKernelOrchestrator:
             container_id=container_id,
             task_pid=handle.pid,
         )
+        await self._runtime.start_task(container_id)
         return LaunchResult(handle=handle, plan=plan, endpoint_ips=endpoint_ips)
 
     async def launch(

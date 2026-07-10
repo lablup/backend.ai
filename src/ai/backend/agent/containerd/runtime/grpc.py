@@ -419,7 +419,10 @@ class ContainerdGrpcRuntime(OciRuntime):
         )
 
     @override
-    async def start_container(self, container_id: str) -> TaskHandle:
+    async def create_task(self, container_id: str) -> TaskHandle:
+        # Tasks.Create leaves the task in the 'created' state: the init process (and its netns)
+        # exist and its PID is returned, but the user command is not exec'd until start_task.
+        # The network layer attaches CNI into /proc/<pid>/ns/net in this window.
         # Capture the task's stdout+stderr to a host log file (the containerd shim writes a
         # plain path directly); ContainerdKernel.get_logs reads it back.
         log_path = container_log_path(container_id)
@@ -434,10 +437,15 @@ class ContainerdGrpcRuntime(OciRuntime):
             ),
             metadata=self._md,
         )
+        return TaskHandle(container_id=container_id, pid=resp.pid)
+
+    @override
+    async def start_task(self, container_id: str) -> None:
+        # Tasks.Start execs the user command in the already-created task, whose network the
+        # caller has attached in the meantime.
         await self._tasks_stub().Start(
             tasks_pb2.StartRequest(container_id=container_id), metadata=self._md
         )
-        return TaskHandle(container_id=container_id, pid=resp.pid)
 
     @override
     async def kill_container(self, container_id: str, *, signal: int) -> None:

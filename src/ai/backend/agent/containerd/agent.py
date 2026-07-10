@@ -958,7 +958,9 @@ class ContainerdAgent(
             probe_id, image_ref=canonical, command=["ldd", "--version"], oci_spec=oci_spec
         )
         try:
-            await self._runtime.start_container(probe_id)
+            # No network needed for the throwaway probe: create the task and start it directly.
+            await self._runtime.create_task(probe_id)
+            await self._runtime.start_task(probe_id)
             for _ in range(50):  # up to ~10s for the trivial command to exit
                 if await self._runtime.container_status(probe_id) in (None, "stopped"):
                     break
