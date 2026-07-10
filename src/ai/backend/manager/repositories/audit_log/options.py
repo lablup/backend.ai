@@ -13,7 +13,11 @@ from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import make_string_in_factory
 
 if TYPE_CHECKING:
-    from ai.backend.common.data.filter_specs import StringMatchSpec
+    from ai.backend.common.data.filter_specs import (
+        StringMatchSpec,
+        UUIDEqualMatchSpec,
+        UUIDInMatchSpec,
+    )
 
 
 class AuditLogConditions:
@@ -232,6 +236,29 @@ class AuditLogConditions:
         return inner
 
     by_triggered_by_in = staticmethod(make_string_in_factory(AuditLogRow.triggered_by))
+
+    # --- acted_as UUID filters ---
+    # acted_as is stored as a stringified UUID, so compare against str(value).
+
+    @staticmethod
+    def by_acted_as_equals(spec: UUIDEqualMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            condition = AuditLogRow.acted_as == str(spec.value)
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
+
+    @staticmethod
+    def by_acted_as_in(spec: UUIDInMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            condition = AuditLogRow.acted_as.in_([str(v) for v in spec.values])
+            if spec.negated:
+                condition = sa.not_(condition)
+            return condition
+
+        return inner
 
     # --- cursor pagination conditions ---
 

@@ -1658,6 +1658,9 @@ input AuditLogFilter
   status: AuditLogStatusFilter = null
   createdAt: DateTimeFilter = null
   triggeredBy: StringFilter = null
+
+  """Added in 26.8.0. Filter by acted_as (the effective/acting user UUID)."""
+  actedAs: UUIDFilter = null
   AND: [AuditLogFilter!] = null
   OR: [AuditLogFilter!] = null
   NOT: [AuditLogFilter!] = null
