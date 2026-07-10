@@ -1,3 +1,4 @@
+import asyncio
 import json
 from collections.abc import AsyncIterator
 from typing import Any, cast
@@ -64,6 +65,15 @@ class FakeEtcd:
             "agent_id": agent_id,
             "container_id": container_id,
         })
+
+
+class _BlockingWatchEtcd(FakeEtcd):
+    """A FakeEtcd whose watch never yields and never returns, so the coordinator's watch task
+    stays live until it is cancelled — lets us assert stop() actually awaits the cancellation."""
+
+    async def watch_prefix(self, prefix: str, **kwargs: Any) -> AsyncIterator[None]:
+        await asyncio.Event().wait()  # blocks forever (until cancelled)
+        yield  # pragma: no cover  (makes this an async generator)
 
 
 class RecordingBackend:
@@ -161,6 +171,18 @@ class TestStartStop:
         await coord.stop("s1")
         assert backend.teardown == ["s1"]
         assert member_key("s1", "a1") not in etcd.store
+
+    async def test_stop_awaits_the_cancelled_watch_task(self) -> None:
+        # With a live (blocked) watch, stop() must cancel AND await it, so no trailing reconcile
+        # runs after teardown and the CancelledError is retrieved.
+        etcd = _BlockingWatchEtcd()
+        backend = RecordingBackend()
+        coord = _coordinator(etcd, backend)
+        await coord.start(_META, _SELF)
+        task = coord._watch_tasks["s1"]
+        assert not task.done()  # watch is live, blocked on events
+        await coord.stop("s1")
+        assert task.done()  # cancelled and awaited to completion
 
 
 class TestReconcileEndpoints:

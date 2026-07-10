@@ -10,6 +10,7 @@ never watches etcd itself — that ownership lives here (see Decision Log, BEP-1
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import logging
 from typing import TYPE_CHECKING, Any
@@ -79,7 +80,11 @@ class SessionNetworkCoordinator:
     async def stop(self, session_id: str) -> None:
         """Stop watching, remove this node's membership, and tear down the data plane."""
         if task := self._watch_tasks.pop(session_id, None):
+            # Await the cancellation so a trailing reconcile can't run after teardown and the
+            # task's CancelledError is retrieved (no "task exception was never retrieved" warning).
             task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await task
         await self._etcd.delete(member_key(session_id, self._agent_id))
         await self._backend.teardown_session_network(session_id)
         self._applied.pop(session_id, None)
