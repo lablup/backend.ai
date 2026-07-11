@@ -437,7 +437,7 @@ class AbstractKernel(UserDict[str, Any], aobject, metaclass=ABCMeta):
         if self.runner is None:
             raise KernelRunnerNotInitializedError("Kernel runner is not initialized")
         try:
-            log.info(
+            log.debug(
                 "kernel.execute(k:{0}, run_id:{1}, mode:{2}, opts:{3})",
                 self.kernel_id,
                 run_id,
@@ -1182,7 +1182,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             self.pending_queues[run_id] = (activated, q)
         else:
             activated, q = self.pending_queues[run_id]
-        log.info(
+        log.debug(
             "CodeRunner.attach_output_queue(k:{0}, run_id:{1}, is running event set:{2})",
             self.kernel_id,
             run_id,
