@@ -111,6 +111,14 @@
   # Ensure sufficient disk space and appropriate permissions.
   # Added in 25.12.0
   var-base-path = "/var/lib/backend.ai"
+  # Unix socket path of the privileged network helper (BEP-1058). When set, the
+  # containerd agent delegates all CAP_NET_ADMIN/CAP_SYS_ADMIN container
+  # networking to the helper over this socket and needs no network privilege
+  # itself. When unset (the default), the agent performs container networking
+  # in-process, which requires the agent process to hold those capabilities.
+  # Only used by the containerd backend.
+  # Added in 25.12.0
+  ## network-helper-socket = "/run/backend.ai/net-helper.sock"
   # Base directory path for mounting storage volumes into containers. Virtual
   # folders and other storage mounts are placed under this path. Should be on a
   # filesystem with sufficient space for user data.
@@ -370,6 +378,15 @@
   # such as when running behind NAT or in a cloud environment.
   # Added in 25.12.0
   ## advertised-host = "192.168.1.100"
+  # DNS nameserver addresses for containers. When empty (the default), the agent
+  # derives them from the host's resolver configuration, dropping loopback
+  # nameservers (a container's network namespace cannot reach the host's
+  # loopback, so a systemd-resolved stub such as 127.0.0.53 is useless inside
+  # it) and reading the systemd-resolved uplink file instead when one is
+  # present. Set this to pin specific nameservers, e.g. an internal corporate
+  # resolver.
+  # Added in 26.7.0
+  ## dns = ["10.0.0.53", "10.0.0.54"]
   # KRunner volumes configuration mapping container paths to host paths.
   # Specifies volumes to mount into containers for the kernel runner. This is
   # typically set automatically by the agent based on environment detection and

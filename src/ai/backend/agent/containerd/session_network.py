@@ -18,12 +18,12 @@ from __future__ import annotations
 
 import json
 import logging
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from typing import TYPE_CHECKING, Any, cast
 
 from ai.backend.agent.containerd.oci import SESSION_ID_LABEL
 from ai.backend.agent.containerd.orchestrator import ContainerdKernelOrchestrator, LaunchResult
-from ai.backend.agent.containerd.runtime.interface import OciRuntime
+from ai.backend.agent.containerd.runtime.interface import ExecResult, OciRuntime
 from ai.backend.agent.containerd.session_tracker import SessionContainerTracker, TeardownScope
 from ai.backend.agent.network.cni import CniRunner
 from ai.backend.agent.network.coordinator import SessionNetworkCoordinator
@@ -407,6 +407,20 @@ class ContainerdSessionNetwork:
     ) -> None:
         await self._orchestrators[session_id].terminate(container_id, plan=plan, task_pid=task_pid)
 
+    async def exec_in_container(
+        self,
+        container_id: str,
+        args: Sequence[str],
+        *,
+        uid: int | None = None,
+        gid: int | None = None,
+        cwd: str | None = None,
+        timeout_sec: float = 30.0,
+    ) -> ExecResult:
+        return await self._runtime.exec_in_container(
+            container_id, args, uid=uid, gid=gid, cwd=cwd, timeout_sec=timeout_sec
+        )
+
     async def image_entrypoint(self, image_ref: str) -> list[str] | None:
         return await self._runtime.image_entrypoint(image_ref)
 
@@ -416,11 +430,14 @@ class ContainerdSessionNetwork:
     async def push_image(self, image_ref: str, *, auth: Mapping[str, str] | None = None) -> None:
         await self._runtime.push_image(image_ref, auth=auth)
 
-    async def remove_image(self, image_ref: str) -> None:
-        await self._runtime.remove_image(image_ref)
+    async def remove_image(self, image_ref: str, *, sync: bool = False) -> None:
+        await self._runtime.remove_image(image_ref, sync=sync)
 
     async def image_exists(self, image_ref: str) -> bool:
         return await self._runtime.image_exists(image_ref)
+
+    async def image_config_digest(self, image_ref: str) -> str | None:
+        return await self._runtime.image_config_digest(image_ref)
 
     async def image_digest(self, image_ref: str) -> str | None:
         return await self._runtime.image_digest(image_ref)

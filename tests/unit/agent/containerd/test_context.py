@@ -4,6 +4,7 @@ The heavy AbstractKernelCreationContext.__init__ is bypassed via __new__ + manua
 injection so the lifecycle methods can be tested in isolation against a fake facade.
 """
 
+import asyncio
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, cast, override
@@ -14,7 +15,8 @@ from ai.backend.agent.config.unified import ScratchType
 from ai.backend.agent.containerd.agent import ContainerdKernelCreationContext
 from ai.backend.agent.containerd.oci import AcceleratorSpec
 from ai.backend.agent.containerd.orchestrator import LaunchResult
-from ai.backend.agent.containerd.runtime.interface import TaskHandle
+from ai.backend.agent.containerd.runtime.interface import ExecResult, TaskHandle
+from ai.backend.agent.errors.agent import ContainerCreationError
 from ai.backend.agent.port_pool import PortPool
 from ai.backend.agent.resources import Mount
 from ai.backend.common.network.types import (
@@ -25,20 +27,28 @@ from ai.backend.common.network.types import (
     NetworkRole,
     SessionNetMeta,
 )
-from ai.backend.common.types import MountPermission, MountTypes
+from ai.backend.common.types import MountPermission, MountTypes, ResourceGroupType
 
 _VXLAN_NC = {"backend": "vxlan", "subnet": "10.128.5.0/24", "vni": 4097, "mtu": 1450}
 
 
 class FakeFacade:
-    def __init__(self) -> None:
+    def __init__(self, exec_exit_code: int = 0) -> None:
         self.ensured: list[tuple[str, dict[str, Any]]] = []
         self.started: list[tuple[str, str]] = []
+        self.execs: list[tuple[list[str], int | None]] = []
+        self._exec_exit_code = exec_exit_code
 
     async def create_container(
         self, session_id: str, container_id: str, *, image_ref: str, command: Any, oci_spec: Any
     ) -> None:
         pass
+
+    async def exec_in_container(
+        self, container_id: str, args: Any, *, uid: int | None = None, **kwargs: Any
+    ) -> ExecResult:
+        self.execs.append((list(args), uid))
+        return ExecResult(exit_code=self._exec_exit_code, stdout=b"", stderr=b"denied")
 
     async def ensure_session(self, session_id: str, network_config: Any) -> SessionNetMeta:
         self.ensured.append((session_id, dict(network_config)))
@@ -94,14 +104,19 @@ class FakePortForwarder:
 
 
 def _context(
-    facade: FakeFacade, *, port_forwarder: FakePortForwarder | None = None
+    facade: FakeFacade,
+    *,
+    port_forwarder: FakePortForwarder | None = None,
+    internal_data: dict[str, Any] | None = None,
 ) -> ContainerdKernelCreationContext:
     ctx = ContainerdKernelCreationContext.__new__(ContainerdKernelCreationContext)
+    ctx.internal_data = internal_data or {}
     ctx._session_network = cast(Any, facade)
     ctx._session_id = "sess-abc"
     ctx._container_id = "kern-123"
     ctx._net_meta = None
     ctx._oci_mounts = []
+    ctx.domain_socket_proxies = []
     ctx._scratch_dir = None
     ctx._accel_spec = AcceleratorSpec()
     ctx._pending_spec = SimpleNamespace(
@@ -158,6 +173,40 @@ class TestApplyNetwork:
         await ctx.apply_network(cast(Any, {}))
         assert len(facade.ensured) == 1
         assert facade.ensured[0][1]["backend"] == "bridge"
+
+
+class TestResolvConfMount:
+    def _ctx_with_scratch(self, tmp_path: Path, dns: list[str]) -> Any:
+        ctx = _context(FakeFacade())
+        (tmp_path / "config").mkdir()
+        ctx._scratch_dir = tmp_path
+        ctx.local_config = cast(Any, SimpleNamespace(container=SimpleNamespace(dns=dns)))
+        return ctx
+
+    async def test_mounts_a_generated_resolv_conf(self, tmp_path: Path) -> None:
+        # runc, unlike dockerd, synthesizes no resolver: without this bind mount the container
+        # resolves no names at all.
+        ctx = self._ctx_with_scratch(tmp_path, ["10.0.0.53"])
+        mount = ctx._prepare_resolv_conf()
+        assert mount is not None
+        assert str(mount.target) == "/etc/resolv.conf"
+        # search/options are inherited from whatever this machine's resolv.conf says, so assert on
+        # the nameservers only — those are what the operator pinned.
+        written = (tmp_path / "config" / "resolv.conf").read_text()
+        assert [ln for ln in written.splitlines() if ln.startswith("nameserver")] == [
+            "nameserver 10.0.0.53"
+        ]
+
+    async def test_is_unconditional_unlike_etc_hosts(self, tmp_path: Path) -> None:
+        # /etc/hosts is only injected for cluster sessions; every container needs a resolver.
+        ctx = self._ctx_with_scratch(tmp_path, ["10.0.0.53"])
+        assert ctx._prepare_etc_hosts(cast(Any, {})) is None  # no cluster peers
+        assert ctx._prepare_resolv_conf() is not None
+
+    async def test_no_scratch_yields_no_mount(self) -> None:
+        ctx = _context(FakeFacade())
+        ctx._scratch_dir = None
+        assert ctx._prepare_resolv_conf() is None
 
 
 class TestScratchAndMounts:
@@ -232,6 +281,63 @@ class TestStartContainer:
         assert facade.started == [("sess-abc", "kern-123")]
         assert result["kernel_host"] == _ADVERTISED_HOST
         assert result["task_pid"] == 555
+
+    async def test_sudo_session_provisions_sudoers_in_the_container(self) -> None:
+        # /etc/sudoers.d lives in the image rootfs, not in any bind mount, so it can only be
+        # written from inside the container — hence the exec, as root.
+        facade = FakeFacade()
+        ctx = _context(
+            facade,
+            port_forwarder=FakePortForwarder(),
+            internal_data={"sudo_session_enabled": True},
+        )
+        await ctx.apply_network(cast(Any, {}))
+        await ctx.start_container(cast(Any, None), [], None, [], cast(Any, {}))
+
+        assert len(facade.execs) == 1
+        args, uid = facade.execs[0]
+        assert "/etc/sudoers.d/01-bai-work" in args[-1]
+        assert uid == 0
+
+    async def test_no_sudo_session_execs_nothing(self) -> None:
+        facade = FakeFacade()
+        ctx = _context(facade, port_forwarder=FakePortForwarder())
+        await ctx.apply_network(cast(Any, {}))
+        await ctx.start_container(cast(Any, None), [], None, [], cast(Any, {}))
+        assert facade.execs == []
+
+    async def test_a_failed_sudoers_provision_fails_the_launch(self) -> None:
+        # Silently starting a kernel whose sudo the user asked for and did not get is worse than
+        # failing the launch.
+        facade = FakeFacade(exec_exit_code=1)
+        ctx = _context(
+            facade,
+            port_forwarder=FakePortForwarder(),
+            internal_data={"sudo_session_enabled": True},
+        )
+        await ctx.apply_network(cast(Any, {}))
+        with pytest.raises(ContainerCreationError):
+            await ctx.start_container(cast(Any, None), [], None, [], cast(Any, {}))
+
+    async def test_block_service_ports_comes_from_internal_data(self) -> None:
+        # It used to be hard-coded False, so ContainerdKernel.start_service (which reads this off
+        # the kernel data) never enforced the manager's policy.
+        facade = FakeFacade()
+        ctx = _context(
+            facade,
+            port_forwarder=FakePortForwarder(),
+            internal_data={"block_service_ports": True},
+        )
+        await ctx.apply_network(cast(Any, {}))
+        result = await ctx.start_container(cast(Any, None), [], None, [], cast(Any, {}))
+        assert result["block_service_ports"] is True
+
+    async def test_block_service_ports_defaults_to_false(self) -> None:
+        facade = FakeFacade()
+        ctx = _context(facade, port_forwarder=FakePortForwarder())
+        await ctx.apply_network(cast(Any, {}))
+        result = await ctx.start_container(cast(Any, None), [], None, [], cast(Any, {}))
+        assert result["block_service_ports"] is False
 
     async def test_kernel_host_is_the_agent_advertised_address(self) -> None:
         # NOT the LOCAL IP: that is a node-local NAT address, and the manager hands kernel_host to
@@ -310,3 +416,113 @@ class TestAcceleratorAllocation:
         # accumulated across accelerators
         assert ctx._accel_spec.gpu_device_ids == ["0"]
         assert [d.source for d in ctx._accel_spec.devices] == ["/dev/rbln0"]
+
+
+class TestProtectedServices:
+    def _ctx_with_rg(self, rg: Any) -> Any:
+        ctx = _context(FakeFacade())
+        ctx.local_config = cast(Any, SimpleNamespace(agent=SimpleNamespace(scaling_group_type=rg)))
+        return ctx
+
+    def test_ttyd_protected_on_a_storage_resource_group(self) -> None:
+        # ttyd on a storage node is a shell into the storage host; it must not be exposed like an
+        # ordinary service app. It used to be unprotected on every resource group.
+        assert self._ctx_with_rg(ResourceGroupType.STORAGE).protected_services == ("ttyd",)
+
+    def test_nothing_protected_on_compute(self) -> None:
+        assert self._ctx_with_rg(ResourceGroupType.COMPUTE).protected_services == ()
+
+
+class TestDomainSocketProxies:
+    """Special service containers (the image importer) need a host socket, e.g. the docker socket.
+
+    The host socket is never bind-mounted directly: each kernel gets a proxy socket that forwards
+    to it. Containerd used to report `domain_socket_proxies: []` and mount nothing, so those
+    sessions could not work at all.
+    """
+
+    def _ctx(self, tmp_path: Path, sockets: list[str]) -> Any:
+        ctx = _context(FakeFacade(), internal_data={"domain_socket_proxies": sockets})
+        ctx._scratch_dir = tmp_path
+        ctx._agent_sock_path = None
+        ctx.local_config = cast(
+            Any,
+            SimpleNamespace(
+                agent=SimpleNamespace(ipc_base_path=tmp_path / "ipc"),
+                container=SimpleNamespace(scratch_root=tmp_path, scratch_type=ScratchType.HOSTDIR),
+            ),
+        )
+        return ctx
+
+    async def test_no_proxies_requested_mounts_nothing(self, tmp_path: Path) -> None:
+        ctx = self._ctx(tmp_path, [])
+        mounts = await ctx.get_intrinsic_mounts()
+        assert ctx.domain_socket_proxies == []
+        assert not any("proxy" in str(m.source) for m in mounts)
+
+    async def test_the_proxy_is_mounted_at_the_host_socket_path(self, tmp_path: Path) -> None:
+        host_sock = tmp_path / "docker.sock"
+        ctx = self._ctx(tmp_path, [str(host_sock)])
+        mounts = await ctx.get_intrinsic_mounts()
+        try:
+            (proxy,) = ctx.domain_socket_proxies
+            # the container sees the socket at its usual path...
+            mount = next(m for m in mounts if str(m.target) == str(host_sock))
+            # ...but what is mounted is OUR proxy socket, not the host's
+            assert Path(str(mount.source)) == proxy.host_proxy_path
+            assert proxy.host_proxy_path != host_sock
+            assert proxy.host_proxy_path.exists()
+        finally:
+            for p in ctx.domain_socket_proxies:
+                p.proxy_server.close()
+                await p.proxy_server.wait_closed()
+
+    async def test_the_proxy_forwards_to_the_host_socket(self, tmp_path: Path) -> None:
+        host_sock = tmp_path / "upstream.sock"
+        received: list[bytes] = []
+
+        async def _handle(reader: Any, writer: Any) -> None:
+            received.append(await reader.read(5))
+            writer.write(b"pong")
+            await writer.drain()
+            writer.close()
+
+        upstream = await asyncio.start_unix_server(_handle, str(host_sock))
+        ctx = self._ctx(tmp_path, [str(host_sock)])
+        await ctx.get_intrinsic_mounts()
+        try:
+            (proxy,) = ctx.domain_socket_proxies
+            reader, writer = await asyncio.open_unix_connection(str(proxy.host_proxy_path))
+            writer.write(b"hello")
+            await writer.drain()
+            assert await reader.read(4) == b"pong"
+            writer.close()
+            assert received == [b"hello"]
+        finally:
+            for p in ctx.domain_socket_proxies:
+                p.proxy_server.close()
+                await p.proxy_server.wait_closed()
+            upstream.close()
+            await upstream.wait_closed()
+
+
+class TestRestartKeepsTheAllocation:
+    async def test_restart_reads_back_resource_txt(self, tmp_path: Path) -> None:
+        # A restart must keep the allocation the kernel already has. Re-deriving it from
+        # resource_slots re-runs the allocator, which can hand out a different cpuset or a
+        # different accelerator device than the one the kernel's processes are pinned to.
+        config_dir = tmp_path / "kern-123" / "config"
+        config_dir.mkdir(parents=True)
+        (config_dir / "resource.txt").write_text(
+            "CID=kern-123\nSCRATCH_SIZE=0\nSLOTS={}\nMOUNTS=\n"
+        )
+        ctx = _context(FakeFacade())
+        ctx.restarting = True
+        ctx.local_config = cast(
+            Any, SimpleNamespace(container=SimpleNamespace(scratch_root=tmp_path))
+        )
+
+        spec, resource_opts = await ctx.prepare_resource_spec()
+
+        assert resource_opts is None  # the stored spec is authoritative on a restart
+        assert spec is not None

@@ -1394,6 +1394,22 @@ class CommonContainerConfig(BaseConfigSchema):
             example=ConfigExample(local="", prod="192.168.1.100"),
         ),
     ]
+    dns: Annotated[
+        list[str] | None,
+        Field(default=None),
+        BackendAIConfigMeta(
+            description=(
+                "DNS nameserver addresses for containers. When empty (the default), the agent "
+                "derives them from the host's resolver configuration, dropping loopback "
+                "nameservers (a container's network namespace cannot reach the host's loopback, "
+                "so a systemd-resolved stub such as 127.0.0.53 is useless inside it) and reading "
+                "the systemd-resolved uplink file instead when one is present. Set this to pin "
+                "specific nameservers, e.g. an internal corporate resolver."
+            ),
+            added_version="26.7.0",
+            example=ConfigExample(local="", prod='["10.0.0.53", "10.0.0.54"]'),
+        ),
+    ]
     krunner_volumes: Annotated[
         Mapping[str, str] | None,
         Field(

@@ -8,6 +8,7 @@ from typing import Any, cast
 import pytest
 
 from ai.backend.agent.containerd.kernel import ContainerdKernel
+from ai.backend.agent.containerd.runtime.interface import ExecResult
 from ai.backend.agent.errors.kernel import KernelRunnerNotInitializedError
 from ai.backend.common.dto.agent.response import CodeCompletionResult
 
@@ -118,35 +119,129 @@ def _fs_kernel(scratch_root: Any, kernel_id: str = "kern-1") -> ContainerdKernel
     return k
 
 
+class FakeRuntime:
+    """Stands in for the containerd gRPC client: records execs and replays canned results."""
+
+    def __init__(self, results: dict[str, ExecResult] | None = None) -> None:
+        self.execs: list[list[str]] = []
+        self.results = results or {}
+        self.opened = 0
+        self.closed = 0
+
+    async def open(self) -> None:
+        self.opened += 1
+
+    async def close(self) -> None:
+        self.closed += 1
+
+    async def exec_in_container(self, container_id: str, args: Any, **kwargs: Any) -> ExecResult:
+        self.execs.append(list(args))
+        # key on the embedded script so a test can target one file op
+        for key, result in self.results.items():
+            if any(key in a for a in args):
+                return result
+        return ExecResult(exit_code=0, stdout=b"", stderr=b"")
+
+
+@pytest.fixture
+def fake_runtime(monkeypatch: Any) -> FakeRuntime:
+    rt = FakeRuntime()
+    monkeypatch.setattr("ai.backend.agent.containerd.kernel.ContainerdGrpcRuntime", lambda **kw: rt)
+    return rt
+
+
+class TestFileOpsReadTheContainerNotTheHost:
+    """The read paths must look inside the container.
+
+    A vfolder is bind-mounted into the container at /home/work/<name>; it does not exist under the
+    host's scratch work dir. Reading the host therefore reported an empty directory for every
+    vfolder — the files were simply invisible.
+    """
+
+    async def test_list_files_execs_in_the_container(self, tmp_path: Any, monkeypatch: Any) -> None:
+        listing = json.dumps([{"filename": "in-vfolder.txt", "size": 3}]).encode()
+        rt = FakeRuntime({"scandir": ExecResult(0, listing, b"")})
+        monkeypatch.setattr(
+            "ai.backend.agent.containerd.kernel.ContainerdGrpcRuntime", lambda **kw: rt
+        )
+        k = _fs_kernel(tmp_path)
+        result = await k.list_files("my-vfolder")
+
+        assert [e["filename"] for e in json.loads(result["files"])] == ["in-vfolder.txt"]
+        # the exec targeted the container path, not any host path
+        assert rt.execs[0][-1] == "/home/work/my-vfolder"
+        assert rt.execs[0][0] == "/opt/backend.ai/bin/python"
+
+    async def test_download_file_returns_the_containers_tar(
+        self, tmp_path: Any, monkeypatch: Any
+    ) -> None:
+        buf = io.BytesIO()
+        with tarfile.open(fileobj=buf, mode="w") as tar:
+            info = tarfile.TarInfo("a.txt")
+            info.size = 4
+            tar.addfile(info, io.BytesIO(b"data"))
+        rt = FakeRuntime({"tarfile": ExecResult(0, buf.getvalue(), b"")})
+        monkeypatch.setattr(
+            "ai.backend.agent.containerd.kernel.ContainerdGrpcRuntime", lambda **kw: rt
+        )
+        k = _fs_kernel(tmp_path)
+        tar_bytes = await k.download_file("a.txt")
+
+        with tarfile.open(fileobj=io.BytesIO(tar_bytes)) as tar:
+            assert tar.getnames() == ["a.txt"]
+
+    async def test_download_single_returns_container_bytes(
+        self, tmp_path: Any, monkeypatch: Any
+    ) -> None:
+        rt = FakeRuntime({"isfile": ExecResult(0, b"hi there", b"")})
+        monkeypatch.setattr(
+            "ai.backend.agent.containerd.kernel.ContainerdGrpcRuntime", lambda **kw: rt
+        )
+        k = _fs_kernel(tmp_path)
+        assert await k.download_single("hello.txt") == b"hi there"
+
+    async def test_a_failing_exec_surfaces_stderr(self, tmp_path: Any, monkeypatch: Any) -> None:
+        rt = FakeRuntime({"isfile": ExecResult(1, b"", b"Expected a single file at /home/work/d")})
+        monkeypatch.setattr(
+            "ai.backend.agent.containerd.kernel.ContainerdGrpcRuntime", lambda **kw: rt
+        )
+        k = _fs_kernel(tmp_path)
+        with pytest.raises(ValueError, match="Expected a single file"):
+            await k.download_single("d")
+
+    async def test_the_runtime_client_is_always_closed(
+        self, tmp_path: Any, fake_runtime: FakeRuntime
+    ) -> None:
+        k = _fs_kernel(tmp_path)
+        await k.list_files(".")
+        assert fake_runtime.opened == 1
+        assert fake_runtime.closed == 1
+
+
 class TestFileOps:
-    async def test_accept_then_download_single_roundtrips(self, tmp_path: Any) -> None:
+    async def test_accept_file_writes_the_host_scratch(self, tmp_path: Any) -> None:
+        # accept_file stays host-side: /home/work IS the scratch bind mount, so the container sees
+        # the write immediately. Docker does the same.
         k = _fs_kernel(tmp_path)
         await k.accept_file("hello.txt", b"hi there")
         assert (tmp_path / "kern-1" / "work" / "hello.txt").read_bytes() == b"hi there"
-        assert await k.download_single("hello.txt") == b"hi there"
 
     async def test_accept_creates_parent_dirs(self, tmp_path: Any) -> None:
         k = _fs_kernel(tmp_path)
         await k.accept_file("sub/dir/f.bin", b"x")
         assert (tmp_path / "kern-1" / "work" / "sub" / "dir" / "f.bin").read_bytes() == b"x"
 
-    async def test_download_file_returns_tar(self, tmp_path: Any) -> None:
-        k = _fs_kernel(tmp_path)
-        await k.accept_file("a.txt", b"data")
-        tar_bytes = await k.download_file("a.txt")
-        with tarfile.open(fileobj=io.BytesIO(tar_bytes)) as tar:
-            assert tar.getnames() == ["a.txt"]
-
-    async def test_list_files_reports_entries(self, tmp_path: Any) -> None:
-        k = _fs_kernel(tmp_path)
-        await k.accept_file("one.txt", b"1")
-        await k.accept_file("two.txt", b"22")
-        result = await k.list_files(".")
-        names = {e["filename"] for e in json.loads(result["files"])}
-        assert names == {"one.txt", "two.txt"}
-        assert result["errors"] == ""
-
     async def test_escape_outside_home_is_rejected(self, tmp_path: Any) -> None:
         k = _fs_kernel(tmp_path)
         with pytest.raises(PermissionError):
             await k.accept_file("../../etc/passwd", b"x")
+
+    async def test_read_paths_reject_escapes_before_exec(
+        self, tmp_path: Any, fake_runtime: FakeRuntime
+    ) -> None:
+        # Confinement must hold on the container-path side too: nothing should be exec'd at all.
+        k = _fs_kernel(tmp_path)
+        for op in (k.list_files, k.download_file, k.download_single):
+            with pytest.raises(PermissionError):
+                await op("../../etc/passwd")
+        assert fake_runtime.execs == []

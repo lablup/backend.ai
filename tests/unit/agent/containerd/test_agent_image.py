@@ -1,6 +1,7 @@
 """Unit tests for ContainerdAgent image methods (facade injected via __new__)."""
 
 import asyncio
+import json
 import struct
 from pathlib import Path
 from types import SimpleNamespace
@@ -13,11 +14,16 @@ from ai.backend.agent.agent import ACTIVE_STATUS_SET, DEAD_STATUS_SET
 from ai.backend.agent.config.unified import ContainerSandboxType
 from ai.backend.agent.containerd.agent import ContainerdAgent
 from ai.backend.agent.containerd.runtime.interface import ContainerInfo, ImageInfo
+from ai.backend.agent.containerd.runtime.spec import _DEFAULT_CAPS
 from ai.backend.agent.network.port_forward import PortForward
 from ai.backend.common.docker import LabelName
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.exception import ImageNotAvailable
-from ai.backend.common.types import AutoPullBehavior, ContainerStatus, ImageCanonical
+from ai.backend.common.types import (
+    AutoPullBehavior,
+    ContainerStatus,
+    ImageCanonical,
+)
 
 
 class FakeFacade:
@@ -34,11 +40,15 @@ class FakeFacade:
         self.pulled: list[str] = []
         self.pushed: list[str] = []
         self.removed: list[str] = []
+        self.remove_sync: list[bool] = []
 
     async def image_exists(self, image_ref: str) -> bool:
         return self._exists
 
     async def image_digest(self, image_ref: str) -> str | None:
+        return "sha256:local" if self._exists else None
+
+    async def image_config_digest(self, image_ref: str) -> str | None:
         return "sha256:local" if self._exists else None
 
     async def pull_image(self, image_ref: str, *, auth: Any = None) -> None:
@@ -53,10 +63,11 @@ class FakeFacade:
         self.pushed.append(image_ref)
         self.push_auth = auth
 
-    async def remove_image(self, image_ref: str) -> None:
+    async def remove_image(self, image_ref: str, *, sync: bool = False) -> None:
         if self._remove_error:
             raise RuntimeError(self._remove_error)
         self.removed.append(image_ref)
+        self.remove_sync.append(sync)
 
     async def image_entrypoint(self, image_ref: str) -> list[str] | None:
         return ["/opt/backend.ai/bin/entrypoint.sh"]
@@ -472,6 +483,7 @@ class TestSeccompConversion:
                 "syscalls": None,
             },
             arch="x86_64",
+            caps=frozenset(),
         )
         assert oci["architectures"] == ["SCMP_ARCH_X86_64"]
         assert oci["syscalls"] == []
@@ -486,6 +498,7 @@ class TestSeccompConversion:
                 "syscalls": [{"names": ["read", "write"], "action": "SCMP_ACT_ALLOW"}],
             },
             arch="x86_64",
+            caps=frozenset(),
         )
         assert oci["architectures"] == ["SCMP_ARCH_X86_64", "SCMP_ARCH_X86"]
         assert oci["syscalls"] == [{"names": ["read", "write"], "action": "SCMP_ACT_ALLOW"}]
@@ -590,3 +603,67 @@ class TestEtcHosts:
         ctx = self._ctx(tmp_path)
         assert ctx._prepare_etc_hosts(cast(Any, {"cluster_hosts": {}})) is None
         assert ctx._prepare_etc_hosts(cast(Any, {})) is None
+
+
+class TestSeccompResolvesAgainstTheContainersRealCaps:
+    """The profile gates whole syscall groups on a capability. Resolving it against the DEFAULT
+    caps while the container is granted EXTRA ones yields the nastiest failure mode available: the
+    process holds the capability and the syscall it needs it for still returns EPERM.
+    """
+
+    PTRACE_GROUP = {
+        "names": ["kcmp", "pidfd_getfd", "process_madvise", "ptrace"],
+        "action": "SCMP_ACT_ALLOW",
+        "includes": {"caps": ["CAP_SYS_PTRACE"]},
+    }
+    PROFILE: dict[str, Any] = {
+        "defaultAction": "SCMP_ACT_ERRNO",
+        "archMap": [{"architecture": "SCMP_ARCH_X86_64", "subArchitectures": None}],
+        "syscalls": [PTRACE_GROUP],
+    }
+
+    def _names(self, caps: frozenset[str]) -> list[str]:
+        oci = agent_mod._docker_seccomp_to_oci(self.PROFILE, arch="x86_64", caps=caps)
+        return [n for sc in oci["syscalls"] for n in sc["names"]]
+
+    def test_ptrace_group_dropped_without_the_capability(self) -> None:
+        assert self._names(frozenset(_DEFAULT_CAPS)) == []
+
+    def test_ptrace_group_allowed_once_the_capability_is_granted(self) -> None:
+        # This is what the jail sandbox grants; the same holds for any plugin-added capability.
+        caps = frozenset(_DEFAULT_CAPS) | {"CAP_SYS_PTRACE"}
+        assert "ptrace" in self._names(caps)
+        assert "process_madvise" in self._names(caps)
+
+    def test_the_real_profile_gates_the_ptrace_group_on_the_capability(self) -> None:
+        # Against the profile actually shipped to kernels, not a synthetic one.
+        profile_path = Path("src/ai/backend/runner/default-seccomp.json")
+        profile = json.loads(profile_path.read_text())
+        base = frozenset(_DEFAULT_CAPS)
+
+        def names(caps: frozenset[str]) -> set[str]:
+            oci = agent_mod._docker_seccomp_to_oci(profile, arch="x86_64", caps=caps)
+            return {n for sc in oci["syscalls"] for n in sc["names"]}
+
+        without = names(base)
+        with_ptrace = names(base | {"CAP_SYS_PTRACE"})
+        # `ptrace` itself is allowed unconditionally on kernels >= 4.8, but the rest of the group
+        # is capability-gated.
+        assert "kcmp" not in without
+        assert {"kcmp", "pidfd_getfd", "process_madvise"} <= with_ptrace
+
+
+class TestPurgeImageFlags:
+    async def test_noprune_skips_the_content_gc_wait(self) -> None:
+        # containerd separates the image record from its content; `sync` waits for the content GC
+        # that frees the layers, which is exactly what noprune asks us NOT to do.
+        facade = FakeFacade()
+        agent = _agent(facade)
+        await agent.purge_images(PurgeImagesReq(images=["a:1"], noprune=True))
+        assert facade.remove_sync == [False]
+
+    async def test_pruning_waits_for_the_content_gc(self) -> None:
+        facade = FakeFacade()
+        agent = _agent(facade)
+        await agent.purge_images(PurgeImagesReq(images=["a:1"], noprune=False))
+        assert facade.remove_sync == [True]

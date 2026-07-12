@@ -10,16 +10,15 @@ from __future__ import annotations
 
 import asyncio
 import io
-import json
 import logging
 import os
-import stat
-import tarfile
+import textwrap
 from collections.abc import Mapping
 from pathlib import Path, PurePosixPath
 from typing import Any, override
 
 from ai.backend.agent.containerd.runtime.grpc import ContainerdGrpcRuntime, container_log_path
+from ai.backend.agent.containerd.runtime.interface import ExecResult
 from ai.backend.agent.errors.kernel import KernelRunnerNotInitializedError
 from ai.backend.agent.kernel import (
     AbstractCodeRunner,
@@ -37,6 +36,55 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 _MAX_DOWNLOAD_SIZE = 1048576  # 1 MiB, matching the Docker backend
 _CONTAINER_HOME = PurePosixPath("/home/work")
+_EXEC_TIMEOUT = 30.0
+# The kernel-runner's own interpreter, bind-mounted into every kernel: the only one guaranteed to
+# exist regardless of what the image ships (the Docker backend's list_files relies on it too).
+_KRUNNER_PYTHON = "/opt/backend.ai/bin/python"
+
+# Scandir the target and print one JSON record per entry — byte-for-byte the same shape the Docker
+# backend produces, since the manager parses it.
+_SCANDIR_CODE = textwrap.dedent("""
+    import json, os, stat, sys
+    files = []
+    for f in os.scandir(sys.argv[1]):
+        fstat = f.stat(follow_symlinks=False)
+        files.append({
+            'mode': stat.filemode(fstat.st_mode),
+            'size': fstat.st_size,
+            'ctime': fstat.st_ctime,
+            'mtime': fstat.st_mtime,
+            'atime': fstat.st_atime,
+            'filename': f.name,
+        })
+    print(json.dumps(files))
+""")
+
+# Tar the target to stdout, aborting once the archive exceeds the cap so a huge directory cannot
+# be streamed through the agent's memory.
+_TAR_TO_STDOUT_CODE = textwrap.dedent("""
+    import io, os, sys, tarfile
+    path, limit = sys.argv[1], int(sys.argv[2])
+    buf = io.BytesIO()
+    with tarfile.open(fileobj=buf, mode='w') as tar:
+        tar.add(path, arcname=os.path.basename(path))
+        if buf.tell() > limit:
+            sys.exit('Too large archive file exceeding 1 MiB')
+    data = buf.getvalue()
+    if len(data) > limit:
+        sys.exit('Too large archive file exceeding 1 MiB')
+    sys.stdout.buffer.write(data)
+""")
+
+_READ_SINGLE_CODE = textwrap.dedent("""
+    import os, sys
+    path, limit = sys.argv[1], int(sys.argv[2])
+    if not os.path.isfile(path):
+        sys.exit('Expected a single file at %s' % path)
+    if os.path.getsize(path) > limit:
+        sys.exit('Too large file exceeding 1 MiB')
+    with open(path, 'rb') as f:
+        sys.stdout.buffer.write(f.read())
+""")
 
 
 class ContainerdKernel(AbstractKernel):
@@ -109,11 +157,23 @@ class ContainerdKernel(AbstractKernel):
     async def get_logs(self) -> dict[str, Any]:
         # The runtime captures the task's stdout+stderr to a host log file (keyed by the
         # container id, which is the kernel id here); read it back.
+        #
+        # Serve at most `container_logs.max_length` — the bound the Docker backend gets from its
+        # log driver (max-size x max-file). Without it a chatty kernel's entire log is read into
+        # memory and shipped to the manager. We keep the TAIL, which is what a log query wants.
+        #
+        # This bounds what is SERVED, not what is on disk: the containerd shim owns the write end
+        # of this file and offers no rotation, so it grows until remove_container unlinks it.
+        # Bounding the disk side means rotating behind the shim's open fd; not attempted here.
         log_path = container_log_path(self.data["container_id"])
+        max_length = int(self.agent_config["container-logs"]["max-length"])
 
         def _read() -> str:
             try:
-                return log_path.read_text(errors="replace")
+                with log_path.open("rb") as f:
+                    size = f.seek(0, io.SEEK_END)
+                    f.seek(max(0, size - max_length), io.SEEK_SET)
+                    return f.read().decode("utf-8", errors="replace")
             except FileNotFoundError:
                 return ""
 
@@ -175,25 +235,36 @@ class ContainerdKernel(AbstractKernel):
         lock_path = self._commit_lock_path(kernel_id, subdir)
         target_ref = canonical or f"localhost/committed-{kernel_id}:latest"
         await asyncio.to_thread(lock_path.parent.mkdir, parents=True, exist_ok=True)
+        commit_timeout = float(self.agent_config["api"]["commit-timeout"])
         try:
             async with FileLock(path=lock_path, timeout=0.1, remove_when_unlock=True):
                 runtime = ContainerdGrpcRuntime(namespace="backend-ai")
                 await runtime.open()
                 try:
-                    await runtime.commit_container(
-                        str(self.data["container_id"]),
-                        base_image_ref=self.image.canonical,
-                        target_ref=target_ref,
-                        labels=extra_labels or {},
-                    )
+                    async with asyncio.timeout(commit_timeout):
+                        await runtime.commit_container(
+                            str(self.data["container_id"]),
+                            base_image_ref=self.image.canonical,
+                            target_ref=target_ref,
+                            labels=extra_labels or {},
+                        )
+                        if filename:
+                            # Export the freshly committed image as the downloadable artifact,
+                            # then drop it: it only existed to be exported (the Docker backend
+                            # deletes its intermediate image the same way). Skipping this used to
+                            # leave the caller with a successful commit and no file at all.
+                            dest = (
+                                Path(self.agent_config["agent"]["image-commit-path"])
+                                / subdir
+                                / filename
+                            )
+                            try:
+                                await runtime.export_image(target_ref, dest)
+                            finally:
+                                if canonical is None:
+                                    await runtime.remove_image(target_ref)
                 finally:
                     await runtime.close()
-            if filename:
-                # Exporting the committed image to a downloadable OCI archive is a follow-up
-                # (needs the Transfer export path); the image is committed to the store above.
-                log.warning(
-                    "commit(k:{}): file export ({}) not yet implemented", kernel_id, filename
-                )
         except TimeoutError:
             log.warning("commit(k:{}): already being committed", kernel_id)
 
@@ -227,58 +298,77 @@ class ContainerdKernel(AbstractKernel):
 
         await asyncio.to_thread(_write)
 
+    def _to_container_path(self, container_path: os.PathLike[str] | str) -> PurePosixPath:
+        """Normalize a user-supplied path and confine it to /home/work."""
+        abspath = PurePosixPath(os.path.normpath(_CONTAINER_HOME / os.fspath(container_path)))
+        if not abspath.is_relative_to(_CONTAINER_HOME):
+            raise PermissionError("Not allowed to access files outside /home/work")
+        return abspath
+
+    async def _exec(self, args: list[str], *, timeout_sec: float = _EXEC_TIMEOUT) -> ExecResult:
+        """Run a command in this kernel's container.
+
+        The file APIs must look at the container's own mount namespace, not the host scratch: a
+        vfolder is bind-mounted into the container at /home/work/<name> and does not exist under
+        the host's scratch work dir at all, so reading the host would report an empty directory
+        for every vfolder.
+        """
+        runtime = ContainerdGrpcRuntime(namespace="backend-ai")
+        await runtime.open()
+        try:
+            return await runtime.exec_in_container(
+                str(self.data["container_id"]), args, timeout_sec=timeout_sec
+            )
+        finally:
+            await runtime.close()
+
     @override
     async def download_file(self, container_path: os.PathLike[str] | str) -> bytes:
-        host = self._to_host_path(container_path)
-
-        def _tar() -> bytes:
-            buf = io.BytesIO()
-            with tarfile.open(fileobj=buf, mode="w") as tar:
-                tar.add(str(host), arcname=host.name)
-                if buf.tell() > _MAX_DOWNLOAD_SIZE:
-                    raise ValueError("Too large archive file exceeding 1 MiB")
-            data = buf.getvalue()
-            if len(data) > _MAX_DOWNLOAD_SIZE:
-                raise ValueError("Too large archive file exceeding 1 MiB")
-            return data
-
-        return await asyncio.to_thread(_tar)
+        abspath = self._to_container_path(container_path)
+        # Tar the target inside the container and stream it out through stdout, the same archive
+        # shape the Docker backend gets from container.get_archive().
+        result = await self._exec([
+            _KRUNNER_PYTHON,
+            "-c",
+            _TAR_TO_STDOUT_CODE,
+            str(abspath),
+            str(_MAX_DOWNLOAD_SIZE),
+        ])
+        if result.exit_code != 0:
+            raise RuntimeError(
+                f"Could not download the archive at {abspath}: "
+                f"{result.stderr.decode('utf-8', errors='replace').strip()}"
+            )
+        if len(result.stdout) > _MAX_DOWNLOAD_SIZE:
+            raise ValueError("Too large archive file exceeding 1 MiB")
+        return result.stdout
 
     @override
     async def download_single(self, container_path: os.PathLike[str] | str) -> bytes:
-        host = self._to_host_path(container_path)
-
-        def _read() -> bytes:
-            if not host.is_file():
-                raise ValueError(f"Expected a single file at {container_path}")
-            if host.stat().st_size > _MAX_DOWNLOAD_SIZE:
-                raise ValueError("Too large file exceeding 1 MiB")
-            return host.read_bytes()
-
-        return await asyncio.to_thread(_read)
+        abspath = self._to_container_path(container_path)
+        result = await self._exec([
+            _KRUNNER_PYTHON,
+            "-c",
+            _READ_SINGLE_CODE,
+            str(abspath),
+            str(_MAX_DOWNLOAD_SIZE),
+        ])
+        if result.exit_code != 0:
+            raise ValueError(
+                f"Could not read {abspath}: "
+                f"{result.stderr.decode('utf-8', errors='replace').strip()}"
+            )
+        return result.stdout
 
     @override
     async def list_files(self, container_path: os.PathLike[str] | str) -> dict[str, Any]:
-        host = self._to_host_path(container_path)
-
-        def _scan() -> dict[str, Any]:
-            try:
-                entries = []
-                for f in os.scandir(host):
-                    fstat = f.stat(follow_symlinks=False)
-                    entries.append({
-                        "mode": stat.filemode(fstat.st_mode),
-                        "size": fstat.st_size,
-                        "ctime": fstat.st_ctime,
-                        "mtime": fstat.st_mtime,
-                        "atime": fstat.st_atime,
-                        "filename": f.name,
-                    })
-                return {"files": json.dumps(entries), "errors": "", "abspath": str(container_path)}
-            except OSError as e:
-                return {"files": "", "errors": str(e), "abspath": str(container_path)}
-
-        return await asyncio.to_thread(_scan)
+        abspath = self._to_container_path(container_path)
+        result = await self._exec([_KRUNNER_PYTHON, "-c", _SCANDIR_CODE, str(abspath)])
+        return {
+            "files": result.stdout.decode("utf-8", errors="replace"),
+            "errors": result.stderr.decode("utf-8", errors="replace"),
+            "abspath": str(container_path),
+        }
 
     @override
     async def notify_event(self, evdata: AgentEventData) -> None:

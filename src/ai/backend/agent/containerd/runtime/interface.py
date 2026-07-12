@@ -30,6 +30,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator, Mapping, Sequence
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 
@@ -39,6 +40,16 @@ class TaskHandle:
 
     container_id: str
     pid: int
+
+
+@dataclass(frozen=True)
+class ExecResult:
+    """The outcome of one ``exec_in_container`` call. ``stdout``/``stderr`` are raw bytes: the
+    file-download path carries tar archives through them."""
+
+    exit_code: int
+    stdout: bytes
+    stderr: bytes
 
 
 @dataclass(frozen=True)
@@ -99,6 +110,11 @@ class OciRuntime(ABC):
         the image is not present."""
 
     @abstractmethod
+    async def image_config_digest(self, image_ref: str) -> str | None:
+        """Return the digest of the image's *config* blob — the identity Docker calls ``Id`` and
+        the manager stores as ``image_id`` — or None if the image is not present."""
+
+    @abstractmethod
     async def pull_image(
         self, image_ref: str, *, auth: Mapping[str, str] | None = None
     ) -> None: ...
@@ -112,12 +128,19 @@ class OciRuntime(ABC):
         agent's image scan). Reads each image's OCI config to surface the labels."""
 
     @abstractmethod
-    async def remove_image(self, image_ref: str) -> None: ...
+    async def remove_image(self, image_ref: str, *, sync: bool = False) -> None:
+        """Delete the image record. ``sync`` waits for the content garbage collection that frees
+        its layers, instead of leaving them to be collected lazily."""
 
     @abstractmethod
     async def push_image(
         self, image_ref: str, *, auth: Mapping[str, str] | None = None
     ) -> None: ...
+
+    @abstractmethod
+    async def export_image(self, image_ref: str, dest_path: Path) -> None:
+        """Write a gzipped OCI-layout archive of the image to ``dest_path`` (the downloadable
+        artifact the session-export flow serves)."""
 
     @abstractmethod
     async def image_entrypoint(self, image_ref: str) -> list[str] | None:
@@ -151,7 +174,11 @@ class OciRuntime(ABC):
         """Start (exec) the previously created task (containerd Tasks.Start)."""
 
     @abstractmethod
-    async def kill_container(self, container_id: str, *, signal: int) -> None: ...
+    async def kill_container(
+        self, container_id: str, *, signal: int, all_processes: bool = True
+    ) -> None:
+        """Signal the container. ``all_processes`` broadcasts to every process in it; clear it to
+        signal only the init process (PID 1), as a graceful stop should."""
 
     @abstractmethod
     async def stop_container(self, container_id: str, *, grace_period: float) -> None:
@@ -195,3 +222,24 @@ class OciRuntime(ABC):
     @abstractmethod
     async def container_status(self, container_id: str) -> str | None:
         """Return the container's status string (e.g. 'running'), or None if absent."""
+
+    @abstractmethod
+    async def exec_in_container(
+        self,
+        container_id: str,
+        args: Sequence[str],
+        *,
+        uid: int | None = None,
+        gid: int | None = None,
+        cwd: str | None = None,
+        timeout_sec: float = 30.0,
+    ) -> ExecResult:
+        """Run a command inside a running container and collect its output.
+
+        The counterpart of ``docker exec``: the file APIs (list/download) and the sudoers
+        provisioning need to see the container's own mount namespace — vfolders are bind-mounted
+        into it and are simply not present on the host scratch.
+
+        ``uid``/``gid`` default to the container process's own user. Raises on timeout after
+        killing the exec'd process, so a hung command cannot pin the agent.
+        """

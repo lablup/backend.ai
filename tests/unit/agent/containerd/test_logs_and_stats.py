@@ -62,13 +62,15 @@ class TestCleanKernelCollectsLogs:
         monkeypatch.setattr(agent, "collect_logs", collect_logs, raising=False)
         agent._session_network = cast(Any, SimpleNamespace(remove_container=remove_container))
         agent._port_forwarder = cast(Any, SimpleNamespace(remove_container=_async_return([])))
+        agent.kernel_registry = cast(Any, {})
         agent.port_pool = cast(Any, SimpleNamespace(release_many=lambda ports: None))
         agent.local_config = cast(
             Any,
             SimpleNamespace(
                 container=SimpleNamespace(
                     scratch_root=Path("/nonexistent-scratch"), scratch_type=None
-                )
+                ),
+                debug=SimpleNamespace(skip_container_deletion=False),
             ),
         )
         return agent

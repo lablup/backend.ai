@@ -17,12 +17,18 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import contextlib
+import gzip
 import hashlib
+import io
 import json
 import logging
+import signal
+import tarfile
 from collections.abc import AsyncIterator, Mapping, Sequence
 from pathlib import Path
-from typing import Any, override
+from typing import Any, cast, override
+from uuid import uuid4
 
 import grpc
 from google.protobuf import any_pb2
@@ -55,12 +61,14 @@ from ai.backend.agent.containerd._grpcapi.api.types import descriptor_pb2, mount
 from ai.backend.agent.containerd._grpcapi.api.types.transfer import imagestore_pb2, registry_pb2
 from ai.backend.agent.containerd.runtime.interface import (
     ContainerInfo,
+    ExecResult,
     ImageInfo,
     OciRuntime,
     TaskEvent,
     TaskHandle,
 )
 from ai.backend.agent.containerd.runtime.spec import build_oci_runtime_spec
+from ai.backend.agent.errors.kernel import ContainerExecTimeout
 from ai.backend.common.arch import CURRENT_ARCH
 from ai.backend.logging import BraceStyleAdapter
 
@@ -80,6 +88,7 @@ _NAMESPACE_HEADER = "containerd-namespace"
 _RUNC_RUNTIME = "io.containerd.runc.v2"
 _SNAPSHOTTER = "overlayfs"
 _SPEC_TYPE_URL = "types.containerd.io/opencontainers/runtime-spec/1/Spec"
+_PROCESS_TYPE_URL = "types.containerd.io/opencontainers/runtime-spec/1/Process"
 _LAYER_MEDIA_TYPE = "application/vnd.oci.image.layer.v1.tar"  # uncompressed -> digest == diff_id
 _CONFIG_MEDIA_TYPE = "application/vnd.oci.image.config.v1+json"
 _MANIFEST_MEDIA_TYPE = "application/vnd.oci.image.manifest.v1+json"
@@ -92,6 +101,10 @@ _GOARCH = {"aarch64": "arm64", "x86_64": "amd64"}
 
 # containerd task status enum (api/types/task/task.proto) -> our string status.
 _TASK_STATUS = {0: "unknown", 1: "created", 2: "running", 3: "stopped", 4: "paused", 5: "pausing"}
+
+# Docker sets StopSignal=SIGINT for kernels; the kernel runner traps it to shut down cleanly.
+_STOP_SIGNAL = signal.SIGINT
+_KILL_SIGNAL = signal.SIGKILL
 
 
 def _containerd_any(msg: Any) -> any_pb2.Any:
@@ -335,9 +348,58 @@ class ContainerdGrpcRuntime(OciRuntime):
             buf.extend(resp.data)
         return bytes(buf)
 
-    async def _resolve_image(self, image_ref: str) -> tuple[str, dict[str, Any]]:
-        """Resolve an image to (rootfs chain_id, image config) for the current platform,
-        following a multi-arch index down to this arch's manifest when present."""
+    @override
+    async def export_image(self, image_ref: str, dest_path: Path) -> None:
+        """Write a gzipped OCI-layout archive of ``image_ref`` to ``dest_path``.
+
+        This is the containerd counterpart of Docker's ``GET /images/<id>/get``, which is what the
+        Docker backend streams into the session-export file. containerd's own export lives behind
+        the Transfer service's streaming API, which needs the `streaming` gRPC service we do not
+        generate stubs for — so we assemble the archive from the content store instead, which we
+        can already read. The result is a standard OCI image layout (oci-layout + index.json +
+        blobs/), the interchange format `docker load` and `ctr images import` both accept.
+        """
+        manifest = await self._resolve_manifest(image_ref)
+        manifest_bytes = json.dumps(manifest, separators=(",", ":")).encode()
+        manifest_digest = "sha256:" + hashlib.sha256(manifest_bytes).hexdigest()
+
+        blobs: list[tuple[str, bytes]] = [(manifest_digest, manifest_bytes)]
+        for desc in [manifest["config"], *manifest.get("layers", [])]:
+            blobs.append((desc["digest"], await self._read_content(desc["digest"])))
+
+        index = {
+            "schemaVersion": 2,
+            "mediaType": "application/vnd.oci.image.index.v1+json",
+            "manifests": [
+                {
+                    "mediaType": manifest.get("mediaType", _MANIFEST_MEDIA_TYPE),
+                    "digest": manifest_digest,
+                    "size": len(manifest_bytes),
+                    "annotations": {"org.opencontainers.image.ref.name": image_ref},
+                }
+            ],
+        }
+
+        def _write() -> None:
+            dest_path.parent.mkdir(parents=True, exist_ok=True)
+            with gzip.open(dest_path, "wb") as gz:
+                with tarfile.open(fileobj=gz, mode="w|") as tar:
+
+                    def add(name: str, payload: bytes) -> None:
+                        info = tarfile.TarInfo(name)
+                        info.size = len(payload)
+                        tar.addfile(info, io.BytesIO(payload))
+
+                    add("oci-layout", json.dumps({"imageLayoutVersion": "1.0.0"}).encode())
+                    add("index.json", json.dumps(index).encode())
+                    for digest, payload in blobs:
+                        algo, _, hexdigest = digest.partition(":")
+                        add(f"blobs/{algo}/{hexdigest}", payload)
+
+        await asyncio.to_thread(_write)
+
+    async def _resolve_manifest(self, image_ref: str) -> dict[str, Any]:
+        """The image's manifest for THIS platform, following a multi-arch index when present."""
         image = (
             await self._images_stub().Get(
                 images_pb2.GetImageRequest(name=image_ref), metadata=self._md
@@ -358,9 +420,28 @@ class ContainerdGrpcRuntime(OciRuntime):
             )
             if manifest_digest is None:
                 raise RuntimeError(f"no linux/{want} manifest in index for {image_ref}")
-            manifest = json.loads(await self._read_content(manifest_digest))
-        else:
-            manifest = json.loads(await self._read_content(target.digest))
+            return cast(dict[str, Any], json.loads(await self._read_content(manifest_digest)))
+        return cast(dict[str, Any], json.loads(await self._read_content(target.digest)))
+
+    @override
+    async def image_config_digest(self, image_ref: str) -> str | None:
+        """The digest of the image's *config* blob — the identity Docker reports as ``Id``.
+
+        This, not the manifest digest, is what the manager stores and hands back as ``image_id``.
+        Comparing the manifest digest against it never matches, so AutoPullBehavior.DIGEST would
+        re-pull the image on every single kernel creation.
+        """
+        try:
+            manifest = await self._resolve_manifest(image_ref)
+        except grpc.aio.AioRpcError as e:
+            if e.code() is grpc.StatusCode.NOT_FOUND:
+                return None
+            raise
+        return str(manifest["config"]["digest"])
+
+    async def _resolve_image(self, image_ref: str) -> tuple[str, dict[str, Any]]:
+        """Resolve an image to (rootfs chain_id, image config) for the current platform."""
+        manifest = await self._resolve_manifest(image_ref)
         config = json.loads(await self._read_content(manifest["config"]["digest"]))
         return _chain_id(config["rootfs"]["diff_ids"]), config
 
@@ -401,8 +482,11 @@ class ContainerdGrpcRuntime(OciRuntime):
             {**oci_spec, "env": env},
             command=command,
             rootfs_path="rootfs",
-            cwd=cfg.get("WorkingDir") or "/",
-            hostname=container_id[:12],
+            # The caller pins both (Docker sets WorkingDir=/home/work and
+            # Hostname=cluster_hostname); fall back to the image / a container-id prefix only
+            # when it did not.
+            cwd=oci_spec.get("cwd") or cfg.get("WorkingDir") or "/",
+            hostname=oci_spec.get("hostname") or container_id[:12],
         )
         spec_any = any_pb2.Any(type_url=_SPEC_TYPE_URL, value=json.dumps(runtime_spec).encode())
         container = containers_pb2.Container(
@@ -448,10 +532,14 @@ class ContainerdGrpcRuntime(OciRuntime):
         )
 
     @override
-    async def kill_container(self, container_id: str, *, signal: int) -> None:
+    async def kill_container(
+        self, container_id: str, *, signal: int, all_processes: bool = True
+    ) -> None:
+        """Signal the container. ``all_processes`` broadcasts to every process in it; clear it to
+        signal only the init process (PID 1), which is what a graceful stop wants."""
         try:
             await self._tasks_stub().Kill(
-                tasks_pb2.KillRequest(container_id=container_id, signal=signal, all=True),
+                tasks_pb2.KillRequest(container_id=container_id, signal=signal, all=all_processes),
                 metadata=self._md,
             )
         except grpc.aio.AioRpcError as e:
@@ -460,17 +548,24 @@ class ContainerdGrpcRuntime(OciRuntime):
 
     @override
     async def stop_container(self, container_id: str, *, grace_period: float) -> None:
-        # SIGTERM, then poll for exit up to `timeout`, then SIGKILL — matching Docker's
-        # container.stop(). kill_container swallows NOT_FOUND, so a task that is already gone is
-        # a no-op. The poll interval mirrors remove_container's (~10 ticks/s).
-        await self.kill_container(container_id, signal=15)  # SIGTERM
+        # Graceful stop, then SIGKILL — matching Docker's container.stop(). kill_container
+        # swallows NOT_FOUND, so a task that is already gone is a no-op. The poll interval
+        # mirrors remove_container's (~10 ticks/s).
+        #
+        # Two details of Docker's contract, both of which we used to get wrong:
+        #  - the signal is SIGINT (Docker's StopSignal for kernels), not SIGTERM. The kernel
+        #    runner happens to trap both, so this is parity rather than a fix in itself.
+        #  - it goes to the INIT PROCESS ONLY. Broadcasting it to every process in the container
+        #    (all=True) tears the user's workload down underneath the runner instead of letting
+        #    the runner shut its children down in order — the whole point of a grace period.
+        await self.kill_container(container_id, signal=_STOP_SIGNAL, all_processes=False)
         deadline_ticks = max(1, int(grace_period / 0.1))
         for _ in range(deadline_ticks):
             status = await self.container_status(container_id)
             if status in (None, "stopped", "created", "unknown"):
                 return
             await asyncio.sleep(0.1)
-        await self.kill_container(container_id, signal=9)  # SIGKILL
+        await self.kill_container(container_id, signal=_KILL_SIGNAL)
 
     @override
     async def remove_container(self, container_id: str) -> None:
@@ -478,7 +573,7 @@ class ContainerdGrpcRuntime(OciRuntime):
         # so SIGKILL the task and wait for it to actually exit before deletion. (Also required
         # for HOSTFILE scratch: the loop mount can only be unmounted once the container's
         # bind-mount of it is gone.)
-        await self.kill_container(container_id, signal=9)  # SIGKILL
+        await self.kill_container(container_id, signal=_KILL_SIGNAL)
         for _ in range(100):  # up to ~10s
             status = await self.container_status(container_id)
             if status in (None, "stopped", "created", "unknown"):
@@ -550,6 +645,103 @@ class ContainerdGrpcRuntime(OciRuntime):
         return _TASK_STATUS.get(resp.process.status, "unknown")
 
     @override
+    async def exec_in_container(
+        self,
+        container_id: str,
+        args: Sequence[str],
+        *,
+        uid: int | None = None,
+        gid: int | None = None,
+        cwd: str | None = None,
+        timeout_sec: float = 30.0,
+    ) -> ExecResult:
+        # Reuse the container's own process spec (env, capabilities, rlimits) and override only
+        # what this call needs; building a Process from scratch would drop the environment the
+        # kernel runner depends on (PATH to /opt/backend.ai/bin, etc).
+        base = await self._container_process_spec(container_id)
+        process = {
+            **base,
+            "args": list(args),
+            "terminal": False,
+        }
+        if uid is not None or gid is not None:
+            user = dict(base.get("user") or {})
+            if uid is not None:
+                user["uid"] = uid
+            if gid is not None:
+                user["gid"] = gid
+            process["user"] = user
+        if cwd is not None:
+            process["cwd"] = cwd
+
+        exec_id = f"bai-exec-{uuid4().hex}"
+        # The shim writes the streams to plain host paths (same as create_task). Keep them
+        # separate and read them back as raw bytes: download_file carries a tar through stdout.
+        out_path = CONTAINER_LOG_ROOT / f"{exec_id}.out"
+        err_path = CONTAINER_LOG_ROOT / f"{exec_id}.err"
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.touch()
+        err_path.touch()
+        try:
+            await self._tasks_stub().Exec(
+                tasks_pb2.ExecProcessRequest(
+                    container_id=container_id,
+                    exec_id=exec_id,
+                    terminal=False,
+                    stdout=str(out_path),
+                    stderr=str(err_path),
+                    spec=any_pb2.Any(
+                        type_url=_PROCESS_TYPE_URL, value=json.dumps(process).encode()
+                    ),
+                ),
+                metadata=self._md,
+            )
+            await self._tasks_stub().Start(
+                tasks_pb2.StartRequest(container_id=container_id, exec_id=exec_id),
+                metadata=self._md,
+            )
+            try:
+                resp: tasks_pb2.WaitResponse = await asyncio.wait_for(
+                    self._tasks_stub().Wait(
+                        tasks_pb2.WaitRequest(container_id=container_id, exec_id=exec_id),
+                        metadata=self._md,
+                    ),
+                    timeout_sec,
+                )
+                return ExecResult(
+                    exit_code=resp.exit_status,
+                    stdout=out_path.read_bytes(),
+                    stderr=err_path.read_bytes(),
+                )
+            except TimeoutError as e:
+                # Do not leave the command running: it holds the exec process (and our stdio
+                # paths) open for as long as it likes.
+                with contextlib.suppress(grpc.aio.AioRpcError):
+                    await self._tasks_stub().Kill(
+                        tasks_pb2.KillRequest(container_id=container_id, exec_id=exec_id, signal=9),
+                        metadata=self._md,
+                    )
+                raise ContainerExecTimeout(
+                    f"exec in {container_id[:12]} timed out after {timeout_sec}s: {list(args)!r}"
+                ) from e
+        finally:
+            with contextlib.suppress(grpc.aio.AioRpcError):
+                await self._tasks_stub().DeleteProcess(
+                    tasks_pb2.DeleteProcessRequest(container_id=container_id, exec_id=exec_id),
+                    metadata=self._md,
+                )
+            out_path.unlink(missing_ok=True)
+            err_path.unlink(missing_ok=True)
+
+    async def _container_process_spec(self, container_id: str) -> dict[str, Any]:
+        """The `process` block of the container's stored OCI runtime spec."""
+        resp: containers_pb2.GetContainerResponse = await self._containers_stub().Get(
+            containers_pb2.GetContainerRequest(id=container_id), metadata=self._md
+        )
+        spec = json.loads(resp.container.spec.value)
+        return cast(dict[str, Any], spec.get("process") or {})
+
+    @override
     async def container_pid(self, container_id: str) -> int | None:
         try:
             resp = await self._tasks_stub().Get(
@@ -613,10 +805,10 @@ class ContainerdGrpcRuntime(OciRuntime):
         return infos
 
     @override
-    async def remove_image(self, image_ref: str) -> None:
+    async def remove_image(self, image_ref: str, *, sync: bool = False) -> None:
         try:
             await self._images_stub().Delete(
-                images_pb2.DeleteImageRequest(name=image_ref), metadata=self._md
+                images_pb2.DeleteImageRequest(name=image_ref, sync=sync), metadata=self._md
             )
         except grpc.aio.AioRpcError as e:
             if e.code() is not grpc.StatusCode.NOT_FOUND:

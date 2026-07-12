@@ -202,3 +202,64 @@ class TestInfinibandDevices:
         (ib / "some-regular-file").touch()  # not a char device -> excluded
         (ib / "subdir").mkdir()  # not a char device -> excluded
         assert [Path(d.source).name for d in infiniband_devices(ib)] == ["uverbs0"]
+
+
+class TestTranslateAcceleratorHostConfig:
+    """Every HostConfig key the in-tree NPU/IPU/ROCm plugins emit must survive the translation.
+
+    Silently dropping them lets the container start and the vendor runtime fail later.
+    """
+
+    def test_furiosa_shaped_host_config(self) -> None:
+        # verbatim shape from accelerator/furiosa/rngd/plugin.py
+        spec = translate_accelerator_args({
+            "HostConfig": {
+                "CapAdd": ["IPC_LOCK"],
+                "SecurityOpt": ["seccomp=unconfined"],
+                "IpcMode": "host",
+                "Ulimits": [{"Name": "memlock", "Hard": -1, "Soft": -1}],
+                "Sysctls": {"net.ipv6.conf.all.disable_ipv6": "0"},
+                "Devices": [],
+            }
+        })
+        assert spec.cap_add == ["CAP_IPC_LOCK"]  # OCI wants the CAP_ prefix
+        assert spec.seccomp_unconfined is True
+        assert spec.ipc_host is True
+        assert spec.sysctls == {"net.ipv6.conf.all.disable_ipv6": "0"}
+        # Docker's -1 (unlimited) becomes the OCI unsigned max
+        assert spec.rlimits == [
+            {"type": "RLIMIT_MEMLOCK", "soft": 0xFFFFFFFFFFFFFFFF, "hard": 0xFFFFFFFFFFFFFFFF}
+        ]
+
+    def test_habana_uses_ipc_not_ipcmode(self) -> None:
+        # accelerator/habana emits `Ipc`, everyone else `IpcMode`
+        assert translate_accelerator_args({"HostConfig": {"Ipc": "host"}}).ipc_host is True
+
+    def test_numeric_group_add_passes_through(self) -> None:
+        spec = translate_accelerator_args({"HostConfig": {"GroupAdd": ["44", 109]}})
+        assert spec.additional_gids == [44, 109]
+
+    def test_unknown_group_is_dropped_not_fatal(self) -> None:
+        spec = translate_accelerator_args({"HostConfig": {"GroupAdd": ["definitely-no-such-grp"]}})
+        assert spec.additional_gids == []
+
+    def test_device_remap_is_preserved(self) -> None:
+        # furiosa renames npu{device_id} -> npu{alloc_idx}; the host source must survive
+        spec = translate_accelerator_args({
+            "HostConfig": {
+                "Devices": [
+                    {
+                        "PathOnHost": "/dev/rngd/npu3",
+                        "PathInContainer": "/dev/rngd/npu0",
+                        "CgroupPermissions": "rwm",
+                    }
+                ]
+            }
+        })
+        assert spec.devices[0].source == "/dev/rngd/npu3"
+        assert spec.devices[0].destination == "/dev/rngd/npu0"
+
+    def test_nothing_requested_stays_empty(self) -> None:
+        spec = translate_accelerator_args({"HostConfig": {}})
+        assert spec.cap_add == [] and spec.sysctls == {} and spec.rlimits == []
+        assert spec.ipc_host is False and spec.seccomp_unconfined is False

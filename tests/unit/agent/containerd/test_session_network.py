@@ -1,10 +1,11 @@
 import json
 from collections.abc import AsyncIterator, Mapping, Sequence
+from pathlib import Path
 from typing import Any, cast, override
 
 import pytest
 
-from ai.backend.agent.containerd.runtime.interface import OciRuntime, TaskHandle
+from ai.backend.agent.containerd.runtime.interface import ExecResult, OciRuntime, TaskHandle
 from ai.backend.agent.containerd.session_network import (
     ContainerdSessionNetwork,
     UnknownNetworkBackend,
@@ -112,6 +113,14 @@ class FakeRuntime(OciRuntime):
         return "sha256:x"
 
     @override
+    async def image_config_digest(self, image_ref: str) -> str | None:
+        return None
+
+    @override
+    async def export_image(self, image_ref: str, dest_path: Path) -> None:
+        return None
+
+    @override
     async def pull_image(
         self, image_ref: str, *, auth: Mapping[str, str] | None = None
     ) -> None: ...
@@ -133,7 +142,7 @@ class FakeRuntime(OciRuntime):
         yield  # pragma: no cover
 
     @override
-    async def remove_image(self, image_ref: str) -> None: ...
+    async def remove_image(self, image_ref: str, *, sync: bool = False) -> None: ...
     @override
     async def push_image(
         self, image_ref: str, *, auth: Mapping[str, str] | None = None
@@ -146,6 +155,19 @@ class FakeRuntime(OciRuntime):
     @override
     async def container_status(self, container_id: str) -> str | None:
         return "running"
+
+    @override
+    async def exec_in_container(
+        self,
+        container_id: str,
+        args: Any,
+        *,
+        uid: int | None = None,
+        gid: int | None = None,
+        cwd: str | None = None,
+        timeout_sec: float = 30.0,
+    ) -> ExecResult:
+        return ExecResult(exit_code=0, stdout=b"", stderr=b"")
 
     @override
     async def create_container(
@@ -169,7 +191,9 @@ class FakeRuntime(OciRuntime):
         self.calls.append(f"start_task:{container_id}")
 
     @override
-    async def kill_container(self, container_id: str, *, signal: int) -> None:
+    async def kill_container(
+        self, container_id: str, *, signal: int, all_processes: bool = True
+    ) -> None:
         self.calls.append(f"kill:{container_id}:{signal}")
 
     @override

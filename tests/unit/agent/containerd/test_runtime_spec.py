@@ -60,18 +60,57 @@ class TestBuildOciRuntimeSpec:
         # default mounts (/proc, /dev, ...) precede binds
         assert spec["mounts"][0]["destination"] == "/proc"
 
-    def test_device_passthrough_adds_device_and_cgroup_rule(self) -> None:
+    def test_device_passthrough_carries_the_real_major_minor(self) -> None:
+        # /dev/null is char 1:3 everywhere. runc mknod()s the node inside the container from these
+        # numbers, so passing -1 (as we used to) cannot produce a working device.
         spec = build_oci_runtime_spec(
-            _oci(devices=[{"source": "/dev/kfd", "destination": "/dev/kfd", "permissions": "rw"}]),
+            _oci(
+                devices=[{"source": "/dev/null", "destination": "/dev/null", "permissions": "rw"}]
+            ),
             command=["x"],
             rootfs_path="/r",
         )
-        assert {"path": "/dev/kfd", "type": "c", "major": -1, "minor": -1} in spec["linux"][
-            "devices"
-        ]
+        (device,) = spec["linux"]["devices"]
+        assert device["path"] == "/dev/null"
+        assert device["type"] == "c"
+        assert (device["major"], device["minor"]) == (1, 3)
+
+    def test_cgroup_rule_is_scoped_to_the_device_not_a_wildcard(self) -> None:
+        # An OCI device rule with no major/minor is a WILDCARD: allowing one NPU would have
+        # allowed every character device on the host — weaker isolation than Docker grants.
+        spec = build_oci_runtime_spec(
+            _oci(
+                devices=[{"source": "/dev/null", "destination": "/dev/null", "permissions": "rw"}]
+            ),
+            command=["x"],
+            rootfs_path="/r",
+        )
         rules = spec["linux"]["resources"]["devices"]
         assert rules[0] == {"allow": False, "access": "rwm"}  # deny-all first
-        assert {"allow": True, "type": "c", "access": "rw"} in rules
+        allow_rules = [r for r in rules if r["allow"]]
+        assert allow_rules == [{"allow": True, "type": "c", "major": 1, "minor": 3, "access": "rw"}]
+        for rule in allow_rules:
+            assert rule.get("major") is not None and rule.get("minor") is not None
+
+    def test_a_remapped_device_stats_the_host_source(self) -> None:
+        # Plugins rename nodes (/dev/rngd/npu3 -> npu0); the numbers must come from the SOURCE.
+        spec = build_oci_runtime_spec(
+            _oci(devices=[{"source": "/dev/null", "destination": "/dev/npu0"}]),
+            command=["x"],
+            rootfs_path="/r",
+        )
+        (device,) = spec["linux"]["devices"]
+        assert device["path"] == "/dev/npu0"
+        assert (device["major"], device["minor"]) == (1, 3)
+
+    def test_a_missing_device_is_skipped(self) -> None:
+        spec = build_oci_runtime_spec(
+            _oci(devices=[{"source": "/dev/does-not-exist", "destination": "/dev/x"}]),
+            command=["x"],
+            rootfs_path="/r",
+        )
+        assert spec["linux"]["devices"] == []
+        assert [r for r in spec["linux"]["resources"]["devices"] if r["allow"]] == []
 
     def test_network_ns_pinned_when_path_given(self) -> None:
         spec = build_oci_runtime_spec(
@@ -205,3 +244,66 @@ class TestNvidiaGpuCdi:
         assert any(d["path"] == "/dev/nvidia0" for d in spec["linux"]["devices"])
         assert spec["hooks"]["createContainer"][0]["path"].endswith("nvidia-cdi-hook")
         assert "prestart" not in spec.get("hooks", {})
+
+
+class TestAcceleratorHostConfigReachesTheSpec:
+    """The NPU/IPU/ROCm plugins emit more than devices; dropping the rest starts a container that
+    then misbehaves inside the vendor runtime, which is far harder to diagnose than a refusal."""
+
+    def test_sysctls_are_emitted(self) -> None:
+        spec = build_oci_runtime_spec(
+            _oci(sysctls={"net.ipv6.conf.all.disable_ipv6": "0"}),
+            command=["x"],
+            rootfs_path="/r",
+        )
+        assert spec["linux"]["sysctl"] == {"net.ipv6.conf.all.disable_ipv6": "0"}
+
+    def test_host_ipc_drops_the_ipc_namespace(self) -> None:
+        # In the OCI spec, sharing the host's IPC namespace means OMITTING the ipc entry.
+        types = {
+            ns["type"]
+            for ns in build_oci_runtime_spec(_oci(ipc_host=True), command=["x"], rootfs_path="/r")[
+                "linux"
+            ]["namespaces"]
+        }
+        assert "ipc" not in types
+
+    def test_ipc_namespace_present_by_default(self) -> None:
+        types = {
+            ns["type"]
+            for ns in build_oci_runtime_spec(_oci(), command=["x"], rootfs_path="/r")["linux"][
+                "namespaces"
+            ]
+        }
+        assert "ipc" in types
+
+    def test_additional_gids_reach_the_process_user(self) -> None:
+        # ROCm's video/render: without them the container cannot open the device it was given.
+        spec = build_oci_runtime_spec(
+            _oci(additional_gids=[44, 109]), command=["x"], rootfs_path="/r"
+        )
+        assert spec["process"]["user"]["additionalGids"] == [44, 109]
+
+    def test_plugin_rlimits_override_the_default_of_the_same_type(self) -> None:
+        spec = build_oci_runtime_spec(
+            _oci(rlimits=[{"type": "RLIMIT_MEMLOCK", "soft": 100, "hard": 200}]),
+            command=["x"],
+            rootfs_path="/r",
+        )
+        memlock = [r for r in spec["process"]["rlimits"] if r["type"] == "RLIMIT_MEMLOCK"]
+        assert memlock == [{"type": "RLIMIT_MEMLOCK", "soft": 100, "hard": 200}]
+        # the untouched default survives
+        assert any(r["type"] == "RLIMIT_NOFILE" for r in spec["process"]["rlimits"])
+
+
+class TestIdentity:
+    def test_hostname_is_taken_from_the_spec(self) -> None:
+        # Docker sets Hostname=cluster_hostname (main1/sub1/...). Leaving runc's default made
+        # `hostname` inside the container report a container-id prefix — which is exactly what
+        # MPI/torchrun read to work out which rank they are.
+        spec = build_oci_runtime_spec(_oci(), command=["x"], rootfs_path="/r", hostname="main1")
+        assert spec["hostname"] == "main1"
+
+    def test_working_dir_is_taken_from_the_spec(self) -> None:
+        spec = build_oci_runtime_spec(_oci(), command=["x"], rootfs_path="/r", cwd="/home/work")
+        assert spec["process"]["cwd"] == "/home/work"

@@ -12,11 +12,17 @@ runtime client; this module only shapes the spec.
 
 from __future__ import annotations
 
+import logging
+import os
+import stat
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
 from ai.backend.agent.containerd.runtime.cdi import CDI_DEFAULT_DIRS, inject_cdi_devices
+from ai.backend.logging import BraceStyleAdapter
+
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 OCI_VERSION = "1.1.0"
 _TYPE_URL = "types.containerd.io/opencontainers/runtime-spec/1/Spec"
@@ -126,13 +132,48 @@ def _linux_devices(
     """Return (linux.devices, cgroup device rules) for host-device passthrough.
 
     NVIDIA GPUs are injected by the nvidia OCI hook (from ``gpus``), not here; only the
-    explicit ``devices`` (AMD/NPU /dev nodes) become runtime-spec devices + cgroup rules."""
+    explicit ``devices`` (AMD/NPU /dev nodes) become runtime-spec devices + cgroup rules.
+
+    Each node is stat()ed on the host: runc needs the real major/minor to mknod the device inside
+    the container, and the cgroup rule needs them to be *specific*. A rule with no major/minor is
+    an OCI wildcard — allowing one NPU would have allowed every character device on the box, which
+    is strictly weaker than what Docker grants.
+    """
     devices: list[dict[str, Any]] = []
     rules: list[dict[str, Any]] = [{"allow": False, "access": "rwm"}]
     for dev in oci_spec.get("devices", []):
-        path = dev["destination"]
-        devices.append({"path": path, "type": "c", "major": -1, "minor": -1})
-        rules.append({"allow": True, "type": "c", "access": dev.get("permissions", "rwm")})
+        # The plugin may remap the path (e.g. /dev/rngd/npu3 -> npu0), so stat the SOURCE.
+        source = Path(dev.get("source") or dev["destination"])
+        try:
+            st = source.stat()
+        except OSError:
+            log.warning("skipping device {}: cannot stat it on the host", source)
+            continue
+        if stat.S_ISBLK(st.st_mode):
+            dev_type = "b"
+        elif stat.S_ISCHR(st.st_mode):
+            dev_type = "c"
+        else:
+            log.warning("skipping device {}: not a block or character device", source)
+            continue
+        major, minor = os.major(st.st_rdev), os.minor(st.st_rdev)
+        access = dev.get("permissions") or "rwm"
+        devices.append({
+            "path": dev["destination"],
+            "type": dev_type,
+            "major": major,
+            "minor": minor,
+            "fileMode": stat.S_IMODE(st.st_mode),
+            "uid": st.st_uid,
+            "gid": st.st_gid,
+        })
+        rules.append({
+            "allow": True,
+            "type": dev_type,
+            "major": major,
+            "minor": minor,
+            "access": access,
+        })
     return devices, rules
 
 
@@ -205,20 +246,34 @@ def build_oci_runtime_spec(
     seccomp = oci_spec.get("seccomp")
     namespaces: list[dict[str, Any]] = [
         {"type": "pid"},
-        {"type": "ipc"},
         {"type": "uts"},
         {"type": "mount"},
     ]
+    # Host IPC (HostConfig.IpcMode=host): several NPU plugins need it to share the vendor
+    # runtime's shared memory with the host daemon. Omitting the ipc namespace entry — rather
+    # than adding one — is how the OCI spec says "stay in the host's".
+    if not oci_spec.get("ipc_host"):
+        namespaces.append({"type": "ipc"})
     net_ns: dict[str, Any] = {"type": "network"}
     if network_ns_path is not None:
         net_ns["path"] = network_ns_path
     namespaces.append(net_ns)
 
+    user: dict[str, Any] = {"uid": 0, "gid": 0}
+    # Supplementary groups the compute plugins asked for (ROCm's video/render): without them the
+    # container's processes cannot open the device nodes they were just given.
+    if additional_gids := oci_spec.get("additional_gids"):
+        user["additionalGids"] = list(additional_gids)
+    # Plugin rlimits override the defaults of the same type (e.g. an NPU raising memlock).
+    plugin_rlimits = oci_spec.get("rlimits") or []
+    overridden = {r["type"] for r in plugin_rlimits}
+    rlimits = [*(r for r in _DEFAULT_RLIMITS if r["type"] not in overridden), *plugin_rlimits]
+
     spec: dict[str, Any] = {
         "ociVersion": OCI_VERSION,
         "process": {
             "terminal": False,
-            "user": {"uid": 0, "gid": 0},
+            "user": user,
             "args": list(command),
             "env": env,
             "cwd": cwd,
@@ -228,7 +283,7 @@ def build_oci_runtime_spec(
                 "permitted": caps,
             },
             "noNewPrivileges": False,
-            "rlimits": _DEFAULT_RLIMITS,
+            "rlimits": rlimits,
         },
         "root": {"path": rootfs_path, "readonly": False},
         "hostname": hostname,
@@ -247,6 +302,8 @@ def build_oci_runtime_spec(
     }
     if seccomp is not None:
         spec["linux"]["seccomp"] = seccomp
+    if sysctls := oci_spec.get("sysctls"):
+        spec["linux"]["sysctl"] = dict(sysctls)
     _inject_gpus(spec, oci_spec, cdi_dirs)
     return spec
 

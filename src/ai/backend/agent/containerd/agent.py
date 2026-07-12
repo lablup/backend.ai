@@ -17,7 +17,9 @@ import asyncio
 import contextlib
 import json
 import logging
+import os
 import platform
+import secrets
 import shutil
 import signal
 import struct
@@ -25,12 +27,14 @@ import subprocess
 import sys
 from collections.abc import AsyncGenerator, Mapping, Sequence
 from decimal import Decimal
+from functools import partial
 from importlib.resources import files
 from io import StringIO
 from pathlib import Path
 from typing import Any, cast, override
 from uuid import UUID, uuid4
 
+import aiotools
 import zmq
 import zmq.asyncio
 
@@ -41,8 +45,10 @@ from ai.backend.agent.agent import (
     ScanImagesResult,
 )
 from ai.backend.agent.config.unified import ContainerSandboxType, ScratchType
+from ai.backend.agent.containerd.dns import resolve_container_dns
 from ai.backend.agent.containerd.runtime.spec import _DEFAULT_CAPS, container_cgroup_fs_path
 from ai.backend.agent.errors import UnsupportedResource
+from ai.backend.agent.errors.agent import ContainerCreationError
 from ai.backend.agent.errors.resources import PortPoolExhaustedError
 from ai.backend.agent.image_distro import (
     LDD_GLIBC_REGEX,
@@ -68,6 +74,7 @@ from ai.backend.agent.network.caps import publish_vtep
 from ai.backend.agent.network.helper.client import HelperClient, HelperPortForwarder
 from ai.backend.agent.network.port_forward import PortForwarder, PortPublisher, forwards_for
 from ai.backend.agent.port_pool import PortPool
+from ai.backend.agent.proxy import DomainSocketProxy, proxy_connection
 from ai.backend.agent.resources import (
     AbstractComputePlugin,
     ComputerContext,
@@ -89,7 +96,13 @@ from ai.backend.agent.types import (
 from ai.backend.agent.utils import container_pid_to_host_pid, host_pid_to_container_pid
 from ai.backend.common.arch import CURRENT_ARCH
 from ai.backend.common.data.image.types import InstalledImageInfo
-from ai.backend.common.docker import MAX_KERNELSPEC, MIN_KERNELSPEC, ImageRef, LabelName
+from ai.backend.common.docker import (
+    MAX_KERNELSPEC,
+    MIN_KERNELSPEC,
+    ImageRef,
+    KernelFeatures,
+    LabelName,
+)
 from ai.backend.common.dto.agent.response import PurgeImageResp, PurgeImagesResp
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.events.dispatcher import EventProducer
@@ -112,6 +125,7 @@ from ai.backend.common.types import (
     KernelId,
     MountPermission,
     MountTypes,
+    ResourceGroupType,
     ResourceSlot,
     Sentinel,
     ServicePort,
@@ -236,13 +250,18 @@ def _seccomp_rule_applies(
 def _docker_seccomp_to_oci(
     profile: Mapping[str, Any],
     *,
+    caps: frozenset[str],
     arch: str = CURRENT_ARCH,
-    caps: frozenset[str] = frozenset(_DEFAULT_CAPS),
 ) -> dict[str, Any]:
     """Convert a Docker-format seccomp profile (archMap + per-syscall includes/excludes) to the
     OCI runtime-spec linux.seccomp shape. Per-syscall includes/excludes are evaluated against the
     container's ``caps``/``arch`` and the host kernel (see _seccomp_rule_applies) so cap-gated
     syscalls stay gated — matching how Docker resolves the profile at container creation.
+
+    ``caps`` is deliberately required, with no default: it must be the set the container will
+    ACTUALLY hold. Defaulting it silently resolves cap-gated syscall groups (the ptrace group,
+    mlock, bpf, ...) against the wrong capability set, and the container then holds a capability
+    whose syscalls seccomp still denies.
 
     Only the host arch's entry (+ its compat sub-arches) is emitted: the full archMap lists arches
     (e.g. SCMP_ARCH_LOONGARCH64) that the node's libseccomp may not know, and runc rejects the
@@ -306,6 +325,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
     _container_id: str
     _session_id: str
     _oci_mounts: list[Mount]
+    domain_socket_proxies: list[DomainSocketProxy]
     _scratch_dir: Path | None
     _pending_spec: Any
     _accel_spec: AcceleratorSpec
@@ -349,6 +369,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         self._container_id = str(kernel_config["kernel_id"])
         self._session_id = str(kernel_config["session_id"])
         self._oci_mounts = []
+        self.domain_socket_proxies = []
         self._pending_spec = None
         self._scratch_dir = None
         self._accel_spec = AcceleratorSpec()
@@ -365,6 +386,24 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
     async def prepare_resource_spec(
         self,
     ) -> tuple[KernelResourceSpec, Mapping[str, Any] | None]:
+        if self.restarting:
+            # A restart must keep the allocation the kernel already has. Re-deriving it from
+            # resource_slots re-runs the allocator, which may hand out a different cpuset or a
+            # different accelerator device than the one the kernel's processes are pinned to.
+            # resource.txt in the scratch is that allocation, written at creation.
+            resource_txt = (
+                self.local_config.container.scratch_root
+                / str(self._container_id)
+                / "config"
+                / "resource.txt"
+            )
+
+            def _read() -> KernelResourceSpec:
+                with resource_txt.open() as f:
+                    return KernelResourceSpec.read_from_file(f)
+
+            return await asyncio.to_thread(_read), None
+
         slots = ResourceSlot.from_json(self.kernel_config["resource_slots"])
         if SlotName("cpu") not in slots:
             raise UnsupportedResource("cpu slot is required")
@@ -459,6 +498,31 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
                 MountPermission.READ_WRITE,
             ),
         ]
+        # Domain-socket proxies (the image importer and other special service containers that need
+        # a host socket, e.g. the docker socket). The host socket itself is never bind-mounted:
+        # each one gets a per-kernel proxy socket that forwards to it, so the container talks to us
+        # and we decide what reaches the host. Same construction as the Docker backend — it needs
+        # no container runtime at all, which is why it ports over unchanged.
+        ipc_base_path = self.local_config.agent.ipc_base_path
+        for host_sock_path in self.internal_data.get("domain_socket_proxies", []):
+            proxy_dir = ipc_base_path / "proxy"
+            await asyncio.to_thread(partial(proxy_dir.mkdir, parents=True, exist_ok=True))
+            host_proxy_path = proxy_dir / f"{secrets.token_hex(12)}.sock"
+            proxy_server = await asyncio.start_unix_server(
+                aiotools.apartial(proxy_connection, Path(host_sock_path)), str(host_proxy_path)
+            )
+            await asyncio.to_thread(host_proxy_path.chmod, 0o666)
+            self.domain_socket_proxies.append(
+                DomainSocketProxy(Path(host_sock_path), host_proxy_path, proxy_server)
+            )
+            mounts.append(
+                Mount(
+                    MountTypes.BIND,
+                    host_proxy_path,
+                    Path(host_sock_path),
+                    MountPermission.READ_WRITE,
+                )
+            )
         # The in-container agent socket (host<->container PID translation, jail status) for
         # libbaihook/jail, bind-mounted directly (no socat relay).
         if self._agent_sock_path is not None:
@@ -508,7 +572,13 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
     @property
     @override
     def protected_services(self) -> Sequence[str]:
-        return ()
+        # On a storage resource group, ttyd is a shell into the storage node: it must not be
+        # exposed like an ordinary service app. Docker makes the same distinction.
+        match self.local_config.agent.scaling_group_type:
+            case ResourceGroupType.STORAGE:
+                return ("ttyd",)
+            case _:
+                return ()
 
     @override
     async def apply_network(self, cluster_info: ClusterInfo) -> None:
@@ -537,6 +607,22 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         hosts_file = self._scratch_dir / "config" / "hosts"
         hosts_file.write_text("\n".join(lines) + "\n")
         return Mount(MountTypes.BIND, hosts_file, Path("/etc/hosts"), MountPermission.READ_ONLY)
+
+    def _prepare_resolv_conf(self) -> Mount | None:
+        """Write this kernel's /etc/resolv.conf and return a bind mount for it.
+
+        Unconditional, unlike /etc/hosts: every container needs a resolver, not just clustered
+        ones. Without this the image's own (usually absent) resolv.conf is all the container gets
+        and no name resolves. See containerd/dns.py for how the nameservers are chosen.
+        """
+        if self._scratch_dir is None:
+            return None
+        resolv = resolve_container_dns(self.local_config.container.dns or ())
+        resolv_file = self._scratch_dir / "config" / "resolv.conf"
+        resolv_file.write_text(resolv.render())
+        return Mount(
+            MountTypes.BIND, resolv_file, Path("/etc/resolv.conf"), MountPermission.READ_ONLY
+        )
 
     @override
     async def prepare_ssh(self, cluster_info: ClusterInfo) -> None:
@@ -609,6 +695,19 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
             cpuset_mems=prev.cpuset_mems or spec.cpuset_mems,
             memory_limit=prev.memory_limit or spec.memory_limit,
             memory_swap=prev.memory_swap or spec.memory_swap,
+            # Union across plugins: two accelerators on one kernel each get what they asked for.
+            cap_add=[*prev.cap_add, *(c for c in spec.cap_add if c not in prev.cap_add)],
+            sysctls={**prev.sysctls, **spec.sysctls},
+            rlimits=[
+                *prev.rlimits,
+                *(r for r in spec.rlimits if r["type"] not in {p["type"] for p in prev.rlimits}),
+            ],
+            additional_gids=[
+                *prev.additional_gids,
+                *(g for g in spec.additional_gids if g not in prev.additional_gids),
+            ],
+            ipc_host=prev.ipc_host or spec.ipc_host,
+            seccomp_unconfined=prev.seccomp_unconfined or spec.seccomp_unconfined,
         )
 
     @override
@@ -660,6 +759,122 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
 
         await asyncio.to_thread(_write)
 
+    def _chown_paths_if_root(self, paths: Sequence[Path]) -> None:
+        """Hand the given scratch paths to the uid/gid the container's runner drops to.
+
+        The container's PID 1 starts as root, but the runner switches to LOCAL_USER_ID/
+        LOCAL_GROUP_ID (see AbstractAgent.create_kernel), so anything we write into the scratch as
+        root — ssh keys, dotfiles, bootstrap.sh — is unwritable (and, at 0600, unreadable) by the
+        user unless it is chowned here. Only possible when the agent itself runs as root.
+        """
+        if os.geteuid() != 0:
+            return
+        uid = self.get_overriding_uid()
+        gid = self.get_overriding_gid()
+        if uid is None and gid is None:
+            if KernelFeatures.UID_MATCH not in self.kernel_features:
+                return
+            uid = self.local_config.container.kernel_uid
+            gid = self.local_config.container.kernel_gid
+        for p in paths:
+            stat_result = p.stat()
+            int_uid = int(uid) if uid is not None else stat_result.st_uid
+            int_gid = int(gid) if gid is not None else stat_result.st_gid
+            try:
+                os.chown(p, int_uid, int_gid)
+            except OSError as e:
+                log.warning("failed to chown {} to {}/{}: {!r}", p, int_uid, int_gid, e)
+
+    async def _provision_internal_data(self, resource_spec: KernelResourceSpec) -> None:
+        """Materialize the manager-supplied ``internal_data`` into the scratch (Docker parity).
+
+        Everything here lands in the scratch dirs that are bind-mounted as /home/work and
+        /home/config, so it needs no container access — but without it the user's SSH login,
+        dotfiles, bootstrap script and registry credentials silently never appear.
+        """
+        if self._scratch_dir is None:
+            return
+        scratch_dir = self._scratch_dir
+        work_dir = scratch_dir / "work"
+        config_dir = scratch_dir / "config"
+        internal_data = self.internal_data
+        bootstrap = self.kernel_config.get("bootstrap_script")
+
+        def _write() -> None:
+            chown_targets: list[Path] = []
+
+            if bootstrap:
+                bootstrap_path = work_dir / "bootstrap.sh"
+                bootstrap_path.write_text(bootstrap)
+                chown_targets.append(bootstrap_path)
+
+            if docker_creds := internal_data.get("docker_credentials"):
+                (config_dir / "docker-creds.json").write_text(dump_json_str(docker_creds))
+
+            # Skip when the user mounted their own .ssh vfolder — theirs wins (Docker parity).
+            ssh_keypair = internal_data.get("ssh_keypair")
+            has_ssh_mount = any(
+                str(mount.target) == "/home/work/.ssh" for mount in resource_spec.mounts
+            )
+            if ssh_keypair and not has_ssh_mount:
+                pubkey = ssh_keypair["public_key"].encode("ascii")
+                privkey = ssh_keypair["private_key"].encode("ascii")
+                ssh_dir = work_dir / ".ssh"
+                ssh_dir.mkdir(parents=True, exist_ok=True)
+                ssh_dir.chmod(0o700)
+                (ssh_dir / "authorized_keys").write_bytes(pubkey)
+                (ssh_dir / "authorized_keys").chmod(0o600)
+                if not (ssh_dir / "id_rsa").is_file():
+                    (ssh_dir / "id_rsa").write_bytes(privkey)
+                    (ssh_dir / "id_rsa").chmod(0o600)
+                (work_dir / "id_container").write_bytes(privkey)
+                (work_dir / "id_container").chmod(0o600)
+                chown_targets += [
+                    ssh_dir,
+                    ssh_dir / "authorized_keys",
+                    ssh_dir / "id_rsa",
+                    work_dir / "id_container",
+                ]
+
+            # Higher-priority dotfiles come last so they overwrite the earlier ones.
+            for dotfile in internal_data.get("dotfiles", []):
+                path = dotfile["path"]
+                if path.startswith("/"):
+                    if path.startswith("/home/"):
+                        # /home/work/... and /home/config/... are this kernel's scratch.
+                        file_path = scratch_dir / "/".join(path.split("/")[2:])
+                    else:
+                        # An absolute path outside /home cannot be reached from the host: it lives
+                        # in the image's rootfs, not in a bind mount. Docker has the same blind
+                        # spot (it writes to the agent's own filesystem), so skip it loudly rather
+                        # than scribbling on the host.
+                        log.warning(
+                            "ignoring dotfile at {}: only paths under /home are in the scratch",
+                            path,
+                        )
+                        continue
+                else:
+                    file_path = work_dir / path
+                file_path.parent.mkdir(parents=True, exist_ok=True)
+                content = dotfile["data"]
+                if not content.endswith("\n"):
+                    content += "\n"
+                file_path.write_text(content)
+                file_path.chmod(int(dotfile["perm"], 8))
+                chown_targets.append(file_path)
+                # The intermediate dirs get 0700, NOT the dotfile's own mode: a file mode like
+                # 0644 on a directory clears its execute bit, so the user could not traverse into
+                # it and would never reach the dotfile. 0700 keeps it private and usable.
+                node = file_path.parent
+                while node != work_dir and node.is_relative_to(work_dir):
+                    node.chmod(0o700)
+                    chown_targets.append(node)
+                    node = node.parent
+
+            self._chown_paths_if_root(chown_targets)
+
+        await asyncio.to_thread(_write)
+
     def _reserve_host_ports(self, service_ports: list[ServicePort]) -> None:
         """Acquire a host port for each *service* container port, recording the pairing.
 
@@ -696,10 +911,16 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
     ) -> ContainerdKernel:
         # In-container config files (env + resource allocation) read by the runner/hooks.
         await self._write_config_files(resource_spec, environ)
+        # User-facing provisioning from internal_data: ssh keypair, dotfiles, bootstrap script,
+        # registry credentials.
+        await self._provision_internal_data(resource_spec)
         # containerd/runc (unlike Docker) neither synthesizes /etc/hosts nor provides cluster DNS,
         # so inject peer hostname -> IP resolution for cluster sessions.
         if (hosts_mount := self._prepare_etc_hosts(cluster_info)) is not None:
             self._oci_mounts.append(hosts_mount)
+        # containerd/runc provides no resolver either (dockerd synthesizes one per container).
+        if (resolv_mount := self._prepare_resolv_conf()) is not None:
+            self._oci_mounts.append(resolv_mount)
         # Build (but do NOT create) the container spec + kernel object. mount_krunner
         # (inherited) has populated resource_spec.mounts with the krunner bind mounts;
         # combine with process_mounts' vfolder mounts and inject them (plus env/labels)
@@ -739,6 +960,19 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         oci_spec["cpuset_mems"] = self._accel_spec.cpuset_mems
         oci_spec["memory_limit"] = self._accel_spec.memory_limit
         oci_spec["memory_swap"] = self._accel_spec.memory_swap
+        # The rest of the accelerator's HostConfig: capabilities, sysctls, rlimits, supplementary
+        # groups and host IPC. The NPU/IPU/ROCm plugins depend on these (memlock, host IPC, the
+        # device's group) and a container that starts without them fails only later, inside the
+        # vendor runtime.
+        extra_caps = list(self._accel_spec.cap_add)
+        if self._accel_spec.sysctls:
+            oci_spec["sysctls"] = dict(self._accel_spec.sysctls)
+        if self._accel_spec.rlimits:
+            oci_spec["rlimits"] = list(self._accel_spec.rlimits)
+        if self._accel_spec.additional_gids:
+            oci_spec["additional_gids"] = list(self._accel_spec.additional_gids)
+        if self._accel_spec.ipc_host:
+            oci_spec["ipc_host"] = True
         # /dev/shm sizing from the session's resource_opts (parity with Docker's ShmSize).
         shmem = (self.kernel_config.get("resource_opts") or {}).get("shmem")
         if shmem:
@@ -751,16 +985,68 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         # REPL, which the agent itself dials at kernel_host) on a host port, DNAT'd to the container
         # once its address is known at start. Same contract as the Docker backend's PortBindings.
         self._reserve_host_ports(service_ports)
-        # seccomp hardening (skip under the jail sandbox, which does its own syscall filtering).
-        if self.local_config.container.sandbox_type != ContainerSandboxType.JAIL:
-            seccomp_path = self.resolve_krunner_filepath("runner/default-seccomp.json")
-            if seccomp_path.exists():
-                oci_spec["seccomp"] = _docker_seccomp_to_oci(json.loads(seccomp_path.read_text()))
-        else:
+        # Identify the container the way the Docker backend does. These labels are the only thing
+        # external tooling (the watcher, operators' `ctr`/`nerdctl ps` filters) and our own
+        # restart-time scan have to go on; with just kernel-id/session-id, scan_running_kernels
+        # falls back to kernelspec "1" and nothing can tell whose kernel this is.
+        oci_spec["labels"] = {
+            **oci_spec.get("labels", {}),
+            LabelName.AGENT_ID: str(self.agent_id),
+            LabelName.OWNER_AGENT: str(self.agent_id),
+            LabelName.KERNEL_SPEC: str(self.kspec_version),
+            LabelName.BLOCK_SERVICE_PORTS: (
+                "1" if self.internal_data.get("block_service_ports", False) else "0"
+            ),
+            LabelName.SERVICE_PORTS: ",".join(
+                f"{sp['name']}:{sp['protocol']}:{sp['container_ports'][0]}"
+                for sp in service_ports
+                if sp.get("container_ports")
+            ),
+        }
+        if (owner_user := self.ownership_data.owner_user_id_to_str) is not None:
+            oci_spec["labels"][LabelName.OWNER_USER] = owner_user
+        if (owner_project := self.ownership_data.owner_project_id_to_str) is not None:
+            oci_spec["labels"][LabelName.OWNER_PROJECT] = owner_project
+        # The container's own identity inside the cluster. Docker sets Hostname to cluster_hostname
+        # (main1/sub1/...); leaving runc's default meant `hostname` reported a container-id prefix,
+        # which MPI/torchrun use to identify the rank they are running as.
+        oci_spec["hostname"] = self.kernel_config["cluster_hostname"]
+        # Docker pins WorkingDir to /home/work rather than trusting the image's.
+        oci_spec["cwd"] = "/home/work"
+
+        is_jail = self.local_config.container.sandbox_type == ContainerSandboxType.JAIL
+        if is_jail:
             # The jail enforces syscall policy by ptrace-tracing the container's processes, so it
             # needs CAP_SYS_PTRACE. Docker's jail path adds the same capability; without it the
             # jail's tracer cannot attach and its confinement silently degrades to nothing.
-            oci_spec["extra_caps"] = ["CAP_SYS_PTRACE"]
+            extra_caps.append("CAP_SYS_PTRACE")
+        if extra_caps:
+            oci_spec["extra_caps"] = extra_caps
+        # The capability set the container will ACTUALLY hold. The seccomp profile must be
+        # resolved against this, not against the defaults: Docker's profile gates whole syscall
+        # groups on a capability (the ptrace group — ptrace/process_vm_readv/kcmp/pidfd_getfd —
+        # on CAP_SYS_PTRACE, mlock on CAP_IPC_LOCK, and so on). Resolving against the defaults
+        # while granting extra capabilities produces the worst failure mode there is: the process
+        # holds the capability, and the syscall it needs it for still returns EPERM.
+        effective_caps = frozenset(_DEFAULT_CAPS) | frozenset(extra_caps)
+        # seccomp hardening. Skipped under the jail sandbox (which does its own ptrace-based
+        # syscall filtering) and when a compute plugin asked for seccomp=unconfined — the vendor
+        # runtimes that do (ROCm, Furiosa) issue syscalls the default profile blocks.
+        if not is_jail and not self._accel_spec.seccomp_unconfined:
+            seccomp_path = self.resolve_krunner_filepath("runner/default-seccomp.json")
+            if seccomp_path.exists():
+                profile = _docker_seccomp_to_oci(
+                    json.loads(seccomp_path.read_text()), caps=effective_caps
+                )
+                # Syscalls the compute plugins additionally need (e.g. io_uring). The Docker
+                # backend appends the same list; without it they get EPERM.
+                if self.additional_allowed_syscalls:
+                    profile.setdefault("syscalls", []).append({
+                        "names": list(self.additional_allowed_syscalls),
+                        "action": "SCMP_ACT_ALLOW",
+                        "args": [],
+                    })
+                oci_spec["seccomp"] = profile
         return ContainerdKernel(
             self.ownership_data,
             self.kernel_config["network_id"],
@@ -820,6 +1106,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
             # OVERLAY IP is reachable only between kernels, and the LOCAL IP only from this node.
             await self._publish_ports(container_ip)
             published = True
+            await self._provision_sudo_session()
         except Exception:
             if not published:
                 self._port_pool.release_many([hp for hp, _ in self._host_port_map])
@@ -841,9 +1128,38 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
             "stdin_port": 0,  # legacy
             "stdout_port": 0,  # legacy
             "host_ports": [host_port for host_port, _ in self._host_port_map],
-            "domain_socket_proxies": [],
-            "block_service_ports": False,
+            "domain_socket_proxies": self.domain_socket_proxies,
+            "block_service_ports": self.internal_data.get("block_service_ports", False),
         }
+
+    async def _provision_sudo_session(self) -> None:
+        """Grant the in-container user passwordless sudo when the session asked for it.
+
+        Must run after the task is started (Docker parity): /etc/sudoers.d lives in the image's
+        rootfs, not in any bind mount, so it can only be written from inside the container. The
+        exec runs as root — the container's init user — regardless of the uid the runner drops to.
+        """
+        if not self.internal_data.get("sudo_session_enabled", False):
+            return
+        result = await self._session_network.exec_in_container(
+            self._container_id,
+            [
+                "sh",
+                "-c",
+                'mkdir -p /etc/sudoers.d && echo "work ALL=(ALL:ALL) NOPASSWD:ALL"'
+                " > /etc/sudoers.d/01-bai-work",
+            ],
+            uid=0,
+            gid=0,
+        )
+        if result.exit_code != 0:
+            raise ContainerCreationError(
+                container_id=self._container_id,
+                message=(
+                    "sudoers provision failed: "
+                    f"{result.stderr.decode('utf-8', errors='replace').strip()}"
+                ),
+            )
 
     async def _publish_ports(self, container_ip: str) -> None:
         """DNAT the reserved host ports at the container.
@@ -1305,13 +1621,22 @@ class ContainerdAgent(
 
     @override
     async def purge_images(self, request: PurgeImagesReq) -> PurgeImagesResp:
-        responses: list[PurgeImageResp] = []
-        for image in request.images:
+        # `noprune` asks to keep the untagged parent layers. containerd separates the image record
+        # from its content: deleting the record leaves the layers for the content garbage
+        # collector, so `sync` (wait for that GC) is the knob — the inverse of noprune.
+        #
+        # `force` has no counterpart and needs none: it exists in Docker because dockerd refuses to
+        # delete an image a stopped container still references. containerd's image records carry no
+        # such reference, so the delete always proceeds.
+        async def _purge(image: str) -> PurgeImageResp:
             try:
-                await self._session_network.remove_image(image)
-                responses.append(PurgeImageResp.success(image))
+                await self._session_network.remove_image(image, sync=not request.noprune)
+                return PurgeImageResp.success(image)
             except Exception as exc:
-                responses.append(PurgeImageResp(image=image, error=str(exc)))
+                return PurgeImageResp(image=image, error=str(exc))
+
+        # Concurrent, like the Docker backend: a sync delete waits for the GC of that image.
+        responses = list(await asyncio.gather(*(_purge(image) for image in request.images)))
         return PurgeImagesResp(responses=responses)
 
     @override
@@ -1319,7 +1644,11 @@ class ContainerdAgent(
         self, image_ref: ImageRef, image_id: str, auto_pull: AutoPullBehavior
     ) -> bool:
         # Returns True if a pull is needed.
-        local_digest = await self._session_network.image_digest(image_ref.canonical)
+        #
+        # Compare the CONFIG digest, not the manifest digest: `image_id` is what the manager
+        # stored, and on Docker that is the image config's `Id`. Comparing a manifest digest
+        # against it never matches, so DIGEST auto-pull re-pulled the image on every creation.
+        local_digest = await self._session_network.image_config_digest(image_ref.canonical)
         if local_digest is None:  # not present locally
             if auto_pull in (AutoPullBehavior.DIGEST, AutoPullBehavior.TAG):
                 return True
@@ -1408,6 +1737,25 @@ class ContainerdAgent(
             log.exception("clean_kernel(k:{}): withdrawing published ports failed", kernel_id)
         else:
             self.port_pool.release_many(released)
+        # Shut the kernel's domain-socket proxies down. Each is a live asyncio unix server holding
+        # a socket file under ipc_base_path; without this they outlive the kernel that needed them.
+        kernel_obj = self.kernel_registry.get(kernel_id)
+        if kernel_obj is not None:
+            for proxy in kernel_obj.get("domain_socket_proxies", []):
+                if proxy.proxy_server.is_serving():
+                    proxy.proxy_server.close()
+                    await proxy.proxy_server.wait_closed()
+                with contextlib.suppress(OSError):
+                    proxy.host_proxy_path.unlink()
+
+        if self.local_config.debug.skip_container_deletion:
+            # A debugging aid: keep the dead container (and its scratch) around for post-mortem
+            # inspection. The Docker backend honors the same flag.
+            log.info(
+                "clean_kernel(k:{}): skipping container removal (debug.skip-container-deletion)",
+                kernel_id,
+            )
+            return
         await self._session_network.remove_container(str(kernel_id))
         # Tear down the scratch (skipped on restart, which reuses it). HOSTFILE must be
         # unmounted (loop image) before removal; otherwise remove the directory tree. Best-effort:
