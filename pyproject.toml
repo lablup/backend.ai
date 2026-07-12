@@ -411,5 +411,7 @@ version = { file = "VERSION" }
 
 [[tool.mypy.overrides]]
 module = "ai.backend.agent.containerd._grpcapi.*"
+# The generated modules are described by the .pyi stubs next to them (their message classes are
+# built at runtime, so there is nothing static to read out of the .py). Their own bodies are not
+# worth type-checking.
 ignore_errors = true
-follow_imports = "skip"
