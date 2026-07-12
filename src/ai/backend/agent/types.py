@@ -115,6 +115,18 @@ class AgentEventData:
 
 
 @attrs.define(auto_attribs=True, slots=True)
+class ContainerNetns:
+    """
+    How to reach a running container's network namespace, for stat collectors that read
+    its interface counters. ``pid`` is preferred (/proc/<pid>/net/dev); ``path`` is the
+    fallback for runtimes that keep the namespace pinned after the main process is gone.
+    """
+
+    pid: int | None
+    path: Path | None
+
+
+@attrs.define(auto_attribs=True, slots=True)
 class Container:
     id: ContainerId
     status: ContainerStatus

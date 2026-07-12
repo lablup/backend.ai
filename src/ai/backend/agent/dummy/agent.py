@@ -25,7 +25,7 @@ from ai.backend.agent.resources import (
     Mount,
     known_slot_types,
 )
-from ai.backend.agent.types import Container, KernelOwnershipData, MountInfo
+from ai.backend.agent.types import Container, ContainerNetns, KernelOwnershipData, MountInfo
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.dto.agent.response import PurgeImagesResp
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
@@ -306,6 +306,11 @@ class DummyAgent(
     def get_cgroup_version(self) -> str:
         # Dummy agent does not use cgroups, so we return an empty string.
         return ""
+
+    @override
+    async def get_container_netns(self, container_id: str) -> ContainerNetns | None:
+        # Dummy agent has no real containers, so there is no namespace to report.
+        return None
 
     @override
     async def extract_image_command(self, image: str) -> list[str] | None:

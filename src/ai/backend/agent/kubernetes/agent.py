@@ -50,7 +50,13 @@ from ai.backend.agent.resources import (
     Mount,
     known_slot_types,
 )
-from ai.backend.agent.types import Container, KernelOwnershipData, MountInfo, Port
+from ai.backend.agent.types import (
+    Container,
+    ContainerNetns,
+    KernelOwnershipData,
+    MountInfo,
+    Port,
+)
 from ai.backend.common.asyncio import current_loop
 from ai.backend.common.docker import ImageRef, KernelFeatures
 from ai.backend.common.dto.agent.response import PurgeImagesResp
@@ -1030,6 +1036,11 @@ class KubernetesAgent(
     def get_cgroup_version(self) -> str:
         # Not implemented yet for K8s Agent
         return ""
+
+    @override
+    async def get_container_netns(self, container_id: str) -> ContainerNetns | None:
+        # The container runs on a remote node, so its namespace is not reachable from here.
+        return None
 
     @override
     async def extract_image_command(self, image: str) -> list[str] | None:
