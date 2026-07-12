@@ -11,14 +11,16 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+import ai.backend.agent.intrinsic as intrinsic_mod
 from ai.backend.agent.alloc_map import DiscretePropertyAllocMap
-from ai.backend.agent.docker.intrinsic import (
+from ai.backend.agent.intrinsic import (
     ContainerNetStat,
     CPUPlugin,
     MemoryPlugin,
     read_proc_net_dev,
 )
 from ai.backend.agent.stats import StatModes
+from ai.backend.agent.types import ContainerNetns
 from ai.backend.common.types import DeviceId, DeviceName, SlotName
 
 
@@ -69,182 +71,93 @@ class BaseDockerIntrinsicTest:
         ctx.mode = StatModes.CGROUP
         return ctx
 
-    @pytest.fixture
-    def mock_fetch_api_stats(
-        self, docker_stats_response: dict[str, Any]
-    ) -> Generator[MagicMock, None, None]:
-        with patch(
-            "ai.backend.agent.docker.intrinsic.fetch_api_stats",
-            return_value=docker_stats_response,
-        ) as mock:
-            yield mock
+
+class TestPluginsHoldNoRuntimeClient(BaseDockerIntrinsicTest):
+    """The intrinsic plugins must not own a container-runtime client.
+
+    They used to construct an aiodocker `Docker()` in `init()`, which aborts when there is no
+    /var/run/docker.sock — so a containerd-only node could not start its agent at all, even though
+    these plugins only ever read cgroups.
+    """
+
+    async def test_cpu_init_needs_no_docker(self) -> None:
+        plugin = CPUPlugin.__new__(CPUPlugin)
+        plugin.local_config = {"agent": {}}
+        await plugin.init()
+        await plugin.cleanup()
+        assert not hasattr(plugin, "_docker")
+
+    async def test_memory_init_needs_no_docker(self) -> None:
+        plugin = MemoryPlugin.__new__(MemoryPlugin)
+        plugin.local_config = {"agent": {}}
+        await plugin.init()
+        await plugin.cleanup()
+        assert not hasattr(plugin, "_docker")
+
+    def test_module_constructs_no_docker_client(self) -> None:
+        # Guards the regression directly: no `Docker(` call anywhere in the neutral module.
+        source = Path(intrinsic_mod.__file__).read_text()
+        assert "Docker()" not in source
+        assert "DockerContainer(" not in source
 
 
-class TestCPUPluginDockerClientLifecycle(BaseDockerIntrinsicTest):
-    """Tests for CPUPlugin Docker client lifecycle management."""
+class TestDockerStatModeGoesThroughTheAgent(BaseDockerIntrinsicTest):
+    """StatModes.DOCKER samples come from the agent hook, not from a client the plugin owns."""
 
     @pytest.fixture
     def cpu_plugin(self) -> CPUPlugin:
         plugin = CPUPlugin.__new__(CPUPlugin)
-        plugin.local_config = {"agent": {"docker-mode": "default"}}
-        plugin._docker = AsyncMock()
+        plugin.local_config = {"agent": {}}
         return plugin
-
-    @pytest.fixture
-    def cpu_cgroup_context(self, cgroup_stat_context: MagicMock) -> MagicMock:
-        """CGROUP stat context with CPU cgroup v2 path mocks."""
-        cgroup_stat_context.agent.docker_info = {"CgroupVersion": "2"}
-
-        def mock_get_cgroup_path(subsys: str, cid: str) -> MagicMock:
-            path = MagicMock()
-            stat_file = MagicMock()
-            stat_file.read_text.return_value = "usage_usec 1000000\n"
-            path.__truediv__ = MagicMock(return_value=stat_file)
-            return path
-
-        cgroup_stat_context.agent.get_cgroup_path = mock_get_cgroup_path
-        return cgroup_stat_context
-
-    async def test_init_creates_docker_client(self, cpu_plugin: CPUPlugin) -> None:
-        """Verify init() creates a Docker client instance."""
-        with patch("ai.backend.agent.docker.intrinsic.Docker") as mock_docker_cls:
-            mock_docker_cls.return_value = AsyncMock()
-            await cpu_plugin.init()
-            mock_docker_cls.assert_called_once()
-            assert cpu_plugin._docker is not None
-
-    async def test_cleanup_closes_docker_client(self, cpu_plugin: CPUPlugin) -> None:
-        """Verify cleanup() closes the Docker client."""
-        cpu_plugin._docker = AsyncMock()
-        await cpu_plugin.cleanup()
-        cpu_plugin._docker.close.assert_called_once()
-
-    async def test_api_mode_uses_instance_docker_client(
-        self,
-        cpu_plugin: CPUPlugin,
-        container_ids: list[str],
-        docker_stat_context: MagicMock,
-        mock_fetch_api_stats: MagicMock,
-    ) -> None:
-        """Verify API mode uses the plugin's Docker client, not a new one."""
-        with patch("ai.backend.agent.docker.intrinsic.Docker") as mock_docker_cls:
-            await cpu_plugin.gather_container_measures(docker_stat_context, container_ids)
-            mock_docker_cls.assert_not_called()
-
-    async def test_sysfs_mode_does_not_use_docker(
-        self,
-        cpu_plugin: CPUPlugin,
-        container_ids: list[str],
-        cpu_cgroup_context: MagicMock,
-    ) -> None:
-        """Verify CGROUP mode doesn't create any new Docker instance."""
-        with patch("ai.backend.agent.docker.intrinsic.Docker") as mock_docker_cls:
-            await cpu_plugin.gather_container_measures(cpu_cgroup_context, container_ids)
-            mock_docker_cls.assert_not_called()
-
-
-class TestMemoryPluginDockerClientLifecycle(BaseDockerIntrinsicTest):
-    """Tests for MemoryPlugin Docker client lifecycle management."""
 
     @pytest.fixture
     def memory_plugin(self) -> MemoryPlugin:
         plugin = MemoryPlugin.__new__(MemoryPlugin)
-        plugin.local_config = {"agent": {"docker-mode": "default"}}
-        plugin._docker = AsyncMock()
+        plugin.local_config = {"agent": {}}
         return plugin
 
-    @pytest.fixture
-    def memory_cgroup_context(
-        self, cgroup_stat_context: MagicMock
-    ) -> Generator[MagicMock, None, None]:
-        """CGROUP stat context with memory/io cgroup v2 path mocks and related patches."""
-        ctx = cgroup_stat_context
-        ctx.agent.get_cgroup_version = MagicMock(return_value="2")
+    async def test_cpu_uses_the_agent_hook(
+        self,
+        cpu_plugin: CPUPlugin,
+        container_ids: list[str],
+        docker_stat_context: MagicMock,
+        docker_stats_response: dict[str, Any],
+    ) -> None:
+        ctx = docker_stat_context
+        ctx.agent.fetch_container_api_stats = AsyncMock(return_value=docker_stats_response)
+        await cpu_plugin.gather_container_measures(ctx, container_ids)
+        assert ctx.agent.fetch_container_api_stats.await_count == len(container_ids)
 
-        mem_path = MagicMock()
-        mem_stat = MagicMock()
-        mem_stat.read_text.return_value = "inactive_file 0\n"
-        mem_path.__truediv__ = MagicMock(return_value=mem_stat)
-        io_path = MagicMock()
-        io_stat = MagicMock()
-        io_stat.read_text.return_value = ""
-        io_path.__truediv__ = MagicMock(return_value=io_stat)
-
-        def mock_get_cgroup_path(subsys: str, cid: str) -> MagicMock:
-            if subsys == "memory":
-                return mem_path
-            return io_path
-
-        ctx.agent.get_cgroup_path = mock_get_cgroup_path
-
-        mock_container_data = {
-            "State": {"Pid": 12345},
-        }
-
-        with (
-            patch(
-                "ai.backend.agent.docker.intrinsic.DockerContainer",
-            ) as mock_container_cls,
-            patch(
-                "ai.backend.agent.docker.intrinsic.read_sysfs",
-                return_value=1048576,
-            ),
-            patch(
-                "ai.backend.agent.docker.intrinsic.read_proc_net_dev",
-                return_value=ContainerNetStat(rx_bytes=0, tx_bytes=0),
-            ),
-            patch(
-                "ai.backend.agent.docker.intrinsic.current_loop",
-            ) as mock_loop,
-        ):
-            mock_container_instance = AsyncMock()
-            mock_container_instance.show.return_value = mock_container_data
-            mock_container_cls.return_value = mock_container_instance
-
-            async def default_run_in_executor(executor: Any, fn: Any, *args: Any) -> Any:
-                return fn(*args)
-
-            mock_loop.return_value.run_in_executor = AsyncMock(
-                side_effect=default_run_in_executor,
-            )
-            yield ctx
-
-    async def test_init_creates_docker_client(self, memory_plugin: MemoryPlugin) -> None:
-        """Verify init() creates a Docker client instance."""
-        with patch("ai.backend.agent.docker.intrinsic.Docker") as mock_docker_cls:
-            mock_docker_cls.return_value = AsyncMock()
-            await memory_plugin.init()
-            mock_docker_cls.assert_called_once()
-            assert memory_plugin._docker is not None
-
-    async def test_cleanup_closes_docker_client(self, memory_plugin: MemoryPlugin) -> None:
-        """Verify cleanup() closes the Docker client."""
-        memory_plugin._docker = AsyncMock()
-        await memory_plugin.cleanup()
-        memory_plugin._docker.close.assert_called_once()
-
-    async def test_api_mode_uses_instance_docker_client(
+    async def test_memory_uses_the_agent_hook(
         self,
         memory_plugin: MemoryPlugin,
         container_ids: list[str],
         docker_stat_context: MagicMock,
-        mock_fetch_api_stats: MagicMock,
+        docker_stats_response: dict[str, Any],
     ) -> None:
-        """Verify API mode uses the plugin's Docker client, not a new one."""
-        with patch("ai.backend.agent.docker.intrinsic.Docker") as mock_docker_cls:
-            await memory_plugin.gather_container_measures(docker_stat_context, container_ids)
-            mock_docker_cls.assert_not_called()
+        ctx = docker_stat_context
+        ctx.agent.fetch_container_api_stats = AsyncMock(return_value=docker_stats_response)
+        with patch("ai.backend.agent.intrinsic.current_loop") as mock_loop:
 
-    async def test_sysfs_mode_uses_instance_docker_client(
+            async def run_in_executor(executor: Any, fn: Any, *args: Any) -> Any:
+                return fn(*args)
+
+            mock_loop.return_value.run_in_executor = AsyncMock(side_effect=run_in_executor)
+            await memory_plugin.gather_container_measures(ctx, container_ids)
+        assert ctx.agent.fetch_container_api_stats.await_count == len(container_ids)
+
+    async def test_a_backend_without_an_api_yields_no_measures(
         self,
-        memory_plugin: MemoryPlugin,
+        cpu_plugin: CPUPlugin,
         container_ids: list[str],
-        memory_cgroup_context: MagicMock,
+        docker_stat_context: MagicMock,
     ) -> None:
-        """Even in CGROUP mode, Docker is needed for container PID. Verify instance client is used."""
-        with patch("ai.backend.agent.docker.intrinsic.Docker") as mock_docker_cls:
-            await memory_plugin.gather_container_measures(memory_cgroup_context, container_ids)
-            mock_docker_cls.assert_not_called()
+        # The default hook returns None (containerd, k8s, dummy): no sample, no crash.
+        ctx = docker_stat_context
+        ctx.agent.fetch_container_api_stats = AsyncMock(return_value=None)
+        measures = await cpu_plugin.gather_container_measures(ctx, container_ids)
+        for m in measures:
+            assert m.per_container == {}
 
 
 class TestMemoryPluginContainerPidValidation(BaseDockerIntrinsicTest):
@@ -254,7 +167,6 @@ class TestMemoryPluginContainerPidValidation(BaseDockerIntrinsicTest):
     def memory_plugin(self) -> MemoryPlugin:
         plugin = MemoryPlugin.__new__(MemoryPlugin)
         plugin.local_config = {"agent": {"docker-mode": "default"}}
-        plugin._docker = AsyncMock()
         return plugin
 
     @contextmanager
@@ -287,23 +199,22 @@ class TestMemoryPluginContainerPidValidation(BaseDockerIntrinsicTest):
 
         ctx.agent.get_cgroup_path = mock_get_cgroup_path
 
-        mock_container_data = {
-            "State": {"Pid": container_pid},
-        }
+        # The backend reports how to reach the container's netns; the plugin no longer inspects
+        # the container through the Docker API itself.
+        ctx.agent.get_container_netns = AsyncMock(
+            return_value=ContainerNetns(pid=container_pid, path=None)
+        )
 
         with (
             patch(
-                "ai.backend.agent.docker.intrinsic.DockerContainer",
-            ) as mock_container_cls,
-            patch(
-                "ai.backend.agent.docker.intrinsic.read_sysfs",
+                "ai.backend.agent.intrinsic.read_sysfs",
                 return_value=1048576,
             ),
             patch(
-                "ai.backend.agent.docker.intrinsic.read_proc_net_dev",
+                "ai.backend.agent.intrinsic.read_proc_net_dev",
             ) as mock_read_proc_net_dev,
             patch(
-                "ai.backend.agent.docker.intrinsic.current_loop",
+                "ai.backend.agent.intrinsic.current_loop",
             ) as mock_loop,
         ):
             mock_read_proc_net_dev.return_value = ContainerNetStat(rx_bytes=4096, tx_bytes=8192)
@@ -311,9 +222,6 @@ class TestMemoryPluginContainerPidValidation(BaseDockerIntrinsicTest):
             async def run_in_executor_impl(executor: Any, fn: Any, *args: Any) -> Any:
                 return fn(*args)
 
-            mock_container_instance = AsyncMock()
-            mock_container_instance.show.return_value = mock_container_data
-            mock_container_cls.return_value = mock_container_instance
             mock_loop.return_value.run_in_executor = AsyncMock(
                 side_effect=run_in_executor_impl,
             )
@@ -380,10 +288,9 @@ class TestMemoryPluginContainerPidValidation(BaseDockerIntrinsicTest):
 @dataclass
 class _SysfsMocks:
     ctx: MagicMock
-    container: AsyncMock
+    get_container_netns: AsyncMock
     read_proc_net_dev: MagicMock
     loop: MagicMock
-    container_data: dict[str, Any]
 
 
 class TestMemoryPluginSysfsTimeoutAndErrorIsolation(BaseDockerIntrinsicTest):
@@ -393,7 +300,6 @@ class TestMemoryPluginSysfsTimeoutAndErrorIsolation(BaseDockerIntrinsicTest):
     def memory_plugin(self) -> MemoryPlugin:
         plugin = MemoryPlugin.__new__(MemoryPlugin)
         plugin.local_config = {"agent": {"docker-mode": "default"}}
-        plugin._docker = AsyncMock()
         return plugin
 
     @pytest.fixture
@@ -415,24 +321,17 @@ class TestMemoryPluginSysfsTimeoutAndErrorIsolation(BaseDockerIntrinsicTest):
         io_path.__truediv__ = MagicMock(return_value=io_stat)
         ctx.agent.get_cgroup_path = lambda subsys, cid: mem_path if subsys == "memory" else io_path
 
-        container_data: dict[str, Any] = {
-            "State": {"Pid": 12345},
-        }
+        get_container_netns = AsyncMock(return_value=ContainerNetns(pid=12345, path=None))
+        ctx.agent.get_container_netns = get_container_netns
 
         with (
+            patch("ai.backend.agent.intrinsic.read_sysfs", return_value=1048576),
             patch(
-                "ai.backend.agent.docker.intrinsic.DockerContainer",
-            ) as mock_container_cls,
-            patch("ai.backend.agent.docker.intrinsic.read_sysfs", return_value=1048576),
-            patch(
-                "ai.backend.agent.docker.intrinsic.read_proc_net_dev",
+                "ai.backend.agent.intrinsic.read_proc_net_dev",
                 return_value=ContainerNetStat(rx_bytes=0, tx_bytes=0),
             ) as mock_read_proc_net_dev,
-            patch("ai.backend.agent.docker.intrinsic.current_loop") as mock_loop,
+            patch("ai.backend.agent.intrinsic.current_loop") as mock_loop,
         ):
-            mock_container = AsyncMock()
-            mock_container.show.return_value = container_data
-            mock_container_cls.return_value = mock_container
 
             async def default_run_in_executor(executor: Any, fn: Any, *args: Any) -> Any:
                 return fn(*args)
@@ -443,29 +342,25 @@ class TestMemoryPluginSysfsTimeoutAndErrorIsolation(BaseDockerIntrinsicTest):
 
             yield _SysfsMocks(
                 ctx=ctx,
-                container=mock_container,
+                get_container_netns=get_container_netns,
                 read_proc_net_dev=mock_read_proc_net_dev,
                 loop=mock_loop,
-                container_data=container_data,
             )
 
-    async def test_slow_container_show_times_out(
+    async def test_slow_get_container_netns_times_out(
         self,
         memory_plugin: MemoryPlugin,
         sysfs_mocks: _SysfsMocks,
     ) -> None:
-        """When container.show() hangs, the call times out and returns None
-        for that container while other containers succeed."""
-        call_count = 0
+        """When the backend hangs resolving the container's netns, the call times out and returns
+        None for that container while other containers succeed."""
 
-        async def slow_show_for_first(*args: Any, **kwargs: Any) -> dict[str, Any]:
-            nonlocal call_count
-            call_count += 1
-            if call_count == 1:
+        async def slow_for_first(container_id: str) -> ContainerNetns:
+            if container_id == "slow_container":
                 await asyncio.sleep(10)
-            return sysfs_mocks.container_data
+            return ContainerNetns(pid=12345, path=None)
 
-        sysfs_mocks.container.show.side_effect = slow_show_for_first
+        sysfs_mocks.get_container_netns.side_effect = slow_for_first
 
         results = await memory_plugin.gather_container_measures(
             sysfs_mocks.ctx, ["slow_container", "normal_container"]
@@ -474,32 +369,28 @@ class TestMemoryPluginSysfsTimeoutAndErrorIsolation(BaseDockerIntrinsicTest):
         assert "slow_container" not in results[0].per_container
         assert "normal_container" in results[0].per_container
 
-    async def test_slow_container_show_for_net_stats_times_out(
+    async def test_pinned_netns_is_used_when_the_pid_is_gone(
         self,
         memory_plugin: MemoryPlugin,
         sysfs_mocks: _SysfsMocks,
+        tmp_path: Path,
     ) -> None:
-        """When container.show() hangs during net stat collection,
-        the call times out and returns None for that container
-        while other containers succeed."""
-        call_count = 0
+        """A container whose main process is gone but whose netns is still pinned must have its
+        counters read through the namespace path instead of /proc/<pid>/net/dev."""
+        ns_path = tmp_path / "netns"
+        ns_path.touch()
+        sysfs_mocks.get_container_netns.return_value = ContainerNetns(pid=None, path=ns_path)
 
-        async def slow_show_on_second_call(*args: Any, **kwargs: Any) -> dict[str, Any]:
-            nonlocal call_count
-            call_count += 1
-            # First call succeeds quickly, second call hangs
-            if call_count == 1:
-                await asyncio.sleep(10)
-            return sysfs_mocks.container_data
+        with patch(
+            "ai.backend.agent.intrinsic.read_netns_net_dev",
+            return_value=ContainerNetStat(rx_bytes=111, tx_bytes=222),
+        ) as mock_read_netns:
+            results = await memory_plugin.gather_container_measures(sysfs_mocks.ctx, ["cid_001"])
 
-        sysfs_mocks.container.show.side_effect = slow_show_on_second_call
-
-        results = await memory_plugin.gather_container_measures(
-            sysfs_mocks.ctx, ["slow_container", "normal_container"]
-        )
-
-        assert "slow_container" not in results[0].per_container
-        assert "normal_container" in results[0].per_container
+        mock_read_netns.assert_called_once_with(ns_path)
+        sysfs_mocks.read_proc_net_dev.assert_not_called()
+        assert results[3].per_container["cid_001"].value == 111
+        assert results[4].per_container["cid_001"].value == 222
 
     async def test_gather_isolates_container_failures(
         self,
@@ -602,7 +493,7 @@ class TestReadProcNetDev:
         net_dev = tmp_path / "net_dev"
         net_dev.write_text(getattr(self, content_attr))
         with patch(
-            "ai.backend.agent.docker.intrinsic.Path",
+            "ai.backend.agent.intrinsic.Path",
             return_value=net_dev,
         ):
             result = read_proc_net_dev(42)
@@ -629,7 +520,7 @@ class TestMemoryRestoreFromContainer:
         spec = MagicMock()
         spec.allocations = {DeviceName("mem"): {SlotName("mem"): alloc}}
         monkeypatch.setattr(
-            "ai.backend.agent.docker.intrinsic.get_resource_spec_from_container",
+            "ai.backend.agent.intrinsic.get_resource_spec_from_container",
             AsyncMock(return_value=spec),
         )
         alloc_map = MagicMock(spec=DiscretePropertyAllocMap)
@@ -639,7 +530,7 @@ class TestMemoryRestoreFromContainer:
     async def test_noop_when_resource_spec_missing(self, monkeypatch: Any) -> None:
         plugin = MemoryPlugin.__new__(MemoryPlugin)
         monkeypatch.setattr(
-            "ai.backend.agent.docker.intrinsic.get_resource_spec_from_container",
+            "ai.backend.agent.intrinsic.get_resource_spec_from_container",
             AsyncMock(return_value=None),
         )
         alloc_map = MagicMock(spec=DiscretePropertyAllocMap)

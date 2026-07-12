@@ -41,13 +41,13 @@ from ai.backend.agent.agent import (
 )
 from ai.backend.agent.config.unified import ContainerSandboxType, ScratchType
 from ai.backend.agent.containerd.runtime.spec import _DEFAULT_CAPS, container_cgroup_fs_path
-from ai.backend.agent.docker.agent import (
+from ai.backend.agent.errors import UnsupportedResource
+from ai.backend.agent.errors.resources import PortPoolExhaustedError
+from ai.backend.agent.image_distro import (
     LDD_GLIBC_REGEX,
     LDD_MUSL_REGEX,
     known_glibc_distros,
 )
-from ai.backend.agent.errors import UnsupportedResource
-from ai.backend.agent.errors.resources import PortPoolExhaustedError
 from ai.backend.agent.kernel import AbstractKernel
 from ai.backend.agent.kernel_registry.adapter import (
     KernelRecoveryDataAdapter,

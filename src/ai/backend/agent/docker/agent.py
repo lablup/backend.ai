@@ -5,7 +5,6 @@ import base64
 import json
 import logging
 import os
-import re
 import secrets
 import shutil
 import signal
@@ -24,7 +23,6 @@ from subprocess import run as subprocess_run
 from typing import (
     TYPE_CHECKING,
     Any,
-    Final,
     cast,
     override,
 )
@@ -58,6 +56,11 @@ from ai.backend.agent.errors import (
 from ai.backend.agent.errors.resources import PortPoolExhaustedError
 from ai.backend.agent.etcd import AgentEtcdClientView
 from ai.backend.agent.fs import create_scratch_filesystem, destroy_scratch_filesystem
+from ai.backend.agent.image_distro import (
+    LDD_GLIBC_REGEX,
+    LDD_MUSL_REGEX,
+    known_glibc_distros,
+)
 from ai.backend.agent.kernel import AbstractKernel, KernelRegistry
 from ai.backend.agent.kernel_registry.adapter import (
     KernelRecoveryDataAdapter,
@@ -159,6 +162,7 @@ from ai.backend.common.types import (
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.logging.formatter import pretty
 
+from .intrinsic import fetch_api_stats
 from .kernel import DockerKernel
 from .utils import PersistentServiceContainer
 
@@ -167,19 +171,6 @@ if TYPE_CHECKING:
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 eof_sentinel = Sentinel.TOKEN
-
-LDD_GLIBC_REGEX = re.compile(r"^ldd \([^\)]+\) ([\d\.]+)$")
-LDD_MUSL_REGEX = re.compile(r"^musl libc .+$")
-
-known_glibc_distros: Final[dict[float, str]] = {
-    2.17: "centos7.6",
-    2.27: "ubuntu18.04",
-    2.28: "centos8.0",
-    2.31: "ubuntu20.04",
-    2.34: "centos9.0",
-    2.35: "ubuntu22.04",
-    2.39: "ubuntu24.04",
-}
 
 deeplearning_image_keys = {
     "tensorflow",
@@ -1693,6 +1684,12 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             pid=data.get("State", {}).get("Pid") or None,
             path=Path(sandbox_key) if sandbox_key else None,
         )
+
+    @override
+    async def fetch_container_api_stats(self, container_id: str) -> Mapping[str, Any] | None:
+        # The intrinsic compute plugins are runtime-neutral and hold no Docker client, so the
+        # StatModes.DOCKER sample is fetched here, where the daemon connection already lives.
+        return await fetch_api_stats(DockerContainer(self.docker, id=container_id))
 
     @override
     async def extract_image_command(self, image: str) -> list[str] | None:

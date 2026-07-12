@@ -1993,6 +1993,18 @@ class AbstractAgent[
         """
         raise NotImplementedError
 
+    async def fetch_container_api_stats(self, container_id: str) -> Mapping[str, Any] | None:
+        """
+        One stat sample straight from the container runtime's own API, in the Docker stats
+        shape, or None when it is unavailable.
+
+        Only ever called under `StatModes.DOCKER`. This exists so the intrinsic CPU/memory
+        plugins stay backend-agnostic: they ask the agent for the sample instead of holding a
+        runtime client of their own. A backend with no such API leaves the default in place and
+        reports the cgroup instead (see `_resolve_stat_mode`).
+        """
+        return None
+
     def update_slots(self, updated_slots: Mapping[SlotName, Decimal]) -> None:
         self.slots = updated_slots
         log.debug("slots: {!r}", self.slots)

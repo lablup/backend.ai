@@ -13,12 +13,12 @@ from typing import (
 import aiodocker
 import trafaret as t
 
-from ai.backend.agent.docker.resources import get_resource_spec_from_container
 from ai.backend.agent.resources import (
     AbstractAllocMap,
     AbstractComputePlugin,
     DeviceSlotInfo,
     DiscretePropertyAllocMap,
+    get_resource_spec_from_container,
 )
 from ai.backend.agent.stats import (
     ContainerMeasurement,
