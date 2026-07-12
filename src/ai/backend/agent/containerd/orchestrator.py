@@ -1,4 +1,4 @@
-"""Composition of containerd runtime + cluster network (BEP-1058).
+"""Composition of containerd runtime + cluster network (BEP-1062).
 
 The runtime (`OciRuntime`) and the network subsystem
 (`ContainerNetworkProvisioner`) are two completely separate classes that never

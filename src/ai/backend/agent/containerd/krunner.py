@@ -1,4 +1,4 @@
-"""containerd-native krunner env provisioning (BEP-1058).
+"""containerd-native krunner env provisioning (BEP-1062).
 
 The Docker backend materializes each krunner env as a Docker *volume*, populated by running
 an extractor container (``docker run`` + ``docker volume create``). The containerd backend

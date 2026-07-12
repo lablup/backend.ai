@@ -1,4 +1,4 @@
-"""Privileged network helper daemon (BEP-1058).
+"""Privileged network helper daemon (BEP-1062).
 
 This is the ONLY component that holds CAP_NET_ADMIN + CAP_SYS_ADMIN. The unprivileged
 agent connects over a unix socket and sends semantic verbs (``protocol.py``); the helper

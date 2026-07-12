@@ -1,4 +1,4 @@
-"""Containerd agent backend (BEP-1058).
+"""Containerd agent backend (BEP-1062).
 
 Selectable via ``agent.backend = "containerd"``. Reuses the Docker backend's resource and
 compute-plugin logic (containerd runs the same Linux containers with the same cgroup-based

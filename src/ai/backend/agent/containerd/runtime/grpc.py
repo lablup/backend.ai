@@ -1,4 +1,4 @@
-"""Native containerd gRPC OCI runtime (BEP-1058).
+"""Native containerd gRPC OCI runtime (BEP-1062).
 
 Talks to the containerd daemon directly over its gRPC API (unix socket) — the sole
 runtime client, with no ``nerdctl``/``ctr`` CLI dependency (and none of the CLI-imposed

@@ -1,4 +1,4 @@
-"""Integration tests for the privileged network helper's RPC layer (BEP-1058).
+"""Integration tests for the privileged network helper's RPC layer (BEP-1062).
 
 These exercise the real client<->server round trip over a unix socket in-process (no
 privileges required): peer auth, protocol framing, input policy, and semantic dispatch

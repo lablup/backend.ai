@@ -1,4 +1,4 @@
-"""Input policy for the privileged network helper (BEP-1058).
+"""Input policy for the privileged network helper (BEP-1062).
 
 Pure, side-effect-free validation of everything the (untrusted) agent sends before
 the helper acts on it. Two design rules keep this small and race-free:

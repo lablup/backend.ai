@@ -2,7 +2,7 @@
 
 These types decouple the cluster-network control plane and data-plane backends
 from any specific container runtime (Docker, containerd, ...). See
-proposals/BEP-1058 and its sub-documents `control-plane.md` and `agent-plugin-v2.md`.
+proposals/BEP-1062 and its sub-documents `control-plane.md` and `agent-plugin-v2.md`.
 """
 
 from __future__ import annotations

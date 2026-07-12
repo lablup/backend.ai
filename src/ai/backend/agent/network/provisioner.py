@@ -1,4 +1,4 @@
-"""Per-container network provisioner (BEP-1058).
+"""Per-container network provisioner (BEP-1062).
 
 The single entry point a containerd (or other host-native) runtime calls to wire a
 container into its session network: ask the v2 backend for the container's

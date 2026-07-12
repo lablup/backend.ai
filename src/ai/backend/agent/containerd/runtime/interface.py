@@ -1,4 +1,4 @@
-"""OCI container runtime interface (BEP-1058).
+"""OCI container runtime interface (BEP-1062).
 
 This is the **container-only** management surface: image and container/task lifecycle over
 containerd's native gRPC API (Containers/Tasks/Images/Content/Snapshots services).
@@ -8,7 +8,7 @@ Terminology — this is deliberately NOT the CRI path:
   implements it with a higher-level *cri plugin* that layers a pod/sandbox model on top of
   the native services.
 - That CRI implementation hides the network namespace behind ``RunPodSandbox`` and drives
-  CNI itself — the runtime would own the network. BEP-1058 owns the network separately
+  CNI itself — the runtime would own the network. BEP-1062 owns the network separately
   (multi-attach LOCAL/OVERLAY, central IPAM, vxlan), so we call the **native** API directly.
 
 This interface therefore imports nothing from the network layer and knows nothing about CNI,

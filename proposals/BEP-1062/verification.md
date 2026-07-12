@@ -1,11 +1,11 @@
 <!-- context-for-ai
 type: detail-doc
-parent: BEP-1058 (Runtime-Neutral Cluster Network with Pluggable Data Plane)
+parent: BEP-1062 (Runtime-Neutral Cluster Network with Pluggable Data Plane)
 scope: Reproducible real-infrastructure smoke tests validating the vxlan command builders, the CNI config + runner protocol, and the etcd put_if_absent CAS. Complements the unit tests (which mock the OS/etcd boundary).
 depends-on: [agent-plugin-v2.md, data-plane-backends.md, control-plane.md]
 -->
 
-# BEP-1058: Real-Infrastructure Verification
+# BEP-1062: Real-Infrastructure Verification
 
 Unit tests mock the OS and etcd boundaries. The three pieces that can only be
 confirmed on real infrastructure were validated on a Linux 6.8 host (lima VM) with
@@ -96,7 +96,7 @@ echo "$OVERLAY_CONF" | env CNI_COMMAND=ADD CNI_NETNS=/proc/<pid>/ns/net CNI_IFNA
 Result: created container has pid 0 (not started); after start the netns has only `lo`;
 CNI attach adds `baimulti0` + session IP `10.128.5.4` inside the real container; teardown
 is clean. `--network none` keeps nerdctl out of networking, so CNI ownership stays with
-the BEP-1058 layer. This validates the runtime↔network separation and the orchestrator
+the BEP-1062 layer. This validates the runtime↔network separation and the orchestrator
 handoff against live containerd. ✅
 
 ## 7. Real code end-to-end (the actual classes, not shell mimics)
@@ -295,6 +295,6 @@ a deployment task, not a code reimplementation. ✅
 - The full containerd task-lifecycle gRPC client (image scan/pull, container/task create,
   snapshotter, OCI spec generation) is a large separate track — comparable in size to
   DockerAgent — and is being developed on `feat/containerd-agent-prototype` (CRI gRPC
-  path). BEP-1058 owns only the network stack; `ContainerdAgent.start_container` will
+  path). BEP-1062 owns only the network stack; `ContainerdAgent.start_container` will
   create the task there and call `ContainerNetworkProvisioner.attach(task_pid=...)`,
   which §5 already validates against live containerd.

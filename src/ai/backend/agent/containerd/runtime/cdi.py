@@ -1,4 +1,4 @@
-"""Container Device Interface (CDI) resolution for the containerd OCI spec (BEP-1058).
+"""Container Device Interface (CDI) resolution for the containerd OCI spec (BEP-1062).
 
 The low-level containerd ``Containers.Create`` path does NOT resolve CDI device references —
 only the CRI plugin, dockerd, or the containerd Go client's ``oci.WithCDIDevices`` do. Since we

@@ -1,4 +1,4 @@
-"""Translate a Backend.AI KernelCreationConfig into a containerd container spec (BEP-1058).
+"""Translate a Backend.AI KernelCreationConfig into a containerd container spec (BEP-1062).
 
 Pure translation from kernel-domain concepts to what `OciRuntime` needs
 (image ref, command, OCI-ish spec + labels/env). Kept small and testable; the full OCI

@@ -1,4 +1,4 @@
-"""Container DNS resolution for the containerd backend (BEP-1058).
+"""Container DNS resolution for the containerd backend (BEP-1062).
 
 The Docker backend gets this for free: dockerd synthesizes a per-container ``resolv.conf`` and
 bind-mounts it over ``/etc/resolv.conf``. Building the OCI spec ourselves means nobody does it,

@@ -1,6 +1,6 @@
-"""Native veth/bridge attach runner (BEP-1058) — replaces the CNI ``bridge`` plugin binary.
+"""Native veth/bridge attach runner (BEP-1062) — replaces the CNI ``bridge`` plugin binary.
 
-The BEP-1058 data plane is host-native: the session fabric (vxlan device, bridge, FDB/ARP)
+The BEP-1062 data plane is host-native: the session fabric (vxlan device, bridge, FDB/ARP)
 is built with plain iproute2. The only remaining ``/opt/cni/bin`` dependency was the
 per-container *attach* step, which this module reimplements over ``ip``/``iptables`` so no
 external cni-plugins package is required.

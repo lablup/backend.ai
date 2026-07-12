@@ -129,7 +129,7 @@ BEP numbers start from 1000.
 | [1056](BEP-1056-scope-linked-metric-catalog.md) | Scope-Linked Metric Catalog & Dashboards | HyeokJin Kim | Draft |
 | [1057](BEP-1057-agent-re-architecture.md) | Agent Re-architecture | HyeokJin Kim | Draft |
 | [1058](BEP-1058-super-admin-impersonation.md) | Super-Admin User Impersonation | HyeokJin Kim | Draft |
-| [1058](BEP-1058-runtime-neutral-cluster-network.md) | Runtime-Neutral Cluster Network with Pluggable Data Plane | Daemyung Kang | Draft |
+| [1062](BEP-1062-runtime-neutral-cluster-network.md) | Runtime-Neutral Cluster Network with Pluggable Data Plane | Daemyung Kang | Draft |
 | _next_ | _(reserve your number here)_ | | |
 
 ## File Structure

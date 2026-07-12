@@ -1,4 +1,4 @@
-"""Entry point for the privileged network helper daemon (BEP-1058).
+"""Entry point for the privileged network helper daemon (BEP-1062).
 
 Capabilities needed (all four, for the reasons noted):
 

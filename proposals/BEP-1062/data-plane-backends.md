@@ -1,6 +1,6 @@
 <!-- context-for-ai
 type: detail-doc
-parent: BEP-1058 (Runtime-Neutral Cluster Network with Pluggable Data Plane)
+parent: BEP-1062 (Runtime-Neutral Cluster Network with Pluggable Data Plane)
 scope: The three data-plane backends (vxlan, host-gw, wireguard), how each realizes cross-node connectivity and per-session isolation, and why no single one fits all environments.
 depends-on: [control-plane.md, agent-plugin-v2.md]
 key-decisions:
@@ -8,7 +8,7 @@ key-decisions:
   - Isolation is per-session: VNI (vxlan), subnet + default-deny (host-gw), peer-restricted + encrypted (wireguard).
 -->
 
-# BEP-1058: Data-Plane Backends
+# BEP-1062: Data-Plane Backends
 
 ## Summary
 

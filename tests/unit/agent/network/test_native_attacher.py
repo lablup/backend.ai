@@ -1,4 +1,4 @@
-"""Unit tests for the native veth/bridge attach runner (BEP-1058)."""
+"""Unit tests for the native veth/bridge attach runner (BEP-1062)."""
 
 import asyncio
 from pathlib import Path

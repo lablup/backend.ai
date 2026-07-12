@@ -1,4 +1,4 @@
-"""Unit tests for the CDI resolver/injector (BEP-1058)."""
+"""Unit tests for the CDI resolver/injector (BEP-1062)."""
 
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""Build a containerd/runc OCI *runtime* spec from our runtime-neutral oci_spec (BEP-1058).
+"""Build a containerd/runc OCI *runtime* spec from our runtime-neutral oci_spec (BEP-1062).
 
 There is no CLI to assemble the OCI runtime spec for us: ``Containers.Create`` takes the full OCI
 runtime spec (the runc ``config.json`` structure) directly, so we build it here.

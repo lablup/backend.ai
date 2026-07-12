@@ -1,4 +1,4 @@
-"""Agent networking capability probe (BEP-1058).
+"""Agent networking capability probe (BEP-1062).
 
 The manager selects a cluster-network data-plane backend per session from each
 participating agent's capabilities, published under ``network/agent/{id}/caps``.

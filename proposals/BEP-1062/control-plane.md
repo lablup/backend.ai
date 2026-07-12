@@ -1,6 +1,6 @@
 <!-- context-for-ai
 type: detail-doc
-parent: BEP-1058 (Runtime-Neutral Cluster Network with Pluggable Data Plane)
+parent: BEP-1062 (Runtime-Neutral Cluster Network with Pluggable Data Plane)
 scope: etcd schema, CAS-based IPAM/VNI allocation, capability-driven backend selection, and agent watch/membership that replaces Swarm gossip.
 depends-on: [data-plane-backends.md]
 key-decisions:
@@ -9,7 +9,7 @@ key-decisions:
   - Reuse existing agent liveness lease for GC.
 -->
 
-# BEP-1058: Control Plane
+# BEP-1062: Control Plane
 
 ## Summary
 

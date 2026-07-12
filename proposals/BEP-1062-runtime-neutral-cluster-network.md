@@ -25,7 +25,7 @@ key-decisions:
 phases: 8
 -->
 
-# BEP-1058: Runtime-Neutral Cluster Network with Pluggable Data Plane
+# BEP-1062: Runtime-Neutral Cluster Network with Pluggable Data Plane
 
 ## Related Issues
 
@@ -47,7 +47,7 @@ We need the same capability — **isolated L2/L3 connectivity between the contai
 - keeps per-session isolation (different organizations may land on the same node),
 - and is fast enough across heterogeneous environments (bare-metal, VM, uncontrolled switches, NICs without tunnel offload).
 
-No single data plane wins in every environment (see [data-plane-backends](./BEP-1058/data-plane-backends.md)). Therefore the design separates a **single control plane** from a **pluggable data plane**, and makes the agent-side plugin **runtime-neutral** so the same backend attaches containers under Docker or containerd.
+No single data plane wins in every environment (see [data-plane-backends](./BEP-1062/data-plane-backends.md)). Therefore the design separates a **single control plane** from a **pluggable data plane**, and makes the agent-side plugin **runtime-neutral** so the same backend attaches containers under Docker or containerd.
 
 ## Current Design
 
@@ -62,9 +62,9 @@ Three pillars, detailed in the sub-documents:
 
 | Pillar | Summary | Document |
 |--------|---------|----------|
-| Control plane | etcd schema (`network/…`) for session→{subnet, vni, backend} mapping, CAS-based IPAM/VNI allocation, capability-driven backend selection, agent watch/membership | [control-plane](./BEP-1058/control-plane.md) |
-| Runtime-neutral agent plugin (v2) | New `backendai_network_agent_v2` group; splits host-level **session-network lifecycle** from runtime-specific **endpoint attach**; returns a neutral `NetworkAttachSpec` consumed by Docker or containerd provisioners | [agent-plugin-v2](./BEP-1058/agent-plugin-v2.md) |
-| Pluggable data plane | `vxlan` (portable default), `host-gw` (native routing, no encapsulation), `wireguard` (encrypted); each realizes the same control-plane contract with its own isolation mechanism | [data-plane-backends](./BEP-1058/data-plane-backends.md) |
+| Control plane | etcd schema (`network/…`) for session→{subnet, vni, backend} mapping, CAS-based IPAM/VNI allocation, capability-driven backend selection, agent watch/membership | [control-plane](./BEP-1062/control-plane.md) |
+| Runtime-neutral agent plugin (v2) | New `backendai_network_agent_v2` group; splits host-level **session-network lifecycle** from runtime-specific **endpoint attach**; returns a neutral `NetworkAttachSpec` consumed by Docker or containerd provisioners | [agent-plugin-v2](./BEP-1062/agent-plugin-v2.md) |
+| Pluggable data plane | `vxlan` (portable default), `host-gw` (native routing, no encapsulation), `wireguard` (encrypted); each realizes the same control-plane contract with its own isolation mechanism | [data-plane-backends](./BEP-1062/data-plane-backends.md) |
 
 The **manager plugin stays as-is**; a new `CNINetworkPlugin` implements it and does control-plane allocation. Runtime neutrality is therefore an **agent-only** change.
 
@@ -72,17 +72,17 @@ The **manager plugin stays as-is**; a new `CNINetworkPlugin` implements it and d
 
 | Document | Description |
 |----------|-------------|
-| [control-plane](./BEP-1058/control-plane.md) | etcd schema, IPAM/VNI allocation, backend selection, watch/membership |
-| [agent-plugin-v2](./BEP-1058/agent-plugin-v2.md) | Runtime-neutral v2 agent plugin interface and attach spec |
-| [data-plane-backends](./BEP-1058/data-plane-backends.md) | vxlan / host-gw / wireguard backends and isolation |
-| [migration](./BEP-1058/migration.md) | Rollout, compatibility, config switches |
-| [verification](./BEP-1058/verification.md) | Real-infra smoke tests (vxlan / CNI / etcd CAS) |
+| [control-plane](./BEP-1062/control-plane.md) | etcd schema, IPAM/VNI allocation, backend selection, watch/membership |
+| [agent-plugin-v2](./BEP-1062/agent-plugin-v2.md) | Runtime-neutral v2 agent plugin interface and attach spec |
+| [data-plane-backends](./BEP-1062/data-plane-backends.md) | vxlan / host-gw / wireguard backends and isolation |
+| [migration](./BEP-1062/migration.md) | Rollout, compatibility, config switches |
+| [verification](./BEP-1062/verification.md) | Real-infra smoke tests (vxlan / CNI / etcd CAS) |
 
 ## Migration / Compatibility
 
 - v1 Docker plugins (`backendai_network_agent_v1`, `OverlayNetworkPlugin`) are untouched; `default_driver="overlay"` keeps current behavior.
 - New `default_driver="cni"` opts a deployment into the v2 path. `forced_backend` optionally pins a data plane; unset ⇒ capability-based auto-selection.
-- Full detail: [migration](./BEP-1058/migration.md).
+- Full detail: [migration](./BEP-1062/migration.md).
 
 ## Implementation Plan
 
@@ -113,7 +113,7 @@ The **manager plugin stays as-is**; a new `CNINetworkPlugin` implements it and d
 | 2026-07-02 | Two interface roles: LOCAL (always) + OVERLAY (multi-node only). The LOCAL interface serves BOTH the agent↔container control channel AND external egress, because the host (agent) is the LOCAL bridge's gateway | Avoids a redundant separate "agent-control" interface. Single-node sessions need only LOCAL; multi-node adds one OVERLAY for cross-node traffic. The LOCAL interface is mandatory even for closed sessions (agent must control the kernel) — only its NAT/egress is optional policy. |
 | 2026-07-02 | The LOCAL interface is egress-only between containers (inter-container communication disabled); host↔container still works | A shared per-node LOCAL bridge would otherwise bridge two different sessions on the same node, breaking isolation — the same reason Swarm disables ICC on `docker_gwbridge`. Default route rides LOCAL; OVERLAY installs only the session-subnet route. |
 | 2026-07-02 | Isolation scope = **Docker Swarm equivalent** (OVERLAY VNI separation + LOCAL ICC-off). Egress network policy (blocking indirect paths — published-port hairpin, node IPs, cloud metadata, internet rendezvous) is explicitly **out of scope**, recorded as future work | Swarm itself does not close these egress paths, and Backend.AI already ships on Swarm today; matching Swarm keeps the security posture unchanged while enabling the containerd migration. Going beyond Swarm is a separable, later effort — see "Security scope & future work" in data-plane-backends.md. |
-| 2026-07-02 | **containerd and CNI are managed separately; their only contract is the container network namespace (`/proc/{task_pid}/ns/net`).** ContainerdAgent owns container lifecycle via the **low-level containerd API** (containers/tasks/images/snapshots), NOT CRI `RunPodSandbox` | CRI's `RunPodSandbox` makes containerd auto-invoke the node CNI, coupling runtime and network and assuming a cluster-owned CNI. BEP-1058 owns the network itself (self-managed vxlan/host-gw), so the runtime must create the task with its own empty netns and let our network subsystem attach it — keeping runtime and network independently versioned/verified/replaceable. This is the "path B" resolution of the earlier CRI-vs-low-level question. |
+| 2026-07-02 | **containerd and CNI are managed separately; their only contract is the container network namespace (`/proc/{task_pid}/ns/net`).** ContainerdAgent owns container lifecycle via the **low-level containerd API** (containers/tasks/images/snapshots), NOT CRI `RunPodSandbox` | CRI's `RunPodSandbox` makes containerd auto-invoke the node CNI, coupling runtime and network and assuming a cluster-owned CNI. BEP-1062 owns the network itself (self-managed vxlan/host-gw), so the runtime must create the task with its own empty netns and let our network subsystem attach it — keeping runtime and network independently versioned/verified/replaceable. This is the "path B" resolution of the earlier CRI-vs-low-level question. |
 | 2026-07-02 | The prototype's **CRI gRPC client is not reused**; a low-level containerd runtime client is needed instead | The CRI client (`feat/containerd-agent-prototype`) is built around the sandbox→auto-CNI model, which conflicts with separate CNI ownership. Only the netns/PID contract crosses the boundary, so the runtime client must expose task creation + PID, not CRI sandboxes. |
 | 2026-07-03 | **The LOCAL (egress) bridge is per-session, not one node-shared bridge**; cross-session isolation on it comes from separate bridges, not ICC-off firewall rules | Real testing (verification.md §9) showed the stock CNI `bridge` plugin does NOT implement ICC-off, so a shared per-node LOCAL bridge lets different sessions reach each other (a cross-session leak). A per-session LOCAL bridge (like the overlay bridge) gives egress + isolation with no firewall rules — the same separate-bridge mechanism verified in §8. Supersedes the earlier "LOCAL ICC-off" framing. Its NAT subnet is a node-local per-session allocation (behind NAT, no cross-node coordination). |
 | 2026-07-02 | **Runtime management and network management are two completely separate classes**; the agent is the sole composition point. `ContainerdRuntimeClient` (containerd only — no network imports) and the network subsystem (`SessionNetworkCoordinator`/`ContainerNetworkProvisioner`, containerd-agnostic) never reference each other. `ContainerdAgent` composes them and hands the task's netns/PID from the runtime to the network layer | Enforces the separation as a code-level invariant, not just a convention: either side can be tested, versioned, or replaced in isolation, and the coupling is confined to one orchestration method. |

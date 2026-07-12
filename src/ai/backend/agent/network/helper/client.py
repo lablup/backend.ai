@@ -1,4 +1,4 @@
-"""Agent-side client + proxies for the privileged network helper (BEP-1058).
+"""Agent-side client + proxies for the privileged network helper (BEP-1062).
 
 These let the *unprivileged* agent keep its normal composition (SessionNetworkCoordinator
 owns etcd membership; the orchestrator drives per-container attach) while every privileged

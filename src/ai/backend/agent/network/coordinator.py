@@ -1,10 +1,10 @@
-"""Per-session cluster-network coordinator (BEP-1058).
+"""Per-session cluster-network coordinator (BEP-1062).
 
 Owns the membership lifecycle for a session network: reads the session meta, drives
 the backend's host-level setup, publishes this agent's membership, and reconciles
 peers from the etcd ``members/`` prefix (driving the backend's idempotent
 ``add_peer``/``del_peer``). The v2 backend is a stateless data-plane executor and
-never watches etcd itself — that ownership lives here (see Decision Log, BEP-1058).
+never watches etcd itself — that ownership lives here (see Decision Log, BEP-1062).
 """
 
 from __future__ import annotations

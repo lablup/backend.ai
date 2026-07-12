@@ -1803,7 +1803,7 @@ class ClusterInfo(TypedDict):
     ssh_keypair: ClusterSSHKeyPair | None
     cluster_ssh_port_mapping: ClusterSSHPortMapping | None
     cluster_hosts: NotRequired[Mapping[str, str]]
-    """cluster_hostname -> IP for every kernel in the session (BEP-1058 central IPAM). Lets a
+    """cluster_hostname -> IP for every kernel in the session (BEP-1062 central IPAM). Lets a
     backend that has no built-in cluster DNS (containerd) resolve peer hostnames by writing
     /etc/hosts. Populated for overlay sessions where the manager pre-assigns IPs; absent
     otherwise (single-node bridge falls back to node-local IPAM with no static mapping)."""
@@ -1958,7 +1958,7 @@ class KernelCreationConfig(TypedDict):
     agent_addr: str
     endpoint_id: str | None
     cluster_network_ip: NotRequired[str | None]
-    """Manager-assigned overlay IP for this kernel's OVERLAY interface (BEP-1058 central
+    """Manager-assigned overlay IP for this kernel's OVERLAY interface (BEP-1062 central
     IPAM). Set only for multi-node overlay sessions; the agent uses it as the static CNI
     address so per-node IPs are disjoint. Absent/None => host-local fallback."""
 

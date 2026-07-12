@@ -1,4 +1,4 @@
-"""Agent-facing composition of session network + container runtime (BEP-1058).
+"""Agent-facing composition of session network + container runtime (BEP-1062).
 
 `ContainerdAgent` holds one of these. It bridges the data the manager sends
 (``cluster_info["network_config"]`` = the CNINetworkPlugin's ``{backend, subnet, vni,

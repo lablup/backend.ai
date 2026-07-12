@@ -1,12 +1,12 @@
-"""Containerd agent backend (BEP-1058).
+"""Containerd agent backend (BEP-1062).
 
 An independent agent backend parallel to DockerAgent, targeting containerd's native
 gRPC/task model instead of the Docker daemon. The container/image lifecycle (scan/pull/push,
 create/start/destroy, resource limits, GPU/device injection, distro probe) runs over the
-containerd gRPC API with no nerdctl/ctr; cluster networking is delegated to the BEP-1058
+containerd gRPC API with no nerdctl/ctr; cluster networking is delegated to the BEP-1062
 stack.
 
-Cluster networking is provided by the BEP-1058 runtime-neutral stack
+Cluster networking is provided by the BEP-1062 runtime-neutral stack
 (``agent.network``): the SessionNetworkCoordinator handles per-session setup and the
 ContainerNetworkProvisioner attaches each container's task PID via CNI.
 """
@@ -582,7 +582,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
 
     @override
     async def apply_network(self, cluster_info: ClusterInfo) -> None:
-        # BEP-1058: set up this node's per-session data plane and register the per-session
+        # BEP-1062: set up this node's per-session data plane and register the per-session
         # orchestrator. Per-container CNI attach happens in start_container against the task
         # PID. Multi-node sessions carry a manager-provided network_config (vxlan overlay);
         # single-node sessions have none, so synthesize a node-local BRIDGE config — the
@@ -595,7 +595,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         )
 
     def _prepare_etc_hosts(self, cluster_info: ClusterInfo) -> Mount | None:
-        """Write an /etc/hosts carrying every cluster peer's ``hostname -> IP`` (BEP-1058 central
+        """Write an /etc/hosts carrying every cluster peer's ``hostname -> IP`` (BEP-1062 central
         IPAM) and return a bind mount for it, so hostname-based cluster workloads (MPI/torchrun)
         resolve peers. Returns None when there is no mapping to inject — single-node bridge
         sessions use node-local IPAM with no manager-assigned addresses."""
@@ -1212,7 +1212,7 @@ class ContainerdAgent(
         ipc_base_path = self.local_config.agent.ipc_base_path
         self._agent_sock_path = ipc_base_path / "container" / f"agent.{self.id}.sock"
         self._agent_sock_task = None
-        # Cluster networking is delegated to the BEP-1058 agent.network stack via a
+        # Cluster networking is delegated to the BEP-1062 agent.network stack via a
         # (verified) facade; the kernel-creation lifecycle will drive it. The vxlan uplink
         # must be the interface carrying this node's VTEP (host_ip) — deriving it from the
         # host_ip keeps the overlay on the same L2 the agents advertise on, instead of a
@@ -1294,7 +1294,7 @@ class ContainerdAgent(
         self._event_monitor_task = asyncio.create_task(self._monitor_task_events())
         self._agent_sock_task = asyncio.create_task(self._handle_agent_socket())
         # Advertise this node's VTEP so the manager can pre-seed session membership and
-        # eliminate the peer-publish race for multi-node overlays (BEP-1058).
+        # eliminate the peer-publish race for multi-node overlays (BEP-1062).
         await publish_vtep(self.etcd, str(self.id), self._host_ip)
 
     @override
@@ -1782,7 +1782,7 @@ class ContainerdAgent(
 
     @override
     async def create_local_network(self, network_name: str) -> None:
-        # Single-node multi-kernel local bridge. In BEP-1058 intra-node connectivity is
+        # Single-node multi-kernel local bridge. In BEP-1062 intra-node connectivity is
         # covered by the per-session overlay/LOCAL bridges, so this is a no-op for now.
         # TODO: a dedicated agent-local bridge for single-node cluster sessions.
         return

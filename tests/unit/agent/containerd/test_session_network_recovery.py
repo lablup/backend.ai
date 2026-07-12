@@ -1,4 +1,4 @@
-"""Restart recovery for the containerd session network (BEP-1058).
+"""Restart recovery for the containerd session network (BEP-1062).
 
 A restart empties the process memory that names the host resources — attach plans, the
 container<->session tracker, the per-session coordinators — while the resources themselves

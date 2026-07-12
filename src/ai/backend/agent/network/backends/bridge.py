@@ -1,4 +1,4 @@
-"""Node-local bridge cluster-network backend (BEP-1058).
+"""Node-local bridge cluster-network backend (BEP-1062).
 
 Single-node data plane: a per-session CNI bridge on a node-local NAT subnet, with no
 cross-node overlay. It gives a single-node container a host-reachable IP (the host is the

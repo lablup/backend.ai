@@ -789,7 +789,7 @@ class CommonAgentConfig(BaseConfigSchema):
         ),
         BackendAIConfigMeta(
             description=(
-                "Unix socket path of the privileged network helper (BEP-1058). When set, the "
+                "Unix socket path of the privileged network helper (BEP-1062). When set, the "
                 "containerd agent delegates all CAP_NET_ADMIN/CAP_SYS_ADMIN container networking "
                 "to the helper over this socket and needs no network privilege itself. When unset "
                 "(the default), the agent performs container networking in-process, which requires "
@@ -2360,7 +2360,7 @@ class AgentSpecificConfig(BaseConfigSchema):
                 DockerExtraConfig.model_validate(self.container.model_dump())
             case AgentBackend.CONTAINERD:
                 # containerd runs the same Linux containers as Docker; reuse its
-                # container-config validation. See BEP-1058.
+                # container-config validation. See BEP-1062.
                 DockerExtraConfig.model_validate(self.container.model_dump())
             case AgentBackend.DUMMY:
                 pass

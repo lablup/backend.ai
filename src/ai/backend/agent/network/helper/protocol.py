@@ -1,4 +1,4 @@
-"""Wire protocol for the privileged network helper (BEP-1058).
+"""Wire protocol for the privileged network helper (BEP-1062).
 
 The unprivileged agent and the privileged (CAP_NET_ADMIN) helper speak a small,
 **semantic** RPC over a unix socket: newline-delimited JSON, one request and one

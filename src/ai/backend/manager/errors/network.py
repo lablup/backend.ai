@@ -1,4 +1,4 @@
-"""Cluster-session network exceptions (BEP-1058)."""
+"""Cluster-session network exceptions (BEP-1062)."""
 
 from __future__ import annotations
 
@@ -42,7 +42,7 @@ class VNIPoolExhausted(BackendAIError, web.HTTPServiceUnavailable):
 
 
 class NetworkBackendMismatch(BackendAIError, web.HTTPConflict):
-    """A member agent is not CNI-capable while the network driver is 'cni' (BEP-1058).
+    """A member agent is not CNI-capable while the network driver is 'cni' (BEP-1062).
 
     This guards the deployment invariant that the agent backend (docker/containerd) and the
     global network driver (overlay/cni) must be a matched pair — a multi-node session
@@ -62,7 +62,7 @@ class NetworkBackendMismatch(BackendAIError, web.HTTPConflict):
 
 
 class UnsupportedNetworkBackend(BackendAIError, web.HTTPBadRequest):
-    """The selected cluster-network backend has no agent-side implementation (BEP-1058).
+    """The selected cluster-network backend has no agent-side implementation (BEP-1062).
 
     host-gw and wireguard are declared in NetworkBackendKind for the selection interface but are
     not implemented. Refusing them here — whether pinned by the operator's forced_backend or

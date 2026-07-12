@@ -1,4 +1,4 @@
-"""Node-local /24 allocator for per-session LOCAL bridges (BEP-1058).
+"""Node-local /24 allocator for per-session LOCAL bridges (BEP-1062).
 
 Every session's LOCAL (control + egress/NAT) bridge sits on a node-local /24 carved out of a
 per-node pool. The index picking that /24 must be:
@@ -6,7 +6,7 @@ per-node pool. The index picking that /24 must be:
 - **idempotent per session** — a re-attach of a second kernel must land on the same subnet;
 - **collision-free across live sessions on the node** — two sessions sharing a /24 would put two
   bridges on one subnet, which breaks both the cross-session isolation the separate-bridge design
-  relies on (BEP-1058 §8) and the per-subnet MASQ refcount the attach runner keeps; and
+  relies on (BEP-1062 §8) and the per-subnet MASQ refcount the attach runner keeps; and
 - **recoverable across an agent restart** — an allocator that starts empty hands index 0 to the
   next session while a surviving pre-restart session still holds it.
 

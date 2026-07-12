@@ -1,4 +1,4 @@
-"""Race-free container network-namespace handles for the helper (BEP-1058).
+"""Race-free container network-namespace handles for the helper (BEP-1062).
 
 The dangerous operation is entering a container's network namespace by PID: a PID is
 reused the moment its process dies, so *validate PID -> then use PID* is a classic

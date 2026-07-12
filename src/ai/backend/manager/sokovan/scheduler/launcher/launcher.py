@@ -389,7 +389,7 @@ class SessionLauncher:
                         "agent_addr": k.agent_addr or "",
                         "scaling_group": k.scaling_group,
                         "endpoint_id": None,  # For inference endpoints
-                        # BEP-1058: manager-assigned overlay IP (multi-node), else None.
+                        # BEP-1062: manager-assigned overlay IP (multi-node), else None.
                         "cluster_network_ip": network_setup.endpoint_ips.get(kernel_id_str),
                     }
                     kernel_configs.append(kernel_config)
@@ -525,7 +525,7 @@ class SessionLauncher:
 
                 network_plugin = self._network_plugin_ctx.plugins[driver]
                 # Pass the participating agents and the operator's backend override so
-                # runtime-neutral plugins (BEP-1058 CNINetworkPlugin) can select and
+                # runtime-neutral plugins (BEP-1062 CNINetworkPlugin) can select and
                 # allocate the per-session data plane. The Swarm overlay plugin ignores
                 # these extra options.
                 member_agents = sorted({
@@ -533,7 +533,7 @@ class SessionLauncher:
                 })
                 forced_backend = self._config_provider.config.network.inter_container.forced_backend
                 # One endpoint per kernel; the manager assigns each a disjoint overlay IP
-                # (BEP-1058 central IPAM). container_id == kernel_id (the agent keys its
+                # (BEP-1062 central IPAM). container_id == kernel_id (the agent keys its
                 # endpoint/CNI on the kernel id).
                 endpoints = [
                     {"container_id": str(kernel.kernel_id), "agent_id": str(kernel.agent_id)}

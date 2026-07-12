@@ -1,4 +1,4 @@
-"""Host-port ingress for container services (BEP-1058).
+"""Host-port ingress for container services (BEP-1062).
 
 The LOCAL bridge is a node-local NAT subnet: the container's address is private and reused on
 every node, exactly as ``docker0``'s is. Egress works because the attach runner installs a

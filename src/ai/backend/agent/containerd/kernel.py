@@ -1,4 +1,4 @@
-"""Containerd kernel + code runner (BEP-1058 / containerd agent backend).
+"""Containerd kernel + code runner (BEP-1062 / containerd agent backend).
 
 Mirrors the Docker kernel contract on containerd's native task model. REPL/service ops go
 through the code runner (network-based); file transfer and logs work off the host scratch
