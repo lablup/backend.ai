@@ -1007,6 +1007,13 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
             oci_spec["labels"][LabelName.OWNER_USER] = owner_user
         if (owner_project := self.ownership_data.owner_project_id_to_str) is not None:
             oci_spec["labels"][LabelName.OWNER_PROJECT] = owner_project
+        # PID 1 must reap the orphans the workload leaves behind, or they accumulate as zombies
+        # until the container runs out of PIDs. The Docker backend gets this from dockerd
+        # (HostConfig.Init -> its bundled tini); runc injects no init, and without this the kernel
+        # runner itself is PID 1 and reaps nothing. Tell the entrypoint to run the program under
+        # our own PID-1 reaper instead (runner/init.py). This mirrors HostConfig.Init and is set on
+        # exactly the containers Docker sets it for: kernel containers.
+        oci_spec["env"]["BACKENDAI_INIT"] = "1"
         # The container's own identity inside the cluster. Docker sets Hostname to cluster_hostname
         # (main1/sub1/...); leaving runc's default meant `hostname` reported a container-id prefix,
         # which MPI/torchrun use to identify the rank they are running as.

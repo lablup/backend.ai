@@ -655,6 +655,7 @@ class AbstractKernelCreationContext[KernelObjectType: AbstractKernel](aobject):
 
         dotfile_extractor_path = self.resolve_krunner_filepath("runner/extract_dotfiles.py")
         entrypoint_sh_path = self.resolve_krunner_filepath("runner/entrypoint.sh")
+        init_path = self.resolve_krunner_filepath("runner/init.py")
 
         fantompass_path = self.resolve_krunner_filepath("runner/fantompass.py")
         hash_phrase_path = self.resolve_krunner_filepath("runner/hash_phrase.py")
@@ -666,6 +667,10 @@ class AbstractKernelCreationContext[KernelObjectType: AbstractKernel](aobject):
 
         _mount(MountTypes.BIND, dotfile_extractor_path, "/opt/kernel/extract_dotfiles.py")
         _mount(MountTypes.BIND, entrypoint_sh_path, "/opt/kernel/entrypoint.sh")
+        # The PID-1 reaper. Mounted for every backend; only used when the entrypoint is told to
+        # (BACKENDAI_INIT), which is the containerd path — on Docker, HostConfig.Init already puts
+        # dockerd's own tini at PID 1.
+        _mount(MountTypes.BIND, init_path, "/opt/kernel/init.py")
         _mount(MountTypes.BIND, fantompass_path, "/opt/kernel/fantompass.py")
         _mount(MountTypes.BIND, hash_phrase_path, "/opt/kernel/hash_phrase.py")
         _mount(MountTypes.BIND, words_json_path, "/opt/kernel/words.json")
