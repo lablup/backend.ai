@@ -23,7 +23,7 @@ import signal
 import struct
 import subprocess
 import sys
-from collections.abc import Mapping, Sequence
+from collections.abc import AsyncGenerator, Mapping, Sequence
 from decimal import Decimal
 from importlib.resources import files
 from io import StringIO
@@ -75,6 +75,7 @@ from ai.backend.agent.resources import (
     known_slot_types,
 )
 from ai.backend.agent.scratch import create_loop_filesystem, destroy_loop_filesystem
+from ai.backend.agent.stats import StatModes
 from ai.backend.agent.types import (
     AgentEventData,
     Container,
@@ -135,6 +136,32 @@ from .session_network import (
 )
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+# Bound the terminal-log persist so a huge or stuck read cannot wedge the clean event.
+_LOG_COLLECTION_TIMEOUT = 60.0
+# Read the finished shim log in this many bytes at a time; collect_logs re-chunks to its own size.
+_LOG_READ_CHUNK = 256 * 1024
+
+
+async def _read_container_log(container_id: str) -> AsyncGenerator[bytes, None]:
+    """Yield the finished shim log file's bytes for collect_logs. Empty (yields nothing) when the
+    task wrote no log or the file is already gone — collect_logs handles a zero-length stream."""
+    path = container_log_path(container_id)
+
+    def _read(handle: Any) -> bytes:
+        data: bytes = handle.read(_LOG_READ_CHUNK)
+        return data
+
+    try:
+        handle = await asyncio.to_thread(path.open, "rb")
+    except FileNotFoundError:
+        return
+    try:
+        while chunk := await asyncio.to_thread(_read, handle):
+            yield chunk
+    finally:
+        await asyncio.to_thread(handle.close)
+
 
 # Placeholder subnet for a single-node BRIDGE session; the bridge backend allocates the
 # real node-local /24 per session and ignores this value (SessionNetMeta requires a subnet).
@@ -1145,6 +1172,19 @@ class ContainerdAgent(
         raise ImageNotAvailable(f"cannot determine the C library variant of {canonical}")
 
     @override
+    def _resolve_stat_mode(self, local_config: Any) -> StatModes:
+        # Always read stats from the cgroup filesystem: there is no Docker daemon to query, so the
+        # 'docker' stat mode (the config default, meaningful only for the Docker backend) would 404
+        # for every containerd container. get_cgroup_path below points the collectors at the exact
+        # cgroup the OCI spec created, so cgroup mode is both correct and driver-independent here.
+        configured = local_config.container.stats_type
+        if configured is not None and StatModes(configured.value) is StatModes.DOCKER:
+            log.debug(
+                "containerd backend: forcing cgroup stat mode (docker stat mode has no daemon)"
+            )
+        return StatModes.CGROUP
+
+    @override
     def get_cgroup_path(self, controller: str, container_id: str) -> Path:
         # The container's cgroup path is set explicitly in the OCI spec (runtime/spec.py sets
         # ``linux.cgroupsPath`` from this same derivation), so we know exactly where it lives
@@ -1304,6 +1344,18 @@ class ContainerdAgent(
         container_id: ContainerId | None,
         restarting: bool,
     ) -> None:
+        # Persist the terminated kernel's logs before anything removes them. remove_container
+        # unlinks the shim log file, so a manager query for a dead kernel's logs would otherwise
+        # find nothing (the Docker backend collects them the same way, from container.log). The
+        # shim log is a finished file here — no follow stream — so we just read it in chunks.
+        if container_id is not None and not restarting:
+            try:
+                async with asyncio.timeout(_LOG_COLLECTION_TIMEOUT):
+                    await self.collect_logs(
+                        kernel_id, str(container_id), _read_container_log(str(container_id))
+                    )
+            except Exception:
+                log.exception("clean_kernel(k:{}): collecting container logs failed", kernel_id)
         # Withdraw the published ports before the container goes: a stale DNAT rule would send the
         # next holder of that host port's traffic at an address that no longer exists. The rules
         # are tagged with the container id, so this needs no bookkeeping of our own — and it works

@@ -275,6 +275,7 @@ from .stats import StatContext, StatModes
 from .types import (
     Container,
     ContainerLifecycleEvent,
+    ContainerNetns,
     KernelLifecycleStatus,
     KernelOwnershipData,
     LifecycleEvent,
@@ -929,9 +930,7 @@ class AbstractAgent[
         self.stat_ctx = StatContext(
             self,
             local_config,
-            mode=StatModes(local_config.container.stats_type.value)
-            if local_config.container.stats_type
-            else None,
+            mode=self._resolve_stat_mode(local_config),
         )
         self._local_cron = None
         self.port_pool = PortPool(
@@ -951,6 +950,13 @@ class AbstractAgent[
         self._active_creates = {}
         self._sync_container_lifecycle_observer = SyncContainerLifecycleObserver.instance()
         self._clean_kernel_registry_task = asyncio.create_task(self._clean_kernel_registry_loop())
+
+    def _resolve_stat_mode(self, local_config: Any) -> StatModes | None:
+        """The per-container stat collector this backend uses. The Docker backend honors the
+        operator's stats_type (default 'docker', which queries the Docker daemon); backends without
+        a Docker daemon override this so they never fall into the daemon path (which would 404)."""
+        stats_type = local_config.container.stats_type
+        return StatModes(stats_type.value) if stats_type else None
 
     @override
     async def __ainit__(self) -> None:
@@ -1950,6 +1956,15 @@ class AbstractAgent[
 
     @abstractmethod
     def get_cgroup_version(self) -> str:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def get_container_netns(self, container_id: str) -> ContainerNetns | None:
+        """
+        Get the handles for reaching the container's network namespace, or None if the
+        container is gone. Stat collectors use it to read the container's interface
+        counters without entering its network namespace.
+        """
         raise NotImplementedError
 
     def update_slots(self, updated_slots: Mapping[SlotName, Decimal]) -> None:
