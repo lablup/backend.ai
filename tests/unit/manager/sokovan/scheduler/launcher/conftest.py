@@ -81,6 +81,10 @@ def mock_network_plugin_ctx() -> MagicMock:
     mock_network_info.options = {}
     mock_plugin.create_network = AsyncMock(return_value=mock_network_info)
     ctx.plugins = {"overlay": mock_plugin}
+    # The launcher reads each member agent's published backend from here to pick the cluster-network
+    # driver. These agents publish nothing, so the driver falls back to the configured default.
+    ctx.etcd = MagicMock()
+    ctx.etcd.get = AsyncMock(return_value=None)
     return ctx
 
 

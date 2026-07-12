@@ -14,7 +14,7 @@ unknown-but-allowed. Refusing on absence would take out working deployments the 
 
 from collections.abc import Iterable
 
-from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
+from ai.backend.common.etcd import AbstractKVStore, AsyncEtcd, ConfigScopes
 from ai.backend.common.network.keys import agent_backend_key
 from ai.backend.manager.errors.network import NetworkBackendMismatch
 
@@ -23,6 +23,44 @@ DRIVER_COMPATIBLE_BACKENDS: dict[str, frozenset[str]] = {
     "cni": frozenset({"containerd"}),
     "overlay": frozenset({"docker"}),
 }
+# ...and the inverse: the driver an agent backend needs. Choosing the container runtime is the
+# operator's decision; the network driver that goes with it is not a second, independent choice
+# they should have to get right as well.
+BACKEND_DRIVER: dict[str, str] = {
+    backend: driver
+    for driver, backends in DRIVER_COMPATIBLE_BACKENDS.items()
+    for backend in backends
+}
+
+
+async def resolve_driver_for_agents(
+    etcd: AbstractKVStore, member_agents: Iterable[str], *, configured_driver: str | None
+) -> str | None:
+    """The driver the member agents' backends actually need, or ``configured_driver`` if unknown.
+
+    The agents' runtime is ground truth: a containerd agent cannot speak Swarm and a docker agent
+    cannot speak CNI, so there is exactly one right answer and no reason to make the operator
+    supply it. ``configured_driver`` stays the fallback for agents that have not published their
+    backend (older agents, or ones still starting), so this cannot strand an existing deployment.
+
+    Refuses a mixed cluster outright: a multi-node session needs one fabric, and there is no driver
+    that spans both.
+    """
+    backends: set[str] = set()
+    for agent_id in member_agents:
+        backend = await etcd.get(agent_backend_key(agent_id), scope=ConfigScopes.GLOBAL)
+        if backend is not None:
+            backends.add(backend)
+    if not backends:
+        return configured_driver  # nobody published; keep whatever the operator configured
+    if len(backends) > 1:
+        raise NetworkBackendMismatch(
+            f"the member agents run different container runtimes ({', '.join(sorted(backends))}). "
+            "A multi-node session needs one uniform network fabric, and no cluster-network driver "
+            "spans both — schedule the session onto agents of a single backend."
+        )
+    (backend,) = backends
+    return BACKEND_DRIVER.get(backend, configured_driver)
 
 
 async def require_members_can_serve_driver(

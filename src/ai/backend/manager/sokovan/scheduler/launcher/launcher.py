@@ -44,6 +44,7 @@ from ai.backend.manager.metrics.scheduler import (
     SchedulerPhaseMetricObserver,
 )
 from ai.backend.manager.models.network import NetworkType
+from ai.backend.manager.network.pairing import resolve_driver_for_agents
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.scheduler import (
     SchedulerRepository,
@@ -505,10 +506,31 @@ class SessionLauncher:
                     "network_name": network_name,
                 }
             elif session.cluster_mode == ClusterMode.MULTI_NODE:
-                # Create overlay network for multi-node sessions
-                driver = self._config_provider.config.network.inter_container.default_driver
+                member_agents = sorted({
+                    str(kernel.agent_id) for kernel in session.kernels if kernel.agent_id
+                })
+                # The agents' container runtime decides the driver: a containerd agent cannot speak
+                # Swarm ('overlay') and a docker agent cannot speak CNI, so there is exactly one
+                # right answer and no reason to make the operator supply it as a second, separate
+                # choice — picking the runtime is the choice. The configured default_driver remains
+                # the fallback for agents that have not published a backend, so this cannot strand
+                # an existing deployment.
+                configured = self._config_provider.config.network.inter_container.default_driver
+                driver = await resolve_driver_for_agents(
+                    self._network_plugin_ctx.etcd,
+                    member_agents,
+                    configured_driver=configured,
+                )
                 if driver is None:
                     raise ValueError("No inter-container network driver is configured.")
+                if driver != configured:
+                    log.info(
+                        "using the '{}' cluster-network driver for session {} (the member agents'"
+                        " backend requires it; configured default was '{}')",
+                        driver,
+                        session.session_id,
+                        configured,
+                    )
 
                 # Check if plugin is available
                 if driver not in self._network_plugin_ctx.plugins:
@@ -528,9 +550,6 @@ class SessionLauncher:
                 # runtime-neutral plugins (BEP-1062 CNINetworkPlugin) can select and
                 # allocate the per-session data plane. The Swarm overlay plugin ignores
                 # these extra options.
-                member_agents = sorted({
-                    str(kernel.agent_id) for kernel in session.kernels if kernel.agent_id
-                })
                 forced_backend = self._config_provider.config.network.inter_container.forced_backend
                 # One endpoint per kernel; the manager assigns each a disjoint overlay IP
                 # (BEP-1062 central IPAM). container_id == kernel_id (the agent keys its
