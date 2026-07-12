@@ -300,6 +300,11 @@ def build_oci_runtime_spec(
             "cgroupsPath": f"/{_CGROUP_PARENT}/{oci_spec.get('labels', {}).get('ai.backend.kernel-id', '')}",
         },
     }
+    # AppArmor. dockerd applies its docker-default profile to every container; runc applies nothing
+    # unless the spec names a profile, so without this a containerd kernel is unconfined — weaker
+    # than the same kernel under Docker.
+    if apparmor_profile := oci_spec.get("apparmor_profile"):
+        spec["process"]["apparmorProfile"] = apparmor_profile
     if seccomp is not None:
         spec["linux"]["seccomp"] = seccomp
     if sysctls := oci_spec.get("sysctls"):

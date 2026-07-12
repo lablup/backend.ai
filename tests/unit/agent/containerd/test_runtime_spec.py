@@ -307,3 +307,21 @@ class TestIdentity:
     def test_working_dir_is_taken_from_the_spec(self) -> None:
         spec = build_oci_runtime_spec(_oci(), command=["x"], rootfs_path="/r", cwd="/home/work")
         assert spec["process"]["cwd"] == "/home/work"
+
+
+class TestAppArmor:
+    """dockerd confines every container with its docker-default profile. runc applies nothing
+    unless the spec names one, so without this a containerd kernel runs unconfined — strictly
+    weaker isolation than the same kernel gets under Docker, and nothing says so.
+    """
+
+    def test_the_profile_reaches_the_process(self) -> None:
+        spec = build_oci_runtime_spec(
+            _oci(apparmor_profile="backendai-default"), command=["x"], rootfs_path="/r"
+        )
+        assert spec["process"]["apparmorProfile"] == "backendai-default"
+
+    def test_no_profile_means_no_key(self) -> None:
+        # A host without AppArmor must not get a spec naming a profile runc cannot find.
+        spec = build_oci_runtime_spec(_oci(), command=["x"], rootfs_path="/r")
+        assert "apparmorProfile" not in spec["process"]

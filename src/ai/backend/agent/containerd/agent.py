@@ -45,6 +45,7 @@ from ai.backend.agent.agent import (
     ScanImagesResult,
 )
 from ai.backend.agent.config.unified import ContainerSandboxType, ScratchType
+from ai.backend.agent.containerd.apparmor import ensure_profile_loaded
 from ai.backend.agent.containerd.dns import resolve_container_dns
 from ai.backend.agent.containerd.runtime.spec import _DEFAULT_CAPS, container_cgroup_fs_path
 from ai.backend.agent.errors import UnsupportedResource
@@ -332,6 +333,8 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
     _agent_sock_path: Path | None
     _port_pool: PortPool
     _port_forwarder: PortPublisher | None
+    # The AppArmor profile the agent loaded at startup, or None if the host cannot give us one.
+    _apparmor_profile: str | None
     # (host_port, container_port) for the REPL and every service port, captured at reserve time and
     # turned into DNAT rules once the container's address is known.
     _host_port_map: list[tuple[int, int]]
@@ -352,6 +355,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         agent_sock_path: Path | None = None,
         port_pool: PortPool,
         port_forwarder: PortPublisher | None = None,
+        apparmor_profile: str | None = None,
     ) -> None:
         super().__init__(
             ownership_data,
@@ -375,6 +379,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         self._accel_spec = AcceleratorSpec()
         self._port_pool = port_pool
         self._port_forwarder = port_forwarder
+        self._apparmor_profile = apparmor_profile
         self._host_port_map = []
         self._repl_host_ports = ()
 
@@ -1036,7 +1041,11 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         # Docker pins WorkingDir to /home/work rather than trusting the image's.
         oci_spec["cwd"] = "/home/work"
 
+        # AppArmor, unless the jail sandbox is in play — the jail ptrace-traces the container's
+        # processes, and Docker likewise drops to apparmor=unconfined for it.
         is_jail = self.local_config.container.sandbox_type == ContainerSandboxType.JAIL
+        if not is_jail and self._apparmor_profile is not None:
+            oci_spec["apparmor_profile"] = self._apparmor_profile
         if is_jail:
             # The jail enforces syscall policy by ptrace-tracing the container's processes, so it
             # needs CAP_SYS_PTRACE. Docker's jail path adds the same capability; without it the
@@ -1211,6 +1220,9 @@ class ContainerdAgent(
     _agent_sock_task: asyncio.Task[None] | None
     _port_forwarder: PortPublisher
     _kernel_recovery: BaseKernelRegistryRecovery
+    # The AppArmor profile loaded at startup, handed to every kernel we create; None when the host
+    # has no AppArmor (kernels then run unconfined, as they did before).
+    _apparmor_profile: str | None
     _kernel_recovery_adapter: KernelRecoveryDataAdapter
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
@@ -1311,6 +1323,11 @@ class ContainerdAgent(
         # Advertise this node's VTEP so the manager can pre-seed session membership and
         # eliminate the peer-publish race for multi-node overlays (BEP-1062).
         await publish_vtep(self.etcd, str(self.id), self._host_ip)
+        # dockerd loads its docker-default profile at startup and confines every container with it;
+        # containerd loads nothing. Load ours here so kernels are no less confined than under
+        # Docker. None means the host cannot give us AppArmor (already logged) — kernels then run
+        # unconfined, as they did before this existed.
+        self._apparmor_profile = await ensure_profile_loaded()
 
     @override
     async def shutdown(self, stop_signal: signal.Signals) -> None:
@@ -1702,6 +1719,7 @@ class ContainerdAgent(
             agent_sock_path=self._agent_sock_path,
             port_pool=self.port_pool,
             port_forwarder=self._port_forwarder,
+            apparmor_profile=self._apparmor_profile,
         )
 
     @override
