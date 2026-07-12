@@ -53,6 +53,10 @@ class _CompleteV2Plugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         return None
 
     @override
+    async def adopt_session_network(self, meta: SessionNetMeta, self_member: Member) -> None:
+        return None
+
+    @override
     async def teardown_session_network(self, session_id: str) -> None:
         return None
 
