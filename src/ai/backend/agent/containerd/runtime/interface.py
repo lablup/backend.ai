@@ -161,8 +161,15 @@ class OciRuntime(ABC):
         attaches CNI to the task after start (``network`` is retained for interface
         compatibility and is otherwise "none")."""
 
+    def configure_logging(self, launcher: Path, log_root: Path, max_total_bytes: int) -> None:
+        """Log new containers through the given writer (a `binary://` log URI).
+
+        Deliberately not abstract: a runtime that does not offer this leaves the default no-op, and
+        the shim then appends the container's output to a plain file that nobody rotates.
+        """
+
     @abstractmethod
-    async def create_task(self, container_id: str) -> TaskHandle:
+    async def create_task(self, container_id: str, *, use_logger: bool = True) -> TaskHandle:
         """Create the container's task (containerd Tasks.Create) and return its handle
         (incl. PID). The task is in the 'created' state: its init process and namespaces —
         including the network namespace — exist, but the user command has not exec'd yet.

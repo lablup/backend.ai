@@ -47,6 +47,7 @@ from ai.backend.agent.agent import (
 from ai.backend.agent.config.unified import ContainerSandboxType, ScratchType
 from ai.backend.agent.containerd.apparmor import ensure_profile_loaded
 from ai.backend.agent.containerd.dns import resolve_container_dns
+from ai.backend.agent.containerd.logs import write_logger_launcher
 from ai.backend.agent.containerd.runtime.spec import _DEFAULT_CAPS, container_cgroup_fs_path
 from ai.backend.agent.errors import UnsupportedResource
 from ai.backend.agent.errors.agent import ContainerCreationError
@@ -144,7 +145,7 @@ from .oci import (
     translate_accelerator_args,
     translate_creation_config,
 )
-from .runtime.grpc import ContainerdGrpcRuntime, container_log_path
+from .runtime.grpc import CONTAINER_LOG_ROOT, ContainerdGrpcRuntime, container_log_path
 from .runtime.interface import OciRuntime, TaskEvent
 from .session_network import (
     ContainerdSessionNetwork,
@@ -1328,6 +1329,17 @@ class ContainerdAgent(
         # Docker. None means the host cannot give us AppArmor (already logged) — kernels then run
         # unconfined, as they did before this existed.
         self._apparmor_profile = await ensure_profile_loaded()
+        # Log kernels through our own writer instead of letting the shim append to a file forever.
+        # containerd starts the launcher below and pipes each container's stdout/stderr into it, so
+        # we own the write end exactly as dockerd's log driver does — which is what makes max-size /
+        # max-file rotation possible at all. The writer is a child of the shim, so it lives with the
+        # container and an agent restart cannot interrupt it.
+        launcher = write_logger_launcher(
+            self.local_config.agent.var_base_path / "containerd-log-writer"
+        )
+        self._runtime.configure_logging(
+            launcher, CONTAINER_LOG_ROOT, int(self.local_config.container_logs.max_length)
+        )
 
     @override
     async def shutdown(self, stop_signal: signal.Signals) -> None:
@@ -1531,7 +1543,8 @@ class ContainerdAgent(
         )
         try:
             # No network needed for the throwaway probe: create the task and start it directly.
-            await self._runtime.create_task(probe_id)
+            # A one-shot probe: a couple of lines, read once, container discarded. No logger.
+            await self._runtime.create_task(probe_id, use_logger=False)
             await self._runtime.start_task(probe_id)
             for _ in range(50):  # up to ~10s for the trivial command to exit
                 if await self._runtime.container_status(probe_id) in (None, "stopped"):

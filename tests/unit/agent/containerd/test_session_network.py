@@ -182,7 +182,7 @@ class FakeRuntime(OciRuntime):
         self.calls.append(f"create:{container_id}:{image_ref}")
 
     @override
-    async def create_task(self, container_id: str) -> TaskHandle:
+    async def create_task(self, container_id: str, *, use_logger: bool = True) -> TaskHandle:
         self.calls.append(f"create_task:{container_id}")
         return TaskHandle(container_id=container_id, pid=9001)
 

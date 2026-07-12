@@ -9,7 +9,6 @@ Diff/Content/Images services.
 from __future__ import annotations
 
 import asyncio
-import io
 import logging
 import os
 import textwrap
@@ -17,6 +16,7 @@ from collections.abc import Mapping
 from pathlib import Path, PurePosixPath
 from typing import Any, override
 
+from ai.backend.agent.containerd.logs import read_log_tail
 from ai.backend.agent.containerd.runtime.grpc import ContainerdGrpcRuntime, container_log_path
 from ai.backend.agent.containerd.runtime.interface import ExecResult
 from ai.backend.agent.errors.kernel import KernelRunnerNotInitializedError
@@ -155,29 +155,14 @@ class ContainerdKernel(AbstractKernel):
 
     @override
     async def get_logs(self) -> dict[str, Any]:
-        # The runtime captures the task's stdout+stderr to a host log file (keyed by the
-        # container id, which is the kernel id here); read it back.
-        #
-        # Serve at most `container_logs.max_length` — the bound the Docker backend gets from its
-        # log driver (max-size x max-file). Without it a chatty kernel's entire log is read into
-        # memory and shipped to the manager. We keep the TAIL, which is what a log query wants.
-        #
-        # This bounds what is SERVED, not what is on disk: the containerd shim owns the write end
-        # of this file and offers no rotation, so it grows until remove_container unlinks it.
-        # Bounding the disk side means rotating behind the shim's open fd; not attempted here.
-        log_path = container_log_path(self.data["container_id"])
+        # The log is a set of files, not one: the active one the shim appends to plus the rotated
+        # ones, exactly as Docker's log driver keeps them. Read across them (oldest first) and serve
+        # at most `container_logs.max_length` — the same window `docker logs` returns for these
+        # kernels. Reading only the active file would return almost nothing right after a rotation.
+        active = container_log_path(self.data["container_id"])
         max_length = int(self.agent_config["container-logs"]["max-length"])
-
-        def _read() -> str:
-            try:
-                with log_path.open("rb") as f:
-                    size = f.seek(0, io.SEEK_END)
-                    f.seek(max(0, size - max_length), io.SEEK_SET)
-                    return f.read().decode("utf-8", errors="replace")
-            except FileNotFoundError:
-                return ""
-
-        return {"logs": await asyncio.to_thread(_read)}
+        raw = await asyncio.to_thread(read_log_tail, active, max_length)
+        return {"logs": raw.decode("utf-8", errors="replace")}
 
     @override
     async def interrupt_kernel(self) -> dict[str, Any]:

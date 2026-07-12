@@ -59,6 +59,7 @@ from ai.backend.agent.containerd._grpcapi.api.services.transfer.v1 import (
 )
 from ai.backend.agent.containerd._grpcapi.api.types import descriptor_pb2, mount_pb2
 from ai.backend.agent.containerd._grpcapi.api.types.transfer import imagestore_pb2, registry_pb2
+from ai.backend.agent.containerd.logs import logger_uri, unlink_log_files
 from ai.backend.agent.containerd.runtime.interface import (
     ContainerInfo,
     ExecResult,
@@ -137,6 +138,9 @@ class ContainerdGrpcRuntime(OciRuntime):
     _diff: diff_pb2_grpc.DiffStub | None
     _events: events_pb2_grpc.EventsStub | None
     _rootfs: dict[str, list[mount_pb2.Mount]]
+    # (logger launcher, log root, total byte budget) — set once the agent has written the launcher.
+    # None means no `binary://` logging: the shim appends to a plain file that nobody rotates.
+    _log_config: tuple[Path, Path, int] | None
 
     def __init__(self, *, address: str = DEFAULT_ADDRESS, namespace: str = "backend-ai") -> None:
         self._address = address
@@ -151,6 +155,12 @@ class ContainerdGrpcRuntime(OciRuntime):
         self._diff = None
         self._events = None
         self._rootfs: dict[str, list[mount_pb2.Mount]] = {}
+        self._log_config = None
+
+    @override
+    def configure_logging(self, launcher: Path, log_root: Path, max_total_bytes: int) -> None:
+        """Log new containers through our own writer (see containerd/log_writer.py)."""
+        self._log_config = (launcher, log_root, max_total_bytes)
 
     @override
     async def open(self) -> None:
@@ -503,21 +513,30 @@ class ContainerdGrpcRuntime(OciRuntime):
         )
 
     @override
-    async def create_task(self, container_id: str) -> TaskHandle:
+    async def create_task(self, container_id: str, *, use_logger: bool = True) -> TaskHandle:
         # Tasks.Create leaves the task in the 'created' state: the init process (and its netns)
         # exist and its PID is returned, but the user command is not exec'd until start_task.
         # The network layer attaches CNI into /proc/<pid>/ns/net in this window.
-        # Capture the task's stdout+stderr to a host log file (the containerd shim writes a
-        # plain path directly); ContainerdKernel.get_logs reads it back.
-        log_path = container_log_path(container_id)
-        log_path.parent.mkdir(parents=True, exist_ok=True)
-        log_path.touch(exist_ok=True)
+        #
+        # `log_uri` is a `binary://` URI: containerd starts that program and pipes the container's
+        # stdout/stderr into it, so we own the write end and can rotate the log the way dockerd's
+        # driver does. Without one, the shim appends to a plain file forever and nobody rotates it —
+        # which is the fallback used for short-lived internal containers (the image-distro probe),
+        # where a few lines of output are read once and the container is thrown away.
+        if use_logger and self._log_config is not None:
+            launcher, log_root, max_bytes = self._log_config
+            stdio = logger_uri(launcher, log_root, max_bytes)
+        else:
+            log_path = container_log_path(container_id)
+            log_path.parent.mkdir(parents=True, exist_ok=True)
+            log_path.touch(exist_ok=True)
+            stdio = str(log_path)
         resp = await self._tasks_stub().Create(
             tasks_pb2.CreateTaskRequest(
                 container_id=container_id,
                 rootfs=self._rootfs.get(container_id, []),
-                stdout=str(log_path),
-                stderr=str(log_path),
+                stdout=stdio,
+                stderr=stdio,
             ),
             metadata=self._md,
         )
@@ -598,7 +617,8 @@ class ContainerdGrpcRuntime(OciRuntime):
                 if e.code() is not grpc.StatusCode.NOT_FOUND:
                     raise
         self._rootfs.pop(container_id, None)
-        container_log_path(container_id).unlink(missing_ok=True)
+        # The rotated files are as much this kernel's log as the active one.
+        unlink_log_files(container_log_path(container_id))
 
     # --- container/task introspection (Phase 1) ---
 

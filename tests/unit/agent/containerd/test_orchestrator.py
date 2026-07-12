@@ -122,7 +122,7 @@ class FakeRuntime(OciRuntime):
         self.calls.append("create_container")
 
     @override
-    async def create_task(self, container_id: str) -> TaskHandle:
+    async def create_task(self, container_id: str, *, use_logger: bool = True) -> TaskHandle:
         self.calls.append("create_task")
         if self._events is not None:
             self._events.append("create_task")
