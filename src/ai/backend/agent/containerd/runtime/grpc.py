@@ -459,6 +459,20 @@ class ContainerdGrpcRuntime(OciRuntime):
                 raise
 
     @override
+    async def stop_container(self, container_id: str, *, grace_period: float) -> None:
+        # SIGTERM, then poll for exit up to `timeout`, then SIGKILL — matching Docker's
+        # container.stop(). kill_container swallows NOT_FOUND, so a task that is already gone is
+        # a no-op. The poll interval mirrors remove_container's (~10 ticks/s).
+        await self.kill_container(container_id, signal=15)  # SIGTERM
+        deadline_ticks = max(1, int(grace_period / 0.1))
+        for _ in range(deadline_ticks):
+            status = await self.container_status(container_id)
+            if status in (None, "stopped", "created", "unknown"):
+                return
+            await asyncio.sleep(0.1)
+        await self.kill_container(container_id, signal=9)  # SIGKILL
+
+    @override
     async def remove_container(self, container_id: str) -> None:
         # containerd rejects deleting a still-running task ("cannot delete a running process"),
         # so SIGKILL the task and wait for it to actually exit before deletion. (Also required

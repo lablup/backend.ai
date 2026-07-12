@@ -199,6 +199,9 @@ def build_oci_runtime_spec(
     env = [f"{k}={v}" for k, v in (oci_spec.get("env") or {}).items()]
     devices, device_rules = _linux_devices(oci_spec)
     resources = _linux_resources(oci_spec, device_rules)
+    # Backend-requested extra capabilities (e.g. CAP_SYS_PTRACE for the jail sandbox), appended to
+    # the default set without duplicating.
+    caps = [*_DEFAULT_CAPS, *(c for c in oci_spec.get("extra_caps", []) if c not in _DEFAULT_CAPS)]
     seccomp = oci_spec.get("seccomp")
     namespaces: list[dict[str, Any]] = [
         {"type": "pid"},
@@ -220,9 +223,9 @@ def build_oci_runtime_spec(
             "env": env,
             "cwd": cwd,
             "capabilities": {
-                "bounding": _DEFAULT_CAPS,
-                "effective": _DEFAULT_CAPS,
-                "permitted": _DEFAULT_CAPS,
+                "bounding": caps,
+                "effective": caps,
+                "permitted": caps,
             },
             "noNewPrivileges": False,
             "rlimits": _DEFAULT_RLIMITS,

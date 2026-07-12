@@ -76,7 +76,7 @@ class FakeRuntime(OciRuntime):
         self.calls.append("remove_image")
 
     @override
-    async def push_image(self, image_ref: str) -> None:
+    async def push_image(self, image_ref: str, *, auth: Mapping[str, str] | None = None) -> None:
         self.calls.append("push_image")
 
     @override
@@ -115,6 +115,10 @@ class FakeRuntime(OciRuntime):
     @override
     async def kill_container(self, container_id: str, *, signal: int) -> None:
         self.calls.append("kill_container")
+
+    @override
+    async def stop_container(self, container_id: str, *, grace_period: float) -> None:
+        self.calls.append("stop_container")
 
     @override
     async def commit_container(

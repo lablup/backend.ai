@@ -137,6 +137,9 @@ from .session_network import (
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
+# Grace period for a kernel to self-terminate on SIGTERM before it is SIGKILL'd (Docker's
+# container.stop() default).
+_KERNEL_STOP_GRACE_SECONDS = 10.0
 # Bound the terminal-log persist so a huge or stuck read cannot wedge the clean event.
 _LOG_COLLECTION_TIMEOUT = 60.0
 # Read the finished shim log in this many bytes at a time; collect_logs re-chunks to its own size.
@@ -739,6 +742,11 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
             seccomp_path = self.resolve_krunner_filepath("runner/default-seccomp.json")
             if seccomp_path.exists():
                 oci_spec["seccomp"] = _docker_seccomp_to_oci(json.loads(seccomp_path.read_text()))
+        else:
+            # The jail enforces syscall policy by ptrace-tracing the container's processes, so it
+            # needs CAP_SYS_PTRACE. Docker's jail path adds the same capability; without it the
+            # jail's tracer cannot attach and its confinement silently degrades to nothing.
+            oci_spec["extra_caps"] = ["CAP_SYS_PTRACE"]
         return ContainerdKernel(
             self.ownership_data,
             self.kernel_config["network_id"],
@@ -1332,10 +1340,14 @@ class ContainerdAgent(
         kernel_id: KernelId,
         container_id: ContainerId | None,
     ) -> None:
-        # Stop the container's task (force). Network detach + container removal happen in
-        # clean_kernel -> remove_container, which replays the attach-time EndpointPlan (kept
-        # per container in the session network) to release the host veth / IPAM / MASQ.
-        await self._session_network.kill_container(str(kernel_id), signal=signal.SIGKILL)
+        # Gracefully stop the task: SIGTERM, wait for self-termination, then SIGKILL — Docker
+        # parity (container.stop()), so a workload gets its grace window to flush/checkpoint
+        # instead of losing data to an immediate kill. Network detach + container removal happen
+        # in clean_kernel -> remove_container, which replays the attach-time EndpointPlan to
+        # release the host veth / IPAM / MASQ.
+        await self._session_network.stop_container(
+            str(kernel_id), grace_period=_KERNEL_STOP_GRACE_SECONDS
+        )
 
     @override
     async def clean_kernel(

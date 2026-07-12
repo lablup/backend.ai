@@ -3,6 +3,7 @@ from pathlib import Path
 import yaml
 
 from ai.backend.agent.containerd.runtime.spec import (
+    _DEFAULT_CAPS,
     OCI_VERSION,
     build_oci_runtime_spec,
     container_cgroup_fs_path,
@@ -29,6 +30,25 @@ class TestBuildOciRuntimeSpec:
         assert "A=1" in spec["process"]["env"]
         assert spec["process"]["cwd"] == "/home/work"
         assert spec["root"] == {"path": "/run/rootfs", "readonly": False}
+
+    def test_default_capabilities_when_no_extra(self) -> None:
+        caps = build_oci_runtime_spec(_oci(), command=["x"], rootfs_path="/r")["process"][
+            "capabilities"
+        ]
+        assert caps["bounding"] == _DEFAULT_CAPS
+        assert caps["effective"] == _DEFAULT_CAPS and caps["permitted"] == _DEFAULT_CAPS
+
+    def test_extra_caps_appended_without_duplicates(self) -> None:
+        # the jail sandbox requests CAP_SYS_PTRACE; a cap already in the default set is not doubled
+        spec = build_oci_runtime_spec(
+            _oci(extra_caps=["CAP_SYS_PTRACE", "CAP_IPC_LOCK"]), command=["x"], rootfs_path="/r"
+        )
+        caps = spec["process"]["capabilities"]["bounding"]
+        assert caps[: len(_DEFAULT_CAPS)] == _DEFAULT_CAPS
+        assert caps[len(_DEFAULT_CAPS) :] == [
+            "CAP_SYS_PTRACE"
+        ]  # IPC_LOCK already present, not added
+        assert "CAP_SYS_PTRACE" in spec["process"]["capabilities"]["effective"]
 
     def test_bind_mounts_appended_after_defaults(self) -> None:
         spec = build_oci_runtime_spec(_oci(), command=["x"], rootfs_path="/r")

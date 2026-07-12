@@ -154,6 +154,11 @@ class OciRuntime(ABC):
     async def kill_container(self, container_id: str, *, signal: int) -> None: ...
 
     @abstractmethod
+    async def stop_container(self, container_id: str, *, grace_period: float) -> None:
+        """Gracefully stop the task: SIGTERM, wait up to ``grace_period`` for it to exit, then SIGKILL
+        if it is still running. Docker parity for the destroy phase (``container.stop()``)."""
+
+    @abstractmethod
     async def remove_container(self, container_id: str) -> None:
         """Remove the task + container (force)."""
 

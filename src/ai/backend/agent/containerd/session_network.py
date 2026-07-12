@@ -428,6 +428,9 @@ class ContainerdSessionNetwork:
     async def kill_container(self, container_id: str, *, signal: int) -> None:
         await self._runtime.kill_container(container_id, signal=signal)
 
+    async def stop_container(self, container_id: str, *, grace_period: float) -> None:
+        await self._runtime.stop_container(container_id, grace_period=grace_period)
+
     async def remove_container(self, container_id: str) -> None:
         # Detach the container's network first, using the plan captured at attach: this frees
         # the host veth, releases the host-local IPAM address, and removes the egress MASQ rule
