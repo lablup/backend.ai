@@ -9,6 +9,7 @@ from typing import Any, cast
 import pytest
 
 import ai.backend.agent.containerd.agent as agent_mod
+from ai.backend.agent.agent import ACTIVE_STATUS_SET, DEAD_STATUS_SET
 from ai.backend.agent.config.unified import ContainerSandboxType
 from ai.backend.agent.containerd.agent import ContainerdAgent
 from ai.backend.agent.containerd.runtime.interface import ContainerInfo, ImageInfo
@@ -342,6 +343,52 @@ class TestEnumerateContainers:
         agent._runtime = cast(Any, self._runtime_with(infos))
         # stopped -> EXITED; filtering to RUNNING excludes it
         assert await agent.enumerate_containers(frozenset({ContainerStatus.RUNNING})) == []
+
+    async def test_created_container_is_not_dead(self) -> None:
+        # A kernel is visible to containerd from Containers.Create until its task starts. If that
+        # window maps to EXITED (a DEAD_STATUS_SET member), sync_container_lifecycles() cleans a
+        # kernel that is still being created. CREATED is in neither the active nor the dead set.
+        kid = "55555555-5555-5555-5555-555555555555"
+        infos = [
+            ContainerInfo(id=kid, image="img:1", status="created",
+                          labels={"ai.backend.kernel-id": kid}),
+        ]  # fmt: skip
+        agent = _agent(FakeFacade())
+        agent._runtime = cast(Any, self._runtime_with(infos))
+        # mapped to CREATED, not EXITED
+        result = await agent.enumerate_containers(frozenset({ContainerStatus.CREATED}))
+        assert result[0][1].status is ContainerStatus.CREATED
+        # ...so the lifecycle sync, which enumerates active|dead, never even sees it and therefore
+        # cannot enqueue a CLEAN for a kernel that is still being created.
+        assert await agent.enumerate_containers(ACTIVE_STATUS_SET | DEAD_STATUS_SET) == []
+
+    async def test_unrecognized_status_is_not_dead(self) -> None:
+        # Fail-safe: an unknown task state must never be reported dead, or the lifecycle sync
+        # would destroy a kernel we simply failed to classify.
+        kid = "66666666-6666-6666-6666-666666666666"
+        infos = [
+            ContainerInfo(id=kid, image="img:1", status="something-new",
+                          labels={"ai.backend.kernel-id": kid}),
+        ]  # fmt: skip
+        agent = _agent(FakeFacade())
+        agent._runtime = cast(Any, self._runtime_with(infos))
+        assert await agent.enumerate_containers(DEAD_STATUS_SET) == []
+
+    async def test_defaults_to_active_only(self) -> None:
+        # reconstruct_resource_usage() enumerates with no argument and restores allocations from
+        # whatever comes back; defaulting to "no filter" re-accounted dead containers' resources.
+        running = "77777777-7777-7777-7777-777777777777"
+        stopped = "88888888-8888-8888-8888-888888888888"
+        infos = [
+            ContainerInfo(id=running, image="img:1", status="running",
+                          labels={"ai.backend.kernel-id": running}),
+            ContainerInfo(id=stopped, image="img:1", status="stopped",
+                          labels={"ai.backend.kernel-id": stopped}),
+        ]  # fmt: skip
+        agent = _agent(FakeFacade())
+        agent._runtime = cast(Any, self._runtime_with(infos))
+        result = await agent.enumerate_containers()
+        assert [c.id for _, c in result] == [running]
 
     def test_cgroup_version_detected(self, monkeypatch: Any) -> None:
         target = "ai.backend.agent.containerd.agent.Path.exists"

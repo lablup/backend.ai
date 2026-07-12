@@ -1,4 +1,5 @@
 import hashlib
+from types import SimpleNamespace
 from typing import Any
 
 from ai.backend.agent.containerd.runtime.grpc import ContainerdGrpcRuntime, _chain_id
@@ -25,6 +26,37 @@ class TestChainId:
     def test_deterministic(self) -> None:
         d = ["sha256:1", "sha256:2", "sha256:3"]
         assert _chain_id(d) == _chain_id(d)
+
+
+class TestListContainerInfos:
+    def _runtime(self, task_status: str | None) -> Any:
+        rt = ContainerdGrpcRuntime.__new__(ContainerdGrpcRuntime)
+
+        class _Stub:
+            async def List(self, req: Any, metadata: Any = None) -> Any:
+                container = SimpleNamespace(id="c1", image="img:1", labels={"k": "v"})
+                return SimpleNamespace(containers=[container])
+
+        async def container_status(container_id: str) -> str | None:
+            return task_status
+
+        rt._containers_stub = lambda: _Stub()  # type: ignore[method-assign]
+        rt.container_status = container_status  # type: ignore[method-assign]
+        type(rt)._md = property(lambda self: [])  # type: ignore[assignment]
+        return rt
+
+    async def test_container_without_a_task_reports_created(self) -> None:
+        # No task => Containers.Create has returned but Tasks.Create has not: the kernel is still
+        # being created. Reporting "stopped" here made the agent map it to EXITED, and the
+        # lifecycle sync then cleaned a kernel that was mid-creation.
+        rt = self._runtime(None)
+        infos = await rt.list_container_infos()
+        assert infos[0].status == "created"
+
+    async def test_task_status_is_passed_through(self) -> None:
+        rt = self._runtime("running")
+        infos = await rt.list_container_infos()
+        assert infos[0].status == "running"
 
 
 class TestStopContainer:

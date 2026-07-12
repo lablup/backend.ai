@@ -35,6 +35,7 @@ import zmq
 import zmq.asyncio
 
 from ai.backend.agent.agent import (
+    ACTIVE_STATUS_SET,
     AbstractAgent,
     AbstractKernelCreationContext,
     ScanImagesResult,
@@ -169,12 +170,25 @@ async def _read_container_log(container_id: str) -> AsyncGenerator[bytes, None]:
 # Placeholder subnet for a single-node BRIDGE session; the bridge backend allocates the
 # real node-local /24 per session and ignores this value (SessionNetMeta requires a subnet).
 _LOCAL_SUBNET = "172.30.0.0/24"
-# containerd task status -> Backend.AI ContainerStatus (anything not running/paused = exited).
+# containerd task status -> Backend.AI ContainerStatus.
+#
+# CREATED must NOT collapse into EXITED: EXITED is in DEAD_STATUS_SET, and
+# sync_container_lifecycles() cleans every dead container it sees. A kernel is visible to
+# containerd from Containers.Create until its task is started, so mapping that window to EXITED
+# makes the lifecycle sync destroy kernels that are still being created. CREATED is in neither
+# ACTIVE_STATUS_SET nor DEAD_STATUS_SET, so the sync leaves it alone — same as the Docker backend,
+# where dockerd reports "created" for exactly this window.
 _CONTAINERD_TO_STATUS = {
+    "created": ContainerStatus.CREATED,
     "running": ContainerStatus.RUNNING,
     "paused": ContainerStatus.PAUSED,
     "pausing": ContainerStatus.PAUSED,
+    "stopped": ContainerStatus.EXITED,
 }
+# Fail-safe for a status we do not recognize (containerd's UNKNOWN, or a future task state):
+# treat it as CREATED so the lifecycle sync neither reports it running nor destroys it. Reaping a
+# genuinely dead container is still covered by the task-exit event and the orphan-kernel observer.
+_UNRECOGNIZED_STATUS = ContainerStatus.CREATED
 
 
 # Backend.AI arch name -> primary seccomp arch token (the archMap key to select).
@@ -1080,11 +1094,16 @@ class ContainerdAgent(
     @override
     async def enumerate_containers(
         self,
-        status_filter: frozenset[ContainerStatus] = frozenset(),
+        status_filter: frozenset[ContainerStatus] = ACTIVE_STATUS_SET,
     ) -> Sequence[tuple[KernelId, Container]]:
         # Reconcile live kernels from containerd: every container carrying the kernel-id label
         # is one of ours (the containerd instance is per-node/per-agent). Lets the agent
         # recover running kernels across a restart.
+        #
+        # The default MUST be ACTIVE_STATUS_SET (as in the Docker backend): callers that want the
+        # dead ones ask for them explicitly. reconstruct_resource_usage() enumerates with no
+        # argument and restores each returned container's allocations, so defaulting to "no filter"
+        # made it re-account CPU/memory/accelerators for already-exited containers.
         #
         # The published ports come back from the DNAT rules, which name their container. Reporting
         # them lets the base agent take them out of the port pool again — otherwise a restarted
@@ -1095,7 +1114,7 @@ class ContainerdAgent(
             raw_kid = ci.labels.get(KERNEL_ID_LABEL)
             if not raw_kid:
                 continue
-            status = _CONTAINERD_TO_STATUS.get(ci.status, ContainerStatus.EXITED)
+            status = _CONTAINERD_TO_STATUS.get(ci.status, _UNRECOGNIZED_STATUS)
             if status_filter and status not in status_filter:
                 continue
             try:

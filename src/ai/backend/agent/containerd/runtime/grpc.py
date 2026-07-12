@@ -526,7 +526,13 @@ class ContainerdGrpcRuntime(OciRuntime):
                     id=c.id,
                     image=c.image,
                     labels=dict(c.labels),
-                    status=await self.container_status(c.id) or "stopped",
+                    # No task => the container exists but has never run: it is mid-creation
+                    # (Containers.Create has returned, Tasks.Create has not). Report "created",
+                    # not "stopped" — the latter reads as dead and gets the kernel cleaned up
+                    # underneath us. A task that has exited reports "stopped" on its own, and
+                    # remove_container() deletes task and container together, so a task-less
+                    # container is never a leftover of a completed run.
+                    status=await self.container_status(c.id) or "created",
                 )
             )
         return infos
