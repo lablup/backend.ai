@@ -131,6 +131,7 @@ BEP numbers start from 1000.
 | [1058](BEP-1058-super-admin-impersonation.md) | Super-Admin User Impersonation | HyeokJin Kim | Draft |
 | [1059](BEP-1059-agent-resource-group-source-of-truth.md) | Agent↔Resource Group Source of Truth | HyeokJin Kim | Draft |
 | [1060](BEP-1060-v2-connection-type-nested-filters.md) | Standardizing v2 Connection-Type Nested Filters | HyeokJin Kim | Draft |
+| [1061](BEP-1061-agent-kernel-lifecycle.md) | Agent Kernel Lifecycle Structuring | HyeokJin Kim | Draft |
 | _next_ | _(reserve your number here)_ | | |
 
 ## File Structure
