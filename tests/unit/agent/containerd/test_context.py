@@ -16,6 +16,7 @@ from ai.backend.agent.containerd.agent import ContainerdKernelCreationContext
 from ai.backend.agent.containerd.oci import AcceleratorSpec
 from ai.backend.agent.containerd.orchestrator import LaunchResult
 from ai.backend.agent.containerd.runtime.interface import ExecResult, TaskHandle
+from ai.backend.agent.errors import UnsupportedResource
 from ai.backend.agent.errors.agent import ContainerCreationError
 from ai.backend.agent.port_pool import PortPool
 from ai.backend.agent.resources import Mount
@@ -526,3 +527,42 @@ class TestRestartKeepsTheAllocation:
 
         assert resource_opts is None  # the stored spec is authoritative on a restart
         assert spec is not None
+
+
+class TestRefusesAV1NetworkDriver:
+    """'overlay' (Docker Swarm) is the manager's DEFAULT inter-container driver, and the containerd
+    backend cannot speak it. Quietly synthesizing a node-local bridge instead would bring the
+    session up with kernels on separate per-node bridges, unable to reach each other, with nothing
+    to say why. Refuse it instead.
+    """
+
+    async def test_overlay_is_refused(self) -> None:
+        ctx = _context(FakeFacade())
+        with pytest.raises(UnsupportedResource, match="overlay"):
+            await ctx.apply_network(cast(Any, {"network_config": {"mode": "overlay"}}))
+
+    async def test_the_refusal_names_the_fix(self) -> None:
+        ctx = _context(FakeFacade())
+        with pytest.raises(UnsupportedResource, match="cni"):
+            await ctx.apply_network(cast(Any, {"network_config": {"mode": "overlay"}}))
+
+    async def test_a_single_node_bridge_config_is_still_served(self) -> None:
+        # The manager sends mode=bridge for single-node multi-kernel sessions; that one IS ours.
+        facade = FakeFacade()
+        ctx = _context(facade)
+        await ctx.apply_network(
+            cast(Any, {"network_config": {"mode": "bridge", "network_name": "bai-singlenode-x"}})
+        )
+        assert facade.ensured[0][1]["backend"] == "bridge"
+
+    async def test_no_network_config_at_all_is_still_served(self) -> None:
+        facade = FakeFacade()
+        ctx = _context(facade)
+        await ctx.apply_network(cast(Any, {}))
+        assert facade.ensured[0][1]["backend"] == "bridge"
+
+    async def test_a_cni_config_is_served_as_given(self) -> None:
+        facade = FakeFacade()
+        ctx = _context(facade)
+        await ctx.apply_network(cast(Any, {"network_config": _VXLAN_NC}))
+        assert facade.ensured[0][1]["backend"] == "vxlan"

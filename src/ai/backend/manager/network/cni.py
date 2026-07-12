@@ -18,7 +18,6 @@ from typing import Any, override
 from ai.backend.common.configs.etcd import EtcdConfig
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.network.keys import (
-    agent_backend_key,
     agent_caps_key,
     agent_vtep_key,
     member_key,
@@ -32,7 +31,6 @@ from ai.backend.common.network.types import (
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.errors.network import (
-    NetworkBackendMismatch,
     UnsupportedNetworkBackend,
 )
 from ai.backend.manager.network.ipam import (
@@ -40,14 +38,12 @@ from ai.backend.manager.network.ipam import (
     SubnetAllocator,
     VNIAllocator,
 )
+from ai.backend.manager.network.pairing import require_members_can_serve_driver
 from ai.backend.manager.plugin.network import AbstractNetworkManagerPlugin, NetworkInfo
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 _DEFAULT_MTU = 1500
-
-# Agent backends whose network stack can serve the BEP-1062 'cni' driver.
-_CNI_COMPATIBLE_BACKENDS = frozenset({"containerd"})
 
 
 class CNINetworkPlugin(AbstractNetworkManagerPlugin):
@@ -202,24 +198,12 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         await etcd.delete_prefix(session_prefix(network_id).rstrip("/"), scope=ConfigScopes.GLOBAL)
 
     async def _require_members_cni_capable(self, member_agents: list[str]) -> None:
-        """Enforce the deployment invariant that all member agents can serve the 'cni'
-        network driver (their backend must be one of CNI_COMPATIBLE_BACKENDS).
+        """Refuse a member agent whose backend cannot serve the 'cni' driver.
 
-        Agents publish their backend under network/agent/{id}/backend at startup. We reject
-        only on a *known* incompatible backend (e.g. a docker/overlay agent under the 'cni'
-        driver, which would break the multi-node overlay); an unpublished backend is treated
-        as unknown-but-allowed so the guard stays safe before the publish path is wired.
+        The symmetric check for 'overlay' lives in OverlayNetworkPlugin; both call the same guard
+        so the two drivers cannot drift apart on what they accept.
         """
-        etcd = self._require_etcd()
-        for agent_id in member_agents:
-            backend = await etcd.get(agent_backend_key(agent_id), scope=ConfigScopes.GLOBAL)
-            if backend is not None and backend not in _CNI_COMPATIBLE_BACKENDS:
-                raise NetworkBackendMismatch(
-                    f"agent '{agent_id}' runs the '{backend}' backend, which cannot serve the "
-                    "'cni' cluster network driver. Multi-node sessions require a uniform "
-                    "network fabric — pair the containerd backend with default_driver='cni' "
-                    "(or the docker backend with 'overlay')."
-                )
+        await require_members_can_serve_driver(self._require_etcd(), "cni", member_agents)
 
     async def _select_backend(
         self, member_agents: list[str], forced_backend: NetworkBackendKind | None

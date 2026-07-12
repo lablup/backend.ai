@@ -589,6 +589,21 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         # same CNI attach path then applies, with no nerdctl-managed network.
         network_config = dict(cluster_info.get("network_config") or {})
         if not network_config.get("backend"):
+            # No BEP-1062 backend in the config: either there is no cluster network at all, or the
+            # manager selected a v1 driver (`mode` names it — 'overlay' is Docker Swarm and is the
+            # DEFAULT inter-container driver). Only the first is ours to serve.
+            #
+            # A v1 driver must NOT be quietly downgraded to a node-local bridge: the kernels would
+            # come up on separate per-node bridges, unable to reach each other, and nothing would
+            # say so. Refuse it, and name the fix. (The manager refuses this pairing too; this is
+            # the backstop for an agent talking to a manager that does not yet.)
+            mode = str(network_config.get("mode") or "bridge")
+            if mode != "bridge":
+                raise UnsupportedResource(
+                    f"the manager selected the '{mode}' cluster-network driver, which the"
+                    " containerd backend cannot serve (it speaks the BEP-1062 'cni' driver)."
+                    " Set the manager's network.inter-container.default-driver to 'cni'."
+                )
             network_config = {"backend": str(NetworkBackendKind.BRIDGE), "subnet": _LOCAL_SUBNET}
         self._net_meta = await self._session_network.ensure_session(
             self._session_id, network_config

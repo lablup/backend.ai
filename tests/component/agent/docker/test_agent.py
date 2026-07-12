@@ -24,6 +24,11 @@ class DummyEtcd:
     async def get_prefix(self, key: str) -> Mapping[str, Any]:
         return {}
 
+    async def put(self, key: str, val: str, *, scope: Any = None) -> None:
+        # The agent publishes its container runtime here at startup, so the manager can pair the
+        # cluster-network driver against it. Nothing in this test reads it back.
+        return None
+
 
 @pytest.fixture
 async def agent(local_config: Any, test_id: str, mocker: Any, socket_relay_image: Any) -> Any:
