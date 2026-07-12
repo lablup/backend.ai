@@ -112,6 +112,42 @@ def _async_return(value: Any) -> Any:
     return _fn
 
 
+class TestEnumerateContainerPids:
+    """Per-process stats must enumerate PIDs from the cgroup, not the (absent) Docker daemon."""
+
+    def _agent(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, *, version: str = "2"
+    ) -> ContainerdAgent:
+        agent = ContainerdAgent.__new__(ContainerdAgent)
+        cgroup_dir = tmp_path / "cg"
+        cgroup_dir.mkdir()
+        monkeypatch.setattr(agent, "get_cgroup_path", lambda controller, cid: cgroup_dir)
+        monkeypatch.setattr(agent, "get_cgroup_version", lambda: version)
+        self._cgroup_dir = cgroup_dir
+        return agent
+
+    async def test_reads_pids_from_cgroup_procs(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        agent = self._agent(tmp_path, monkeypatch)
+        (self._cgroup_dir / "cgroup.procs").write_text("101\n102\n2003\n")
+        assert await agent.enumerate_container_pids(cast(Any, "cid")) == [101, 102, 2003]
+
+    async def test_missing_cgroup_yields_no_pids(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # the container has exited; its cgroup is gone -> empty, not an error
+        agent = self._agent(tmp_path, monkeypatch)
+        assert await agent.enumerate_container_pids(cast(Any, "cid")) == []
+
+    async def test_non_numeric_lines_are_skipped(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        agent = self._agent(tmp_path, monkeypatch)
+        (self._cgroup_dir / "cgroup.procs").write_text("101\n\ngarbage\n102\n")
+        assert await agent.enumerate_container_pids(cast(Any, "cid")) == [101, 102]
+
+
 class TestStatModeSelection:
     """The containerd backend must never use the daemon-querying 'docker' stat mode."""
 

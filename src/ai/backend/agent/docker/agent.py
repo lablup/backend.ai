@@ -93,6 +93,7 @@ from ai.backend.agent.scratch import create_loop_filesystem, destroy_loop_filesy
 from ai.backend.agent.types import (
     AgentEventData,
     Container,
+    ContainerNetns,
     KernelOwnershipData,
     LifecycleEvent,
     MountInfo,
@@ -130,6 +131,7 @@ from ai.backend.common.json import (
 )
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
 from ai.backend.common.types import (
+    PID,
     AgentId,
     AutoPullBehavior,
     BinarySize,
@@ -1654,6 +1656,43 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
     @override
     def get_cgroup_version(self) -> str:
         return cast(str, self.docker_info["CgroupVersion"])
+
+    @override
+    async def enumerate_container_pids(self, container_id: ContainerId) -> list[PID]:
+        # Preserve the Docker backend's original behavior: enumerate via the daemon's /top
+        # (the base falls back to cgroup.procs, which the daemon-less backends use).
+        async with closing_async(Docker()) as docker:
+            try:
+                result = await docker._query_json(f"containers/{container_id}/top", method="GET")
+                procs = result["Processes"]
+            except (KeyError, DockerError):
+                log.debug("enumerate_container_pids(): cannot find container {}", container_id)
+                return []
+        pids: list[PID] = []
+        for proc in procs:
+            try:
+                pids.append(PID(int(proc[1])))
+            except (ValueError, KeyError, IndexError):
+                continue
+        return pids
+
+    @override
+    async def get_container_netns(self, container_id: str) -> ContainerNetns | None:
+        async with closing_async(Docker()) as docker:
+            container = DockerContainer(docker, id=container_id)
+            try:
+                data = await container.show()
+            except DockerError as e:
+                if e.status == 404:
+                    return None
+                raise
+        # A container that is still being set up (or already exited) reports Pid 0 while
+        # keeping its sandbox namespace pinned at SandboxKey.
+        sandbox_key = data.get("NetworkSettings", {}).get("SandboxKey", "")
+        return ContainerNetns(
+            pid=data.get("State", {}).get("Pid") or None,
+            path=Path(sandbox_key) if sandbox_key else None,
+        )
 
     @override
     async def extract_image_command(self, image: str) -> list[str] | None:

@@ -193,6 +193,7 @@ from ai.backend.common.runner.types import Runner
 from ai.backend.common.service_ports import parse_service_ports
 from ai.backend.common.typed_validators import HostPortPair
 from ai.backend.common.types import (
+    PID,
     AbuseReportValue,
     AgentId,
     AutoPullBehavior,
@@ -1957,6 +1958,31 @@ class AbstractAgent[
     @abstractmethod
     def get_cgroup_version(self) -> str:
         raise NotImplementedError
+
+    async def enumerate_container_pids(self, container_id: ContainerId) -> list[PID]:
+        """Host PIDs belonging to a container, for per-process stat collection.
+
+        Default: read the container's cgroup ``cgroup.procs`` — the authoritative membership,
+        backend-agnostic and needing no container-daemon call (the Docker backend overrides this
+        to keep its ``/top`` query). cgroup v1 exposes the same PID set under every controller, so
+        any present one ('cpu') works; v2 ignores the controller (unified hierarchy)."""
+        controller = "" if self.get_cgroup_version() == "2" else "cpu"
+        procs_file = self.get_cgroup_path(controller, container_id) / "cgroup.procs"
+
+        def _read() -> list[PID]:
+            try:
+                content = procs_file.read_text()
+            except OSError:  # cgroup gone (container exited) — no PIDs to report
+                return []
+            pids: list[PID] = []
+            for line in content.split():
+                try:
+                    pids.append(PID(int(line)))
+                except ValueError:
+                    continue
+            return pids
+
+        return await asyncio.to_thread(_read)
 
     @abstractmethod
     async def get_container_netns(self, container_id: str) -> ContainerNetns | None:
