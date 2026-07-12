@@ -1360,7 +1360,17 @@ class ContainerdAgent(
         # unlinks the shim log file, so a manager query for a dead kernel's logs would otherwise
         # find nothing (the Docker backend collects them the same way, from container.log). The
         # shim log is a finished file here — no follow stream — so we just read it in chunks.
-        if container_id is not None and not restarting:
+        #
+        # Gate on the log file still existing: clean_kernel can fire more than once for a kernel,
+        # and remove_container (below) unlinks the file. collect_logs *always* emits a
+        # DoSyncKernelLogs event, even for an empty read — so a second clean, after the file is
+        # gone, would sync an empty log and OVERWRITE the good one the first clean persisted. (The
+        # Docker backend is implicitly guarded: its second collect hits a 404 and is skipped.)
+        if (
+            container_id is not None
+            and not restarting
+            and container_log_path(str(container_id)).exists()
+        ):
             try:
                 async with asyncio.timeout(_LOG_COLLECTION_TIMEOUT):
                     await self.collect_logs(

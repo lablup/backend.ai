@@ -91,6 +91,19 @@ class TestCleanKernelCollectsLogs:
         await agent.clean_kernel(cast(Any, "kid"), cast(Any, "kid"), restarting=True)
         assert "collect_logs" not in events
 
+    async def test_second_clean_after_removal_does_not_recollect(
+        self, log_root: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # clean_kernel can fire twice; the first collects and (via remove) unlinks the shim log.
+        # The second must NOT collect — collect_logs always emits a sync event, so an empty
+        # re-collect would overwrite the good log the first clean persisted.
+        events: list[str] = []
+        agent = self._agent(events, monkeypatch)
+        # no shim log file on disk (already removed by a prior clean)
+        assert not (log_root / "kid.log").exists()
+        await agent.clean_kernel(cast(Any, "kid"), cast(Any, "kid"), restarting=False)
+        assert "collect_logs" not in events
+
 
 def _async_return(value: Any) -> Any:
     async def _fn(*a: Any, **k: Any) -> Any:
