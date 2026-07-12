@@ -52,6 +52,7 @@ from ai.backend.agent.containerd.runtime.spec import _DEFAULT_CAPS, container_cg
 from ai.backend.agent.errors import UnsupportedResource
 from ai.backend.agent.errors.agent import ContainerCreationError
 from ai.backend.agent.errors.resources import PortPoolExhaustedError
+from ai.backend.agent.fs import create_scratch_filesystem, destroy_scratch_filesystem
 from ai.backend.agent.image_distro import (
     LDD_GLIBC_REGEX,
     LDD_MUSL_REGEX,
@@ -185,6 +186,8 @@ async def _read_container_log(container_id: str) -> AsyncGenerator[bytes, None]:
 
 # Placeholder subnet for a single-node BRIDGE session; the bridge backend allocates the
 # real node-local /24 per session and ignores this value (SessionNetMeta requires a subnet).
+# tmpfs quota for the MEMORY scratch, in MiB. The Docker backend passes the same literal.
+_MEMORY_SCRATCH_SIZE_MIB = 64
 _LOCAL_SUBNET = "172.30.0.0/24"
 # containerd task status -> Backend.AI ContainerStatus.
 #
@@ -429,6 +432,10 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         resource_opts = self.kernel_config.get("resource_opts", {})
         return resource_spec, resource_opts
 
+    def _memory_tmp_dir(self) -> Path:
+        """The host tmpfs bind-mounted at /tmp under the MEMORY scratch type (Docker parity)."""
+        return self.local_config.container.scratch_root / f"{self._container_id}_tmp"
+
     @override
     async def prepare_scratch(self) -> None:
         # Create the per-kernel scratch dirs (config/ + work/) and seed the default dotfiles.
@@ -445,6 +452,16 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
             await create_loop_filesystem(
                 scratch_root, self.local_config.container.scratch_size, self.kernel_id
             )
+        elif sys.platform.startswith("linux") and scratch_type == ScratchType.MEMORY:
+            # MEMORY means the scratch itself lives in RAM: mount a tmpfs over it, as the Docker
+            # backend does. Backing it with a container-private tmpfs at /tmp instead — which is
+            # what this used to do — left /home/work on disk (so the scratch was not in memory at
+            # all) and left /tmp with the kernel's default tmpfs size of half the host's RAM,
+            # unbounded by anything.
+            await asyncio.to_thread(scratch_dir.mkdir, parents=True, exist_ok=True)
+            await asyncio.to_thread(self._memory_tmp_dir().mkdir, parents=True, exist_ok=True)
+            await create_scratch_filesystem(scratch_dir, _MEMORY_SCRATCH_SIZE_MIB)
+            await create_scratch_filesystem(self._memory_tmp_dir(), _MEMORY_SCRATCH_SIZE_MIB)
 
         def _prepare() -> None:
             config_dir.mkdir(parents=True, exist_ok=True)
@@ -488,7 +505,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
     async def get_intrinsic_mounts(self) -> Sequence[Mount]:
         # The kernel runner requires the per-kernel scratch dirs: config/ (RO) at
         # /home/config and work/ (RW) at /home/work. prepare_scratch created them.
-        # (lxcfs, /etc/localtime, coredump, domain-socket proxies are follow-ups.)
+
         scratch_dir = (self.local_config.container.scratch_root / str(self._container_id)).resolve()
         mounts = [
             Mount(
@@ -504,6 +521,30 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
                 MountPermission.READ_WRITE,
             ),
         ]
+        # MEMORY scratch: /tmp is the host tmpfs prepare_scratch mounted, bound in — not a
+        # container-private tmpfs, whose default size is half the host's RAM and which the agent
+        # cannot see or reclaim. Docker binds the same directory.
+        if self.local_config.container.scratch_type == ScratchType.MEMORY:
+            mounts.append(
+                Mount(
+                    MountTypes.BIND,
+                    self._memory_tmp_dir(),
+                    Path("/tmp"),
+                    MountPermission.READ_WRITE,
+                )
+            )
+        # Coredumps. With debug.coredump enabled the host's core_pattern writes cores into this
+        # directory, so the container has to see it at the path the pattern names — otherwise the
+        # kernel cannot write the core at all and the feature is silently inert.
+        if self.local_config.debug.coredump.enabled:
+            mounts.append(
+                Mount(
+                    MountTypes.BIND,
+                    self.local_config.debug.coredump.path,
+                    self.local_config.debug.coredump.core_path,
+                    MountPermission.READ_WRITE,
+                )
+            )
         # Domain-socket proxies (the image importer and other special service containers that need
         # a host socket, e.g. the docker socket). The host socket itself is never bind-mounted:
         # each one gets a per-kernel proxy socket that forwards to it, so the container talks to us
@@ -998,9 +1039,6 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         shmem = (self.kernel_config.get("resource_opts") or {}).get("shmem")
         if shmem:
             oci_spec["shmem"] = int(shmem)
-        # MEMORY scratch type -> in-memory (tmpfs) /tmp.
-        if self.local_config.container.scratch_type == ScratchType.MEMORY:
-            oci_spec["tmpfs_tmp"] = True
         # The LOCAL bridge is a node-local NAT subnet, so the container's address is private and
         # unroutable off this node — an AppProxy may run on any host. Publish each service (and the
         # REPL, which the agent itself dials at kernel_host) on a host port, DNAT'd to the container
@@ -1821,6 +1859,15 @@ class ContainerdAgent(
             try:
                 if sys.platform.startswith("linux") and scratch_type == ScratchType.HOSTFILE:
                     await destroy_loop_filesystem(scratch_root, kernel_id)
+                elif sys.platform.startswith("linux") and scratch_type == ScratchType.MEMORY:
+                    # Unmount before removing: rmtree on a live tmpfs deletes the files but leaves
+                    # the mount, so the RAM is never given back and the mount table grows with
+                    # every kernel that ever ran here.
+                    tmp_dir = scratch_root / f"{kernel_id}_tmp"
+                    await destroy_scratch_filesystem(scratch_dir)
+                    await destroy_scratch_filesystem(tmp_dir)
+                    await asyncio.to_thread(shutil.rmtree, scratch_dir, ignore_errors=True)
+                    await asyncio.to_thread(shutil.rmtree, tmp_dir, ignore_errors=True)
                 else:
                     await asyncio.to_thread(shutil.rmtree, scratch_dir, ignore_errors=True)
             except Exception:

@@ -451,6 +451,7 @@ class TestDomainSocketProxies:
             SimpleNamespace(
                 agent=SimpleNamespace(ipc_base_path=tmp_path / "ipc"),
                 container=SimpleNamespace(scratch_root=tmp_path, scratch_type=ScratchType.HOSTDIR),
+                debug=SimpleNamespace(coredump=SimpleNamespace(enabled=False)),
             ),
         )
         return ctx
@@ -566,3 +567,79 @@ class TestRefusesAV1NetworkDriver:
         ctx = _context(facade)
         await ctx.apply_network(cast(Any, {"network_config": _VXLAN_NC}))
         assert facade.ensured[0][1]["backend"] == "vxlan"
+
+
+class TestMemoryScratch:
+    """MEMORY means the scratch lives in RAM, and it did not.
+
+    The old behaviour gave the container a private tmpfs at /tmp and left /home/work on disk — so
+    the scratch was not in memory at all, and /tmp was bounded by nothing but the kernel's default
+    (half the host's RAM). Docker mounts a sized tmpfs over the scratch itself and binds a second
+    one at /tmp; this now does the same.
+    """
+
+    def _ctx(self, tmp_path: Path, scratch_type: ScratchType) -> Any:
+        ctx = _context(FakeFacade())
+        ctx._scratch_dir = tmp_path / "kern-123"
+        ctx._agent_sock_path = None
+        ctx.local_config = cast(
+            Any,
+            SimpleNamespace(
+                container=SimpleNamespace(scratch_root=tmp_path, scratch_type=scratch_type),
+                debug=SimpleNamespace(coredump=SimpleNamespace(enabled=False)),
+                agent=SimpleNamespace(ipc_base_path=tmp_path / "ipc"),
+            ),
+        )
+        return ctx
+
+    async def test_tmp_is_bound_from_the_host_tmpfs(self, tmp_path: Path) -> None:
+        ctx = self._ctx(tmp_path, ScratchType.MEMORY)
+        mounts = await ctx.get_intrinsic_mounts()
+
+        tmp_mount = next(m for m in mounts if str(m.target) == "/tmp")
+        # the host tmpfs prepare_scratch mounted — not a container-private one the agent cannot see
+        assert Path(str(tmp_mount.source)) == tmp_path / "kern-123_tmp"
+
+    async def test_other_scratch_types_get_no_tmp_mount(self, tmp_path: Path) -> None:
+        ctx = self._ctx(tmp_path, ScratchType.HOSTDIR)
+        mounts = await ctx.get_intrinsic_mounts()
+        assert not any(str(m.target) == "/tmp" for m in mounts)
+
+
+class TestCoredumpMount:
+    def _ctx(self, tmp_path: Path, enabled: bool) -> Any:
+        ctx = _context(FakeFacade())
+        ctx._scratch_dir = tmp_path / "kern-123"
+        ctx._agent_sock_path = None
+        ctx.local_config = cast(
+            Any,
+            SimpleNamespace(
+                container=SimpleNamespace(scratch_root=tmp_path, scratch_type=ScratchType.HOSTDIR),
+                debug=SimpleNamespace(
+                    coredump=SimpleNamespace(
+                        enabled=enabled,
+                        path=tmp_path / "coredumps",
+                        core_path=Path("/var/crash"),
+                    )
+                ),
+                agent=SimpleNamespace(ipc_base_path=tmp_path / "ipc"),
+            ),
+        )
+        return ctx
+
+    async def test_the_host_coredump_dir_is_bound_where_core_pattern_names_it(
+        self, tmp_path: Path
+    ) -> None:
+        # The host's core_pattern writes cores to an absolute path; the container has to see that
+        # path, or the kernel cannot write the core at all and the feature is silently inert.
+        ctx = self._ctx(tmp_path, enabled=True)
+        mounts = await ctx.get_intrinsic_mounts()
+
+        core = next(m for m in mounts if str(m.target) == "/var/crash")
+        assert Path(str(core.source)) == tmp_path / "coredumps"
+        assert core.permission == MountPermission.READ_WRITE  # the kernel has to write into it
+
+    async def test_disabled_mounts_nothing(self, tmp_path: Path) -> None:
+        ctx = self._ctx(tmp_path, enabled=False)
+        mounts = await ctx.get_intrinsic_mounts()
+        assert not any(str(m.target) == "/var/crash" for m in mounts)
