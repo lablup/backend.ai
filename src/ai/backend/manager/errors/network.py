@@ -59,3 +59,24 @@ class NetworkBackendMismatch(BackendAIError, web.HTTPConflict):
             operation=ErrorOperation.CREATE,
             error_detail=ErrorDetail.CONFLICT,
         )
+
+
+class UnsupportedNetworkBackend(BackendAIError, web.HTTPBadRequest):
+    """The selected cluster-network backend has no agent-side implementation (BEP-1058).
+
+    host-gw and wireguard are declared in NetworkBackendKind for the selection interface but are
+    not implemented. Refusing them here — whether pinned by the operator's forced_backend or
+    reached by capability auto-selection — turns a late agent-side UnknownNetworkBackend crash into
+    a clear create-time error.
+    """
+
+    error_type = "https://api.backend.ai/probs/unsupported-network-backend"
+    error_title = "The selected cluster-network backend is not implemented."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.SESSION,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.NOT_IMPLEMENTED,
+        )

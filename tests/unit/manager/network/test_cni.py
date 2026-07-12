@@ -16,6 +16,7 @@ from ai.backend.common.network.types import NetworkBackendKind, mac_for_ip
 from ai.backend.manager.errors.network import (
     NetworkBackendMismatch,
     NetworkPoolExhausted,
+    UnsupportedNetworkBackend,
     VNIPoolExhausted,
 )
 from ai.backend.manager.network.cni import CNINetworkPlugin
@@ -207,12 +208,16 @@ class TestSelectBackend:
         plugin = _plugin_with(FakeEtcd())
         assert await plugin._select_backend([], None) is NetworkBackendKind.VXLAN
 
-    async def test_all_native_selects_host_gw(self) -> None:
+    async def test_all_native_would_resolve_host_gw_but_it_is_unimplemented(self) -> None:
+        # the capability auto-select still resolves to host-gw internally, but host-gw has no
+        # agent-side implementation, so selection refuses it rather than crashing the agent later
         etcd = FakeEtcd()
         for agent_id in ("a1", "a2"):
             etcd.store[f"network/agent/{agent_id}/caps"] = json.dumps({"native_routing_ok": True})
         plugin = _plugin_with(etcd)
-        assert await plugin._select_backend(["a1", "a2"], None) is NetworkBackendKind.HOST_GW
+        assert await plugin._resolve_backend(["a1", "a2"], None) is NetworkBackendKind.HOST_GW
+        with pytest.raises(UnsupportedNetworkBackend):
+            await plugin._select_backend(["a1", "a2"], None)
 
     async def test_one_non_native_falls_back_to_vxlan(self) -> None:
         etcd = FakeEtcd()
@@ -220,6 +225,19 @@ class TestSelectBackend:
         etcd.store["network/agent/a2/caps"] = json.dumps({"native_routing_ok": False})
         plugin = _plugin_with(etcd)
         assert await plugin._select_backend(["a1", "a2"], None) is NetworkBackendKind.VXLAN
+
+    async def test_forced_unimplemented_backend_is_refused(self) -> None:
+        # an operator pinning host-gw or wireguard (both declared but not implemented) must get a
+        # clear create-time error, not a late UnknownNetworkBackend crash on the agent
+        plugin = _plugin_with(FakeEtcd())
+        for backend in (NetworkBackendKind.HOST_GW, NetworkBackendKind.WIREGUARD):
+            with pytest.raises(UnsupportedNetworkBackend):
+                await plugin._select_backend(["a1"], backend)
+
+    async def test_forced_implemented_backend_is_accepted(self) -> None:
+        plugin = _plugin_with(FakeEtcd())
+        for backend in (NetworkBackendKind.VXLAN, NetworkBackendKind.BRIDGE):
+            assert await plugin._select_backend(["a1"], backend) is backend
 
     async def test_missing_caps_falls_back_to_vxlan(self) -> None:
         plugin = _plugin_with(FakeEtcd())  # no caps published
@@ -243,11 +261,13 @@ class TestCreateNetwork:
         raw = etcd.store["network/session/s1/meta"]
         assert json.loads(raw)["backend"] == "vxlan"
 
-    async def test_host_gw_has_no_vni(self) -> None:
+    async def test_non_vxlan_backend_has_no_vni(self) -> None:
+        # a VNI is a vxlan concept; any other (implemented) backend gets none. bridge stands in for
+        # "not vxlan" here — host-gw would be the natural example but is not implemented (refused).
         etcd = FakeEtcd()
         plugin = _plugin_with(etcd)
-        info = await plugin.create_network(identifier="s2", options={"forced_backend": "host-gw"})
-        assert info.options["backend"] == "host-gw"
+        info = await plugin.create_network(identifier="s2", options={"forced_backend": "bridge"})
+        assert info.options["backend"] == "bridge"
         assert info.options["vni"] is None
 
     async def test_assigns_disjoint_endpoint_ips_and_records_them(self) -> None:
@@ -342,13 +362,13 @@ class TestCreateNetwork:
         # a2 falls back to self-publish + watch convergence (no seed written)
         assert "network/session/s1/members/a2" not in etcd.store
 
-    async def test_host_gw_does_not_preseed_members(self) -> None:
+    async def test_non_vxlan_backend_does_not_preseed_members(self) -> None:
         etcd = FakeEtcd()
         etcd.store["network/agent/a1/vtep"] = "192.168.105.7"
         plugin = _plugin_with(etcd)
         await plugin.create_network(
             identifier="s2",
-            options={"forced_backend": "host-gw", "member_agents": ["a1"]},
+            options={"forced_backend": "bridge", "member_agents": ["a1"]},
         )
         # VTEP-based pre-seed applies to vxlan only
         assert "network/session/s2/members/a1" not in etcd.store

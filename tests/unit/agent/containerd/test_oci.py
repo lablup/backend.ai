@@ -1,11 +1,14 @@
 from pathlib import Path
 from typing import Any, cast
 
+import pytest
+
 from ai.backend.agent.containerd.oci import (
     KERNEL_ID_LABEL,
     KRUNNER_ENTRYPOINT,
     SESSION_ID_LABEL,
     DevicePassthrough,
+    infiniband_devices,
     mount_to_oci,
     translate_accelerator_args,
     translate_creation_config,
@@ -153,3 +156,49 @@ class TestTranslateAcceleratorArgs:
         })
         assert spec.memory_limit == 2147483648
         assert spec.memory_swap == 2147483648
+
+
+class TestInfinibandDevices:
+    """Docker-parity RDMA passthrough: enumerate the host's IB char devices when present."""
+
+    def _fake_ib(self, tmp_path: Path, names: list[str], monkeypatch: pytest.MonkeyPatch) -> Path:
+        ib = tmp_path / "infiniband"
+        ib.mkdir()
+        for name in names:
+            (ib / name).touch()
+        # the host has no real char devices under a tmp dir, so treat the created files as such
+        monkeypatch.setattr(
+            Path, "is_char_device", lambda self, _n=set(names): self.name in _n, raising=False
+        )
+        return ib
+
+    def test_no_ib_dir_yields_nothing(self, tmp_path: Path) -> None:
+        assert infiniband_devices(tmp_path / "absent") == []
+
+    def test_dir_without_uverbs0_yields_nothing(self, tmp_path: Path) -> None:
+        # the uverbs0 sentinel gates the whole passthrough (matches the Docker backend)
+        ib = tmp_path / "infiniband"
+        ib.mkdir()
+        (ib / "rdma_cm").touch()
+        assert infiniband_devices(ib) == []
+
+    def test_enumerates_every_char_device(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        ib = self._fake_ib(
+            tmp_path, ["uverbs0", "uverbs1", "rdma_cm", "issm0", "umad0"], monkeypatch
+        )
+        devs = infiniband_devices(ib)
+        assert [d.source for d in devs] == [
+            str(ib / n) for n in ["issm0", "rdma_cm", "umad0", "uverbs0", "uverbs1"]
+        ]
+        # each is a bidirectional rwm passthrough (source == destination)
+        assert all(d.source == d.destination and d.permissions == "rwm" for d in devs)
+
+    def test_non_char_entries_are_skipped(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        ib = self._fake_ib(tmp_path, ["uverbs0"], monkeypatch)
+        (ib / "some-regular-file").touch()  # not a char device -> excluded
+        (ib / "subdir").mkdir()  # not a char device -> excluded
+        assert [Path(d.source).name for d in infiniband_devices(ib)] == ["uverbs0"]

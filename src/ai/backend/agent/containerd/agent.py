@@ -78,6 +78,7 @@ from ai.backend.agent.scratch import create_loop_filesystem, destroy_loop_filesy
 from ai.backend.agent.types import (
     AgentEventData,
     Container,
+    ContainerNetns,
     KernelOwnershipData,
     LifecycleEvent,
     MountInfo,
@@ -122,6 +123,7 @@ from .oci import (
     KERNEL_ID_LABEL,
     KRUNNER_ENTRYPOINT,
     AcceleratorSpec,
+    infiniband_devices,
     translate_accelerator_args,
     translate_creation_config,
 )
@@ -677,10 +679,14 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         # /dev node passthrough (AMD/NPU), and NVIDIA GPU IDs (nvidia-container-toolkit).
         oci_spec = self._pending_spec.oci_spec
         oci_spec["env"].update(self._accel_spec.env)
-        if self._accel_spec.devices:
+        # RDMA/InfiniBand: expose the host's HCA char devices (Docker parity — unconditional bulk
+        # passthrough when the host has IB; CAP_IPC_LOCK is already granted in the runtime spec).
+        # Not scheduled and not tenant-isolated; proper GPUDirect-RDMA topology is BEP-1051.
+        passthrough_devices = [*self._accel_spec.devices, *infiniband_devices()]
+        if passthrough_devices:
             oci_spec["devices"] = [
                 {"source": d.source, "destination": d.destination, "permissions": d.permissions}
-                for d in self._accel_spec.devices
+                for d in passthrough_devices
             ]
         if self._accel_spec.gpu_device_ids:
             oci_spec["gpus"] = list(self._accel_spec.gpu_device_ids)
@@ -1150,6 +1156,15 @@ class ContainerdAgent(
     def get_cgroup_version(self) -> str:
         # cgroup v2 exposes a unified hierarchy marked by /sys/fs/cgroup/cgroup.controllers.
         return "2" if Path("/sys/fs/cgroup/cgroup.controllers").exists() else "1"
+
+    @override
+    async def get_container_netns(self, container_id: str) -> ContainerNetns | None:
+        # The task's netns is not pinned anywhere on disk (CNI attaches against /proc/<pid>/ns/net),
+        # so once the task is gone there is no namespace left to read counters from.
+        pid = await self._runtime.container_pid(container_id)
+        if pid is None:
+            return None
+        return ContainerNetns(pid=pid, path=None)
 
     @override
     async def extract_image_command(self, image: str) -> list[str] | None:

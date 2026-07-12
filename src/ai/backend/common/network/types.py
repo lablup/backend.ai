@@ -38,9 +38,21 @@ class NetworkBackendKind(StrEnum):
     sessions: a plain CNI bridge (host-local IPAM) gives the container a host-reachable IP,
     replacing the former nerdctl-managed bridge."""
     HOST_GW = "host-gw"
-    """Native L3 routing without encapsulation; requires a cooperative fabric."""
+    """Native L3 routing without encapsulation; requires a cooperative fabric. NOT IMPLEMENTED —
+    declared for the selection interface; no agent-side data-plane backend exists yet."""
     WIREGUARD = "wireguard"
-    """Encrypted host-to-host tunnels; use when confidentiality is required."""
+    """Encrypted host-to-host tunnels; use when confidentiality is required. NOT IMPLEMENTED —
+    a placeholder for a future backend; nothing selects or registers it."""
+
+
+# The backends that actually have an agent-side data-plane implementation and are registered by
+# build_containerd_session_network. Keep in sync with that registration: the manager guards its
+# backend selection against this set so an unimplemented backend (host-gw / wireguard) is refused
+# with a clear error at create_network time, instead of crashing the agent with UnknownNetworkBackend.
+IMPLEMENTED_NETWORK_BACKENDS: frozenset[NetworkBackendKind] = frozenset({
+    NetworkBackendKind.VXLAN,
+    NetworkBackendKind.BRIDGE,
+})
 
 
 class AttachKind(StrEnum):

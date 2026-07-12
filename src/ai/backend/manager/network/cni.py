@@ -25,9 +25,16 @@ from ai.backend.common.network.keys import (
     session_meta_key,
     session_prefix,
 )
-from ai.backend.common.network.types import Member, NetworkBackendKind
+from ai.backend.common.network.types import (
+    IMPLEMENTED_NETWORK_BACKENDS,
+    Member,
+    NetworkBackendKind,
+)
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.errors.network import NetworkBackendMismatch
+from ai.backend.manager.errors.network import (
+    NetworkBackendMismatch,
+    UnsupportedNetworkBackend,
+)
 from ai.backend.manager.network.ipam import (
     EndpointAllocator,
     SubnetAllocator,
@@ -218,7 +225,20 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         self, member_agents: list[str], forced_backend: NetworkBackendKind | None
     ) -> NetworkBackendKind:
         """Operator override wins; otherwise host-gw only if every member advertises
-        native-routing capability, else the portable vxlan default."""
+        native-routing capability, else the portable vxlan default. The chosen backend is
+        validated against the set that actually has an agent-side implementation, so an
+        unimplemented one (host-gw / wireguard) is refused here rather than crashing the agent."""
+        backend = await self._resolve_backend(member_agents, forced_backend)
+        if backend not in IMPLEMENTED_NETWORK_BACKENDS:
+            raise UnsupportedNetworkBackend(
+                f"cluster-network backend '{backend}' is declared but not implemented "
+                f"(implemented: {sorted(b.value for b in IMPLEMENTED_NETWORK_BACKENDS)})"
+            )
+        return backend
+
+    async def _resolve_backend(
+        self, member_agents: list[str], forced_backend: NetworkBackendKind | None
+    ) -> NetworkBackendKind:
         if forced_backend is not None:
             return forced_backend
         if not member_agents:

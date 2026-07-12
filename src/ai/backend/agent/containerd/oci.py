@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 from ai.backend.agent.resources import Mount
@@ -18,6 +19,10 @@ from ai.backend.common.types import KernelCreationConfig, MountPermission
 KERNEL_ID_LABEL = "ai.backend.kernel-id"
 SESSION_ID_LABEL = "ai.backend.session-id"
 KRUNNER_ENTRYPOINT = "/opt/kernel/entrypoint.sh"
+
+# RDMA/InfiniBand verbs devices live under this directory; uverbs0 is the sentinel the Docker
+# backend keys on (docker/agent.py). See infiniband_devices().
+_IB_ROOT = Path("/dev/infiniband")
 
 
 def mount_to_oci(mount: Mount) -> dict[str, Any]:
@@ -47,6 +52,25 @@ class DevicePassthrough:
     source: str
     destination: str
     permissions: str = "rwm"
+
+
+def infiniband_devices(ib_root: Path = _IB_ROOT) -> list[DevicePassthrough]:
+    """The RDMA/InfiniBand character devices to pass through, or [] when the host has no HCA.
+
+    Docker parity (docker/agent.py): if ``/dev/infiniband`` exists and holds ``uverbs0``, the whole
+    directory is exposed into every container — an unconditional, unscheduled bulk passthrough (no
+    HCA<->GPU topology, no per-tenant isolation). Docker hands dockerd the directory and lets it
+    expand to the char nodes; the OCI/containerd path cannot pass a directory, so each node under it
+    is enumerated into its own device entry. Same devices reach the container, expressed per-node.
+    """
+    if not (ib_root.is_dir() and (ib_root / "uverbs0").exists()):
+        return []
+    devices: list[DevicePassthrough] = []
+    for node in sorted(ib_root.iterdir()):
+        if node.is_char_device():
+            path = str(node)
+            devices.append(DevicePassthrough(source=path, destination=path))
+    return devices
 
 
 @dataclass(frozen=True)
