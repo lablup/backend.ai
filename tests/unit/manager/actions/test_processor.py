@@ -318,21 +318,6 @@ class TestReporterMonitorActorIdentities:
     def mock_meta(self) -> BaseActionTriggerMeta:
         return BaseActionTriggerMeta(action_id=uuid4(), started_at=datetime.now(tz=UTC))
 
-    @staticmethod
-    def _result() -> ProcessResult:
-        return ProcessResult(
-            meta=BaseActionResultMeta(
-                action_id=uuid4(),
-                entity_id="1",
-                status=OperationStatus.SUCCESS,
-                description="Success",
-                started_at=datetime.now(tz=UTC),
-                ended_at=datetime.now(tz=UTC),
-                duration=timedelta(seconds=0.0),
-                error_code=None,
-            ),
-        )
-
     async def test_started_message_records_both_identities_under_impersonation(
         self,
         reporter_monitor: ReporterMonitor,
@@ -359,8 +344,21 @@ class TestReporterMonitorActorIdentities:
         target = _make_user(uuid4())
         super_admin = _make_user(uuid4(), is_superadmin=True)
 
+        now = datetime.now(tz=UTC)
+        result = ProcessResult(
+            meta=BaseActionResultMeta(
+                action_id=uuid4(),
+                entity_id="1",
+                status=OperationStatus.SUCCESS,
+                description="Success",
+                started_at=now,
+                ended_at=now,
+                duration=timedelta(seconds=0.0),
+                error_code=None,
+            ),
+        )
         with with_user(target), with_triggered_user(super_admin):
-            await reporter_monitor.done(mock_action, self._result())
+            await reporter_monitor.done(mock_action, result)
 
         message = reporter_hub.report_finished.call_args.args[0]
         assert message.triggered_by == str(super_admin.user_id)
@@ -374,8 +372,21 @@ class TestReporterMonitorActorIdentities:
     ) -> None:
         user = _make_user(uuid4())
 
+        now = datetime.now(tz=UTC)
+        result = ProcessResult(
+            meta=BaseActionResultMeta(
+                action_id=uuid4(),
+                entity_id="1",
+                status=OperationStatus.SUCCESS,
+                description="Success",
+                started_at=now,
+                ended_at=now,
+                duration=timedelta(seconds=0.0),
+                error_code=None,
+            ),
+        )
         with with_user(user), with_triggered_user(user):
-            await reporter_monitor.done(mock_action, self._result())
+            await reporter_monitor.done(mock_action, result)
 
         message = reporter_hub.report_finished.call_args.args[0]
         assert message.triggered_by == str(user.user_id)
@@ -387,7 +398,20 @@ class TestReporterMonitorActorIdentities:
         reporter_hub: MagicMock,
         mock_action: MockAction,
     ) -> None:
-        await reporter_monitor.done(mock_action, self._result())
+        now = datetime.now(tz=UTC)
+        result = ProcessResult(
+            meta=BaseActionResultMeta(
+                action_id=uuid4(),
+                entity_id="1",
+                status=OperationStatus.SUCCESS,
+                description="Success",
+                started_at=now,
+                ended_at=now,
+                duration=timedelta(seconds=0.0),
+                error_code=None,
+            ),
+        )
+        await reporter_monitor.done(mock_action, result)
 
         message = reporter_hub.report_finished.call_args.args[0]
         assert message.triggered_by is None
