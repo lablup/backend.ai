@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from ai.backend.common.data.app_config.types import AppConfigScopeType
+from ai.backend.common.data.app_config.types import AppConfigPermission, AppConfigScopeType
 from ai.backend.common.identifier.app_config_allow_list import AppConfigAllowListID
 from ai.backend.manager.data.app_config_allow_list.types import (
     AppConfigAllowListData,
@@ -61,6 +61,7 @@ class TestAppConfigAllowListService:
             config_name="theme",
             scope_type=AppConfigScopeType.USER,
             rank=AppConfigScopeType.USER.default_rank(),
+            permission=AppConfigPermission.READ_WRITE,
             created_at=datetime.now(UTC),
             updated_at=datetime.now(UTC),
         )

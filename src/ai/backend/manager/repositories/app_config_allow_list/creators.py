@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.app_config.types import AppConfigScopeType
+from ai.backend.common.data.app_config.types import AppConfigPermission, AppConfigScopeType
 from ai.backend.manager.models.app_config_allow_list.row import AppConfigAllowListRow
 from ai.backend.manager.repositories.base import CreatorSpec
 
@@ -17,17 +17,24 @@ class AppConfigAllowListCreatorSpec(CreatorSpec[AppConfigAllowListRow]):
     ``rank`` is the merge priority every fragment under the entry carries; when not
     given, it falls back to the scope type's default (public=100, domain=200,
     user=300), which orders the scopes so a user's own fragment wins the merge.
+    ``permission`` likewise falls back to the scope type's default write policy
+    (public/domain=ro, user=rw) when not given.
     """
 
     config_name: str
     scope_type: AppConfigScopeType
     rank: int | None = None
+    permission: AppConfigPermission | None = None
 
     @override
     def build_row(self) -> AppConfigAllowListRow:
         rank = self.rank if self.rank is not None else self.scope_type.default_rank()
+        permission = (
+            self.permission if self.permission is not None else self.scope_type.default_permission()
+        )
         return AppConfigAllowListRow(
             config_name=self.config_name,
             scope_type=self.scope_type,
             rank=rank,
+            permission=permission,
         )

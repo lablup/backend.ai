@@ -8,7 +8,7 @@ from collections.abc import AsyncGenerator
 import pytest
 import sqlalchemy as sa
 
-from ai.backend.common.data.app_config.types import AppConfigScopeType
+from ai.backend.common.data.app_config.types import AppConfigPermission, AppConfigScopeType
 from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.common.identifier.app_config_allow_list import AppConfigAllowListID
 from ai.backend.manager.data.app_config_allow_list.types import (
@@ -195,6 +195,50 @@ class TestRankAssignment:
         assert (await repository.get_by_id(created.id)).rank == 250
 
 
+class TestPermissionAssignment:
+    @pytest.mark.parametrize(
+        ("scope_type", "expected_permission"),
+        [
+            (AppConfigScopeType.PUBLIC, AppConfigPermission.READ_ONLY),
+            (AppConfigScopeType.DOMAIN, AppConfigPermission.READ_ONLY),
+            (AppConfigScopeType.USER, AppConfigPermission.READ_WRITE),
+        ],
+    )
+    async def test_permission_defaults_by_scope_type(
+        self,
+        repository: AppConfigAllowListRepository,
+        definition_repository: AppConfigDefinitionRepository,
+        scope_type: AppConfigScopeType,
+        expected_permission: AppConfigPermission,
+    ) -> None:
+        await _register(definition_repository, "theme")
+        created = await _create_entry(repository, "theme", scope_type)
+        assert created.permission is expected_permission
+        # persisted, not just returned
+        fetched = await repository.get_by_id(created.id)
+        assert fetched.permission is expected_permission
+
+    async def test_explicit_permission_overrides_default(
+        self,
+        repository: AppConfigAllowListRepository,
+        definition_repository: AppConfigDefinitionRepository,
+    ) -> None:
+        await _register(definition_repository, "theme")
+        # a user layer locked to admin-only writes, overriding the rw default
+        created = await repository.create(
+            Creator(
+                spec=AppConfigAllowListCreatorSpec(
+                    config_name="theme",
+                    scope_type=AppConfigScopeType.USER,
+                    permission=AppConfigPermission.READ_ONLY,
+                )
+            )
+        )
+        assert created.permission is AppConfigPermission.READ_ONLY
+        fetched = await repository.get_by_id(created.id)
+        assert fetched.permission is AppConfigPermission.READ_ONLY
+
+
 class TestUpdate:
     async def test_update_changes_rank(
         self,
@@ -212,6 +256,26 @@ class TestUpdate:
         # identity fields are untouched
         assert updated.config_name == existing_entry.config_name
         assert updated.scope_type is existing_entry.scope_type
+
+    async def test_update_changes_permission(
+        self,
+        repository: AppConfigAllowListRepository,
+        existing_entry: AppConfigAllowListData,
+    ) -> None:
+        # existing_entry is ("theme", PUBLIC) -> default permission=ro.
+        updated = await repository.update(
+            Updater(
+                spec=AppConfigAllowListUpdaterSpec(
+                    permission=OptionalState.update(AppConfigPermission.READ_WRITE),
+                ),
+                pk_value=existing_entry.id,
+            )
+        )
+        assert updated.permission is AppConfigPermission.READ_WRITE
+        fetched = await repository.get_by_id(existing_entry.id)
+        assert fetched.permission is AppConfigPermission.READ_WRITE
+        # rank left untouched
+        assert fetched.rank == existing_entry.rank
 
     async def test_update_missing_raises(self, repository: AppConfigAllowListRepository) -> None:
         with pytest.raises(AppConfigAllowListNotFound):

@@ -79,6 +79,7 @@ def _allow_list_row(config_name: str, scope_type: AppConfigScopeType) -> AppConf
         config_name=config_name,
         scope_type=scope_type,
         rank=scope_type.default_rank(),
+        permission=scope_type.default_permission(),
     )
 
 

@@ -6,7 +6,23 @@ import enum
 
 from ai.backend.common.data.permission.types import ScopeType
 
-__all__ = ("AppConfigScopeType",)
+__all__ = ("AppConfigScopeType", "AppConfigPermission")
+
+
+class AppConfigPermission(enum.StrEnum):
+    """What a config layer's scope owner may do with it (BEP-1052).
+
+    Stored per ``(config_name, scope_type)`` on the allow-list, admin-owned (mirrors
+    VFolder's ``permission``). It gates writes only — reads always follow scope visibility
+    (public → everyone, domain → members, user → owner):
+
+    * ``ro`` — read-only: only a superadmin may write the layer.
+    * ``rw`` — read-write: the scope owner may write it (a user their own ``user`` layer),
+      and a superadmin always may.
+    """
+
+    READ_ONLY = "ro"
+    READ_WRITE = "rw"
 
 
 class AppConfigScopeType(enum.StrEnum):
@@ -57,3 +73,17 @@ class AppConfigScopeType(enum.StrEnum):
                 return 200
             case AppConfigScopeType.USER:
                 return 300
+
+    def default_permission(self) -> AppConfigPermission:
+        """Default write permission for an allow-list entry at this scope type (BEP-1052).
+
+        ``public`` / ``domain`` layers are admin-managed (``ro`` — only a superadmin writes);
+        a ``user`` layer is ``rw`` so the owning user manages their own fragment without admin.
+        """
+        match self:
+            case AppConfigScopeType.PUBLIC:
+                return AppConfigPermission.READ_ONLY
+            case AppConfigScopeType.DOMAIN:
+                return AppConfigPermission.READ_ONLY
+            case AppConfigScopeType.USER:
+                return AppConfigPermission.READ_WRITE

@@ -5,7 +5,7 @@ from datetime import datetime
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
-from ai.backend.common.data.app_config.types import AppConfigScopeType
+from ai.backend.common.data.app_config.types import AppConfigPermission, AppConfigScopeType
 from ai.backend.common.identifier.app_config_allow_list import AppConfigAllowListID
 from ai.backend.manager.data.app_config_allow_list.types import (
     AppConfigAllowListData,
@@ -16,16 +16,18 @@ __all__ = ("AppConfigAllowListRow",)
 
 
 class AppConfigAllowListRow(Base):  # type: ignore[misc]
-    """Permission to write config fragments for one config name at one scope type.
+    """Registration of one config layer: a ``(config_name, scope_type)`` and its access policy.
 
-    A config fragment may be created only when a matching row exists here.
-    Deletion cascades both ways: fragments reference this table by
-    ``(config_name, scope_type)`` and this table references
-    ``app_config_definitions`` by ``config_name``, both ``ON DELETE CASCADE`` —
-    so retiring a config name clears its entries and fragments. ``rank`` is the
-    merge priority the entry's fragments carry (low → high; higher wins) —
-    admin-owned so fragment owners cannot re-order the merge. At most one row per
-    ``(config_name, scope_type)``; only admins create or remove these rows.
+    A config fragment may exist only when a matching row exists here — the row *registers*
+    the layer (it is not itself a write grant). Deletion cascades both ways: fragments
+    reference this table by ``(config_name, scope_type)`` and this table references
+    ``app_config_definitions`` by ``config_name``, both ``ON DELETE CASCADE`` — so retiring a
+    config name clears its entries and fragments. ``rank`` is the merge priority the entry's
+    fragments carry (low → high; higher wins) — admin-owned so fragment owners cannot
+    re-order the merge. ``permission`` (``ro`` / ``rw``) is the admin-owned write policy for
+    the layer — ``rw`` lets the scope owner write, ``ro`` restricts writes to superadmins;
+    reads always follow scope visibility. At most one row per ``(config_name, scope_type)``;
+    only admins create or remove these rows.
     """
 
     __tablename__ = "app_config_allow_list"
@@ -57,6 +59,11 @@ class AppConfigAllowListRow(Base):  # type: ignore[misc]
         sa.Integer,
         nullable=False,
     )
+    permission: Mapped[AppConfigPermission] = mapped_column(
+        "permission",
+        StrEnumType(AppConfigPermission),
+        nullable=False,
+    )
     created_at: Mapped[datetime] = mapped_column(
         "created_at",
         sa.DateTime(timezone=True),
@@ -77,6 +84,7 @@ class AppConfigAllowListRow(Base):  # type: ignore[misc]
             config_name=self.config_name,
             scope_type=self.scope_type,
             rank=self.rank,
+            permission=self.permission,
             created_at=self.created_at,
             updated_at=self.updated_at,
         )
