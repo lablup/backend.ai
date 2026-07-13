@@ -63,13 +63,21 @@ class TestPydanticColumnExcludeUnset:
         column_with_exclude_unset_false: PydanticColumn[ModelDefinitionDraft],
         dialect: Dialect,
     ) -> None:
-        # Contrast case: without exclude_unset, unset fields are stored as explicit nulls.
+        # Contrast case: without exclude_unset, unset fields are stored as explicit
+        # nulls, and reloading marks them "explicitly set" — the legacy bug behavior.
         draft = ModelDefinitionDraft.model_validate({"models": [{"service": {"port": 8080}}]})
 
         stored = column_with_exclude_unset_false.process_bind_param(draft, dialect)
+        loaded = column_with_exclude_unset_false.process_result_value(stored, dialect)
 
         assert stored is not None
         assert stored["models"][0]["service"]["shell"] is None
+        assert loaded is not None
+        assert loaded.models
+        service = loaded.models[0].service
+        assert service is not None
+        assert "shell" in service.model_fields_set
+        assert service.shell is None
 
     def test_copy_preserves_exclude_unset(
         self, column: PydanticColumn[ModelDefinitionDraft], dialect: Dialect
