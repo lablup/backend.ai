@@ -238,12 +238,11 @@ class AuditLogConditions:
     by_triggered_by_in = staticmethod(make_string_in_factory(AuditLogRow.triggered_by))
 
     # --- acted_as UUID filters ---
-    # acted_as is stored as a stringified UUID, so compare against str(value).
 
     @staticmethod
     def by_acted_as_equals(spec: UUIDEqualMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            condition = AuditLogRow.acted_as == str(spec.value)
+            condition = AuditLogRow.acted_as == spec.value
             if spec.negated:
                 condition = sa.not_(condition)
             return condition
@@ -253,7 +252,7 @@ class AuditLogConditions:
     @staticmethod
     def by_acted_as_in(spec: UUIDInMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            condition = AuditLogRow.acted_as.in_([str(v) for v in spec.values])
+            condition = AuditLogRow.acted_as.in_(spec.values)
             if spec.negated:
                 condition = sa.not_(condition)
             return condition

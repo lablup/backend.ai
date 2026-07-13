@@ -248,7 +248,7 @@ class AuditLogAdapter(BaseAdapter):
             created_at=data.created_at,
             request_id=data.request_id,
             triggered_by=data.triggered_by,
-            acted_as=uuid.UUID(data.acted_as) if data.acted_as else None,
+            acted_as=data.acted_as,
             description=data.description,
             duration=str(data.duration) if data.duration is not None else None,
             status=AuditLogStatus(data.status.value),

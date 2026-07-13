@@ -851,17 +851,14 @@ class ExportAdapter(BaseFilterAdapter):
         uuid_filter: UUIDFilter,
         field_def: ExportFieldDef,
     ) -> QueryCondition | None:
-        """Convert UUIDFilter to QueryCondition for the given field.
-
-        The target column stores stringified UUIDs, so values are compared as ``str``.
-        """
+        """Convert UUIDFilter to QueryCondition for the given field."""
         column = field_def.column
 
         def make_equals_factory(
             col: InstrumentedAttribute[Any],
         ) -> Callable[[UUIDEqualMatchSpec], QueryCondition]:
             def factory(spec: UUIDEqualMatchSpec) -> QueryCondition:
-                value = str(spec.value)
+                value = spec.value
                 if spec.negated:
                     return lambda: col != value
                 return lambda: col == value
@@ -872,7 +869,7 @@ class ExportAdapter(BaseFilterAdapter):
             col: InstrumentedAttribute[Any],
         ) -> Callable[[UUIDInMatchSpec], QueryCondition]:
             def factory(spec: UUIDInMatchSpec) -> QueryCondition:
-                values = [str(v) for v in spec.values]
+                values = spec.values
                 if spec.negated:
                     return lambda: ~col.in_(values)
                 return lambda: col.in_(values)
