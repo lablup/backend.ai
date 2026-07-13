@@ -49,6 +49,9 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     ReplaceDeploymentOptionsGQLInput as ReplaceDeploymentOptionsGQLInputDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
+    ReplicaNestedFilter as ReplicaNestedFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
     SyncReplicaInput as SyncReplicaInputDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
@@ -91,6 +94,7 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
 from ai.backend.common.dto.manager.v2.deployment.types import (
     ProjectDeploymentScope as ProjectDeploymentScopeDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
     NullableDateTimeFilter,
@@ -616,6 +620,31 @@ class ProjectDeploymentScopeGQL(PydanticInputMixin[ProjectDeploymentScopeDTO]):
 
 
 @gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter deployments by conditions on their replicas.",
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="ReplicaNestedFilter",
+)
+class ReplicaNestedFilterGQL(PydanticInputMixin[ReplicaNestedFilterDTO]):
+    some: ReplicaFilter | None = gql_field(
+        description="Matches parents with at least one replica satisfying all conditions.",
+        default=None,
+    )
+    every: ReplicaFilter | None = gql_field(
+        description=(
+            "Matches parents where every replica satisfies all conditions "
+            "(also true when the parent has no replica)."
+        ),
+        default=None,
+    )
+    none: ReplicaFilter | None = gql_field(
+        description="Matches parents with no replica satisfying all conditions.",
+        default=None,
+    )
+
+
+@gql_pydantic_input(
     BackendAIGQLMeta(description="", added_version="25.19.0"),
     name="DeploymentFilter",
 )
@@ -655,6 +684,13 @@ class DeploymentFilter(PydanticInputMixin[DeploymentFilterDTO]):
         BackendAIGQLMeta(
             added_version="26.4.3",
             description="Filter by deployment destruction datetime. Supports IS NULL / IS NOT NULL.",
+        ),
+        default=None,
+    )
+    replicas: ReplicaNestedFilterGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by conditions on deployment replicas.",
         ),
         default=None,
     )

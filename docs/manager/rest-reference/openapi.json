@@ -4082,6 +4082,375 @@
         "title": "NullableDateTimeFilter",
         "type": "object"
       },
+      "ReplicaFilter": {
+        "description": "Filter for deployment replicas.",
+        "properties": {
+          "deployment_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by deployment ID",
+            "title": "Deployment Id"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReplicaStatusFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Replica status filter"
+          },
+          "health_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReplicaHealthStatusFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Replica health status filter"
+          },
+          "traffic_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReplicaTrafficStatusFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Replica traffic status filter"
+          },
+          "AND": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ReplicaFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "AND conjunction",
+            "title": "And"
+          },
+          "OR": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ReplicaFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "OR conjunction",
+            "title": "Or"
+          },
+          "NOT": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ReplicaFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "NOT negation",
+            "title": "Not"
+          }
+        },
+        "title": "ReplicaFilter",
+        "type": "object"
+      },
+      "ReplicaHealthStatusFilter": {
+        "description": "Filter for replica health status.",
+        "properties": {
+          "equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RouteHealthStatus"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exact health status match"
+          },
+          "in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/RouteHealthStatus"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Health status is in list",
+            "title": "In"
+          },
+          "not_equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RouteHealthStatus"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Excludes exact health status match"
+          },
+          "not_in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/RouteHealthStatus"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Health status is not in list",
+            "title": "Not In"
+          }
+        },
+        "title": "ReplicaHealthStatusFilter",
+        "type": "object"
+      },
+      "ReplicaNestedFilter": {
+        "description": "Filter deployments by conditions on their replicas.",
+        "properties": {
+          "some": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReplicaFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Matches parents with at least one replica satisfying all conditions."
+          },
+          "every": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReplicaFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Matches parents where every replica satisfies all conditions (also true when the parent has no replica)."
+          },
+          "none": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReplicaFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Matches parents with no replica satisfying all conditions."
+          }
+        },
+        "title": "ReplicaNestedFilter",
+        "type": "object"
+      },
+      "ReplicaStatusFilter": {
+        "description": "Filter for replica (route) status.",
+        "properties": {
+          "equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RouteStatus"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exact status match"
+          },
+          "in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/RouteStatus"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Status is in list",
+            "title": "In"
+          },
+          "not_equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RouteStatus"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Excludes exact status match"
+          },
+          "not_in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/RouteStatus"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Status is not in list",
+            "title": "Not In"
+          }
+        },
+        "title": "ReplicaStatusFilter",
+        "type": "object"
+      },
+      "ReplicaTrafficStatusFilter": {
+        "description": "Filter for replica traffic status.",
+        "properties": {
+          "equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RouteTrafficStatus"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exact traffic status match"
+          },
+          "in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/RouteTrafficStatus"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Traffic status is in list",
+            "title": "In"
+          },
+          "not_equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RouteTrafficStatus"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Excludes exact traffic status match"
+          },
+          "not_in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/RouteTrafficStatus"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Traffic status is not in list",
+            "title": "Not In"
+          }
+        },
+        "title": "ReplicaTrafficStatusFilter",
+        "type": "object"
+      },
+      "RouteHealthStatus": {
+        "description": "Health check status of a route.",
+        "enum": [
+          "not_checked",
+          "healthy",
+          "unhealthy",
+          "degraded"
+        ],
+        "title": "RouteHealthStatus",
+        "type": "string"
+      },
+      "RouteStatus": {
+        "description": "Lifecycle status of a route in the deployment.",
+        "enum": [
+          "provisioning",
+          "running",
+          "terminating",
+          "terminated",
+          "failed_to_start"
+        ],
+        "title": "RouteStatus",
+        "type": "string"
+      },
+      "RouteTrafficStatus": {
+        "description": "Traffic routing status for a route.\n\nControls whether traffic should be sent to this route.\nActual traffic delivery depends on health being HEALTHY.\n\n- ACTIVE: Traffic enabled (will receive traffic when health is HEALTHY)\n- INACTIVE: Traffic disabled (will not receive traffic regardless of health)",
+        "enum": [
+          "active",
+          "inactive"
+        ],
+        "title": "RouteTrafficStatus",
+        "type": "string"
+      },
       "AdminSearchDeploymentsInput": {
         "description": "Input for searching deployments (admin, no scope).",
         "properties": {
@@ -5070,99 +5439,6 @@
         "title": "SearchAllocatedResourceSlotsInput",
         "type": "object"
       },
-      "ReplicaFilter": {
-        "description": "Filter for deployment replicas.",
-        "properties": {
-          "deployment_id": {
-            "anyOf": [
-              {
-                "format": "uuid",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Filter by deployment ID",
-            "title": "Deployment Id"
-          },
-          "status": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/ReplicaStatusFilter"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Replica status filter"
-          },
-          "traffic_status": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/ReplicaTrafficStatusFilter"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Replica traffic status filter"
-          },
-          "AND": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/ReplicaFilter"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "AND conjunction",
-            "title": "And"
-          },
-          "OR": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/ReplicaFilter"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "OR conjunction",
-            "title": "Or"
-          },
-          "NOT": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/ReplicaFilter"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "NOT negation",
-            "title": "Not"
-          }
-        },
-        "title": "ReplicaFilter",
-        "type": "object"
-      },
       "ReplicaOrder": {
         "description": "Ordering specification for deployment replicas.",
         "properties": {
@@ -5187,153 +5463,6 @@
           "id"
         ],
         "title": "ReplicaOrderField",
-        "type": "string"
-      },
-      "ReplicaStatusFilter": {
-        "description": "Filter for replica (route) status.",
-        "properties": {
-          "equals": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/RouteStatus"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Exact status match"
-          },
-          "in": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/RouteStatus"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Status is in list",
-            "title": "In"
-          },
-          "not_equals": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/RouteStatus"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Excludes exact status match"
-          },
-          "not_in": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/RouteStatus"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Status is not in list",
-            "title": "Not In"
-          }
-        },
-        "title": "ReplicaStatusFilter",
-        "type": "object"
-      },
-      "ReplicaTrafficStatusFilter": {
-        "description": "Filter for replica traffic status.",
-        "properties": {
-          "equals": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/RouteTrafficStatus"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Exact traffic status match"
-          },
-          "in": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/RouteTrafficStatus"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Traffic status is in list",
-            "title": "In"
-          },
-          "not_equals": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/RouteTrafficStatus"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Excludes exact traffic status match"
-          },
-          "not_in": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/RouteTrafficStatus"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Traffic status is not in list",
-            "title": "Not In"
-          }
-        },
-        "title": "ReplicaTrafficStatusFilter",
-        "type": "object"
-      },
-      "RouteStatus": {
-        "description": "Lifecycle status of a route in the deployment.",
-        "enum": [
-          "provisioning",
-          "running",
-          "terminating",
-          "terminated",
-          "failed_to_start"
-        ],
-        "title": "RouteStatus",
-        "type": "string"
-      },
-      "RouteTrafficStatus": {
-        "description": "Traffic routing status for a route.\n\nControls whether traffic should be sent to this route.\nActual traffic delivery depends on health being HEALTHY.\n\n- ACTIVE: Traffic enabled (will receive traffic when health is HEALTHY)\n- INACTIVE: Traffic disabled (will not receive traffic regardless of health)",
-        "enum": [
-          "active",
-          "inactive"
-        ],
-        "title": "RouteTrafficStatus",
         "type": "string"
       },
       "SearchReplicasInput": {
@@ -5521,17 +5650,6 @@
         },
         "title": "RouteFilter",
         "type": "object"
-      },
-      "RouteHealthStatus": {
-        "description": "Health check status of a route.",
-        "enum": [
-          "not_checked",
-          "healthy",
-          "unhealthy",
-          "degraded"
-        ],
-        "title": "RouteHealthStatus",
-        "type": "string"
       },
       "RouteOrder": {
         "description": "Order specification for routes.",
