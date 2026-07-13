@@ -64,24 +64,21 @@ a  -->  d  -->  b  -->  c  -->  d'
 
 ### Release Version Comment
 
-Every migration file must include a comment indicating which release version
-(including the minor version, e.g., `26.3.0`) it belongs to. Place the comment
-next to the revision identifiers:
+Every migration file includes a comment marking which release it belongs to,
+placed next to the revision identifiers. Use the `NEXT_RELEASE_VERSION`
+placeholder instead of a hardcoded version:
 
 ```python
 # revision identifiers, used by Alembic.
 revision = "1cc9b47e0a8e"
 down_revision = "ffcf0ed13a26"
-# Part of: 26.3.0
+# Part of: NEXT_RELEASE_VERSION
 branch_labels = None
 depends_on = None
 ```
 
-For backport migrations, note both the target release branch and the main branch:
-
-```python
-# Part of: 26.2.1 (backport), 26.3.0 (main)
-```
+For backport migrations the placeholder freezes **per branch**: the backport migration `d` on the release branch freezes to the backport target version when that release is cut,
+and its main-branch duplicate `d'` freezes to the main release version.
 
 ### Idempotent Writing Rules
 
