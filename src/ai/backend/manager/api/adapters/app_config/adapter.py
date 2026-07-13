@@ -99,15 +99,14 @@ class AppConfigAdapter(BaseAdapter):
 
     # --- admin fragment CRUD ---
 
-    async def admin_create(
-        self, input: CreateAppConfigFragmentInput
-    ) -> CreateAppConfigFragmentPayload:
+    async def create(self, input: CreateAppConfigFragmentInput) -> CreateAppConfigFragmentPayload:
         spec = AppConfigFragmentCreatorSpec(
             config_name=input.config_name,
             scope_type=AppConfigScopeType(input.scope_type.value),
             scope_id=input.scope_id,
             config=input.config,
         )
+        # Write authorization is enforced by the RBAC validators on the processor.
         action_result = await self._processors.app_config_fragment.create.wait_for_complete(
             CreateAppConfigFragmentAction(creator_spec=spec)
         )
@@ -121,15 +120,15 @@ class AppConfigAdapter(BaseAdapter):
         )
         return self._fragment_to_node(action_result.fragment)
 
-    async def admin_update(
+    async def update(
         self, fragment_id: AppConfigFragmentID, input: UpdateAppConfigFragmentInput
     ) -> UpdateAppConfigFragmentPayload:
         updater = Updater(
             spec=AppConfigFragmentUpdaterSpec(config=OptionalState.update(input.config)),
             pk_value=fragment_id,
         )
-        # No allow-list gate: a fragment row exists only while its entry does (FK with
-        # cascade), so an existing fragment is always writable at its own scope.
+        # Write authorization is enforced by the RBAC validators on the processor (the
+        # fragment's scope is resolved via its RBAC scope association).
         action_result = await self._processors.app_config_fragment.update.wait_for_complete(
             UpdateAppConfigFragmentAction(updater=updater)
         )
@@ -137,12 +136,10 @@ class AppConfigAdapter(BaseAdapter):
             app_config_fragment=self._fragment_to_node(action_result.fragment),
         )
 
-    async def admin_purge(
-        self, input: PurgeAppConfigFragmentInput
-    ) -> PurgeAppConfigFragmentPayload:
+    async def purge(self, input: PurgeAppConfigFragmentInput) -> PurgeAppConfigFragmentPayload:
         fragment_id = AppConfigFragmentID(input.id)
         purger = Purger(row_class=AppConfigFragmentRow, pk_value=fragment_id)
-        # No allow-list gate — see ``admin_update``.
+        # Write authorization is enforced by the RBAC validators — see ``update``.
         action_result = await self._processors.app_config_fragment.purge.wait_for_complete(
             PurgeAppConfigFragmentAction(purger=purger)
         )
