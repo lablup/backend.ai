@@ -37,7 +37,7 @@ class AuditLogMonitor(ActionMonitor):
             entity_id=result.meta.entity_id or BLANK_ID,
             request_id=current_request_id() or BLANK_ID,
             triggered_by=str(trigger.user_id) if trigger else None,
-            acted_as=str(acting.user_id) if acting else None,
+            acted_as=acting.user_id if acting else None,
             duration=result.meta.duration,
         )
         creator = Creator(

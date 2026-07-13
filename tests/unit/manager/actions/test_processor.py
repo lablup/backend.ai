@@ -263,7 +263,7 @@ class TestAuditLogMonitorActorIdentities:
 
         spec = self._recorded_spec(mock_audit_log_repository)
         assert spec.triggered_by == str(user.user_id)
-        assert spec.acted_as == str(user.user_id)
+        assert spec.acted_as == user.user_id
 
     async def test_impersonation_records_both_identities(
         self,
@@ -279,7 +279,7 @@ class TestAuditLogMonitorActorIdentities:
 
         spec = self._recorded_spec(mock_audit_log_repository)
         assert spec.triggered_by == str(super_admin.user_id)
-        assert spec.acted_as == str(target.user_id)
+        assert spec.acted_as == target.user_id
 
     async def test_system_trigger_records_both_none(
         self,

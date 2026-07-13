@@ -87,7 +87,7 @@ AUDIT_LOG_FIELDS: list[ExportFieldDef] = [
         key="acted_as",
         name="Acted As",
         description="Effective user the action ran as (differs during impersonation)",
-        field_type=ExportFieldType.STRING,
+        field_type=ExportFieldType.UUID,
         column=AuditLogRow.acted_as,
     ),
     ExportFieldDef(
