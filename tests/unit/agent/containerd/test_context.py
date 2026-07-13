@@ -125,6 +125,10 @@ def _context(
         image_ref="img:1", oci_spec={}, command=["/opt/kernel/entrypoint.sh"]
     )
     ctx.kernel_config = cast(Any, {})
+    ctx.restarting = False
+    ctx.kernel_features = frozenset({"uid-match"})
+    ctx.uid = None
+    ctx.main_gid = None
     ctx._port_forwarder = cast(Any, port_forwarder)
     # what _reserve_host_ports would have produced: one service port, no REPL port
     ctx._host_port_map = [(30003, 8070)]
@@ -648,3 +652,165 @@ class TestCoredumpMount:
         ctx = self._ctx(tmp_path, enabled=False)
         mounts = await ctx.get_intrinsic_mounts()
         assert not any(str(m.target) == "/var/crash" for m in mounts)
+
+
+class TestTheKernelUserOwnsItsHome:
+    """/home/work is the user's home, bind-mounted from the host scratch. The container's PID 1
+    starts as root and drops to LOCAL_USER_ID before the user ever sees it (runner/entrypoint.sh),
+    so anything a root agent writes there is root-owned — and the user cannot write to their own
+    home: Jupyter cannot save, the shell cannot write history, the dotfiles are theirs in name only.
+
+    The container cannot fix this for itself: a recursive chown inside would also take ownership of
+    every vfolder mounted under /home/work. So the agent hands the files over on the host, exactly
+    as the Docker backend does.
+    """
+
+    def _ctx(
+        self,
+        tmp_path: Path,
+        monkeypatch: Any,
+        *,
+        root: bool = True,
+        uid_match: bool = True,
+        override: tuple[int | None, int | None] = (None, None),
+    ) -> tuple[Any, list[tuple[Path, int, int]]]:
+        chowned: list[tuple[Path, int, int]] = []
+
+        monkeypatch.setattr(
+            "ai.backend.agent.containerd.agent.os.geteuid", lambda: 0 if root else 1000
+        )
+        monkeypatch.setattr(
+            "ai.backend.agent.containerd.agent.os.chown",
+            lambda p, uid, gid: chowned.append((Path(p), uid, gid)),
+        )
+        ctx = _context(FakeFacade())
+        ctx.kernel_features = frozenset({"uid-match"} if uid_match else set())
+        ctx.uid, ctx.main_gid = override
+        ctx.local_config = cast(
+            Any,
+            SimpleNamespace(
+                container=SimpleNamespace(
+                    scratch_root=tmp_path,
+                    scratch_type=ScratchType.HOSTDIR,
+                    kernel_uid=1000,
+                    kernel_gid=1001,
+                )
+            ),
+        )
+        return ctx, chowned
+
+    async def test_the_home_and_the_seeded_dotfiles_are_handed_over(
+        self, tmp_path: Path, monkeypatch: Any
+    ) -> None:
+        ctx, chowned = self._ctx(tmp_path, monkeypatch)
+        await ctx.prepare_scratch()
+
+        work_dir = tmp_path / "kern-123" / "work"
+        owned = {path for path, _uid, _gid in chowned}
+        assert work_dir in owned  # the home itself: without it the user cannot create a file
+        assert work_dir / ".bashrc" in owned
+        assert work_dir / ".jupyter" in owned
+        assert all(uid == 1000 and gid == 1001 for _p, uid, gid in chowned)
+
+    async def test_every_file_we_seed_is_a_file_we_hand_over(
+        self, tmp_path: Path, monkeypatch: Any
+    ) -> None:
+        # A seeded file missing from the chown list is a file the user cannot write. The two lists
+        # are one list for exactly this reason.
+        ctx, chowned = self._ctx(tmp_path, monkeypatch)
+        await ctx.prepare_scratch()
+
+        work_dir = tmp_path / "kern-123" / "work"
+        seeded = {p for p in work_dir.rglob("*") if p.is_file()}
+        owned = {path for path, _uid, _gid in chowned}
+        assert seeded <= owned
+
+    async def test_a_non_root_agent_chowns_nothing(self, tmp_path: Path, monkeypatch: Any) -> None:
+        # It could not anyway; and it does not need to — the scratch is already its own, and the
+        # kernel runs as the same uid.
+        ctx, chowned = self._ctx(tmp_path, monkeypatch, root=False)
+        await ctx.prepare_scratch()
+        assert chowned == []
+
+    async def test_without_uid_match_the_files_stay_as_they_are(
+        self, tmp_path: Path, monkeypatch: Any
+    ) -> None:
+        ctx, chowned = self._ctx(tmp_path, monkeypatch, uid_match=False)
+        await ctx.prepare_scratch()
+        assert chowned == []
+
+    async def test_an_overriding_uid_wins_over_uid_match(
+        self, tmp_path: Path, monkeypatch: Any
+    ) -> None:
+        ctx, chowned = self._ctx(tmp_path, monkeypatch, override=(5000, 5001))
+        await ctx.prepare_scratch()
+        assert chowned
+        assert all(uid == 5000 and gid == 5001 for _p, uid, gid in chowned)
+
+    async def test_a_restart_does_not_overwrite_the_users_own_dotfiles(
+        self, tmp_path: Path, monkeypatch: Any
+    ) -> None:
+        # A restart reuses the scratch. Re-seeding would replace the .bashrc the user edited with
+        # ours — which is why the Docker backend seeds only on first creation.
+        ctx, _chowned = self._ctx(tmp_path, monkeypatch)
+        await ctx.prepare_scratch()
+        bashrc = tmp_path / "kern-123" / "work" / ".bashrc"
+        bashrc.write_text("# the user's own")
+
+        restarted, _c = self._ctx(tmp_path, monkeypatch)
+        restarted.restarting = True
+        await restarted.prepare_scratch()
+
+        assert bashrc.read_text() == "# the user's own"
+
+
+class TestTheClusterKeyIsReadableByTheKernelUser:
+    """id_cluster is written 0600 by a root agent, so the kernel's user cannot read it — and
+    reading it is its entire purpose: passwordless chief<->worker SSH for MPI/torchrun/bssh."""
+
+    async def _prepare(
+        self, tmp_path: Path, monkeypatch: Any, *, root: bool = True
+    ) -> list[tuple[Path, int, int]]:
+        chowned: list[tuple[Path, int, int]] = []
+        monkeypatch.setattr(
+            "ai.backend.agent.containerd.agent.os.geteuid", lambda: 0 if root else 1000
+        )
+        monkeypatch.setattr(
+            "ai.backend.agent.containerd.agent.os.chown",
+            lambda p, uid, gid: chowned.append((Path(p), uid, gid)),
+        )
+        ctx = _context(FakeFacade())
+        ctx._scratch_dir = tmp_path
+        ctx.local_config = cast(
+            Any,
+            SimpleNamespace(container=SimpleNamespace(kernel_uid=1000, kernel_gid=1001)),
+        )
+        await ctx.prepare_ssh(
+            cast(
+                Any,
+                {
+                    "ssh_keypair": {"private_key": "PRIV", "public_key": "PUB"},
+                    "cluster_ssh_port_mapping": None,
+                },
+            )
+        )
+        return chowned
+
+    async def test_the_keypair_is_handed_to_the_kernel_user(
+        self, tmp_path: Path, monkeypatch: Any
+    ) -> None:
+        chowned = await self._prepare(tmp_path, monkeypatch)
+        owned = {path for path, _u, _g in chowned}
+        ssh_dir = tmp_path / "config" / "ssh"
+        assert ssh_dir / "id_cluster" in owned
+        assert ssh_dir / "id_cluster.pub" in owned
+        assert all(uid == 1000 and gid == 1001 for _p, uid, gid in chowned)
+
+    async def test_the_private_key_stays_0600(self, tmp_path: Path, monkeypatch: Any) -> None:
+        # Handing it over must not widen it: ssh refuses a group/world-readable private key.
+        await self._prepare(tmp_path, monkeypatch)
+        priv = tmp_path / "config" / "ssh" / "id_cluster"
+        assert priv.stat().st_mode & 0o077 == 0
+
+    async def test_a_non_root_agent_chowns_nothing(self, tmp_path: Path, monkeypatch: Any) -> None:
+        assert await self._prepare(tmp_path, monkeypatch, root=False) == []

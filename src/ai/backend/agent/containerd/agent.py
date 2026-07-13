@@ -186,6 +186,19 @@ async def _read_container_log(container_id: str) -> AsyncGenerator[bytes, None]:
 
 # tmpfs quota for the MEMORY scratch, in MiB. The Docker backend passes the same literal.
 _MEMORY_SCRATCH_SIZE_MIB = 64
+
+# The files we seed into the user's home. One list, so what we hand to the user and what we hand
+# OWNERSHIP of cannot drift apart — a seeded file the chown list forgets is a file the user cannot
+# write. (Same set as the Docker backend's.)
+_SEEDED_DOTFILES = (
+    ".bashrc",
+    ".bash_profile",
+    ".zshrc",
+    ".vimrc",
+    ".tmux.conf",
+    "DO_NOT_STORE_PERSISTENT_FILES_HERE.md",
+)
+_JUPYTER_CUSTOM_FILES = ("custom.css", "logo.svg", "roboto.ttf", "roboto-italic.ttf")
 # containerd task status -> Backend.AI ContainerStatus.
 #
 # CREATED must NOT collapse into EXITED: EXITED is in DEAD_STATUS_SET, and
@@ -436,7 +449,6 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
     @override
     async def prepare_scratch(self) -> None:
         # Create the per-kernel scratch dirs (config/ + work/) and seed the default dotfiles.
-        # (Containers run as root so no chown is needed.)
         scratch_type = self.local_config.container.scratch_type
         scratch_root = self.local_config.container.scratch_root
         scratch_dir = (scratch_root / str(self._container_id)).resolve()
@@ -462,8 +474,27 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
 
         def _prepare() -> None:
             config_dir.mkdir(parents=True, exist_ok=True)
+            config_dir.chmod(0o755)
             work_dir.mkdir(parents=True, exist_ok=True)
+            work_dir.chmod(0o755)
+            if self.restarting:
+                # A restart reuses the scratch. Re-seeding would overwrite the user's own .bashrc
+                # with ours, which is why the Docker backend seeds only on first creation.
+                return
             self._clone_dotfiles(work_dir)
+            # /home/work is the user's home, and the container's PID 1 drops to LOCAL_USER_ID
+            # before it ever reaches them (runner/entrypoint.sh). A root agent writes them as
+            # root, so without this the user cannot write to their own home directory: Jupyter
+            # cannot save, the shell cannot write history, and the dotfiles we just seeded are
+            # theirs in name only. The container cannot fix it for itself either — a recursive
+            # chown inside would also take ownership of every vfolder mounted under /home/work.
+            self._chown_paths_if_root([
+                work_dir,
+                work_dir / ".jupyter",
+                work_dir / ".jupyter" / "custom",
+                *(work_dir / ".jupyter" / "custom" / name for name in _JUPYTER_CUSTOM_FILES),
+                *(work_dir / name for name in _SEEDED_DOTFILES),
+            ])
 
         await asyncio.to_thread(_prepare)
         self._scratch_dir = scratch_dir
@@ -483,15 +514,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
             ("logo.svg", jupyter_custom_dir / "logo.svg"),
             ("roboto.ttf", jupyter_custom_dir / "roboto.ttf"),
             ("roboto-italic.ttf", jupyter_custom_dir / "roboto-italic.ttf"),
-            (".bashrc", work_dir / ".bashrc"),
-            (".bash_profile", work_dir / ".bash_profile"),
-            (".zshrc", work_dir / ".zshrc"),
-            (".vimrc", work_dir / ".vimrc"),
-            (".tmux.conf", work_dir / ".tmux.conf"),
-            (
-                "DO_NOT_STORE_PERSISTENT_FILES_HERE.md",
-                work_dir / "DO_NOT_STORE_PERSISTENT_FILES_HERE.md",
-            ),
+            *((name, work_dir / name) for name in _SEEDED_DOTFILES),
         ]
         for src_name, dst in copies:
             src = _runner_file(src_name)
@@ -707,11 +730,14 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         def _write() -> None:
             ssh_dir = scratch_dir / "config" / "ssh"
             ssh_dir.mkdir(parents=True, exist_ok=True)
+            paths_to_chown: list[Path] = []
             if sshkey is not None:
                 priv = ssh_dir / "id_cluster"
                 priv.write_text(sshkey["private_key"])
                 priv.chmod(0o600)
-                (ssh_dir / "id_cluster.pub").write_text(sshkey["public_key"])
+                pub = ssh_dir / "id_cluster.pub"
+                pub.write_text(sshkey["public_key"])
+                paths_to_chown.extend([priv, pub])
             if port_mapping is not None:
                 (ssh_dir / "port-mapping.json").write_text(dump_json_str(port_mapping))
             host_key = ssh_dir / "dropbear_rsa_host_key"
@@ -729,6 +755,13 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
                         log.debug(
                             "dropbear host key generation failed; will regenerate in container"
                         )
+            if host_key.is_file():
+                paths_to_chown.append(host_key)
+            # A root agent writes these as root, and 0600 means root-only. The user the kernel runs
+            # as could then not read its own cluster key — which is the whole point of the file:
+            # passwordless chief<->worker SSH for MPI/torchrun. The Docker backend chowns the same
+            # three (docker/agent.py, prepare_ssh).
+            self._chown_paths_if_root(paths_to_chown)
 
         await asyncio.to_thread(_write)
 
@@ -842,7 +875,12 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
             uid = self.local_config.container.kernel_uid
             gid = self.local_config.container.kernel_gid
         for p in paths:
-            stat_result = p.stat()
+            try:
+                stat_result = p.stat()
+            except FileNotFoundError:
+                # A seeded file the runner package does not ship, or a key generation that failed:
+                # the caller lists what it means to hand over, not what it managed to write.
+                continue
             int_uid = int(uid) if uid is not None else stat_result.st_uid
             int_gid = int(gid) if gid is not None else stat_result.st_gid
             try:
