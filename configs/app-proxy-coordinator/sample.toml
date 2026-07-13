@@ -46,6 +46,20 @@
   # entirely.
   # Added in 25.9.0
   max_overflow = 128
+  # Maximum lifetime of a connection in seconds before it's recycled. Set to -1
+  # to disable connection recycling. Useful for handling database connections
+  # closed by the server after inactivity or by network equipment with idle
+  # timeouts.
+  # Added in 26.8.0
+  pool_recycle = 3600.0
+  # Whether to test connections with a lightweight ping before using them.
+  # Detects stale or disconnected connections at pool checkout and transparently
+  # reconnects them with clean transaction state, preventing 'SAVEPOINT can only
+  # be used in transaction blocks' errors after a Postgres connection drop or
+  # failover. Adds a small overhead per checkout but is recommended for
+  # production.
+  # Added in 26.8.0
+  pool_pre_ping = true
 
 # Redis configuration for the proxy coordinator's internal operations including
 # caching, pub/sub messaging, and distributed locking (when using Redlock).
@@ -284,19 +298,57 @@
       # Added in 22.03.0
       ## password = "ETCD_PASSWORD"
 
+    # Strategy for resolving the real client IP behind a load balancer / reverse
+    # proxy when enforcing per-circuit client-IP allowlists via Traefik's
+    # ipAllowList middleware. Leave unset when Traefik is directly exposed to
+    # clients.
+    # Added in 26.4.5
+    [proxy_coordinator.traefik.client_ip_strategy]
+      # Number of trusted proxy hops in front of Traefik. Traefik selects the IP
+      # at this depth (counted from the rightmost, i.e. nearest-proxy, entry) of
+      # 'X-Forwarded-For' as the client IP. Mutually exclusive with
+      # 'excluded_ips'. Use this when a fixed number of proxies always front
+      # Traefik.
+      # Added in 26.4.5
+      ## depth = 1
+      # CIDR blocks (or bare IPs) of trusted proxies in front of Traefik.
+      # Traefik scans 'X-Forwarded-For' right-to-left, skipping these networks,
+      # and uses the first remaining address as the client IP. Mutually
+      # exclusive with 'depth'. Prefer this for environments where the proxy
+      # chain length varies.
+      # Added in 26.4.5
+      excluded_ips = ["10.0.0.0/8"]
+
 # Performance profiling configuration for debugging and optimization. Includes
 # settings for cProfile and Pyroscope continuous profiling.
 # Added in 25.9.0
 [profiling]
-  # Starts a memray live server.
-  # Added in 25.13.0
-  enable_memray = false
-  # Path to store memray allocation captures.
-  # Added in 25.13.0
-  memray_output_destination = "/var/log/backend.ai/memray/proxy-worker.bin"
   # Allows sending pyroscope telemetry to pyroscope server.
   # Added in 25.13.0
   enable_pyroscope = false
+
+  # Memray allocation-tracking configuration. Enable it only while diagnosing
+  # memory growth: the capture file keeps growing for as long as the process
+  # runs.
+  # Added in 26.8.0
+  [profiling.memray]
+    # Whether to track memory allocations with memray. The capture file grows
+    # continuously while the process runs, so keep this disabled unless you are
+    # actively debugging memory usage.
+    # Added in 26.8.0
+    enabled = false
+    # Path to store the memray allocation capture. Memray refuses to start when
+    # the file already exists, so the process appends its PID to the path.
+    # Ensure the parent directory exists and has enough space.
+    # Added in 26.8.0
+    output-destination = "/var/log/backend.ai/memray/output.bin"
+    # Whether to also capture native (C/C++) call stacks, so that allocations
+    # made inside extension modules are attributed to their native frames
+    # instead of the calling Python frame. This adds runtime overhead and
+    # enlarges the capture, and the native frames only resolve when debug
+    # symbols are available.
+    # Added in 26.8.0
+    native-traces = false
 
   # Pyroscope configuration.
   # Added in 25.13.0
@@ -493,6 +545,15 @@
   # OTLP receiver.
   # Added in 25.7.0
   endpoint = "http://otel-collector:4317"
+  # Maximum number of spans queued for export. Spans are dropped when the queue
+  # is full. The default (65536) accommodates burst traffic from GraphQL
+  # workloads.
+  # Added in 26.2.0
+  max-queue-size = 65536
+  # Maximum number of spans exported in a single batch. Larger batches reduce
+  # export overhead but increase memory usage.
+  # Added in 26.2.0
+  max-export-batch-size = 4096
 
 # Service discovery configuration for locating other Backend.AI components in
 # the cluster. Supports Redis-based or etcd-based service registration and
@@ -502,6 +563,46 @@
   # Type of service discovery to use. Supported types are 'etcd' and 'redis'.
   # Added in 25.9.0
   type = "redis"
+  # Unique instance identifier for this service instance.
+  # Added in 26.3.0
+  ## instance-id = "..."
+  # Logical group name for this service (e.g., 'manager', 'agent', 'storage-
+  # proxy').
+  # Added in 26.3.0
+  ## service-group = "..."
+  # Human-readable display name for this service instance.
+  # Added in 26.3.0
+  ## display-name = "..."
+
+  # Additional labels for service categorization and filtering.
+  # Added in 26.3.0
+  # Replace <name> with your actual key (e.g., 'default', 'local')
+  [service_discovery.extra-labels.<name>]
+
+  # List of endpoints exposed by this service instance.
+  # Added in 26.3.0
+  [[service_discovery.endpoints]]
+  # Add multiple [[service_discovery.endpoints]] sections as needed
+    # Role of this endpoint (e.g., 'main', 'health', 'internal').
+    # Added in 26.3.0
+    role = "main"
+    # Network scope of this endpoint (e.g., 'public', 'private', 'internal').
+    # Added in 26.3.0
+    scope = "public"
+    # Hostname or IP address of the endpoint.
+    # Added in 26.3.0
+    address = "manager.example.com"
+    # Port number of the endpoint.
+    # Added in 26.3.0
+    port = 443
+    # Protocol used by the endpoint (e.g., 'grpc', 'http', 'https').
+    # Added in 26.3.0
+    protocol = "https"
+
+    # Additional metadata for the endpoint.
+    # Added in 26.3.0
+    # Replace <name> with your actual key (e.g., 'default', 'local')
+    [service_discovery.endpoints.metadata.<name>]
 
 # etcd connection configuration for distributed coordination and configuration
 # management. Used for service discovery (if etcd-based) and Traefik

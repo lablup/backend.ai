@@ -1184,10 +1184,11 @@ def main(ctx: click.Context, config_path: Path | None, debug: bool, log_level: L
                     "Pyroscope configuration is required when enable_pyroscope is True"
                 )
             pyroscope.configure(**server_config.profiling.pyroscope_config.model_dump())
-        if server_config.profiling.enable_memray:
+        if server_config.profiling.memray.enabled:
             tracker = memray.Tracker(
-                server_config.profiling.memray_output_destination,
+                server_config.profiling.memray.output_destination,
                 follow_fork=True,
+                native_traces=server_config.profiling.memray.native_traces,
             )
             tracker.__enter__()
         server_config.proxy_coordinator.pid_file.touch(exist_ok=True)
@@ -1212,7 +1213,7 @@ def main(ctx: click.Context, config_path: Path | None, debug: bool, log_level: L
                 log.info("runtime: {0}", env_info())
                 if server_config.profiling.enable_pyroscope:
                     log.info("Pyroscope tracing enabled")
-                if server_config.profiling.enable_memray:
+                if server_config.profiling.memray.enabled:
                     log.info("Memray tracing enabled")
                 log_config = logging.getLogger("ai.backend.appproxy.coordinator.config")
                 log_config.debug("debug mode enabled.")
