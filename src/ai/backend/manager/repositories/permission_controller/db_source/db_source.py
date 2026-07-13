@@ -13,6 +13,9 @@ from ai.backend.common.data.permission.types import (
     RBACElementType,
     RelationType,
 )
+from ai.backend.common.entity.types import EntityRef
+from ai.backend.common.identifier.entity import EntityID
+from ai.backend.common.identifier.user import UserID
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.actions.action.rbac_role_invitation import (
     CreateRoleInvitationResult,
@@ -52,11 +55,13 @@ from ai.backend.manager.data.permission.status import (
 from ai.backend.manager.data.permission.types import (
     EntityType,
     OperationType,
+    Permission,
     RBACElementRef,
     ScopeData,
     ScopeListResult,
     ScopeType,
 )
+from ai.backend.manager.data.permission.virtual_scope import VirtualScopePermissionCheckKey
 from ai.backend.manager.data.role_invitation.types import (
     RoleInvitationData,
     RoleInvitationState,
@@ -81,6 +86,8 @@ from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.role_invitation.row import RoleInvitationRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
 from ai.backend.manager.repositories.base.creator import (
     BulkCreator,
     BulkCreatorResultWithFailures,
@@ -143,6 +150,20 @@ class _PermissionGroupKey:
     user_id: uuid.UUID
     element_type: RBACElementType
     subject_entity_type: RBACElementType
+
+
+@dataclass(frozen=True)
+class _VirtualScopePermissionGroupKey:
+    """Group key for batching virtual-scope-chain resolution inputs.
+
+    Keys sharing the same ``(user_id, entity_type)`` are resolved by a single
+    SQL round-trip differing only in the per-target ``entity_id`` IN-list.
+    ``entity_type`` is the DB-facing :class:`EntityType` enum (converted from the
+    open ``EntityRef.entity_type``) so it binds against the permission columns.
+    """
+
+    user_id: uuid.UUID
+    entity_type: EntityType
 
 
 class PermissionDBSource:
@@ -1160,6 +1181,136 @@ class PermissionDBSource:
         that received no grant map to an empty frozenset.
         """
         return await self._resolve_permissions_via_direct_scope_walk(keys)
+
+    # ------------------------------------------------ virtual-scope-chain checks
+
+    async def check_permission_via_virtual_scope(
+        self,
+        user_id: UserID,
+        entity: EntityRef,
+        permission: Permission,
+    ) -> bool:
+        """Return whether the user holds *permission* on the entity via a virtual scope.
+
+        Resolves the effective permission through the virtual-scope chain and tests
+        it bitwise (``effective & permission != NONE``).
+        """
+        key = VirtualScopePermissionCheckKey(user_id=user_id, entity=entity)
+        resolved = await self.resolve_effective_permissions_via_virtual_scope([key])
+        return bool(resolved.get(key, Permission.NONE) & permission)
+
+    async def check_bulk_permission_via_virtual_scope(
+        self,
+        keys: Collection[VirtualScopePermissionCheckKey],
+        permission: Permission,
+    ) -> Mapping[VirtualScopePermissionCheckKey, bool]:
+        """Check *permission* on each target key through the virtual-scope chain in one go.
+
+        Returns a mapping from each input key to whether the permission is granted.
+        """
+        if not keys:
+            return {}
+        resolved = await self.resolve_effective_permissions_via_virtual_scope(keys)
+        return {key: bool(resolved.get(key, Permission.NONE) & permission) for key in keys}
+
+    async def resolve_effective_permissions_via_virtual_scope(
+        self,
+        keys: Collection[VirtualScopePermissionCheckKey],
+    ) -> Mapping[VirtualScopePermissionCheckKey, Permission]:
+        """Resolve each target's effective :class:`Permission` through the virtual-scope chain.
+
+        Walks ``entity -> entity_memberships -> scope_bindings -> scope`` and
+        OR-combines the granted bitmask at each resolved scope, clipping every
+        path by both hop caps (``granted & scope_cap & entity_cap``; ``None`` = no
+        ceiling). Keys sharing ``(user_id, entity_type)`` share one round-trip;
+        keys with no reachable grant map to :attr:`Permission.NONE`.
+        """
+        if not keys:
+            return {}
+
+        groups: defaultdict[
+            _VirtualScopePermissionGroupKey, list[VirtualScopePermissionCheckKey]
+        ] = defaultdict(list)
+        for key in keys:
+            groups[
+                _VirtualScopePermissionGroupKey(
+                    user_id=key.user_id,
+                    entity_type=EntityType(key.entity.entity_type),
+                )
+            ].append(key)
+
+        result: dict[VirtualScopePermissionCheckKey, Permission] = {}
+        async with self._db.begin_readonly_session_read_committed() as db_session:
+            for group_key, members in groups.items():
+                entity_ids = [k.entity.entity_id for k in members]
+                granted = await self._resolve_permissions_for_virtual_scope_group(
+                    db_session=db_session,
+                    group_key=group_key,
+                    entity_ids=entity_ids,
+                )
+                for key in members:
+                    result[key] = granted.get(key.entity.entity_id, Permission.NONE)
+        return result
+
+    async def _resolve_permissions_for_virtual_scope_group(
+        self,
+        *,
+        db_session: SASession,
+        group_key: _VirtualScopePermissionGroupKey,
+        entity_ids: Sequence[EntityID],
+    ) -> Mapping[EntityID, Permission]:
+        """Run the virtual-scope-chain query for a single ``(user_id, entity_type)``
+        group with N entity_ids.
+
+        Returns a mapping from entity_id to its effective (cap-clipped, OR-combined)
+        :class:`Permission`. Entities with no reachable grant are absent from the map.
+        """
+        em = EntityMembershipRow.__table__
+        sb = ScopeBindingRow.__table__
+        perm = PermissionRow.__table__
+        roles = RoleRow.__table__
+        user_roles = UserRoleRow.__table__
+
+        query = (
+            sa.select(
+                em.c.entity_id,
+                perm.c.permission,
+                sb.c.permission_cap.label("scope_cap"),
+                em.c.permission_cap.label("entity_cap"),
+            )
+            .select_from(
+                em.join(sb, sb.c.virtual_scope_id == em.c.virtual_scope_id)
+                .join(
+                    perm,
+                    sa.and_(
+                        perm.c.scope_type == sb.c.scope_type,
+                        # scope_bindings.scope_id is a native UUID; permissions.scope_id
+                        # stores its canonical string form. Cast to compare.
+                        perm.c.scope_id == sa.cast(sb.c.scope_id, sa.String),
+                        perm.c.entity_type == group_key.entity_type,
+                    ),
+                )
+                .join(roles, roles.c.id == perm.c.role_id)
+                .join(user_roles, user_roles.c.role_id == roles.c.id)
+            )
+            .where(
+                sa.and_(
+                    em.c.entity_type == group_key.entity_type,
+                    em.c.entity_id.in_(entity_ids),
+                    user_roles.c.user_id == group_key.user_id,
+                    roles.c.status == RoleStatus.ACTIVE,
+                )
+            )
+        )
+
+        full_cap = Permission.full()
+        granted: defaultdict[EntityID, Permission] = defaultdict(lambda: Permission.NONE)
+        result = await db_session.execute(query)
+        for row in result:
+            scope_cap = row.scope_cap if row.scope_cap is not None else full_cap
+            entity_cap = row.entity_cap if row.entity_cap is not None else full_cap
+            granted[row.entity_id] |= row.permission & scope_cap & entity_cap
+        return granted
 
     async def bulk_assign_role(
         self, bulk_creator: BulkCreator[UserRoleRow]
