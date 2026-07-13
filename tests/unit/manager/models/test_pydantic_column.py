@@ -20,6 +20,10 @@ class TestPydanticColumnExcludeUnset:
     def column(self) -> PydanticColumn[ModelDefinitionDraft]:
         return PydanticColumn(ModelDefinitionDraft, exclude_unset=True)
 
+    @pytest.fixture
+    def column_with_exclude_unset_false(self) -> PydanticColumn[ModelDefinitionDraft]:
+        return PydanticColumn(ModelDefinitionDraft, exclude_unset=False)
+
     def test_round_trip_keeps_unset_fields_unset(
         self, column: PydanticColumn[ModelDefinitionDraft], dialect: Dialect
     ) -> None:
@@ -54,12 +58,15 @@ class TestPydanticColumnExcludeUnset:
         assert service is not None
         assert "shell" in service.model_fields_set
 
-    def test_default_dump_materializes_unset_fields_as_null(self, dialect: Dialect) -> None:
+    def test_default_dump_materializes_unset_fields_as_null(
+        self,
+        column_with_exclude_unset_false: PydanticColumn[ModelDefinitionDraft],
+        dialect: Dialect,
+    ) -> None:
         # Contrast case: without exclude_unset, unset fields are stored as explicit nulls.
-        column = PydanticColumn(ModelDefinitionDraft)
         draft = ModelDefinitionDraft.model_validate({"models": [{"service": {"port": 8080}}]})
 
-        stored = column.process_bind_param(draft, dialect)
+        stored = column_with_exclude_unset_false.process_bind_param(draft, dialect)
 
         assert stored is not None
         assert stored["models"][0]["service"]["shell"] is None
