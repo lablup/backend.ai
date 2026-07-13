@@ -16,6 +16,37 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 26.4.8 (2026-07-13)
+
+### Breaking Changes
+* Schedule all workloads within a single tick in priority order instead of dropping lower-priority workloads ([#12668](https://github.com/lablup/backend.ai/issues/12668))
+
+### Improvements
+* Delegate pagination `total_count` computation to polymorphic strategy methods, removing a redundant count query for unpaginated queries. ([#12702](https://github.com/lablup/backend.ai/issues/12702))
+
+### Fixes
+* Re-trigger image pulling for sessions stuck in `PREPARING` by including `PREPARING` in `CheckPreconditionLifecycleHandler.target_statuses`, so a lost pull-completion event no longer leaves the session unable to progress. ([#12455](https://github.com/lablup/backend.ai/issues/12455))
+* Fix `session download` and `session ssh` failing with HTTP 400 by sending the file list as query parameters to match the manager endpoint contract. ([#12509](https://github.com/lablup/backend.ai/issues/12509))
+* Fix `alembic upgrade` aborting on large deployments by chunking bulk INSERTs in RBAC backfill migrations so they stay within PostgreSQL's 32767 bind-parameter limit. ([#12535](https://github.com/lablup/backend.ai/issues/12535))
+* Fix `alembic upgrade` failing when upgrading from older versions, caused by RBAC migration helpers leaking production ORM columns into their frozen table definitions ([#12537](https://github.com/lablup/backend.ai/issues/12537))
+* Fix web server login, logout, edu-launcher token login, and no-auth password reset failing when the first configured Manager endpoint is down by routing them through the healthy-endpoint pool instead of pinning to `api.endpoint[0]`. ([#12543](https://github.com/lablup/backend.ai/issues/12543))
+* Apply resource group `default_session_options` (handler_options and resource_opts) to enqueued sessions instead of silently ignoring them. ([#12559](https://github.com/lablup/backend.ai/issues/12559))
+* Authorize `owner_id` delegation in session enqueue against the target owner's scope, closing a privilege-escalation hole where any user could create sessions owned by arbitrary users. ([#12568](https://github.com/lablup/backend.ai/issues/12568))
+* Fix vfolder host usage `percentage` returned by `vfolder/_/hosts` to be on the 0-100 scale again, so storage status indicators in WebUI and FastTrack reflect actual usage instead of always showing "Adequate" ([#12634](https://github.com/lablup/backend.ai/issues/12634))
+* Fix GPFS quota unset failing with `GPFSJobFailedError` by serializing the quota limit as a plain integer instead of a human-readable `BinarySize` string. ([#12641](https://github.com/lablup/backend.ai/issues/12641))
+* Fix `create_kernel` crashing with a JSON serialization error when a kernel is allocated a unified-memory accelerator device ([#12649](https://github.com/lablup/backend.ai/issues/12649))
+* Fix a manager memory leak where the background-task event stream (`GET /events/background-task`) leaked an asyncio task and a registered event propagator when a client disconnected before the task finished. ([#12686](https://github.com/lablup/backend.ai/issues/12686))
+* Scope the ATOM and ATOM+ RSD device group to only the devices assigned to a container, so creating a new session no longer resets the device context of other running containers on the same node. ([#12721](https://github.com/lablup/backend.ai/issues/12721))
+* Fix app proxy coordinator event handler leak when legacy circuit initialization times out waiting for the proxy worker ([#12729](https://github.com/lablup/backend.ai/issues/12729))
+* Fix resource preset check failing for project members whose membership is recorded only in `association_scopes_entities` ([#12766](https://github.com/lablup/backend.ai/issues/12766))
+* Backfill the missing admin-page read permission for project and domain admin roles created at runtime, which an earlier migration skipped due to a role-name pattern mismatch. ([#12772](https://github.com/lablup/backend.ai/issues/12772))
+* Return creation timestamps for user and project resource policies in v2 API responses. ([#12791](https://github.com/lablup/backend.ai/issues/12791))
+* Stop auto-assigning admin roles to users joining a scope by clearing `auto_assign` for roles whose name ends with `admin`, which the system-role backfill had wrongly enabled. ([#12810](https://github.com/lablup/backend.ai/issues/12810))
+
+### Miscellaneous
+* Lower per-execution agent logs `kernel.execute` and `CodeRunner.attach_output_queue` from INFO to DEBUG to reduce log noise. ([#12777](https://github.com/lablup/backend.ai/issues/12777))
+
+
 ## 26.4.7 (2026-07-02)
 
 ### Fixes
