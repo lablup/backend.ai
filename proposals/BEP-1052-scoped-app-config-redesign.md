@@ -26,14 +26,18 @@ lookup**.
 **Write authorization is set up ahead of time.** Every config name is
 **explicitly registered** in `app_config_definitions`, and `app_config_allow_list`
 records — **pre-configured by admins** — enumerate the
-`(config_name, scope_type)` pairs at which a fragment may be written.
-**Every** fragment write, admin or user, requires a matching record;
-admins additionally own the allow-list and `app_config_definitions` themselves
-(users cannot). So the cost of permission lives entirely on the
-(infrequent) write path and the (one-time) admin setup, never on read.
+`(config_name, scope_type)` pairs at which a fragment may exist and carry a
+**`permission` (`ro` / `rw`)** that decides who may write there. **Every**
+fragment write requires a matching record; a superadmin may then write any
+scope, while a non-admin may write only their own scope and only where the
+record is `rw`. Admins additionally own the allow-list and
+`app_config_definitions` themselves (users cannot). So the cost of permission
+lives entirely on the (infrequent) write path and the (one-time) admin setup,
+never on read.
 
-Whether a value is admin-fixed or user-overridable is therefore a matter
-of whether an allow-list grant exists — see [Write model](#write-model).
+Whether a value is admin-fixed or user-overridable is therefore a matter of
+the `(config_name, user)` record's `permission` — `rw` (the user overrides)
+vs `ro` / absent (admin-fixed) — see [Write model](#write-model).
 
 ## User Stories
 
@@ -47,7 +51,8 @@ Three scopes cover the use cases (`public` for the pre-login shell):
 | User value with **no** default                   | `user`            | User (where granted); admin may also write       |
 
 - Admins set values that apply across a domain; a domain-fixed value
-  cannot be changed by users (no `user` write grant exists).
+  cannot be changed by users (no writable `user` entry — the
+  `(config_name, user)` entry is absent or `ro`).
 - Some domain settings must be readable **before login** (theme).
 - Where the admin has granted it, users persist their own settings on
   the server (language, recently used sessions, visible/ordered table
@@ -64,7 +69,8 @@ Three scopes cover the use cases (`public` for the pre-login shell):
 - **Scope = entity.** Access control is expressed at the scope level,
   not per field. Three scopes: `public` (anonymous read / admin write),
   `domain` (same-domain read / admin write), `user` (owner+admin read /
-  owner-modify + admin write).
+  owner-modify when the entry is `rw`, admin write otherwise). Write is
+  governed by the entry's `permission`; read is scope-visibility only.
 - **Explicitly registered names.** Every config name lives in
   `app_config_definitions`; allow-list entries reference it by foreign key,
   and fragments reference it transitively through their allow-list entry (a
@@ -76,13 +82,16 @@ Three scopes cover the use cases (`public` for the pre-login shell):
   the allow-list entry, so the ordering cannot be computed without it (an
   indexed `(config_name, scope_type)` join). The join is for `rank` alone;
   no permission or policy is evaluated at read time.
-- **Allow-list = the write gate and the merge order.** `app_config_allow_list`
-  holds **one record per `(config_name, scope_type)`**; a fragment at
-  that scope may be created **only if** the record exists — through the
-  admin mutations and the regular ones alike. Fragments reference their
-  entry by FK (`ON DELETE CASCADE`), so removing an entry removes its
-  fragments. What sets admins apart is that they alone manage the
-  allow-list (and the `app_config_definitions`) itself.
+- **Allow-list = registration, merge order, and write permission.**
+  `app_config_allow_list` holds **one record per `(config_name, scope_type)`**.
+  Its **presence** registers the layer — a fragment at that scope may exist
+  **only if** the record exists (FK, `ON DELETE CASCADE`, so removing an entry
+  removes its fragments). Its **`rank`** is the merge order (§2). Its
+  **`permission` (`ro` / `rw`)** is the write authorization: `rw` lets the
+  scope's owner write, `ro` is superadmin-only. Presence no longer *is* the
+  write grant — registration (may a fragment exist here) and write-authorization
+  (may this caller write it) are separate concerns. What sets admins apart is
+  that they alone manage the allow-list (and `app_config_definitions`) itself.
 - **`rank` lives on the allow-list entry.** Merge priority is an
   admin-owned policy: it sits on the (admin-managed) allow-list entry,
   not on the fragment — a fragment owner editing their own fragment can
@@ -122,27 +131,34 @@ Keyed by the natural composite `(scope_type, scope_id, config_name)`
 - `config` — schema-less JSON payload.
 - `created_at` / `updated_at`.
 
-### `app_config_allow_list` — the per-`(config_name, scope_type)` write gate
+### `app_config_allow_list` — registration + merge order + write permission
 
-One row per `(config_name, scope_type)` (unique) — a normalized,
-single-purpose table: **the write gate**. A fragment at `(config_name, scope_type)`
-may be written only if its row exists here. Admins set these up in
-advance.
+One row per `(config_name, scope_type)` (unique) — a normalized table that
+**registers** a config layer, carries its merge `rank`, and its write
+`permission`. A fragment at `(config_name, scope_type)` may exist only if its
+row exists here; whether the scope's owner may write it is the row's
+`permission`. Admins set these up in advance.
 
 - `config_name` — FK → `app_config_definitions.config_name`.
-- `scope_type` — a scope at which fragments may be written
-  (`public | domain | user`). A user-overridable config carries a
-  `(config_name, user)` row; an admin-only value carries
-  `(config_name, domain)` and/or `(config_name, public)`.
+- `scope_type` — a scope at which fragments may exist
+  (`public | domain | user`). A user config carries a `(config_name, user)`
+  row; an admin-only value carries `(config_name, domain)` and/or
+  `(config_name, public)`.
 - `rank` — the merge priority every fragment under this entry carries
   (low → high; higher wins). Defaults per scope type (see §2); admins
   may set it explicitly.
+- `permission` — `ro` / `rw` (VFolder-style): the write authorization for
+  the scope's **owner** — `rw` = owner may write, `ro` = superadmin-only.
+  Defaults per scope type (`public` / `domain` = `ro`, `user` = `rw`); admins
+  may set it explicitly. Does **not** affect reads.
 - `created_at` / `updated_at`.
 
-A row's **presence** is the write grant, and its `rank` is the merge
-order of its fragments. It gates **both** write paths; admins, unlike
-users, may also create/purge the allow-list rows themselves — and
-purging one cascades to its fragments.
+A row's **presence** registers the layer (a fragment may exist there) and its
+`rank` sets the merge order; its **`permission`** decides who may write.
+Presence gates *both* write paths at the FK/existence level; `permission` then
+decides owner-write vs superadmin-only. Admins, unlike users, may also
+create/purge the allow-list rows themselves — and purging one cascades to its
+fragments.
 
 ### Scope-ID convention
 
@@ -154,18 +170,19 @@ purging one cascades to its fragments.
 
 ### Integrity
 
-- **Every** fragment create (admin or regular) requires an
-  `app_config_allow_list` row for the write's `(config_name,
-  scope_type)` — enforced both by the write gate (domain error) and by
-  the composite FK. That entry references a registered `config_name`, so
-  registration is guaranteed transitively; the fragment needs no direct
-  FK to `app_config_definitions`. Updates and purges of an existing
-  fragment need no gate: the FK guarantees the entry exists while the
-  fragment does.
-- A regular (non-admin) mutation is further restricted to the caller's
-  own `user` row; admin mutations may target any scope (still gated by
-  the allow-list) and are the only writes that may touch the allow-list
-  and `app_config_definitions`.
+- **Every** fragment create (superadmin or owner) requires an
+  `app_config_allow_list` row for the write's `(config_name, scope_type)` —
+  the entry must exist (composite FK) and the caller must be authorized
+  against its `permission` (domain error). That entry references a registered
+  `config_name`, so registration is guaranteed transitively; the fragment
+  needs no direct FK to `app_config_definitions`. Update / purge of an
+  existing fragment re-check the same authorization against the fragment's
+  layer, but need no existence gate — the FK guarantees the entry exists while
+  the fragment does.
+- A non-admin mutation is restricted to the caller's own `user` row **and**
+  requires that row's `permission` to be `rw`; a superadmin may target any
+  scope (the entry must still exist, but its `permission` is bypassed) and is
+  the only writer that may touch the allow-list and `app_config_definitions`.
 - `app_config_definitions` purge **cascades down the whole subtree**: its
   allow-list entries are removed by the `config_name` FK (`ON DELETE
   CASCADE`), and their fragments cascade from those entries in turn — so
@@ -181,14 +198,14 @@ purging one cascades to its fragments.
 
 Two kinds of mutation:
 
-- **Admin mutations** (admin-only) — `create` / `update` / `purge` a
-  fragment at any scope whose `(config_name, scope_type)` is in the
-  allow-list. The only mutations that may write another user's `user`
-  row, and the only ones that may manage the allow-list and
-  `app_config_definitions` themselves.
-- **Regular mutations** (any authenticated user) — `create` / `update` /
-  `purge` the caller's own `user` row, **only when** an allow-list row
-  exists for `(config_name, user)`.
+- **Superadmin mutations** — `create` / `update` / `purge` a fragment at any
+  scope whose `(config_name, scope_type)` is registered, **regardless of
+  `permission`** (a superadmin writes `ro` layers too). The only mutations
+  that may write another user's `user` row, and the only ones that may manage
+  the allow-list and `app_config_definitions` themselves.
+- **Owner mutations** (any authenticated user) — `create` / `update` /
+  `purge` the caller's own `user` row, **only when** the `(config_name, user)`
+  entry exists **and its `permission` is `rw`**.
 
 `create` errors if the natural key already exists; `update` errors if it
 does not; `purge` removes the row (and thus its contribution to the
@@ -197,21 +214,25 @@ with `{}`, which reads back as `null` (null projection, §3). `update`
 replaces the stored JSON wholesale — no partial/deep update at the write
 boundary.
 
-**Overridability is a write-grant decision:**
+**Overridability is a `permission` decision:**
 
-- **Fixed** (user cannot change): no `(config_name, user)` row exists in
-  the allow-list, so a regular `user`-scope write is rejected and the
-  merged value is the admin's (`public` / `domain` fragments only).
-- **Overridable**: the admin grants `(config_name, user)`. The admin
-  sets the `domain` default; the user freely creates/updates/purges
-  their own `user` fragment, which wins on merge (the `user` entry's
-  default `rank` is the highest).
-- **User-only**: the grant exists and no admin fragment is published.
+- **Fixed** (user cannot change): either no `(config_name, user)` row exists,
+  or it exists with `permission = ro` (an admin-managed `user`-scope value). A
+  regular `user`-scope write is rejected and the merged value is the admin's
+  (`public` / `domain` fragments only).
+- **Overridable**: a `(config_name, user)` row with `permission = rw`. The
+  admin sets the `domain` default; the user freely creates/updates/purges
+  their own `user` fragment, which wins on merge (the `user` entry's default
+  `rank` is the highest).
+- **User-only**: an `rw` `(config_name, user)` row exists and no admin
+  fragment is published.
 
-To promote a fixed value to user-customizable, the admin adds a single
-`(config_name, user)` grant — no data migration. To lock it back down,
-the admin removes the grant: the cascade drops the existing `user`
-fragments with it, so the admin value applies again immediately.
+To promote a fixed value to user-customizable, the admin adds a
+`(config_name, user)` entry with `permission = rw` (or flips an existing `ro`
+entry to `rw`) — no data migration. To lock it back down, the admin flips the
+entry to `ro` (existing `user` fragments remain but become admin-only) or
+removes the entry entirely (the cascade drops the `user` fragments, so the
+admin value applies again immediately).
 
 ---
 
@@ -231,8 +252,8 @@ their own row.
   room for custom placement in between.
 - **Admin override.** The admin may set `rank` explicitly when creating
   the entry — e.g. a `domain` entry ranked above `user` yields a
-  domain-enforced value that user fragments cannot beat even where a
-  user grant exists.
+  domain-enforced value that user fragments cannot beat even where the
+  user entry is `rw` and the user set their own.
 - **Per-caller totality.** For one caller and one `config_name`, at most
   one fragment applies per scope type (§3), so the entry ranks totally
   order every merge input.
@@ -304,16 +325,17 @@ likewise `null` — clients fall back to their built-in defaults.
   queries; each is a rank merge over the fragments joined to their
   allow-list entries, no per-scope stitching.
 - **User edits a config** — a regular create/update/purge on the
-  caller's own `user` row (only where the grant exists); the response is
+  caller's own `user` row (only where the entry is `rw`); the response is
   the recomputed merge.
 - **Admin publishes a fixed domain value** — add the `(config_name,
   domain)` allow-list row, write the `domain` fragment, and add no
   `(config_name, user)` row; users cannot override it.
-- **Admin makes a value user-overridable** — add the `(config_name,
-  user)` grant; users then create/update/purge their own copy. No data
-  migration.
-- **Admin locks a value back down** — remove the `(config_name, user)`
-  grant; the cascade drops the existing `user` fragments with it.
+- **Admin makes a value user-overridable** — add the `(config_name, user)`
+  entry with `permission = rw` (or flip an existing `ro` entry to `rw`); users
+  then create/update/purge their own copy. No data migration.
+- **Admin locks a value back down** — flip the `(config_name, user)` entry to
+  `ro` (existing `user` fragments remain but become admin-only), or remove the
+  entry (the cascade drops the `user` fragments with it).
 - **Admin reorders contributions** — set the allow-list entries'
   `rank`s (per `(config_name, scope_type)`, not per fragment).
 - **Admin retires a config name** — purge the `app_config_definitions`
