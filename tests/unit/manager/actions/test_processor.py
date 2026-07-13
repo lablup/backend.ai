@@ -1,3 +1,4 @@
+from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Final, override
@@ -19,6 +20,7 @@ from ai.backend.manager.actions.action import (
 )
 from ai.backend.manager.actions.monitors.audit_log import AuditLogMonitor
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
+from ai.backend.manager.actions.monitors.reporter import ReporterMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import ActionOperationType, OperationStatus
 from ai.backend.manager.repositories.audit_log import AuditLogCreatorSpec
@@ -291,3 +293,131 @@ class TestAuditLogMonitorActorIdentities:
         spec = self._recorded_spec(mock_audit_log_repository)
         assert spec.triggered_by is None
         assert spec.acted_as is None
+
+
+@dataclass(frozen=True)
+class _ExpectedActorIdentities:
+    """The (triggered_by, acted_as) a reporter message should record for a context."""
+
+    triggered_by: str | None
+    acted_as: UUID | None
+
+
+class TestReporterMonitorActorIdentities:
+    """ReporterMonitor records triggered_by (the caller) and acted_as (the effective/acting
+    subject) separately, mirroring the audit-log monitor; they diverge only during
+    impersonation."""
+
+    @pytest.fixture
+    def reporter_hub(self) -> MagicMock:
+        hub = MagicMock()
+        hub.report_started = AsyncMock(return_value=None)
+        hub.report_finished = AsyncMock(return_value=None)
+        return hub
+
+    @pytest.fixture
+    def reporter_monitor(self, reporter_hub: MagicMock) -> ReporterMonitor:
+        return ReporterMonitor(reporter_hub)
+
+    @pytest.fixture
+    def mock_action(self) -> MockAction:
+        return MockAction(id="1", type=_MOCK_ACTION_TYPE, operation=_MOCK_OPERATION_TYPE)
+
+    @pytest.fixture
+    def mock_meta(self) -> BaseActionTriggerMeta:
+        return BaseActionTriggerMeta(action_id=uuid4(), started_at=datetime.now(tz=UTC))
+
+    @pytest.fixture
+    def mock_result(self) -> ProcessResult:
+        now = datetime.now(tz=UTC)
+        return ProcessResult(
+            meta=BaseActionResultMeta(
+                action_id=uuid4(),
+                entity_id="1",
+                status=OperationStatus.SUCCESS,
+                description="Success",
+                started_at=now,
+                ended_at=now,
+                duration=timedelta(seconds=0.0),
+                error_code=None,
+            ),
+        )
+
+    @pytest.fixture
+    def impersonation_context(self) -> Iterator[_ExpectedActorIdentities]:
+        """Super admin acting as another user: caller and effective subject differ."""
+        target = _make_user(uuid4())
+        super_admin = _make_user(uuid4(), is_superadmin=True)
+        with with_user(target), with_triggered_user(super_admin):
+            yield _ExpectedActorIdentities(
+                triggered_by=str(super_admin.user_id), acted_as=target.user_id
+            )
+
+    @pytest.fixture
+    def normal_context(self) -> Iterator[_ExpectedActorIdentities]:
+        """Caller and effective subject are the same user."""
+        user = _make_user(uuid4())
+        with with_user(user), with_triggered_user(user):
+            yield _ExpectedActorIdentities(triggered_by=str(user.user_id), acted_as=user.user_id)
+
+    @pytest.fixture
+    def system_context(self) -> Iterator[_ExpectedActorIdentities]:
+        """System-triggered action: no authenticated user."""
+        yield _ExpectedActorIdentities(triggered_by=None, acted_as=None)
+
+    async def test_impersonation_records_caller_and_effective_identities(
+        self,
+        reporter_monitor: ReporterMonitor,
+        reporter_hub: MagicMock,
+        mock_action: MockAction,
+        mock_meta: BaseActionTriggerMeta,
+        mock_result: ProcessResult,
+        impersonation_context: _ExpectedActorIdentities,
+    ) -> None:
+        expected = impersonation_context
+
+        await reporter_monitor.prepare(mock_action, mock_meta)
+        await reporter_monitor.done(mock_action, mock_result)
+
+        started = reporter_hub.report_started.call_args.args[0]
+        finished = reporter_hub.report_finished.call_args.args[0]
+        assert started.triggered_by == finished.triggered_by == expected.triggered_by
+        assert started.acted_as == finished.acted_as == expected.acted_as
+
+    async def test_normal_context_triggered_by_equals_acted_as(
+        self,
+        reporter_monitor: ReporterMonitor,
+        reporter_hub: MagicMock,
+        mock_action: MockAction,
+        mock_meta: BaseActionTriggerMeta,
+        mock_result: ProcessResult,
+        normal_context: _ExpectedActorIdentities,
+    ) -> None:
+        expected = normal_context
+
+        await reporter_monitor.prepare(mock_action, mock_meta)
+        await reporter_monitor.done(mock_action, mock_result)
+
+        started = reporter_hub.report_started.call_args.args[0]
+        finished = reporter_hub.report_finished.call_args.args[0]
+        assert started.triggered_by == finished.triggered_by == expected.triggered_by
+        assert started.acted_as == finished.acted_as == expected.acted_as
+
+    async def test_system_trigger_records_both_none(
+        self,
+        reporter_monitor: ReporterMonitor,
+        reporter_hub: MagicMock,
+        mock_action: MockAction,
+        mock_meta: BaseActionTriggerMeta,
+        mock_result: ProcessResult,
+        system_context: _ExpectedActorIdentities,
+    ) -> None:
+        expected = system_context
+
+        await reporter_monitor.prepare(mock_action, mock_meta)
+        await reporter_monitor.done(mock_action, mock_result)
+
+        started = reporter_hub.report_started.call_args.args[0]
+        finished = reporter_hub.report_finished.call_args.args[0]
+        assert started.triggered_by == finished.triggered_by == expected.triggered_by
+        assert started.acted_as == finished.acted_as == expected.acted_as
