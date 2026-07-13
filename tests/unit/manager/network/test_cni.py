@@ -261,6 +261,16 @@ class TestCreateNetwork:
         raw = etcd.store["network/session/s1/meta"]
         assert json.loads(raw)["backend"] == "vxlan"
 
+    async def test_vxlan_overlay_mtu_subtracts_the_encapsulation_overhead(self) -> None:
+        # The value handed to every kernel is the OVERLAY MTU: underlay - 50. Handing the underlay
+        # 1500 straight through (as this used to) lets a 1500-byte frame reach the 1450-MTU vxlan
+        # port, where it is dropped with no ICMP — a PMTUD black hole that hangs NCCL/mpirun.
+        etcd = FakeEtcd()
+        plugin = _plugin_with(etcd)
+        info = await plugin.create_network(identifier="s1", options={"forced_backend": "vxlan"})
+        assert info.options["mtu"] == 1450  # 1500 underlay - 50 VXLAN overhead
+        assert json.loads(etcd.store["network/session/s1/meta"])["mtu"] == 1450
+
     async def test_non_vxlan_backend_has_no_vni(self) -> None:
         # a VNI is a vxlan concept; any other (implemented) backend gets none. bridge stands in for
         # "not vxlan" here — host-gw would be the natural example but is not implemented (refused).

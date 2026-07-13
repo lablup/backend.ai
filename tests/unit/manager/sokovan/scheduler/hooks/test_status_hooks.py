@@ -44,12 +44,18 @@ class TestTerminatedTransitionHookNetworkCleanup:
 
     @pytest.fixture
     def network_plugin(self) -> AsyncMock:
+        # The 'overlay' (Docker Swarm) driver, kept as the primary handle the older tests assert on.
         return AsyncMock()
 
     @pytest.fixture
-    def network_plugin_ctx(self, network_plugin: AsyncMock) -> MagicMock:
+    def cni_plugin(self) -> AsyncMock:
+        # The 'cni' (BEP-1062) driver, which a containerd cluster session is actually created with.
+        return AsyncMock()
+
+    @pytest.fixture
+    def network_plugin_ctx(self, network_plugin: AsyncMock, cni_plugin: AsyncMock) -> MagicMock:
         ctx = MagicMock()
-        ctx.plugins = {"overlay": network_plugin}
+        ctx.plugins = {"overlay": network_plugin, "cni": cni_plugin}
         return ctx
 
     @pytest.fixture
@@ -131,17 +137,37 @@ class TestTerminatedTransitionHookNetworkCleanup:
         session.main_kernel.resource.agent = agent_id
         return session
 
-    async def test_multinode_volatile_destroys_overlay_network(
+    async def test_multinode_destroys_through_every_driver(
         self,
         hook: TerminatedTransitionHook,
         multi_node_session: MagicMock,
         network_plugin: AsyncMock,
+        cni_plugin: AsyncMock,
         agent_client: AsyncMock,
     ) -> None:
+        # The launcher picks the driver dynamically from the member agents' runtime, so the manager
+        # does not know at teardown which one created this session. Each destroy is idempotent and a
+        # no-op on a session it does not own, so every registered driver is asked -- and exactly the
+        # one that created it reclaims its state.
         await hook.execute(multi_node_session)
 
         network_plugin.destroy_network.assert_awaited_once_with(network_id="net-123")
+        cni_plugin.destroy_network.assert_awaited_once_with(network_id="net-123")
         agent_client.destroy_local_network.assert_not_awaited()
+
+    async def test_a_cni_session_is_reclaimed_under_the_default_overlay_config(
+        self,
+        hook: TerminatedTransitionHook,
+        multi_node_session: MagicMock,
+        cni_plugin: AsyncMock,
+    ) -> None:
+        # The regression: create dynamically via 'cni', but the old teardown destroyed via the
+        # configured default ('overlay' out of the box), so the CNI subnet/VNI/etcd state was never
+        # released and the pool exhausted after ~4096 sessions. The CNI driver must be reached
+        # regardless of what the config default says.
+        await hook.execute(multi_node_session)
+
+        cni_plugin.destroy_network.assert_awaited_once_with(network_id="net-123")
 
     async def test_singlenode_volatile_destroys_local_network(
         self,
@@ -187,20 +213,6 @@ class TestTerminatedTransitionHookNetworkCleanup:
         network_plugin.destroy_network.assert_not_awaited()
         agent_client.destroy_local_network.assert_not_awaited()
 
-    async def test_multinode_without_driver_raises(
-        self,
-        hook: TerminatedTransitionHook,
-        config_provider: MagicMock,
-        multi_node_session: MagicMock,
-        network_plugin: AsyncMock,
-    ) -> None:
-        config_provider.config.network.inter_container.default_driver = None
-
-        with pytest.raises(ServerMisconfiguredError):
-            await hook.execute(multi_node_session)
-
-        network_plugin.destroy_network.assert_not_awaited()
-
     async def test_destroy_failure_propagates(
         self,
         hook: TerminatedTransitionHook,
@@ -235,13 +247,13 @@ class TestTerminatedTransitionHookNetworkCleanup:
         self,
         hook: TerminatedTransitionHook,
         recorder_pool: RecordPool[SessionId],
-        config_provider: MagicMock,
         multi_node_session: MagicMock,
+        network_plugin: AsyncMock,
         session_id: SessionId,
     ) -> None:
         """A failed cleanup is recorded as FAILED with an error_code, since the
-        hook raises BackendAIError subclasses (ServerMisconfiguredError)."""
-        config_provider.config.network.inter_container.default_driver = None
+        hook propagates the driver's BackendAIError."""
+        network_plugin.destroy_network.side_effect = ServerMisconfiguredError("boom")
 
         with pytest.raises(ServerMisconfiguredError):
             await hook.execute(multi_node_session)

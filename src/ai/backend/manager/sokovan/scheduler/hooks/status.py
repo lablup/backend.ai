@@ -21,7 +21,6 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.clients.agent.pool import AgentClientPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.sokovan import SessionWithKernels
-from ai.backend.manager.errors.common import ServerMisconfiguredError
 from ai.backend.manager.errors.resource import AgentNotAllocated
 from ai.backend.manager.models.network import NetworkType
 from ai.backend.manager.plugin.network import NetworkPluginContext
@@ -177,7 +176,7 @@ class TerminatedTransitionHook(StatusTransitionHook):
                 if cluster_mode == ClusterMode.SINGLE_NODE:
                     await self._destroy_local_network(session, network_id)
                 elif cluster_mode == ClusterMode.MULTI_NODE:
-                    await self._destroy_overlay_network(session_id, network_id)
+                    await self._destroy_multinode_network(session_id, network_id)
 
     async def _destroy_local_network(self, session: SessionWithKernels, network_id: str) -> None:
         session_id = session.session_info.identity.id
@@ -197,25 +196,35 @@ class TerminatedTransitionHook(StatusTransitionHook):
                 )
                 raise
 
-    async def _destroy_overlay_network(self, session_id: SessionId, network_id: str) -> None:
-        default_driver = self._deps.config_provider.config.network.inter_container.default_driver
-        if default_driver is None:
-            raise ServerMisconfiguredError("No inter-container network driver is configured.")
-        if default_driver not in self._deps.network_plugin_ctx.plugins:
-            available = list(self._deps.network_plugin_ctx.plugins.keys())
-            raise ServerMisconfiguredError(
-                f"Network plugin '{default_driver}' not found. Available plugins: {available}. "
-                f"For overlay networks, ensure Docker Swarm is initialized with 'docker swarm init'."
-            )
-        network_plugin = self._deps.network_plugin_ctx.plugins[default_driver]
-        try:
-            await network_plugin.destroy_network(network_id=network_id)
-        except Exception:
-            log.exception(
-                "Failed to destroy overlay network for session. "
-                "Session ID: {}, Network ID: {}, Driver: {}",
-                session_id,
-                network_id,
-                default_driver,
-            )
-            raise
+    async def _destroy_multinode_network(self, session_id: SessionId, network_id: str) -> None:
+        """Tear down the session's multi-node network across every registered driver.
+
+        The driver is NOT re-derived from ``default_driver`` here: the launcher picks it
+        *dynamically* from the member agents' runtime (a containerd agent gets 'cni', a docker
+        agent gets 'overlay'), and can diverge from the configured default -- so destroying by the
+        configured driver leaks the network of every session whose agents needed the other one.
+        That was the failure: create via 'cni' (dynamic) but destroy via 'overlay' (config default,
+        which is 'overlay' out of the box) meant the CNI subnet/VNI/etcd state was never released,
+        and the pool exhausted after ~4096 multi-node sessions.
+
+        Each ``destroy_network`` is idempotent and a no-op on a session it does not own -- the CNI
+        driver keys off its own etcd session meta, the overlay driver off the Docker network's
+        existence -- so calling every driver reclaims exactly the one that created this session,
+        without the manager having to remember (or re-derive) which one that was.
+        """
+        errors: list[tuple[str, BaseException]] = []
+        for driver, plugin in self._deps.network_plugin_ctx.plugins.items():
+            try:
+                await plugin.destroy_network(network_id=network_id)
+            except Exception as e:
+                log.exception(
+                    "Failed to destroy the '{}' network for session {} (network {})",
+                    driver,
+                    session_id,
+                    network_id,
+                )
+                errors.append((driver, e))
+        if errors:
+            # The hook is blocking: propagate so the coordinator keeps retrying rather than
+            # silently leaking the network state of a session that did not fully clean up.
+            raise errors[0][1]

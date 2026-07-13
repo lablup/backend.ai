@@ -70,6 +70,20 @@ class TestCommandBuilders:
     def test_bridge_link_add(self) -> None:
         assert bridge_link_add_args(4097) == ["ip", "link", "add", "baibr4097", "type", "bridge"]
 
+    def test_mtu_is_a_generic_link_property_before_type(self) -> None:
+        # `mtu` MUST precede `type vxlan`: iproute2 parses the token after `type vxlan` as a vxlan
+        # sub-option, so `... type vxlan id N ... mtu M` errors out. Verified against live iproute2.
+        vargs = vxlan_link_add_args(4097, "eth0", mtu=1450)
+        assert vargs[vargs.index("mtu") + 1] == "1450"
+        assert vargs.index("mtu") < vargs.index("type")
+        bargs = bridge_link_add_args(4097, mtu=1450)
+        assert bargs[bargs.index("mtu") + 1] == "1450"
+        assert bargs.index("mtu") < bargs.index("type")
+
+    def test_no_mtu_by_default(self) -> None:
+        assert "mtu" not in vxlan_link_add_args(4097, "eth0")
+        assert "mtu" not in bridge_link_add_args(4097)
+
     def test_fdb_append_uses_broadcast_mac_and_peer_dst(self) -> None:
         args = fdb_append_args(4097, "10.0.0.2")
         assert args == [
@@ -169,11 +183,11 @@ class TestSetupTeardown:
         assert rec.calls[0] == ["ip", "link", "del", "baibr4097"]
         assert rec.calls[1] == ["ip", "link", "del", "baivx4097"]
         assert ["ip", "link", "del", local_bridge_dev(4097)] in rec.calls
-        assert vxlan_link_add_args(4097, "eth0") in rec.calls
-        assert bridge_link_add_args(4097) in rec.calls
+        assert vxlan_link_add_args(4097, "eth0", mtu=1450) in rec.calls
+        assert bridge_link_add_args(4097, mtu=1450) in rec.calls
         # deletes come before the add of the same device
         assert rec.calls.index(["ip", "link", "del", "baivx4097"]) < rec.calls.index(
-            vxlan_link_add_args(4097, "eth0")
+            vxlan_link_add_args(4097, "eth0", mtu=1450)
         )
         # vxlan enslaved to bridge, then both brought up
         assert ["ip", "link", "set", "baivx4097", "master", "baibr4097"] in rec.calls
@@ -200,7 +214,7 @@ class TestSetupTeardown:
         plugin = _plugin(cast(Recorder, rec))
         await plugin.setup_session_network(_META, _SELF)  # must not raise
         assert ["ip", "link", "del", "baivx4097"] in rec.calls
-        assert vxlan_link_add_args(4097, "eth0") in rec.calls
+        assert vxlan_link_add_args(4097, "eth0", mtu=1450) in rec.calls
 
     async def test_setup_rejects_non_vxlan_meta(self) -> None:
         rec = Recorder()

@@ -45,7 +45,13 @@ from ai.backend.manager.plugin.network import AbstractNetworkManagerPlugin, Netw
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
-_DEFAULT_MTU = 1500
+# The underlay (uplink) MTU. The overlay MTU handed to every kernel is this minus the VXLAN
+# encapsulation overhead, so a full-size inner frame still fits the tunnel — the same 1450 default
+# Docker Swarm's overlay uses. Setting the container NIC to the underlay 1500 (as this used to) lets
+# a 1500-byte frame reach a 1450-MTU VXLAN port, where it is silently dropped with no ICMP (L2
+# bridging), i.e. a PMTUD black hole: handshakes pass, bulk transfers (NCCL/mpirun) hang.
+_DEFAULT_UNDERLAY_MTU = 1500
+_VXLAN_OVERHEAD = 50  # IPv4 VXLAN: 20 IP + 8 UDP + 8 VXLAN + 14 inner Ethernet
 
 
 class CNINetworkPlugin(AbstractNetworkManagerPlugin):
@@ -123,7 +129,15 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         try:
             if backend is NetworkBackendKind.VXLAN:
                 vni = await self._vni_allocator.acquire(session_id)
-            mtu = int(self.plugin_config.get("mtu") or _DEFAULT_MTU)
+            # `mtu` in plugin_config is the UNDERLAY MTU; the overlay MTU (what the kernel's NIC
+            # gets) is that minus the tunnel overhead. Only meaningful for the VXLAN backend; host-gw
+            # and wireguard would carry their own overhead, but VXLAN is the only one implemented.
+            underlay_mtu = int(self.plugin_config.get("mtu") or _DEFAULT_UNDERLAY_MTU)
+            mtu = (
+                underlay_mtu - _VXLAN_OVERHEAD
+                if backend is NetworkBackendKind.VXLAN
+                else underlay_mtu
+            )
 
             meta: dict[str, Any] = {
                 "subnet": subnet,

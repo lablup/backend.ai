@@ -57,9 +57,19 @@ def bridge_dev(vni: int) -> str:
 # --- pure command builders ---
 
 
-def vxlan_link_add_args(vni: int, uplink: str, *, dstport: int = VXLAN_DSTPORT) -> list[str]:
+def vxlan_link_add_args(
+    vni: int, uplink: str, *, mtu: int | None = None, dstport: int = VXLAN_DSTPORT
+) -> list[str]:
+    # ``mtu`` is the OVERLAY MTU (the inner frame the tunnel carries), which the manager already
+    # computed as underlay - overhead. Setting it explicitly ties the vxlan device, the overlay
+    # bridge and the container NIC to one value instead of relying on the kernel's auto-calc
+    # (uplink - 50) happening to match — which silently diverges the moment this node's uplink MTU
+    # differs from the manager's assumption, reopening the black hole.
+    # ``mtu`` is a generic link property and MUST precede ``type vxlan``: after it, ``ip`` parses
+    # the next token (our ``id``) as a vxlan sub-option and errors out. Verified against iproute2.
+    mtu_args = ["mtu", str(mtu)] if mtu is not None else []
     return [
-        "ip", "link", "add", vxlan_dev(vni),
+        "ip", "link", "add", vxlan_dev(vni), *mtu_args,
         "type", "vxlan",
         "id", str(vni),
         "dev", uplink,
@@ -68,8 +78,9 @@ def vxlan_link_add_args(vni: int, uplink: str, *, dstport: int = VXLAN_DSTPORT) 
     ]  # fmt: skip
 
 
-def bridge_link_add_args(vni: int) -> list[str]:
-    return ["ip", "link", "add", bridge_dev(vni), "type", "bridge"]
+def bridge_link_add_args(vni: int, *, mtu: int | None = None) -> list[str]:
+    mtu_args = ["mtu", str(mtu)] if mtu is not None else []
+    return ["ip", "link", "add", bridge_dev(vni), *mtu_args, "type", "bridge"]
 
 
 def set_master_args(vni: int) -> list[str]:
@@ -275,8 +286,10 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         await self._delete_link_quiet(bridge_dev(vni))
         await self._delete_link_quiet(vxlan_dev(vni))
         await self._delete_link_quiet(local_bridge_dev(vni))
-        await self._runner(vxlan_link_add_args(vni, self._uplink))
-        await self._runner(bridge_link_add_args(vni))
+        # The overlay MTU (underlay - VXLAN overhead) the manager put in the meta, applied to both
+        # the vxlan device and the overlay bridge so a full-size inner frame fits the tunnel.
+        await self._runner(vxlan_link_add_args(vni, self._uplink, mtu=meta.mtu))
+        await self._runner(bridge_link_add_args(vni, mtu=meta.mtu))
         await self._runner(set_master_args(vni))
         await self._runner(link_up_args(vxlan_dev(vni)))
         await self._runner(link_up_args(bridge_dev(vni)))
