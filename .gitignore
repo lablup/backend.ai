@@ -135,6 +135,14 @@ ENV/
 /loki-config.yaml
 /tempo-config.yaml
 
+# backend.ai-install (single-host TUI installer) writes these into the repo in
+# DEVELOP mode; harbor/* only appears when installing with --with-harbor.
+/etcd.config.json
+/etcd.installed.json
+/vfolder/
+/harbor/
+/harbor-offline-installer-*.tgz
+
 # Local temp and installer-generated directories
 /.tmp/
 /tmp/
