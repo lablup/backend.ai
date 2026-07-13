@@ -54,6 +54,16 @@ class TestPydanticColumnExcludeUnset:
         assert service is not None
         assert "shell" in service.model_fields_set
 
+    def test_default_dump_materializes_unset_fields_as_null(self, dialect: Dialect) -> None:
+        # Contrast case: without exclude_unset, unset fields are stored as explicit nulls.
+        column = PydanticColumn(ModelDefinitionDraft)
+        draft = ModelDefinitionDraft.model_validate({"models": [{"service": {"port": 8080}}]})
+
+        stored = column.process_bind_param(draft, dialect)
+
+        assert stored is not None
+        assert stored["models"][0]["service"]["shell"] is None
+
     def test_copy_preserves_exclude_unset(
         self, column: PydanticColumn[ModelDefinitionDraft], dialect: Dialect
     ) -> None:

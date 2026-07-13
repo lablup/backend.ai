@@ -142,8 +142,14 @@ class PrecedenceCase:
     request_payload: Mapping[str, Any] | None = None
 
 
-class DraftMergeChain:
-    """Runs the real revision-draft chain end to end; only the I/O boundary is mocked.
+async def _merge_chain(
+    *,
+    variant_default: Mapping[str, Any],
+    reads_files: bool,
+    yaml_payload: Mapping[str, Any] | None = None,
+    request_payload: Mapping[str, Any] | None = None,
+) -> RevisionDraft:
+    """Run the real revision-draft chain end to end; only the I/O boundary is mocked.
 
     Layer order (low → high), merged with the same reduce as
     ``deployment_controller.add_revision`` (= ``_merge_all``):
@@ -153,35 +159,22 @@ class DraftMergeChain:
     3. model-definition.yaml (file I/O mocked; real ``from_file_payload`` parse)
     4. request draft
     """
-
-    async def merge(
-        self,
-        *,
-        variant_default: Mapping[str, Any],
-        reads_files: bool,
-        yaml_payload: Mapping[str, Any] | None = None,
-        request_payload: Mapping[str, Any] | None = None,
-    ) -> RevisionDraft:
-        variant = _variant(
-            reads_vfolder_config_files=reads_files,
-            default_model_definition=ModelDefinitionDraft.model_validate(variant_default),
-        )
-        reader = RevisionDraftReader(deployment_repository=_repository(variant, yaml_payload))
-        request = ModelDefinitionDraft.model_validate(request_payload) if request_payload else None
-        drafts = await reader.read_for_deployment_revision(
-            runtime_variant_id=variant.id,
-            request_draft=RevisionDraft(mounts=_mounts(), model_definition=request),
-            preset_id=None,
-        )
-        return _merge_all(*drafts)
+    variant = _variant(
+        reads_vfolder_config_files=reads_files,
+        default_model_definition=ModelDefinitionDraft.model_validate(variant_default),
+    )
+    reader = RevisionDraftReader(deployment_repository=_repository(variant, yaml_payload))
+    request = ModelDefinitionDraft.model_validate(request_payload) if request_payload else None
+    drafts = await reader.read_for_deployment_revision(
+        runtime_variant_id=variant.id,
+        request_draft=RevisionDraft(mounts=_mounts(), model_definition=request),
+        preset_id=None,
+    )
+    return _merge_all(*drafts)
 
 
 class TestMergeChainModelDefinition:
-    """Scenario-level checks over ``DraftMergeChain`` — see its docstring for the wiring."""
-
-    @pytest.fixture
-    def chain(self) -> DraftMergeChain:
-        return DraftMergeChain()
+    """Scenario-level checks over ``_merge_chain`` — see its docstring for the wiring."""
 
     @pytest.fixture
     def variant_default(self) -> Mapping[str, Any]:
@@ -277,11 +270,10 @@ class TestMergeChainModelDefinition:
     )
     async def test_layer_precedence(
         self,
-        chain: DraftMergeChain,
         variant_default: Mapping[str, Any],
         case: PrecedenceCase,
     ) -> None:
-        merged = await chain.merge(
+        merged = await _merge_chain(
             variant_default=variant_default,
             reads_files=case.reads_files,
             yaml_payload=case.yaml_payload,
@@ -298,10 +290,8 @@ class TestMergeChainModelDefinition:
         assert resolved_service is not None
         assert resolved_service.shell == case.expected_shell
 
-    async def test_explicit_null_shell_preserved(
-        self, chain: DraftMergeChain, variant_default: Mapping[str, Any]
-    ) -> None:
-        merged = await chain.merge(
+    async def test_explicit_null_shell_preserved(self, variant_default: Mapping[str, Any]) -> None:
+        merged = await _merge_chain(
             variant_default=variant_default,
             reads_files=True,
             yaml_payload={"models": [{"service": {"start_command": "yaml-cmd", "shell": None}}]},
@@ -312,10 +302,8 @@ class TestMergeChainModelDefinition:
         assert resolved_service is not None
         assert resolved_service.shell is None
 
-    async def test_empty_health_check_opts_out(
-        self, chain: DraftMergeChain, variant_default: Mapping[str, Any]
-    ) -> None:
-        merged = await chain.merge(
+    async def test_empty_health_check_opts_out(self, variant_default: Mapping[str, Any]) -> None:
+        merged = await _merge_chain(
             variant_default=variant_default,
             reads_files=True,
             yaml_payload={
@@ -329,9 +317,9 @@ class TestMergeChainModelDefinition:
         assert _model_definition(merged).to_resolved().health_check_config() is None
 
     async def test_health_check_auto_enables_with_defaults(
-        self, chain: DraftMergeChain, variant_without_health_check: Mapping[str, Any]
+        self, variant_without_health_check: Mapping[str, Any]
     ) -> None:
-        merged = await chain.merge(
+        merged = await _merge_chain(
             variant_default=variant_without_health_check,
             reads_files=True,
             yaml_payload={
