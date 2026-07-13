@@ -18,7 +18,7 @@ from ai.backend.manager.clients.storage_proxy.session_manager import StorageSess
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.session.draft import SessionSpecDraft
 from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.errors.common import RejectedByHook
+from ai.backend.manager.errors.common import InternalServerError, RejectedByHook
 from ai.backend.manager.metrics.scheduler import (
     SchedulerOperationMetricObserver,
     SchedulerPhaseMetricObserver,
@@ -138,6 +138,32 @@ class SchedulingController:
             DotfileVFolderConflictRule(),
         ])
 
+    async def _verify_resource_group_accessible(self, draft: SessionSpecDraft) -> None:
+        """Reject the draft when its target resource group is outside the
+        requester's single-project allowlist.
+
+        The scope decision and rejection live in the caller; the repository only
+        performs DB reads.
+        """
+        resource_group_id = draft.scope.resource_group_id
+        if resource_group_id is None:
+            return
+        domain_name = str(draft.scope.domain_name) if draft.scope.domain_name else None
+        project_id = draft.scope.project_id
+        access_key = draft.identity.access_key
+        if access_key is None or domain_name is None or project_id is None:
+            raise InternalServerError(
+                "Unreachable: resource_group_id supplied without identity context",
+            )
+        accessible_rg_ids = await self._repository.query_accessible_resource_group_ids(
+            domain_name=domain_name,
+            project_id=project_id,
+            access_key=access_key,
+        )
+        if resource_group_id not in accessible_rg_ids:
+            rg_label = draft.scope.resource_group_name or resource_group_id
+            raise InvalidAPIParameters(f"Resource group '{rg_label}' is not accessible")
+
     async def enqueue_session_from_draft(
         self,
         draft: SessionSpecDraft,
@@ -164,6 +190,8 @@ class SchedulingController:
         6. ``POST_ENQUEUE_SESSION`` hook notification.
         """
         rg_id = draft.scope.resource_group_id
+
+        await self._verify_resource_group_accessible(draft)
 
         allowed_vfolder_types = list(
             await self._config_provider.legacy_etcd_config_loader.get_vfolder_types()
