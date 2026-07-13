@@ -58,6 +58,7 @@ from ai.backend.agent.etcd import AgentEtcdClientView
 from ai.backend.agent.fs import create_scratch_filesystem, destroy_scratch_filesystem
 from ai.backend.agent.image_distro import (
     distro_from_ldd_output,
+    is_deeplearning_image,
 )
 from ai.backend.agent.kernel import AbstractKernel, KernelRegistry
 from ai.backend.agent.kernel_registry.adapter import (
@@ -170,15 +171,6 @@ if TYPE_CHECKING:
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 eof_sentinel = Sentinel.TOKEN
 
-deeplearning_image_keys = {
-    "tensorflow",
-    "caffe",
-    "keras",
-    "torch",
-    "mxnet",
-    "theano",
-}
-
 deeplearning_sample_volume = VolumeInfo(
     "deeplearning-samples",
     "/home/work/samples",
@@ -195,10 +187,8 @@ async def get_extra_volumes(docker: Docker, lang: str) -> list[VolumeInfo]:
     # deeplearning specialization
     # TODO: extract as config
     volume_list = []
-    for k in deeplearning_image_keys:
-        if k in lang:
-            volume_list.append(deeplearning_sample_volume)
-            break
+    if is_deeplearning_image(lang):
+        volume_list.append(deeplearning_sample_volume)
 
     # Mount only actually existing volumes
     mount_list = []

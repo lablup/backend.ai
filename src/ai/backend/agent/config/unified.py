@@ -1415,6 +1415,27 @@ class CommonContainerConfig(BaseConfigSchema):
             example=ConfigExample(local="", prod='["10.0.0.53", "10.0.0.54"]'),
         ),
     ]
+    deeplearning_samples_path: Annotated[
+        str | None,
+        Field(
+            default=None,
+            validation_alias=AliasChoices("deeplearning-samples-path", "deeplearning_samples_path"),
+            serialization_alias="deeplearning-samples-path",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Host directory of deep-learning sample notebooks, mounted read-only at "
+                "/home/work/samples in kernels whose image is a deep-learning one (tensorflow, "
+                "torch, keras, caffe, mxnet, theano). Unset (the default) means no samples "
+                "directory, which is also what a Docker node without the volume gets. The Docker "
+                "backend mounts a named Docker volume ('deeplearning-samples'); containerd has no "
+                "volume registry, so the same content is named by its path here. Only used by the "
+                "containerd backend."
+            ),
+            added_version="26.7.0",
+            example=ConfigExample(local="", prod="/var/lib/backend.ai/deeplearning-samples"),
+        ),
+    ]
     registry_hosts_dir: Annotated[
         str,
         Field(

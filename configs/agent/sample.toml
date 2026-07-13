@@ -387,6 +387,15 @@
   # resolver.
   # Added in 26.7.0
   ## dns = ["10.0.0.53", "10.0.0.54"]
+  # Host directory of deep-learning sample notebooks, mounted read-only at
+  # /home/work/samples in kernels whose image is a deep-learning one
+  # (tensorflow, torch, keras, caffe, mxnet, theano). Unset (the default) means
+  # no samples directory, which is also what a Docker node without the volume
+  # gets. The Docker backend mounts a named Docker volume ('deeplearning-
+  # samples'); containerd has no volume registry, so the same content is named
+  # by its path here. Only used by the containerd backend.
+  # Added in 26.7.0
+  ## deeplearning-samples-path = "/var/lib/backend.ai/deeplearning-samples"
   # Directory of containerd registry host configs (the standard `certs.d`
   # layout: one `<host:port>/hosts.toml` per registry). This is how a registry
   # that is not plain public HTTPS is described — a private CA, a self-signed

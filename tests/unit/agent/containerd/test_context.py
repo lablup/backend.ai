@@ -226,7 +226,11 @@ class TestScratchAndMounts:
         ctx.local_config = cast(
             Any,
             SimpleNamespace(
-                container=SimpleNamespace(scratch_root=tmp_path, scratch_type=ScratchType.HOSTDIR)
+                container=SimpleNamespace(
+                    scratch_root=tmp_path,
+                    scratch_type=ScratchType.HOSTDIR,
+                    deeplearning_samples_path=None,
+                )
             ),
         )
         await ctx.prepare_scratch()
@@ -460,7 +464,11 @@ class TestDomainSocketProxies:
             Any,
             SimpleNamespace(
                 agent=SimpleNamespace(ipc_base_path=tmp_path / "ipc"),
-                container=SimpleNamespace(scratch_root=tmp_path, scratch_type=ScratchType.HOSTDIR),
+                container=SimpleNamespace(
+                    scratch_root=tmp_path,
+                    scratch_type=ScratchType.HOSTDIR,
+                    deeplearning_samples_path=None,
+                ),
                 debug=SimpleNamespace(coredump=SimpleNamespace(enabled=False)),
             ),
         )
@@ -595,7 +603,11 @@ class TestMemoryScratch:
         ctx.local_config = cast(
             Any,
             SimpleNamespace(
-                container=SimpleNamespace(scratch_root=tmp_path, scratch_type=scratch_type),
+                container=SimpleNamespace(
+                    scratch_root=tmp_path,
+                    scratch_type=scratch_type,
+                    deeplearning_samples_path=None,
+                ),
                 debug=SimpleNamespace(coredump=SimpleNamespace(enabled=False)),
                 agent=SimpleNamespace(ipc_base_path=tmp_path / "ipc"),
             ),
@@ -624,7 +636,11 @@ class TestCoredumpMount:
         ctx.local_config = cast(
             Any,
             SimpleNamespace(
-                container=SimpleNamespace(scratch_root=tmp_path, scratch_type=ScratchType.HOSTDIR),
+                container=SimpleNamespace(
+                    scratch_root=tmp_path,
+                    scratch_type=ScratchType.HOSTDIR,
+                    deeplearning_samples_path=None,
+                ),
                 debug=SimpleNamespace(
                     coredump=SimpleNamespace(
                         enabled=enabled,
@@ -873,3 +889,90 @@ class TestAcceleratorMounts:
             await ctx.generate_accelerator_mounts(cast(Any, _FakeComputePlugin()), cast(Any, {}))
             == []
         )
+
+
+class TestTheContainerIdReachesTheContainer:
+    """`CID=` in resource.txt is the only place the in-container side learns its own container id.
+    The jail / libbaihook abuse reporter puts it in the report the agent then acts on (the agent
+    reads `body["CID"]`), so without it an abuse report names no container."""
+
+    async def _write(self, tmp_path: Path) -> Path:
+        # Driven through the real start_container, so the line cannot go missing by the call site
+        # being dropped — which is exactly how it was missing in the first place.
+        ctx = _context(FakeFacade(), port_forwarder=FakePortForwarder())
+        ctx._scratch_dir = tmp_path
+        (tmp_path / "config").mkdir()
+        (tmp_path / "config" / "resource.txt").write_text("CPU_CORES=2\n")
+        (tmp_path / "config" / "resource_base.txt").write_text("CPU_CORES=2\n")
+        await ctx.apply_network(cast(Any, {}))
+        await ctx.start_container(cast(Any, None), [], None, [], cast(Any, {}))
+        return tmp_path / "config"
+
+    async def test_the_container_id_is_appended(self, tmp_path: Path) -> None:
+        config_dir = await self._write(tmp_path)
+        lines = (config_dir / "resource.txt").read_text().splitlines()
+        assert "CID=kern-123" in lines
+        assert "CPU_CORES=2" in lines  # what was already there survives
+
+    async def test_the_base_copy_stays_pristine(self, tmp_path: Path) -> None:
+        # resource_base.txt is the untouched copy the runner diffs against; the Docker backend
+        # appends to resource.txt only, after the container exists.
+        config_dir = await self._write(tmp_path)
+        assert "CID=" not in (config_dir / "resource_base.txt").read_text()
+
+
+class TestTheDeepLearningSamples:
+    """The Docker backend mounts a named Docker volume at /home/work/samples for DL images.
+    containerd has no volume registry, so the operator names the directory instead."""
+
+    def _ctx(self, tmp_path: Path, *, samples: str | None, image: str) -> Any:
+        ctx = _context(FakeFacade())
+        ctx.image_ref = cast(Any, SimpleNamespace(short=image))
+        ctx._agent_sock_path = None
+        ctx.local_config = cast(
+            Any,
+            SimpleNamespace(
+                container=SimpleNamespace(
+                    scratch_root=tmp_path,
+                    scratch_type=ScratchType.HOSTDIR,
+                    deeplearning_samples_path=samples,
+                ),
+                debug=SimpleNamespace(coredump=SimpleNamespace(enabled=False)),
+                agent=SimpleNamespace(ipc_base_path=tmp_path / "ipc"),
+            ),
+        )
+        return ctx
+
+    async def _targets(self, ctx: Any) -> set[str]:
+        return {str(m.target) for m in await ctx.get_intrinsic_mounts()}
+
+    async def test_a_dl_image_gets_the_samples(self, tmp_path: Path) -> None:
+        samples = tmp_path / "samples"
+        samples.mkdir()
+        ctx = self._ctx(tmp_path, samples=str(samples), image="pytorch:2.1")
+        assert "/home/work/samples" in await self._targets(ctx)
+
+    async def test_a_non_dl_image_does_not(self, tmp_path: Path) -> None:
+        samples = tmp_path / "samples"
+        samples.mkdir()
+        ctx = self._ctx(tmp_path, samples=str(samples), image="python:3.13")
+        assert "/home/work/samples" not in await self._targets(ctx)
+
+    async def test_unconfigured_means_no_samples(self, tmp_path: Path) -> None:
+        # Which is also what a Docker node without the volume gets.
+        ctx = self._ctx(tmp_path, samples=None, image="tensorflow:2.15")
+        assert "/home/work/samples" not in await self._targets(ctx)
+
+    async def test_a_path_that_is_not_there_does_not_break_the_kernel(self, tmp_path: Path) -> None:
+        # Bind-mounting a missing source would fail the container creation outright.
+        ctx = self._ctx(tmp_path, samples=str(tmp_path / "nope"), image="tensorflow:2.15")
+        assert "/home/work/samples" not in await self._targets(ctx)
+
+    async def test_it_is_read_only(self, tmp_path: Path) -> None:
+        samples = tmp_path / "samples"
+        samples.mkdir()
+        ctx = self._ctx(tmp_path, samples=str(samples), image="keras:3")
+        mount = next(
+            m for m in await ctx.get_intrinsic_mounts() if str(m.target) == "/home/work/samples"
+        )
+        assert mount.permission == MountPermission.READ_ONLY

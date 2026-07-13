@@ -56,6 +56,7 @@ from ai.backend.agent.fs import create_scratch_filesystem, destroy_scratch_files
 from ai.backend.agent.image_distro import (
     UnknownImageLibc,
     distro_from_ldd_output,
+    is_deeplearning_image,
 )
 from ai.backend.agent.kernel import AbstractKernel
 from ai.backend.agent.kernel_registry.adapter import (
@@ -131,6 +132,7 @@ from ai.backend.common.types import (
     ResourceSlot,
     Sentinel,
     ServicePort,
+    SessionId,
     SlotName,
     current_resource_slots,
 )
@@ -140,6 +142,7 @@ from .kernel import ContainerdKernel
 from .oci import (
     KERNEL_ID_LABEL,
     KRUNNER_ENTRYPOINT,
+    SESSION_ID_LABEL,
     AcceleratorSpec,
     infiniband_devices,
     translate_accelerator_args,
@@ -628,6 +631,29 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
                             MountPermission.READ_WRITE,
                         )
                     )
+        # Deep-learning sample notebooks at /home/work/samples, read-only, for the images they are
+        # meant for. The Docker backend mounts a named Docker volume; containerd has no volume
+        # registry, so the operator names the directory (unset = no samples, which is also what a
+        # Docker node without the volume gets).
+        if (samples := self.local_config.container.deeplearning_samples_path) and (
+            is_deeplearning_image(self.image_ref.short)
+        ):
+            samples_dir = Path(samples)
+            if samples_dir.is_dir():
+                mounts.append(
+                    Mount(
+                        MountTypes.BIND,
+                        samples_dir,
+                        Path("/home/work/samples"),
+                        MountPermission.READ_ONLY,
+                    )
+                )
+            else:
+                log.warning(
+                    "container.deeplearning-samples-path points at {}, which is not a directory;"
+                    " the kernel starts without /home/work/samples",
+                    samples_dir,
+                )
         return mounts
 
     @property
@@ -867,6 +893,24 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
             shutil.copyfile(config_dir / "resource.txt", config_dir / "resource_base.txt")
 
         await asyncio.to_thread(_write)
+
+    async def _append_container_id_to_resource_spec(self) -> None:
+        """Append ``CID=`` to resource.txt, once the container it names exists.
+
+        This is the only place the in-container side learns its own container id, and the jail /
+        libbaihook abuse reporter puts it in the report the agent then acts on (agent.py reads
+        ``body["CID"]``). Appended after creation, and to resource.txt only — resource_base.txt is
+        the pristine copy the runner diffs against, and the Docker backend keeps it that way too.
+        """
+        if self._scratch_dir is None:
+            return
+        resource_txt = self._scratch_dir / "config" / "resource.txt"
+
+        def _append() -> None:
+            with resource_txt.open("a") as f:
+                f.write(f"CID={self._container_id}\n")
+
+        await asyncio.to_thread(_append)
 
     def _chown_paths_if_root(self, paths: Sequence[Path]) -> None:
         """Hand the given scratch paths to the uid/gid the container's runner drops to.
@@ -1211,6 +1255,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
                 command=command,
                 oci_spec=spec.oci_spec,
             )
+            await self._append_container_id_to_resource_spec()
             # Start + attach the CNI chain (bridge for single-node, +overlay for multi-node).
             result = await self._session_network.start_and_attach_container(
                 self._session_id,
@@ -1506,18 +1551,47 @@ class ContainerdAgent(
                 log.exception("containerd event monitor failed; retrying")
             await asyncio.sleep(1.0)
 
+    async def _session_id_of(self, container_id: str) -> SessionId | None:
+        """The session a container belongs to, read off the container itself.
+
+        The label is the only source that survives the agent forgetting the kernel — which is the
+        case this exists for.
+        """
+        try:
+            for info in await self._runtime.list_container_infos():
+                if info.id != container_id:
+                    continue
+                if raw := info.labels.get(SESSION_ID_LABEL):
+                    return SessionId(UUID(raw))
+                return None
+        except Exception:
+            log.exception("could not resolve the session of container {}", container_id)
+        return None
+
     async def _handle_task_event(self, ev: TaskEvent) -> None:
         try:
             kernel_id = KernelId(UUID(ev.container_id))
         except ValueError:
             return
         kernel_obj = self.kernel_registry.get(kernel_id)
-        if kernel_obj is None:
-            return  # not a live kernel of ours
-        session_id = kernel_obj.session_id
+        session_id = (
+            kernel_obj.session_id
+            if kernel_obj is not None
+            # A container of ours that the registry does not know about — one that outlived a
+            # restart, or whose creation failed after the container existed. Its death is exactly
+            # when it can be cleaned, and dropping the event (which is what this used to do) left
+            # it to the periodic reconciler, so its scratch and its ports sat allocated until then.
+            # The session it belongs to is on the container itself, which is why the Docker backend
+            # reads it from the label rather than from its own memory.
+            else await self._session_id_of(ev.container_id)
+        )
+        if session_id is None:
+            return  # not a container of ours
         match ev.kind:
             case "exit":
-                reason = kernel_obj.termination_reason or KernelLifecycleEventReason.SELF_TERMINATED
+                reason = (
+                    kernel_obj.termination_reason if kernel_obj is not None else None
+                ) or KernelLifecycleEventReason.SELF_TERMINATED
                 await self.inject_container_lifecycle_event(
                     kernel_id,
                     session_id,
@@ -1527,7 +1601,8 @@ class ContainerdAgent(
                     exit_code=ev.exit_code,
                 )
             case "oom":
-                await kernel_obj.notify_event(AgentEventData(type="oom", data={}))
+                if kernel_obj is not None:
+                    await kernel_obj.notify_event(AgentEventData(type="oom", data={}))
             case "start":
                 await self.inject_container_lifecycle_event(
                     kernel_id,
@@ -1835,6 +1910,17 @@ class ContainerdAgent(
         kernel_id: KernelId,
         container_id: ContainerId | None,
     ) -> None:
+        if await self._runtime.container_status(str(kernel_id)) is None:
+            # Nothing to stop: the container is already gone, but the registry still holds its
+            # allocations. They are derived from the containers that exist, so re-derive them —
+            # otherwise the slots this kernel held stay spoken for and the node quietly loses
+            # capacity. (The Docker backend does the same when the daemon answers 404/409.)
+            log.warning(
+                "destroy_kernel(k:{}): the container is already gone; reconciling resources",
+                kernel_id,
+            )
+            await self.reconstruct_resource_usage()
+            return
         # Gracefully stop the task: SIGTERM, wait for self-termination, then SIGKILL — Docker
         # parity (container.stop()), so a workload gets its grace window to flush/checkpoint
         # instead of losing data to an immediate kill. Network detach + container removal happen

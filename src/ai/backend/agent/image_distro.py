@@ -22,6 +22,22 @@ known_glibc_distros: Final[dict[float, str]] = {
 }
 
 
+DEEPLEARNING_IMAGE_KEYS: Final[frozenset[str]] = frozenset({
+    "tensorflow",
+    "caffe",
+    "keras",
+    "torch",
+    "mxnet",
+    "theano",
+})
+
+
+def is_deeplearning_image(image_name: str) -> bool:
+    """Whether an image is one of the deep-learning ones the sample notebooks are meant for.
+    Matched on the name, as it has always been — the images carry no label saying so."""
+    return any(key in image_name for key in DEEPLEARNING_IMAGE_KEYS)
+
+
 def distro_from_ldd_output(first_line: str) -> str:
     """The distro an image's first `ldd --version` line implies.
 

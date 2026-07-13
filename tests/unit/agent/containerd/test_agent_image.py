@@ -6,6 +6,7 @@ import struct
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, cast
+from uuid import UUID
 
 import pytest
 
@@ -13,9 +14,11 @@ import ai.backend.agent.containerd.agent as agent_mod
 from ai.backend.agent.agent import ACTIVE_STATUS_SET, DEAD_STATUS_SET
 from ai.backend.agent.config.unified import ContainerSandboxType
 from ai.backend.agent.containerd.agent import ContainerdAgent
-from ai.backend.agent.containerd.runtime.interface import ContainerInfo, ImageInfo
+from ai.backend.agent.containerd.oci import SESSION_ID_LABEL
+from ai.backend.agent.containerd.runtime.interface import ContainerInfo, ImageInfo, TaskEvent
 from ai.backend.agent.containerd.runtime.spec import _DEFAULT_CAPS
 from ai.backend.agent.network.port_forward import PortForward
+from ai.backend.agent.types import LifecycleEvent
 from ai.backend.common.docker import LabelName
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.exception import ImageNotAvailable
@@ -23,6 +26,8 @@ from ai.backend.common.types import (
     AutoPullBehavior,
     ContainerStatus,
     ImageCanonical,
+    KernelId,
+    SessionId,
 )
 
 
@@ -746,3 +751,127 @@ class TestTheDistroProbeIsCached:
         )
         assert await agent.resolve_image_distro(image) == "ubuntu20.04"
         assert cache.reads == [] and cache.writes == []
+
+
+class _EventRuntime:
+    """containerd, for the lifecycle-event path: which containers exist, and what they say about
+    themselves."""
+
+    def __init__(self, containers: dict[str, str] | None = None, status: str | None = None) -> None:
+        self._containers = containers or {}  # container_id -> session_id label
+        self._status = status
+
+    async def list_container_infos(self) -> list[ContainerInfo]:
+        return [
+            ContainerInfo(id=cid, image="img:1", labels={SESSION_ID_LABEL: sid}, status="stopped")
+            for cid, sid in self._containers.items()
+        ]
+
+    async def container_status(self, container_id: str) -> str | None:
+        return self._status
+
+
+class TestDeathOfAContainerWeForgot:
+    """A container of ours that the kernel registry does not know about — one that outlived a
+    restart, or whose creation failed after the container existed. Its death is exactly when it can
+    be cleaned; dropping the event left it to the periodic reconciler, so its scratch and its ports
+    sat allocated until then. The session it belongs to is written on the container itself, which is
+    why the Docker backend reads it from the label instead of from its own memory.
+    """
+
+    _KERNEL = UUID("00000000-0000-0000-0000-0000000000aa")
+    _SESSION = UUID("00000000-0000-0000-0000-0000000000bb")
+
+    def _agent_with(self, runtime: Any, monkeypatch: pytest.MonkeyPatch) -> tuple[Any, list[Any]]:
+        injected: list[Any] = []
+        agent = _agent(FakeFacade())
+        agent._runtime = cast(Any, runtime)
+        agent.kernel_registry = cast(Any, {})
+
+        async def inject(
+            kernel_id: Any, session_id: Any, event: Any, reason: Any, **kw: Any
+        ) -> None:
+            injected.append((kernel_id, session_id, event, kw.get("exit_code")))
+
+        monkeypatch.setattr(agent, "inject_container_lifecycle_event", inject)
+        return agent, injected
+
+    async def test_its_death_is_still_cleaned_up(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        runtime = _EventRuntime({str(self._KERNEL): str(self._SESSION)})
+        agent, injected = self._agent_with(runtime, monkeypatch)
+
+        await agent._handle_task_event(
+            TaskEvent(kind="exit", container_id=str(self._KERNEL), exit_code=137)
+        )
+
+        assert len(injected) == 1
+        kernel_id, session_id, event, exit_code = injected[0]
+        assert kernel_id == KernelId(self._KERNEL)
+        assert session_id == SessionId(self._SESSION)  # read off the container, not from memory
+        assert event is LifecycleEvent.CLEAN
+        assert exit_code == 137
+
+    async def test_a_container_that_is_not_ours_is_ignored(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # No session label -> not a kernel of ours. Cleaning it would be someone else's container.
+        agent, injected = self._agent_with(_EventRuntime({}), monkeypatch)
+
+        await agent._handle_task_event(
+            TaskEvent(kind="exit", container_id=str(self._KERNEL), exit_code=0)
+        )
+
+        assert injected == []
+
+
+class TestDestroyingAKernelThatIsAlreadyGone:
+    async def test_the_resources_it_held_are_re_derived(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # The container is gone but the registry still holds its allocations. They are derived from
+        # the containers that exist, so re-derive them — otherwise the slots stay spoken for and the
+        # node quietly loses capacity. (Docker does this when the daemon answers 404/409.)
+        reconstructed: list[bool] = []
+        agent = _agent(FakeFacade())
+        agent._runtime = cast(Any, _EventRuntime(status=None))  # no container, no task
+
+        async def reconstruct() -> None:
+            reconstructed.append(True)
+
+        monkeypatch.setattr(agent, "reconstruct_resource_usage", reconstruct)
+        facade = cast(Any, agent._session_network)
+        facade.stopped = []
+
+        async def stop_container(container_id: str, *, grace_period: float) -> None:
+            facade.stopped.append(container_id)
+
+        facade.stop_container = stop_container
+
+        await agent.destroy_kernel(KernelId(UUID(int=1)), None)
+
+        assert reconstructed == [True]
+        assert facade.stopped == []  # nothing to stop
+
+    async def test_a_live_kernel_is_stopped_gracefully(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        reconstructed: list[bool] = []
+        agent = _agent(FakeFacade())
+        agent._runtime = cast(Any, _EventRuntime(status="running"))
+
+        async def reconstruct() -> None:
+            reconstructed.append(True)
+
+        monkeypatch.setattr(agent, "reconstruct_resource_usage", reconstruct)
+        facade = cast(Any, agent._session_network)
+        facade.stopped = []
+
+        async def stop_container(container_id: str, *, grace_period: float) -> None:
+            facade.stopped.append(container_id)
+
+        facade.stop_container = stop_container
+
+        await agent.destroy_kernel(KernelId(UUID(int=1)), None)
+
+        assert facade.stopped == [str(UUID(int=1))]
+        assert reconstructed == []  # the resources are still legitimately held
