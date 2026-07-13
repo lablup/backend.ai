@@ -1,9 +1,9 @@
-"""Idle checker contract: prepare (batched I/O) + judge (pure), driven by the reconcile handler."""
+"""Idle checker contract driven once per checker type by the reconcile handler."""
 
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 from ai.backend.common.identifier.idle_checker import IdleCheckerID
@@ -24,30 +24,22 @@ class CheckerAssignment:
 class IdleJudgment:
     """One session's judgment from one checker definition."""
 
+    checker_id: IdleCheckerID
     session_id: SessionId
     is_idle: bool
     message: str
 
 
-class IdleChecker[StateT](ABC):
-    """Per-``CheckerType`` behavior; ``StateT`` is one session's judgment material.
-
-    Concrete checkers receive the I/O clients ``prepare`` needs via their constructors.
-    """
+class IdleChecker(ABC):
+    """Per-``CheckerType`` behavior with constructor-injected I/O clients."""
 
     @abstractmethod
-    async def prepare(
+    async def judge(
         self,
         assignments: Sequence[CheckerAssignment],
-    ) -> Mapping[IdleCheckerID, Mapping[SessionId, StateT]]:
-        """Called once per tick with every definition of this type.
+    ) -> Sequence[IdleJudgment]:
+        """Evaluate every assignment of this type in one batched call.
 
-        Batch the I/O across all assignments (session ids key the Valkey/DB reads) and
-        bake everything ``judge`` needs into per-session states.
+        Implementations may batch external I/O but must not retain per-call state.
         """
-        raise NotImplementedError
-
-    @abstractmethod
-    def judge(self, session_states: Mapping[SessionId, StateT]) -> Sequence[IdleJudgment]:
-        """Judge one definition's sessions from prepared states alone; no I/O."""
         raise NotImplementedError

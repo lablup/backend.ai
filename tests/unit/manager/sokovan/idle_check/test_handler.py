@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from collections.abc import Sequence
+from dataclasses import replace
 from datetime import UTC, datetime
 from typing import Final, override
 from uuid import uuid4
@@ -19,6 +19,7 @@ from ai.backend.common.identifier.idle_checker import IdleCheckerID
 from ai.backend.common.types import SessionId, SessionTypes
 from ai.backend.manager.data.idle_checker.types import IdleCheckSession
 from ai.backend.manager.data.permission.id import ScopeId
+from ai.backend.manager.errors.common import InternalServerError
 from ai.backend.manager.repositories.idle_checker.types import (
     BoundCheckerData,
     IdleCheckBatchData,
@@ -49,52 +50,43 @@ _SPECS: Final[dict[CheckerType, IdleCheckerSpec]] = {
 }
 
 
-@dataclass(frozen=True)
-class FakeSessionState:
-    is_idle: bool
-
-
-class FakeChecker(IdleChecker[FakeSessionState]):
-    """Bakes idleness into per-session states at prepare and judges purely from them."""
+class FakeChecker(IdleChecker):
+    """Records the single batched call and returns configured session judgments."""
 
     idle_session_ids: set[SessionId]
-    prepare_calls: list[list[tuple[IdleCheckerID, list[SessionId]]]]
-    judge_calls: list[list[SessionId]]
+    judge_calls: list[list[tuple[IdleCheckerID, list[SessionId]]]]
+    should_fail: bool
     _message: str
 
     def __init__(self, message: str = "idle") -> None:
         self.idle_session_ids = set()
-        self.prepare_calls = []
         self.judge_calls = []
+        self.should_fail = False
         self._message = message
 
     @override
-    async def prepare(
+    async def judge(
         self,
         assignments: Sequence[CheckerAssignment],
-    ) -> Mapping[IdleCheckerID, Mapping[SessionId, FakeSessionState]]:
+    ) -> Sequence[IdleJudgment]:
         call_record: list[tuple[IdleCheckerID, list[SessionId]]] = []
-        states: dict[IdleCheckerID, dict[SessionId, FakeSessionState]] = {}
         for assignment in assignments:
             session_ids = [session.session_id for session in assignment.sessions]
             call_record.append((assignment.definition.checker_id, session_ids))
-            session_states: dict[SessionId, FakeSessionState] = {}
-            for session_id in session_ids:
-                session_states[session_id] = FakeSessionState(
-                    is_idle=session_id in self.idle_session_ids
-                )
-            states[assignment.definition.checker_id] = session_states
-        self.prepare_calls.append(call_record)
-        return states
-
-    @override
-    def judge(self, session_states: Mapping[SessionId, FakeSessionState]) -> Sequence[IdleJudgment]:
-        self.judge_calls.append(list(session_states))
+        self.judge_calls.append(call_record)
+        if self.should_fail:
+            raise InternalServerError("Fake checker failed")
         judgments: list[IdleJudgment] = []
-        for session_id, state in session_states.items():
-            judgments.append(
-                IdleJudgment(session_id=session_id, is_idle=state.is_idle, message=self._message)
-            )
+        for assignment in assignments:
+            for session in assignment.sessions:
+                judgments.append(
+                    IdleJudgment(
+                        checker_id=assignment.definition.checker_id,
+                        session_id=session.session_id,
+                        is_idle=session.session_id in self.idle_session_ids,
+                        message=self._message,
+                    )
+                )
         return judgments
 
 
@@ -160,7 +152,7 @@ class TestIdleCheckReconcileHandler:
             CheckerType.NETWORK_TIMEOUT: network_checker,
         })
 
-    async def test_prepares_each_checker_type_once_batching_its_definitions(
+    async def test_batches_judgments_by_checker_type(
         self,
         handler: IdleCheckReconcileHandler,
         first_session_id: SessionId,
@@ -187,31 +179,30 @@ class TestIdleCheckReconcileHandler:
 
         await handler.execute(reconcile_info)
 
-        assert lifetime_checker.prepare_calls == [
+        assert lifetime_checker.judge_calls == [
             [
                 (lifetime_bound.checker.checker_id, [first_session_id, second_session_id]),
                 (second_lifetime_bound.checker.checker_id, [second_session_id]),
             ],
         ]
-        assert network_checker.prepare_calls == [
+        assert network_checker.judge_calls == [
             [(network_bound.checker.checker_id, [second_session_id])],
         ]
 
-    async def test_judges_each_definition_over_its_prepared_sessions(
+    async def test_deduplicates_cross_scope_assignments(
         self,
         handler: IdleCheckReconcileHandler,
         first_session_id: SessionId,
-        second_session_id: SessionId,
         lifetime_bound: BoundCheckerData,
-        second_lifetime_bound: BoundCheckerData,
         lifetime_checker: FakeChecker,
     ) -> None:
+        duplicate_binding = replace(
+            lifetime_bound,
+            scope=ScopeId(ScopeType.DOMAIN, str(uuid4())),
+        )
         reconcile_info = IdleCheckReconcileInfo(
             batch=IdleCheckBatchData(
-                targets=(
-                    _target(first_session_id, [lifetime_bound]),
-                    _target(second_session_id, [lifetime_bound, second_lifetime_bound]),
-                )
+                targets=(_target(first_session_id, [lifetime_bound, duplicate_binding]),)
             ),
             current_time=_NOW,
         )
@@ -219,11 +210,10 @@ class TestIdleCheckReconcileHandler:
         await handler.execute(reconcile_info)
 
         assert lifetime_checker.judge_calls == [
-            [first_session_id, second_session_id],
-            [second_session_id],
+            [(lifetime_bound.checker.checker_id, [first_session_id])],
         ]
 
-    async def test_merges_idle_reasons_per_session(
+    async def test_merges_idle_reasons(
         self,
         handler: IdleCheckReconcileHandler,
         first_session_id: SessionId,
@@ -274,7 +264,7 @@ class TestIdleCheckReconcileHandler:
         ]
         assert result.processed_count() == 2
 
-    async def test_session_judged_active_everywhere_has_no_report(
+    async def test_active_session_has_no_report(
         self,
         handler: IdleCheckReconcileHandler,
         first_session_id: SessionId,
@@ -293,10 +283,13 @@ class TestIdleCheckReconcileHandler:
         result = await handler.execute(reconcile_info)
 
         assert result.reports == []
-        assert lifetime_checker.judge_calls == [[first_session_id]]
-        assert network_checker.judge_calls == [[first_session_id]]
+        expected_call = [(lifetime_bound.checker.checker_id, [first_session_id])]
+        assert lifetime_checker.judge_calls == [expected_call]
+        assert network_checker.judge_calls == [
+            [(network_bound.checker.checker_id, [first_session_id])]
+        ]
 
-    async def test_skips_checker_types_without_implementation(
+    async def test_skips_unimplemented_checker_types(
         self,
         first_session_id: SessionId,
         lifetime_bound: BoundCheckerData,
