@@ -132,7 +132,7 @@ def _context(
     ctx.main_gid = None
     ctx._port_forwarder = cast(Any, port_forwarder)
     # what _reserve_host_ports would have produced: one service port, no REPL port
-    ctx._host_port_map = [(30003, 8070)]
+    ctx._host_port_map = [(30003, 8070, None)]
     ctx._port_pool = PortPool((30000, 30010), 0.0)
     ctx._port_pool.discard(30003)  # _reserve_host_ports had acquired it
     ctx.local_config = cast(
@@ -976,3 +976,58 @@ class TestTheDeepLearningSamples:
             m for m in await ctx.get_intrinsic_mounts() if str(m.target) == "/home/work/samples"
         )
         assert mount.permission == MountPermission.READ_ONLY
+
+
+class TestReserveHostPortsBinding:
+    """The published-port host address is chosen per service: a protected service (ttyd on a
+    storage node) binds to loopback so it cannot be reached off-node; an ordinary service binds to
+    the configured bind-host. The DNAT rule then confines itself with `-d`. Before this,
+    protected_services was defined but never consulted and every service was DNAT'd on every
+    address."""
+
+    def _ctx(self, *, rg: Any, bind_host: str) -> Any:
+        ctx = _context(FakeFacade())
+        ctx.local_config = cast(
+            Any,
+            SimpleNamespace(
+                agent=SimpleNamespace(scaling_group_type=rg),
+                container=SimpleNamespace(bind_host=bind_host),
+            ),
+        )
+        ctx._port_pool = PortPool((30000, 30100), 0.0)
+        return ctx
+
+    def _reserve(self, ctx: Any, service_ports: list[Any]) -> dict[int, str | None]:
+        ctx._reserve_host_ports(service_ports)
+        # container_port -> host_ip, so a test can assert per service without depending on ordering
+        return {
+            container_port: host_ip for _hp, container_port, host_ip in ctx._host_port_map
+        }
+
+    def test_protected_service_binds_loopback_on_storage(self) -> None:
+        ctx = self._ctx(rg=ResourceGroupType.STORAGE, bind_host="10.0.0.5")
+        sports = [
+            {"name": "ttyd", "container_ports": (7681,)},
+            {"name": "jupyter", "container_ports": (8080,)},
+        ]
+        by_port = self._reserve(ctx, sports)
+        assert by_port[7681] == "127.0.0.1"  # protected -> loopback, even with a bind_host set
+        assert by_port[8080] == "10.0.0.5"  # ordinary -> the configured bind_host
+
+    def test_ordinary_service_binds_the_configured_host(self) -> None:
+        ctx = self._ctx(rg=ResourceGroupType.COMPUTE, bind_host="10.0.0.5")
+        by_port = self._reserve(ctx, [{"name": "jupyter", "container_ports": (8080,)}])
+        assert by_port[8080] == "10.0.0.5"
+
+    def test_empty_bind_host_means_every_address(self) -> None:
+        # The default. bind_host "" -> None -> the DNAT falls back to --dst-type LOCAL, unchanged
+        # from before an operator sets bind-host.
+        ctx = self._ctx(rg=ResourceGroupType.COMPUTE, bind_host="")
+        by_port = self._reserve(ctx, [{"name": "jupyter", "container_ports": (8080,)}])
+        assert by_port[8080] is None
+
+    def test_ttyd_is_not_protected_on_compute(self) -> None:
+        # Only storage protects ttyd; on compute it is an ordinary service.
+        ctx = self._ctx(rg=ResourceGroupType.COMPUTE, bind_host="10.0.0.5")
+        by_port = self._reserve(ctx, [{"name": "ttyd", "container_ports": (7681,)}])
+        assert by_port[7681] == "10.0.0.5"

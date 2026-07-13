@@ -36,6 +36,12 @@ class PortForward:
     host_port: int
     container_ip: str
     container_port: int
+    # The host address the service is published on. None means "every local address" (the LOCAL
+    # addrtype match). A concrete address confines the DNAT to that interface — 127.0.0.1 for a
+    # protected service (a storage node's ttyd shell must not be remotely reachable), or the
+    # operator's configured bind-host to keep service ports off the public interface. Docker
+    # applies exactly the same per-port host-IP binding.
+    host_ip: str | None = None
 
 
 def _comment(container_id: str) -> list[str]:
@@ -45,16 +51,22 @@ def _comment(container_id: str) -> list[str]:
 def dnat_rule(chain: str, forward: PortForward) -> list[str]:
     """The DNAT rule body, shared by -A (install), -D (remove) and -C (probe).
 
-    ``--dst-type LOCAL`` is not optional. Without it the rule matches on the port alone, and this
-    node both forwards overlay traffic for other nodes and originates its own connections — so a
-    packet merely *transiting* the host, or an outbound connection to some remote host's port
-    30001, would be redirected into a local container. Docker's published-port rules carry the
-    same guard for the same reason.
+    A concrete ``host_ip`` binds the rule to one address with ``-d``; otherwise ``--dst-type LOCAL``
+    matches every local address. That guard is not optional in the fallback case: without it the
+    rule matches on the port alone, and this node both forwards overlay traffic for other nodes and
+    originates its own connections — so a packet merely *transiting* the host, or an outbound
+    connection to some remote host's port 30001, would be redirected into a local container.
+    Docker's published-port rules carry the same guard for the same reason.
     """
+    dst_match = (
+        ["-d", f"{forward.host_ip}/32"]
+        if forward.host_ip
+        else ["-m", "addrtype", "--dst-type", "LOCAL"]
+    )
     return [
         chain,
         "-p", "tcp",
-        "-m", "addrtype", "--dst-type", "LOCAL",
+        *dst_match,
         "--dport", str(forward.host_port),
         *_comment(forward.container_id),
         "-j", "DNAT",
@@ -106,11 +118,19 @@ def _parse_line(line: str) -> PortForward | None:
     ip, _, container_port = dest.rpartition(":")
     if not (ip and container_port.isdigit() and dport.isdigit()):
         return None
+    # ``-d <ip>/32`` when the rule was bound to one interface; absent for the every-address
+    # (``--dst-type LOCAL``) form. Read it back so the removal rule this parses into matches the
+    # installed one byte for byte — a ``-D`` that omitted the ``-d`` would fail to delete a bound
+    # rule and leak it.
+    host_ip: str | None = None
+    if raw_d := value_after("-d"):
+        host_ip = raw_d.split("/", 1)[0]
     return PortForward(
         container_id=comment.strip('"')[len(_COMMENT_PREFIX) :],
         host_port=int(dport),
         container_ip=ip,
         container_port=int(container_port),
+        host_ip=host_ip,
     )
 
 
@@ -134,17 +154,19 @@ def parse_forwards(
 
 
 def forwards_for(
-    container_id: str, container_ip: str, ports: Iterable[tuple[int, int]]
+    container_id: str, container_ip: str, ports: Iterable[tuple[int, int, str | None]]
 ) -> list[PortForward]:
-    """``ports`` is the (host_port, container_port) pairing the agent allocated."""
+    """``ports`` is the (host_port, container_port, host_ip) pairing the agent allocated. ``host_ip``
+    is the address the service is published on (None = every local address)."""
     return [
         PortForward(
             container_id=container_id,
             host_port=host_port,
             container_ip=container_ip,
             container_port=container_port,
+            host_ip=host_ip,
         )
-        for host_port, container_port in ports
+        for host_port, container_port, host_ip in ports
     ]
 
 

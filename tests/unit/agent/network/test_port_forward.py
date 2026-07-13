@@ -85,9 +85,14 @@ class TestRuleBuilders:
             assert add[3] == "-A" and delete[3] == "-D"
             assert add[4:] == delete[4:]
 
-    def test_forwards_for_pairs_host_and_container_ports(self) -> None:
-        forwards = forwards_for(_CID, "172.30.1.7", [(30001, 8070), (30002, 7681)])
-        assert [(f.host_port, f.container_port) for f in forwards] == [(30001, 8070), (30002, 7681)]
+    def test_forwards_for_pairs_host_container_ports_and_bind_ip(self) -> None:
+        forwards = forwards_for(
+            _CID, "172.30.1.7", [(30001, 8070, "127.0.0.1"), (30002, 7681, None)]
+        )
+        assert [(f.host_port, f.container_port, f.host_ip) for f in forwards] == [
+            (30001, 8070, "127.0.0.1"),
+            (30002, 7681, None),
+        ]
         assert host_ports_of(forwards) == [30001, 30002]
 
 
@@ -116,7 +121,7 @@ class TestPortForwarder:
     async def test_install_applies_every_chain_for_every_port(self) -> None:
         runner = _Runner()
         await PortForwarder(runner).install(
-            forwards_for(_CID, "172.30.1.7", [(30001, 8070), (30002, 7681)])
+            forwards_for(_CID, "172.30.1.7", [(30001, 8070, None), (30002, 7681, None)])
         )
         assert len(runner.calls) == 4  # 2 ports x 2 chains
         assert "PREROUTING" in runner.flat() and "OUTPUT" in runner.flat()
@@ -129,7 +134,7 @@ class TestPortForwarder:
         forwarder = PortForwarder(runner)
         with pytest.raises(RuntimeError):
             await forwarder.install(
-                forwards_for(_CID, "172.30.1.7", [(30001, 8070), (30002, 7681)])
+                forwards_for(_CID, "172.30.1.7", [(30001, 8070, None), (30002, 7681, None)])
             )
         deletes = [c for c in runner.calls if "-D" in c]
         assert sorted(c[c.index("--dport") + 1] for c in deletes) == [
@@ -154,7 +159,9 @@ class TestPortForwarder:
 
         runner = _FailOnChain()
         with pytest.raises(RuntimeError):
-            await PortForwarder(runner).install(forwards_for(_CID, "172.30.1.7", [(30001, 8070)]))
+            await PortForwarder(runner).install(
+                forwards_for(_CID, "172.30.1.7", [(30001, 8070, None)])
+            )
         # the PREROUTING rule that did get inserted must be deleted on rollback
         deletes = [c for c in runner.calls if "-D" in c and "PREROUTING" in c]
         assert [c[c.index("--dport") + 1] for c in deletes] == ["30001"]
@@ -172,3 +179,53 @@ class TestPortForwarder:
     async def test_remove_of_an_unknown_container_is_a_noop(self) -> None:
         runner = _Runner(_SAVE_OUTPUT)
         assert await PortForwarder(runner).remove_container("never-seen") == []
+
+
+class TestBindAddress:
+    """S1/S2: a service is published on a chosen host address, not every one.
+
+    A protected service (a storage node's ttyd shell) binds to loopback so it is not reachable
+    off-node; an ordinary service binds to the operator's configured bind-host so kernel ports stay
+    off interfaces the operator did not choose. Without this the DNAT matched --dst-type LOCAL, i.e.
+    every local address, exposing both.
+    """
+
+    def _bound(self, host_ip: str | None) -> PortForward:
+        return PortForward(
+            container_id=_CID,
+            host_port=30001,
+            container_ip="172.30.1.7",
+            container_port=8070,
+            host_ip=host_ip,
+        )
+
+    def test_a_bound_service_matches_only_that_address(self) -> None:
+        for argv in install_args(self._bound("127.0.0.1")):
+            assert argv[argv.index("-d") + 1] == "127.0.0.1/32"
+            assert "--dst-type" not in argv  # not the every-address form
+
+    def test_an_unbound_service_matches_every_local_address(self) -> None:
+        for argv in install_args(self._bound(None)):
+            assert argv[argv.index("--dst-type") + 1] == "LOCAL"
+            assert "-d" not in argv
+
+    def test_remove_of_a_bound_rule_mirrors_install(self) -> None:
+        # A -D that dropped the -d would fail to delete the installed -d rule and leak it.
+        fwd = self._bound("127.0.0.1")
+        for add, delete in zip(install_args(fwd), remove_args(fwd), strict=True):
+            assert add[4:] == delete[4:]
+
+    def test_a_bound_rule_round_trips_through_iptables_parse(self) -> None:
+        # remove_container lists the rules back from iptables and rebuilds -D from them, so the
+        # parsed host_ip must equal the installed one or the removal silently leaks the rule.
+        save = (
+            f"-A PREROUTING -d 127.0.0.1/32 -p tcp -m tcp --dport 30001 "
+            f'-m comment --comment "bai:{_CID}" -j DNAT --to-destination 172.30.1.7:8070'
+        )
+        (parsed,) = parse_forwards(save, container_id=_CID)
+        assert parsed.host_ip == "127.0.0.1"
+        assert parsed.host_port == 30001 and parsed.container_ip == "172.30.1.7"
+
+    def test_an_unbound_rule_parses_back_to_none(self) -> None:
+        (parsed,) = parse_forwards(_SAVE_OUTPUT.splitlines()[1], container_id=_CID)
+        assert parsed.host_ip is None

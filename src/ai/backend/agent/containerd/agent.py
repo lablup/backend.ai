@@ -353,7 +353,11 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
     _apparmor_profile: str | None
     # (host_port, container_port) for the REPL and every service port, captured at reserve time and
     # turned into DNAT rules once the container's address is known.
-    _host_port_map: list[tuple[int, int]]
+    # (host_port, container_port, host_ip): the host address is where the service is published —
+    # 127.0.0.1 for a protected service, the configured bind-host for an ordinary one — so a
+    # protected service (e.g. a storage node's ttyd) is not exposed on every interface. None means
+    # every local address (the pre-S1/S2 behaviour, kept only for the empty-bind-host default).
+    _host_port_map: list[tuple[int, int, str | None]]
     _repl_host_ports: tuple[int, ...]
 
     def __init__(
@@ -1049,14 +1053,22 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
                 f"(needed: {needed}, remaining: {self._port_pool.remaining()})"
             )
         self._host_port_map = []
+        # A protected service is bound to loopback so it cannot be reached off-node (a storage
+        # node's ttyd is an interactive shell into the container); an ordinary service is bound to
+        # the operator's configured bind-host, which keeps kernel service ports off any interface
+        # the operator did not choose. Docker makes the same two-way distinction. bind_host defaults
+        # to "" — every local address — so the ordinary case is unchanged until an operator sets it.
+        protected = set(self.protected_services)
+        bind_host = self.local_config.container.bind_host or None
         # No sshd special case: the manager only builds a cluster SSH port mapping for HOST-network
         # sessions, and those never reach this backend.
         for sport in service_ports:
+            host_ip = "127.0.0.1" if sport["name"] in protected else bind_host
             host_ports: list[int] = []
             for container_port in sport["container_ports"]:
                 host_port = self._port_pool.acquire()
                 host_ports.append(host_port)
-                self._host_port_map.append((host_port, container_port))
+                self._host_port_map.append((host_port, container_port, host_ip))
             sport["host_ports"] = tuple(host_ports)
 
     @override
@@ -1276,7 +1288,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
             await self._provision_sudo_session()
         except Exception:
             if not published:
-                self._port_pool.release_many([hp for hp, _ in self._host_port_map])
+                self._port_pool.release_many([hp for hp, _, _ in self._host_port_map])
             raise
         kernel_host = str(
             self.local_config.container.advertised_host or self.local_config.container.bind_host
@@ -1294,7 +1306,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
             "repl_out_port": repl_out_port,
             "stdin_port": 0,  # legacy
             "stdout_port": 0,  # legacy
-            "host_ports": [host_port for host_port, _ in self._host_port_map],
+            "host_ports": [host_port for host_port, _, _ in self._host_port_map],
             "domain_socket_proxies": self.domain_socket_proxies,
             "block_service_ports": self.internal_data.get("block_service_ports", False),
         }

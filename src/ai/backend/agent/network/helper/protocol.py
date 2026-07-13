@@ -48,21 +48,31 @@ class ProtocolError(RuntimeError):
     contract. Never carries privileged detail back to the caller."""
 
 
-def _decode_ports(raw: Any) -> tuple[tuple[int, int], ...] | None:
-    """Shape-check only; the *values* are the policy layer's business."""
+def _decode_ports(raw: Any) -> tuple[tuple[int, int, str | None], ...] | None:
+    """Shape-check only; the *values* are the policy layer's business.
+
+    Each entry is ``[host_port, container_port]`` or ``[host_port, container_port, host_ip]``, where
+    ``host_ip`` (the interface the service is published on) is a string or null. The 2-element form
+    is accepted for compatibility and means "every local address"."""
     if raw is None:
         return None
     if not isinstance(raw, list):
         raise ProtocolError("ports must be an array")
-    pairs: list[tuple[int, int]] = []
-    for pair in raw:
-        if not isinstance(pair, list) or len(pair) != 2:
-            raise ProtocolError("each port entry must be a [host_port, container_port] pair")
-        host_port, container_port = pair
+    triples: list[tuple[int, int, str | None]] = []
+    for entry in raw:
+        if not isinstance(entry, list) or len(entry) not in (2, 3):
+            raise ProtocolError(
+                "each port entry must be [host_port, container_port] or"
+                " [host_port, container_port, host_ip]"
+            )
+        host_port, container_port = entry[0], entry[1]
+        host_ip = entry[2] if len(entry) == 3 else None
         if not isinstance(host_port, int) or not isinstance(container_port, int):
             raise ProtocolError("ports must be integers")
-        pairs.append((host_port, container_port))
-    return tuple(pairs)
+        if host_ip is not None and not isinstance(host_ip, str):
+            raise ProtocolError("host_ip must be a string or null")
+        triples.append((host_port, container_port, host_ip))
+    return tuple(triples)
 
 
 def _decode_forwards(raw: Any) -> tuple[tuple[str, int, str, int], ...] | None:
@@ -103,9 +113,12 @@ class HelperRequest:
     vtep_ip: str | None = None
     ip: str | None = None
     mac: str | None = None
-    # PUBLISH_PORTS only: the (host_port, container_port) pairing the agent's port pool produced.
-    # No destination address travels with it — see HelperOp.PUBLISH_PORTS.
-    ports: tuple[tuple[int, int], ...] | None = None
+    # PUBLISH_PORTS only: the (host_port, container_port, host_ip) pairing the agent's port pool
+    # produced. host_ip is the interface the service is published on (None = every local address);
+    # the DNAT *destination* is never sent — the helper uses its own assigned LOCAL address (see
+    # HelperOp.PUBLISH_PORTS), so a compromised agent can pick the publish interface but not the
+    # redirect target.
+    ports: tuple[tuple[int, int, str | None], ...] | None = None
 
     def encode(self) -> bytes:
         payload: dict[str, Any] = {"op": str(self.op), "session_id": self.session_id}

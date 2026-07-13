@@ -282,7 +282,7 @@ class HelperPortForwarder:
                 op=HelperOp.PUBLISH_PORTS,
                 session_id=self._session_for(container_id),
                 container_id=container_id,
-                ports=tuple((f.host_port, f.container_port) for f in forwards),
+                ports=tuple((f.host_port, f.container_port, f.host_ip) for f in forwards),
             )
         )
 

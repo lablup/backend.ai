@@ -75,28 +75,31 @@ def validate_container_id(value: str) -> str:
 
 
 def validate_port_pairs(
-    value: tuple[tuple[int, int], ...] | None,
-) -> tuple[tuple[int, int], ...]:
-    """Bound the agent-supplied (host_port, container_port) pairing.
+    value: tuple[tuple[int, int, str | None], ...] | None,
+) -> tuple[tuple[int, int, str | None], ...]:
+    """Bound the agent-supplied (host_port, container_port, host_ip) pairing.
 
-    This is the trust boundary for host-port ingress. The destination address is never taken from
-    the agent (the helper uses the LOCAL address it assigned at attach), so the only thing the
-    agent can influence is *which* host port is redirected — hence the unprivileged-port floor and
-    the duplicate check. The worst a lying agent achieves is publishing its own container on some
-    other unprivileged port of the node.
+    This is the trust boundary for host-port ingress. The DNAT *destination* is never taken from the
+    agent (the helper uses the LOCAL address it assigned at attach), so the agent can influence only
+    *which* host port is redirected and *which local interface* it is published on — hence the
+    unprivileged-port floor, the duplicate check, and validating host_ip as a real IPv4 (or None for
+    every local address). The worst a lying agent achieves is publishing its own container on some
+    other unprivileged port, or a different local interface, of the node.
     """
     if not value:
         raise PolicyViolation("missing ports")
     if len(value) > _MAX_PUBLISHED_PORTS:
         raise PolicyViolation("too many ports")
     seen: set[int] = set()
-    for host_port, container_port in value:
+    for host_port, container_port, host_ip in value:
         if not (_MIN_HOST_PORT <= host_port <= _MAX_PORT):
             raise PolicyViolation("host port out of range")
         if not (1 <= container_port <= _MAX_PORT):
             raise PolicyViolation("container port out of range")
         if host_port in seen:
             raise PolicyViolation("duplicate host port")
+        if host_ip is not None:
+            validate_ipv4(host_ip, what="host_ip")
         seen.add(host_port)
     return value
 
