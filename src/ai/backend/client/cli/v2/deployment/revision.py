@@ -81,12 +81,18 @@ def add(
         raise click.UsageError("--use-shell and --no-use-shell are mutually exclusive.")
     if no_use_shell or use_shell is not None:
         # Explicit null disables shell wrapping over any baseline in the draft merge.
+        # `or {}` also normalizes containers present as explicit null in the config.
         shell = None if no_use_shell else use_shell
-        model_def = data.setdefault("model_definition", {})
+        model_def = data.get("model_definition") or {}
+        data["model_definition"] = model_def
         models = model_def.get("models") or [{}]
         model_def["models"] = models
         for model in models:
-            model.setdefault("service", {})["shell"] = shell
+            if not isinstance(model, dict):
+                continue  # let DTO validation report invalid entries
+            service = model.get("service") or {}
+            model["service"] = service
+            service["shell"] = shell
     body = AddRevisionInput.model_validate(data)
 
     async def _run() -> None:
