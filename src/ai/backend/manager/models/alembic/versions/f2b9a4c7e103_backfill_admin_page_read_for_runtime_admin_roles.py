@@ -34,8 +34,8 @@ def upgrade() -> None:
     # scope_id from existing permissions already held by each role.
     conn.execute(
         sa.text("""
-        INSERT INTO permissions (role_id, scope_type, scope_id, entity_type, operation)
-        SELECT DISTINCT p.role_id, p.scope_type, p.scope_id, 'project_admin_page', 'read'
+        INSERT INTO permissions (role_id, scope_type, scope_id, entity_type, operation, permission)
+        SELECT DISTINCT p.role_id, p.scope_type, p.scope_id, 'project_admin_page', 'read', 1
         FROM permissions p
         JOIN roles r ON r.id = p.role_id
         WHERE r.name LIKE 'project-%-admin'
@@ -48,8 +48,8 @@ def upgrade() -> None:
     # domain admin role (named 'domain-<name>-admin').
     conn.execute(
         sa.text("""
-        INSERT INTO permissions (role_id, scope_type, scope_id, entity_type, operation)
-        SELECT DISTINCT p.role_id, p.scope_type, p.scope_id, 'domain_admin_page', 'read'
+        INSERT INTO permissions (role_id, scope_type, scope_id, entity_type, operation, permission)
+        SELECT DISTINCT p.role_id, p.scope_type, p.scope_id, 'domain_admin_page', 'read', 1
         FROM permissions p
         JOIN roles r ON r.id = p.role_id
         WHERE r.name LIKE 'domain-%-admin'
