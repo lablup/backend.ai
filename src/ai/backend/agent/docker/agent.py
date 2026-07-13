@@ -57,9 +57,7 @@ from ai.backend.agent.errors.resources import PortPoolExhaustedError
 from ai.backend.agent.etcd import AgentEtcdClientView
 from ai.backend.agent.fs import create_scratch_filesystem, destroy_scratch_filesystem
 from ai.backend.agent.image_distro import (
-    LDD_GLIBC_REGEX,
-    LDD_MUSL_REGEX,
-    known_glibc_distros,
+    distro_from_ldd_output,
 )
 from ai.backend.agent.kernel import AbstractKernel, KernelRegistry
 from ai.backend.agent.kernel_registry.adapter import (
@@ -1789,21 +1787,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             await container.delete()
             log.debug("response: {}", container_log)
             version_lines = container_log[0].splitlines()
-            if m := LDD_GLIBC_REGEX.search(version_lines[0]):
-                version = float(m.group(1))
-                if version in known_glibc_distros:
-                    distro = known_glibc_distros[version]
-                else:
-                    for idx, known_version in enumerate(known_glibc_distros.keys()):
-                        if version < known_version:
-                            distro = list(known_glibc_distros.values())[idx - 1]
-                            break
-                    else:
-                        distro = list(known_glibc_distros.values())[-1]
-            elif m := LDD_MUSL_REGEX.search(version_lines[0]):
-                distro = "alpine3.8"
-            else:
-                raise RuntimeError("Could not determine the C library variant.")
+            distro = distro_from_ldd_output(version_lines[0])
             await self.valkey_stat_client.set_image_distro(image_id, distro)
             return distro
 

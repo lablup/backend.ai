@@ -54,9 +54,8 @@ from ai.backend.agent.errors.agent import ContainerCreationError
 from ai.backend.agent.errors.resources import PortPoolExhaustedError
 from ai.backend.agent.fs import create_scratch_filesystem, destroy_scratch_filesystem
 from ai.backend.agent.image_distro import (
-    LDD_GLIBC_REGEX,
-    LDD_MUSL_REGEX,
-    known_glibc_distros,
+    UnknownImageLibc,
+    distro_from_ldd_output,
 )
 from ai.backend.agent.kernel import AbstractKernel
 from ai.backend.agent.kernel_registry.adapter import (
@@ -814,7 +813,19 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         computer: AbstractComputePlugin,
         device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
     ) -> list[MountInfo]:
-        return []
+        """The mounts an accelerator plugin needs in the container, and the per-kernel directory it
+        writes them from.
+
+        Not every accelerator is served by the device nodes and env vars alone: the IPU plugin
+        writes a per-device ``ipuof`` config into this directory and mounts it, and the Hyperaccel
+        LPU plugin mounts its runtime libraries. Returning nothing here (as this used to) drops
+        them silently — the kernel starts, and the device it was allocated is unusable from inside.
+        """
+        if self._scratch_dir is None:
+            return []
+        src_path = self._scratch_dir / "config" / str(computer.key)
+        await asyncio.to_thread(src_path.mkdir, parents=True, exist_ok=True)
+        return await computer.generate_mounts(src_path, device_alloc)
 
     @override
     def resolve_krunner_filepath(self, filename: str) -> Path:
@@ -1611,9 +1622,16 @@ class ContainerdAgent(
         distro = image["labels"].get(LabelName.BASE_DISTRO)
         if distro:
             return distro
-        # Fallback for unlabeled images: probe the C library by running `ldd --version` in a
-        # throwaway container and parsing its captured stdout (same heuristic as DockerAgent).
-        return await self._probe_image_distro(image["canonical"])
+        # An unlabelled image has to be probed, which means running a throwaway container in it.
+        # An image's libc never changes — the image is immutable — so probing it once per kernel
+        # (which is what this did) is a container start the user waits through for an answer we
+        # already had. Cache it as the Docker backend does, keyed by the image's own id.
+        image_id = image["digest"].partition(":")[-1]
+        if cached := await self.valkey_stat_client.get_image_distro(image_id):
+            return cached
+        distro = await self._probe_image_distro(image["canonical"])
+        await self.valkey_stat_client.set_image_distro(image_id, distro)
+        return distro
 
     async def _probe_image_distro(self, canonical: str) -> str:
         probe_id = f"distro-probe-{uuid4().hex[:12]}"
@@ -1634,17 +1652,10 @@ class ContainerdAgent(
         finally:
             await self._runtime.remove_container(probe_id)
         first_line = output.splitlines()[0] if output.strip() else ""
-        if m := LDD_GLIBC_REGEX.search(first_line):
-            version = float(m.group(1))
-            if version in known_glibc_distros:
-                return known_glibc_distros[version]
-            for idx, known_version in enumerate(known_glibc_distros.keys()):
-                if version < known_version:
-                    return list(known_glibc_distros.values())[idx - 1]
-            return list(known_glibc_distros.values())[-1]
-        if LDD_MUSL_REGEX.search(first_line):
-            return "alpine3.8"
-        raise ImageNotAvailable(f"cannot determine the C library variant of {canonical}")
+        try:
+            return distro_from_ldd_output(first_line)
+        except UnknownImageLibc as e:
+            raise ImageNotAvailable(f"cannot determine the C library variant of {canonical}") from e
 
     @override
     def _resolve_stat_mode(self, local_config: Any) -> StatModes:

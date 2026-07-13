@@ -107,9 +107,31 @@ class _NoForwards:
         return []
 
 
-def _agent(facade: FakeFacade, *, port_forwarder: Any = None) -> ContainerdAgent:
+class _FakeDistroCache:
+    """The Valkey stat client's image-distro cache. An image's libc never changes (the image is
+    immutable), so a probe is a container start the user waits through for an answer we already
+    have."""
+
+    def __init__(self, cached: dict[str, str] | None = None) -> None:
+        self.cached = cached or {}
+        self.reads: list[str] = []
+        self.writes: list[tuple[str, str]] = []
+
+    async def get_image_distro(self, image_id: str) -> str | None:
+        self.reads.append(image_id)
+        return self.cached.get(image_id)
+
+    async def set_image_distro(self, image_id: str, distro: str) -> None:
+        self.writes.append((image_id, distro))
+        self.cached[image_id] = distro
+
+
+def _agent(
+    facade: FakeFacade, *, port_forwarder: Any = None, distro_cache: Any = None
+) -> ContainerdAgent:
     agent = ContainerdAgent.__new__(ContainerdAgent)
     agent._session_network = cast(Any, facade)
+    agent.valkey_stat_client = cast(Any, distro_cache or _FakeDistroCache())
     agent.local_config = cast(
         Any, SimpleNamespace(container=SimpleNamespace(scratch_root=Path("/tmp/bai-scratch")))
     )
@@ -135,7 +157,7 @@ class TestResolveImageDistro:
         runtime = _FakeRuntime()
         agent = _agent(FakeFacade())
         agent._runtime = cast(Any, runtime)
-        image = cast(Any, {"labels": {}, "canonical": "cr.example/img:1"})
+        image = cast(Any, {"labels": {}, "canonical": "cr.example/img:1", "digest": "sha256:abc"})
         distro = await agent.resolve_image_distro(image)
         assert isinstance(distro, str) and distro  # a concrete distro was resolved
         assert runtime.created and runtime.removed  # probe container created + cleaned up
@@ -148,7 +170,7 @@ class TestResolveImageDistro:
         )
         agent = _agent(FakeFacade())
         agent._runtime = cast(Any, _FakeRuntime())
-        image = cast(Any, {"labels": {}, "canonical": "cr.example/img:1"})
+        image = cast(Any, {"labels": {}, "canonical": "cr.example/img:1", "digest": "sha256:abc"})
         with pytest.raises(ImageNotAvailable):
             await agent.resolve_image_distro(image)
 
@@ -667,3 +689,60 @@ class TestPurgeImageFlags:
         agent = _agent(facade)
         await agent.purge_images(PurgeImagesReq(images=["a:1"], noprune=False))
         assert facade.remove_sync == [True]
+
+
+class TestTheDistroProbeIsCached:
+    """Probing means starting a throwaway container in the image. Doing it per kernel creation (as
+    this used to) makes every launch from an unlabelled image wait for an answer that cannot change:
+    the image is immutable, so its libc is too."""
+
+    def _image(self) -> Any:
+        return cast(
+            Any, {"labels": {}, "canonical": "cr.example/img:1", "digest": "sha256:deadbeef"}
+        )
+
+    def _probe(self, tmp_path: Any, monkeypatch: Any) -> None:
+        logfile = tmp_path / "probe.log"
+        logfile.write_text("ldd (Ubuntu GLIBC 2.35-0ubuntu3) 2.35\n")
+        monkeypatch.setattr(
+            "ai.backend.agent.containerd.agent.container_log_path", lambda cid: logfile
+        )
+
+    async def test_a_probed_distro_is_written_to_the_cache(
+        self, tmp_path: Any, monkeypatch: Any
+    ) -> None:
+        self._probe(tmp_path, monkeypatch)
+        cache = _FakeDistroCache()
+        agent = _agent(FakeFacade(), distro_cache=cache)
+        agent._runtime = cast(Any, _FakeRuntime())
+
+        distro = await agent.resolve_image_distro(self._image())
+
+        assert cache.writes == [("deadbeef", distro)]  # keyed by the image's own id
+
+    async def test_a_cached_distro_starts_no_container(
+        self, tmp_path: Any, monkeypatch: Any
+    ) -> None:
+        self._probe(tmp_path, monkeypatch)
+        cache = _FakeDistroCache({"deadbeef": "ubuntu22.04"})
+        runtime = _FakeRuntime()
+        agent = _agent(FakeFacade(), distro_cache=cache)
+        agent._runtime = cast(Any, runtime)
+
+        assert await agent.resolve_image_distro(self._image()) == "ubuntu22.04"
+        assert not runtime.created  # the point: no probe container at all
+
+    async def test_a_labelled_image_never_reaches_the_cache(self) -> None:
+        # The label is the answer; nothing to probe and nothing to remember.
+        cache = _FakeDistroCache()
+        agent = _agent(FakeFacade(), distro_cache=cache)
+        image = cast(
+            Any,
+            {
+                "labels": {LabelName.BASE_DISTRO: "ubuntu20.04"},
+                "canonical": "x",
+                "digest": "sha256:abc",
+            },
+        )
+        assert await agent.resolve_image_distro(image) == "ubuntu20.04"
+        assert cache.reads == [] and cache.writes == []

@@ -21,6 +21,7 @@ from ai.backend.agent.errors.agent import ContainerCreationError
 from ai.backend.agent.network.local_subnet import DEFAULT_LAYOUT
 from ai.backend.agent.port_pool import PortPool
 from ai.backend.agent.resources import Mount
+from ai.backend.agent.types import MountInfo
 from ai.backend.common.network.types import (
     AttachKind,
     EndpointPlan,
@@ -814,3 +815,61 @@ class TestTheClusterKeyIsReadableByTheKernelUser:
 
     async def test_a_non_root_agent_chowns_nothing(self, tmp_path: Path, monkeypatch: Any) -> None:
         assert await self._prepare(tmp_path, monkeypatch, root=False) == []
+
+
+class _FakeComputePlugin:
+    """An accelerator plugin of the shape the real ones have: handed a per-kernel directory, it
+    writes what its device needs into it and mounts it (the IPU plugin writes an `ipuof` config
+    there; the Hyperaccel LPU plugin mounts its runtime libraries)."""
+
+    key = "ipu"
+
+    def __init__(self) -> None:
+        self.source_paths: list[Path] = []
+
+    async def generate_mounts(self, source_path: Path, device_alloc: Any) -> list[MountInfo]:
+        self.source_paths.append(source_path)
+        (source_path / "ipuof.conf").write_text("device=0")
+        return [
+            MountInfo(MountTypes.BIND, source_path / "ipuof.conf", Path("/etc/ipuof.conf")),
+            MountInfo(MountTypes.BIND, Path("/opt/hyperdex"), Path("/opt/hyperdex")),
+        ]
+
+
+class TestAcceleratorMounts:
+    """Not every accelerator is served by device nodes and env vars alone. This used to return
+    nothing at all, so those mounts were dropped silently: the kernel starts, and the device it was
+    allocated is unusable from inside it."""
+
+    def _ctx(self, tmp_path: Path) -> Any:
+        ctx = _context(FakeFacade())
+        ctx._scratch_dir = tmp_path
+        return ctx
+
+    async def test_the_plugin_gets_a_per_kernel_directory_to_write_into(
+        self, tmp_path: Path
+    ) -> None:
+        ctx = self._ctx(tmp_path)
+        computer = _FakeComputePlugin()
+
+        await ctx.generate_accelerator_mounts(cast(Any, computer), cast(Any, {}))
+
+        assert computer.source_paths == [tmp_path / "config" / "ipu"]
+        assert (tmp_path / "config" / "ipu").is_dir()  # it must exist before the plugin writes
+
+    async def test_the_plugins_mounts_are_returned(self, tmp_path: Path) -> None:
+        ctx = self._ctx(tmp_path)
+        mounts = await ctx.generate_accelerator_mounts(
+            cast(Any, _FakeComputePlugin()), cast(Any, {})
+        )
+
+        targets = {str(m.dst_path) for m in mounts}
+        assert targets == {"/etc/ipuof.conf", "/opt/hyperdex"}
+
+    async def test_no_scratch_yields_no_mounts(self, tmp_path: Path) -> None:
+        ctx = self._ctx(tmp_path)
+        ctx._scratch_dir = None
+        assert (
+            await ctx.generate_accelerator_mounts(cast(Any, _FakeComputePlugin()), cast(Any, {}))
+            == []
+        )
