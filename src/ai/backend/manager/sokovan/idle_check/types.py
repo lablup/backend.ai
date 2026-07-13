@@ -8,6 +8,7 @@ from datetime import datetime
 from typing import override
 from uuid import UUID
 
+from ai.backend.common.identifier.idle_checker import IdleCheckerID
 from ai.backend.common.types import SessionId
 from ai.backend.manager.data.reconciler.types import (
     BaseReconcilerCategory,
@@ -77,13 +78,29 @@ class IdleCheckDecision(ReconcilerDecision):
         return self.handler_policy
 
 
+@dataclass(frozen=True)
+class IdleReason:
+    """One checker's grounds for judging a session idle."""
+
+    checker_id: IdleCheckerID
+    message: str
+
+
+@dataclass(frozen=True)
+class IdleCheckReport:
+    """One session judged idle and every checker's reason for it."""
+
+    session_id: SessionId
+    reasons: Sequence[IdleReason]
+
+
 @dataclass
 class IdleCheckResult(BaseReconcilerResult):
-    idle_session_ids: list[SessionId] = field(default_factory=list)
+    reports: list[IdleCheckReport] = field(default_factory=list)
 
     @override
     def processed_count(self) -> int:
-        return len(self.idle_session_ids)
+        return len(self.reports)
 
     @override
     def failed_count(self) -> int:
