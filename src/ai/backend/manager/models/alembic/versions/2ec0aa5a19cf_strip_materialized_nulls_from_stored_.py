@@ -18,7 +18,7 @@ free-form dicts (``pre_start_actions[].args``, ``metadata.min_resource``) —
 never an unset-field artifact.
 
 Revision ID: 2ec0aa5a19cf
-Revises: c05f9465a9cd
+Revises: b13d304bf1fd
 Create Date: 2026-07-07 14:37:50.082414
 
 """
@@ -27,7 +27,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "2ec0aa5a19cf"
-down_revision = "c05f9465a9cd"
+down_revision = "b13d304bf1fd"
 branch_labels = None
 depends_on = None
 # Part of: NEXT_RELEASE_VERSION
