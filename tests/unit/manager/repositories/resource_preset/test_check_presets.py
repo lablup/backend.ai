@@ -37,6 +37,7 @@ from ai.backend.common.types import (
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.kernel.types import KernelStatus
+from ai.backend.manager.data.permission.types import EntityType, ScopeType
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
@@ -52,6 +53,9 @@ from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
+from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+    AssociationScopesEntitiesRow,
+)
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
@@ -117,6 +121,7 @@ class TestCheckPresetsOccupiedSlots:
                 KeyPairResourcePolicyRow,
                 RoleRow,
                 UserRoleRow,
+                AssociationScopesEntitiesRow,
                 UserRow,
                 KeyPairRow,
                 GroupRow,
@@ -297,6 +302,16 @@ class TestCheckPresetsOccupiedSlots:
                 sa.insert(association_groups_users).values(
                     user_id=test_user_uuid,
                     group_id=group_id,
+                )
+            )
+            # Record project membership in the RBAC association table, which
+            # check_presets now uses to resolve the user's group.
+            db_sess.add(
+                AssociationScopesEntitiesRow(
+                    scope_type=ScopeType.PROJECT,
+                    scope_id=str(group_id),
+                    entity_type=EntityType.USER,
+                    entity_id=str(test_user_uuid),
                 )
             )
             await db_sess.flush()
@@ -1197,6 +1212,7 @@ class TestCheckPresetsZeroValues:
                 KeyPairResourcePolicyRow,
                 RoleRow,
                 UserRoleRow,
+                AssociationScopesEntitiesRow,
                 UserRow,
                 KeyPairRow,
                 GroupRow,
@@ -1409,6 +1425,16 @@ class TestCheckPresetsZeroValues:
                 sa.insert(association_groups_users).values(
                     user_id=test_user_uuid,
                     group_id=group_id,
+                )
+            )
+            # Record project membership in the RBAC association table, which
+            # check_presets now uses to resolve the user's group.
+            db_sess.add(
+                AssociationScopesEntitiesRow(
+                    scope_type=ScopeType.PROJECT,
+                    scope_id=str(group_id),
+                    entity_type=EntityType.USER,
+                    entity_id=str(test_user_uuid),
                 )
             )
             await db_sess.flush()
