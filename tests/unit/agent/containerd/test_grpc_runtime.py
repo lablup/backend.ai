@@ -6,7 +6,11 @@ import tarfile
 from types import SimpleNamespace
 from typing import Any, cast
 
+from ai.backend.agent.containerd._grpcapi.api.types import mount_pb2
 from ai.backend.agent.containerd.runtime.grpc import ContainerdGrpcRuntime, _chain_id
+
+_ACTIVE_MOUNT = mount_pb2.Mount(type="overlay", source="overlay", options=["upperdir=/active"])
+_BASE_VIEW_MOUNT = mount_pb2.Mount(type="overlay", source="overlay", options=["lowerdir=/base"])
 
 
 class TestChainId:
@@ -182,3 +186,235 @@ class TestExportImage:
         assert descriptor["size"] == len(manifest_blob)
         assert hexd == hashlib.sha256(manifest_blob).hexdigest()
         assert descriptor["annotations"]["org.opencontainers.image.ref.name"] == "img:1"
+
+
+class _CommitHarness:
+    """The containerd services a commit touches, faked with the semantics the real ones have.
+
+    Two of those semantics are the whole reason this test exists, and both were learned the hard way
+    against a live daemon: the differ returns a descriptor whose annotations are EMPTY and records
+    the layer's uncompressed digest as a *content label* instead; and the garbage collector reaches
+    a blob only through the `containerd.io/gc.ref.*` labels of whatever references it.
+    """
+
+    BASE_LAYER = {
+        "mediaType": "application/vnd.docker.image.rootfs.diff.tar.gzip",
+        "digest": "sha256:base-layer",
+        "size": 768,
+    }
+    BASE_DIFF_ID = "sha256:base-diff-id"
+    NEW_LAYER_DIGEST = "sha256:new-layer-blob"  # the compressed blob
+    NEW_DIFF_ID = "sha256:new-layer-uncompressed"  # what the config must record
+
+    def __init__(self) -> None:
+        self.diff_requests: list[Any] = []
+        self.views: list[Any] = []
+        self.removed_snapshots: list[str] = []
+        self.paused: list[str] = []
+        self.resumed: list[str] = []
+        self.written: dict[str, tuple[bytes, dict[str, str]]] = {}
+        self.label_updates: list[tuple[str, list[str]]] = []
+        self.created_images: list[Any] = []
+
+    def runtime(self) -> Any:
+        rt = cast(Any, ContainerdGrpcRuntime.__new__(ContainerdGrpcRuntime))
+        harness = self
+
+        base_config = {
+            "rootfs": {"type": "layers", "diff_ids": [self.BASE_DIFF_ID]},
+            "config": {"Labels": {"base": "yes"}},
+            "history": [{"created_by": "base"}],
+        }
+        base_manifest = {
+            "schemaVersion": 2,
+            "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+            "config": {"digest": "sha256:base-config", "size": 1},
+            "layers": [self.BASE_LAYER],
+        }
+
+        class _Snapshots:
+            async def Mounts(self, req: Any, metadata: Any = None) -> Any:
+                return SimpleNamespace(mounts=[_ACTIVE_MOUNT])
+
+            async def View(self, req: Any, metadata: Any = None) -> Any:
+                harness.views.append(req)
+                return SimpleNamespace(mounts=[_BASE_VIEW_MOUNT])
+
+            async def Remove(self, req: Any, metadata: Any = None) -> Any:
+                harness.removed_snapshots.append(req.key)
+                return SimpleNamespace()
+
+        class _Diff:
+            async def Diff(self, req: Any, metadata: Any = None) -> Any:
+                harness.diff_requests.append(req)
+                # As the real differ does: no annotations on the descriptor...
+                return SimpleNamespace(
+                    diff=SimpleNamespace(digest=harness.NEW_LAYER_DIGEST, size=177, annotations={})
+                )
+
+        class _Content:
+            async def Info(self, req: Any, metadata: Any = None) -> Any:
+                # ...the diff_id lives here instead.
+                return SimpleNamespace(
+                    info=SimpleNamespace(labels={"containerd.io/uncompressed": harness.NEW_DIFF_ID})
+                )
+
+            async def Update(self, req: Any, metadata: Any = None) -> Any:
+                harness.label_updates.append((req.info.digest, list(req.update_mask.paths)))
+                return SimpleNamespace()
+
+        class _Tasks:
+            async def Pause(self, req: Any, metadata: Any = None) -> Any:
+                harness.paused.append(req.container_id)
+                return SimpleNamespace()
+
+            async def Resume(self, req: Any, metadata: Any = None) -> Any:
+                harness.resumed.append(req.container_id)
+                return SimpleNamespace()
+
+        class _Images:
+            async def Create(self, req: Any, metadata: Any = None) -> Any:
+                harness.created_images.append(req.image)
+                return SimpleNamespace()
+
+        async def _resolve_manifest(image_ref: str) -> Any:
+            return base_manifest
+
+        async def _read_content(digest: str) -> bytes:
+            return json.dumps(base_config).encode()
+
+        async def _write_content(
+            data: bytes, media_type: str, *, labels: Any = None
+        ) -> dict[str, Any]:
+            digest = "sha256:" + hashlib.sha256(data).hexdigest()
+            harness.written[digest] = (data, dict(labels or {}))
+            return {"mediaType": media_type, "digest": digest, "size": len(data)}
+
+        rt._snapshots_stub = lambda: _Snapshots()
+        rt._diff_stub = lambda: _Diff()
+        rt._content_stub = lambda: _Content()
+        rt._tasks_stub = lambda: _Tasks()
+        rt._images_stub = lambda: _Images()
+        rt._resolve_manifest = _resolve_manifest
+        rt._write_content = _write_content
+        rt._read_content = _read_content
+        type(rt)._md = property(lambda self: [])
+        return rt
+
+    def manifest(self) -> dict[str, Any]:
+        for digest, (data, _labels) in self.written.items():
+            payload = json.loads(data)
+            if payload.get("layers") is not None:
+                return cast(dict[str, Any], payload)
+        raise AssertionError("no manifest was written")
+
+    def manifest_labels(self) -> dict[str, str]:
+        for digest, (data, labels) in self.written.items():
+            if json.loads(data).get("layers") is not None:
+                return labels
+        raise AssertionError("no manifest was written")
+
+    def config(self) -> dict[str, Any]:
+        for digest, (data, _labels) in self.written.items():
+            payload = json.loads(data)
+            if payload.get("rootfs") is not None:
+                return cast(dict[str, Any], payload)
+        raise AssertionError("no config was written")
+
+
+class TestCommitContainer:
+    async def _commit(self) -> _CommitHarness:
+        harness = _CommitHarness()
+        rt = harness.runtime()
+        await rt.commit_container(
+            "kern-1",
+            base_image_ref="base:1",
+            target_ref="committed:1",
+            labels={"ai.backend.customized-image.name": "mine"},
+        )
+        return harness
+
+    async def test_the_layer_is_a_diff_against_the_base_not_the_whole_rootfs(self) -> None:
+        # `left=[]` diffs the rootfs against nothing, flattening the entire OS into one layer that
+        # shares nothing with the base image: gigabytes duplicated per commit, a push that uploads
+        # the whole OS, and a pull that can reuse none of what the puller already has.
+        harness = await self._commit()
+        request = harness.diff_requests[0]
+        assert list(request.left) == [_BASE_VIEW_MOUNT]
+        assert list(request.right) == [_ACTIVE_MOUNT]
+
+    async def test_the_base_layers_are_kept_and_ours_is_appended(self) -> None:
+        harness = await self._commit()
+        layers = harness.manifest()["layers"]
+        assert layers[0] == harness.BASE_LAYER  # the same blob, byte for byte: stored once
+        assert layers[1]["digest"] == harness.NEW_LAYER_DIGEST
+        assert layers[1]["mediaType"] == "application/vnd.oci.image.layer.v1.tar+gzip"
+
+    async def test_the_config_records_the_uncompressed_digest_as_the_diff_id(self) -> None:
+        # The blob's own digest is the COMPRESSED one. Recording it produces an image containerd
+        # stores happily and then refuses to unpack ("wrong diff id calculated on extraction").
+        harness = await self._commit()
+        diff_ids = harness.config()["rootfs"]["diff_ids"]
+        assert diff_ids == [harness.BASE_DIFF_ID, harness.NEW_DIFF_ID]
+        assert harness.NEW_LAYER_DIGEST not in diff_ids
+
+    async def test_the_manifest_names_its_config_and_every_layer_for_the_gc(self) -> None:
+        # containerd's GC reaches content only through these labels. Without them the config and
+        # layers are unreferenced, the next GC pass deletes them, and the committed image is left an
+        # empty shell: `ctr images check` says "incomplete (0/2)" and running it fails with
+        # "content digest ...: not found". (Verified against a live daemon.)
+        harness = await self._commit()
+        labels = harness.manifest_labels()
+        config_digest = harness.manifest()["config"]["digest"]
+        assert labels["containerd.io/gc.ref.content.config"] == config_digest
+        assert labels["containerd.io/gc.ref.content.l.0"] == harness.BASE_LAYER["digest"]
+        assert labels["containerd.io/gc.ref.content.l.1"] == harness.NEW_LAYER_DIGEST
+
+    async def test_the_blobs_are_gc_roots_until_the_image_references_them(self) -> None:
+        # Between writing a blob and creating the image, nothing references it — and the GC deletes
+        # what nothing references, including a 2 GB layer we are still assembling an image around.
+        harness = await self._commit()
+        for _digest, (_data, labels) in harness.written.items():
+            assert "containerd.io/gc.root" in labels
+
+    async def test_the_roots_are_released_once_the_image_exists(self) -> None:
+        # A GC root is never collected — not even after the image is deleted. Leaving them on would
+        # pin every commit's layers on the node forever.
+        harness = await self._commit()
+        rooted = {digest for digest, (_d, labels) in harness.written.items()}
+        rooted.add(harness.NEW_LAYER_DIGEST)  # the differ's blob is rooted through the Diff labels
+        dropped = {digest for digest, _paths in harness.label_updates}
+        assert rooted == dropped
+        for _digest, paths in harness.label_updates:
+            # only that one label: the differ's `uncompressed` label on the layer is how containerd
+            # maps a diff_id back to the blob, and wiping it would break the unpack.
+            assert paths == ["labels.containerd.io/gc.root"]
+
+    async def test_the_container_is_frozen_while_its_rootfs_is_read(self) -> None:
+        # `docker commit` pauses by default: a rootfs read while it is being written yields a layer
+        # of half-written files, and the user is not told which.
+        harness = await self._commit()
+        assert harness.paused == ["kern-1"]
+        assert harness.resumed == ["kern-1"]
+
+    async def test_the_base_view_is_removed(self) -> None:
+        # It is a snapshot like any other; leaving one behind per commit leaks the snapshotter.
+        harness = await self._commit()
+        assert harness.removed_snapshots == [harness.views[0].key]
+
+    async def test_the_image_points_at_the_manifest(self) -> None:
+        harness = await self._commit()
+        image = harness.created_images[0]
+        manifest_digest = next(
+            digest
+            for digest, (data, _l) in harness.written.items()
+            if json.loads(data).get("layers") is not None
+        )
+        assert image.name == "committed:1"
+        assert image.target.digest == manifest_digest
+
+    async def test_the_caller_labels_are_merged_into_the_config(self) -> None:
+        harness = await self._commit()
+        labels = harness.config()["config"]["Labels"]
+        assert labels["ai.backend.customized-image.name"] == "mine"
+        assert labels["base"] == "yes"  # the base image's own labels survive

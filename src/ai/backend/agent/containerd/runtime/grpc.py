@@ -26,12 +26,13 @@ import logging
 import signal
 import tarfile
 from collections.abc import AsyncIterator, Mapping, Sequence
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, cast, override
 from uuid import uuid4
 
 import grpc
-from google.protobuf import any_pb2
+from google.protobuf import any_pb2, field_mask_pb2
 
 from ai.backend.agent.containerd._grpcapi.api.events import task_pb2 as task_events_pb2
 from ai.backend.agent.containerd._grpcapi.api.services.containers.v1 import (
@@ -97,6 +98,24 @@ _INDEX_MEDIA_TYPES = frozenset({
     "application/vnd.oci.image.index.v1+json",
     "application/vnd.docker.distribution.manifest.list.v2+json",
 })
+# A commit produces an OCI manifest even when the base image is a Docker one (as most registry
+# images still are), keeping the base's layer descriptors exactly as they are — a mix the registries
+# accept and containerd's own tooling (nerdctl commit) produces too. It is not a free choice: the
+# differ refuses to write a Docker-media-type layer at all ("unsupported diff media type ...
+# tar.gzip: not implemented", verified against containerd 2.2.1), so the new layer must be OCI, and
+# an OCI layer under a Docker manifest is the combination nothing accepts.
+_OCI_LAYER_GZIP_MEDIA_TYPE = "application/vnd.oci.image.layer.v1.tar+gzip"
+
+# containerd's garbage collector reaches content ONLY through these labels. A manifest that does not
+# name its config and layers is a manifest whose config and layers are unreferenced — the next GC
+# pass deletes them and leaves the image an empty shell. containerd itself writes them on every pull
+# (`ctr content ls` shows them on any pulled manifest); a blob we write ourselves is no different.
+_GC_ROOT_LABEL = "containerd.io/gc.root"
+_GC_REF_CONFIG_LABEL = "containerd.io/gc.ref.content.config"
+_GC_REF_LAYER_LABEL = "containerd.io/gc.ref.content.l.{index}"
+# The differ records the layer's *uncompressed* digest here — the diff_id the image config needs,
+# which for a compressed layer is not the blob's own digest.
+_UNCOMPRESSED_LABEL = "containerd.io/uncompressed"
 # GOARCH names for platform matching in a multi-arch image index.
 _GOARCH = {"aarch64": "arm64", "x86_64": "amd64"}
 
@@ -256,7 +275,9 @@ class ContainerdGrpcRuntime(OciRuntime):
                 ev_start.ParseFromString(env.event.value)
                 yield TaskEvent("start", ev_start.container_id)
 
-    async def _write_content(self, data: bytes, media_type: str) -> dict[str, Any]:
+    async def _write_content(
+        self, data: bytes, media_type: str, *, labels: Mapping[str, str] | None = None
+    ) -> dict[str, Any]:
         """Write a blob to the content store and return its OCI descriptor dict."""
         digest = "sha256:" + hashlib.sha256(data).hexdigest()
         ref = f"commit-{digest[7:19]}"
@@ -276,11 +297,69 @@ class ContainerdGrpcRuntime(OciRuntime):
                 total=len(data),
                 expected=digest,
                 offset=len(data),
+                labels=dict(labels or {}),
             )
 
         async for _resp in self._content_stub().Write(_requests(), metadata=self._md):
             pass
         return {"mediaType": media_type, "digest": digest, "size": len(data)}
+
+    async def _uncompressed_digest(self, digest: str) -> str:
+        """The diff_id of a compressed layer blob: the digest of its *uncompressed* tar, which the
+        differ writes as a label on the blob it produced."""
+        info = (
+            await self._content_stub().Info(
+                content_pb2.InfoRequest(digest=digest), metadata=self._md
+            )
+        ).info
+        uncompressed = info.labels.get(_UNCOMPRESSED_LABEL)
+        if not uncompressed:
+            raise RuntimeError(
+                f"containerd did not record an uncompressed digest for the committed layer {digest};"
+                " the image it produced would not unpack"
+            )
+        return str(uncompressed)
+
+    async def _drop_gc_root(self, digest: str) -> None:
+        """Release the temporary GC root held on a blob while the image that will reference it did
+        not exist yet. The mask names the one label, so the differ's ``uncompressed`` label — which
+        is how containerd maps a diff_id back to this blob when it unpacks the image — survives."""
+        await self._content_stub().Update(
+            content_pb2.UpdateRequest(
+                info=content_pb2.Info(digest=digest, labels={_GC_ROOT_LABEL: ""}),
+                update_mask=field_mask_pb2.FieldMask(paths=[f"labels.{_GC_ROOT_LABEL}"]),
+            ),
+            metadata=self._md,
+        )
+
+    @contextlib.asynccontextmanager
+    async def _paused(self, container_id: str) -> AsyncIterator[None]:
+        """Freeze the container's processes for the duration of the diff, the way `docker commit`
+        does by default: a rootfs read while it is being written yields a layer of half-written
+        files, and the user is not told which.
+
+        A container with no running task (already exited) needs no pausing, and a runtime that
+        refuses to pause must not cost the user their commit — it costs them only the guarantee.
+        """
+        try:
+            await self._tasks_stub().Pause(
+                tasks_pb2.PauseTaskRequest(container_id=container_id), metadata=self._md
+            )
+        except grpc.aio.AioRpcError as e:
+            log.warning(
+                "could not pause {} for the commit ({}); its rootfs is being read while it runs",
+                container_id,
+                e.code().name,
+            )
+            yield
+            return
+        try:
+            yield
+        finally:
+            with contextlib.suppress(grpc.aio.AioRpcError):
+                await self._tasks_stub().Resume(
+                    tasks_pb2.ResumeTaskRequest(container_id=container_id), metadata=self._md
+                )
 
     @override
     async def commit_container(
@@ -291,46 +370,105 @@ class ContainerdGrpcRuntime(OciRuntime):
         target_ref: str,
         labels: Mapping[str, str] | None = None,
     ) -> None:
-        # 1. The container's rootfs (active snapshot, incl. the user's changes).
-        mounts = (
+        base_manifest = await self._resolve_manifest(base_image_ref)
+        base_config = json.loads(await self._read_content(base_manifest["config"]["digest"]))
+        base_layers = list(base_manifest.get("layers") or [])
+        base_diff_ids = list(base_config["rootfs"]["diff_ids"])
+        now = datetime.now(UTC).isoformat()
+
+        # 1. Diff the container's rootfs against the base image's, so the layer holds what the user
+        #    CHANGED and the image shares every layer below it with the base. A diff against nothing
+        #    (left=[]) would flatten the whole rootfs into one layer that no other image shares:
+        #    gigabytes duplicated in the content store, a push that uploads the entire OS, and a
+        #    pull that can reuse none of what the puller already has.
+        active = (
             await self._snapshots_stub().Mounts(
                 snapshots_pb2.MountsRequest(snapshotter=_SNAPSHOTTER, key=container_id),
                 metadata=self._md,
             )
         ).mounts
-        # 2. Diff the whole rootfs into one uncompressed layer (its digest == the diff_id).
-        layer = (
-            await self._diff_stub().Diff(
-                diff_pb2.DiffRequest(
-                    left=[],
-                    right=list(mounts),
-                    media_type=_LAYER_MEDIA_TYPE,
-                    ref=f"commit-{container_id}",
+        view_key = f"backendai-commit-{container_id}"
+        base_view = (
+            await self._snapshots_stub().View(
+                snapshots_pb2.ViewSnapshotRequest(
+                    snapshotter=_SNAPSHOTTER,
+                    key=view_key,
+                    parent=_chain_id(base_diff_ids),
                 ),
                 metadata=self._md,
             )
-        ).diff
-        # 3. New config = the base image config with a single-layer rootfs + merged labels.
-        _chain, base_config = await self._resolve_image(base_image_ref)
-        config = dict(base_config)
-        config["rootfs"] = {"type": "layers", "diff_ids": [layer.digest]}
+        ).mounts
+        try:
+            async with self._paused(container_id):
+                layer = (
+                    await self._diff_stub().Diff(
+                        diff_pb2.DiffRequest(
+                            left=list(base_view),
+                            right=list(active),
+                            media_type=_OCI_LAYER_GZIP_MEDIA_TYPE,
+                            ref=f"commit-{container_id}",
+                            # The image that will reference this blob does not exist yet, so until
+                            # it does the blob is unreferenced — and containerd's GC deletes what
+                            # nothing references. Hold it as a root, and let go below.
+                            labels={_GC_ROOT_LABEL: now},
+                        ),
+                        metadata=self._md,
+                    )
+                ).diff
+        finally:
+            with contextlib.suppress(grpc.aio.AioRpcError):
+                await self._snapshots_stub().Remove(
+                    snapshots_pb2.RemoveSnapshotRequest(snapshotter=_SNAPSHOTTER, key=view_key),
+                    metadata=self._md,
+                )
+
+        # 2. New config: the base's, plus this layer's diff_id and a history entry.
+        #
+        #    The diff_id is the layer's UNCOMPRESSED digest, which for a gzipped layer is NOT the
+        #    blob's digest. The differ records it as a *content label*, and leaves the descriptor it
+        #    returns with empty annotations — so it has to be read back from the content store.
+        #    Taking the blob's own digest instead produces an image containerd accepts, stores, and
+        #    then refuses to unpack ("wrong diff id calculated on extraction"): complete on disk,
+        #    unusable in fact.
+        diff_id = await self._uncompressed_digest(layer.digest)
+        config = json.loads(json.dumps(base_config))  # deep copy: we edit nested members
+        config["rootfs"] = {"type": "layers", "diff_ids": [*base_diff_ids, diff_id]}
         cfg = dict(config.get("config") or {})
         cfg["Labels"] = {**(cfg.get("Labels") or {}), **(labels or {})}
         config["config"] = cfg
-        config_desc = await self._write_content(json.dumps(config).encode(), _CONFIG_MEDIA_TYPE)
-        # 4. New manifest referencing the config + the single layer.
+        config["created"] = now
+        config["history"] = [
+            *(config.get("history") or []),
+            {"created": now, "created_by": f"backend.ai commit {container_id}"},
+        ]
+        config_desc = await self._write_content(
+            json.dumps(config).encode(), _CONFIG_MEDIA_TYPE, labels={_GC_ROOT_LABEL: now}
+        )
+
+        # 3. New manifest: the base's layers plus ours. Its GC labels are what keep the config and
+        #    every layer reachable once the image is the only thing rooting them.
+        layers: list[dict[str, Any]] = [
+            *base_layers,
+            {
+                "mediaType": _OCI_LAYER_GZIP_MEDIA_TYPE,
+                "digest": layer.digest,
+                "size": layer.size,
+            },
+        ]
         manifest = {
             "schemaVersion": 2,
             "mediaType": _MANIFEST_MEDIA_TYPE,
             "config": config_desc,
-            "layers": [
-                {"mediaType": _LAYER_MEDIA_TYPE, "digest": layer.digest, "size": layer.size}
-            ],
+            "layers": layers,
         }
+        gc_refs = {_GC_REF_CONFIG_LABEL: config_desc["digest"], _GC_ROOT_LABEL: now}
+        for index, desc in enumerate(layers):
+            gc_refs[_GC_REF_LAYER_LABEL.format(index=index)] = str(desc["digest"])
         manifest_desc = await self._write_content(
-            json.dumps(manifest).encode(), _MANIFEST_MEDIA_TYPE
+            json.dumps(manifest).encode(), _MANIFEST_MEDIA_TYPE, labels=gc_refs
         )
-        # 5. Register the image pointing at the manifest.
+
+        # 4. Register the image pointing at the manifest.
         target = descriptor_pb2.Descriptor(
             media_type=_MANIFEST_MEDIA_TYPE,
             digest=manifest_desc["digest"],
@@ -347,6 +485,13 @@ class ContainerdGrpcRuntime(OciRuntime):
             await self._images_stub().Update(
                 images_pb2.UpdateImageRequest(image=image), metadata=self._md
             )
+
+        # 5. The image now roots the manifest, and the manifest references the config and the layer,
+        #    so the temporary roots can go. Leaving them would pin every commit's blobs forever —
+        #    a GC root is never collected, even after the image is deleted.
+        for digest in (manifest_desc["digest"], config_desc["digest"], layer.digest):
+            with contextlib.suppress(grpc.aio.AioRpcError):
+                await self._drop_gc_root(digest)
 
     # --- image content helpers (read the manifest chain to resolve the rootfs) ---
 
