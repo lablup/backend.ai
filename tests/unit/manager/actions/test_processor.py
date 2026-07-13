@@ -1,3 +1,4 @@
+from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Final, override
@@ -294,6 +295,14 @@ class TestAuditLogMonitorActorIdentities:
         assert spec.acted_as is None
 
 
+@dataclass(frozen=True)
+class _ExpectedActorIdentities:
+    """The (triggered_by, acted_as) a reporter message should record for a context."""
+
+    triggered_by: str | None
+    acted_as: UUID | None
+
+
 class TestReporterMonitorActorIdentities:
     """ReporterMonitor records triggered_by (the caller) and acted_as (the effective/acting
     subject) separately, mirroring the audit-log monitor; they diverge only during
@@ -318,34 +327,10 @@ class TestReporterMonitorActorIdentities:
     def mock_meta(self) -> BaseActionTriggerMeta:
         return BaseActionTriggerMeta(action_id=uuid4(), started_at=datetime.now(tz=UTC))
 
-    async def test_started_message_records_both_identities_under_impersonation(
-        self,
-        reporter_monitor: ReporterMonitor,
-        reporter_hub: MagicMock,
-        mock_action: MockAction,
-        mock_meta: BaseActionTriggerMeta,
-    ) -> None:
-        target = _make_user(uuid4())
-        super_admin = _make_user(uuid4(), is_superadmin=True)
-
-        with with_user(target), with_triggered_user(super_admin):
-            await reporter_monitor.prepare(mock_action, mock_meta)
-
-        message = reporter_hub.report_started.call_args.args[0]
-        assert message.triggered_by == str(super_admin.user_id)
-        assert message.acted_as == target.user_id
-
-    async def test_finished_message_records_both_identities_under_impersonation(
-        self,
-        reporter_monitor: ReporterMonitor,
-        reporter_hub: MagicMock,
-        mock_action: MockAction,
-    ) -> None:
-        target = _make_user(uuid4())
-        super_admin = _make_user(uuid4(), is_superadmin=True)
-
+    @pytest.fixture
+    def mock_result(self) -> ProcessResult:
         now = datetime.now(tz=UTC)
-        result = ProcessResult(
+        return ProcessResult(
             meta=BaseActionResultMeta(
                 action_id=uuid4(),
                 entity_id="1",
@@ -357,62 +342,82 @@ class TestReporterMonitorActorIdentities:
                 error_code=None,
             ),
         )
-        with with_user(target), with_triggered_user(super_admin):
-            await reporter_monitor.done(mock_action, result)
 
-        message = reporter_hub.report_finished.call_args.args[0]
-        assert message.triggered_by == str(super_admin.user_id)
-        assert message.acted_as == target.user_id
+    @pytest.fixture
+    def impersonation_context(self) -> Iterator[_ExpectedActorIdentities]:
+        """Super admin acting as another user: caller and effective subject differ."""
+        target = _make_user(uuid4())
+        super_admin = _make_user(uuid4(), is_superadmin=True)
+        with with_user(target), with_triggered_user(super_admin):
+            yield _ExpectedActorIdentities(
+                triggered_by=str(super_admin.user_id), acted_as=target.user_id
+            )
+
+    @pytest.fixture
+    def normal_context(self) -> Iterator[_ExpectedActorIdentities]:
+        """Caller and effective subject are the same user."""
+        user = _make_user(uuid4())
+        with with_user(user), with_triggered_user(user):
+            yield _ExpectedActorIdentities(triggered_by=str(user.user_id), acted_as=user.user_id)
+
+    @pytest.fixture
+    def system_context(self) -> Iterator[_ExpectedActorIdentities]:
+        """System-triggered action: no authenticated user."""
+        yield _ExpectedActorIdentities(triggered_by=None, acted_as=None)
+
+    async def test_impersonation_records_caller_and_effective_identities(
+        self,
+        reporter_monitor: ReporterMonitor,
+        reporter_hub: MagicMock,
+        mock_action: MockAction,
+        mock_meta: BaseActionTriggerMeta,
+        mock_result: ProcessResult,
+        impersonation_context: _ExpectedActorIdentities,
+    ) -> None:
+        expected = impersonation_context
+
+        await reporter_monitor.prepare(mock_action, mock_meta)
+        await reporter_monitor.done(mock_action, mock_result)
+
+        started = reporter_hub.report_started.call_args.args[0]
+        finished = reporter_hub.report_finished.call_args.args[0]
+        assert started.triggered_by == finished.triggered_by == expected.triggered_by
+        assert started.acted_as == finished.acted_as == expected.acted_as
 
     async def test_normal_context_triggered_by_equals_acted_as(
         self,
         reporter_monitor: ReporterMonitor,
         reporter_hub: MagicMock,
         mock_action: MockAction,
+        mock_meta: BaseActionTriggerMeta,
+        mock_result: ProcessResult,
+        normal_context: _ExpectedActorIdentities,
     ) -> None:
-        user = _make_user(uuid4())
+        expected = normal_context
 
-        now = datetime.now(tz=UTC)
-        result = ProcessResult(
-            meta=BaseActionResultMeta(
-                action_id=uuid4(),
-                entity_id="1",
-                status=OperationStatus.SUCCESS,
-                description="Success",
-                started_at=now,
-                ended_at=now,
-                duration=timedelta(seconds=0.0),
-                error_code=None,
-            ),
-        )
-        with with_user(user), with_triggered_user(user):
-            await reporter_monitor.done(mock_action, result)
+        await reporter_monitor.prepare(mock_action, mock_meta)
+        await reporter_monitor.done(mock_action, mock_result)
 
-        message = reporter_hub.report_finished.call_args.args[0]
-        assert message.triggered_by == str(user.user_id)
-        assert message.acted_as == user.user_id
+        started = reporter_hub.report_started.call_args.args[0]
+        finished = reporter_hub.report_finished.call_args.args[0]
+        assert started.triggered_by == finished.triggered_by == expected.triggered_by
+        assert started.acted_as == finished.acted_as == expected.acted_as
 
     async def test_system_trigger_records_both_none(
         self,
         reporter_monitor: ReporterMonitor,
         reporter_hub: MagicMock,
         mock_action: MockAction,
+        mock_meta: BaseActionTriggerMeta,
+        mock_result: ProcessResult,
+        system_context: _ExpectedActorIdentities,
     ) -> None:
-        now = datetime.now(tz=UTC)
-        result = ProcessResult(
-            meta=BaseActionResultMeta(
-                action_id=uuid4(),
-                entity_id="1",
-                status=OperationStatus.SUCCESS,
-                description="Success",
-                started_at=now,
-                ended_at=now,
-                duration=timedelta(seconds=0.0),
-                error_code=None,
-            ),
-        )
-        await reporter_monitor.done(mock_action, result)
+        expected = system_context
 
-        message = reporter_hub.report_finished.call_args.args[0]
-        assert message.triggered_by is None
-        assert message.acted_as is None
+        await reporter_monitor.prepare(mock_action, mock_meta)
+        await reporter_monitor.done(mock_action, mock_result)
+
+        started = reporter_hub.report_started.call_args.args[0]
+        finished = reporter_hub.report_finished.call_args.args[0]
+        assert started.triggered_by == finished.triggered_by == expected.triggered_by
+        assert started.acted_as == finished.acted_as == expected.acted_as
