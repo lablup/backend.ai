@@ -39,12 +39,18 @@ from ai.backend.agent.utils import get_arch_name
 from ai.backend.common.config import BaseConfigSchema
 from ai.backend.common.configs import (
     EtcdConfig,
+    MemrayConfig,
     OTELConfig,
     PyroscopeConfig,
     ServiceDiscoveryConfig,
 )
 from ai.backend.common.configs.redis import RedisConfig
-from ai.backend.common.meta import BackendAIConfigMeta, CompositeType, ConfigExample
+from ai.backend.common.meta import (
+    NEXT_RELEASE_VERSION,
+    BackendAIConfigMeta,
+    CompositeType,
+    ConfigExample,
+)
 from ai.backend.common.typed_validators import (
     AutoDirectoryPath,
     GroupID,
@@ -2113,6 +2119,19 @@ class AgentGlobalConfig(BaseConfigSchema):
                 "and memory issues in the agent process."
             ),
             added_version="25.12.0",
+            composite=CompositeType.FIELD,
+        ),
+    ]
+    memray: Annotated[
+        MemrayConfig,
+        Field(default_factory=MemrayConfig),
+        BackendAIConfigMeta(
+            description=(
+                "Memray allocation-tracking configuration for the agent. "
+                "Enable it only while diagnosing agent memory growth: the capture file keeps "
+                "growing for as long as the process runs."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
             composite=CompositeType.FIELD,
         ),
     ]

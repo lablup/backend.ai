@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import functools
 import logging
 import os
@@ -1779,6 +1780,26 @@ def main(
         raise click.Abort() from e
 
     if not is_invoked_subcommand:
+        memray_tracker: contextlib.AbstractContextManager[Any] | None = None
+        if server_config.memray.enabled:
+            import memray
+
+            # `aiotools.start_server()` forks the service worker, so follow it to
+            # capture the allocations of the process that does the actual work.
+            # The PID suffix keeps a restart from colliding with an earlier capture,
+            # which memray would refuse to overwrite.
+            memray_destination = server_config.memray.output_destination
+            memray_destination = memray_destination.with_name(
+                f"{memray_destination.stem}.{os.getpid()}{memray_destination.suffix}"
+            )
+            memray_destination.parent.mkdir(parents=True, exist_ok=True)
+            memray_tracker = memray.Tracker(
+                memray_destination,
+                follow_fork=True,
+                native_traces=server_config.memray.native_traces,
+            )
+            memray_tracker.__enter__()
+
         server_config.agent_common.pid_file.write_text(str(os.getpid()))
         image_commit_path = server_config.agent_common.image_commit_path
         image_commit_path.mkdir(parents=True, exist_ok=True)
@@ -1823,6 +1844,8 @@ def main(
                 )
                 log.info("exit.")
         finally:
+            if memray_tracker is not None:
+                memray_tracker.__exit__(None, None, None)
             if server_config.agent_common.pid_file.is_file():
                 # check is_file() to prevent deleting /dev/null!
                 server_config.agent_common.pid_file.unlink()

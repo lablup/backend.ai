@@ -468,6 +468,29 @@
   # Added in 24.12.1
   ## sample-rate = 100
 
+# Memray allocation-tracking configuration for the agent. Enable it only while
+# diagnosing agent memory growth: the capture file keeps growing for as long as
+# the process runs.
+# Added in 26.8.0
+[memray]
+  # Whether to track memory allocations with memray. The capture file grows
+  # continuously while the process runs, so keep this disabled unless you are
+  # actively debugging memory usage.
+  # Added in 26.8.0
+  enabled = false
+  # Path to store the memray allocation capture. Memray refuses to start when
+  # the file already exists, so the process appends its PID to the path. Ensure
+  # the parent directory exists and has enough space.
+  # Added in 26.8.0
+  output-destination = "/var/log/backend.ai/memray/agent.bin"
+  # Whether to also capture native (C/C++) call stacks, so that allocations made
+  # inside extension modules are attributed to their native frames instead of
+  # the calling Python frame. This adds runtime overhead and enlarges the
+  # capture, and the native frames only resolve when debug symbols are
+  # available.
+  # Added in 26.8.0
+  native-traces = false
+
 # Logging configuration for the agent. Controls log levels, output destinations,
 # and log formatting. Proper logging setup is essential for debugging and
 # monitoring agent behavior in production environments.
