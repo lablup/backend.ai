@@ -645,6 +645,7 @@ class ResourcePolicyAdapter(BaseAdapter):
         return UserResourcePolicyNode(
             id=data.name,
             name=data.name,
+            created_at=data.created_at,
             max_vfolder_count=data.max_vfolder_count,
             max_concurrent_logins=data.max_concurrent_logins,
             max_quota_scope_size=_to_binary_size_info(data.max_quota_scope_size),
@@ -659,6 +660,7 @@ class ResourcePolicyAdapter(BaseAdapter):
         return ProjectResourcePolicyNode(
             id=data.name,
             name=data.name,
+            created_at=data.created_at,
             max_vfolder_count=data.max_vfolder_count,
             max_quota_scope_size=_to_binary_size_info(data.max_quota_scope_size),
             max_network_count=data.max_network_count,
