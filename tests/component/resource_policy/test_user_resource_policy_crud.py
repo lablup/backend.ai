@@ -37,6 +37,7 @@ class TestUserResourcePolicyCreate:
         assert isinstance(result, CreateUserResourcePolicyPayload)
         policy = result.user_resource_policy
         assert policy.name == name
+        assert policy.created_at is not None
         assert policy.max_vfolder_count == 20
         assert policy.max_quota_scope_size.value == 1073741824
         assert policy.max_session_count_per_model_session == 5
@@ -57,6 +58,7 @@ class TestUserResourcePolicyGet:
 
         result = await admin_v2_registry.resource_policy.admin_get_user_resource_policy(name)
         assert result.name == name
+        assert result.created_at is not None
         assert result.max_vfolder_count == created.user_resource_policy.max_vfolder_count
 
 
