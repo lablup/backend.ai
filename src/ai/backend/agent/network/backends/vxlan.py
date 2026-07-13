@@ -208,7 +208,6 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
 
     _runner: Runner
     _uplink: str
-    _local_pool_prefix: str
     _sessions: dict[str, SessionNetMeta]
     _local_subnets: LocalSubnetAllocator
 
@@ -219,28 +218,25 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         *,
         uplink: str = "eth0",
         runner: Runner | None = None,
-        local_pool_prefix: str = "172.30",
         local_subnets: LocalSubnetAllocator | None = None,
     ) -> None:
         super().__init__(plugin_config, local_config)
         self._uplink = uplink
         self._runner = runner or _run_command
-        self._local_pool_prefix = local_pool_prefix
         self._sessions = {}
         # Defaults to the store's single process-wide owner, which is also what the bridge backend
-        # resolves: both carve their LOCAL /24 out of the same node-local pool, so one owner keeps
+        # resolves: both carve their LOCAL block out of the same node-local pool, so one owner keeps
         # their indices from colliding on a subnet.
         self._local_subnets = local_subnets or get_local_subnet_allocator()
 
     async def _local_subnet(self, session_id: str) -> str:
-        """The node-local /24 for the session's LOCAL/egress bridge (idempotent, durable).
+        """The node-local block for the session's LOCAL/egress bridge (idempotent, durable).
 
         Node-local (behind NAT, never stretched across nodes), so it needs no cross-node
-        coordination and cannot collide with another node's LOCAL subnet. TODO: use a
-        larger pool / smaller blocks if >256 concurrent sessions per node are expected.
+        coordination and cannot collide with another node's LOCAL subnet. The pool it is cut from
+        and the size of the cut are the operator's (`container.local-network-*`).
         """
-        index = await self._local_subnets.allocate(session_id)
-        return f"{self._local_pool_prefix}.{index}.0/24"
+        return await self._local_subnets.allocate_subnet(session_id)
 
     @override
     async def init(self, context: Any = None) -> None:

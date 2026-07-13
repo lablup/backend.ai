@@ -64,6 +64,31 @@ Multi-node sessions additionally get an **OVERLAY** interface (below), which car
 inter-node isolation and installs only the session-subnet route. Single-node sessions have
 no OVERLAY at all.
 
+### The LOCAL pool is the operator's
+
+The LOCAL subnet is node-local (behind NAT, never stretched), so the node cuts it itself, out
+of a pool no other node needs to agree on. Both the pool and the per-session block are
+configured, not fixed:
+
+| Agent config | Default | Meaning |
+|---|---|---|
+| `container.local-network-pool` | `172.30.0.0/16` | the private range every session's LOCAL bridge is carved out of |
+| `container.local-network-block-size` | `26` | the block one session gets — 1,024 sessions/node of up to 61 containers each |
+
+Neither can be fixed by us: a pool that overlaps a network the host already routes silently
+steals that traffic from the container, and the block size trades the node's session ceiling
+against the containers one session may put on it.
+
+An index is meaningless without the pool it was cut from, so the node's journal records the
+pool alongside the claims. Re-cutting it under live sessions would name subnets their bridges
+are not on — teardown would delete a device nobody owns, and the next session would be handed
+a block already in use. The agent refuses to read such a store and says to drain the node
+first, rather than guess.
+
+The manager's overlay pool is the same decision one layer up: `network.inter-container.ipam-pool`
+(default `10.128.0.0/12`), stretched across the session's nodes, so it must not collide with
+anything those nodes route.
+
 ## Security scope & future work
 
 Isolation provided here is **equivalent to Docker Swarm**, no more:

@@ -18,6 +18,7 @@ from ai.backend.agent.containerd.orchestrator import LaunchResult
 from ai.backend.agent.containerd.runtime.interface import ExecResult, TaskHandle
 from ai.backend.agent.errors import UnsupportedResource
 from ai.backend.agent.errors.agent import ContainerCreationError
+from ai.backend.agent.network.local_subnet import DEFAULT_LAYOUT
 from ai.backend.agent.port_pool import PortPool
 from ai.backend.agent.resources import Mount
 from ai.backend.common.network.types import (
@@ -132,7 +133,11 @@ def _context(
     ctx.local_config = cast(
         Any,
         SimpleNamespace(
-            container=SimpleNamespace(advertised_host=_ADVERTISED_HOST, bind_host="0.0.0.0")
+            container=SimpleNamespace(
+                advertised_host=_ADVERTISED_HOST,
+                bind_host="0.0.0.0",
+                local_subnet_layout=lambda: DEFAULT_LAYOUT,
+            )
         ),
     )
     return ctx

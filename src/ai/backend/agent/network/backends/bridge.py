@@ -46,7 +46,6 @@ class BridgeNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
 
     _runner: Runner
     _uplink: str
-    _local_pool_prefix: str
     _local_subnets: LocalSubnetAllocator
 
     def __init__(
@@ -56,22 +55,21 @@ class BridgeNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         *,
         uplink: str = "eth0",
         runner: Runner | None = None,
-        local_pool_prefix: str = "172.30",
         local_subnets: LocalSubnetAllocator | None = None,
     ) -> None:
         super().__init__(plugin_config, local_config)
         self._uplink = uplink
         self._runner = runner or _run_command
-        self._local_pool_prefix = local_pool_prefix
-        # Defaults to the store's single process-wide owner (see the vxlan backend's __init__).
+        # Defaults to the store's single process-wide owner (see the vxlan backend's __init__),
+        # which also owns the pool the block is cut from (the operator's, not ours).
         self._local_subnets = local_subnets or get_local_subnet_allocator()
 
     async def _index(self, session_id: str) -> int:
-        """Claim the session's node-local /24 index (idempotent, durable across restarts)."""
+        """Claim the session's node-local block index (idempotent, durable across restarts)."""
         return await self._local_subnets.allocate(session_id)
 
     async def _subnet(self, session_id: str) -> str:
-        return f"{self._local_pool_prefix}.{await self._index(session_id)}.0/24"
+        return await self._local_subnets.allocate_subnet(session_id)
 
     async def _bridge(self, session_id: str) -> str:
         return local_bridge_dev(await self._index(session_id))

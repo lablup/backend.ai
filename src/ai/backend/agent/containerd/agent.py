@@ -184,11 +184,8 @@ async def _read_container_log(container_id: str) -> AsyncGenerator[bytes, None]:
         await asyncio.to_thread(handle.close)
 
 
-# Placeholder subnet for a single-node BRIDGE session; the bridge backend allocates the
-# real node-local /24 per session and ignores this value (SessionNetMeta requires a subnet).
 # tmpfs quota for the MEMORY scratch, in MiB. The Docker backend passes the same literal.
 _MEMORY_SCRATCH_SIZE_MIB = 64
-_LOCAL_SUBNET = "172.30.0.0/24"
 # containerd task status -> Backend.AI ContainerStatus.
 #
 # CREATED must NOT collapse into EXITED: EXITED is in DEAD_STATUS_SET, and
@@ -651,7 +648,13 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
                     " containerd backend cannot serve (it speaks the BEP-1062 'cni' driver)."
                     " Set the manager's network.inter-container.default-driver to 'cni'."
                 )
-            network_config = {"backend": str(NetworkBackendKind.BRIDGE), "subnet": _LOCAL_SUBNET}
+            # SessionNetMeta requires a subnet, but a single-node BRIDGE session has no
+            # cluster-wide one: the bridge backend cuts this session's block out of the node's
+            # own pool and never reads this field. Name the pool, so the value is at least true.
+            network_config = {
+                "backend": str(NetworkBackendKind.BRIDGE),
+                "subnet": str(self.local_config.container.local_subnet_layout().pool),
+            }
         self._net_meta = await self._session_network.ensure_session(
             self._session_id, network_config
         )
@@ -1294,6 +1297,7 @@ class ContainerdAgent(
             uplink=_uplink_for_ip(self._host_ip),
             runtime=self._runtime,
             helper_socket=self.local_config.agent.network_helper_socket,
+            local_subnet_layout=container_cfg.local_subnet_layout(),
         )
         # Host-port ingress is an iptables (CAP_NET_ADMIN) op, so only the process that owns the
         # host's networking may install it: this agent when it runs privileged, the helper when

@@ -34,6 +34,8 @@ from ai.backend.manager.errors.network import (
     UnsupportedNetworkBackend,
 )
 from ai.backend.manager.network.ipam import (
+    DEFAULT_BLOCK_PREFIXLEN,
+    DEFAULT_IPAM_POOL,
     EndpointAllocator,
     SubnetAllocator,
     VNIAllocator,
@@ -70,7 +72,14 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         etcd_config = EtcdConfig.model_validate(self.local_config["etcd"]).to_dataclass()
         self._etcd = AsyncEtcd.create_from_config(etcd_config)
         await self._etcd.open()
-        self._subnet_allocator = SubnetAllocator(self._etcd)
+        # The overlay pool is the operator's: it is stretched across the session's nodes, so it
+        # must not collide with anything those nodes already route.
+        inter_container = (self.local_config.get("network") or {}).get("inter-container") or {}
+        self._subnet_allocator = SubnetAllocator(
+            self._etcd,
+            pool=str(inter_container.get("ipam-pool") or DEFAULT_IPAM_POOL),
+            block_prefixlen=int(inter_container.get("ipam-block-size") or DEFAULT_BLOCK_PREFIXLEN),
+        )
         self._vni_allocator = VNIAllocator(self._etcd)
         self._endpoint_allocator = EndpointAllocator(self._etcd)
 

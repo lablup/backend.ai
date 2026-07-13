@@ -3,9 +3,15 @@ from pathlib import Path
 
 import pytest
 
-from ai.backend.agent.errors.network import LocalSubnetPoolExhausted, NetworkStateStoreConflict
+from ai.backend.agent.errors.network import (
+    LocalSubnetLayoutChanged,
+    LocalSubnetPoolExhausted,
+    NetworkStateStoreConflict,
+)
 from ai.backend.agent.network.local_subnet import (
+    DEFAULT_LAYOUT,
     LocalSubnetAllocator,
+    LocalSubnetLayout,
     get_local_subnet_allocator,
 )
 
@@ -13,6 +19,20 @@ from ai.backend.agent.network.local_subnet import (
 @pytest.fixture
 def state_dir(tmp_path: Path) -> Path:
     return tmp_path / "net-local-subnet"
+
+
+@pytest.fixture
+def tiny_pool() -> LocalSubnetLayout:
+    """Two blocks, so exhaustion is reachable in a test."""
+    return LocalSubnetLayout.parse("172.30.0.0/29", 30)
+
+
+def _journal(state_dir: Path, claims: dict[str, str], *, layout: LocalSubnetLayout) -> None:
+    """Write a store by hand, as a surviving pre-restart agent would have left it."""
+    state_dir.mkdir(parents=True, exist_ok=True)
+    (state_dir / ".layout").write_text(layout.serialize())
+    for index, session_id in claims.items():
+        (state_dir / index).write_text(session_id)
 
 
 class TestAllocate:
@@ -31,12 +51,119 @@ class TestAllocate:
         await alloc.release("s1")
         assert await alloc.allocate("s3") == 1  # reuses the freed block
 
-    async def test_pool_exhaustion_raises(self, state_dir: Path) -> None:
-        alloc = LocalSubnetAllocator(state_dir, pool_size=2)
+    async def test_pool_exhaustion_raises(
+        self, state_dir: Path, tiny_pool: LocalSubnetLayout
+    ) -> None:
+        alloc = LocalSubnetAllocator(state_dir, layout=tiny_pool)
         await alloc.allocate("s1")
         await alloc.allocate("s2")
         with pytest.raises(LocalSubnetPoolExhausted):
             await alloc.allocate("s3")
+
+    async def test_exhaustion_names_the_knob_that_fixes_it(
+        self, state_dir: Path, tiny_pool: LocalSubnetLayout
+    ) -> None:
+        # An operator reading this in a log has to know which setting to change; "pool exhausted"
+        # on its own does not tell them the pool is theirs to widen.
+        alloc = LocalSubnetAllocator(state_dir, layout=tiny_pool)
+        await alloc.allocate("s1")
+        await alloc.allocate("s2")
+
+        with pytest.raises(LocalSubnetPoolExhausted) as exc_info:
+            await alloc.allocate("s3")
+
+        message = str(exc_info.value)
+        assert "container.local-network-block-size" in message
+        assert "container.local-network-pool" in message
+
+
+class TestTheLayout:
+    """The pool and the block size are the operator's: the pool must not collide with what the
+    host already routes, and the block size trades the node's session ceiling against the
+    addresses one session may hold."""
+
+    def test_a_block_is_carved_out_of_the_configured_pool(self) -> None:
+        layout = LocalSubnetLayout.parse("10.42.0.0/16", 26)
+        assert layout.subnet(0) == "10.42.0.0/26"
+        assert layout.subnet(1) == "10.42.0.64/26"
+        assert layout.subnet(4) == "10.42.1.0/26"
+
+    def test_the_default_holds_a_thousand_sessions(self) -> None:
+        # The /24-per-session default this replaces capped a node at 256 sessions.
+        layout = LocalSubnetLayout.parse("172.30.0.0/16", 26)
+        assert layout.size == 1024
+        assert layout.addresses_per_session == 61
+
+    def test_a_block_bigger_than_its_pool_is_rejected(self) -> None:
+        with pytest.raises(ValueError):
+            LocalSubnetLayout.parse("172.30.0.0/24", 16)
+
+    async def test_the_allocator_hands_out_subnets_from_it(self, state_dir: Path) -> None:
+        alloc = LocalSubnetAllocator(state_dir, layout=LocalSubnetLayout.parse("10.42.0.0/16", 26))
+        assert await alloc.allocate_subnet("s1") == "10.42.0.0/26"
+        assert await alloc.allocate_subnet("s2") == "10.42.0.64/26"
+        assert await alloc.allocate_subnet("s1") == "10.42.0.0/26"  # idempotent
+
+
+class TestRecuttingThePool:
+    """An index names a subnet only against the pool it was cut from. Reading an old index under a
+    new pool would name a subnet the live bridge is not on — teardown would delete a device nobody
+    owns, and the next session would be handed a block already in use."""
+
+    async def test_a_changed_pool_under_live_sessions_is_refused(self, state_dir: Path) -> None:
+        await LocalSubnetAllocator(
+            state_dir, layout=LocalSubnetLayout.parse("172.30.0.0/16", 26)
+        ).allocate("live")
+
+        restarted = LocalSubnetAllocator(
+            state_dir, layout=LocalSubnetLayout.parse("10.42.0.0/16", 26)
+        )
+        with pytest.raises(LocalSubnetLayoutChanged):
+            await restarted.allocate("newcomer")
+
+    async def test_a_changed_block_size_under_live_sessions_is_refused(
+        self, state_dir: Path
+    ) -> None:
+        await LocalSubnetAllocator(
+            state_dir, layout=LocalSubnetLayout.parse("172.30.0.0/16", 26)
+        ).allocate("live")
+
+        restarted = LocalSubnetAllocator(
+            state_dir, layout=LocalSubnetLayout.parse("172.30.0.0/16", 24)
+        )
+        with pytest.raises(LocalSubnetLayoutChanged):
+            await restarted.load()
+
+    async def test_a_drained_node_adopts_the_new_pool(self, state_dir: Path) -> None:
+        alloc = LocalSubnetAllocator(state_dir, layout=LocalSubnetLayout.parse("172.30.0.0/16", 26))
+        await alloc.allocate("s1")
+        await alloc.release("s1")  # drained
+
+        recut = LocalSubnetAllocator(state_dir, layout=LocalSubnetLayout.parse("10.42.0.0/16", 28))
+        assert await recut.allocate_subnet("s2") == "10.42.0.0/28"
+
+    async def test_an_unmarked_store_is_held_to_the_pool_it_was_written_from(
+        self, state_dir: Path
+    ) -> None:
+        # A store written before the pool was configurable carries no marker, but it is not
+        # ambiguous: that allocator always cut 172.30.0.0/16 into /24s. Under today's /26 default
+        # its index 1 would name 172.30.0.64/26, which is not where that session's bridge is.
+        state_dir.mkdir(parents=True, exist_ok=True)
+        (state_dir / "1").write_text("survivor-of-the-old-agent")
+
+        with pytest.raises(LocalSubnetLayoutChanged):
+            await LocalSubnetAllocator(state_dir, layout=DEFAULT_LAYOUT).load()
+
+        legacy = LocalSubnetAllocator(
+            state_dir, layout=LocalSubnetLayout.parse("172.30.0.0/16", 24)
+        )
+        assert await legacy.allocate_subnet("survivor-of-the-old-agent") == "172.30.1.0/24"
+
+    async def test_the_same_pool_replays_normally(self, state_dir: Path) -> None:
+        layout = LocalSubnetLayout.parse("10.42.0.0/16", 26)
+        held = await LocalSubnetAllocator(state_dir, layout=layout).allocate_subnet("survivor")
+        restarted = LocalSubnetAllocator(state_dir, layout=layout)
+        assert await restarted.allocate_subnet("survivor") == held
 
 
 class TestForeignWriter:
@@ -74,8 +201,7 @@ class TestJournalReplay:
         assert await alloc.lookup("s1") == 0
 
     async def test_replay_ignores_non_index_entries(self, state_dir: Path) -> None:
-        state_dir.mkdir(parents=True, exist_ok=True)
-        (state_dir / "0").write_text("s1")
+        _journal(state_dir, {"0": "s1"}, layout=DEFAULT_LAYOUT)
         (state_dir / "not-an-index").write_text("junk")
 
         alloc = LocalSubnetAllocator(state_dir)
@@ -86,9 +212,7 @@ class TestJournalReplay:
         self, state_dir: Path
     ) -> None:
         # A store written by an older, racy allocator can name one session twice.
-        state_dir.mkdir(parents=True, exist_ok=True)
-        (state_dir / "1").write_text("s1")
-        (state_dir / "3").write_text("s1")
+        _journal(state_dir, {"1": "s1", "3": "s1"}, layout=DEFAULT_LAYOUT)
 
         alloc = LocalSubnetAllocator(state_dir)
         assert await alloc.lookup("s1") == 1

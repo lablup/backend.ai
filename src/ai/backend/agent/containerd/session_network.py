@@ -27,7 +27,7 @@ from ai.backend.agent.containerd.runtime.interface import ExecResult, OciRuntime
 from ai.backend.agent.containerd.session_tracker import SessionContainerTracker, TeardownScope
 from ai.backend.agent.network.cni import CniRunner
 from ai.backend.agent.network.coordinator import SessionNetworkCoordinator
-from ai.backend.agent.network.local_subnet import LocalSubnetAllocator
+from ai.backend.agent.network.local_subnet import LocalSubnetAllocator, LocalSubnetLayout
 from ai.backend.agent.network.native_attacher import HostLocalIpam
 from ai.backend.agent.network.provisioner import ContainerNetworkProvisioner
 from ai.backend.common.network.keys import endpoint_key, session_meta_key
@@ -490,6 +490,7 @@ def build_containerd_session_network(
     cni_runner: CniRunner | None = None,
     backends: Mapping[str, AbstractNetworkAgentPluginV2[Any]] | None = None,
     helper_socket: str | None = None,
+    local_subnet_layout: LocalSubnetLayout | None = None,
 ) -> ContainerdSessionNetwork:
     """Assemble a ContainerdSessionNetwork with default real collaborators.
 
@@ -541,8 +542,8 @@ def build_containerd_session_network(
         make_provisioner = _helper_provisioner_factory
     else:
         # The process-wide owner of the node-local pool: shared by both backends here (they carve
-        # their LOCAL /24 out of the same pool) and by every other agent this runtime hosts.
-        owned_local_subnets = get_local_subnet_allocator()
+        # their LOCAL block out of the same pool) and by every other agent this runtime hosts.
+        owned_local_subnets = get_local_subnet_allocator(layout=local_subnet_layout)
         owned_ipam = get_host_local_ipam()
         if backends is None:
             backends = {

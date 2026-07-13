@@ -182,7 +182,7 @@ from datetime import UTC, datetime
 from ipaddress import IPv4Network
 from pathlib import Path
 from pprint import pformat
-from typing import Annotated, Any, Literal, override
+from typing import Annotated, Any, Literal, Self, override
 
 from pydantic import (
     AliasChoices,
@@ -192,6 +192,7 @@ from pydantic import (
     IPvAnyNetwork,
     field_serializer,
     field_validator,
+    model_validator,
 )
 
 from ai.backend.common.config import BaseConfigSchema
@@ -224,6 +225,7 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.logging.config import LoggingConfig
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.defs import DEFAULT_METRIC_RANGE_VECTOR_TIMEWINDOW
+from ai.backend.manager.network.ipam import DEFAULT_BLOCK_PREFIXLEN, DEFAULT_IPAM_POOL
 from ai.backend.manager.pglock import PgAdvisoryLock
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -1912,6 +1914,47 @@ class InterContainerNetworkConfig(BaseConfigSchema):
             example=ConfigExample(local="{}", prod="{}"),
         ),
     ]
+    ipam_pool: Annotated[
+        str,
+        Field(
+            default=DEFAULT_IPAM_POOL,
+            validation_alias=AliasChoices("ipam_pool", "ipam-pool"),
+            serialization_alias="ipam-pool",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Private IPv4 pool the cluster-network overlay subnets are allocated from when "
+                "default_driver='cni' (BEP-1062). Each cluster session gets one block out of it, "
+                "stretched across every node the session lands on, so the pool must not overlap "
+                "any network those nodes route — a session whose overlay collides with the "
+                "corporate network cannot reach it. Change it while no cluster session is running: "
+                "the allocations are held in etcd and are not re-cut. Ignored by the 'overlay' "
+                "(Docker Swarm) driver, which uses Docker's own IPAM."
+            ),
+            added_version="26.7.0",
+            example=ConfigExample(local="10.128.0.0/12", prod="10.128.0.0/12"),
+        ),
+    ]
+    ipam_block_size: Annotated[
+        int,
+        Field(
+            default=DEFAULT_BLOCK_PREFIXLEN,
+            ge=8,
+            le=30,
+            validation_alias=AliasChoices("ipam_block_size", "ipam-block-size"),
+            serialization_alias="ipam-block-size",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Prefix length of the overlay block one cluster session gets out of 'ipam-pool'. "
+                "The default /24 holds 253 kernels per session; a session that needs more is "
+                "widened automatically, so raise this only to fit more concurrent sessions into "
+                "the pool."
+            ),
+            added_version="26.7.0",
+            example=ConfigExample(local="24", prod="24"),
+        ),
+    ]
     forced_backend: Annotated[
         str | None,
         Field(
@@ -1931,6 +1974,18 @@ class InterContainerNetworkConfig(BaseConfigSchema):
             example=ConfigExample(local="vxlan", prod="null"),
         ),
     ]
+
+    @model_validator(mode="after")
+    def _validate_ipam_pool(self) -> Self:
+        # The pool and the block size only mean something together: a /24 block cannot be cut out
+        # of a /28 pool. Reject the pair here rather than at the first cluster session.
+        pool = IPv4Network(self.ipam_pool, strict=False)
+        if not pool.prefixlen <= self.ipam_block_size <= 30:
+            raise ValueError(
+                f"ipam-block-size (/{self.ipam_block_size}) must be no larger than the pool"
+                f" ({pool}) and no smaller than /30"
+            )
+        return self
 
 
 class SubnetNetworkConfig(BaseConfigSchema):

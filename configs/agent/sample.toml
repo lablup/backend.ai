@@ -111,7 +111,7 @@
   # Ensure sufficient disk space and appropriate permissions.
   # Added in 25.12.0
   var-base-path = "/var/lib/backend.ai"
-  # Unix socket path of the privileged network helper (BEP-1058). When set, the
+  # Unix socket path of the privileged network helper (BEP-1062). When set, the
   # containerd agent delegates all CAP_NET_ADMIN/CAP_SYS_ADMIN container
   # networking to the helper over this socket and needs no network privilege
   # itself. When unset (the default), the agent performs container networking
@@ -387,6 +387,24 @@
   # resolver.
   # Added in 26.7.0
   ## dns = ["10.0.0.53", "10.0.0.54"]
+  # Private IPv4 pool this node cuts every session's LOCAL (control +
+  # egress/NAT) bridge subnet out of (BEP-1062). Node-local and behind NAT, so
+  # it never leaves the host and needs no coordination with other nodes — but it
+  # must not overlap any network the host itself routes, or containers will
+  # reach this pool instead of the real destination. Change it on a drained node
+  # only: sessions hold blocks cut from the previous pool, and the agent refuses
+  # to start rather than read them as a different subnet. Only used by the
+  # containerd backend.
+  # Added in 26.7.0
+  local-network-pool = "172.30.0.0/16"
+  # Prefix length of the block each session gets out of 'local-network-pool'.
+  # This sets both how many sessions a node can hold and how many containers one
+  # session may put on this node: the default /26 out of a /16 pool gives 1024
+  # sessions of up to 61 containers each. Raise it for more, smaller sessions;
+  # lower it for fewer, larger ones. Change it on a drained node only (see
+  # 'local-network-pool').
+  # Added in 26.7.0
+  local-network-block-size = 26
   # KRunner volumes configuration mapping container paths to host paths.
   # Specifies volumes to mount into containers for the kernel runner. This is
   # typically set automatically by the agent based on environment detection and

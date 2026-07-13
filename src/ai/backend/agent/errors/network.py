@@ -32,6 +32,26 @@ class LocalSubnetPoolExhausted(BackendAIError, web.HTTPServiceUnavailable):
         )
 
 
+class LocalSubnetLayoutChanged(BackendAIError, web.HTTPInternalServerError):
+    """The node-local pool was re-cut while sessions still hold blocks from the old one.
+
+    A journalled index names a subnet only against the pool it was cut from, so reading it back
+    under a different pool (or block size) would name a subnet the live bridge is not on. The
+    operator has to drain the node before changing either.
+    """
+
+    error_type = "https://api.backend.ai/probs/agent/local-subnet-layout-changed"
+    error_title = "The node-local subnet pool changed while sessions still hold blocks from it."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AGENT,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.CONFLICT,
+        )
+
+
 class OverlayAddressNotAssigned(BackendAIError, web.HTTPInternalServerError):
     """The manager did not assign an overlay IP for a multi-node vxlan endpoint.
 

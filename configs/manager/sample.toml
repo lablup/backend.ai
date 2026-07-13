@@ -750,6 +750,28 @@
     # custom network plugin settings for advanced networking scenarios.
     # Added in 25.8.0
     ## plugin = "{}"
+    # Private IPv4 pool the cluster-network overlay subnets are allocated from
+    # when default_driver='cni' (BEP-1062). Each cluster session gets one block
+    # out of it, stretched across every node the session lands on, so the pool
+    # must not overlap any network those nodes route — a session whose overlay
+    # collides with the corporate network cannot reach it. Change it while no
+    # cluster session is running: the allocations are held in etcd and are not
+    # re-cut. Ignored by the 'overlay' (Docker Swarm) driver, which uses
+    # Docker's own IPAM.
+    # Added in 26.7.0
+    ipam-pool = "10.128.0.0/12"
+    # Prefix length of the overlay block one cluster session gets out of 'ipam-
+    # pool'. The default /24 holds 253 kernels per session; a session that needs
+    # more is widened automatically, so raise this only to fit more concurrent
+    # sessions into the pool.
+    # Added in 26.7.0
+    ipam-block-size = 24
+    # Pins the cluster-network data-plane backend when default_driver='cni'. One
+    # of 'vxlan', 'host-gw', or 'wireguard'. When unset (null), the backend is
+    # selected per session from agent capabilities ('host-gw' if all members
+    # support native routing, otherwise 'vxlan'). See BEP-1062.
+    # Added in 25.14.0
+    ## forced-backend = "null"
 
   # Subnet configurations for Backend.AI network segmentation. Defines IP
   # address ranges for agents and containers.
