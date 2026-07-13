@@ -607,9 +607,10 @@ class PydanticColumn[TBaseModel: BaseModel](TypeDecorator[TBaseModel]):
     impl = JSONB
     cache_ok = True
 
-    def __init__(self, schema: type[TBaseModel]) -> None:
+    def __init__(self, schema: type[TBaseModel], *, exclude_unset: bool = False) -> None:
         super().__init__()
         self._schema = schema
+        self._exclude_unset = exclude_unset
 
     @override
     def process_bind_param(
@@ -619,7 +620,7 @@ class PydanticColumn[TBaseModel: BaseModel](TypeDecorator[TBaseModel]):
     ) -> dict[str, Any] | None:
         # JSONB accepts Python objects directly, not JSON strings
         if value is not None:
-            return value.model_dump(mode="json")
+            return value.model_dump(mode="json", exclude_unset=self._exclude_unset)
         return None
 
     @override
@@ -635,7 +636,7 @@ class PydanticColumn[TBaseModel: BaseModel](TypeDecorator[TBaseModel]):
 
     @override
     def copy(self, **_kw: Any) -> Self:
-        return PydanticColumn(self._schema)  # type: ignore[return-value]
+        return PydanticColumn(self._schema, exclude_unset=self._exclude_unset)  # type: ignore[return-value]
 
 
 class PydanticListColumn[TBaseModel: BaseModel](TypeDecorator[list[TBaseModel]]):
