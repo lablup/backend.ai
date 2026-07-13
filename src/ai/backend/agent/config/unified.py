@@ -1415,6 +1415,29 @@ class CommonContainerConfig(BaseConfigSchema):
             example=ConfigExample(local="", prod='["10.0.0.53", "10.0.0.54"]'),
         ),
     ]
+    registry_hosts_dir: Annotated[
+        str,
+        Field(
+            default="/etc/containerd/certs.d",
+            validation_alias=AliasChoices("registry-hosts-dir", "registry_hosts_dir"),
+            serialization_alias="registry-hosts-dir",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Directory of containerd registry host configs (the standard `certs.d` layout: one "
+                "`<host:port>/hosts.toml` per registry). This is how a registry that is not plain "
+                "public HTTPS is described — a private CA, a self-signed certificate, plain HTTP, "
+                "or a mirror — and it is the same file `ctr` and `nerdctl` read, so an existing "
+                "host configuration works unchanged. Unlike the Docker backend, where the daemon "
+                "applies its own `daemon.json`/`certs.d`, containerd's transfer service consults "
+                "these files only when the client names the directory: an agent that does not pass "
+                "it cannot pull from such a registry no matter what the host has configured. A "
+                "missing directory is not an error. Only used by the containerd backend."
+            ),
+            added_version="26.7.0",
+            example=ConfigExample(local="/etc/containerd/certs.d", prod="/etc/containerd/certs.d"),
+        ),
+    ]
     local_network_pool: Annotated[
         str,
         Field(

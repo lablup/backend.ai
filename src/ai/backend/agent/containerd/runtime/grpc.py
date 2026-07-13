@@ -157,13 +157,25 @@ class ContainerdGrpcRuntime(OciRuntime):
     _diff: diff_pb2_grpc.DiffStub | None
     _events: events_pb2_grpc.EventsStub | None
     _rootfs: dict[str, list[mount_pb2.Mount]]
+    # containerd's `certs.d` directory. The transfer service reads a registry's hosts.toml only
+    # when the CLIENT names this directory, so an agent that leaves it unset cannot reach a private
+    # CA / self-signed / plain-HTTP registry however the host is configured. See registry_hosts_dir
+    # in the agent config.
+    _registry_hosts_dir: str | None
     # (logger launcher, log root, total byte budget) — set once the agent has written the launcher.
     # None means no `binary://` logging: the shim appends to a plain file that nobody rotates.
     _log_config: tuple[Path, Path, int] | None
 
-    def __init__(self, *, address: str = DEFAULT_ADDRESS, namespace: str = "backend-ai") -> None:
+    def __init__(
+        self,
+        *,
+        address: str = DEFAULT_ADDRESS,
+        namespace: str = "backend-ai",
+        registry_hosts_dir: str | None = None,
+    ) -> None:
         self._address = address
         self._namespace = namespace
+        self._registry_hosts_dir = registry_hosts_dir
         self._channel = None
         self._containers = None
         self._tasks = None
@@ -991,13 +1003,22 @@ class ContainerdGrpcRuntime(OciRuntime):
         entry = cfg.get("Entrypoint") or cfg.get("Cmd")
         return [str(x) for x in entry] if entry else None
 
-    @staticmethod
-    def _oci_registry(image_ref: str, auth: Mapping[str, str] | None) -> Any:
-        """An OCIRegistry ref with a basic-auth Authorization header when credentials given."""
+    def _oci_registry(self, image_ref: str, auth: Mapping[str, str] | None) -> Any:
+        """An OCIRegistry ref: basic-auth header when credentials are given, plus the host config
+        directory that describes registries which are not plain public HTTPS.
+
+        Docker gets the latter for free — dockerd applies its own daemon.json/certs.d — but
+        containerd's transfer service consults hosts.toml only when we name the directory. Leaving
+        it unset means "every registry is public HTTPS with a well-known CA", which is why a
+        self-signed or HTTP registry failed with `server gave HTTP response to HTTPS client` even
+        on a host that had it correctly configured for ctr/nerdctl.
+        """
         resolver = registry_pb2.RegistryResolver()
         if auth and (user := auth.get("username")) and (pw := auth.get("password")):
             token = base64.b64encode(f"{user}:{pw}".encode()).decode()
             resolver.headers["Authorization"] = f"Basic {token}"
+        if self._registry_hosts_dir:
+            resolver.host_dir = self._registry_hosts_dir
         return _containerd_any(registry_pb2.OCIRegistry(reference=image_ref, resolver=resolver))
 
     @override

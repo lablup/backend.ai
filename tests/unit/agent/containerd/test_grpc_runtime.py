@@ -1,3 +1,4 @@
+import base64
 import gzip
 import hashlib
 import json
@@ -7,6 +8,7 @@ from types import SimpleNamespace
 from typing import Any, cast
 
 from ai.backend.agent.containerd._grpcapi.api.types import mount_pb2
+from ai.backend.agent.containerd._grpcapi.api.types.transfer import registry_pb2
 from ai.backend.agent.containerd.runtime.grpc import ContainerdGrpcRuntime, _chain_id
 
 _ACTIVE_MOUNT = mount_pb2.Mount(type="overlay", source="overlay", options=["upperdir=/active"])
@@ -418,3 +420,36 @@ class TestCommitContainer:
         labels = harness.config()["config"]["Labels"]
         assert labels["ai.backend.customized-image.name"] == "mine"
         assert labels["base"] == "yes"  # the base image's own labels survive
+
+
+class TestRegistryResolution:
+    """How a registry that is not plain public HTTPS gets described.
+
+    Docker gets this for free: dockerd applies its own daemon.json / certs.d. containerd's transfer
+    service reads a registry's hosts.toml only when the CLIENT names the directory, so an agent that
+    passes nothing says "every registry is public HTTPS with a well-known CA" — and a self-signed or
+    plain-HTTP registry fails with `server gave HTTP response to HTTPS client` even on a host that
+    has it correctly configured for ctr and nerdctl. (Verified against a live plain-HTTP registry:
+    the same pull fails without the directory and succeeds with it.)
+    """
+
+    def _resolver(self, runtime: Any, auth: Any = None) -> Any:
+        registry = runtime._oci_registry("reg:5000/img:1", auth)
+        parsed = registry_pb2.OCIRegistry()
+        parsed.ParseFromString(registry.value)
+        return parsed
+
+    def test_the_host_config_directory_is_passed_to_containerd(self) -> None:
+        runtime = ContainerdGrpcRuntime(registry_hosts_dir="/etc/containerd/certs.d")
+        assert self._resolver(runtime).resolver.host_dir == "/etc/containerd/certs.d"
+
+    def test_an_unset_directory_is_not_sent_as_an_empty_path(self) -> None:
+        runtime = ContainerdGrpcRuntime(registry_hosts_dir=None)
+        assert self._resolver(runtime).resolver.host_dir == ""
+
+    def test_credentials_still_travel_as_a_basic_auth_header(self) -> None:
+        runtime = ContainerdGrpcRuntime(registry_hosts_dir="/etc/containerd/certs.d")
+        resolver = self._resolver(runtime, {"username": "u", "password": "p"}).resolver
+        expected = "Basic " + base64.b64encode(b"u:p").decode()
+        assert resolver.headers["Authorization"] == expected
+        assert resolver.host_dir == "/etc/containerd/certs.d"  # and both at once
