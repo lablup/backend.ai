@@ -3870,6 +3870,9 @@ input DeploymentFilter {
   Added in 26.4.3. Filter by deployment destruction datetime. Supports IS NULL / IS NOT NULL.
   """
   destroyedAt: NullableDateTimeFilter = null
+
+  """Added in 26.8.0. Filter by conditions on deployment replicas."""
+  replicas: ReplicaNestedFilter = null
   AND: [DeploymentFilter!] = null
   OR: [DeploymentFilter!] = null
   NOT: [DeploymentFilter!] = null
@@ -10717,6 +10720,9 @@ type ReplaceRolePermissionsPayload {
 """Added in 25.19.0. """
 input ReplicaFilter {
   status: ReplicaStatusFilter = null
+
+  """Added in 26.8.0. Filter by replica health status."""
+  healthStatus: ReplicaHealthStatusFilter = null
   trafficStatus: TrafficStatusFilter = null
   AND: [ReplicaFilter!] = null
   OR: [ReplicaFilter!] = null
@@ -10731,6 +10737,33 @@ enum ReplicaHealthStatus {
   HEALTHY
   UNHEALTHY
   DEGRADED
+}
+
+"""Added in 26.8.0. Filter for replica health status."""
+input ReplicaHealthStatusFilter {
+  """Health status is in the list."""
+  in: [ReplicaHealthStatus!] = null
+  equals: ReplicaHealthStatus = null
+
+  """Excludes health statuses in the list."""
+  notIn: [ReplicaHealthStatus!] = null
+
+  """Excludes exact health status match."""
+  notEquals: ReplicaHealthStatus = null
+}
+
+"""Added in 26.8.0. Filter deployments by conditions on their replicas."""
+input ReplicaNestedFilter {
+  """Matches parents with at least one replica satisfying all conditions."""
+  some: ReplicaFilter = null
+
+  """
+  Matches parents where every replica satisfies all conditions (also true when the parent has no replica).
+  """
+  every: ReplicaFilter = null
+
+  """Matches parents with no replica satisfying all conditions."""
+  none: ReplicaFilter = null
 }
 
 """Added in 25.19.0. """

@@ -94,6 +94,8 @@ __all__ = (
     "ModelServiceConfigInput",
     "PresetValueInput",
     "ReplicaFilter",
+    "ReplicaHealthStatusFilter",
+    "ReplicaNestedFilter",
     "ReplicaOrder",
     "ReplicaStatusFilter",
     "ReplicaTrafficStatusFilter",
@@ -630,6 +632,60 @@ class ReplicaTrafficStatusFilter(BaseRequestModel):
     )
 
 
+class ReplicaHealthStatusFilter(BaseRequestModel):
+    """Filter for replica health status."""
+
+    equals: RouteHealthStatus | None = Field(default=None, description="Exact health status match")
+    in_: list[RouteHealthStatus] | None = Field(
+        default=None, alias="in", description="Health status is in list"
+    )
+    not_equals: RouteHealthStatus | None = Field(
+        default=None, description="Excludes exact health status match"
+    )
+    not_in: list[RouteHealthStatus] | None = Field(
+        default=None, description="Health status is not in list"
+    )
+
+
+class ReplicaFilter(BaseRequestModel):
+    """Filter for deployment replicas."""
+
+    deployment_id: UUID | None = Field(default=None, description="Filter by deployment ID")
+    status: ReplicaStatusFilter | None = Field(default=None, description="Replica status filter")
+    health_status: ReplicaHealthStatusFilter | None = Field(
+        default=None, description="Replica health status filter"
+    )
+    traffic_status: ReplicaTrafficStatusFilter | None = Field(
+        default=None, description="Replica traffic status filter"
+    )
+    AND: list[ReplicaFilter] | None = Field(default=None, description="AND conjunction")
+    OR: list[ReplicaFilter] | None = Field(default=None, description="OR conjunction")
+    NOT: list[ReplicaFilter] | None = Field(default=None, description="NOT negation")
+
+
+ReplicaFilter.model_rebuild()
+
+
+class ReplicaNestedFilter(BaseRequestModel):
+    """Filter deployments by conditions on their replicas."""
+
+    some: ReplicaFilter | None = Field(
+        default=None,
+        description="Matches parents with at least one replica satisfying all conditions.",
+    )
+    every: ReplicaFilter | None = Field(
+        default=None,
+        description=(
+            "Matches parents where every replica satisfies all conditions "
+            "(also true when the parent has no replica)."
+        ),
+    )
+    none: ReplicaFilter | None = Field(
+        default=None,
+        description="Matches parents with no replica satisfying all conditions.",
+    )
+
+
 class DeploymentFilter(BaseRequestModel):
     """Filter for deployments."""
 
@@ -649,6 +705,9 @@ class DeploymentFilter(BaseRequestModel):
     created_at: DateTimeFilter | None = Field(default=None, description="Creation datetime filter")
     destroyed_at: NullableDateTimeFilter | None = Field(
         default=None, description="Destruction datetime filter (supports is_null)"
+    )
+    replicas: ReplicaNestedFilter | None = Field(
+        default=None, description="Filter by conditions on deployment replicas"
     )
     AND: list[DeploymentFilter] | None = Field(default=None, description="AND conjunction")
     OR: list[DeploymentFilter] | None = Field(default=None, description="OR conjunction")
@@ -732,22 +791,6 @@ class AutoScalingRuleFilter(BaseRequestModel):
 
 
 AutoScalingRuleFilter.model_rebuild()
-
-
-class ReplicaFilter(BaseRequestModel):
-    """Filter for deployment replicas."""
-
-    deployment_id: UUID | None = Field(default=None, description="Filter by deployment ID")
-    status: ReplicaStatusFilter | None = Field(default=None, description="Replica status filter")
-    traffic_status: ReplicaTrafficStatusFilter | None = Field(
-        default=None, description="Replica traffic status filter"
-    )
-    AND: list[ReplicaFilter] | None = Field(default=None, description="AND conjunction")
-    OR: list[ReplicaFilter] | None = Field(default=None, description="OR conjunction")
-    NOT: list[ReplicaFilter] | None = Field(default=None, description="NOT negation")
-
-
-ReplicaFilter.model_rebuild()
 
 
 class DeploymentPolicyFilter(BaseRequestModel):

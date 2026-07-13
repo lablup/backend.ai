@@ -1717,6 +1717,21 @@ class DeploymentAdapter(BaseAdapter):
             )
             if dt_condition is not None:
                 conditions.append(dt_condition)
+        if f.replicas is not None:
+            if f.replicas.some is not None:
+                replica_conditions = self._convert_replica_filter(f.replicas.some)
+                conditions.append(DeploymentConditions.by_replica_exists(replica_conditions))
+            if f.replicas.none is not None:
+                replica_conditions = self._convert_replica_filter(f.replicas.none)
+                conditions.append(
+                    negate_conditions([DeploymentConditions.by_replica_exists(replica_conditions)])
+                )
+            if f.replicas.every is not None:
+                replica_conditions = self._convert_replica_filter(f.replicas.every)
+                violating_replica = negate_conditions(replica_conditions)
+                conditions.append(
+                    negate_conditions([DeploymentConditions.by_replica_exists([violating_replica])])
+                )
         if f.AND:
             for sub in f.AND:
                 conditions.extend(self._convert_deployment_filter(sub))
@@ -2100,6 +2115,37 @@ class DeploymentAdapter(BaseAdapter):
                 conditions.append(
                     RouteConditions.by_status_not_in([
                         ManagerRouteStatus(s.value) for s in st.not_in
+                    ])
+                )
+        if f.health_status is not None:
+            health_status = f.health_status
+            if health_status.equals is not None:
+                conditions.append(
+                    RouteConditions.by_health_statuses([
+                        ManagerRouteHealthStatus(health_status.equals.value)
+                    ])
+                )
+            if health_status.in_ is not None:
+                conditions.append(
+                    RouteConditions.by_health_statuses([
+                        ManagerRouteHealthStatus(status.value) for status in health_status.in_
+                    ])
+                )
+            if health_status.not_equals is not None:
+                conditions.append(
+                    negate_conditions([
+                        RouteConditions.by_health_statuses([
+                            ManagerRouteHealthStatus(health_status.not_equals.value)
+                        ])
+                    ])
+                )
+            if health_status.not_in is not None:
+                conditions.append(
+                    negate_conditions([
+                        RouteConditions.by_health_statuses([
+                            ManagerRouteHealthStatus(status.value)
+                            for status in health_status.not_in
+                        ])
                     ])
                 )
         if f.traffic_status is not None:
