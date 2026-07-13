@@ -310,25 +310,24 @@ class TestReporterMonitorActorIdentities:
     def reporter_monitor(self, reporter_hub: MagicMock) -> ReporterMonitor:
         return ReporterMonitor(reporter_hub)
 
-    @staticmethod
-    def _action() -> MockAction:
+    @pytest.fixture
+    def mock_action(self) -> MockAction:
         return MockAction(id="1", type=_MOCK_ACTION_TYPE, operation=_MOCK_OPERATION_TYPE)
 
-    @staticmethod
-    def _meta() -> BaseActionTriggerMeta:
+    @pytest.fixture
+    def mock_meta(self) -> BaseActionTriggerMeta:
         return BaseActionTriggerMeta(action_id=uuid4(), started_at=datetime.now(tz=UTC))
 
     @staticmethod
     def _result() -> ProcessResult:
-        now = datetime.now(tz=UTC)
         return ProcessResult(
             meta=BaseActionResultMeta(
                 action_id=uuid4(),
                 entity_id="1",
                 status=OperationStatus.SUCCESS,
                 description="Success",
-                started_at=now,
-                ended_at=now,
+                started_at=datetime.now(tz=UTC),
+                ended_at=datetime.now(tz=UTC),
                 duration=timedelta(seconds=0.0),
                 error_code=None,
             ),
@@ -338,12 +337,14 @@ class TestReporterMonitorActorIdentities:
         self,
         reporter_monitor: ReporterMonitor,
         reporter_hub: MagicMock,
+        mock_action: MockAction,
+        mock_meta: BaseActionTriggerMeta,
     ) -> None:
         target = _make_user(uuid4())
         super_admin = _make_user(uuid4(), is_superadmin=True)
 
         with with_user(target), with_triggered_user(super_admin):
-            await reporter_monitor.prepare(self._action(), self._meta())
+            await reporter_monitor.prepare(mock_action, mock_meta)
 
         message = reporter_hub.report_started.call_args.args[0]
         assert message.triggered_by == str(super_admin.user_id)
@@ -353,12 +354,13 @@ class TestReporterMonitorActorIdentities:
         self,
         reporter_monitor: ReporterMonitor,
         reporter_hub: MagicMock,
+        mock_action: MockAction,
     ) -> None:
         target = _make_user(uuid4())
         super_admin = _make_user(uuid4(), is_superadmin=True)
 
         with with_user(target), with_triggered_user(super_admin):
-            await reporter_monitor.done(self._action(), self._result())
+            await reporter_monitor.done(mock_action, self._result())
 
         message = reporter_hub.report_finished.call_args.args[0]
         assert message.triggered_by == str(super_admin.user_id)
@@ -368,11 +370,12 @@ class TestReporterMonitorActorIdentities:
         self,
         reporter_monitor: ReporterMonitor,
         reporter_hub: MagicMock,
+        mock_action: MockAction,
     ) -> None:
         user = _make_user(uuid4())
 
         with with_user(user), with_triggered_user(user):
-            await reporter_monitor.done(self._action(), self._result())
+            await reporter_monitor.done(mock_action, self._result())
 
         message = reporter_hub.report_finished.call_args.args[0]
         assert message.triggered_by == str(user.user_id)
@@ -382,8 +385,9 @@ class TestReporterMonitorActorIdentities:
         self,
         reporter_monitor: ReporterMonitor,
         reporter_hub: MagicMock,
+        mock_action: MockAction,
     ) -> None:
-        await reporter_monitor.done(self._action(), self._result())
+        await reporter_monitor.done(mock_action, self._result())
 
         message = reporter_hub.report_finished.call_args.args[0]
         assert message.triggered_by is None
