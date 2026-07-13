@@ -48,7 +48,7 @@ class MemrayConfig(BaseConfigSchema):
             added_version=NEXT_RELEASE_VERSION,
             example=ConfigExample(
                 local="./memray-output.bin",
-                prod="/var/log/backend.ai/memray/agent.bin",
+                prod="/var/log/backend.ai/memray/output.bin",
             ),
         ),
     ]

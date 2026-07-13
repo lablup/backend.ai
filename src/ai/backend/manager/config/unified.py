@@ -198,6 +198,7 @@ from ai.backend.common.config import BaseConfigSchema
 from ai.backend.common.configs.client import HttpTimeoutConfig
 from ai.backend.common.configs.etcd import EtcdConfig
 from ai.backend.common.configs.jwt import SharedJWTConfig
+from ai.backend.common.configs.memray import MemrayConfig
 from ai.backend.common.configs.otel import OTELConfig
 from ai.backend.common.configs.pyroscope import PyroscopeConfig
 from ai.backend.common.configs.redis import RedisConfig
@@ -206,6 +207,7 @@ from ai.backend.common.data.storage.types import ArtifactStorageImportStep, Name
 from ai.backend.common.defs import DEFAULT_FILE_IO_TIMEOUT
 from ai.backend.common.lock import EtcdLock, FileLock, RedisLock
 from ai.backend.common.meta import (
+    NEXT_RELEASE_VERSION,
     BackendAIConfigMeta,
     CompositeType,
     ConfigExample,
@@ -3422,6 +3424,19 @@ class ManagerUnifiedConfig(BaseConfigSchema):
                 "production deployments."
             ),
             added_version="25.8.0",
+            composite=CompositeType.FIELD,
+        ),
+    ]
+    memray: Annotated[
+        MemrayConfig,
+        Field(default_factory=MemrayConfig),
+        BackendAIConfigMeta(
+            description=(
+                "Memray allocation-tracking configuration for the manager. "
+                "Enable it only while diagnosing manager memory growth: the capture file keeps "
+                "growing for as long as the process runs."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
             composite=CompositeType.FIELD,
         ),
     ]

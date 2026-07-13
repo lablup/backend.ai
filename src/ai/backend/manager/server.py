@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import functools
 import grp
 import logging
@@ -509,6 +510,26 @@ def main(
     bootstrap_cfg = asyncio.run(BootstrapConfig.load_from_file(discovered_cfg_path, log_level))
 
     if ctx.invoked_subcommand is None:
+        memray_tracker: contextlib.AbstractContextManager[Any] | None = None
+        if bootstrap_cfg.memray.enabled:
+            import memray
+
+            # `aiotools.start_server()` forks the service workers, so follow them to
+            # capture the allocations of the processes that do the actual work.
+            # The PID suffix keeps a restart from colliding with an earlier capture,
+            # which memray would refuse to overwrite.
+            memray_destination = bootstrap_cfg.memray.output_destination
+            memray_destination = memray_destination.with_name(
+                f"{memray_destination.stem}.{os.getpid()}{memray_destination.suffix}"
+            )
+            memray_destination.parent.mkdir(parents=True, exist_ok=True)
+            memray_tracker = memray.Tracker(
+                memray_destination,
+                follow_fork=True,
+                native_traces=bootstrap_cfg.memray.native_traces,
+            )
+            memray_tracker.__enter__()
+
         bootstrap_cfg.manager.pid_file.write_text(str(os.getpid()))
         ipc_base_path = bootstrap_cfg.manager.ipc_base_path
         log_sockpath = ipc_base_path / f"manager-logger-{os.getpid()}.sock"
@@ -549,6 +570,8 @@ def main(
                     cleanup_prometheus_multiprocess_dir()
                     log.info("terminated.")
         finally:
+            if memray_tracker is not None:
+                memray_tracker.__exit__(None, None, None)
             if bootstrap_cfg.manager.pid_file.is_file():
                 # check is_file() to prevent deleting /dev/null!
                 bootstrap_cfg.manager.pid_file.unlink()

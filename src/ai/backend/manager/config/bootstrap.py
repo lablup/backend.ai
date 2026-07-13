@@ -11,6 +11,7 @@ from ai.backend.common.configs.loader import (
     LoaderChain,
     TomlConfigLoader,
 )
+from ai.backend.common.configs.memray import MemrayConfig
 from ai.backend.common.configs.pyroscope import PyroscopeConfig
 from ai.backend.common.types import BackendAISchema
 from ai.backend.logging.config import LoggingConfig
@@ -64,6 +65,14 @@ class BootstrapConfig(BackendAISchema):
         Pyroscope profiling configuration.
         Controls integration with the Pyroscope performance profiling tool.
         Used for monitoring and analyzing application performance.
+        """,
+    )
+    memray: MemrayConfig = Field(
+        default_factory=MemrayConfig,  # type: ignore[arg-type]
+        description="""
+        Memray allocation-tracking configuration.
+        Enable it only while diagnosing manager memory growth: the capture file
+        keeps growing for as long as the process runs.
         """,
     )
     debug: DebugConfig = Field(

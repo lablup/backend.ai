@@ -482,7 +482,7 @@
   # the file already exists, so the process appends its PID to the path. Ensure
   # the parent directory exists and has enough space.
   # Added in 26.8.0
-  output-destination = "/var/log/backend.ai/memray/agent.bin"
+  output-destination = "/var/log/backend.ai/memray/output.bin"
   # Whether to also capture native (C/C++) call stacks, so that allocations made
   # inside extension modules are attributed to their native frames instead of
   # the calling Python frame. This adds runtime overhead and enlarges the
