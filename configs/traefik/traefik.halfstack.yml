@@ -1,16 +1,7 @@
-# Traefik static configuration for halfstack Docker Compose.
-#
-# The app-proxy coordinator writes router/service/middleware definitions into
-# etcd under the namespace `traefik/worker_{authority}/...`, so the etcd
-# provider's `rootKey` must point at that worker-specific subtree.
-#
-# Traefik runs as a Docker container in the halfstack (see the
-# `backendai-half-traefik` service in docker-compose.halfstack-main.yml) and
-# reaches the host etcd via the shared `half` network using the
-# `backendai-half-etcd` service hostname. `install-dev.sh
-# --app-proxy-frontend=traefik` copies this file to
-# `traefik.halfstack.current.yml` and substitutes the "APPPROXY_MARKER_DIR"
-# placeholder below with the actual last-used-time marker directory.
+# Traefik static configuration for the halfstack `backendai-half-traefik`
+# service. The etcd provider's `rootKey` must match the coordinator's
+# `traefik/worker_{authority}` subtree, and the installer substitutes the
+# marker-directory placeholder when copying this file.
 
 api:
   dashboard: true
