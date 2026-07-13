@@ -131,9 +131,7 @@ def _fs_kernel(
         Any,
         SimpleNamespace(
             mounts=[
-                Mount(
-                    MountTypes.BIND, work, Path("/home/work"), MountPermission.READ_WRITE
-                ),
+                Mount(MountTypes.BIND, work, Path("/home/work"), MountPermission.READ_WRITE),
                 *(mounts or []),
             ]
         ),
@@ -279,3 +277,49 @@ class TestFileOpsResolveTheHostPath:
         result = await k.list_files("nope")
         assert result["files"] == ""
         assert result["errors"]
+
+
+class TestAReadOnlyVfolder:
+    """Read-only is a *container-side* mount flag. The agent writes the host path, which it may well
+    be able to write regardless (as root, always) — so an upload that resolves into a read-only
+    vfolder would be handed exactly the write the mount exists to deny. Reads, of course, are fine.
+    """
+
+    def _kernel(self, tmp_path: Any) -> tuple[Any, Any]:
+        vfolder = tmp_path / "storage" / "ro-vfolder"
+        vfolder.mkdir(parents=True)
+        k = _fs_kernel(
+            tmp_path,
+            mounts=[
+                Mount(
+                    MountTypes.BIND,
+                    vfolder,
+                    Path("/home/work/ro-vfolder"),
+                    MountPermission.READ_ONLY,
+                )
+            ],
+        )
+        return k, vfolder
+
+    async def test_an_upload_into_it_is_refused(self, tmp_path: Any) -> None:
+        k, vfolder = self._kernel(tmp_path)
+        with pytest.raises(PermissionError, match="read-only"):
+            await k.accept_file("ro-vfolder/x.txt", b"payload")
+        assert not (vfolder / "x.txt").exists()
+
+    async def test_it_is_not_diverted_to_the_scratch(self, tmp_path: Any) -> None:
+        # Refused, not written somewhere the user can never see it.
+        k, _vfolder = self._kernel(tmp_path)
+        with pytest.raises(PermissionError):
+            await k.accept_file("ro-vfolder/x.txt", b"payload")
+        assert not (tmp_path / "kern-1" / "work" / "ro-vfolder" / "x.txt").exists()
+
+    async def test_reading_it_still_works(self, tmp_path: Any) -> None:
+        k, vfolder = self._kernel(tmp_path)
+        (vfolder / "given.txt").write_bytes(b"read me")
+        assert await k.download_single("ro-vfolder/given.txt") == b"read me"
+
+    async def test_the_scratch_is_still_writable(self, tmp_path: Any) -> None:
+        k, _vfolder = self._kernel(tmp_path)
+        await k.accept_file("hello.txt", b"hi")
+        assert (tmp_path / "kern-1" / "work" / "hello.txt").read_bytes() == b"hi"

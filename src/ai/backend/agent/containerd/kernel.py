@@ -37,7 +37,7 @@ from ai.backend.common.dto.agent.response import CodeCompletionResp
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.json import dump_json_str
 from ai.backend.common.lock import FileLock
-from ai.backend.common.types import CommitStatus, KernelId, SessionId
+from ai.backend.common.types import CommitStatus, KernelId, MountPermission, SessionId
 from ai.backend.logging import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -219,7 +219,9 @@ class ContainerdKernel(AbstractKernel):
     def _host_work_dir(self) -> Path:
         return Path(self.agent_config["container"]["scratch-root"]) / str(self.kernel_id) / "work"
 
-    def _to_host_path(self, container_path: os.PathLike[str] | str) -> Path:
+    def _to_host_path(
+        self, container_path: os.PathLike[str] | str, *, for_write: bool = False
+    ) -> Path:
         """Map a path under /home/work to the host path that actually backs it.
 
         Everything under /home/work is a host bind mount — the scratch work dir, with each vfolder
@@ -230,10 +232,16 @@ class ContainerdKernel(AbstractKernel):
 
         The mount table comes from the resource spec, which is written to (and read back from)
         resource.txt, so it survives an agent restart with the kernel.
+
+        ``for_write`` refuses a read-only mount. Read-only is a *container-side* flag: the agent
+        writes the host path, which it may well be able to write regardless (as root, always). An
+        upload that resolves into a read-only vfolder without this check would be handed exactly
+        the write the mount exists to deny.
         """
         abspath = self._to_container_path(container_path)
         base_target = _CONTAINER_HOME
         base_source = self._host_work_dir()
+        base_perm = MountPermission.READ_WRITE  # the scratch is always the kernel's to write
         for mount in self.resource_spec.mounts:
             if mount.source is None:
                 continue
@@ -241,7 +249,11 @@ class ContainerdKernel(AbstractKernel):
             if abspath != target and not abspath.is_relative_to(target):
                 continue
             if len(target.parts) >= len(base_target.parts):
-                base_target, base_source = target, Path(str(mount.source))
+                base_target = target
+                base_source = Path(str(mount.source))
+                base_perm = mount.permission
+        if for_write and base_perm == MountPermission.READ_ONLY:
+            raise PermissionError(f"{base_target} is mounted read-only")
         root = base_source.resolve()
         host = (root / abspath.relative_to(base_target)).resolve(strict=False)
         # A symlink in the scratch may point anywhere on the host; following it would hand the user
@@ -252,7 +264,7 @@ class ContainerdKernel(AbstractKernel):
 
     @override
     async def accept_file(self, container_path: os.PathLike[str] | str, filedata: bytes) -> None:
-        host = self._to_host_path(container_path)
+        host = self._to_host_path(container_path, for_write=True)
 
         def _write() -> None:
             host.parent.mkdir(parents=True, exist_ok=True)
