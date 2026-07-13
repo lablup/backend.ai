@@ -9,16 +9,23 @@ tests and requires a real container namespace, so it is out of scope here.
 from __future__ import annotations
 
 import asyncio
+import ipaddress
 import os
+import tempfile
+from pathlib import Path
 from typing import Any, cast
 
 import pytest
 
+from ai.backend.agent.containerd.oci import SESSION_ID_LABEL
+from ai.backend.agent.containerd.runtime.interface import ContainerInfo
 from ai.backend.agent.network.helper.client import (
     HelperClient,
     HelperClientError,
     HelperProvisioner,
 )
+from ai.backend.agent.network.helper.journal import HelperJournal
+from ai.backend.agent.network.helper.netns import PinnedNetns
 from ai.backend.agent.network.helper.policy import (
     PolicyViolation,
     validate_network_config,
@@ -26,7 +33,17 @@ from ai.backend.agent.network.helper.policy import (
 )
 from ai.backend.agent.network.helper.protocol import HelperOp, HelperRequest, HelperResponse
 from ai.backend.agent.network.helper.server import NetworkHelperServer
-from ai.backend.common.network.types import EndpointPlan, NetworkBackendKind, SessionNetMeta
+from ai.backend.agent.network.native_attacher import HostLocalIpam
+from ai.backend.common.network.types import (
+    AttachKind,
+    EndpointPlan,
+    NetworkAttachSpec,
+    NetworkBackendKind,
+    NetworkRole,
+    SessionNetMeta,
+)
+
+_LOCAL_SUBNET = "172.30.0.0/26"
 
 
 class _StubBackend:
@@ -34,6 +51,7 @@ class _StubBackend:
 
     def __init__(self) -> None:
         self.setup_calls: list[str] = []
+        self.adopt_calls: list[str] = []
         self.teardown_calls: list[str] = []
         self.peers: list[tuple[str, str, str | None]] = []  # (op, session_id, vtep_ip)
         self.endpoints: list[tuple[str, str, str, str, str]] = []  # (op, sid, ip, mac, vtep)
@@ -41,6 +59,9 @@ class _StubBackend:
 
     async def setup_session_network(self, meta: Any, self_member: Any) -> None:
         self.setup_calls.append(meta.session_id)
+
+    async def adopt_session_network(self, meta: Any, self_member: Any) -> None:
+        self.adopt_calls.append(meta.session_id)
 
     async def teardown_session_network(self, session_id: str) -> None:
         self.teardown_calls.append(session_id)
@@ -61,12 +82,32 @@ class _StubBackend:
         self, kernel_config: Any, cluster_info: Any, *, meta: Any
     ) -> EndpointPlan:
         self.attach_kernel_configs.append(kernel_config)
-        return EndpointPlan(attachments=[])
+        # The LOCAL attachment the real backends always emit: it names the node-local subnet the
+        # container's address was allocated from, which is how the helper finds that address again
+        # after a restart.
+        return EndpointPlan(
+            attachments=[
+                NetworkAttachSpec(
+                    kind=AttachKind.CNI,
+                    interface_name="eth0",
+                    role=NetworkRole.LOCAL,
+                    is_default_route=True,
+                    cni_config={
+                        "type": "bridge",
+                        "bridge": "bailo0",
+                        "ipam": {"type": "host-local", "subnet": _LOCAL_SUBNET},
+                    },
+                )
+            ]
+        )
 
 
 class _StubRuntime:
-    def __init__(self, pid: int | None = None) -> None:
+    """containerd, as the helper sees it: which containers are still running, and their PIDs."""
+
+    def __init__(self, pid: int | None = None, live: dict[str, str] | None = None) -> None:
         self._pid = pid
+        self._live = live or {}  # container_id -> session_id
 
     async def open(self) -> None:
         pass
@@ -74,9 +115,16 @@ class _StubRuntime:
     async def container_pid(self, container_id: str) -> int | None:
         return self._pid
 
-
-async def _noop_cni(command: str, **kwargs: Any) -> dict[str, Any] | None:
-    return {}
+    async def list_container_infos(self) -> list[ContainerInfo]:
+        return [
+            ContainerInfo(
+                id=container_id,
+                image="img:1",
+                labels={SESSION_ID_LABEL: session_id},
+                status="running",
+            )
+            for container_id, session_id in self._live.items()
+        ]
 
 
 def _short_socket_path() -> str:
@@ -104,19 +152,87 @@ class _RecordingForwarder:
         return [f for f in self.installed if f.container_id == container_id]
 
 
+class _RecordingCni:
+    """Stands in for the native attach runner, without a netns to move a veth into.
+
+    It allocates from the same durable IPAM store the real runner does, because that store is
+    precisely what recovery reads back to find the address a pre-restart attach assigned — a stub
+    that skipped it would leave nothing to recover and the test would pass on an empty store.
+    """
+
+    def __init__(self, ipam: HostLocalIpam) -> None:
+        self._ipam = ipam
+        self.calls: list[tuple[str, str, str]] = []  # (command, ifname, container_id)
+
+    async def __call__(
+        self,
+        command: str,
+        *,
+        ifname: str = "",
+        container_id: str = "",
+        config: Any = None,
+        **kwargs: Any,
+    ) -> dict[str, Any] | None:
+        self.calls.append((command, ifname, container_id))
+        ipam_cfg = (config or {}).get("ipam") or {}
+        subnet = ipam_cfg.get("subnet")
+        if ipam_cfg.get("type") != "host-local" or not subnet:
+            return {}  # a static (overlay) address: nothing to allocate
+        if command == "ADD":
+            # The real runner reserves the gateway (the first host) for the bridge itself.
+            gateway = str(next(iter(ipaddress.ip_network(subnet).hosts())))
+            ip = await self._ipam.allocate(subnet, container_id, ifname, reserve=[gateway])
+            return {"ips": [{"address": f"{ip}/{subnet.split('/')[1]}"}]}
+        if command == "DEL":
+            await self._ipam.release(subnet, container_id, ifname)
+        return {}
+
+    def dels(self) -> list[str]:
+        return [container_id for cmd, _if, container_id in self.calls if cmd == "DEL"]
+
+
+class _FakeNetns:
+    """Pins nothing. A real pin needs a live process in a non-host netns, which a unit test cannot
+    produce; the TOCTOU logic it guards is the module's own (netns.py), not the attach path's."""
+
+    def open(self, pid: int) -> PinnedNetns:
+        return PinnedNetns(netns_fd=-1, pidfd=-1)  # close() tolerates a bad fd
+
+    def alive(self, pinned: PinnedNetns) -> bool:
+        return True
+
+
 class _Harness:
-    def __init__(self, runtime: _StubRuntime | None = None, cni_runner: Any = None) -> None:
+    """One helper daemon. ``state_dir`` is its journal + IPAM store: pass the same one twice to
+    restart the daemon over the state its predecessor left behind."""
+
+    def __init__(
+        self,
+        runtime: _StubRuntime | None = None,
+        *,
+        state_dir: Path | None = None,
+        forwarder: _RecordingForwarder | None = None,
+    ) -> None:
         self.backend = _StubBackend()
-        self.forwarder = _RecordingForwarder()
+        self.forwarder = forwarder or _RecordingForwarder()
+        self._tmp = None if state_dir is not None else tempfile.TemporaryDirectory()
+        root = state_dir if state_dir is not None else Path(cast(Any, self._tmp).name)
+        self.state_dir = root
+        self.journal = HelperJournal(root / "journal")
+        self.ipam = HostLocalIpam(root / "ipam")
+        self.cni = _RecordingCni(self.ipam)
         self.server = NetworkHelperServer(
             socket_path=_short_socket_path(),
             allowed_uid=os.getuid(),
             agent_id="i-test",
             host_ip="127.0.0.1",
             runtime=cast(Any, runtime or _StubRuntime()),
-            cni_runner=cni_runner or _noop_cni,
+            cni_runner=self.cni,
             backends=cast(Any, {"bridge": self.backend, "vxlan": self.backend}),
             forwarder=cast(Any, self.forwarder),
+            journal=self.journal,
+            ipam=self.ipam,
+            netns_pinner=cast(Any, _FakeNetns()),
         )
         self._task: asyncio.Task[None] | None = None
 
@@ -135,6 +251,8 @@ class _Harness:
             os.unlink(self.server._socket_path)
         except OSError:
             pass
+        if self._tmp is not None:
+            self._tmp.cleanup()
 
     def client(self) -> HelperClient:
         return HelperClient(self.server._socket_path)
@@ -302,6 +420,138 @@ class TestHelperRpc:
                 )
 
 
+class TestRestartRecovery:
+    """The helper outlives the agent, but not every crash. Its session registry is memory while the
+    node's bridges, veths and DNAT rules are not — so a restarted helper that did not rebuild it
+    would hold a node it refuses to talk about: a new kernel could not join a running session, and
+    a teardown would report success while leaking the session's devices and its subnet block.
+    """
+
+    _CONFIG = {"backend": "bridge", "subnet": "172.30.0.0/16"}
+
+    async def _first_life(self, state_dir: Path, *, live: dict[str, str]) -> _RecordingForwarder:
+        """A helper that set a session up and attached its container, then died."""
+        forwarder = _RecordingForwarder()
+        async with _Harness(
+            runtime=_StubRuntime(pid=4242, live=live),
+            state_dir=state_dir,
+            forwarder=forwarder,
+        ) as h:
+            await h.client().call(
+                HelperRequest(HelperOp.SETUP_SESSION, "s1", network_config=dict(self._CONFIG))
+            )
+            for container_id in live:
+                await h.client().call(
+                    HelperRequest(HelperOp.ATTACH_CONTAINER, "s1", container_id=container_id)
+                )
+        return forwarder
+
+    async def test_a_live_session_is_re_adopted_not_set_up_again(self, tmp_path: Path) -> None:
+        # setup_session_network deletes a stale device of the session's name before CNI recreates
+        # it — right for a fresh session, fatal for this one: its bridge is up and carrying the
+        # kernels' traffic. Recovery must adopt, never set up.
+        await self._first_life(tmp_path, live={"c1": "s1"})
+
+        async with _Harness(
+            runtime=_StubRuntime(pid=4242, live={"c1": "s1"}), state_dir=tmp_path
+        ) as restarted:
+            assert restarted.backend.adopt_calls == ["s1"]
+            assert restarted.backend.setup_calls == []
+            assert restarted.backend.teardown_calls == []
+
+    async def test_a_pre_restart_session_still_serves_its_verbs(self, tmp_path: Path) -> None:
+        # Before this, every verb about a session that predates the restart was refused with
+        # "before session setup" — a second kernel could not join it, and its peers went unprogrammed.
+        await self._first_life(tmp_path, live={"c1": "s1"})
+
+        async with _Harness(
+            runtime=_StubRuntime(pid=4242, live={"c1": "s1"}), state_dir=tmp_path
+        ) as restarted:
+            resp = await restarted.client().call(
+                HelperRequest(HelperOp.ADD_PEER, "s1", vtep_ip="192.168.1.9")
+            )
+            assert resp.ok
+            assert restarted.backend.peers == [("add", "s1", "192.168.1.9")]
+
+    async def test_a_pre_restart_container_publishes_to_the_address_it_actually_holds(
+        self, tmp_path: Path
+    ) -> None:
+        # The DNAT destination is the LOCAL address the helper assigned at attach — never one the
+        # agent sends. After a restart that address is only in the IPAM store, so recovery reads it
+        # back from there; without it, publishing for a surviving kernel would be refused.
+        await self._first_life(tmp_path, live={"c1": "s1"})
+        assigned = (await HostLocalIpam(tmp_path / "ipam").owners(_LOCAL_SUBNET))["c1/eth0"]
+
+        async with _Harness(
+            runtime=_StubRuntime(pid=4242, live={"c1": "s1"}), state_dir=tmp_path
+        ) as restarted:
+            await restarted.client().call(
+                HelperRequest(
+                    HelperOp.PUBLISH_PORTS, "s1", container_id="c1", ports=((30001, 8070),)
+                )
+            )
+            assert [f.container_ip for f in restarted.forwarder.installed] == [assigned]
+
+    async def test_a_session_whose_containers_all_died_is_torn_down(self, tmp_path: Path) -> None:
+        # Its subnet block is finite and nobody else will ever name these devices: the agent
+        # already believes the session gone (or is gone itself), so only this pass can give
+        # them back.
+        await self._first_life(tmp_path, live={"c1": "s1"})
+
+        async with _Harness(runtime=_StubRuntime(live={}), state_dir=tmp_path) as restarted:
+            assert restarted.backend.teardown_calls == ["s1"]
+            assert restarted.backend.adopt_calls == []
+            assert await restarted.journal.sessions() == {}
+
+    async def test_a_container_that_died_gives_back_its_veth_and_address(
+        self, tmp_path: Path
+    ) -> None:
+        # The container's netns took its end of the veth with it; the host side, its address and
+        # its DNAT rules are the helper's to release.
+        await self._first_life(tmp_path, live={"c1": "s1"})
+
+        async with _Harness(runtime=_StubRuntime(live={}), state_dir=tmp_path) as restarted:
+            assert restarted.cni.dels() == ["c1"]
+            assert restarted.forwarder.removed == ["c1"]
+            assert await restarted.journal.attachments() == {}
+
+    async def test_teardown_after_a_restart_actually_tears_down(self, tmp_path: Path) -> None:
+        # The worst of the old failures: with no session entry, teardown returned ok while the
+        # bridge stayed up and the block stayed claimed. Nothing said so.
+        await self._first_life(tmp_path, live={"c1": "s1"})
+
+        async with _Harness(
+            runtime=_StubRuntime(pid=4242, live={"c1": "s1"}), state_dir=tmp_path
+        ) as restarted:
+            resp = await restarted.client().call(HelperRequest(HelperOp.TEARDOWN_SESSION, "s1"))
+            assert resp.ok
+            assert restarted.backend.teardown_calls == ["s1"]
+            assert await restarted.journal.sessions() == {}
+
+    async def test_a_surviving_container_can_still_be_detached(self, tmp_path: Path) -> None:
+        # Its plan is re-derived from the journal, so the detach gives back the same host veth and
+        # address the pre-restart attach took.
+        await self._first_life(tmp_path, live={"c1": "s1"})
+
+        async with _Harness(
+            runtime=_StubRuntime(pid=4242, live={"c1": "s1"}), state_dir=tmp_path
+        ) as restarted:
+            await restarted.client().call(
+                HelperRequest(HelperOp.DETACH_CONTAINER, "s1", container_id="c1")
+            )
+            assert restarted.cni.dels() == ["c1"]
+            assert await restarted.journal.attachments() == {}
+
+    async def test_a_helper_with_no_journal_starts_clean(self, tmp_path: Path) -> None:
+        # A first-ever boot must not be a special case.
+        async with _Harness(runtime=_StubRuntime(live={}), state_dir=tmp_path) as h:
+            assert h.backend.adopt_calls == [] and h.backend.teardown_calls == []
+            resp = await h.client().call(
+                HelperRequest(HelperOp.SETUP_SESSION, "s1", network_config=dict(self._CONFIG))
+            )
+            assert resp.ok
+
+
 class _RecordingClient:
     """Captures the requests HelperProvisioner sends, returning a benign ATTACH response."""
 
@@ -318,7 +568,7 @@ class TestHelperProvisioner:
         # The agent relays the manager-assigned cluster_network_ip to the helper so a multi-node
         # container attaches at its central, disjoint overlay address (the helper re-validates it).
         client = _RecordingClient()
-        prov = HelperProvisioner(cast(Any, client))
+        prov = HelperProvisioner(cast(Any, client), "s1")
         meta = SessionNetMeta(
             session_id="s1",
             subnet="10.0.0.0/24",
@@ -339,7 +589,7 @@ class TestHelperProvisioner:
     async def test_attach_sends_no_ip_for_single_node(self) -> None:
         # Single-node sessions have no manager overlay IP; the helper keeps its host-local path.
         client = _RecordingClient()
-        prov = HelperProvisioner(cast(Any, client))
+        prov = HelperProvisioner(cast(Any, client), "s1")
         meta = SessionNetMeta(
             session_id="s2",
             subnet="10.0.1.0/24",

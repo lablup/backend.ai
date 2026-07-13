@@ -122,10 +122,10 @@ class HelperBackendProxy(AbstractNetworkAgentPluginV2["AbstractKernel"]):
 
     @override
     async def adopt_session_network(self, meta: SessionNetMeta, self_member: Member) -> None:
-        # Nothing to do: the helper is a daemon that outlives the agent, so it still holds this
-        # session's devices, attach plans and backend state. (A helper restart loses them, and the
-        # agent's next peer/endpoint call is refused with "before session setup" — helper-side
-        # recovery is not implemented.)
+        # Nothing to do: the helper owns this session's devices, attach plans and backend state,
+        # and it recovers them itself — from its own journal reconciled against containerd, not
+        # from anything we could tell it (see helper/server.py `recover`). Re-declaring the session
+        # here is exactly the move the trust model forbids the agent.
         return
 
     @override
@@ -172,8 +172,13 @@ class HelperBackendProxy(AbstractNetworkAgentPluginV2["AbstractKernel"]):
         *,
         meta: SessionNetMeta,
     ) -> EndpointPlan:
-        # Attach is driven through HelperProvisioner (a semantic ATTACH verb), not here.
-        raise HelperClientError("attach_endpoint must go through the helper provisioner")
+        # The live attach goes through HelperProvisioner (a semantic ATTACH verb), so the only
+        # caller here is the agent's restart recovery, re-deriving the plan it will later detach
+        # with. Under a helper that plan lives helper-side, and detach is a verb naming the
+        # container — so the agent needs nothing but a handle, and an empty plan is that handle.
+        # (Raising instead, as this used to, aborted recovery for every container on the node and
+        # left them all with no detach path: their host veths and addresses then leaked.)
+        return EndpointPlan(attachments=[])
 
     @override
     async def detach_endpoint(self, kernel: AbstractKernel) -> None:
@@ -184,14 +189,18 @@ class HelperProvisioner:
     """Drop-in for ``ContainerNetworkProvisioner`` that routes per-container attach/detach to
     the helper. The agent-supplied ``task_pid`` is intentionally ignored: the helper resolves
     the PID from containerd itself and pins the netns, so a stale/forged PID cannot mislead it.
+
+    One provisioner per session (the session network builds it alongside that session's
+    orchestrator), so detach knows its session without having to have witnessed the attach — which
+    is what a restarted agent has not done for the kernels that outlived it.
     """
 
     _client: HelperClient
-    _session_of: dict[str, str]
+    _session_id: str
 
-    def __init__(self, client: HelperClient) -> None:
+    def __init__(self, client: HelperClient, session_id: str) -> None:
         self._client = client
-        self._session_of = {}
+        self._session_id = session_id
 
     async def attach(
         self,
@@ -216,7 +225,6 @@ class HelperProvisioner:
                 ip=overlay_ip,
             )
         )
-        self._session_of[container_id] = meta.session_id
         assigned: dict[NetworkRole, str] = {}
         for role_name, ip in (resp.assigned or {}).items():
             try:
@@ -228,13 +236,12 @@ class HelperProvisioner:
         return EndpointPlan(attachments=[]), assigned
 
     async def detach(self, plan: EndpointPlan, *, container_id: str, task_pid: int) -> None:
-        session_id = self._session_of.pop(container_id, None)
-        if session_id is None:
-            return
+        # The plan is ignored: the helper holds the real one (and re-derives it after its own
+        # restart). Detach names the container; the helper resolves everything else.
         await self._client.call(
             HelperRequest(
                 op=HelperOp.DETACH_CONTAINER,
-                session_id=session_id,
+                session_id=self._session_id,
                 container_id=container_id,
             )
         )

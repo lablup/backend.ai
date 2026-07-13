@@ -74,9 +74,10 @@ class ContainerdSessionNetwork:
     _runtime: OciRuntime
     _cni_runner: CniRunner
     _backends: Mapping[str, AbstractNetworkAgentPluginV2[Any]]
-    # Builds the per-session container-attach provisioner. Overridable so the privileged
-    # network helper can supply a proxy that RPCs attach/detach instead of running them here.
-    _make_provisioner: Callable[[AbstractNetworkAgentPluginV2[Any]], Any]
+    # Builds the per-session container-attach provisioner (one per session, so it can name its
+    # own session without having witnessed the attach). Overridable so the privileged network
+    # helper can supply a proxy that RPCs attach/detach instead of running them here.
+    _make_provisioner: Callable[[AbstractNetworkAgentPluginV2[Any], str], Any]
     _coordinators: dict[str, SessionNetworkCoordinator]
     _orchestrators: dict[str, ContainerdKernelOrchestrator]
     # Tracks container<->session so the last kernel's removal deterministically tears the
@@ -102,7 +103,7 @@ class ContainerdSessionNetwork:
         runtime: OciRuntime,
         cni_runner: CniRunner,
         backends: Mapping[str, AbstractNetworkAgentPluginV2[Any]],
-        provisioner_factory: Callable[[AbstractNetworkAgentPluginV2[Any]], Any] | None = None,
+        provisioner_factory: Callable[[AbstractNetworkAgentPluginV2[Any], str], Any] | None = None,
         local_subnets: LocalSubnetAllocator | None = None,
         ipam: HostLocalIpam | None = None,
     ) -> None:
@@ -113,7 +114,7 @@ class ContainerdSessionNetwork:
         self._cni_runner = cni_runner
         self._backends = backends
         self._make_provisioner = provisioner_factory or (
-            lambda backend: ContainerNetworkProvisioner(backend, self._cni_runner)
+            lambda backend, _session_id: ContainerNetworkProvisioner(backend, self._cni_runner)
         )
         self._coordinators = {}
         self._orchestrators = {}
@@ -206,7 +207,9 @@ class ContainerdSessionNetwork:
     async def _resume_session(self, session_id: str, meta: SessionNetMeta) -> None:
         backend = self._resolve_backend(meta)
         coordinator = SessionNetworkCoordinator(self._etcd, backend, self._agent_id)
-        orchestrator = ContainerdKernelOrchestrator(self._runtime, self._make_provisioner(backend))
+        orchestrator = ContainerdKernelOrchestrator(
+            self._runtime, self._make_provisioner(backend, session_id)
+        )
         # resume, not start: the devices are up and carrying this session's traffic.
         await coordinator.resume(meta, self._self_member(meta))
         self._coordinators[session_id] = coordinator
@@ -325,7 +328,9 @@ class ContainerdSessionNetwork:
             return meta
         backend = self._resolve_backend(meta)
         coordinator = SessionNetworkCoordinator(self._etcd, backend, self._agent_id)
-        orchestrator = ContainerdKernelOrchestrator(self._runtime, self._make_provisioner(backend))
+        orchestrator = ContainerdKernelOrchestrator(
+            self._runtime, self._make_provisioner(backend, session_id)
+        )
         # Register only AFTER a successful start, so a partial failure (which raises here)
         # doesn't leave a half-set-up coordinator that the idempotency check above would
         # then skip on retry — a retry must re-run the full setup cleanly.
@@ -517,7 +522,7 @@ def build_containerd_session_network(
     # attach) is delegated to the CAP_NET_ADMIN/CAP_SYS_ADMIN helper, so this (agent) process
     # needs no network privilege: the backend becomes a proxy and the per-container
     # provisioner RPCs the helper. See ai.backend.agent.network.helper.
-    make_provisioner: Callable[[AbstractNetworkAgentPluginV2[Any]], Any] | None = None
+    make_provisioner: Callable[[AbstractNetworkAgentPluginV2[Any], str], Any] | None = None
     # Journals this process may reconcile on restart; left None under a helper, which owns the
     # host state, keeps its own records, and outlives the agent.
     owned_local_subnets: LocalSubnetAllocator | None = None
@@ -536,8 +541,10 @@ def build_containerd_session_network(
             str(NetworkBackendKind.BRIDGE): proxy,
         }
 
-        def _helper_provisioner_factory(_backend: AbstractNetworkAgentPluginV2[Any]) -> Any:
-            return HelperProvisioner(client)
+        def _helper_provisioner_factory(
+            _backend: AbstractNetworkAgentPluginV2[Any], session_id: str
+        ) -> Any:
+            return HelperProvisioner(client, session_id)
 
         make_provisioner = _helper_provisioner_factory
     else:

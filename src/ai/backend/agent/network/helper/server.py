@@ -17,6 +17,12 @@ Trust model (why a compromised agent stays contained):
   setup/attach/detach/teardown so concurrent requests cannot race the device registry.
 
 Only setup/teardown/attach/detach are exposed; there is no generic "run command" verb.
+
+The helper is a daemon that outlives the agent, but it is not immortal: it can be restarted or
+crash while the node's kernels keep running. Its session registry is in memory, so on boot it
+rebuilds that registry from its own journal (``journal.py``) reconciled against containerd — see
+`recover`. Nothing is taken back from the agent, which is the process this separation exists to
+contain.
 """
 
 from __future__ import annotations
@@ -29,15 +35,18 @@ import struct
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
+from ai.backend.agent.containerd.oci import SESSION_ID_LABEL
 from ai.backend.agent.network.cni import CniAttacher, plan_to_invocations
 from ai.backend.agent.network.helper import netns as netns_mod
 from ai.backend.agent.network.helper import policy
+from ai.backend.agent.network.helper.journal import AttachRecord, HelperJournal
 from ai.backend.agent.network.helper.protocol import (
     HelperOp,
     HelperRequest,
     HelperResponse,
     ProtocolError,
 )
+from ai.backend.agent.network.native_attacher import HostLocalIpam, get_host_local_ipam
 from ai.backend.agent.network.port_forward import PortForwarder, forwards_for
 from ai.backend.common.network.types import (
     Member,
@@ -107,6 +116,11 @@ class NetworkHelperServer:
     _backends: dict[str, AbstractNetworkAgentPluginV2[Any]]
     _sessions: dict[str, _SessionEntry]
     _locks: dict[str, asyncio.Lock]
+    _journal: HelperJournal
+    _netns: netns_mod.NetnsPinner
+    # The store the attach path allocates LOCAL addresses from. Read on recovery to find the
+    # address a pre-restart attach assigned, which is the address its published ports DNAT to.
+    _ipam: HostLocalIpam
 
     def __init__(
         self,
@@ -119,6 +133,9 @@ class NetworkHelperServer:
         cni_runner: CniRunner,
         backends: dict[str, AbstractNetworkAgentPluginV2[Any]],
         forwarder: PortForwarder | None = None,
+        journal: HelperJournal | None = None,
+        ipam: HostLocalIpam | None = None,
+        netns_pinner: netns_mod.NetnsPinner | None = None,
     ) -> None:
         self._socket_path = socket_path
         self._allowed_uid = allowed_uid
@@ -130,6 +147,9 @@ class NetworkHelperServer:
         self._backends = backends
         self._sessions = {}
         self._locks = {}
+        self._journal = journal or HelperJournal()
+        self._ipam = ipam or get_host_local_ipam()
+        self._netns = netns_pinner or netns_mod.NetnsPinner()
 
     def _lock(self, session_id: str) -> asyncio.Lock:
         lock = self._locks.get(session_id)
@@ -140,6 +160,9 @@ class NetworkHelperServer:
 
     async def serve_forever(self) -> None:
         await self._runtime.open()
+        # Before the socket exists, so no request can race the rebuild and be refused for a session
+        # this helper is about to remember.
+        await self.recover()
         sock_path = Path(self._socket_path)
         if sock_path.exists():
             sock_path.unlink()
@@ -151,6 +174,191 @@ class NetworkHelperServer:
         log.info("running as uid={} with {}", os.getuid(), _self_effective_caps())
         async with server:
             await server.serve_forever()
+
+    async def recover(self) -> None:
+        """Rebuild the session registry after a helper restart, and give back what died while we
+        were down.
+
+        The registry is memory; the devices are not. A restarted helper that skipped this would
+        hold a node whose bridges, vxlan devices and DNAT rules are all up and carrying traffic,
+        while refusing every verb about them — a new kernel could not join a running session, and a
+        teardown would report success while leaking the session's devices *and* its node-local
+        subnet block, which the pool never gets back.
+
+        Ground truth is this helper's own journal (what it set up and attached) reconciled against
+        containerd (what is actually still running). The agent is not consulted: it is the process
+        this separation exists to contain, and a session's subnet is exactly the thing it must not
+        be able to re-declare.
+        """
+        try:
+            live = await self._live_containers()
+            journalled_sessions = await self._journal.sessions()
+            journalled_attachments = await self._journal.attachments()
+        except Exception:
+            log.exception("could not read the helper journal; starting with an empty registry")
+            return
+        if not journalled_sessions and not journalled_attachments:
+            return
+
+        live_sessions = {
+            session_id
+            for session_id, cfg in journalled_sessions.items()
+            if any(sid == session_id for sid in live.values())
+        }
+        log.info(
+            "recovering {} live session(s) of {} journalled; {} container(s) still running",
+            len(live_sessions),
+            len(journalled_sessions),
+            len(live),
+        )
+
+        # Dead containers first, while their session's devices and journal records still exist:
+        # the DEL needs the plan, and the plan needs the session. Tearing the session down first
+        # would release its subnet block and leave these addresses stranded in the IPAM store.
+        for container_id, record in journalled_attachments.items():
+            if container_id in live:
+                continue
+            await self._reclaim_dead_container(container_id, record, journalled_sessions)
+
+        for session_id, raw_config in journalled_sessions.items():
+            try:
+                if session_id in live_sessions:
+                    await self._readopt_session(
+                        session_id, raw_config, live, journalled_attachments
+                    )
+                else:
+                    await self._reclaim_dead_session(session_id, raw_config)
+            except Exception:
+                # One unrecoverable session must not cost us the others: a helper that gave up here
+                # would refuse every verb for every session on the node.
+                log.exception("failed to recover session {}", session_id)
+
+    async def _live_containers(self) -> dict[str, str]:
+        """``{container_id: session_id}`` for every container containerd still runs for us."""
+        live: dict[str, str] = {}
+        for info in await self._runtime.list_container_infos():
+            if session_id := info.labels.get(SESSION_ID_LABEL):
+                live[info.id] = session_id
+        return live
+
+    def _meta_of(self, session_id: str, raw_config: dict[str, Any]) -> SessionNetMeta:
+        cfg = policy.validate_network_config(raw_config)
+        return SessionNetMeta(
+            session_id=session_id,
+            subnet=cfg.subnet or "",
+            backend=cfg.backend,
+            mtu=cfg.mtu,
+            vni=cfg.vni,
+        )
+
+    async def _readopt_session(
+        self,
+        session_id: str,
+        raw_config: dict[str, Any],
+        live: dict[str, str],
+        attachments: dict[str, AttachRecord],
+    ) -> None:
+        """Take a still-running session back over — without touching its data plane.
+
+        `adopt_session_network`, not `setup_session_network`: setup deletes a stale device of the
+        session's name before CNI recreates it, which is right for a fresh session and fatal for
+        this one — its bridge is up and carrying the kernels' traffic.
+        """
+        meta = self._meta_of(session_id, raw_config)
+        backend = self._resolve_backend(meta.backend)
+        await backend.adopt_session_network(meta, self._self_member(meta.backend))
+        entry = _SessionEntry(meta, backend)
+        for container_id in (cid for cid, sid in live.items() if sid == session_id):
+            record = attachments.get(container_id)
+            if record is None:
+                # Running, in this session, but we never journalled attaching it: it was attached
+                # by nobody we know of. Leave it out rather than invent a plan for it — detach
+                # still withdraws its DNAT rules, which are tagged with the container itself.
+                log.warning("no attach record for live container {}; not adopting", container_id)
+                continue
+            plan = await self._derive_plan(backend, meta, record.overlay_ip)
+            entry.attached[container_id] = plan
+            if (local_ip := await self._local_ip_of(plan, container_id)) is not None:
+                entry.local_ips[container_id] = local_ip
+        self._sessions[session_id] = entry
+        log.info(
+            "re-adopted session {} with {} attached container(s)", session_id, len(entry.attached)
+        )
+
+    async def _reclaim_dead_session(self, session_id: str, raw_config: dict[str, Any]) -> None:
+        """Tear down a session whose containers are all gone. Only this pass can: the agent
+        already believes it torn down (or is itself gone), so nothing else will ever name these
+        devices, and the node-local block they hold is finite."""
+        meta = self._meta_of(session_id, raw_config)
+        backend = self._resolve_backend(meta.backend)
+        await backend.teardown_session_network(session_id)
+        await self._journal.forget_session(session_id)
+        self._locks.pop(session_id, None)
+        log.info("reclaimed the network of dead session {}", session_id)
+
+    async def _reclaim_dead_container(
+        self,
+        container_id: str,
+        record: AttachRecord,
+        journalled_sessions: dict[str, dict[str, Any]],
+    ) -> None:
+        """Give back the host veth, the LOCAL address and the DNAT rules of a container that died
+        while we were down. The container's own netns took its end of the veth with it; the host
+        side, its address and its rules are ours to release."""
+        try:
+            await self._forwarder.remove_container(container_id)
+            raw_config = journalled_sessions.get(record.session_id)
+            if raw_config is not None:
+                meta = self._meta_of(record.session_id, raw_config)
+                backend = self._resolve_backend(meta.backend)
+                plan = await self._derive_plan(backend, meta, record.overlay_ip)
+                await self._del_attachment(plan, container_id)
+            await self._journal.forget_attachment(container_id)
+        except Exception:
+            log.exception("failed to reclaim the network of dead container {}", container_id)
+        else:
+            log.info("reclaimed the network of dead container {}", container_id)
+
+    async def _derive_plan(
+        self,
+        backend: AbstractNetworkAgentPluginV2[Any],
+        meta: SessionNetMeta,
+        overlay_ip: str | None,
+    ) -> Any:
+        """Re-derive the plan a pre-restart attach produced.
+
+        It is a pure function of the session meta and the overlay IP, and its node-local block comes
+        from the allocator's journal, which is idempotent per session — so this reproduces the very
+        plan that attach applied, which is what makes it safe to detach with.
+        """
+        kernel_config: dict[str, Any] = {}
+        if overlay_ip is not None:
+            kernel_config["cluster_network_ip"] = policy.validate_overlay_ip(
+                overlay_ip, meta.subnet
+            )
+        return await backend.attach_endpoint(cast(Any, kernel_config), cast(Any, {}), meta=meta)
+
+    async def _local_ip_of(self, plan: Any, container_id: str) -> str | None:
+        """The LOCAL address this container holds, read back from the store the attach allocated it
+        from. It is what its published ports DNAT to, so a restarted helper must know it before it
+        can serve PUBLISH_PORTS for a pre-restart container."""
+        for spec in plan.attachments:
+            if spec.role is not NetworkRole.LOCAL:
+                continue
+            subnet = (spec.cni_config.get("ipam") or {}).get("subnet")
+            if not subnet:
+                return None
+            owners = await self._ipam.owners(str(subnet))
+            return owners.get(f"{container_id}/{spec.interface_name}")
+        return None
+
+    def _self_member(self, backend: NetworkBackendKind) -> Member:
+        return Member(
+            agent_id=self._agent_id,
+            host_ip=self._host_ip,
+            vtep_ip=self._host_ip if backend is NetworkBackendKind.VXLAN else None,
+            ip_range=None,
+        )
 
     def _peer_uid(self, writer: asyncio.StreamWriter) -> int:
         sock = writer.get_extra_info("socket")
@@ -240,13 +448,10 @@ class NetworkHelperServer:
             vni=cfg.vni,
         )
         backend = self._resolve_backend(cfg.backend)
-        self_member = Member(
-            agent_id=self._agent_id,
-            host_ip=self._host_ip,
-            vtep_ip=self._host_ip if cfg.backend is NetworkBackendKind.VXLAN else None,
-            ip_range=None,
-        )
-        await backend.setup_session_network(meta, self_member)
+        # Journal before the host is mutated: a record with no device is reconciled away on the
+        # next boot, while a device with no record is one nobody can ever name again.
+        await self._journal.record_session(session_id, dict(raw_config))
+        await backend.setup_session_network(meta, self._self_member(cfg.backend))
         self._sessions[session_id] = _SessionEntry(meta, backend)
 
     async def _teardown(self, session_id: str) -> None:
@@ -254,6 +459,14 @@ class NetworkHelperServer:
         self._locks.pop(session_id, None)
         if entry is not None:
             await entry.backend.teardown_session_network(session_id)
+        elif (raw_config := (await self._journal.sessions()).get(session_id)) is not None:
+            # We journalled this session but hold no entry for it — recovery could not rebuild it.
+            # Tear it down from the record anyway: reporting success while leaving the bridge up
+            # and the session's subnet block claimed is the one outcome we cannot afford, because
+            # nothing will ever name them again.
+            meta = self._meta_of(session_id, raw_config)
+            await self._resolve_backend(meta.backend).teardown_session_network(session_id)
+        await self._journal.forget_session(session_id)
 
     async def _attach(
         self, session_id: str, container_id: str | None, overlay_ip: str | None
@@ -277,12 +490,12 @@ class NetworkHelperServer:
         pid = await self._runtime.container_pid(container_id)
         if pid is None:
             raise HelperError("no running task for container")
-        pinned = netns_mod.open_container_netns(pid)
+        pinned = self._netns.open(pid)
         try:
             # Re-confirm the PID<->container binding still holds after pinning, so a
             # PID reused between resolution and pin cannot slip through.
             pid2 = await self._runtime.container_pid(container_id)
-            if pid2 != pid or not netns_mod.pidfd_alive(pinned.pidfd):
+            if pid2 != pid or not self._netns.alive(pinned):
                 raise netns_mod.NetnsError("container task changed during attach")
             # The plan (bridge/subnet CNI config) is derived helper-side from the session meta;
             # the overlay's static IP (+ derived MAC) comes from the validated kernel_config.
@@ -293,6 +506,11 @@ class NetworkHelperServer:
             # so it needs the ``/proc/<pid>/ns/net`` form, not the pinned-fd path. The pin
             # above already validated this is a live, non-host container netns; we keep the
             # pidfd open across the attach so a vanished process is still detectable.
+            # Journalled before the attach, so a helper that dies mid-attach still knows on its next
+            # boot that this container may hold a veth and an address to give back.
+            await self._journal.record_attachment(
+                container_id, session_id, kernel_config.get("cluster_network_ip")
+            )
             assigned = await self._attacher.attach(
                 plan, container_id=container_id, netns=f"/proc/{pid}/ns/net"
             )
@@ -349,13 +567,18 @@ class NetworkHelperServer:
         await self._forwarder.remove_container(container_id)
         entry = self._sessions.get(session_id)
         if entry is None:
+            await self._journal.forget_attachment(container_id)
             return
         entry.local_ips.pop(container_id, None)
         plan = entry.attached.pop(container_id, None)
-        if plan is None:
-            return
-        # Detach only needs the host-side veth removal + IPAM release; it does not enter
-        # the (possibly already-gone) container netns, so no netns handle is required.
+        if plan is not None:
+            await self._del_attachment(plan, container_id)
+        await self._journal.forget_attachment(container_id)
+
+    async def _del_attachment(self, plan: Any, container_id: str) -> None:
+        """Hand back the host side of an attachment: the veth and, for host-local IPAM, the
+        address. Detach only needs the host side; it does not enter the (possibly already-gone)
+        container netns, so no netns handle is required."""
         for inv in reversed(plan_to_invocations(plan)):
             await self._attacher._runner(
                 "DEL", ifname=inv.ifname, netns="", container_id=container_id, config=inv.config

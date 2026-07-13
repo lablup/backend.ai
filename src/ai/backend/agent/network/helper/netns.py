@@ -96,6 +96,22 @@ def open_container_netns(pid: int) -> PinnedNetns:
     return PinnedNetns(netns_fd=netns_fd, pidfd=pidfd)
 
 
+class NetnsPinner:
+    """The seam the helper pins namespaces through.
+
+    Production always uses this one — it is a thin pass-through to the functions above. It exists so
+    the attach path can be driven in a test without a real container: pinning needs a live process
+    in a non-host netns, which a unit test has no way to produce, and without the seam every test of
+    what attach *does* would have to stop at the pin.
+    """
+
+    def open(self, pid: int) -> PinnedNetns:
+        return open_container_netns(pid)
+
+    def alive(self, pinned: PinnedNetns) -> bool:
+        return pidfd_alive(pinned.pidfd)
+
+
 def pidfd_alive(pidfd: int) -> bool:
     """True if the pinned process is still alive (used to re-confirm identity after
     resolving the PID from containerd a second time).
