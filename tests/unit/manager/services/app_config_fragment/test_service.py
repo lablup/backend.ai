@@ -33,7 +33,6 @@ from ai.backend.manager.repositories.app_config_fragment.updaters import (
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     BulkCreator,
-    Creator,
     OffsetPagination,
     Purger,
     Updater,
@@ -120,7 +119,7 @@ class TestAppConfigFragmentService:
         result = await service.create(CreateAppConfigFragmentAction(creator_spec=spec))
 
         assert result.fragment == fragment
-        mock_repository.create.assert_called_once_with(Creator(spec=spec))
+        mock_repository.create.assert_called_once_with(spec)
 
     # --- get / search ---
 

@@ -3,7 +3,7 @@ from __future__ import annotations
 from ai.backend.manager.repositories.app_config_fragment.repository import (
     AppConfigFragmentRepository,
 )
-from ai.backend.manager.repositories.base import BulkCreator, Creator
+from ai.backend.manager.repositories.base import BulkCreator
 from ai.backend.manager.services.app_config_fragment.actions.admin_search import (
     AdminSearchAppConfigFragmentAction,
     AdminSearchAppConfigFragmentActionResult,
@@ -62,7 +62,7 @@ class AppConfigFragmentService:
     async def create(
         self, action: CreateAppConfigFragmentAction
     ) -> CreateAppConfigFragmentActionResult:
-        data = await self._repository.create(Creator(spec=action.creator_spec))
+        data = await self._repository.create(action.creator_spec)
         return CreateAppConfigFragmentActionResult(fragment=data)
 
     async def get(self, action: GetAppConfigFragmentAction) -> GetAppConfigFragmentActionResult:
