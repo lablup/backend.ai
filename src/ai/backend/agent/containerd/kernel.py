@@ -1,24 +1,31 @@
 """Containerd kernel + code runner (BEP-1062 / containerd agent backend).
 
 Mirrors the Docker kernel contract on containerd's native task model. REPL/service ops go
-through the code runner (network-based); file transfer and logs work off the host scratch
-mount + captured task stdout; session-to-image commit builds the image over the containerd
-Diff/Content/Images services.
+through the code runner (network-based); session-to-image commit builds the image over the
+containerd Diff/Content/Images services.
+
+The file APIs read the host, not the container. Everything under /home/work is a host bind mount --
+the scratch work dir, with each vfolder mounted over a subdirectory of it -- so a container path
+resolves to a host path through the kernel's own mount table. That is what dockerd does for
+`docker cp` (container.ResolvePath), and it is why that works on a container that is not running.
+Going through the container instead (which is what this used to do, via exec) means no files can be
+fetched from a kernel that has exited -- the one moment a user most wants them.
 """
 
 from __future__ import annotations
 
 import asyncio
+import io
 import logging
 import os
-import textwrap
+import stat
+import tarfile
 from collections.abc import Mapping
 from pathlib import Path, PurePosixPath
 from typing import Any, override
 
 from ai.backend.agent.containerd.logs import read_log_tail
 from ai.backend.agent.containerd.runtime.grpc import ContainerdGrpcRuntime, container_log_path
-from ai.backend.agent.containerd.runtime.interface import ExecResult
 from ai.backend.agent.errors.kernel import KernelRunnerNotInitializedError
 from ai.backend.agent.kernel import (
     AbstractCodeRunner,
@@ -28,6 +35,7 @@ from ai.backend.agent.types import AgentEventData, KernelOwnershipData
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.dto.agent.response import CodeCompletionResp
 from ai.backend.common.events.dispatcher import EventProducer
+from ai.backend.common.json import dump_json_str
 from ai.backend.common.lock import FileLock
 from ai.backend.common.types import CommitStatus, KernelId, SessionId
 from ai.backend.logging import BraceStyleAdapter
@@ -36,55 +44,6 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 _MAX_DOWNLOAD_SIZE = 1048576  # 1 MiB, matching the Docker backend
 _CONTAINER_HOME = PurePosixPath("/home/work")
-_EXEC_TIMEOUT = 30.0
-# The kernel-runner's own interpreter, bind-mounted into every kernel: the only one guaranteed to
-# exist regardless of what the image ships (the Docker backend's list_files relies on it too).
-_KRUNNER_PYTHON = "/opt/backend.ai/bin/python"
-
-# Scandir the target and print one JSON record per entry — byte-for-byte the same shape the Docker
-# backend produces, since the manager parses it.
-_SCANDIR_CODE = textwrap.dedent("""
-    import json, os, stat, sys
-    files = []
-    for f in os.scandir(sys.argv[1]):
-        fstat = f.stat(follow_symlinks=False)
-        files.append({
-            'mode': stat.filemode(fstat.st_mode),
-            'size': fstat.st_size,
-            'ctime': fstat.st_ctime,
-            'mtime': fstat.st_mtime,
-            'atime': fstat.st_atime,
-            'filename': f.name,
-        })
-    print(json.dumps(files))
-""")
-
-# Tar the target to stdout, aborting once the archive exceeds the cap so a huge directory cannot
-# be streamed through the agent's memory.
-_TAR_TO_STDOUT_CODE = textwrap.dedent("""
-    import io, os, sys, tarfile
-    path, limit = sys.argv[1], int(sys.argv[2])
-    buf = io.BytesIO()
-    with tarfile.open(fileobj=buf, mode='w') as tar:
-        tar.add(path, arcname=os.path.basename(path))
-        if buf.tell() > limit:
-            sys.exit('Too large archive file exceeding 1 MiB')
-    data = buf.getvalue()
-    if len(data) > limit:
-        sys.exit('Too large archive file exceeding 1 MiB')
-    sys.stdout.buffer.write(data)
-""")
-
-_READ_SINGLE_CODE = textwrap.dedent("""
-    import os, sys
-    path, limit = sys.argv[1], int(sys.argv[2])
-    if not os.path.isfile(path):
-        sys.exit('Expected a single file at %s' % path)
-    if os.path.getsize(path) > limit:
-        sys.exit('Too large file exceeding 1 MiB')
-    with open(path, 'rb') as f:
-        sys.stdout.buffer.write(f.read())
-""")
 
 
 class ContainerdKernel(AbstractKernel):
@@ -261,15 +220,33 @@ class ContainerdKernel(AbstractKernel):
         return Path(self.agent_config["container"]["scratch-root"]) / str(self.kernel_id) / "work"
 
     def _to_host_path(self, container_path: os.PathLike[str] | str) -> Path:
-        """Map a container path under /home/work to its host scratch path, rejecting any
-        path that escapes /home/work (that dir IS a host bind mount, so no container access
-        is needed for file I/O)."""
-        abspath = PurePosixPath(os.path.normpath(_CONTAINER_HOME / os.fspath(container_path)))
-        if not abspath.is_relative_to(_CONTAINER_HOME):
-            raise PermissionError("Not allowed to access files outside /home/work")
-        work = self._host_work_dir().resolve()
-        host = (work / abspath.relative_to(_CONTAINER_HOME)).resolve(strict=False)
-        if host != work and not host.is_relative_to(work):
+        """Map a path under /home/work to the host path that actually backs it.
+
+        Everything under /home/work is a host bind mount — the scratch work dir, with each vfolder
+        mounted over a subdirectory of it — so a container path resolves to a host path by matching
+        it against the kernel's own mount table, longest target first. This is what dockerd does for
+        `docker cp` (container.ResolvePath), and it is why that works on a container that is not
+        running: no process, no namespace, and no runtime are involved.
+
+        The mount table comes from the resource spec, which is written to (and read back from)
+        resource.txt, so it survives an agent restart with the kernel.
+        """
+        abspath = self._to_container_path(container_path)
+        base_target = _CONTAINER_HOME
+        base_source = self._host_work_dir()
+        for mount in self.resource_spec.mounts:
+            if mount.source is None:
+                continue
+            target = PurePosixPath(str(mount.target))
+            if abspath != target and not abspath.is_relative_to(target):
+                continue
+            if len(target.parts) >= len(base_target.parts):
+                base_target, base_source = target, Path(str(mount.source))
+        root = base_source.resolve()
+        host = (root / abspath.relative_to(base_target)).resolve(strict=False)
+        # A symlink in the scratch may point anywhere on the host; following it would hand the user
+        # a file the container itself could never open.
+        if host != root and not host.is_relative_to(root):
             raise PermissionError("Not allowed to access files outside /home/work")
         return host
 
@@ -290,68 +267,68 @@ class ContainerdKernel(AbstractKernel):
             raise PermissionError("Not allowed to access files outside /home/work")
         return abspath
 
-    async def _exec(self, args: list[str], *, timeout_sec: float = _EXEC_TIMEOUT) -> ExecResult:
-        """Run a command in this kernel's container.
-
-        The file APIs must look at the container's own mount namespace, not the host scratch: a
-        vfolder is bind-mounted into the container at /home/work/<name> and does not exist under
-        the host's scratch work dir at all, so reading the host would report an empty directory
-        for every vfolder.
-        """
-        runtime = ContainerdGrpcRuntime(namespace="backend-ai")
-        await runtime.open()
-        try:
-            return await runtime.exec_in_container(
-                str(self.data["container_id"]), args, timeout_sec=timeout_sec
-            )
-        finally:
-            await runtime.close()
-
     @override
     async def download_file(self, container_path: os.PathLike[str] | str) -> bytes:
-        abspath = self._to_container_path(container_path)
-        # Tar the target inside the container and stream it out through stdout, the same archive
-        # shape the Docker backend gets from container.get_archive().
-        result = await self._exec([
-            _KRUNNER_PYTHON,
-            "-c",
-            _TAR_TO_STDOUT_CODE,
-            str(abspath),
-            str(_MAX_DOWNLOAD_SIZE),
-        ])
-        if result.exit_code != 0:
-            raise RuntimeError(
-                f"Could not download the archive at {abspath}: "
-                f"{result.stderr.decode('utf-8', errors='replace').strip()}"
-            )
-        if len(result.stdout) > _MAX_DOWNLOAD_SIZE:
-            raise ValueError("Too large archive file exceeding 1 MiB")
-        return result.stdout
+        """A tar of the target, the same archive shape the Docker backend gets from
+        container.get_archive() (one member, named after the target)."""
+        host = self._to_host_path(container_path)
+
+        def _tar() -> bytes:
+            buf = io.BytesIO()
+            with tarfile.open(fileobj=buf, mode="w") as tar:
+                tar.add(host, arcname=host.name)
+                if buf.tell() > _MAX_DOWNLOAD_SIZE:
+                    raise ValueError("Too large archive file exceeding 1 MiB")
+            data = buf.getvalue()
+            if len(data) > _MAX_DOWNLOAD_SIZE:
+                raise ValueError("Too large archive file exceeding 1 MiB")
+            return data
+
+        try:
+            return await asyncio.to_thread(_tar)
+        except FileNotFoundError as e:
+            raise RuntimeError(f"Could not download the archive at {container_path}") from e
 
     @override
     async def download_single(self, container_path: os.PathLike[str] | str) -> bytes:
-        abspath = self._to_container_path(container_path)
-        result = await self._exec([
-            _KRUNNER_PYTHON,
-            "-c",
-            _READ_SINGLE_CODE,
-            str(abspath),
-            str(_MAX_DOWNLOAD_SIZE),
-        ])
-        if result.exit_code != 0:
-            raise ValueError(
-                f"Could not read {abspath}: "
-                f"{result.stderr.decode('utf-8', errors='replace').strip()}"
-            )
-        return result.stdout
+        host = self._to_host_path(container_path)
+
+        def _read() -> bytes:
+            if not host.is_file():
+                raise ValueError(f"Expected a single file at {container_path}")
+            if host.stat().st_size > _MAX_DOWNLOAD_SIZE:
+                raise ValueError("Too large file exceeding 1 MiB")
+            return host.read_bytes()
+
+        return await asyncio.to_thread(_read)
 
     @override
     async def list_files(self, container_path: os.PathLike[str] | str) -> dict[str, Any]:
-        abspath = self._to_container_path(container_path)
-        result = await self._exec([_KRUNNER_PYTHON, "-c", _SCANDIR_CODE, str(abspath)])
+        host = self._to_host_path(container_path)
+
+        def _scandir() -> tuple[str, str]:
+            files = []
+            try:
+                for entry in os.scandir(host):
+                    fstat = entry.stat(follow_symlinks=False)
+                    files.append({
+                        "mode": stat.filemode(fstat.st_mode),
+                        "size": fstat.st_size,
+                        "ctime": fstat.st_ctime,
+                        "mtime": fstat.st_mtime,
+                        "atime": fstat.st_atime,
+                        "filename": entry.name,
+                    })
+            except OSError as e:
+                return "", str(e)
+            return dump_json_str(files), ""
+
+        # The manager parses `files` as the JSON list the Docker backend produces, so the shape of
+        # each record is a contract, not a detail.
+        files_json, errors = await asyncio.to_thread(_scandir)
         return {
-            "files": result.stdout.decode("utf-8", errors="replace"),
-            "errors": result.stderr.decode("utf-8", errors="replace"),
+            "files": files_json,
+            "errors": errors,
             "abspath": str(container_path),
         }
 

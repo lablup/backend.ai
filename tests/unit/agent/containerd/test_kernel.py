@@ -3,14 +3,17 @@
 import io
 import json
 import tarfile
+from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, cast
 
 import pytest
 
 from ai.backend.agent.containerd.kernel import ContainerdKernel
-from ai.backend.agent.containerd.runtime.interface import ExecResult
 from ai.backend.agent.errors.kernel import KernelRunnerNotInitializedError
+from ai.backend.agent.resources import Mount
 from ai.backend.common.dto.agent.response import CodeCompletionResult
+from ai.backend.common.types import MountPermission, MountTypes
 
 
 class FakeRunner:
@@ -110,112 +113,32 @@ class TestRunnerNotInitialized:
             await _kernel(None).check_status()
 
 
-def _fs_kernel(scratch_root: Any, kernel_id: str = "kern-1") -> ContainerdKernel:
+def _fs_kernel(
+    scratch_root: Any,
+    kernel_id: str = "kern-1",
+    *,
+    mounts: list[Mount] | None = None,
+) -> ContainerdKernel:
     k = ContainerdKernel.__new__(ContainerdKernel)
     k.data = {"container_id": kernel_id}
     k.kernel_id = cast(Any, kernel_id)
     k.agent_config = cast(Any, {"container": {"scratch-root": scratch_root}})
-    (scratch_root / kernel_id / "work").mkdir(parents=True, exist_ok=True)
+    work = scratch_root / kernel_id / "work"
+    work.mkdir(parents=True, exist_ok=True)
+    # The mount table the real kernel carries: the scratch work dir at /home/work, plus whatever
+    # vfolders were mounted over it. It is serialized into resource.txt, so it survives a restart.
+    k.resource_spec = cast(
+        Any,
+        SimpleNamespace(
+            mounts=[
+                Mount(
+                    MountTypes.BIND, work, Path("/home/work"), MountPermission.READ_WRITE
+                ),
+                *(mounts or []),
+            ]
+        ),
+    )
     return k
-
-
-class FakeRuntime:
-    """Stands in for the containerd gRPC client: records execs and replays canned results."""
-
-    def __init__(self, results: dict[str, ExecResult] | None = None) -> None:
-        self.execs: list[list[str]] = []
-        self.results = results or {}
-        self.opened = 0
-        self.closed = 0
-
-    async def open(self) -> None:
-        self.opened += 1
-
-    async def close(self) -> None:
-        self.closed += 1
-
-    async def exec_in_container(self, container_id: str, args: Any, **kwargs: Any) -> ExecResult:
-        self.execs.append(list(args))
-        # key on the embedded script so a test can target one file op
-        for key, result in self.results.items():
-            if any(key in a for a in args):
-                return result
-        return ExecResult(exit_code=0, stdout=b"", stderr=b"")
-
-
-@pytest.fixture
-def fake_runtime(monkeypatch: Any) -> FakeRuntime:
-    rt = FakeRuntime()
-    monkeypatch.setattr("ai.backend.agent.containerd.kernel.ContainerdGrpcRuntime", lambda **kw: rt)
-    return rt
-
-
-class TestFileOpsReadTheContainerNotTheHost:
-    """The read paths must look inside the container.
-
-    A vfolder is bind-mounted into the container at /home/work/<name>; it does not exist under the
-    host's scratch work dir. Reading the host therefore reported an empty directory for every
-    vfolder — the files were simply invisible.
-    """
-
-    async def test_list_files_execs_in_the_container(self, tmp_path: Any, monkeypatch: Any) -> None:
-        listing = json.dumps([{"filename": "in-vfolder.txt", "size": 3}]).encode()
-        rt = FakeRuntime({"scandir": ExecResult(0, listing, b"")})
-        monkeypatch.setattr(
-            "ai.backend.agent.containerd.kernel.ContainerdGrpcRuntime", lambda **kw: rt
-        )
-        k = _fs_kernel(tmp_path)
-        result = await k.list_files("my-vfolder")
-
-        assert [e["filename"] for e in json.loads(result["files"])] == ["in-vfolder.txt"]
-        # the exec targeted the container path, not any host path
-        assert rt.execs[0][-1] == "/home/work/my-vfolder"
-        assert rt.execs[0][0] == "/opt/backend.ai/bin/python"
-
-    async def test_download_file_returns_the_containers_tar(
-        self, tmp_path: Any, monkeypatch: Any
-    ) -> None:
-        buf = io.BytesIO()
-        with tarfile.open(fileobj=buf, mode="w") as tar:
-            info = tarfile.TarInfo("a.txt")
-            info.size = 4
-            tar.addfile(info, io.BytesIO(b"data"))
-        rt = FakeRuntime({"tarfile": ExecResult(0, buf.getvalue(), b"")})
-        monkeypatch.setattr(
-            "ai.backend.agent.containerd.kernel.ContainerdGrpcRuntime", lambda **kw: rt
-        )
-        k = _fs_kernel(tmp_path)
-        tar_bytes = await k.download_file("a.txt")
-
-        with tarfile.open(fileobj=io.BytesIO(tar_bytes)) as tar:
-            assert tar.getnames() == ["a.txt"]
-
-    async def test_download_single_returns_container_bytes(
-        self, tmp_path: Any, monkeypatch: Any
-    ) -> None:
-        rt = FakeRuntime({"isfile": ExecResult(0, b"hi there", b"")})
-        monkeypatch.setattr(
-            "ai.backend.agent.containerd.kernel.ContainerdGrpcRuntime", lambda **kw: rt
-        )
-        k = _fs_kernel(tmp_path)
-        assert await k.download_single("hello.txt") == b"hi there"
-
-    async def test_a_failing_exec_surfaces_stderr(self, tmp_path: Any, monkeypatch: Any) -> None:
-        rt = FakeRuntime({"isfile": ExecResult(1, b"", b"Expected a single file at /home/work/d")})
-        monkeypatch.setattr(
-            "ai.backend.agent.containerd.kernel.ContainerdGrpcRuntime", lambda **kw: rt
-        )
-        k = _fs_kernel(tmp_path)
-        with pytest.raises(ValueError, match="Expected a single file"):
-            await k.download_single("d")
-
-    async def test_the_runtime_client_is_always_closed(
-        self, tmp_path: Any, fake_runtime: FakeRuntime
-    ) -> None:
-        k = _fs_kernel(tmp_path)
-        await k.list_files(".")
-        assert fake_runtime.opened == 1
-        assert fake_runtime.closed == 1
 
 
 class TestFileOps:
@@ -236,12 +159,123 @@ class TestFileOps:
         with pytest.raises(PermissionError):
             await k.accept_file("../../etc/passwd", b"x")
 
-    async def test_read_paths_reject_escapes_before_exec(
-        self, tmp_path: Any, fake_runtime: FakeRuntime
-    ) -> None:
-        # Confinement must hold on the container-path side too: nothing should be exec'd at all.
+    async def test_read_paths_reject_escapes(self, tmp_path: Any) -> None:
+        # Confinement must hold on every read path, not just the write one.
         k = _fs_kernel(tmp_path)
         for op in (k.list_files, k.download_file, k.download_single):
             with pytest.raises(PermissionError):
                 await op("../../etc/passwd")
-        assert fake_runtime.execs == []
+
+
+class TestFileOpsResolveTheHostPath:
+    """The file APIs read the host, through the kernel's own mount table.
+
+    Everything under /home/work is a host bind mount — the scratch work dir, with each vfolder
+    mounted over a subdirectory of it — so a container path has a host path, and no container is
+    needed to read it. This is what dockerd does for `docker cp` (container.ResolvePath), and it is
+    why that works on a container that is not running. Going through the container instead (which is
+    what this used to do, via exec) means no files can be fetched from a kernel that has exited —
+    the one moment a user most wants them.
+    """
+
+    def _kernel_with_vfolder(self, tmp_path: Any) -> tuple[Any, Any]:
+        vfolder = tmp_path / "storage" / "my-vfolder"
+        vfolder.mkdir(parents=True)
+        k = _fs_kernel(
+            tmp_path,
+            mounts=[
+                Mount(
+                    MountTypes.BIND,
+                    vfolder,
+                    Path("/home/work/my-vfolder"),
+                    MountPermission.READ_WRITE,
+                )
+            ],
+        )
+        return k, vfolder
+
+    async def test_a_vfolder_resolves_to_its_own_storage_path(self, tmp_path: Any) -> None:
+        # The vfolder is NOT under the scratch work dir — it is mounted over a subdirectory of it.
+        # Reading the scratch would report an empty directory and the files would be invisible.
+        k, vfolder = self._kernel_with_vfolder(tmp_path)
+        (vfolder / "in-vfolder.txt").write_bytes(b"abc")
+
+        listing = json.loads((await k.list_files("my-vfolder"))["files"])
+
+        assert [e["filename"] for e in listing] == ["in-vfolder.txt"]
+        assert await k.download_single("my-vfolder/in-vfolder.txt") == b"abc"
+
+    async def test_the_longest_mount_wins(self, tmp_path: Any) -> None:
+        # /home/work/my-vfolder/x must come from the vfolder, not from the scratch that /home/work
+        # itself is mounted from — both mounts match the path.
+        k, vfolder = self._kernel_with_vfolder(tmp_path)
+        (vfolder / "x").write_bytes(b"from the vfolder")
+        decoy = tmp_path / "kern-1" / "work" / "my-vfolder"
+        decoy.mkdir(parents=True)
+        (decoy / "x").write_bytes(b"from the scratch, shadowed by the mount")
+
+        assert await k.download_single("my-vfolder/x") == b"from the vfolder"
+
+    async def test_a_scratch_file_is_read_from_the_scratch(self, tmp_path: Any) -> None:
+        k, _vfolder = self._kernel_with_vfolder(tmp_path)
+        (tmp_path / "kern-1" / "work" / "a.txt").write_bytes(b"hello")
+
+        assert await k.download_single("a.txt") == b"hello"
+
+    async def test_an_exited_kernel_can_still_be_read(self, tmp_path: Any) -> None:
+        # The whole point. There is no container_id, no task, and no runtime here — and it still
+        # works, because none of them were ever needed.
+        k, vfolder = self._kernel_with_vfolder(tmp_path)
+        (vfolder / "results.csv").write_bytes(b"1,2,3")
+        k.data = {}  # the container is gone
+
+        assert await k.download_single("my-vfolder/results.csv") == b"1,2,3"
+
+    async def test_download_file_tars_the_target(self, tmp_path: Any) -> None:
+        # Same archive shape the Docker backend returns from container.get_archive(): one member,
+        # named after the target.
+        k = _fs_kernel(tmp_path)
+        (tmp_path / "kern-1" / "work" / "a.txt").write_bytes(b"data")
+
+        with tarfile.open(fileobj=io.BytesIO(await k.download_file("a.txt"))) as tar:
+            assert tar.getnames() == ["a.txt"]
+            member = tar.extractfile("a.txt")
+            assert member is not None and member.read() == b"data"
+
+    async def test_a_directory_is_tarred_whole(self, tmp_path: Any) -> None:
+        k = _fs_kernel(tmp_path)
+        d = tmp_path / "kern-1" / "work" / "sub"
+        d.mkdir()
+        (d / "f.txt").write_bytes(b"x")
+
+        with tarfile.open(fileobj=io.BytesIO(await k.download_file("sub"))) as tar:
+            assert sorted(tar.getnames()) == ["sub", "sub/f.txt"]
+
+    async def test_download_single_refuses_a_directory(self, tmp_path: Any) -> None:
+        k = _fs_kernel(tmp_path)
+        (tmp_path / "kern-1" / "work" / "sub").mkdir()
+        with pytest.raises(ValueError, match="single file"):
+            await k.download_single("sub")
+
+    async def test_an_oversized_file_is_refused(self, tmp_path: Any) -> None:
+        k = _fs_kernel(tmp_path)
+        (tmp_path / "kern-1" / "work" / "big.bin").write_bytes(b"x" * (1048576 + 1))
+        with pytest.raises(ValueError, match="Too large"):
+            await k.download_single("big.bin")
+
+    async def test_a_symlink_out_of_the_mount_is_refused(self, tmp_path: Any) -> None:
+        # On the host a symlink can point anywhere; following it would hand the user a file the
+        # container itself could never open.
+        k = _fs_kernel(tmp_path)
+        secret = tmp_path / "secret.txt"
+        secret.write_bytes(b"host secret")
+        (tmp_path / "kern-1" / "work" / "escape").symlink_to(secret)
+
+        with pytest.raises(PermissionError):
+            await k.download_single("escape")
+
+    async def test_listing_a_missing_directory_reports_the_error(self, tmp_path: Any) -> None:
+        k = _fs_kernel(tmp_path)
+        result = await k.list_files("nope")
+        assert result["files"] == ""
+        assert result["errors"]
