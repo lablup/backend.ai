@@ -361,7 +361,7 @@ class TestCheckPermissionViaVirtualScope:
         )
         unreachable = VirtualScopePermissionCheckKey(
             user_id=chain.user_id,
-            entity=EntityRef(entity_type=_TARGET_ENTITY_TYPE, entity_id=EntityID(uuid.uuid4())),
+            entity=EntityRef(entity_type=_TARGET_ENTITY_TYPE, entity_id=uuid.uuid4()),
         )
         result = await db_source.check_bulk_permission_via_virtual_scope(
             [reachable, unreachable], Permission.READ
