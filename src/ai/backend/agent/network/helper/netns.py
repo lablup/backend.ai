@@ -83,11 +83,14 @@ def open_container_netns(pid: int) -> PinnedNetns:
     except (ProcessLookupError, OSError) as e:
         raise NetnsError("target process is gone") from e
     try:
-        # O_RDONLY without O_CLOEXEC: the fd must survive exec to reach the CNI child.
         netns_fd = os.open(f"/proc/{pid}/ns/net", os.O_RDONLY)
     except OSError as e:
         os.close(pidfd)
         raise NetnsError("cannot open container netns") from e
+    # Python opens every fd with O_CLOEXEC (PEP 446), so it must be cleared explicitly: the fd has
+    # to survive exec to reach a CNI child through ``pass_fds``, which is the whole point of
+    # handing that child ``netns_path`` instead of a /proc path it could re-resolve.
+    os.set_inheritable(netns_fd, True)
     st = os.fstat(netns_fd)
     if _NsIdent(st.st_dev, st.st_ino) == _host_netns_ident():
         os.close(netns_fd)
