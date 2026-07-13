@@ -644,7 +644,8 @@ def _merge_service_config_draft(
         start_command=_pick_non_null_override(
             base.start_command, override.start_command, "start_command" in s
         ),
-        shell=_pick_non_null_override(base.shell, override.shell, "shell" in s),
+        # shell requires explicit none to disable shell wrapping; otherwise the baseline's default is preserved.
+        shell=_pick(base.shell, override.shell, "shell" in s),
         port=_pick_non_null_override(base.port, override.port, "port" in s),
         health_check=health_check,
     )
