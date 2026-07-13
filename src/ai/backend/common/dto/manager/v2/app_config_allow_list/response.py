@@ -8,7 +8,7 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
-from ai.backend.common.data.app_config.types import AppConfigScopeType
+from ai.backend.common.data.app_config.types import AppConfigPermission, AppConfigScopeType
 
 __all__ = (
     "AppConfigAllowListNode",
@@ -27,6 +27,9 @@ class AppConfigAllowListNode(BaseResponseModel):
     scope_type: AppConfigScopeType = Field(description="Scope type the entry permits writes at.")
     rank: int = Field(
         description=("Merge rank applied to fragments under this entry (low to high; higher wins).")
+    )
+    permission: AppConfigPermission = Field(
+        description="Write policy for the fragments under this entry (rw = scope owner may write, ro = superadmin only)."
     )
     created_at: datetime = Field(description="Creation timestamp (UTC).")
     updated_at: datetime = Field(description="Last update timestamp (UTC).")

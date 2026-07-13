@@ -1119,6 +1119,15 @@
         "title": "UpdateAppConfigFragmentInput",
         "type": "object"
       },
+      "AppConfigPermission": {
+        "description": "What a config layer's scope owner may do with it (BEP-1052).\n\nStored per ``(config_name, scope_type)`` on the allow-list, admin-owned (mirrors\nVFolder's ``permission``). It gates writes only — reads always follow scope visibility\n(public → everyone, domain → members, user → owner):\n\n* ``ro`` — read-only: only a superadmin may write the layer.\n* ``rw`` — read-write: the scope owner may write it (a user their own ``user`` layer),\n  and a superadmin always may.",
+        "enum": [
+          "ro",
+          "rw"
+        ],
+        "title": "AppConfigPermission",
+        "type": "string"
+      },
       "CreateAppConfigAllowListInput": {
         "description": "Input for registering a new app config allow-list entry.",
         "properties": {
@@ -1145,6 +1154,18 @@
             "default": null,
             "description": "Merge rank applied to fragments under this entry (low to high; higher wins). Defaults to the scope type's default rank (public=100, domain=200, user=300).",
             "title": "Rank"
+          },
+          "permission": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AppConfigPermission"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Write policy for the fragments under this entry (rw = scope owner may write, ro = superadmin only). Defaults to the scope type's default (public/domain=ro, user=rw)."
           }
         },
         "required": [
@@ -1405,7 +1426,7 @@
         "type": "object"
       },
       "UpdateAppConfigAllowListInput": {
-        "description": "Input for updating an app config allow-list entry.\n\nOnly ``rank`` is updatable — the identity pair (``config_name``, ``scope_type``)\nis immutable (purge and recreate to change it).",
+        "description": "Input for updating an app config allow-list entry.\n\n``rank`` and ``permission`` are updatable — the identity pair (``config_name``,\n``scope_type``) is immutable (purge and recreate to change it).",
         "properties": {
           "id": {
             "description": "App config allow-list entry id to update.",
@@ -1425,6 +1446,18 @@
             "default": null,
             "description": "New merge rank applied to fragments under this entry (low to high; higher wins). Omit to leave unchanged.",
             "title": "Rank"
+          },
+          "permission": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AppConfigPermission"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "New write policy for the fragments under this entry (rw = scope owner may write, ro = superadmin only). Omit to leave unchanged."
           }
         },
         "required": [

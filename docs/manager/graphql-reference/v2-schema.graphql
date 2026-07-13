@@ -627,6 +627,11 @@ type AppConfigAllowList implements Node {
   """
   rank: Int!
 
+  """
+  Added in 26.8.0. Write policy for the fragments under this entry (rw = scope owner may write, ro = superadmin only).
+  """
+  permission: AppConfigPermission!
+
   """Creation timestamp (UTC)."""
   createdAt: DateTime!
 
@@ -782,6 +787,11 @@ enum AppConfigDefinitionOrderField {
   CONFIG_NAME
   CREATED_AT
   UPDATED_AT
+}
+
+enum AppConfigPermission {
+  READ_ONLY
+  READ_WRITE
 }
 
 enum AppConfigScopeType {
@@ -2345,6 +2355,11 @@ input CreateAppConfigAllowListInput {
   Added in 26.8.0. Merge rank applied to fragments under this entry (low to high; higher wins). Defaults to the scope type's default rank (public=100, domain=200, user=300).
   """
   rank: Int = null
+
+  """
+  Added in 26.8.0. Write policy for the fragments under this entry (rw = scope owner may write, ro = superadmin only). Defaults to the scope type's default (public/domain=ro, user=rw).
+  """
+  permission: AppConfigPermission = null
 }
 
 """Added in 26.7.0. Payload for app config allow-list entry creation."""
@@ -13512,7 +13527,7 @@ input UpdateAllowedResourceGroupsForProjectInput {
 }
 
 """
-Added in 26.8.0. Input for updating an app config allow-list entry (rank only).
+Added in 26.8.0. Input for updating an app config allow-list entry (rank / permission).
 """
 input UpdateAppConfigAllowListInput {
   """App config allow-list entry id to update."""
@@ -13522,6 +13537,11 @@ input UpdateAppConfigAllowListInput {
   New merge rank applied to fragments under this entry (low to high; higher wins). Omit to leave unchanged.
   """
   rank: Int = null
+
+  """
+  New write policy for the fragments under this entry (rw = scope owner may write, ro = superadmin only). Omit to leave unchanged.
+  """
+  permission: AppConfigPermission = null
 }
 
 """Added in 26.8.0. Payload for app config allow-list entry update."""

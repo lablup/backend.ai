@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
-from ai.backend.common.data.app_config.types import AppConfigScopeType
+from ai.backend.common.data.app_config.types import AppConfigPermission, AppConfigScopeType
 from ai.backend.common.dto.manager.v2.app_config_allow_list.response import (
     AppConfigAllowListNode,
 )
@@ -31,6 +31,7 @@ class TestAppConfigAllowListGQL:
             config_name="theme",
             scope_type=AppConfigScopeType.DOMAIN,
             rank=200,
+            permission=AppConfigPermission.READ_ONLY,
             created_at=created,
             updated_at=updated,
         )
@@ -40,6 +41,7 @@ class TestAppConfigAllowListGQL:
         assert gql.config_name == "theme"
         assert gql.scope_type == AppConfigScopeType.DOMAIN
         assert gql.rank == 200
+        assert gql.permission == AppConfigPermission.READ_ONLY
         assert gql.created_at == created
         assert gql.updated_at == updated
 

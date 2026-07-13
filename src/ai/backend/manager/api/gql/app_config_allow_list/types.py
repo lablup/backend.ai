@@ -11,7 +11,7 @@ from uuid import UUID
 from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
-from ai.backend.common.data.app_config.types import AppConfigScopeType
+from ai.backend.common.data.app_config.types import AppConfigPermission, AppConfigScopeType
 from ai.backend.common.dto.manager.v2.app_config_allow_list.request import (
     AppConfigAllowListFilter as AppConfigAllowListFilterDTO,
 )
@@ -102,6 +102,12 @@ class AppConfigAllowListGQL(PydanticNodeMixin[AppConfigAllowListNode]):
             description=(
                 "Merge rank applied to fragments under this entry (low to high; higher wins)."
             ),
+        ),
+    )
+    permission: AppConfigPermission = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Write policy for the fragments under this entry (rw = scope owner may write, ro = superadmin only).",
         ),
     )
     created_at: datetime = gql_field(description="Creation timestamp (UTC).")
@@ -254,6 +260,17 @@ class CreateAppConfigAllowListInputGQL(PydanticInputMixin[CreateAppConfigAllowLi
         ),
         default=None,
     )
+    permission: AppConfigPermission | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Write policy for the fragments under this entry (rw = scope owner may write, "
+                "ro = superadmin only). Defaults to the scope type's default "
+                "(public/domain=ro, user=rw)."
+            ),
+        ),
+        default=None,
+    )
 
 
 @gql_pydantic_type(
@@ -272,7 +289,7 @@ class CreateAppConfigAllowListPayloadGQL(PydanticOutputMixin[CreateAppConfigAllo
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        description="Input for updating an app config allow-list entry (rank only).",
+        description="Input for updating an app config allow-list entry (rank / permission).",
         added_version=NEXT_RELEASE_VERSION,
     ),
     name="UpdateAppConfigAllowListInput",
@@ -283,6 +300,13 @@ class UpdateAppConfigAllowListInputGQL(PydanticInputMixin[UpdateAppConfigAllowLi
         description=(
             "New merge rank applied to fragments under this entry (low to high; higher "
             "wins). Omit to leave unchanged."
+        ),
+        default=None,
+    )
+    permission: AppConfigPermission | None = gql_field(
+        description=(
+            "New write policy for the fragments under this entry (rw = scope owner may write, "
+            "ro = superadmin only). Omit to leave unchanged."
         ),
         default=None,
     )
