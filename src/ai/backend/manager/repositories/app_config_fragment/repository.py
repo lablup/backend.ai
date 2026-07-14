@@ -21,6 +21,9 @@ from ai.backend.manager.repositories.app_config_fragment.creators import (
 from ai.backend.manager.repositories.app_config_fragment.db_source import (
     AppConfigFragmentDBSource,
 )
+from ai.backend.manager.repositories.app_config_fragment.purgers import (
+    AppConfigFragmentPurgerSpec,
+)
 from ai.backend.manager.repositories.app_config_fragment.types import (
     AppConfigScopeArguments,
 )
@@ -75,8 +78,8 @@ class AppConfigFragmentRepository:
         return await self._db_source.update(updater)
 
     @app_config_fragment_repository_resilience.apply()
-    async def purge(self, purger: Purger[AppConfigFragmentRow]) -> AppConfigFragmentData:
-        return await self._db_source.purge(purger)
+    async def purge(self, purger_spec: AppConfigFragmentPurgerSpec) -> AppConfigFragmentData:
+        return await self._db_source.purge(purger_spec)
 
     @app_config_fragment_repository_resilience.apply()
     async def admin_search(self, querier: BatchQuerier) -> AppConfigFragmentSearchResult:

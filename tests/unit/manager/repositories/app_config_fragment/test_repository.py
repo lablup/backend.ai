@@ -34,6 +34,9 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.app_config_fragment.creators import (
     AppConfigFragmentCreatorSpec,
 )
+from ai.backend.manager.repositories.app_config_fragment.purgers import (
+    AppConfigFragmentPurgerSpec,
+)
 from ai.backend.manager.repositories.app_config_fragment.repository import (
     AppConfigFragmentRepository,
 )
@@ -285,7 +288,7 @@ class TestPurge:
         domain_scoped_fragment: AppConfigFragmentData,
     ) -> None:
         purged = await repository.purge(
-            Purger(row_class=AppConfigFragmentRow, pk_value=domain_scoped_fragment.id),
+            AppConfigFragmentPurgerSpec(fragment_id=domain_scoped_fragment.id),
         )
         assert purged.id == domain_scoped_fragment.id
         with pytest.raises(AppConfigFragmentNotFound):
@@ -295,7 +298,7 @@ class TestPurge:
         missing_id = AppConfigFragmentID(uuid.uuid4())
         with pytest.raises(AppConfigFragmentNotFound):
             await repository.purge(
-                Purger(row_class=AppConfigFragmentRow, pk_value=missing_id),
+                AppConfigFragmentPurgerSpec(fragment_id=missing_id),
             )
 
 
@@ -775,5 +778,5 @@ class TestRBACScopeAssociation:
     ) -> None:
         created = await self._create(repository, AppConfigScopeType.USER, _USER_ID)
         assert len(await self._scope_bindings(database, str(created.id))) == 1
-        await repository.purge(Purger(row_class=AppConfigFragmentRow, pk_value=created.id))
+        await repository.purge(AppConfigFragmentPurgerSpec(fragment_id=created.id))
         assert await self._scope_bindings(database, str(created.id)) == []

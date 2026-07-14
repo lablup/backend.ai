@@ -1,9 +1,14 @@
 """add_app_config_fragment_permissions_to_rbac
 
-Backfill ``APP_CONFIG_FRAGMENT`` permissions onto existing RBAC roles so that already
-provisioned user / domain / project roles can exercise fragment writes once RBAC
-enforcement is enabled (BEP-1052). New roles receive these permissions at creation via the
-runtime allow list; this migration covers roles that predate the allow-list change.
+Backfill ``APP_CONFIG_FRAGMENT`` permissions onto existing write-capable RBAC roles (a
+user's own ``user``-scope role and ``domain`` admins) so they can exercise fragment writes
+once RBAC enforcement is enabled (BEP-1052). New roles receive these permissions at role
+creation; this migration only covers roles that predate the new entity type.
+
+Only ``permissions`` rows are backfilled. The RBAC scope *associations*
+(``association_scopes_entities``, which bind a fragment to its owning scope) are NOT
+migrated: they are per-fragment and written at fragment-creation time, and this feature is
+still unreleased, so no fragments — and therefore no associations — exist yet.
 
 Revision ID: b3d9f7a2c184
 Revises: a3c1d8e5b294

@@ -24,6 +24,9 @@ from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentR
 from ai.backend.manager.repositories.app_config_fragment.creators import (
     AppConfigFragmentCreatorSpec,
 )
+from ai.backend.manager.repositories.app_config_fragment.purgers import (
+    AppConfigFragmentPurgerSpec,
+)
 from ai.backend.manager.repositories.app_config_fragment.repository import (
     AppConfigFragmentRepository,
 )
@@ -221,12 +224,12 @@ class TestAppConfigFragmentService:
     ) -> None:
         fragment = _fragment()
         mock_repository.purge = AsyncMock(return_value=fragment)
-        purger = Purger(row_class=AppConfigFragmentRow, pk_value=fragment.id)
+        purger_spec = AppConfigFragmentPurgerSpec(fragment_id=fragment.id)
 
-        result = await service.purge(PurgeAppConfigFragmentAction(purger=purger))
+        result = await service.purge(PurgeAppConfigFragmentAction(purger_spec=purger_spec))
 
         assert result.fragment == fragment
-        mock_repository.purge.assert_called_once_with(purger)
+        mock_repository.purge.assert_called_once_with(purger_spec)
 
     # --- bulk ---
 

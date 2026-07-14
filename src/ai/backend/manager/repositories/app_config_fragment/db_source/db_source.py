@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import cast
 
 import sqlalchemy as sa
 
@@ -111,17 +110,20 @@ class AppConfigFragmentDBSource:
             return result.row.to_data()
 
     @app_config_fragment_db_source_resilience.apply()
-    async def purge(self, purger: Purger[AppConfigFragmentRow]) -> AppConfigFragmentData:
-        fragment_id = cast(AppConfigFragmentID, purger.pk_value)
+    async def purge(self, purger_spec: AppConfigFragmentPurgerSpec) -> AppConfigFragmentData:
+        # Purge is an RBAC unbind: the fragment row, its scope associations, and any
+        # permissions granted at its own scope are deleted together (entity-as-scope).
         rbac_purger = RBACEntityPurger(
-            row_class=purger.row_class,
-            pk_value=purger.pk_value,
-            spec=AppConfigFragmentPurgerSpec(fragment_id=fragment_id),
+            row_class=AppConfigFragmentRow,
+            pk_value=purger_spec.fragment_id,
+            spec=purger_spec,
         )
         async with self._rbac_ops_provider.write_ops() as w:
             result = await w.purge_scoped(rbac_purger)
             if result is None:
-                raise AppConfigFragmentNotFound(f"App config fragment {purger.pk_value} not found")
+                raise AppConfigFragmentNotFound(
+                    f"App config fragment {purger_spec.fragment_id} not found"
+                )
             return result.row.to_data()
 
     @app_config_fragment_db_source_resilience.apply()
