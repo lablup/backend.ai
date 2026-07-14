@@ -53,6 +53,7 @@ class SeededIdleCheckData:
     project_session_id: SessionId
     domain_session_id: SessionId
     inference_session_id: SessionId
+    unstarted_session_id: SessionId
     resource_group_checker_id: IdleCheckerID
     project_checker_id: IdleCheckerID
     domain_checker_id: IdleCheckerID
@@ -278,7 +279,7 @@ class TestFetchIdleCheckBatch:
                     target_session_types=[SessionTypes.INTERACTIVE, SessionTypes.BATCH],
                     spec=IdleCheckerSpec(
                         type=CheckerType.SESSION_LIFETIME,
-                        session_lifetime=SessionLifetimeSpec(),
+                        session_lifetime=SessionLifetimeSpec(max_lifetime_seconds=3600),
                     ),
                 )
             )
@@ -326,10 +327,12 @@ class TestFetchIdleCheckBatch:
         project_session_id = SessionId(uuid.uuid4())
         domain_session_id = SessionId(uuid.uuid4())
         inference_session_id = SessionId(uuid.uuid4())
+        unstarted_session_id = SessionId(uuid.uuid4())
         session_specs = (
             (
                 resource_group_scope,
                 resource_group_session_id,
+                datetime(2026, 1, 1, tzinfo=UTC),
                 datetime(2026, 1, 1, tzinfo=UTC),
                 SessionTypes.INTERACTIVE,
             ),
@@ -337,11 +340,13 @@ class TestFetchIdleCheckBatch:
                 project_scope,
                 project_session_id,
                 datetime(2026, 1, 2, tzinfo=UTC),
+                datetime(2026, 1, 2, tzinfo=UTC),
                 SessionTypes.INTERACTIVE,
             ),
             (
                 domain_scope,
                 domain_session_id,
+                datetime(2026, 1, 3, tzinfo=UTC),
                 datetime(2026, 1, 3, tzinfo=UTC),
                 SessionTypes.INTERACTIVE,
             ),
@@ -349,7 +354,15 @@ class TestFetchIdleCheckBatch:
                 resource_group_scope,
                 inference_session_id,
                 datetime(2026, 1, 4, tzinfo=UTC),
+                datetime(2026, 1, 4, tzinfo=UTC),
                 SessionTypes.INFERENCE,
+            ),
+            (
+                domain_scope,
+                unstarted_session_id,
+                datetime(2026, 1, 5, tzinfo=UTC),
+                None,
+                SessionTypes.INTERACTIVE,
             ),
         )
         resource_group_checker_id = IdleCheckerID(uuid.uuid4())
@@ -361,7 +374,7 @@ class TestFetchIdleCheckBatch:
                 CheckerType.SESSION_LIFETIME,
                 IdleCheckerSpec(
                     type=CheckerType.SESSION_LIFETIME,
-                    session_lifetime=SessionLifetimeSpec(),
+                    session_lifetime=SessionLifetimeSpec(max_lifetime_seconds=3600),
                 ),
                 ScopeType.RESOURCE_GROUP,
                 resource_group_scope.scaling_group_id,
@@ -428,7 +441,7 @@ class TestFetchIdleCheckBatch:
                         use_host_network=False,
                     )
                 )
-            for scope, session_id, created_at, session_type in session_specs:
+            for scope, session_id, created_at, starts_at, session_type in session_specs:
                 db_sess.add(
                     SessionRow(
                         id=session_id,
@@ -451,7 +464,7 @@ class TestFetchIdleCheckBatch:
                         result=SessionResult.UNDEFINED,
                         created_at=created_at,
                         terminated_at=None,
-                        starts_at=created_at,
+                        starts_at=starts_at,
                         startup_command=None,
                         callback_url=None,
                         occupying_slots=ResourceSlot({"cpu": "1"}),
@@ -490,6 +503,7 @@ class TestFetchIdleCheckBatch:
             project_session_id=project_session_id,
             domain_session_id=domain_session_id,
             inference_session_id=inference_session_id,
+            unstarted_session_id=unstarted_session_id,
             resource_group_checker_id=resource_group_checker_id,
             project_checker_id=project_checker_id,
             domain_checker_id=domain_checker_id,
@@ -586,14 +600,24 @@ class TestFetchIdleCheckBatch:
         seeded_idle_check_data: SeededIdleCheckData,
     ) -> None:
         batch = await repository.fetch_idle_check_batch([SessionStatus.RUNNING])
-        targets_by_session_id = {target.session.session_id: target for target in batch.targets}
+        target_session_ids = {target.session.session_id for target in batch.targets}
 
-        assert set(targets_by_session_id) == {
-            seeded_idle_check_data.resource_group_session_id,
-            seeded_idle_check_data.project_session_id,
-            seeded_idle_check_data.domain_session_id,
-        }
-        assert seeded_idle_check_data.inference_session_id not in targets_by_session_id
+        assert seeded_idle_check_data.inference_session_id not in target_session_ids
+
+    @pytest.mark.parametrize(
+        "seeded_idle_check_data",
+        [("resource-group", "project", "domain")],
+        indirect=True,
+    )
+    async def test_excludes_sessions_without_starts_at(
+        self,
+        repository: IdleCheckerRepository,
+        seeded_idle_check_data: SeededIdleCheckData,
+    ) -> None:
+        batch = await repository.fetch_idle_check_batch([SessionStatus.RUNNING])
+        target_session_ids = {target.session.session_id for target in batch.targets}
+
+        assert seeded_idle_check_data.unstarted_session_id not in target_session_ids
 
     @pytest.fixture
     async def per_type_checker_data(
@@ -704,7 +728,7 @@ class TestFetchIdleCheckBatch:
                         target_session_types=list(target_types),
                         spec=IdleCheckerSpec(
                             type=CheckerType.SESSION_LIFETIME,
-                            session_lifetime=SessionLifetimeSpec(),
+                            session_lifetime=SessionLifetimeSpec(max_lifetime_seconds=3600),
                         ),
                     )
                 )

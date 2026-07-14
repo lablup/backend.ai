@@ -41,7 +41,10 @@ class IdleCheckReconcileHandler(ReconcilerHandler[IdleCheckReconcileInfo, IdleCh
             checker = self._checkers.get(checker_type)
             if checker is None:
                 continue
-            judgments = await checker.judge(assignments)
+            judgments = await checker.judge(
+                assignments,
+                current_time=reconcile_info.current_time,
+            )
             for judgment in judgments:
                 if not judgment.is_idle:
                     continue

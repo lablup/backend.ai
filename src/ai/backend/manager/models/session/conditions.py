@@ -46,6 +46,13 @@ class SessionConditions:
         return inner
 
     @staticmethod
+    def started() -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return SessionRow.starts_at.isnot(None)
+
+        return inner
+
+    @staticmethod
     def by_idle_check_candidates(
         candidates: Collection[tuple[ScopeId, Collection[SessionTypes]]],
     ) -> QueryCondition:

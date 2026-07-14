@@ -59,6 +59,7 @@ class IdleCheckerRepository:
             pagination=NoPagination(),
             conditions=[
                 SessionConditions.by_statuses(session_statuses),
+                SessionConditions.started(),
                 SessionConditions.by_idle_check_candidates(idle_check_candidates),
             ],
         )

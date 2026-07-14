@@ -14,6 +14,9 @@ from ai.backend.manager.defs import LockID
 from ai.backend.manager.repositories.idle_checker.repository import IdleCheckerRepository
 from ai.backend.manager.sokovan.idle_check.applier import IdleCheckApplier
 from ai.backend.manager.sokovan.idle_check.checkers.base import IdleChecker
+from ai.backend.manager.sokovan.idle_check.checkers.session_lifetime import (
+    SessionLifetimeChecker,
+)
 from ai.backend.manager.sokovan.idle_check.handlers.reconcile import IdleCheckReconcileHandler
 from ai.backend.manager.sokovan.idle_check.source import IdleCheckSource
 from ai.backend.manager.sokovan.idle_check.types import (
@@ -48,7 +51,9 @@ def build_idle_check_stage(
         lock_id=LockID.LOCKID_IDLE_CHECK_RECONCILE,
         transitions=transitions,
     )
-    checkers: Mapping[CheckerType, IdleChecker] = {}
+    checkers: Mapping[CheckerType, IdleChecker] = {
+        CheckerType.SESSION_LIFETIME: SessionLifetimeChecker(),
+    }
     stage = ReconcilerStage(
         handler=IdleCheckReconcileHandler(checkers),
         source=IdleCheckSource(idle_checker_repository),

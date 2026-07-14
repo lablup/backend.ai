@@ -5,6 +5,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from dataclasses import dataclass
+from datetime import datetime
 
 from ai.backend.common.identifier.idle_checker import IdleCheckerID
 from ai.backend.common.types import SessionId
@@ -37,6 +38,8 @@ class IdleChecker(ABC):
     async def judge(
         self,
         assignments: Sequence[CheckerAssignment],
+        *,
+        current_time: datetime,
     ) -> Sequence[IdleJudgment]:
         """Evaluate every assignment of this type in one batched call.
 

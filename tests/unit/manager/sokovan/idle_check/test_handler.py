@@ -42,7 +42,8 @@ _NOW = datetime(2026, 1, 2, tzinfo=UTC)
 
 _SPECS: Final[dict[CheckerType, IdleCheckerSpec]] = {
     CheckerType.SESSION_LIFETIME: IdleCheckerSpec(
-        type=CheckerType.SESSION_LIFETIME, session_lifetime=SessionLifetimeSpec()
+        type=CheckerType.SESSION_LIFETIME,
+        session_lifetime=SessionLifetimeSpec(max_lifetime_seconds=3600),
     ),
     CheckerType.NETWORK_TIMEOUT: IdleCheckerSpec(
         type=CheckerType.NETWORK_TIMEOUT, network=NetworkTimeoutSpec()
@@ -55,12 +56,14 @@ class FakeChecker(IdleChecker):
 
     idle_session_ids: set[SessionId]
     judge_calls: list[list[tuple[IdleCheckerID, list[SessionId]]]]
+    judge_current_times: list[datetime]
     should_fail: bool
     _message: str
 
     def __init__(self, message: str = "idle") -> None:
         self.idle_session_ids = set()
         self.judge_calls = []
+        self.judge_current_times = []
         self.should_fail = False
         self._message = message
 
@@ -68,7 +71,10 @@ class FakeChecker(IdleChecker):
     async def judge(
         self,
         assignments: Sequence[CheckerAssignment],
+        *,
+        current_time: datetime,
     ) -> Sequence[IdleJudgment]:
+        self.judge_current_times.append(current_time)
         call_record: list[tuple[IdleCheckerID, list[SessionId]]] = []
         for assignment in assignments:
             session_ids = [session.session_id for session in assignment.sessions]
@@ -145,7 +151,9 @@ class TestIdleCheckReconcileHandler:
 
     @pytest.fixture()
     def handler(
-        self, lifetime_checker: FakeChecker, network_checker: FakeChecker
+        self,
+        lifetime_checker: FakeChecker,
+        network_checker: FakeChecker,
     ) -> IdleCheckReconcileHandler:
         return IdleCheckReconcileHandler({
             CheckerType.SESSION_LIFETIME: lifetime_checker,
@@ -188,6 +196,8 @@ class TestIdleCheckReconcileHandler:
         assert network_checker.judge_calls == [
             [(network_bound.checker.checker_id, [second_session_id])],
         ]
+        assert lifetime_checker.judge_current_times == [_NOW]
+        assert network_checker.judge_current_times == [_NOW]
 
     async def test_deduplicates_cross_scope_assignments(
         self,
