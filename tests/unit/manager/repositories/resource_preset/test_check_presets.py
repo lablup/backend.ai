@@ -39,6 +39,7 @@ from ai.backend.common.types import (
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.kernel.types import KernelStatus
+from ai.backend.manager.data.permission.types import EntityType, ScopeType
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
@@ -48,12 +49,15 @@ from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.models.group import GroupRow, association_groups_users
+from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
+from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+    AssociationScopesEntitiesRow,
+)
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
@@ -143,7 +147,7 @@ class TestCheckPresetsOccupiedSlots:
                 sgroups_for_domains,  # association table
                 sgroups_for_keypairs,  # association table
                 sgroups_for_groups,  # association table
-                association_groups_users,  # association table
+                AssociationScopesEntitiesRow,  # RBAC project membership
             ],
         ):
             # Seed default resource slot types (FK target for normalized tables)
@@ -306,11 +310,13 @@ class TestCheckPresetsOccupiedSlots:
             db_sess.add(group)
             await db_sess.flush()
 
-            # Add user to group
-            await db_sess.execute(
-                sa.insert(association_groups_users).values(
-                    user_id=test_user_uuid,
-                    group_id=group_id,
+            # RBAC project membership (queried by check_presets)
+            db_sess.add(
+                AssociationScopesEntitiesRow(
+                    scope_type=ScopeType.PROJECT,
+                    scope_id=str(group_id),
+                    entity_type=EntityType.USER,
+                    entity_id=str(test_user_uuid),
                 )
             )
             await db_sess.flush()
@@ -1264,7 +1270,7 @@ class TestCheckPresetsZeroValues:
                 sgroups_for_domains,  # association table
                 sgroups_for_keypairs,  # association table
                 sgroups_for_groups,  # association table
-                association_groups_users,  # association table
+                AssociationScopesEntitiesRow,  # RBAC project membership
             ],
         ):
             # Seed default resource slot types (FK target for normalized tables)
@@ -1447,11 +1453,13 @@ class TestCheckPresetsZeroValues:
             db_sess.add(group)
             await db_sess.flush()
 
-            # Add user to group
-            await db_sess.execute(
-                sa.insert(association_groups_users).values(
-                    user_id=test_user_uuid,
-                    group_id=group_id,
+            # RBAC project membership (queried by check_presets)
+            db_sess.add(
+                AssociationScopesEntitiesRow(
+                    scope_type=ScopeType.PROJECT,
+                    scope_id=str(group_id),
+                    entity_type=EntityType.USER,
+                    entity_id=str(test_user_uuid),
                 )
             )
             await db_sess.flush()
