@@ -37,9 +37,6 @@ from ai.backend.manager.repositories.scheduler import (
     SchedulerRepository,
 )
 from ai.backend.manager.repositories.scheduler.types.session_creation import SessionSpecContextFetch
-from ai.backend.manager.sokovan.scheduler.provisioner.selectors.concentrated import (
-    ConcentratedAgentSelector,
-)
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.exceptions import (
     BatchAgentSelectionFailedError,
     NoAgentsInResourceGroupError,
@@ -96,6 +93,7 @@ class SchedulingControllerArgs:
     valkey_schedule: ValkeyScheduleClient
     network_plugin_ctx: NetworkPluginContext
     hook_plugin_ctx: HookPluginContext
+    agent_selector: AgentSelector
 
 
 @dataclass
@@ -196,14 +194,7 @@ class SchedulingController:
             InferenceModelFolderRule(),
             DotfileVFolderConflictRule(),
         ])
-
-        # The compute-schedule (dry-run) path drives the real agent selector to
-        # test per-kernel node fitting. Feasibility does not depend on the
-        # placement strategy (it only narrows already-compatible candidates), so
-        # a single default selector built from config is sufficient — mirrors
-        # ``create_default_scheduler_components``.
-        resource_priority = args.config_provider.config.manager.agent_selection_resource_priority
-        self._agent_selector = AgentSelector(ConcentratedAgentSelector(resource_priority))
+        self._agent_selector = args.agent_selector
 
     async def _verify_resource_group_accessible(self, draft: SessionSpecDraft) -> None:
         """Reject the draft when its target resource group is outside the
