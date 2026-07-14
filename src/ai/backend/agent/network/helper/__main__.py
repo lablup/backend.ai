@@ -37,7 +37,9 @@ Configuration comes from environment variables so the launcher stays trivial:
     BACKENDAI_NETHELPER_AGENT_ID this node's agent id
     BACKENDAI_NETHELPER_HOST_IP  advertised host IP (VTEP for vxlan)
     BACKENDAI_NETHELPER_CTRD_NS  containerd namespace (default backend-ai)
-    BACKENDAI_NETHELPER_UPLINK   uplink interface for vxlan (default eth0)
+    BACKENDAI_NETHELPER_UPLINK   uplink interface for vxlan (default: the live interface holding
+                                 HOST_IP, so the overlay rides the L2 the VTEP is advertised on;
+                                 eth0 if none does)
     BACKENDAI_NETHELPER_LOCAL_POOL   node-local LOCAL subnet pool (otherwise taken from the agent
                                      config's [container] local-network-pool)
     BACKENDAI_NETHELPER_LOCAL_BLOCK  per-session block prefix length within that pool (otherwise
@@ -64,6 +66,7 @@ from ai.backend.agent.network.local_subnet import (
     get_local_subnet_allocator,
 )
 from ai.backend.agent.network.native_attacher import NativeBridgeAttachRunner
+from ai.backend.agent.network.vtep import uplink_for_ip, usable_vtep
 from ai.backend.common import config as common_config
 from ai.backend.common.network.types import NetworkBackendKind
 
@@ -124,7 +127,9 @@ async def _amain() -> None:
     agent_id = os.environ.get("BACKENDAI_NETHELPER_AGENT_ID", "")
     host_ip = os.environ.get("BACKENDAI_NETHELPER_HOST_IP", "127.0.0.1")
     ctrd_ns = os.environ.get("BACKENDAI_NETHELPER_CTRD_NS", "backend-ai")
-    uplink = os.environ.get("BACKENDAI_NETHELPER_UPLINK", "eth0")
+    # Derive the uplink from the advertised address, as the agent does: a vxlan device built on a
+    # hard-coded eth0 that does not carry the VTEP advertises an endpoint peers cannot reach.
+    uplink = os.environ.get("BACKENDAI_NETHELPER_UPLINK") or uplink_for_ip(host_ip)
 
     Path(socket_path).parent.mkdir(parents=True, exist_ok=True)
 
@@ -145,6 +150,9 @@ async def _amain() -> None:
         allowed_uid=allowed_uid,
         agent_id=agent_id,
         host_ip=host_ip,
+        # Only an address that can actually anchor a tunnel is ever advertised to peers; with none,
+        # the helper refuses vxlan sessions instead of stranding them (see network.vtep).
+        vtep_ip=usable_vtep(host_ip),
         runtime=runtime,
         cni_runner=NativeBridgeAttachRunner(),
         backends=backends,

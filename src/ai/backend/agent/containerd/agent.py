@@ -73,10 +73,11 @@ from ai.backend.agent.kernel_registry.pickle.creator import (
 )
 from ai.backend.agent.kernel_registry.recovery.base_recovery import BaseKernelRegistryRecovery
 from ai.backend.agent.kernel_registry.writer.types import KernelRegistrySaveMetadata
-from ai.backend.agent.network.caps import publish_vtep
+from ai.backend.agent.network.caps import publish_vtep, withdraw_vtep
 from ai.backend.agent.network.helper.client import HelperClient, HelperPortForwarder
 from ai.backend.agent.network.local_subnet import cluster_host_ips
 from ai.backend.agent.network.port_forward import PortForwarder, PortPublisher, forwards_for
+from ai.backend.agent.network.vtep import uplink_for_ip, usable_vtep
 from ai.backend.agent.port_pool import PortPool
 from ai.backend.agent.proxy import DomainSocketProxy, proxy_connection
 from ai.backend.agent.resources import (
@@ -318,67 +319,6 @@ def _registry_auth(registry_conf: ImageRegistry) -> dict[str, str] | None:
     if user and password:
         return {"username": user, "password": password}
     return None
-
-
-def _live_iface_for_ip(host_ip: str) -> str | None:
-    """The UP interface that owns ``host_ip``, or None if this host cannot send from it.
-
-    "Owns" is not enough on its own: psutil reports the addresses of DOWN interfaces too, and a
-    vxlan device built on a down uplink comes up happily and carries nothing.
-    """
-    import socket
-
-    import psutil
-
-    stats = psutil.net_if_stats()
-    for iface, addrs in psutil.net_if_addrs().items():
-        for addr in addrs:
-            if addr.family == socket.AF_INET and addr.address == host_ip:
-                return iface if iface in stats and stats[iface].isup else None
-    return None
-
-
-def _uplink_for_ip(host_ip: str) -> str:
-    """Resolve the local interface that owns ``host_ip`` (the VTEP address).
-
-    The vxlan device must be created on the interface carrying the node's advertised
-    (VTEP) IP so the overlay rides the same L2 the agents reach each other on. Falls back
-    to ``eth0`` if no interface matches (single-node / misconfiguration)."""
-    return _live_iface_for_ip(host_ip) or "eth0"
-
-
-def _usable_vtep(host_ip: str) -> str | None:
-    """The node's VTEP address if it can actually anchor a vxlan tunnel, else None.
-
-    The VTEP is what every peer programs into its FDB. It comes from ``container.advertised-host``
-    (or ``bind-host``), whose defaults are the unusable ``""`` and ``0.0.0.0``: a peer that seeds
-    ``""`` into ``bridge fdb append ... dst ''`` fails outright, and ``0.0.0.0`` is accepted but
-    points nowhere, so the overlay is silently dead. So it must be a concrete unicast IPv4 —
-    routable off-link, and held by an interface of this host that is actually up.
-
-    Rejected, and why: ``""`` and an FQDN (neither is an address iproute2 can take as an FDB
-    destination); IPv6 (the vxlan path is IPv4-only end to end — see `_uplink_for_ip` and
-    `vxlan_link_add_args`); ``0.0.0.0``; loopback; multicast/reserved; and link-local (169.254/16,
-    what a host holds when DHCP failed — real, held, and unreachable from another subnet).
-
-    None means this node cannot join a multi-node overlay session; single-node sessions are
-    unaffected, which is why it is not fatal at startup.
-    """
-    import ipaddress
-
-    try:
-        addr = ipaddress.IPv4Address(host_ip)
-    except ipaddress.AddressValueError:
-        return None
-    if (
-        addr.is_unspecified
-        or addr.is_loopback
-        or addr.is_multicast
-        or addr.is_reserved
-        or addr.is_link_local
-    ):
-        return None
-    return host_ip if _live_iface_for_ip(host_ip) is not None else None
 
 
 class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKernel]):
@@ -1455,7 +1395,7 @@ class ContainerdAgent(
     _runtime: OciRuntime
     _session_network: ContainerdSessionNetwork
     _host_ip: str
-    # The validated VTEP (see _usable_vtep); None when this node holds no address that can anchor
+    # The validated VTEP (see network.vtep); None when this node holds no address that can anchor
     # a vxlan tunnel, which disables multi-node overlay sessions here.
     _vtep_ip: str | None
     _event_monitor_task: asyncio.Task[None] | None
@@ -1496,14 +1436,14 @@ class ContainerdAgent(
         # cannot be reached at must never reach a session's membership record. None disables the
         # multi-node overlay on this node (ensure_session then refuses a vxlan session outright);
         # single-node sessions never touch it.
-        self._vtep_ip = _usable_vtep(self._host_ip)
+        self._vtep_ip = usable_vtep(self._host_ip)
         # When a privileged network helper is configured, delegate all CAP_NET_ADMIN/
         # CAP_SYS_ADMIN host networking to it so this agent process needs no such privilege.
         self._session_network = build_containerd_session_network(
             self.etcd,
             agent_id=str(self.id),
             host_ip=self._host_ip,
-            uplink=_uplink_for_ip(self._vtep_ip or self._host_ip),
+            uplink=uplink_for_ip(self._vtep_ip or self._host_ip),
             runtime=self._runtime,
             helper_socket=self.local_config.agent.network_helper_socket,
             local_subnet_layout=container_cfg.local_subnet_layout(),
@@ -1580,6 +1520,10 @@ class ContainerdAgent(
         if self._vtep_ip is not None:
             await publish_vtep(self.etcd, str(self.id), self._vtep_ip)
         else:
+            # Retract, not merely skip: the key is durable, so an address published on an earlier
+            # boot would otherwise keep being pre-seeded into peers' FDBs long after this node
+            # stopped holding it.
+            await withdraw_vtep(self.etcd, str(self.id))
             log.warning(
                 "no usable VTEP: container.advertised-host/bind-host ({!r}) is not a routable"
                 " unicast IPv4 address held by an interface of this host that is up. Single-node"

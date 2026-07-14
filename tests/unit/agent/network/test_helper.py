@@ -56,9 +56,11 @@ class _StubBackend:
         self.peers: list[tuple[str, str, str | None]] = []  # (op, session_id, vtep_ip)
         self.endpoints: list[tuple[str, str, str, str, str]] = []  # (op, sid, ip, mac, vtep)
         self.attach_kernel_configs: list[Any] = []  # kernel_config each attach_endpoint received
+        self.self_members: list[Any] = []  # the membership the server publishes for this node
 
     async def setup_session_network(self, meta: Any, self_member: Any) -> None:
         self.setup_calls.append(meta.session_id)
+        self.self_members.append(self_member)
 
     async def adopt_session_network(self, meta: Any, self_member: Any) -> None:
         self.adopt_calls.append(meta.session_id)
@@ -212,6 +214,7 @@ class _Harness:
         *,
         state_dir: Path | None = None,
         forwarder: _RecordingForwarder | None = None,
+        vtep_ip: str | None = "192.168.0.10",
     ) -> None:
         self.backend = _StubBackend()
         self.forwarder = forwarder or _RecordingForwarder()
@@ -226,6 +229,9 @@ class _Harness:
             allowed_uid=os.getuid(),
             agent_id="i-test",
             host_ip="127.0.0.1",
+            # The entry point validates the real address; a test injects one so it does not depend
+            # on what the machine running it happens to hold. None exercises the refusal path.
+            vtep_ip=vtep_ip,
             runtime=cast(Any, runtime or _StubRuntime()),
             cni_runner=self.cni,
             backends=cast(Any, {"bridge": self.backend, "vxlan": self.backend}),
@@ -371,6 +377,30 @@ class TestHelperRpc:
                 )
             assert h.backend.attach_kernel_configs == []  # rejected before building the plan
 
+    async def test_self_member_advertises_the_validated_vtep(self) -> None:
+        # It is the helper, not the agent, that publishes membership when it runs — so the address
+        # peers program into their FDB comes from here, and must be the validated one.
+        async with _Harness() as h:
+            await self._setup_vxlan(h, "sess-v")
+            assert h.backend.self_members[-1].vtep_ip == "192.168.0.10"
+
+    async def test_a_vxlan_session_is_refused_without_a_usable_vtep(self) -> None:
+        # Setting it up anyway would publish an unusable VTEP; peers guard on `is None` alone, so
+        # they would program "" / 0.0.0.0 and the session would hang at rendezvous with no error.
+        async with _Harness(vtep_ip=None) as h:
+            with pytest.raises(HelperClientError):
+                await self._setup_vxlan(h, "sess-novtep")
+            assert h.backend.setup_calls == []  # refused before anything was journalled or built
+
+    async def test_a_bridge_session_still_works_without_a_vtep(self) -> None:
+        async with _Harness(vtep_ip=None) as h:
+            await h.client().call(
+                HelperRequest(
+                    HelperOp.SETUP_SESSION, "sess-b", network_config={"backend": "bridge"}
+                )
+            )
+            assert h.backend.setup_calls == ["sess-b"]
+
     async def test_add_peer_dispatches_vtep(self) -> None:
         async with _Harness() as h:
             await self._setup_vxlan(h, "sess-p")
@@ -487,7 +517,7 @@ class TestRestartRecovery:
         ) as restarted:
             await restarted.client().call(
                 HelperRequest(
-                    HelperOp.PUBLISH_PORTS, "s1", container_id="c1", ports=((30001, 8070),)
+                    HelperOp.PUBLISH_PORTS, "s1", container_id="c1", ports=((30001, 8070, None),)
                 )
             )
             assert [f.container_ip for f in restarted.forwarder.installed] == [assigned]
@@ -605,7 +635,7 @@ _NC = {"backend": "bridge", "subnet": "172.30.0.0/24"}
 _LOCAL_IP = "172.30.0.5"
 
 
-async def _publish(h: _Harness, ports: tuple[tuple[int, int], ...]) -> None:
+async def _publish(h: _Harness, ports: tuple[tuple[int, int, str | None], ...]) -> None:
     await h.client().call(
         HelperRequest(op=HelperOp.PUBLISH_PORTS, session_id="s1", container_id="c1", ports=ports)
     )
@@ -627,7 +657,7 @@ class TestPublishPorts:
     async def test_publishes_to_the_address_the_helper_assigned(self) -> None:
         async with _Harness() as h:
             await self._setup(h)
-            await _publish(h, ((30001, 8070),))
+            await _publish(h, ((30001, 8070, None),))
             assert [(f.host_port, f.container_port) for f in h.forwarder.installed] == [
                 (30001, 8070)
             ]
@@ -638,7 +668,7 @@ class TestPublishPorts:
         async with _Harness() as h:
             await self._setup(h, attached=False)
             with pytest.raises(HelperClientError):
-                await _publish(h, ((30001, 8070),))
+                await _publish(h, ((30001, 8070, None),))
             assert h.forwarder.installed == []
 
     async def test_a_privileged_host_port_is_refused(self) -> None:
@@ -646,20 +676,20 @@ class TestPublishPorts:
         async with _Harness() as h:
             await self._setup(h)
             with pytest.raises(HelperClientError):
-                await _publish(h, ((22, 22),))
+                await _publish(h, ((22, 22, None),))
             assert h.forwarder.installed == []
 
     async def test_a_duplicate_host_port_is_refused(self) -> None:
         async with _Harness() as h:
             await self._setup(h)
             with pytest.raises(HelperClientError):
-                await _publish(h, ((30001, 8070), (30001, 7681)))
+                await _publish(h, ((30001, 8070, None), (30001, 7681, None)))
             assert h.forwarder.installed == []
 
     async def test_unpublish_returns_the_host_ports_and_needs_no_session(self) -> None:
         async with _Harness() as h:
             await self._setup(h)
-            await _publish(h, ((30001, 8070), (30002, 7681)))
+            await _publish(h, ((30001, 8070, None), (30002, 7681, None)))
             # a session the helper never heard of: the rules still name their own container
             resp = await h.client().call(
                 HelperRequest(op=HelperOp.UNPUBLISH_PORTS, session_id="c1", container_id="c1")
@@ -672,7 +702,7 @@ class TestPublishPorts:
         # an address that is gone
         async with _Harness() as h:
             await self._setup(h)
-            await _publish(h, ((30001, 8070),))
+            await _publish(h, ((30001, 8070, None),))
             await h.client().call(
                 HelperRequest(op=HelperOp.DETACH_CONTAINER, session_id="s1", container_id="c1")
             )
@@ -681,7 +711,7 @@ class TestPublishPorts:
     async def test_list_ports_reports_every_published_rule(self) -> None:
         async with _Harness() as h:
             await self._setup(h)
-            await _publish(h, ((30001, 8070),))
+            await _publish(h, ((30001, 8070, None),))
             resp = await h.client().call(
                 HelperRequest(op=HelperOp.LIST_PORTS, session_id="list-ports")
             )

@@ -36,6 +36,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 from ai.backend.agent.containerd.oci import SESSION_ID_LABEL
+from ai.backend.agent.errors.network import UnusableVtep
 from ai.backend.agent.network.cni import CniAttacher, plan_to_invocations
 from ai.backend.agent.network.helper import netns as netns_mod
 from ai.backend.agent.network.helper import policy
@@ -110,6 +111,10 @@ class NetworkHelperServer:
     _allowed_uid: int
     _agent_id: str
     _host_ip: str
+    # The validated VTEP. The helper, not the agent, owns the host's networking when it runs, so it
+    # is the one that publishes this node's membership — and an unusable address published there is
+    # what strands a whole overlay session (see network.vtep). None disables vxlan sessions here.
+    _vtep_ip: str | None
     _runtime: OciRuntime
     _attacher: CniAttacher
     _forwarder: PortForwarder
@@ -132,6 +137,7 @@ class NetworkHelperServer:
         runtime: OciRuntime,
         cni_runner: CniRunner,
         backends: dict[str, AbstractNetworkAgentPluginV2[Any]],
+        vtep_ip: str | None = None,
         forwarder: PortForwarder | None = None,
         journal: HelperJournal | None = None,
         ipam: HostLocalIpam | None = None,
@@ -141,6 +147,10 @@ class NetworkHelperServer:
         self._allowed_uid = allowed_uid
         self._agent_id = agent_id
         self._host_ip = host_ip
+        # Validated by the entry point (__main__), like the agent validates its own before handing
+        # it to the session network — the address is a deployment fact, not something to re-derive
+        # per request. None means this node cannot anchor a tunnel: vxlan sessions are refused.
+        self._vtep_ip = vtep_ip
         self._runtime = runtime
         self._attacher = CniAttacher(cni_runner)
         self._forwarder = forwarder or PortForwarder()
@@ -353,12 +363,26 @@ class NetworkHelperServer:
         return None
 
     def _self_member(self, backend: NetworkBackendKind) -> Member:
+        """This node's membership record — what every peer reads and programs into its FDB. Only the
+        *validated* VTEP goes in: peers guard on `vtep_ip is None` alone, so "" or 0.0.0.0 would
+        sail through into an FDB entry that fails or points nowhere."""
         return Member(
             agent_id=self._agent_id,
             host_ip=self._host_ip,
-            vtep_ip=self._host_ip if backend is NetworkBackendKind.VXLAN else None,
+            vtep_ip=self._vtep_ip if backend is NetworkBackendKind.VXLAN else None,
             ip_range=None,
         )
+
+    def _require_vtep(self, backend: NetworkBackendKind) -> None:
+        """A vxlan session must not be set up on a node that cannot be reached at its VTEP: the
+        peers would program an unusable address and the session hangs at rendezvous with no error."""
+        if backend is NetworkBackendKind.VXLAN and self._vtep_ip is None:
+            raise UnusableVtep(
+                f"network helper on agent {self._agent_id} cannot join a multi-node overlay session:"
+                f" its host address ({self._host_ip!r}) is not a routable unicast IPv4 held by an"
+                " interface of this host that is up. Set BACKENDAI_NETHELPER_HOST_IP (and the"
+                " agent's container.advertised-host) to the address peers reach this node on."
+            )
 
     def _peer_uid(self, writer: asyncio.StreamWriter) -> int:
         sock = writer.get_extra_info("socket")
@@ -440,6 +464,7 @@ class NetworkHelperServer:
 
     async def _setup(self, session_id: str, raw_config: dict[str, Any]) -> None:
         cfg = policy.validate_network_config(raw_config)
+        self._require_vtep(cfg.backend)  # refuse before anything is journalled or built
         meta = SessionNetMeta(
             session_id=session_id,
             subnet=cfg.subnet or "",

@@ -120,3 +120,13 @@ async def publish_vtep(etcd: AbstractKVStore, agent_id: str, vtep_ip: str) -> No
     removes the peer-publish race: each agent's reconcile-at-start finds every peer's VTEP
     already present instead of waiting for the etcd watch to deliver it. Called at startup."""
     await etcd.put(agent_vtep_key(agent_id), vtep_ip, scope=ConfigScopes.GLOBAL)
+
+
+async def withdraw_vtep(etcd: AbstractKVStore, agent_id: str) -> None:
+    """Retract this agent's VTEP, for a node that no longer has a usable one.
+
+    The key is durable, and the manager pre-seeds member records straight from it — so a node that
+    published an address on an earlier boot and now holds none would have its peers program that
+    stale address, which by then may belong to a different host entirely. Not publishing is not
+    enough; the old value has to go."""
+    await etcd.delete(agent_vtep_key(agent_id), scope=ConfigScopes.GLOBAL)

@@ -333,9 +333,22 @@ class ContainerdSessionNetwork:
 
         The VTEP published here is the *validated* one, never the raw configured address: a peer
         guards on `vtep_ip is None` only, so an empty or unspecified string would sail through and
-        become `bridge fdb append ... dst ''` (fails) or `dst 0.0.0.0` (points nowhere). A vxlan
-        session on a node with no usable VTEP therefore does not start at all — see ensure_session.
+        become `bridge fdb append ... dst ''` (fails) or `dst 0.0.0.0` (points nowhere).
+
+        With no usable VTEP this raises rather than publishing a null one, and it does so here --
+        the one place both the create path and the RESTART path build the record -- because a null
+        is not merely useless to peers, it is destructive: their reconcile drops every endpoint
+        whose member has no VTEP, so a restarted node that republished null would have its peers
+        tear the FDB/ARP entries for all of its running kernels out from under a healthy session.
+        Refusing leaves the previously published record (and this node's live devices) untouched;
+        recover() logs the session and moves on.
         """
+        if meta.backend is NetworkBackendKind.VXLAN and self._vtep_ip is None:
+            raise UnusableVtep(
+                f"agent {self._agent_id} cannot take part in the multi-node overlay session"
+                f" {meta.session_id}: container.advertised-host/bind-host is not a routable unicast"
+                " address this host holds. Set it to the address peers reach this node on."
+            )
         return Member(
             agent_id=self._agent_id,
             host_ip=self._host_ip,
@@ -404,6 +417,13 @@ class ContainerdSessionNetwork:
             # doesn't leave a half-set-up coordinator that the idempotency check above would
             # then skip on retry — a retry must re-run the full setup cleanly.
             await coordinator.start(meta, self._self_member(meta))
+            # The block this session just claimed can only hold *stale* claims: its containers do
+            # not exist yet. Clearing them here is what makes a pinned address safe to hand out,
+            # whichever way the block came back to the pool — a teardown purges it too, but a block
+            # reclaimed as an orphan on restart does not, and a claim leaked by a failed detach or
+            # a half-finished attach is exactly what a later pin would collide with (and, since a
+            # pin that cannot be honoured fails its kernel, keep colliding with).
+            await self._purge_local_addresses(session_id)
             self._coordinators[session_id] = coordinator
             self._orchestrators[session_id] = orchestrator
             return meta
@@ -417,11 +437,20 @@ class ContainerdSessionNetwork:
     async def local_subnet_of(self, session_id: str) -> str | None:
         """This session's node-local LOCAL subnet (the /26 both backends carve from the node pool),
         so a single-node cluster session can lay out deterministic peer IPs in it and write
-        /etc/hosts. None under a privileged helper, which owns the pool and assigns the addresses
-        itself — the agent cannot compute them, so peer resolution there is the helper's to add."""
+        /etc/hosts.
+
+        A *lookup*, never an allocation: the session's block is claimed by setup_session_network,
+        which has already run by the time a kernel is prepared. Allocating here instead would let a
+        kernel that is still being prepared while its session is torn down (a sibling died first)
+        mint a fresh block for a dead session — one no teardown will ever release, since the
+        session's coordinator is gone, so it would leak from the node's pool until a restart.
+
+        None under a privileged helper, which owns the pool and assigns the addresses itself — the
+        agent cannot compute them, so peer resolution there is the helper's to add.
+        """
         if self._local_subnets is None:
             return None
-        return await self._local_subnets.allocate_subnet(session_id)
+        return await self._local_subnets.subnet_of(session_id)
 
     async def teardown_session(self, session_id: str) -> None:
         # Under the same per-session lock as setup, so a teardown racing the last kernel's setup

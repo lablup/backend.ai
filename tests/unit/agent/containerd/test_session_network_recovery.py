@@ -161,6 +161,9 @@ def _build(
         backends={"vxlan": cast(Any, backend)},
         local_subnets=local_subnets,
         ipam=ipam,
+        # A node resuming a vxlan session must have a usable VTEP: publishing a null one would have
+        # its peers drop every endpoint on this node (see _self_member).
+        vtep_ip=_HOST_IP,
     )
     return net, runtime
 
@@ -187,6 +190,33 @@ class TestResumeLiveSessions:
         await net.recover()
         assert backend.adopted == ["s1"]
         assert backend.setup == []
+
+    async def test_a_lost_vtep_does_not_republish_a_null_over_a_live_session(
+        self, etcd: FakeEtcd
+    ) -> None:
+        # The restart path bypasses ensure_session, so it needs its own guard. Publishing
+        # vtep_ip=null here would be worse than doing nothing: every peer's reconcile drops the
+        # endpoints of a member with no VTEP, tearing the FDB/ARP entries for this node's running
+        # kernels out of a session that was healthy a moment ago.
+        etcd.store[member_key("s1", _AGENT_ID)] = json.dumps({
+            "host_ip": _HOST_IP,
+            "vtep_ip": _HOST_IP,
+        })
+        backend = RecordingBackend()
+        net, _ = _build(
+            containers=[_ContainerInfo("c1", {SESSION_ID_LABEL: "s1"})],
+            pids={"c1": 4242},
+            etcd=etcd,
+            backend=backend,
+            cni=CniRecorder(),
+        )
+        net._vtep_ip = None  # the uplink is down / advertised-host was edited since the last boot
+
+        await net.recover()  # recover() logs the session and moves on; it must not raise
+
+        assert backend.adopted == []  # the session is not resumed
+        published = json.loads(etcd.store[member_key("s1", _AGENT_ID)])
+        assert published["vtep_ip"] == _HOST_IP  # the good record is left as it was
 
     async def test_republishes_this_node_membership(self, etcd: FakeEtcd) -> None:
         net, _ = _build(
