@@ -3,12 +3,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.app_config_fragment.types import AppConfigFragmentData
 from ai.backend.manager.data.permission.types import RBACElementRef
-from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
-from ai.backend.manager.repositories.base import Purger
+from ai.backend.manager.repositories.app_config_fragment.purgers import (
+    AppConfigFragmentPurgerSpec,
+)
 from ai.backend.manager.services.app_config_fragment.actions.base import (
     AppConfigFragmentSingleEntityAction,
     AppConfigFragmentSingleEntityActionResult,
@@ -25,7 +25,7 @@ class PurgeAppConfigFragmentAction(AppConfigFragmentSingleEntityAction):
     entry itself cascades to its fragments without going through this action.
     """
 
-    purger: Purger[AppConfigFragmentRow]
+    purger_spec: AppConfigFragmentPurgerSpec
 
     @override
     @classmethod
@@ -34,11 +34,11 @@ class PurgeAppConfigFragmentAction(AppConfigFragmentSingleEntityAction):
 
     @override
     def target_entity_id(self) -> str:
-        return str(self.purger.pk_value)
+        return str(self.purger_spec.fragment_id)
 
     @override
     def target_element(self) -> RBACElementRef:
-        return RBACElementRef(RBACElementType.APP_CONFIG_FRAGMENT, str(self.purger.pk_value))
+        return self.purger_spec.entity_ref()
 
 
 @dataclass

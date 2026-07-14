@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+from ai.backend.manager.errors.app_config import AppConfigFragmentBulkScopeMismatch
 from ai.backend.manager.repositories.app_config_fragment.repository import (
     AppConfigFragmentRepository,
 )
-from ai.backend.manager.repositories.base import BulkCreator, Creator
+from ai.backend.manager.repositories.base import BulkCreator
 from ai.backend.manager.services.app_config_fragment.actions.admin_search import (
     AdminSearchAppConfigFragmentAction,
     AdminSearchAppConfigFragmentActionResult,
@@ -62,7 +63,7 @@ class AppConfigFragmentService:
     async def create(
         self, action: CreateAppConfigFragmentAction
     ) -> CreateAppConfigFragmentActionResult:
-        data = await self._repository.create(Creator(spec=action.creator_spec))
+        data = await self._repository.create(action.creator_spec)
         return CreateAppConfigFragmentActionResult(fragment=data)
 
     async def get(self, action: GetAppConfigFragmentAction) -> GetAppConfigFragmentActionResult:
@@ -103,12 +104,17 @@ class AppConfigFragmentService:
     async def purge(
         self, action: PurgeAppConfigFragmentAction
     ) -> PurgeAppConfigFragmentActionResult:
-        data = await self._repository.purge(action.purger)
+        data = await self._repository.purge(action.purger_spec)
         return PurgeAppConfigFragmentActionResult(fragment=data)
 
     async def bulk_create(
         self, action: BulkCreateAppConfigFragmentAction
     ) -> BulkCreateAppConfigFragmentActionResult:
+        scopes = {(spec.scope_type, spec.scope_id) for spec in action.creator_specs}
+        if len(scopes) > 1:
+            raise AppConfigFragmentBulkScopeMismatch(
+                "All fragments in a bulk create must share the same scope."
+            )
         result = await self._repository.bulk_create(BulkCreator(specs=action.creator_specs))
         return BulkCreateAppConfigFragmentActionResult(
             succeeded=result.succeeded, failed=result.failed
