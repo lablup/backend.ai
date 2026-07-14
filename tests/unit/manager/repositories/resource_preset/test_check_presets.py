@@ -47,7 +47,7 @@ from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.models.group import GroupRow, association_groups_users
+from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
@@ -146,7 +146,6 @@ class TestCheckPresetsOccupiedSlots:
                 sgroups_for_domains,  # association table
                 sgroups_for_keypairs,  # association table
                 sgroups_for_groups,  # association table
-                association_groups_users,  # association table
             ],
         ):
             # Seed default resource slot types (FK target for normalized tables)
@@ -297,15 +296,7 @@ class TestCheckPresetsOccupiedSlots:
             db_sess.add(group)
             await db_sess.flush()
 
-            # Add user to group
-            await db_sess.execute(
-                sa.insert(association_groups_users).values(
-                    user_id=test_user_uuid,
-                    group_id=group_id,
-                )
-            )
-            # Record project membership in the RBAC association table, which
-            # check_presets now uses to resolve the user's group.
+            # RBAC project membership (queried by check_presets)
             db_sess.add(
                 AssociationScopesEntitiesRow(
                     scope_type=ScopeType.PROJECT,
@@ -1237,7 +1228,6 @@ class TestCheckPresetsZeroValues:
                 sgroups_for_domains,  # association table
                 sgroups_for_keypairs,  # association table
                 sgroups_for_groups,  # association table
-                association_groups_users,  # association table
             ],
         ):
             # Seed default resource slot types (FK target for normalized tables)
@@ -1420,15 +1410,7 @@ class TestCheckPresetsZeroValues:
             db_sess.add(group)
             await db_sess.flush()
 
-            # Add user to group
-            await db_sess.execute(
-                sa.insert(association_groups_users).values(
-                    user_id=test_user_uuid,
-                    group_id=group_id,
-                )
-            )
-            # Record project membership in the RBAC association table, which
-            # check_presets now uses to resolve the user's group.
+            # RBAC project membership (queried by check_presets)
             db_sess.add(
                 AssociationScopesEntitiesRow(
                     scope_type=ScopeType.PROJECT,
