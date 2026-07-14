@@ -85,6 +85,14 @@ _DEFAULT_MOUNTS: list[dict[str, Any]] = [
      "options": ["nosuid", "noexec", "nodev"]},
     {"destination": "/sys", "type": "sysfs", "source": "sysfs",
      "options": ["nosuid", "noexec", "nodev", "ro"]},
+    # The container's own cgroup, read-only, as `runc spec` and dockerd both mount. Without it
+    # /sys/fs/cgroup is an empty directory inside the kernel, and container-aware runtimes read
+    # their limits from there: the JVM's UseContainerSupport falls back to the HOST's RAM to size
+    # its heap and is then OOM-killed by the memory cgroup the agent did set (same for Go/Node
+    # memory-limit detection). Paired with the private cgroup namespace below, so it exposes the
+    # container's own subtree, not the host hierarchy.
+    {"destination": "/sys/fs/cgroup", "type": "cgroup", "source": "cgroup",
+     "options": ["nosuid", "noexec", "nodev", "relatime", "ro"]},
 ]  # fmt: skip
 
 
@@ -234,6 +242,10 @@ def build_oci_runtime_spec(
         {"type": "pid"},
         {"type": "uts"},
         {"type": "mount"},
+        # A private cgroup namespace, so the read-only /sys/fs/cgroup mount above shows the
+        # container's own cgroup as the root rather than the host's full hierarchy — both what
+        # `runc spec` produces on a cgroup-v2 host and what limit-reading runtimes expect.
+        {"type": "cgroup"},
     ]
     # Host IPC (HostConfig.IpcMode=host): several NPU plugins need it to share the vendor
     # runtime's shared memory with the host daemon. Omitting the ipc namespace entry — rather

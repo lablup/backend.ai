@@ -128,6 +128,20 @@ class TestBuildOciRuntimeSpec:
         spec = build_oci_runtime_spec(_oci(), command=["x"], rootfs_path="/r")
         assert spec["linux"]["cgroupsPath"] == "/backend-ai/kern-1"
 
+    def test_cgroupfs_is_mounted_read_only(self) -> None:
+        # Without this /sys/fs/cgroup is empty inside the kernel and container-aware runtimes read
+        # their limits from the HOST (the JVM then sizes its heap to host RAM and is OOM-killed).
+        spec = build_oci_runtime_spec(_oci(), command=["x"], rootfs_path="/r")
+        cg = [m for m in spec["mounts"] if m["destination"] == "/sys/fs/cgroup"]
+        assert len(cg) == 1
+        assert cg[0]["type"] == "cgroup"
+        assert "ro" in cg[0]["options"]
+
+    def test_has_a_private_cgroup_namespace(self) -> None:
+        # So the read-only mount shows the container's own subtree, not the host hierarchy.
+        spec = build_oci_runtime_spec(_oci(), command=["x"], rootfs_path="/r")
+        assert any(ns["type"] == "cgroup" for ns in spec["linux"]["namespaces"])
+
     def test_cgroup_fs_path_matches_spec_cgroups_path(self) -> None:
         # The stats reader (agent.get_cgroup_path -> container_cgroup_fs_path) must resolve to the
         # exact cgroup the spec tells the runtime to create; otherwise utilization reads the wrong
