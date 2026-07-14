@@ -465,7 +465,7 @@ def create_processors(
             services.app_config_allow_list, action_monitors
         ),
         app_config_fragment=AppConfigFragmentProcessors(
-            services.app_config_fragment, action_monitors, validators
+            services.app_config_fragment, action_monitors
         ),
         domain=DomainProcessors(services.domain, action_monitors, validators),
         dotfile=DotfileProcessors(services.dotfile, action_monitors, validators),
