@@ -146,8 +146,19 @@ else
     fi
   fi
 
-  # Correct the ownership of agent socket.
-  chown $USER_ID:$GROUP_ID /opt/kernel/agent.sock
+  # The agent socket. The containerd backend mounts the *directory* that holds it and links the
+  # well-known path to it, so that the socket the agent re-creates on a restart is still reachable
+  # from a kernel that outlived it: a bind-mounted socket FILE pins the inode it had at mount time,
+  # and that inode dies with the agent process. The Docker backend mounts the file directly (its
+  # inode is kept alive by a persistent relay container), so there is nothing to link there.
+  if [ -S /opt/kernel/agent-sock/agent.sock ]; then
+    ln -sf /opt/kernel/agent-sock/agent.sock /opt/kernel/agent.sock
+    chown -h $USER_ID:$GROUP_ID /opt/kernel/agent.sock
+    chown $USER_ID:$GROUP_ID /opt/kernel/agent-sock/agent.sock
+  else
+    # Correct the ownership of agent socket.
+    chown $USER_ID:$GROUP_ID /opt/kernel/agent.sock
+  fi
 
   # Extract dotfiles
   /opt/kernel/su-exec $USER_ID:$GROUP_ID /opt/backend.ai/bin/python -s /opt/kernel/extract_dotfiles.py

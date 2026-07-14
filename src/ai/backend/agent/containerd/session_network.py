@@ -23,7 +23,7 @@ import logging
 from collections.abc import AsyncIterator, Callable, Mapping, Sequence
 from typing import TYPE_CHECKING, Any, cast
 
-from ai.backend.agent.containerd.oci import SESSION_ID_LABEL
+from ai.backend.agent.containerd.oci import OWNER_AGENT_LABEL, SESSION_ID_LABEL
 from ai.backend.agent.containerd.orchestrator import ContainerdKernelOrchestrator, LaunchResult
 from ai.backend.agent.containerd.runtime.interface import ExecResult, OciRuntime
 from ai.backend.agent.containerd.session_tracker import SessionContainerTracker, TeardownScope
@@ -204,9 +204,16 @@ class ContainerdSessionNetwork:
         await self._reclaim_orphans(live)
 
     async def _live_containers(self) -> dict[str, str]:
-        """``{container_id: session_id}`` for every container this node still runs for us."""
+        """``{container_id: session_id}`` for every container this node still runs **for us**.
+
+        Ours only: a containerd namespace can be shared by two agents on one host, and this map
+        decides what gets resumed, adopted and reclaimed. Taking another agent's containers for our
+        own would have us publish membership for its sessions and hold its blocks against reclaim.
+        """
         live: dict[str, str] = {}
         for info in await self._runtime.list_container_infos():
+            if info.labels.get(OWNER_AGENT_LABEL) != self._agent_id:
+                continue
             if session_id := info.labels.get(SESSION_ID_LABEL):
                 live[info.id] = session_id
         return live

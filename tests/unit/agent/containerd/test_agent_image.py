@@ -131,10 +131,14 @@ class _FakeDistroCache:
         self.cached[image_id] = distro
 
 
+_AGENT_ID = "i-test-agent"
+
+
 def _agent(
     facade: FakeFacade, *, port_forwarder: Any = None, distro_cache: Any = None
 ) -> ContainerdAgent:
     agent = ContainerdAgent.__new__(ContainerdAgent)
+    agent.id = cast(Any, _AGENT_ID)
     agent._session_network = cast(Any, facade)
     agent.valkey_stat_client = cast(Any, distro_cache or _FakeDistroCache())
     agent.local_config = cast(
@@ -315,6 +319,26 @@ class TestCgroupPath:
 
 
 class TestEnumerateContainers:
+    async def test_another_agents_kernels_are_not_ours(self) -> None:
+        # A containerd namespace can be shared by two agents on one host, and every caller of this
+        # treats what it returns as its own: it re-accounts the allocations, destroys what it cannot
+        # match to a kernel, and takes the host ports. Adopting a neighbour's kernel means killing
+        # it.
+        mine = "11111111-1111-1111-1111-111111111111"
+        theirs = "22222222-2222-2222-2222-222222222222"
+        infos = [
+            ContainerInfo(id=mine, image="img:1", status="running",
+                          labels={"ai.backend.kernel-id": mine, "ai.backend.owner": _AGENT_ID}),
+            ContainerInfo(id=theirs, image="img:1", status="running",
+                          labels={"ai.backend.kernel-id": theirs, "ai.backend.owner": "i-other"}),
+        ]  # fmt: skip
+        agent = _agent(FakeFacade())
+        agent._runtime = cast(Any, self._runtime_with(infos))
+
+        result = await agent.enumerate_containers()
+
+        assert [str(kid) for kid, _ in result] == [mine]
+
     def _runtime_with(self, infos: list[Any]) -> Any:
         class _R:
             async def list_container_infos(self) -> list[Any]:
@@ -326,7 +350,7 @@ class TestEnumerateContainers:
         kid = "11111111-1111-1111-1111-111111111111"
         infos = [
             ContainerInfo(id=kid, image="img:1", status="running",
-                          labels={"ai.backend.kernel-id": kid}),
+                          labels={"ai.backend.kernel-id": kid, "ai.backend.owner": _AGENT_ID}),
             ContainerInfo(id="c2", image="redis", status="running", labels={}),  # not a kernel
         ]  # fmt: skip
         agent = _agent(FakeFacade())
@@ -344,7 +368,7 @@ class TestEnumerateContainers:
         kid = "33333333-3333-3333-3333-333333333333"
         infos = [
             ContainerInfo(id=kid, image="img:1", status="running",
-                          labels={"ai.backend.kernel-id": kid}),
+                          labels={"ai.backend.kernel-id": kid, "ai.backend.owner": _AGENT_ID}),
         ]  # fmt: skip
 
         class _Forwarder:
@@ -364,7 +388,7 @@ class TestEnumerateContainers:
         kid = "44444444-4444-4444-4444-444444444444"
         infos = [
             ContainerInfo(id=kid, image="img:1", status="running",
-                          labels={"ai.backend.kernel-id": kid}),
+                          labels={"ai.backend.kernel-id": kid, "ai.backend.owner": _AGENT_ID}),
         ]  # fmt: skip
         agent = _agent(FakeFacade())
         agent._runtime = cast(Any, self._runtime_with(infos))
@@ -375,7 +399,7 @@ class TestEnumerateContainers:
         kid = "22222222-2222-2222-2222-222222222222"
         infos = [
             ContainerInfo(id=kid, image="img:1", status="stopped",
-                          labels={"ai.backend.kernel-id": kid}),
+                          labels={"ai.backend.kernel-id": kid, "ai.backend.owner": _AGENT_ID}),
         ]  # fmt: skip
         agent = _agent(FakeFacade())
         agent._runtime = cast(Any, self._runtime_with(infos))
@@ -389,7 +413,7 @@ class TestEnumerateContainers:
         kid = "55555555-5555-5555-5555-555555555555"
         infos = [
             ContainerInfo(id=kid, image="img:1", status="created",
-                          labels={"ai.backend.kernel-id": kid}),
+                          labels={"ai.backend.kernel-id": kid, "ai.backend.owner": _AGENT_ID}),
         ]  # fmt: skip
         agent = _agent(FakeFacade())
         agent._runtime = cast(Any, self._runtime_with(infos))
@@ -406,7 +430,7 @@ class TestEnumerateContainers:
         kid = "66666666-6666-6666-6666-666666666666"
         infos = [
             ContainerInfo(id=kid, image="img:1", status="something-new",
-                          labels={"ai.backend.kernel-id": kid}),
+                          labels={"ai.backend.kernel-id": kid, "ai.backend.owner": _AGENT_ID}),
         ]  # fmt: skip
         agent = _agent(FakeFacade())
         agent._runtime = cast(Any, self._runtime_with(infos))
@@ -419,9 +443,9 @@ class TestEnumerateContainers:
         stopped = "88888888-8888-8888-8888-888888888888"
         infos = [
             ContainerInfo(id=running, image="img:1", status="running",
-                          labels={"ai.backend.kernel-id": running}),
+                          labels={"ai.backend.kernel-id": running, "ai.backend.owner": _AGENT_ID}),
             ContainerInfo(id=stopped, image="img:1", status="stopped",
-                          labels={"ai.backend.kernel-id": stopped}),
+                          labels={"ai.backend.kernel-id": stopped, "ai.backend.owner": _AGENT_ID}),
         ]  # fmt: skip
         agent = _agent(FakeFacade())
         agent._runtime = cast(Any, self._runtime_with(infos))

@@ -14,7 +14,7 @@ from typing import Any, cast
 
 import pytest
 
-from ai.backend.agent.containerd.oci import SESSION_ID_LABEL
+from ai.backend.agent.containerd.oci import OWNER_AGENT_LABEL, SESSION_ID_LABEL
 from ai.backend.agent.containerd.session_network import ContainerdSessionNetwork
 from ai.backend.agent.network.local_subnet import LocalSubnetAllocator
 from ai.backend.agent.network.native_attacher import HostLocalIpam
@@ -181,7 +181,9 @@ class TestResumeLiveSessions:
         # session whose containers survived the restart would cut them off the network.
         backend = RecordingBackend()
         net, _ = _build(
-            containers=[_ContainerInfo("c1", {SESSION_ID_LABEL: "s1"})],
+            containers=[
+                _ContainerInfo("c1", {SESSION_ID_LABEL: "s1", OWNER_AGENT_LABEL: _AGENT_ID})
+            ],
             pids={"c1": 4242},
             etcd=etcd,
             backend=backend,
@@ -204,7 +206,9 @@ class TestResumeLiveSessions:
         })
         backend = RecordingBackend()
         net, _ = _build(
-            containers=[_ContainerInfo("c1", {SESSION_ID_LABEL: "s1"})],
+            containers=[
+                _ContainerInfo("c1", {SESSION_ID_LABEL: "s1", OWNER_AGENT_LABEL: _AGENT_ID})
+            ],
             pids={"c1": 4242},
             etcd=etcd,
             backend=backend,
@@ -220,7 +224,9 @@ class TestResumeLiveSessions:
 
     async def test_republishes_this_node_membership(self, etcd: FakeEtcd) -> None:
         net, _ = _build(
-            containers=[_ContainerInfo("c1", {SESSION_ID_LABEL: "s1"})],
+            containers=[
+                _ContainerInfo("c1", {SESSION_ID_LABEL: "s1", OWNER_AGENT_LABEL: _AGENT_ID})
+            ],
             pids={"c1": 4242},
             etcd=etcd,
             backend=RecordingBackend(),
@@ -238,7 +244,9 @@ class TestResumeLiveSessions:
             "agent_id": _AGENT_ID,
         })
         net, _ = _build(
-            containers=[_ContainerInfo("c1", {SESSION_ID_LABEL: "s1"})],
+            containers=[
+                _ContainerInfo("c1", {SESSION_ID_LABEL: "s1", OWNER_AGENT_LABEL: _AGENT_ID})
+            ],
             pids={"c1": 4242},
             etcd=etcd,
             backend=RecordingBackend(),
@@ -258,7 +266,9 @@ class TestResumeLiveSessions:
         self, etcd: FakeEtcd
     ) -> None:
         net, _ = _build(
-            containers=[_ContainerInfo("c1", {SESSION_ID_LABEL: "s1"})],
+            containers=[
+                _ContainerInfo("c1", {SESSION_ID_LABEL: "s1", OWNER_AGENT_LABEL: _AGENT_ID})
+            ],
             pids={"c1": None},
             etcd=etcd,
             backend=RecordingBackend(),
@@ -286,8 +296,8 @@ class TestResumeLiveSessions:
 
         net, _ = _build(
             containers=[
-                _ContainerInfo("c1", {SESSION_ID_LABEL: "s1"}),
-                _ContainerInfo("c2", {SESSION_ID_LABEL: "s1"}),
+                _ContainerInfo("c1", {SESSION_ID_LABEL: "s1", OWNER_AGENT_LABEL: _AGENT_ID}),
+                _ContainerInfo("c2", {SESSION_ID_LABEL: "s1", OWNER_AGENT_LABEL: _AGENT_ID}),
             ],
             pids={"c1": 1, "c2": 2},
             etcd=etcd,
@@ -301,7 +311,9 @@ class TestResumeLiveSessions:
     async def test_a_session_without_meta_is_not_resumed(self) -> None:
         backend = RecordingBackend()
         net, _ = _build(
-            containers=[_ContainerInfo("c1", {SESSION_ID_LABEL: "gone"})],
+            containers=[
+                _ContainerInfo("c1", {SESSION_ID_LABEL: "gone", OWNER_AGENT_LABEL: _AGENT_ID})
+            ],
             pids={"c1": 4242},
             etcd=FakeEtcd(),  # manager dropped the meta
             backend=backend,
@@ -318,7 +330,9 @@ class TestCleanupAfterRecovery:
         # leaking the host veth, the IPAM lease and the MASQ rule.
         cni = CniRecorder()
         net, runtime = _build(
-            containers=[_ContainerInfo("c1", {SESSION_ID_LABEL: "s1"})],
+            containers=[
+                _ContainerInfo("c1", {SESSION_ID_LABEL: "s1", OWNER_AGENT_LABEL: _AGENT_ID})
+            ],
             pids={"c1": 4242},
             etcd=etcd,
             backend=RecordingBackend(),
@@ -333,7 +347,9 @@ class TestCleanupAfterRecovery:
     async def test_removing_the_last_container_tears_the_session_down(self, etcd: FakeEtcd) -> None:
         backend = RecordingBackend()
         net, _ = _build(
-            containers=[_ContainerInfo("c1", {SESSION_ID_LABEL: "s1"})],
+            containers=[
+                _ContainerInfo("c1", {SESSION_ID_LABEL: "s1", OWNER_AGENT_LABEL: _AGENT_ID})
+            ],
             pids={"c1": 4242},
             etcd=etcd,
             backend=backend,
@@ -349,8 +365,8 @@ class TestCleanupAfterRecovery:
         backend = RecordingBackend()
         net, _ = _build(
             containers=[
-                _ContainerInfo("c1", {SESSION_ID_LABEL: "s1"}),
-                _ContainerInfo("c2", {SESSION_ID_LABEL: "s1"}),
+                _ContainerInfo("c1", {SESSION_ID_LABEL: "s1", OWNER_AGENT_LABEL: _AGENT_ID}),
+                _ContainerInfo("c2", {SESSION_ID_LABEL: "s1", OWNER_AGENT_LABEL: _AGENT_ID}),
             ],
             pids={"c1": 1, "c2": 2},
             etcd=etcd,
@@ -372,7 +388,9 @@ class TestJournalReclamation:
         await allocator.allocate("dead")  # died while the agent was down
 
         net, _ = _build(
-            containers=[_ContainerInfo("c1", {SESSION_ID_LABEL: "s1"})],
+            containers=[
+                _ContainerInfo("c1", {SESSION_ID_LABEL: "s1", OWNER_AGENT_LABEL: _AGENT_ID})
+            ],
             pids={"c1": 4242},
             etcd=etcd,
             backend=RecordingBackend(),
@@ -392,7 +410,9 @@ class TestJournalReclamation:
         await allocator.allocate("truly-dead")
 
         net, _ = _build(
-            containers=[_ContainerInfo("c1", {SESSION_ID_LABEL: "s1"})],
+            containers=[
+                _ContainerInfo("c1", {SESSION_ID_LABEL: "s1", OWNER_AGENT_LABEL: _AGENT_ID})
+            ],
             pids={"c1": 4242},
             etcd=FakeEtcd(),  # no meta for s1 -> not resumed, but c1 is live
             backend=RecordingBackend(),
@@ -413,7 +433,9 @@ class TestJournalReclamation:
 
         cni = CniRecorder()
         net, _ = _build(
-            containers=[_ContainerInfo("c1", {SESSION_ID_LABEL: "s1"})],
+            containers=[
+                _ContainerInfo("c1", {SESSION_ID_LABEL: "s1", OWNER_AGENT_LABEL: _AGENT_ID})
+            ],
             pids={"c1": 4242},
             etcd=etcd,
             backend=RecordingBackend(),
@@ -434,7 +456,9 @@ class TestJournalReclamation:
         # its own records, and outlives the agent.
         cni = CniRecorder()
         net, _ = _build(
-            containers=[_ContainerInfo("c1", {SESSION_ID_LABEL: "s1"})],
+            containers=[
+                _ContainerInfo("c1", {SESSION_ID_LABEL: "s1", OWNER_AGENT_LABEL: _AGENT_ID})
+            ],
             pids={"c1": 4242},
             etcd=etcd,
             backend=RecordingBackend(),

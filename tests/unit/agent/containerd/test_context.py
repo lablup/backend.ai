@@ -477,6 +477,22 @@ class TestDomainSocketProxies:
         )
         return ctx
 
+    async def test_the_agent_socket_is_mounted_as_a_directory(self, tmp_path: Path) -> None:
+        # A bind-mounted socket FILE pins the inode it had at mount time, and that inode dies with
+        # the agent process — so every kernel that outlived an agent restart was left holding a
+        # dangling socket, its hook and jail losing PID translation with no error anywhere. The
+        # directory is mounted instead (the entrypoint links the well-known path to it), so the
+        # socket a restarted agent re-creates is resolved at connect time.
+        ctx = self._ctx(tmp_path, [])
+        sock = tmp_path / "ipc" / "container" / "agent-i-test" / "agent.sock"
+        ctx._agent_sock_path = sock
+
+        mounts = await ctx.get_intrinsic_mounts()
+
+        mount = next(m for m in mounts if str(m.target) == "/opt/kernel/agent-sock")
+        assert Path(str(mount.source)) == sock.parent  # the directory, not the socket file
+        assert not any(str(m.target) == "/opt/kernel/agent.sock" for m in mounts)
+
     async def test_no_proxies_requested_mounts_nothing(self, tmp_path: Path) -> None:
         ctx = self._ctx(tmp_path, [])
         mounts = await ctx.get_intrinsic_mounts()

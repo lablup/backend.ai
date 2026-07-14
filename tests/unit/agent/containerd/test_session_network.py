@@ -6,7 +6,7 @@ from typing import Any, cast, override
 
 import pytest
 
-from ai.backend.agent.containerd.oci import SESSION_ID_LABEL
+from ai.backend.agent.containerd.oci import OWNER_AGENT_LABEL, SESSION_ID_LABEL
 from ai.backend.agent.containerd.runtime.interface import ExecResult, OciRuntime, TaskHandle
 from ai.backend.agent.containerd.session_network import (
     ContainerdSessionNetwork,
@@ -357,7 +357,9 @@ class TestFailedAdopt:
         # node did not build and whose kernels are still running on it. And the failure that trips
         # the adopt is the same transient etcd error that made the resume fail — correlated.
         etcd, backend, runner = FakeEtcd(), RecordingBackend(), RecordingRunner()
-        rt = FakeRuntime([_ContainerInfo("c1", {SESSION_ID_LABEL: "s1"})])
+        rt = FakeRuntime([
+            _ContainerInfo("c1", {SESSION_ID_LABEL: "s1", OWNER_AGENT_LABEL: "agent-1"})
+        ])
         facade = _facade(etcd, backend, runner, runtime=rt)
 
         async def boom(meta: Any, self_member: Any) -> None:
@@ -378,7 +380,9 @@ class TestSetupUnderLiveContainers:
         # would delete the bridge they are enslaved to (setup clears devices by name) and purge the
         # addresses they hold — handing a live container's IP to the next kernel.
         etcd, backend, runner = FakeEtcd(), RecordingBackend(), RecordingRunner()
-        rt = FakeRuntime([_ContainerInfo("c1", {SESSION_ID_LABEL: "s1"})])
+        rt = FakeRuntime([
+            _ContainerInfo("c1", {SESSION_ID_LABEL: "s1", OWNER_AGENT_LABEL: "agent-1"})
+        ])
         facade = _facade(etcd, backend, runner, runtime=rt)
 
         await facade.ensure_session("s1", "c2", _VXLAN_NC)  # a NEW kernel of that same session

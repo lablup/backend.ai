@@ -26,6 +26,10 @@ _RLIM_INFINITY = 0xFFFFFFFFFFFFFFFF
 
 KERNEL_ID_LABEL = "ai.backend.kernel-id"
 SESSION_ID_LABEL = "ai.backend.session-id"
+# Which agent owns the container. A containerd namespace can be shared by two agents on one host,
+# and every restart-time scan has to keep to its own kernels (LabelName.OWNER_AGENT, written at
+# create time).
+OWNER_AGENT_LABEL = "ai.backend.owner"
 KRUNNER_ENTRYPOINT = "/opt/kernel/entrypoint.sh"
 
 # RDMA/InfiniBand verbs devices live under this directory; uverbs0 is the sentinel the Docker
