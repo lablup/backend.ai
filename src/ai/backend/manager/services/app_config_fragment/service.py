@@ -113,7 +113,8 @@ class AppConfigFragmentService:
         scopes = {(spec.scope_type, spec.scope_id) for spec in action.creator_specs}
         if len(scopes) > 1:
             raise AppConfigFragmentBulkScopeMismatch(
-                "All fragments in a bulk create must share the same scope."
+                f"A bulk create must target a single scope, but received {len(scopes)}: "
+                f"{sorted((scope_type.value, scope_id) for scope_type, scope_id in scopes)}."
             )
         result = await self._repository.bulk_create(BulkCreator(specs=action.creator_specs))
         return BulkCreateAppConfigFragmentActionResult(

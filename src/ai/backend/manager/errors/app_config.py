@@ -39,3 +39,4 @@ class AppConfigFragmentWriteNotAllowed(GenericForbidden):
 
 class AppConfigFragmentBulkScopeMismatch(GenericBadRequest):
     error_type = "https://api.backend.ai/probs/app-config-fragment-bulk-scope-mismatch"
+    error_title = "All fragments in a bulk create must share the same scope."
