@@ -34,12 +34,12 @@ from ai.backend.manager.api.rest.v2.vfolder.handler import V2VFolderHandler
 from ai.backend.manager.api.rest.v2.vfolder.registry import register_v2_vfolder_routes
 from ai.backend.manager.api.rest.vfolder.handler import VFolderHandler
 from ai.backend.manager.api.rest.vfolder.registry import register_vfolder_routes
+from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.data.vfolder.types import VFolderOwnershipType
 from ai.backend.manager.models.resource_policy import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.vfolder.admin_repository import VFolderAdminRepository

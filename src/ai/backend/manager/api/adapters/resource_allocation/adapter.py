@@ -8,7 +8,6 @@ from uuid import UUID
 
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.dto.manager.v2.common import (
-    BinarySizeInfo,
     ResourceLimitEntryInfo,
     ResourceSlotEntryInfo,
 )
@@ -60,16 +59,6 @@ from ai.backend.manager.services.resource_allocation.actions.get_resource_group_
 from ai.backend.manager.services.resource_allocation.actions.resolve_keypair_context import (
     ResolveKeypairContextAction,
 )
-
-
-def _humanize_bytes(value: int) -> str:
-    """Convert bytes integer to human-readable string (e.g., 1073741824 -> '1g')."""
-    return f"{BinarySize(value):s}"
-
-
-def _to_binary_size_info(value: int) -> BinarySizeInfo:
-    """Convert bytes integer to BinarySizeInfo DTO."""
-    return BinarySizeInfo(value=value, display=_humanize_bytes(value))
 
 
 class ResourceAllocationAdapter(BaseAdapter):
@@ -398,7 +387,9 @@ def _preset_availability_to_node(data: PresetAvailabilityData) -> PresetAvailabi
             for k, v in data.preset.resource_slots.items()
         ],
         shared_memory=(
-            _to_binary_size_info(data.preset.shared_memory) if data.preset.shared_memory else None
+            BinarySize.to_size_info(data.preset.shared_memory)
+            if data.preset.shared_memory is not None
+            else None
         ),
         resource_group_name=data.preset.scaling_group_name,
         available=data.available,

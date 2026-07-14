@@ -22,11 +22,15 @@ from ai.backend.manager.repositories.app_config_allow_list.creators import (
 from ai.backend.manager.repositories.app_config_allow_list.repository import (
     AppConfigAllowListRepository,
 )
+from ai.backend.manager.repositories.app_config_allow_list.updaters import (
+    AppConfigAllowListUpdaterSpec,
+)
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     Creator,
     OffsetPagination,
     Purger,
+    Updater,
 )
 from ai.backend.manager.services.app_config_allow_list.actions.create import (
     CreateAppConfigAllowListAction,
@@ -40,9 +44,13 @@ from ai.backend.manager.services.app_config_allow_list.actions.purge import (
 from ai.backend.manager.services.app_config_allow_list.actions.search import (
     SearchAppConfigAllowListAction,
 )
+from ai.backend.manager.services.app_config_allow_list.actions.update import (
+    UpdateAppConfigAllowListAction,
+)
 from ai.backend.manager.services.app_config_allow_list.service import (
     AppConfigAllowListService,
 )
+from ai.backend.manager.types import OptionalState
 
 
 class TestAppConfigAllowListService:
@@ -52,6 +60,7 @@ class TestAppConfigAllowListService:
             id=AppConfigAllowListID(uuid.uuid4()),
             config_name="theme",
             scope_type=AppConfigScopeType.USER,
+            rank=AppConfigScopeType.USER.default_rank(),
             created_at=datetime.now(UTC),
             updated_at=datetime.now(UTC),
         )
@@ -129,6 +138,23 @@ class TestAppConfigAllowListService:
         assert result.data == [allow_list_data]
         assert result.total_count == 1
         mock_repository.search.assert_called_once_with(querier)
+
+    async def test_update(
+        self,
+        service: AppConfigAllowListService,
+        mock_repository: MagicMock,
+        allow_list_data: AppConfigAllowListData,
+    ) -> None:
+        mock_repository.update = AsyncMock(return_value=allow_list_data)
+        updater = Updater(
+            spec=AppConfigAllowListUpdaterSpec(rank=OptionalState.update(250)),
+            pk_value=allow_list_data.id,
+        )
+
+        result = await service.update(UpdateAppConfigAllowListAction(updater=updater))
+
+        assert result.allow_list == allow_list_data
+        mock_repository.update.assert_called_once_with(updater)
 
     async def test_purge(
         self,

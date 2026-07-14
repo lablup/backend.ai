@@ -260,9 +260,11 @@ class TestResourceGroupGQLResourceInfoResolver:
                 ResourceGroupSchedulerConfigInfo(
                     type=SchedulerTypeDTO.FIFO,
                     preemption=PreemptionConfigInfo(
+                        enabled=False,
                         preemptible_priority=5,
                         order=PreemptionOrderDTO.OLDEST,
                         mode=PreemptionModeDTO.TERMINATE,
+                        preemption_min_runtime=0.0,
                     ),
                 )
             ),

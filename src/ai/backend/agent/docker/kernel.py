@@ -79,9 +79,11 @@ class DockerKernel(AbstractKernel):
     async def close(self) -> None:
         pass
 
+    @override
     def __getstate__(self) -> Mapping[str, Any]:
         return super().__getstate__()
 
+    @override
     def __setstate__(self, props: MutableMapping[str, Any]) -> None:
         if "network_driver" not in props:
             props["network_driver"] = "bridge"

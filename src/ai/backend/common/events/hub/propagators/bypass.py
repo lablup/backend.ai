@@ -2,6 +2,7 @@ import asyncio
 import logging
 import uuid
 from collections.abc import AsyncIterator
+from typing import override
 
 from ai.backend.common.events.hub.hub import EventPropagator
 from ai.backend.common.events.types import AbstractEvent
@@ -24,6 +25,7 @@ class AsyncBypassPropagator(EventPropagator):
         self._queue = asyncio.Queue()
         self._closed = False
 
+    @override
     def id(self) -> uuid.UUID:
         """
         Get the unique identifier for the propagator.
@@ -44,9 +46,11 @@ class AsyncBypassPropagator(EventPropagator):
             except Exception as e:
                 log.error("Error propagating event: {}", e)
 
+    @override
     async def propagate_event(self, event: AbstractEvent) -> None:
         await self._queue.put(event)
 
+    @override
     async def close(self) -> None:
         if self._closed:
             return

@@ -26,6 +26,7 @@ from ai.backend.common.dto.manager.infra import (
     CheckPresetsResponse,
     ListPresetsResponse,
 )
+from ai.backend.common.identifier.resource_group import ResourceGroupName
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
 from ai.backend.manager.repositories.base.creator import Creator
@@ -454,7 +455,7 @@ class TestCheckPresets:
         resource_preset_processors: ResourcePresetProcessors,
         admin_registry: BackendAIClientRegistry,
         group_name_fixture: str,
-        scaling_group_fixture: str,
+        scaling_group_name: ResourceGroupName,
         database_fixture: None,
     ) -> None:
         """S-6: check_presets with scaling_group filter returns only that SG."""
@@ -466,14 +467,14 @@ class TestCheckPresets:
         result = await admin_registry.infra.check_presets(
             CheckPresetsRequest(
                 group=group_name_fixture,
-                scaling_group=scaling_group_fixture,
+                scaling_group=scaling_group_name,
             )
         )
         assert isinstance(result, CheckPresetsResponse)
         assert isinstance(result.presets, list)
         # When filtered, scaling_groups should contain only the specified SG
         if result.scaling_groups:
-            assert scaling_group_fixture in result.scaling_groups
+            assert scaling_group_name in result.scaling_groups
             assert len(result.scaling_groups) == 1
 
     async def test_s7_check_presets_no_sessions_zero_usage(

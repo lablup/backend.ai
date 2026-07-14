@@ -1,6 +1,6 @@
 from collections.abc import Mapping, Sequence
 from http import HTTPStatus
-from typing import Any
+from typing import Any, override
 
 from aiohttp import web
 
@@ -10,19 +10,24 @@ from .plugin import MetadataPlugin, MetadataPluginRoute, NewMetadataPluginRespon
 
 
 class ContainerMetadataPlugin(MetadataPlugin):
+    @override
     async def init(self, context: Any | None = None) -> None:
         pass
 
+    @override
     async def cleanup(self) -> None:
         pass
 
+    @override
     async def update_plugin_config(self, plugin_config: Mapping[str, Any]) -> None:
         pass
 
+    @override
     async def prepare_app(self) -> NewMetadataPluginResponse:
         app = web.Application()
         return NewMetadataPluginResponse(app, [])
 
+    @override
     async def routes(self) -> Sequence[MetadataPluginRoute]:
         return [
             MetadataPluginRoute("GET", "/envs", self.get_envs, None),

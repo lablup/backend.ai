@@ -19,6 +19,8 @@ import sqlalchemy as sa
 from dateutil.tz import tzutc
 
 from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
@@ -107,13 +109,25 @@ async def db_with_cleanup(
 
 
 @pytest.fixture
+def test_domain_id() -> DomainID:
+    return DomainID(uuid.uuid4())
+
+
+@pytest.fixture
+def test_scaling_group_id() -> ResourceGroupID:
+    return ResourceGroupID(uuid.uuid4())
+
+
+@pytest.fixture
 async def test_domain_name(
     db_with_cleanup: ExtendedAsyncSAEngine,
+    test_domain_id: DomainID,
 ) -> AsyncGenerator[str, None]:
     domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
     async with db_with_cleanup.begin_session() as db_sess:
         db_sess.add(
             DomainRow(
+                id=test_domain_id,
                 name=domain_name,
                 total_resource_slots=ResourceSlot({
                     "cpu": Decimal("1000"),
@@ -128,11 +142,13 @@ async def test_domain_name(
 @pytest.fixture
 async def test_scaling_group_name(
     db_with_cleanup: ExtendedAsyncSAEngine,
+    test_scaling_group_id: ResourceGroupID,
 ) -> AsyncGenerator[str, None]:
     sg_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
     async with db_with_cleanup.begin_session() as db_sess:
         db_sess.add(
             ScalingGroupRow(
+                id=test_scaling_group_id,
                 name=sg_name,
                 driver="static",
                 scheduler="fifo",
@@ -287,6 +303,7 @@ async def test_group_id(
 async def test_agent_id(
     db_with_cleanup: ExtendedAsyncSAEngine,
     test_scaling_group_name: str,
+    test_scaling_group_id: ResourceGroupID,
 ) -> AsyncGenerator[str, None]:
     agent_id = f"test-agent-{uuid.uuid4().hex[:8]}"
     async with db_with_cleanup.begin_session() as db_sess:
@@ -296,6 +313,7 @@ async def test_agent_id(
                 status=AgentStatus.ALIVE,
                 region="local",
                 scaling_group=test_scaling_group_name,
+                resource_group_id=test_scaling_group_id,
                 available_slots=ResourceSlot({"cpu": Decimal("10"), "mem": Decimal("10240")}),
                 occupied_slots=ResourceSlot(),
                 addr=_AGENT_ADDR,
@@ -371,7 +389,9 @@ async def seed_agent_resources(
 async def create_pending_session_with_kernels(
     db: ExtendedAsyncSAEngine,
     *,
+    domain_id: DomainID,
     domain_name: str,
+    resource_group_id: ResourceGroupID,
     scaling_group_name: str,
     group_id: uuid.UUID,
     user_uuid: uuid.UUID,
@@ -397,10 +417,12 @@ async def create_pending_session_with_kernels(
                 id=session_id,
                 name=f"test-session-{uuid.uuid4().hex[:8]}",
                 session_type=SessionTypes.INTERACTIVE,
+                domain_id=domain_id,
                 domain_name=domain_name,
                 group_id=group_id,
                 user_uuid=user_uuid,
                 access_key=access_key,
+                resource_group_id=resource_group_id,
                 scaling_group_name=scaling_group_name,
                 status=SessionStatus.PENDING,
                 status_info="test",
@@ -425,6 +447,7 @@ async def create_pending_session_with_kernels(
                     agent=None,
                     agent_addr=None,
                     scaling_group=scaling_group_name,
+                    resource_group_id=resource_group_id,
                     cluster_idx=idx,
                     cluster_role="main" if idx == 0 else "sub",
                     cluster_hostname=f"kernel-{uuid.uuid4().hex[:8]}",
@@ -468,6 +491,7 @@ def make_allocation_batch(
     *,
     session_id: SessionId,
     scaling_group_name: str,
+    resource_group_id: ResourceGroupID,
     access_key: AccessKey,
     kernel_assignments: list[tuple[KernelId, str, Decimal, Decimal]],
 ) -> AllocationBatch:
@@ -484,6 +508,7 @@ def make_allocation_batch(
             agent_id=AgentId(agent_id),
             agent_addr=_AGENT_ADDR,
             scaling_group=scaling_group_name,
+            resource_group_id=resource_group_id,
         )
         for kernel_id, agent_id, _cpu, _mem in kernel_assignments
     ]
@@ -499,6 +524,7 @@ def make_allocation_batch(
         session_type=SessionTypes.INTERACTIVE,
         cluster_mode=ClusterMode.SINGLE_NODE,
         scaling_group=scaling_group_name,
+        resource_group_id=resource_group_id,
         kernel_allocations=kernel_allocations,
         agent_allocations=agent_allocations,
         access_key=access_key,

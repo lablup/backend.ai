@@ -5,7 +5,7 @@ import json
 import textwrap
 from collections import defaultdict
 from collections.abc import Callable, Mapping
-from typing import Any, cast
+from typing import Any, cast, override
 
 import humanize
 
@@ -76,6 +76,7 @@ class OutputFormatter(AbstractOutputFormatter):
     The base implementation of output formats.
     """
 
+    @override
     def format_console(self, value: Any, field: FieldSpec) -> str:
         if value is None:
             return "(null)"
@@ -91,6 +92,7 @@ class OutputFormatter(AbstractOutputFormatter):
             return "[" + ", ".join(self.format_console(v, field) for v in value) + "]"
         return str(value)
 
+    @override
     def format_json(self, value: Any, field: FieldSpec) -> Any:
         if value is None:
             return None
@@ -104,12 +106,14 @@ class OutputFormatter(AbstractOutputFormatter):
 
 
 class NestedDictOutputFormatter(OutputFormatter):
+    @override
     def format_console(self, value: Any, field: FieldSpec) -> str:
         if value is None:
             return "(null)"
         value = json.loads(value)
         return format_nested_dicts(value)
 
+    @override
     def format_json(self, value: Any, field: FieldSpec) -> Any:
         if value is None:
             return None
@@ -117,11 +121,13 @@ class NestedDictOutputFormatter(OutputFormatter):
 
 
 class MiBytesOutputFormatter(OutputFormatter):
+    @override
     def format_console(self, value: Any, field: FieldSpec) -> str:
         if value is not None:
             value = round(value / 2**20, 1)
         return super().format_console(value, field)
 
+    @override
     def format_json(self, value: Any, field: FieldSpec) -> Any:
         if value is not None:
             value = round(value / 2**20, 1)
@@ -129,11 +135,13 @@ class MiBytesOutputFormatter(OutputFormatter):
 
 
 class SizeBytesOutputFormatter(OutputFormatter):
+    @override
     def format_console(self, value: Any, field: FieldSpec) -> str:
         if value is not None:
             value = humanize.naturalsize(value, binary=True, gnu=True)
         return super().format_console(value, field)
 
+    @override
     def format_json(self, value: Any, field: FieldSpec) -> Any:
         if value is not None:
             value = humanize.naturalsize(value, binary=True, gnu=True)
@@ -144,9 +152,11 @@ class SubFieldOutputFormatter(OutputFormatter):
     def __init__(self, subfield_name: str) -> None:
         self._subfield_name = subfield_name
 
+    @override
     def format_console(self, value: Any, field: FieldSpec) -> str:
         return super().format_console(value[self._subfield_name], field)
 
+    @override
     def format_json(self, value: Any, field: FieldSpec) -> Any:
         return super().format_json(value[self._subfield_name], field)
 
@@ -167,14 +177,17 @@ class CustomizedImageOutputFormatter(OutputFormatter):
             raise ValueError("Expected exactly one owner email label")
         return f"{customized_name[0]} (Owner: {owner_email[0]})"
 
+    @override
     def format_console(self, value: Any, field: FieldSpec) -> str:
         return super().format_console(self._get_name(value), field)
 
+    @override
     def format_json(self, value: Any, field: FieldSpec) -> Any:
         return super().format_json(self._get_name(value), field)
 
 
 class ResourceSlotFormatter(OutputFormatter):
+    @override
     def format_console(self, value: Any, field: FieldSpec) -> str:
         value = json.loads(value)
         if mem := value.get("mem"):
@@ -182,6 +195,7 @@ class ResourceSlotFormatter(OutputFormatter):
 
         return ", ".join(f"{k}:{v}" for k, v in value.items())
 
+    @override
     def format_json(self, value: Any, field: FieldSpec) -> Any:
         return json.loads(value)
 
@@ -194,6 +208,7 @@ sizebytes_output_formatter = SizeBytesOutputFormatter()
 
 
 class AgentStatFormatter(OutputFormatter):
+    @override
     def format_console(self, value: Any, field: FieldSpec) -> str:
         try:
             raw_stats = json.loads(value)
@@ -264,20 +279,24 @@ class AgentStatFormatter(OutputFormatter):
         bufs.append("\n".join(dev_metric_bufs))
         return "\n".join(bufs)
 
+    @override
     def format_json(self, value: Any, field: FieldSpec) -> Any:
         # TODO: improve
         return self.format_console(value, field)
 
 
 class GroupListFormatter(OutputFormatter):
+    @override
     def format_console(self, value: Any, field: FieldSpec) -> str:
         return ", ".join(g["name"] for g in value)
 
+    @override
     def format_json(self, value: Any, field: FieldSpec) -> Any:
         return value
 
 
 class InlineRoutingFormatter(OutputFormatter):
+    @override
     def format_console(self, value: Any, field: FieldSpec) -> str:
         count_by_status: defaultdict[int, int] = defaultdict(int)
         for route in value:
@@ -286,19 +305,23 @@ class InlineRoutingFormatter(OutputFormatter):
             f"{key} {value}" for key, value in sorted(count_by_status.items(), key=lambda kv: kv[0])
         ])
 
+    @override
     def format_json(self, value: Any, field: FieldSpec) -> Any:
         return value
 
 
 class KernelStatFormatter(OutputFormatter):
+    @override
     def format_console(self, value: Any, field: FieldSpec) -> str:
         return format_stats(value)
 
+    @override
     def format_json(self, value: Any, field: FieldSpec) -> Any:
         return value
 
 
 class NestedObjectFormatter(OutputFormatter):
+    @override
     def format_json(self, value: Any, field: FieldSpec) -> Any:
         if not isinstance(value, list):
             raise ValueError("NestedObjectFormatter expects a list value")
@@ -318,6 +341,7 @@ def _fit_multiline_in_cell(text: str, indent: str) -> str:
 
 
 class ContainerListFormatter(NestedObjectFormatter):
+    @override
     def format_console(self, value: Any, field: FieldSpec, indent: str = "") -> str:
         if not isinstance(value, list):
             raise ValueError("ContainerListFormatter expects a list value")
@@ -337,6 +361,7 @@ class ContainerListFormatter(NestedObjectFormatter):
 
 
 class DependencyListFormatter(NestedObjectFormatter):
+    @override
     def format_console(self, value: Any, field: FieldSpec, indent: str = "") -> str:
         if not isinstance(value, list):
             raise ValueError("DependencyListFormatter expects a list value")
@@ -358,10 +383,12 @@ class DependencyListFormatter(NestedObjectFormatter):
 class ImageObjectFormatter(OutputFormatter):
     """Formatter for nested image_object field, extracting the name."""
 
+    @override
     def format_console(self, value: Any, field: FieldSpec) -> str:
         if value is None:
             return "(none)"
         return value.get("name") or "(unknown)"
 
+    @override
     def format_json(self, value: Any, field: FieldSpec) -> Any:
         return value

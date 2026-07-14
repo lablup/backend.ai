@@ -22,9 +22,11 @@ from ai.backend.common.dto.manager.v2.scaling_group.types import (
 
 def _make_preemption_config() -> PreemptionConfigInfo:
     return PreemptionConfigInfo(
+        enabled=False,
         preemptible_priority=5,
         order=PreemptionOrder.OLDEST,
         mode=PreemptionMode.TERMINATE,
+        preemption_min_runtime=0.0,
     )
 
 
@@ -90,9 +92,22 @@ class TestPreemptionConfigInfo:
 
     def test_valid_creation(self) -> None:
         info = _make_preemption_config()
+        assert info.enabled is False
         assert info.preemptible_priority == 5
         assert info.order == PreemptionOrder.OLDEST
         assert info.mode == PreemptionMode.TERMINATE
+        assert info.preemption_min_runtime == 0.0
+
+    def test_enabled_with_min_runtime(self) -> None:
+        info = PreemptionConfigInfo(
+            enabled=True,
+            preemptible_priority=5,
+            order=PreemptionOrder.OLDEST,
+            mode=PreemptionMode.TERMINATE,
+            preemption_min_runtime=300.0,
+        )
+        assert info.enabled is True
+        assert info.preemption_min_runtime == 300.0
 
 
 class TestScalingGroupSchedulerInfo:

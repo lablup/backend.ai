@@ -12,6 +12,7 @@ from sqlalchemy import Row
 from ai.backend.manager.repositories.base import (
     CursorBackwardPagination,
     CursorForwardPagination,
+    NoPagination,
     OffsetPagination,
     PageInfoResult,
 )
@@ -285,3 +286,83 @@ class TestCursorBackwardPagination:
 
         # When using backward cursor, there's always a next page (we came from somewhere ahead)
         assert result.has_next_page is True
+
+
+class TestCountStrategyMethods:
+    """Tests for the polymorphic count strategy: attach_count() and count_from_rows()."""
+
+    def test_offset_attach_count_adds_column(self) -> None:
+        """OffsetPagination.attach_count() folds a count column into the query."""
+        pagination = OffsetPagination(limit=10)
+        mock_query = MagicMock()
+        mock_query.add_columns.return_value = mock_query
+
+        result = pagination.attach_count(mock_query)
+
+        mock_query.add_columns.assert_called_once()
+        assert result is mock_query
+
+    def test_offset_count_from_rows_reads_window_value(self) -> None:
+        """OffsetPagination.count_from_rows() reads total_count from the first row."""
+        pagination = OffsetPagination(limit=10)
+        rows = [MagicMock(total_count=42) for _ in range(3)]
+
+        assert pagination.count_from_rows(cast(list[Row[Any]], rows)) == 42
+
+    def test_offset_count_from_rows_empty_returns_none(self) -> None:
+        """OffsetPagination.count_from_rows() returns None on empty rows (fallback)."""
+        pagination = OffsetPagination(limit=10)
+
+        assert pagination.count_from_rows([]) is None
+
+    def test_no_pagination_attach_count_is_identity(self) -> None:
+        """NoPagination.attach_count() leaves the query unchanged."""
+        pagination = NoPagination()
+        mock_query = MagicMock()
+
+        result = pagination.attach_count(mock_query)
+
+        mock_query.add_columns.assert_not_called()
+        assert result is mock_query
+
+    def test_no_pagination_count_from_rows_is_len(self) -> None:
+        """NoPagination.count_from_rows() returns len(rows), never None."""
+        pagination = NoPagination()
+        rows = [MagicMock() for _ in range(7)]
+
+        assert pagination.count_from_rows(cast(list[Row[Any]], rows)) == 7
+        assert pagination.count_from_rows([]) == 0
+
+    def test_cursor_forward_attach_count_is_identity(self) -> None:
+        """CursorForwardPagination.attach_count() leaves the query unchanged."""
+        pagination = CursorForwardPagination(first=10, cursor_order=MagicMock())
+        mock_query = MagicMock()
+
+        result = pagination.attach_count(mock_query)
+
+        mock_query.add_columns.assert_not_called()
+        assert result is mock_query
+
+    def test_cursor_forward_count_from_rows_returns_none(self) -> None:
+        """CursorForwardPagination.count_from_rows() always signals a count query."""
+        pagination = CursorForwardPagination(first=10, cursor_order=MagicMock())
+        rows = [MagicMock() for _ in range(11)]
+
+        assert pagination.count_from_rows(cast(list[Row[Any]], rows)) is None
+
+    def test_cursor_backward_attach_count_is_identity(self) -> None:
+        """CursorBackwardPagination.attach_count() leaves the query unchanged."""
+        pagination = CursorBackwardPagination(last=10, cursor_order=MagicMock())
+        mock_query = MagicMock()
+
+        result = pagination.attach_count(mock_query)
+
+        mock_query.add_columns.assert_not_called()
+        assert result is mock_query
+
+    def test_cursor_backward_count_from_rows_returns_none(self) -> None:
+        """CursorBackwardPagination.count_from_rows() always signals a count query."""
+        pagination = CursorBackwardPagination(last=10, cursor_order=MagicMock())
+        rows = [MagicMock() for _ in range(11)]
+
+        assert pagination.count_from_rows(cast(list[Row[Any]], rows)) is None

@@ -8,7 +8,7 @@ import traceback
 from abc import ABCMeta, abstractmethod
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Any, ClassVar, Self
+from typing import Any, ClassVar, Self, override
 
 import aiofiles.os
 import attrs
@@ -109,9 +109,11 @@ class ChownTask(AbstractTask):
     uid: int = attrs.field()
     gid: int = attrs.field()
 
+    @override
     async def run(self) -> Any:
         os.chown(self.directory, self.uid, self.gid)
 
+    @override
     def serialize(self) -> bytes:
         return msgpack.packb((
             self.directory,
@@ -120,6 +122,7 @@ class ChownTask(AbstractTask):
         ))
 
     @classmethod
+    @override
     def deserialize(cls, values: tuple[Any, ...]) -> Self:
         return cls(
             values[0],
@@ -146,6 +149,7 @@ class MountTask(AbstractTask):
     fstab_path: str = attrs.field(default="/etc/fstab")
     mount_prefix: str | None = attrs.field(default=None)
 
+    @override
     async def run(self) -> Any:
         return await _mount(
             self.mount_path,
@@ -173,6 +177,7 @@ class MountTask(AbstractTask):
             mount_prefix,
         )
 
+    @override
     def serialize(self) -> bytes:
         return msgpack.packb((
             self.mount_path,
@@ -187,6 +192,7 @@ class MountTask(AbstractTask):
         ))
 
     @classmethod
+    @override
     def deserialize(cls, values: tuple[Any, ...]) -> Self:
         return cls(
             values[0],
@@ -216,6 +222,7 @@ class UmountTask(AbstractTask):
     mount_prefix: str | None = attrs.field(default=None)
     timeout: float | None = attrs.field(default=None)
 
+    @override
     async def run(self) -> Any:
         did_umount = await _umount(
             self.mount_path,
@@ -246,6 +253,7 @@ class UmountTask(AbstractTask):
             timeout,
         )
 
+    @override
     def serialize(self) -> bytes:
         return msgpack.packb((
             self.mount_path,
@@ -258,6 +266,7 @@ class UmountTask(AbstractTask):
         ))
 
     @classmethod
+    @override
     def deserialize(cls, values: tuple[Any, ...]) -> Self:
         return cls(
             values[0],
@@ -275,6 +284,7 @@ class DeletePathTask(AbstractTask):
     name = "delete-path"
     path: Path
 
+    @override
     async def run(self) -> Any:
         if self.path.is_dir():
             loop = asyncio.get_running_loop()
@@ -285,10 +295,12 @@ class DeletePathTask(AbstractTask):
         else:
             await aiofiles.os.remove(self.path)
 
+    @override
     def serialize(self) -> bytes:
         return msgpack.packb((self.path,))
 
     @classmethod
+    @override
     def deserialize(cls, values: tuple[Any, ...]) -> Self:
         return cls(
             values[0],

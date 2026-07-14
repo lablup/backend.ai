@@ -4,6 +4,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from pathlib import Path
+from typing import override
 
 from ai.backend.common.dependencies import DependencyComposer, DependencyStack
 
@@ -29,10 +30,12 @@ class CoordinatorDependencyComposer(DependencyComposer[DependencyInput, Dependen
     """Main composer for all app proxy coordinator dependencies."""
 
     @property
+    @override
     def stage_name(self) -> str:
         return "coordinator"
 
     @asynccontextmanager
+    @override
     async def compose(
         self,
         stack: DependencyStack,

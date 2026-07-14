@@ -9,15 +9,105 @@ python_sources(
     ],
 )
 
-visibility_private_component(
-    allowed_dependents=[
-        "//src/ai/backend/testutils/**",
-    ],
-    allowed_dependencies=[
+# Each rule set is self-contained: the upper-layer denies come first, then the same
+# base allowances as the default set. Paths starting with "/" are relative to this
+# (manager) directory; "//" is relative to the build root.
+__dependencies_rules__(
+    # data: must not depend on views, models, repositories, services, api, config, clients.
+    (
+        "/data/**",
+        "!/views/**",
+        "!/models/**",
+        "!/repositories/**",
+        "!/services/**",
+        "!/api/**",
+        "!/config/**",
+        "!/config_legacy.py",
+        "!/clients/**",
+        "/**",
         "//src/ai/backend/common/**",
         "//src/ai/backend/cli/**",
         "//src/ai/backend/logging/**",
-    ],
+        "//reqs#*",
+        "//stubs/**",
+        "!*",
+    ),
+    # views: must not depend on models, repositories, services, api, config, clients.
+    (
+        "/views/**",
+        "!/models/**",
+        "!/repositories/**",
+        "!/services/**",
+        "!/api/**",
+        "!/config/**",
+        "!/config_legacy.py",
+        "!/clients/**",
+        "/**",
+        "//src/ai/backend/common/**",
+        "//src/ai/backend/cli/**",
+        "//src/ai/backend/logging/**",
+        "//reqs#*",
+        "//stubs/**",
+        "!*",
+    ),
+    # models/alembic: exception to the models rule below — migration scripts may import
+    # config / config_legacy. Must be listed BEFORE the general models rule so its more
+    # specific selector wins.
+    (
+        "/models/alembic/**",
+        "!/repositories/**",
+        "!/services/**",
+        "!/api/**",
+        "!/clients/**",
+        "/**",
+        "//src/ai/backend/common/**",
+        "//src/ai/backend/cli/**",
+        "//src/ai/backend/logging/**",
+        "//reqs#*",
+        "//stubs/**",
+        "!*",
+    ),
+    # models: may depend on views/data; must not depend on repositories, services, api,
+    # config, clients.
+    (
+        "/models/**",
+        "!/repositories/**",
+        "!/services/**",
+        "!/api/**",
+        "!/config/**",
+        "!/config_legacy.py",
+        "!/clients/**",
+        "/**",
+        "//src/ai/backend/common/**",
+        "//src/ai/backend/cli/**",
+        "//src/ai/backend/logging/**",
+        "//reqs#*",
+        "//stubs/**",
+        "!*",
+    ),
+    # default: every other file in the component.
+    (
+        "*",
+        "/**",
+        "//src/ai/backend/common/**",
+        "//src/ai/backend/cli/**",
+        "//src/ai/backend/logging/**",
+        "//reqs#*",
+        "//stubs/**",
+        "!*",
+    ),
+)
+
+# Who may import the manager component (equivalent to visibility_private_component).
+__dependents_rules__(
+    (
+        {"type": "*"},
+        "/**",  # code within this component may import itself
+        "//src/ai/backend/testutils/**",  # allowed extra dependents
+        "//tests/**",  # tests may import the source files
+        "//plugins/**",  # external plugins may import the source files
+        "!*",  # no one else may import the source files
+    )
 )
 
 python_distribution(

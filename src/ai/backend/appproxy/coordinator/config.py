@@ -29,7 +29,12 @@ from ai.backend.common.configs import (
     PyroscopeConfig,
     ServiceDiscoveryConfig,
 )
-from ai.backend.common.meta import BackendAIConfigMeta, CompositeType, ConfigExample
+from ai.backend.common.meta import (
+    NEXT_RELEASE_VERSION,
+    BackendAIConfigMeta,
+    CompositeType,
+    ConfigExample,
+)
 from ai.backend.common.types import ServiceDiscoveryType
 from ai.backend.logging import LogLevel
 from ai.backend.logging.config import LoggingConfig
@@ -162,6 +167,35 @@ class DBConfig(BaseSchema):
             ),
             added_version="25.9.0",
             example=ConfigExample(local="64", prod="128"),
+        ),
+    ]
+    pool_recycle: Annotated[
+        float,
+        Field(default=-1, ge=-1),
+        BackendAIConfigMeta(
+            description=(
+                "Maximum lifetime of a connection in seconds before it's recycled. "
+                "Set to -1 to disable connection recycling. "
+                "Useful for handling database connections closed by the server after inactivity "
+                "or by network equipment with idle timeouts."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="-1", prod="3600"),
+        ),
+    ]
+    pool_pre_ping: Annotated[
+        bool,
+        Field(default=True),
+        BackendAIConfigMeta(
+            description=(
+                "Whether to test connections with a lightweight ping before using them. "
+                "Detects stale or disconnected connections at pool checkout and transparently "
+                "reconnects them with clean transaction state, preventing 'SAVEPOINT can only be "
+                "used in transaction blocks' errors after a Postgres connection drop or failover. "
+                "Adds a small overhead per checkout but is recommended for production."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="true", prod="true"),
         ),
     ]
 

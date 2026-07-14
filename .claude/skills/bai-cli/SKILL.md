@@ -104,6 +104,8 @@ Check options with `--help`.
 - **prometheus-query-definition**: user(get, search, execute) · admin(create, update, delete, preview)
 - **prometheus-query-definition-category**: user(get, search) · admin(create, delete)
 - **app-config**: user(get-domain, get-user, get-merged, delete-domain, delete-user)
+- **app-config-definition**: admin(create, get, search, purge)
+- **app-config-allow-list**: admin(create, get, search, update, purge)
 - **export**: admin(list-reports, get-report, audit-logs, keypairs, projects, sessions, sessions-by-project, users, users-by-domain) · my(keypairs, sessions)
 
 ### Utilities (not entities)

@@ -53,7 +53,7 @@ def show(_cli_ctx: CLIContext, alembic_config: str) -> None:
     from alembic.script import ScriptDirectory
     from sqlalchemy.engine import Connection
 
-    from ai.backend.manager.models.utils import create_async_engine
+    from ai.backend.manager.repositories.db.engine import create_async_engine
 
     def _get_current_rev_sync(connection: Connection) -> str | None:
         context = MigrationContext.configure(connection)
@@ -224,7 +224,7 @@ def oneshot(_cli_ctx: CLIContext, alembic_config: str) -> None:
     from sqlalchemy.engine import Connection, Engine
 
     from ai.backend.manager.models.base import ensure_all_tables_registered, metadata
-    from ai.backend.manager.models.utils import create_async_engine
+    from ai.backend.manager.repositories.db.engine import create_async_engine
 
     ensure_all_tables_registered()
 

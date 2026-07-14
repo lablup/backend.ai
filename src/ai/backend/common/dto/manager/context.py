@@ -1,6 +1,6 @@
 import uuid
 from collections.abc import Mapping
-from typing import Any, Self
+from typing import Any, Self, override
 
 from aiohttp import web
 
@@ -14,6 +14,7 @@ class UserIdentityCtx(MiddlewareParam):
     domain_name: str
 
     @classmethod
+    @override
     async def from_request(cls, request: web.Request) -> Self:
         return cls(
             user_uuid=request["user"]["uuid"],
@@ -28,6 +29,7 @@ class KeypairCtx(MiddlewareParam):
     resource_policy: Mapping[str, Any]
 
     @classmethod
+    @override
     async def from_request(cls, request: web.Request) -> Self:
         return cls(
             access_key=request["keypair"]["access_key"],

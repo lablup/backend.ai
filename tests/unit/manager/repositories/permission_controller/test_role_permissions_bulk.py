@@ -20,8 +20,16 @@ from ai.backend.manager.data.permission.types import (
     ScopeType,
 )
 from ai.backend.manager.errors.permission import RoleNotFound
+
+# ORM cluster registration: configure_mappers() (triggered when this isolated
+# test registers a domain-cluster row) resolves string relationships against the
+# registry. These rows are reachable via relationships but are not otherwise
+# imported/registered by this test; _ORM_CLUSTER keeps them live.
+from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow
 from ai.backend.manager.repositories.base.creator import BulkCreator
 from ai.backend.manager.repositories.base.purger import Purger
 from ai.backend.manager.repositories.permission_controller.creators import (
@@ -49,6 +57,13 @@ ALL_OWNER_OPS = (
     OperationType.UPDATE,
     OperationType.SOFT_DELETE,
     OperationType.HARD_DELETE,
+)
+
+
+_ORM_CLUSTER = (
+    AgentRow,
+    ImageRow,
+    ScalingGroupForDomainRow,
 )
 
 

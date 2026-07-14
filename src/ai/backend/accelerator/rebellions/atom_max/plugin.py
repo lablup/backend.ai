@@ -129,7 +129,7 @@ class ATOMMaxPlugin(AbstractATOMPlugin[ATOMMaxDevice]):
             ),
         ]
 
-    async def group_npus(
+    async def _group_npus(
         self,
         devices: Iterable[ATOMMaxDevice],
     ) -> int:

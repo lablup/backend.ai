@@ -18,18 +18,20 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Callable
+from typing import override
 
 import pytest
 
-from ai.backend.common.identifier.domain import DomainName
+from ai.backend.common.identifier.domain import DomainID, DomainName
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.project import ProjectID
-from ai.backend.common.identifier.resource_group import ResourceGroupName
+from ai.backend.common.identifier.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.identifier.session import SessionID
 from ai.backend.common.types import AccessKey, ClusterMode, ResourceSlotEntry, SessionTypes
 from ai.backend.manager.data.session.draft import (
     KernelExecutionSpecDraft,
     KernelGroupDraft,
+    KernelResourceInput,
     KernelSpecDraft,
     SessionClassificationDraft,
     SessionIdentityDraft,
@@ -69,9 +71,11 @@ class _TransformRule(SessionSpecDraftRule):
         self._log = log
         self._transform = transform
 
+    @override
     def name(self) -> str:
         return self._tag
 
+    @override
     async def prepare(
         self,
         draft: SessionSpecDraft,
@@ -99,8 +103,10 @@ def minimal_kernel_group(image_id: ImageID) -> KernelGroupDraft:
         role="main",
         replica_count=1,
         execution_spec=KernelExecutionSpecDraft(
-            image_id=image_id,
-            resources=(ResourceSlotEntry(resource_type="cpu", quantity="1"),),
+            resource_input=KernelResourceInput(
+                image_id=image_id,
+                resources=(ResourceSlotEntry(resource_type="cpu", quantity="1"),),
+            ),
         ),
     )
 
@@ -117,8 +123,10 @@ def complete_draft(image_id: ImageID, minimal_kernel_group: KernelGroupDraft) ->
             user_uuid=uuid.uuid4(),
         ),
         scope=SessionScopeDraft(
+            domain_id=DomainID(uuid.uuid4()),
             domain_name=DomainName("default"),
             project_id=ProjectID(uuid.uuid4()),
+            resource_group_id=ResourceGroupID(uuid.uuid4()),
             resource_group_name=ResourceGroupName("default"),
         ),
         classification=SessionClassificationDraft(
@@ -142,8 +150,10 @@ def complete_draft(image_id: ImageID, minimal_kernel_group: KernelGroupDraft) ->
                 cluster_hostname="main1",
                 local_rank=0,
                 execution_spec=KernelExecutionSpecDraft(
-                    image_id=image_id,
-                    resources=(ResourceSlotEntry(resource_type="cpu", quantity="1"),),
+                    resource_input=KernelResourceInput(
+                        image_id=image_id,
+                        resources=(ResourceSlotEntry(resource_type="cpu", quantity="1"),),
+                    ),
                 ),
             ),
         ),
@@ -333,8 +343,10 @@ class TestFinalization:
             cluster_hostname="main1",
             local_rank=0,
             execution_spec=KernelExecutionSpecDraft(
-                image_id=image_id,
-                resources=(ResourceSlotEntry(resource_type="cpu", quantity="1"),),
+                resource_input=KernelResourceInput(
+                    image_id=image_id,
+                    resources=(ResourceSlotEntry(resource_type="cpu", quantity="1"),),
+                ),
             ),
         )
         draft = complete_draft.model_copy(update={"kernel_specs": (broken_kernel,)})
@@ -358,8 +370,10 @@ class TestFinalization:
             cluster_hostname="main1",
             local_rank=0,
             execution_spec=KernelExecutionSpecDraft(
-                # image_id intentionally unset
-                resources=(ResourceSlotEntry(resource_type="cpu", quantity="1"),),
+                resource_input=KernelResourceInput(
+                    # image_id intentionally unset
+                    resources=(ResourceSlotEntry(resource_type="cpu", quantity="1"),),
+                ),
             ),
         )
         draft = complete_draft.model_copy(update={"kernel_specs": (broken_kernel,)})
@@ -368,4 +382,4 @@ class TestFinalization:
         extra_data = exc_info.value.extra_data
         assert extra_data is not None
         missing: list[str] = extra_data["missing"]
-        assert "kernel_specs[0].execution_spec.image_id" in missing
+        assert "kernel_specs[0].execution_spec.resource_input.image_id" in missing

@@ -14,15 +14,15 @@ from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
 from ai.backend.common.types import ResourceSlot, SessionId
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.session.draft import SessionSpecDraft
 from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.errors.common import RejectedByHook
+from ai.backend.manager.errors.common import InternalServerError, RejectedByHook
 from ai.backend.manager.metrics.scheduler import (
     SchedulerOperationMetricObserver,
     SchedulerPhaseMetricObserver,
 )
-from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.scheduler import (
     MarkTerminatingResult,
@@ -138,6 +138,32 @@ class SchedulingController:
             DotfileVFolderConflictRule(),
         ])
 
+    async def _verify_resource_group_accessible(self, draft: SessionSpecDraft) -> None:
+        """Reject the draft when its target resource group is outside the
+        requester's single-project allowlist.
+
+        The scope decision and rejection live in the caller; the repository only
+        performs DB reads.
+        """
+        resource_group_id = draft.scope.resource_group_id
+        if resource_group_id is None:
+            return
+        domain_name = str(draft.scope.domain_name) if draft.scope.domain_name else None
+        project_id = draft.scope.project_id
+        access_key = draft.identity.access_key
+        if access_key is None or domain_name is None or project_id is None:
+            raise InternalServerError(
+                "Unreachable: resource_group_id supplied without identity context",
+            )
+        accessible_rg_ids = await self._repository.query_accessible_resource_group_ids(
+            domain_name=domain_name,
+            project_id=project_id,
+            access_key=access_key,
+        )
+        if resource_group_id not in accessible_rg_ids:
+            rg_label = draft.scope.resource_group_name or resource_group_id
+            raise InvalidAPIParameters(f"Resource group '{rg_label}' is not accessible")
+
     async def enqueue_session_from_draft(
         self,
         draft: SessionSpecDraft,
@@ -146,32 +172,42 @@ class SchedulingController:
 
         Only input is the :class:`SessionSpecDraft` — request-envelope
         extras (sudo, model-definition overlay) ride on
-        ``draft.internal_data_extras``. Every validation-adjacent DB read
-        (image metadata, keypair policy, resource-group network,
-        container uid/gid, resolved vfolder mounts, dotfiles, active
-        session count) flows through
-        :meth:`SchedulerRepository.fetch_session_spec_contexts`.
+        ``draft.internal_data_extras``. Validation-adjacent DB reads (image
+        metadata, keypair policy, resource-group network, container uid/gid,
+        dotfiles, active session count) flow through
+        :meth:`SchedulerRepository.fetch_session_spec_contexts`; vfolder mounts
+        are resolved separately via
+        :meth:`SchedulerRepository.resolve_vfolder_mounts_by_role`.
 
         Flow:
 
-        1. Batch fetch — resolve prep / validation context bundles.
-        2. Preparer chain — draft → finalized ``SessionSpec``.
-        3. ``PRE_ENQUEUE_SESSION`` hook — rejected calls raise.
-        4. Validator chain — spec + context.
-        5. ``SchedulerRepository.enqueue_session_from_spec`` — writer tx.
-        6. Broadcast PENDING + ask the coordinator to schedule.
-        7. ``POST_ENQUEUE_SESSION`` hook notification.
+        1. Context fetch + vfolder-mount resolution + preparer chain →
+           finalized ``SessionSpec`` + validation context.
+        2. ``PRE_ENQUEUE_SESSION`` hook — rejected calls raise.
+        3. Validator chain — spec + context.
+        4. ``SchedulerRepository.enqueue_session_from_spec`` — writer tx.
+        5. Broadcast PENDING + ask the coordinator to schedule.
+        6. ``POST_ENQUEUE_SESSION`` hook notification.
         """
-        rg_name = str(draft.scope.resource_group_name) if draft.scope.resource_group_name else ""
+        rg_id = draft.scope.resource_group_id
+
+        await self._verify_resource_group_accessible(draft)
 
         allowed_vfolder_types = list(
             await self._config_provider.legacy_etcd_config_loader.get_vfolder_types()
         )
 
         with self._metric_observer.measure_phase(
-            "scheduling_controller", rg_name, "spec_fetch_contexts"
+            "scheduling_controller", rg_id, "spec_fetch_contexts"
         ):
-            fetched = await self._repository.fetch_session_spec_contexts(
+            fetched = await self._repository.fetch_session_spec_contexts(draft)
+
+        # Vfolder mounts are resolved separately (storage-manager RPC / etcd),
+        # kept out of the context fetch so resource-only callers can skip them.
+        with self._metric_observer.measure_phase(
+            "scheduling_controller", rg_id, "vfolder_mount_resolution"
+        ):
+            vfolder_mounts_by_role = await self._repository.resolve_vfolder_mounts_by_role(
                 draft,
                 storage_manager=self._storage_manager,
                 allowed_vfolder_types=allowed_vfolder_types,
@@ -184,7 +220,7 @@ class SchedulingController:
             image_infos=fetched.image_infos,
             resource_group_allow_fractional=fetched.resource_group_allow_fractional,
             dotfile_data=fetched.dotfile_data,
-            vfolder_mounts_by_role=fetched.vfolder_mounts_by_role,
+            vfolder_mounts_by_role=vfolder_mounts_by_role,
         )
         val_ctx = SessionSpecValidationContext(
             keypair_resource_policy=fetched.keypair_resource_policy,
@@ -196,7 +232,7 @@ class SchedulingController:
         )
 
         with self._metric_observer.measure_phase(
-            "scheduling_controller", rg_name, "spec_preparation"
+            "scheduling_controller", rg_id, "spec_preparation"
         ):
             spec = await self._spec_preparer.prepare(draft, prep_ctx)
 
@@ -212,12 +248,10 @@ class SchedulingController:
         if hook_result.status != PASSED:
             raise RejectedByHook.from_hook_result(hook_result)
 
-        with self._metric_observer.measure_phase(
-            "scheduling_controller", rg_name, "spec_validation"
-        ):
+        with self._metric_observer.measure_phase("scheduling_controller", rg_id, "spec_validation"):
             self._spec_validator.validate(spec, val_ctx)
 
-        with self._metric_observer.measure_phase("scheduling_controller", rg_name, "enqueue"):
+        with self._metric_observer.measure_phase("scheduling_controller", rg_id, "enqueue"):
             session_id = await self._repository.enqueue_session_from_spec(spec)
 
         log.info(

@@ -5,6 +5,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
 
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.manager.data.kernel.types import KernelInfo, KernelStatus
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.sokovan.scheduler.results import (
@@ -67,13 +68,13 @@ class KernelLifecycleHandler(ABC):
     @abstractmethod
     async def execute(
         self,
-        scaling_group: str,
+        resource_group_id: ResourceGroupID,
         kernels: Sequence[KernelInfo],
     ) -> KernelExecutionResult:
         """Execute the handler logic on the given kernels.
 
         Args:
-            scaling_group: The scaling group being processed
+            resource_group_id: The id of the resource group being processed
             kernels: Kernels with full KernelInfo data
 
         Returns:

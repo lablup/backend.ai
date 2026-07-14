@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
+from typing import override
 from uuid import UUID
 
 from ai.backend.common.identifier.deployment import DeploymentID
@@ -42,9 +43,11 @@ class GroupScalingReconcileInfo(BaseReconcilerInfo):
     views: list[ReplicaGroupScalingReconcileView]
     current_time: datetime
 
+    @override
     def entity_ids(self) -> Sequence[UUID]:
         return [view.group_id for view in self.views]
 
+    @override
     def now(self) -> datetime:
         return self.current_time
 
@@ -67,15 +70,19 @@ class GroupScalingDecision(ReconcilerDecision):
     handler_options: DeploymentHandlerOptions
     error_code: str | None = None
 
+    @override
     def entity_id(self) -> UUID:
         return self.replica_group_id
 
+    @override
     def outcome(self) -> HandlerOutcome:
         return self.handler_outcome
 
+    @override
     def last_history(self) -> LastHistory | None:
         return self.prior_history
 
+    @override
     def policy_resolver(self) -> HandlerPolicyResolver:
         return self.handler_options
 
@@ -90,11 +97,14 @@ class GroupScalingReconcileResult(BaseReconcilerResult):
     processed: int = 0
     failed: int = 0
 
+    @override
     def processed_count(self) -> int:
         return self.processed
 
+    @override
     def failed_count(self) -> int:
         return self.failed
 
+    @override
     def decisions(self) -> Sequence[ReconcilerDecision]:
         return self.scaling_decisions

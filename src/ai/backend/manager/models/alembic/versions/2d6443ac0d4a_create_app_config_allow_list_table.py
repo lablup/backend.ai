@@ -8,7 +8,7 @@ foreign key into ``app_config_definitions`` so an entry may only reference a
 registered config name.
 
 Revision ID: 2d6443ac0d4a
-Revises: c7e1a9d4f6b2
+Revises: f2b9a4c7e103
 Create Date: 2026-06-18
 
 """
@@ -20,7 +20,7 @@ from ai.backend.manager.models.base import IDColumn
 
 # revision identifiers, used by Alembic.
 revision = "2d6443ac0d4a"
-down_revision = "c7e1a9d4f6b2"
+down_revision = "daf20413acda"
 # Part of: 26.5.0
 branch_labels = None
 depends_on = None

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import UTC, datetime
-from typing import Protocol, runtime_checkable
+from typing import Protocol, override, runtime_checkable
 
 from ai.backend.common.health_checker.abc import StaticServiceHealthChecker
 from ai.backend.common.health_checker.types import (
@@ -55,6 +55,7 @@ class ValkeyHealthChecker(StaticServiceHealthChecker):
         self._component_timeout = component_timeout
 
     @property
+    @override
     def target_service_group(self) -> ServiceGroup:
         """The service group this checker monitors."""
         return REDIS
@@ -99,6 +100,7 @@ class ValkeyHealthChecker(StaticServiceHealthChecker):
 
         return (component_id, status)
 
+    @override
     async def check_service(self) -> ServiceHealth:
         """
         Check health of all Valkey/Redis clients concurrently.
@@ -135,6 +137,7 @@ class ValkeyHealthChecker(StaticServiceHealthChecker):
         return ServiceHealth(results=results)
 
     @property
+    @override
     def timeout(self) -> float:
         """The timeout for the entire health check in seconds."""
         return self._timeout

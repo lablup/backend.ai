@@ -28,7 +28,7 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
     DeploymentStrategySpecInfo,
     RollingUpdateStrategySpecInfo,
 )
-from ai.backend.common.dto.manager.v2.deployment.types import (
+from ai.backend.common.schema.deployment import (
     IntOrPercent as IntOrPercentDTO,
 )
 from ai.backend.manager.api.gql.decorators import (

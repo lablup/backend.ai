@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import override
+
 from aiohttp import web
 
 from ai.backend.common.exception import (
@@ -17,6 +19,7 @@ class TusLeaseHeldError(BackendAIError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/storage/tus-lease-held"
     error_title = "TUS session lease is held by another storage-proxy"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE_PROXY,
@@ -31,6 +34,7 @@ class TusLeaseLostError(BackendAIError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/storage/tus-lease-lost"
     error_title = "TUS session lease lost mid-write"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE_PROXY,
@@ -45,6 +49,7 @@ class TusSessionNotFoundError(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/storage/tus-session-not-found"
     error_title = "TUS upload session not found"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE_PROXY,

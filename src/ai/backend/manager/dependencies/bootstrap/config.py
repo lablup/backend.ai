@@ -4,6 +4,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from pathlib import Path
+from typing import override
 
 from ai.backend.common.dependencies import NonMonitorableDependencyProvider
 from ai.backend.logging.types import LogLevel
@@ -30,10 +31,12 @@ class BootstrapConfigDependency(
     """
 
     @property
+    @override
     def stage_name(self) -> str:
         return "bootstrap-config"
 
     @asynccontextmanager
+    @override
     async def provide(self, setup_input: BootstrapConfigInput) -> AsyncIterator[BootstrapConfig]:
         """Load and provide bootstrap configuration.
 

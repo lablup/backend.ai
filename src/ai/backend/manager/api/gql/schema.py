@@ -1,4 +1,5 @@
 import re
+from typing import override
 
 import strawberry
 from graphql.pyutils.undefined import Undefined as GraphQLUndefined
@@ -22,6 +23,7 @@ from .app_config_allow_list import (
     admin_app_config_allow_lists,
     admin_create_app_config_allow_list,
     admin_purge_app_config_allow_list,
+    admin_update_app_config_allow_list,
 )
 from .app_config_definition import (
     admin_app_config_definition,
@@ -409,6 +411,7 @@ from .runtime_variant_preset import (
     runtime_variant_presets,
 )
 from .scheduler import (
+    compute_schedule,
     scheduling_events_by_session,
 )
 from .scheduling_handler import scheduling_handlers
@@ -524,6 +527,7 @@ class Query:
     admin_resource_groups = admin_resource_groups
     admin_resource_group_v2 = admin_resource_group_v2
     scheduling_handlers = scheduling_handlers
+    compute_schedule = compute_schedule
     admin_allowed_resource_groups_for_domain_v2 = admin_allowed_resource_groups_for_domain_v2
     admin_allowed_resource_groups_for_project_v2 = admin_allowed_resource_groups_for_project_v2
     admin_allowed_domains_for_resource_group_v2 = admin_allowed_domains_for_resource_group_v2
@@ -707,6 +711,7 @@ class Query:
 class Mutation:
     admin_create_app_config_allow_list = admin_create_app_config_allow_list
     admin_purge_app_config_allow_list = admin_purge_app_config_allow_list
+    admin_update_app_config_allow_list = admin_update_app_config_allow_list
     scan_artifacts = scan_artifacts
     scan_artifact_models = scan_artifact_models
     import_artifacts = import_artifacts
@@ -955,6 +960,7 @@ class Subscription:
 
 
 class CustomizedSchema(Schema):
+    @override
     def as_str(self) -> str:
         # Strawberry picks up pydantic field defaults (including SENTINEL) as GraphQL
         # schema field default_values.  SENTINEL is not a valid GraphQL scalar value, so

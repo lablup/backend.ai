@@ -37,10 +37,10 @@ from uuid import UUID
 import yarl
 from pydantic import ConfigDict, Field
 
-from ai.backend.common.identifier.domain import DomainName
+from ai.backend.common.identifier.domain import DomainID, DomainName
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.project import ProjectID
-from ai.backend.common.identifier.resource_group import ResourceGroupName
+from ai.backend.common.identifier.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.identifier.session import SessionID
 from ai.backend.common.types import (
     AccessKey,
@@ -52,6 +52,7 @@ from ai.backend.common.types import (
     SessionTypes,
     VFolderMount,
 )
+from ai.backend.manager.data.network.types import NetworkType
 from ai.backend.manager.data.session.options import (
     AgentSelectionPolicy,
     FailurePolicy,
@@ -59,7 +60,6 @@ from ai.backend.manager.data.session.options import (
     ResourceOpts,
     SessionHandlerOptions,
 )
-from ai.backend.manager.models.network import NetworkType
 
 
 class _DraftBaseModel(BackendAISchema):
@@ -74,12 +74,26 @@ class _DraftBaseModel(BackendAISchema):
     model_config = ConfigDict(arbitrary_types_allowed=True, frozen=True)
 
 
-class KernelExecutionSpecDraft(_DraftBaseModel):
-    """Optional-heavy mirror of ``KernelExecutionSpec``."""
+class KernelResourceInput(_DraftBaseModel):
+    """Minimal per-kernel resource inputs for requested-slots resolution.
+
+    A standalone input consumed by the scheduler dry-run; ``image_id`` may be
+    ``None`` when a resource-group default supplies it downstream.
+    """
 
     image_id: ImageID | None = None
     resources: tuple[ResourceSlotEntry, ...] = ()
     resource_opts: ResourceOpts | None = None
+
+
+class KernelExecutionSpecDraft(_DraftBaseModel):
+    """Optional-heavy mirror of ``KernelExecutionSpec``.
+
+    ``resource_input`` groups the slot-resolution inputs (image + resource
+    slots) shared with the scheduler dry-run.
+    """
+
+    resource_input: KernelResourceInput = Field(default_factory=KernelResourceInput)
     environ: Mapping[str, str] = Field(default_factory=dict)
     mounts: tuple[MountInfoEntry, ...] = ()
     startup_command: str | None = None
@@ -179,8 +193,10 @@ class SessionNetworkDraft(_DraftBaseModel):
 class SessionScopeDraft(_DraftBaseModel):
     """Optional-heavy mirror of ``SessionScope``."""
 
+    domain_id: DomainID | None = None
     domain_name: DomainName | None = None
     project_id: ProjectID | None = None
+    resource_group_id: ResourceGroupID | None = None
     resource_group_name: ResourceGroupName | None = None
 
 

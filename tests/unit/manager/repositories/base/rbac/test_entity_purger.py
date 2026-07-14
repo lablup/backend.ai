@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, override
 from uuid import UUID
 
 import pytest
@@ -108,9 +108,11 @@ class SimpleRBACEntityPurgerSpec(RBACEntityPurgerSpec):
     def __init__(self, entity_uuid: UUID) -> None:
         self._entity_uuid = entity_uuid
 
+    @override
     def element_type(self) -> RBACElementType:
         return RBACElementType.VFOLDER
 
+    @override
     def entity_ref(self) -> RBACElementRef:
         return RBACElementRef(
             element_type=self.element_type(),
@@ -675,9 +677,11 @@ class TestRBACEntityPurgerBidirectionalCleanup:
 class TestEntityBatchPurgerSpec(RBACEntityBatchPurgerSpec[RBACEntityPurgerTestRow]):
     """Test spec for batch purging entities."""
 
+    @override
     def build_subquery(self) -> sa.sql.Select[tuple[RBACEntityPurgerTestRow]]:
         return sa.select(RBACEntityPurgerTestRow)
 
+    @override
     def element_type(self) -> RBACElementType:
         return RBACElementType.VFOLDER
 
@@ -919,9 +923,11 @@ class CompositePKPurgerSpec(RBACEntityPurgerSpec):
     def __init__(self, entity_uuid: str) -> None:
         self._entity_uuid = entity_uuid
 
+    @override
     def element_type(self) -> RBACElementType:
         return RBACElementType.VFOLDER
 
+    @override
     def entity_ref(self) -> RBACElementRef:
         return RBACElementRef(
             element_type=self.element_type(),
@@ -932,9 +938,11 @@ class CompositePKPurgerSpec(RBACEntityPurgerSpec):
 class CompositePKBatchPurgerSpec(RBACEntityBatchPurgerSpec[CompositePKPurgerTestRow]):
     """Batch purger spec for composite PK testing."""
 
+    @override
     def build_subquery(self) -> sa.Select[Any]:
         return sa.select(CompositePKPurgerTestRow)
 
+    @override
     def element_type(self) -> RBACElementType:
         return RBACElementType.VFOLDER
 

@@ -36,6 +36,10 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.api.gql.base import resolve_global_id
 from ai.backend.manager.clients.valkey_client.statistics import KernelStatistics
+from ai.backend.manager.data.permission.permission_defs import ComputeSessionPermission
+from ai.backend.manager.data.permission.permission_defs import (
+    VFolderPermission as VFolderRBACPermission,
+)
 from ai.backend.manager.data.session.types import SessionData, SessionStatus
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.errors.api import NotImplementedAPI
@@ -48,10 +52,6 @@ from ai.backend.manager.models.minilang.ordering import ColumnMapType, QueryOrde
 from ai.backend.manager.models.minilang.queryfilter import FieldSpecType, QueryFilterParser
 from ai.backend.manager.models.rbac import ScopeType, SystemScope
 from ai.backend.manager.models.rbac.context import ClientContext
-from ai.backend.manager.models.rbac.permission_defs import ComputeSessionPermission
-from ai.backend.manager.models.rbac.permission_defs import (
-    VFolderPermission as VFolderRBACPermission,
-)
 from ai.backend.manager.models.session import (
     DEFAULT_SESSION_ORDERING,
     SessionDependencyRow,

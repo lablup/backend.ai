@@ -6,6 +6,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import selectinload
 
 from ai.backend.common.exception import AgentNotFound
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import AgentId, ImageID
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.agent.types import (
@@ -91,19 +92,22 @@ class AgentDBSource:
                 raise AgentNotFound(f"Agent with id {agent_id} not found")
             return agent_row.to_data()
 
-    async def _check_scaling_group_exists(
+    async def _resolve_scaling_group_id(
         self, session: "AsyncSession", scaling_group_name: str
-    ) -> None:
-        scaling_group_row = await session.scalar(
-            sa.select(ScalingGroupRow).where(ScalingGroupRow.name == scaling_group_name)
+    ) -> ResourceGroupID:
+        scaling_group_id = await session.scalar(
+            sa.select(ScalingGroupRow.id).where(ScalingGroupRow.name == scaling_group_name)
         )
-        if not scaling_group_row:
+        if scaling_group_id is None:
             log.error("Scaling group named [{}] does not exist.", scaling_group_name)
             raise ScalingGroupNotFound(scaling_group_name)
+        return ResourceGroupID(scaling_group_id)
 
     async def upsert_agent_with_state(self, upsert_data: AgentHeartbeatUpsert) -> UpsertResult:
         async with self._db.begin_session_read_committed() as session:
-            await self._check_scaling_group_exists(session, upsert_data.metadata.scaling_group)
+            resource_group_id = await self._resolve_scaling_group_id(
+                session, upsert_data.metadata.scaling_group
+            )
 
             query = (
                 sa.select(AgentRow).where(AgentRow.id == upsert_data.metadata.id).with_for_update()
@@ -112,9 +116,16 @@ class AgentDBSource:
             agent_data = row.to_heartbeat_update_data() if row is not None else None
             upsert_result = UpsertResult.from_state_comparison(agent_data, upsert_data)
 
-            stmt = pg_insert(agents).values(upsert_data.insert_fields)
+            stmt = pg_insert(agents).values({
+                **upsert_data.insert_fields,
+                "resource_group_id": resource_group_id,
+            })
             final_query = stmt.on_conflict_do_update(
-                index_elements=["id"], set_=upsert_data.update_fields
+                index_elements=["id"],
+                set_={
+                    **upsert_data.update_fields,
+                    "resource_group_id": resource_group_id,
+                },
             )
 
             await session.execute(final_query)

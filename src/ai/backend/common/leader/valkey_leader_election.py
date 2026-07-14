@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from dataclasses import dataclass
-from typing import Final
+from typing import Final, override
 
 from ai.backend.common.clients.valkey_client.valkey_leader.client import ValkeyLeaderClient
 from ai.backend.common.leader.base import AbstractLeaderElection, LeaderTask
@@ -65,15 +65,18 @@ class ValkeyLeaderElection(AbstractLeaderElection):
         self._leader_tasks = []
 
     @property
+    @override
     def is_leader(self) -> bool:
         """Check if this instance is currently the leader."""
         return self._is_leader
 
     @property
+    @override
     def server_id(self) -> str:
         """Get the server ID."""
         return self._config.server_id
 
+    @override
     def register_task(self, task: LeaderTask) -> None:
         """
         Register a task to run when this instance is the leader.
@@ -146,6 +149,7 @@ class ValkeyLeaderElection(AbstractLeaderElection):
 
             await asyncio.sleep(self._config.renewal_interval)
 
+    @override
     async def start(self) -> None:
         """
         Start the leader election renewal loop and all registered tasks.
@@ -169,6 +173,7 @@ class ValkeyLeaderElection(AbstractLeaderElection):
 
         log.info("Valkey leader election started")
 
+    @override
     async def stop(self) -> None:
         """
         Stop the leader election, all tasks, and release leadership if held.

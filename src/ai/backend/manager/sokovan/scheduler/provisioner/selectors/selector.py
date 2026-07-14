@@ -26,13 +26,16 @@ from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.sokovan import AgentInfo
 
 from .exceptions import (
+    BatchAgentSelectionFailedError,
     ContainerLimitExceededError,
     InsufficientResourcesError,
     NoAgentsInResourceGroupError,
     NoAvailableAgentError,
     NoCompatibleAgentError,
+    RequirementSelectionError,
     TrackerCompatibilityError,
 )
+from .types import ResourceRequirements
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -91,20 +94,6 @@ class KernelResourceSpec:
     requested_slots: ResourceSlot
     # Architecture required
     required_architecture: str
-
-
-@dataclass
-class ResourceRequirements:
-    """Resource requirements for allocation."""
-
-    # Resource slots required
-    requested_slots: ResourceSlot
-    # Architecture required
-    required_architecture: str
-    # Kernel IDs that these requirements are for
-    # For single-node, this includes all kernel IDs
-    # For multi-node, this includes only one kernel ID
-    kernel_ids: Sequence[KernelId]
 
 
 @dataclass
@@ -265,11 +254,13 @@ class AgentSelector:
         designated_agent_ids: list[AgentId] | None = None,
     ) -> list[AgentSelection]:
         """
-        Select agents for a batch of resource requirements.
+        Select agents for every resource requirement in the criteria.
 
-        This method extracts resource requirements from criteria and processes
-        them all at once, returning paired selections. Agent state changes are
-        tracked internally as diffs and applied to the mutable agents list at the end.
+        Every requirement is evaluated (a placement failure does not abort the
+        batch early); if any requirement could not be placed, the whole batch
+        fails and a :class:`BatchAgentSelectionFailedError` carrying every
+        per-requirement failure (with its remediation hint) is raised. On full
+        success the diffs are applied to the mutable agents list.
 
         Args:
             agents: Available agents to choose from (will be modified with diff updates)
@@ -278,16 +269,16 @@ class AgentSelector:
             designated_agent_ids: Optional list of designated agents for the session
 
         Returns:
-            List of AgentSelection objects pairing requirements with selected agents
+            The list of AgentSelection objects pairing requirements with agents.
 
         Raises:
-            NoAvailableAgentError: If no agents are available
-            NoCompatibleAgentError: If no compatible agents are found
+            NoAgentsInResourceGroupError: If the resource group has no agents at all
+            BatchAgentSelectionFailedError: If any requirement could not be placed
             ValueError: If architecture mismatch in single-node session
         """
         resource_requirements = criteria.get_resource_requirements()
         if not resource_requirements:
-            # Return empty list for sessions with no kernels
+            # Empty list for sessions with no kernels
             return []
         if not agents:
             raise NoAgentsInResourceGroupError(criteria.session_metadata.scaling_group)
@@ -296,16 +287,22 @@ class AgentSelector:
         state_trackers = [AgentStateTracker(original_agent=agent) for agent in agents]
 
         selections: list[AgentSelection] = []
+        errors: list[RequirementSelectionError] = []
 
         for resource_req in resource_requirements:
-            # Select agent for this requirement using state trackers
-            selected_tracker = await self._select_agent_tracker_for_requirements(
-                state_trackers,
-                resource_req,
-                criteria,
-                config,
-                designated_agent_ids,
-            )
+            # Capture a placement failure and continue evaluating the remaining
+            # requirements so every failure's remediation hint is collected.
+            try:
+                selected_tracker = await self._select_agent_tracker_for_requirements(
+                    state_trackers,
+                    resource_req,
+                    criteria,
+                    config,
+                    designated_agent_ids,
+                )
+            except (NoAvailableAgentError, NoCompatibleAgentError) as e:
+                errors.append(e)
+                continue
 
             # Update state tracker with diff for the selected agent
             selected_tracker.apply_diff(resource_req.requested_slots, len(resource_req.kernel_ids))
@@ -318,7 +315,11 @@ class AgentSelector:
                 )
             )
 
-        # Apply the diff changes to the mutable agents list
+        if errors:
+            # All-or-nothing per session: surface every requirement's failure.
+            raise BatchAgentSelectionFailedError(errors)
+
+        # Apply the diff changes to the mutable agents list (full success only)
         for tracker in state_trackers:
             agent = tracker.original_agent
             if tracker.additional_slots or tracker.additional_containers > 0:
@@ -346,8 +347,8 @@ class AgentSelector:
             # No agents with matching architecture
             available_archs = {t.original_agent.architecture for t in state_trackers}
             raise NoCompatibleAgentError(
-                f"No agents with required architecture '{resource_req.required_architecture}'. "
-                f"Available architectures: {', '.join(sorted(available_archs))}"
+                resource_requirement=resource_req,
+                available_architectures=sorted(available_archs),
             )
 
         # Second pass: filter by resource availability (quantitative check)
@@ -366,9 +367,7 @@ class AgentSelector:
 
         if not compatible_trackers:
             raise NoAvailableAgentError(
-                kernel_ids=resource_req.kernel_ids,
-                required_architecture=resource_req.required_architecture,
-                requested_slots=resource_req.requested_slots,
+                resource_requirement=resource_req,
                 agent_errors=agent_errors,
             )
 
@@ -379,10 +378,11 @@ class AgentSelector:
                     return tracker
 
             raise NoAvailableAgentError(
-                kernel_ids=resource_req.kernel_ids,
-                required_architecture=resource_req.required_architecture,
-                requested_slots=resource_req.requested_slots,
+                resource_requirement=resource_req,
                 agent_errors=agent_errors,
+                available_agent_ids=[
+                    tracker.original_agent.agent_id for tracker in compatible_trackers
+                ],
                 designated_agent_ids=designated_agent_ids,
             )
 

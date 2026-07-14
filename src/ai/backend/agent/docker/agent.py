@@ -1516,6 +1516,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             [KernelRecoveryDataAdapterTarget(container_loader, container_writer)],
         )
 
+    @override
     async def __ainit__(self) -> None:
         async with closing_async(Docker()) as docker:
             docker_host = ""
@@ -1603,6 +1604,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             blocklist=self.local_config.agent.block_network_plugins,
         )
 
+    @override
     async def shutdown(self, stop_signal: signal.Signals) -> None:
         # Stop handling agent sock.
         if self.agent_sock_task is not None:

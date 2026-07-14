@@ -259,15 +259,11 @@ class SchedulingTarget(_OptionsBaseModel):
     )
 
 
-class KernelExecutionSpec(_OptionsBaseModel):
-    """Per-kernel execution spec.
+class KernelResourceConfig(_OptionsBaseModel):
+    """Resolved per-kernel resource inputs (image + slots).
 
-    Used both as the shared baseline in
-    ``DefaultSessionOptions.default_kernel_execution_spec`` (merged
-    into every group unless overridden) and as the per-group override on
-    ``KernelGroup.execution_spec``. All fields are resolved; ``None`` on the
-    optional fields carries real meaning (for example ``starts_at=None``
-    = "start immediately on schedule").
+    The resolved counterpart of the draft's ``KernelResourceInput``; grouped as
+    a single field so the same shape is shared with the scheduler dry-run.
     """
 
     image_id: ImageID = Field(
@@ -288,6 +284,22 @@ class KernelExecutionSpec(_OptionsBaseModel):
     resource_opts: ResourceOpts = Field(
         default_factory=ResourceOpts,
         description="Qualitative resource hints such as shared memory.",
+    )
+
+
+class KernelExecutionSpec(_OptionsBaseModel):
+    """Per-kernel execution spec.
+
+    Used both as the shared baseline in
+    ``DefaultSessionOptions.default_kernel_execution_spec`` (merged
+    into every group unless overridden) and as the per-group override on
+    ``KernelGroup.execution_spec``. All fields are resolved; ``None`` on the
+    optional fields carries real meaning (for example ``starts_at=None``
+    = "start immediately on schedule").
+    """
+
+    resource_input: KernelResourceConfig = Field(
+        description="Resolved image + resource-slot inputs for this kernel.",
     )
     environ: Mapping[str, str] = Field(
         default_factory=dict,

@@ -5,6 +5,7 @@ from uuid import UUID
 
 from ai.backend.common.bgtask.reporter import ProgressReporter
 from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
+from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
@@ -13,6 +14,7 @@ from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryAr
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.common.types import AgentId, ImageAlias, ImageID
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.container_registry.harbor import HarborRegistry_v2
 from ai.backend.manager.data.image.types import (
     ImageAgentInstallStatus,
     ImageAliasData,
@@ -55,6 +57,7 @@ image_repository_resilience = Resilience(
 
 
 class ImageRepository:
+    _db: ExtendedAsyncSAEngine
     _db_source: ImageDBSource
     _stateful_source: ImageStatefulSource
     _config_provider: ManagerConfigProvider
@@ -65,6 +68,7 @@ class ImageRepository:
         valkey_image: ValkeyImageClient,
         config_provider: ManagerConfigProvider,
     ) -> None:
+        self._db = db
         self._db_source = ImageDBSource(db)
         self._stateful_source = ImageStatefulSource(valkey_image)
         self._config_provider = config_provider
@@ -265,7 +269,14 @@ class ImageRepository:
 
     @image_repository_resilience.apply()
     async def untag_image_from_registry(self, image_id: UUID) -> ImageData:
-        return await self._db_source.remove_tag_from_registry(image_id)
+        image_data, image_ref, registry_row = await self._db_source.fetch_image_and_registry(
+            image_id
+        )
+        if registry_row.type != ContainerRegistryType.HARBOR2:
+            raise NotImplementedError("This feature is only supported for Harbor 2 registries")
+        scanner = HarborRegistry_v2(self._db, image_ref.registry, registry_row)
+        await scanner.untag(image_ref)
+        return image_data
 
     @image_repository_resilience.apply()
     async def update_image_properties(self, updater: Updater[ImageRow]) -> ImageData:

@@ -13,7 +13,11 @@ __all__ = ("AppConfigDefinitionRow",)
 
 
 class AppConfigDefinitionRow(Base):  # type: ignore[misc]
-    """One registered ``config_name`` (admin-managed)."""
+    """One registered ``config_name`` (admin-managed).
+
+    Purging a row cascades to its allow-list entries (``ON DELETE CASCADE``) and,
+    through them, to their fragments.
+    """
 
     __tablename__ = "app_config_definitions"
 

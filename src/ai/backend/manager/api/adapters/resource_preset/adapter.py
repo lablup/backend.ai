@@ -8,7 +8,6 @@ from uuid import UUID
 
 from ai.backend.common.api_handlers import SENTINEL
 from ai.backend.common.dto.manager.v2.common import (
-    BinarySizeInfo,
     BinarySizeInput,
     ResourceSlotEntryInfo,
 )
@@ -63,21 +62,11 @@ from ai.backend.manager.services.resource_preset.actions.search_presets import (
 from ai.backend.manager.types import OptionalState, TriState
 
 
-def _humanize_bytes(value: int) -> str:
-    """Convert bytes integer to human-readable string (e.g., 1073741824 → '1g')."""
-    return f"{BinarySize(value):s}"
-
-
 def _resolve_binary_size_input(input: BinarySizeInput | None) -> int | None:
     """Resolve BinarySizeInput to bytes integer."""
     if input is None:
         return None
     return input.bytes
-
-
-def _to_binary_size_info(value: int) -> BinarySizeInfo:
-    """Convert bytes integer to BinarySizeInfo DTO."""
-    return BinarySizeInfo(value=value, display=_humanize_bytes(value))
 
 
 def _resource_slot_entries_to_slot(
@@ -274,7 +263,9 @@ class ResourcePresetAdapter(BaseAdapter):
                 for k, v in data.resource_slots.items()
             ],
             shared_memory=(
-                _to_binary_size_info(data.shared_memory) if data.shared_memory else None
+                BinarySize.to_size_info(data.shared_memory)
+                if data.shared_memory is not None
+                else None
             ),
             resource_group_name=data.scaling_group_name,
         )

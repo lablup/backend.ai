@@ -169,11 +169,6 @@
   # production to prevent information disclosure.
   # Added in 25.9.0
   metric_access_allowed_hosts = "10.0.0.0/8"
-  # The interval in seconds between collecting metrics from inference model
-  # endpoints. Metrics include request counts, latencies, and throughput. Lower
-  # values provide more granular data but increase overhead on model services.
-  # Added in 25.9.0
-  inference_metric_collection_interval = 5.0
   # The interval in seconds for cleaning up idle HTTP client sessions. The
   # worker maintains a pool of aiohttp.ClientSession instances for backend
   # connections. Periodic cleanup prevents resource leaks from accumulated idle
@@ -185,6 +180,14 @@
   # defaults to api_bind_addr. Required when behind NAT or containers.
   # Added in 25.9.0
   ## announce_addr = { host = "worker.example.com", port = 10201 }
+  # CIDR blocks (or bare IP addresses) of load balancers / reverse proxies that
+  # sit in front of this worker and may be trusted to set the 'X-Forwarded-For'
+  # header. Client-IP allowlist checks honor 'X-Forwarded-For' only when the
+  # immediate peer matches one of these networks; otherwise the direct
+  # connection address is used, so a directly-exposed worker cannot be spoofed
+  # by a forged header. Leave empty when clients connect directly to the worker.
+  # Added in 26.4.5
+  trusted_proxies = ["10.0.0.0/8"]
 
   # Configuration for wildcard domain routing. Required when frontend_mode is
   # 'wildcard'. Defines the bind address, base domain, and port settings for
@@ -228,12 +231,12 @@
     # Ensure the range is large enough for your expected concurrent sessions and
     # firewall rules allow access.
     # Added in 25.9.0
-    bind_port_range = "10205,10300"
+    bind_port_range = [10205, 10300]
     # The externally accessible port range when the worker is behind NAT or port
     # mapping. Required when external ports differ from bind_port_range. Must be
     # the same size as bind_port_range for correct port mapping.
     # Added in 25.9.0
-    ## advertised_port_range = "10205,10300"
+    ## advertised_port_range = [10205, 10300]
 
   # Configuration for Traefik-delegated routing. Required when frontend_mode is
   # 'traefik'. The worker configures Traefik dynamically instead of handling
@@ -297,7 +300,7 @@
       # proxied application. Configure corresponding Traefik entrypoints for
       # each port in this range.
       # Added in 25.9.0
-      port_range = "10205,10300"
+      port_range = [10205, 10300]
 
   # Configuration for HTTP/2 protocol support using nghttpx. Required when
   # protocol is 'h2'. Defines the nghttpx binary path and API port pool for
@@ -313,7 +316,7 @@
     # ports are used for the worker to communicate with nghttpx instances.
     # Should not overlap with other service ports on the same host.
     # Added in 25.9.0
-    api_port_pool = "50000,60000"
+    api_port_pool = [50000, 60000]
 
   # Filter rules to route specific applications to this worker. Each filter
   # matches applications by key-value pairs. Useful for routing specific
@@ -529,6 +532,15 @@
   # OTLP receiver.
   # Added in 25.7.0
   endpoint = "http://otel-collector:4317"
+  # Maximum number of spans queued for export. Spans are dropped when the queue
+  # is full. The default (65536) accommodates burst traffic from GraphQL
+  # workloads.
+  # Added in 26.2.0
+  max-queue-size = 65536
+  # Maximum number of spans exported in a single batch. Larger batches reduce
+  # export overhead but increase memory usage.
+  # Added in 26.2.0
+  max-export-batch-size = 4096
 
 # Service discovery configuration for locating the coordinator and other
 # Backend.AI components. Supports Redis-based or etcd-based service registration
@@ -538,6 +550,46 @@
   # Type of service discovery to use. Supported types are 'etcd' and 'redis'.
   # Added in 25.9.0
   type = "redis"
+  # Unique instance identifier for this service instance.
+  # Added in 26.3.0
+  ## instance-id = "..."
+  # Logical group name for this service (e.g., 'manager', 'agent', 'storage-
+  # proxy').
+  # Added in 26.3.0
+  ## service-group = "..."
+  # Human-readable display name for this service instance.
+  # Added in 26.3.0
+  ## display-name = "..."
+
+  # Additional labels for service categorization and filtering.
+  # Added in 26.3.0
+  # Replace <name> with your actual key (e.g., 'default', 'local')
+  [service_discovery.extra-labels.<name>]
+
+  # List of endpoints exposed by this service instance.
+  # Added in 26.3.0
+  [[service_discovery.endpoints]]
+  # Add multiple [[service_discovery.endpoints]] sections as needed
+    # Role of this endpoint (e.g., 'main', 'health', 'internal').
+    # Added in 26.3.0
+    role = "main"
+    # Network scope of this endpoint (e.g., 'public', 'private', 'internal').
+    # Added in 26.3.0
+    scope = "public"
+    # Hostname or IP address of the endpoint.
+    # Added in 26.3.0
+    address = "manager.example.com"
+    # Port number of the endpoint.
+    # Added in 26.3.0
+    port = 443
+    # Protocol used by the endpoint (e.g., 'grpc', 'http', 'https').
+    # Added in 26.3.0
+    protocol = "https"
+
+    # Additional metadata for the endpoint.
+    # Added in 26.3.0
+    # Replace <name> with your actual key (e.g., 'default', 'local')
+    [service_discovery.endpoints.metadata.<name>]
 
 # etcd connection configuration for distributed coordination. Used for service
 # discovery (if etcd-based) and shared configuration management.

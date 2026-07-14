@@ -15,6 +15,7 @@ from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID, uuid4
 
 import pytest
+import sqlalchemy as sa
 from dateutil.tz import tzutc
 
 from ai.backend.common.auth import PublicKey
@@ -23,6 +24,8 @@ from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiv
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.data.agent.types import AgentInfo
 from ai.backend.common.exception import AgentNotFound
+from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import (
     AgentId,
     ClusterMode,
@@ -79,6 +82,7 @@ class ScalingGroupFixtureData:
     """Data from scaling_group fixture"""
 
     name: str
+    id: ResourceGroupID
 
 
 @dataclass
@@ -250,8 +254,10 @@ class TestAgentRepositoryDB:
     ) -> AsyncGenerator[ScalingGroupFixtureData, None]:
         """Create default scaling group in database"""
         name = str(uuid4())
+        scaling_group_id = ResourceGroupID(uuid4())
         async with db_with_cleanup.begin_session() as db_sess:
             scaling_group = ScalingGroupRow(
+                id=scaling_group_id,
                 name=name,
                 description="Test scaling group",
                 is_active=True,
@@ -263,7 +269,7 @@ class TestAgentRepositoryDB:
                 use_host_network=False,
             )
             db_sess.add(scaling_group)
-        yield ScalingGroupFixtureData(name=name)
+        yield ScalingGroupFixtureData(name=name, id=scaling_group_id)
 
     @pytest.fixture
     async def alive_agent(
@@ -280,6 +286,7 @@ class TestAgentRepositoryDB:
                 status_changed=datetime.now(tzutc()),
                 region="us-west-1",
                 scaling_group=scaling_group.name,
+                resource_group_id=scaling_group.id,
                 available_slots=ResourceSlot({SlotName("cpu"): 8.0}),
                 occupied_slots=ResourceSlot({}),
                 addr="tcp://192.168.1.100:6001",
@@ -311,6 +318,7 @@ class TestAgentRepositoryDB:
                 status_changed=datetime.now(tzutc()),
                 region="us-west-1",
                 scaling_group=scaling_group.name,
+                resource_group_id=scaling_group.id,
                 available_slots=ResourceSlot({SlotName("cpu"): 8.0}),
                 occupied_slots=ResourceSlot({}),
                 addr="tcp://192.168.1.100:6001",
@@ -355,6 +363,8 @@ class TestAgentRepositoryDB:
         self,
         agent_repository: AgentRepository,
         sample_agent_info: AgentInfo,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        scaling_group: ScalingGroupFixtureData,
     ) -> None:
         """Test sync_agent_heartbeat creates a new agent"""
         agent_id = AgentId("agent-new")
@@ -371,6 +381,11 @@ class TestAgentRepositoryDB:
         agent = await agent_repository.get_by_id(agent_id)
         assert agent.id == agent_id
         assert agent.status == AgentStatus.ALIVE
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            resource_group_id = await db_sess.scalar(
+                sa.select(AgentRow.resource_group_id).where(AgentRow.id == agent_id)
+            )
+        assert resource_group_id == scaling_group.id
 
     async def test_sync_agent_heartbeat_existing_agent_alive(
         self,
@@ -407,6 +422,51 @@ class TestAgentRepositoryDB:
         assert result.was_revived is True
         agent = await agent_repository.get_by_id(lost_agent.agent_id)
         assert agent.status == AgentStatus.ALIVE
+
+    async def test_sync_agent_heartbeat_scaling_group_change_updates_resource_group_id(
+        self,
+        agent_repository: AgentRepository,
+        alive_agent: AgentFixtureData,
+        sample_agent_info: AgentInfo,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> None:
+        """A heartbeat reporting a different scaling group updates both name and id columns"""
+        new_sgroup_name = str(uuid4())
+        new_sgroup_id = ResourceGroupID(uuid4())
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                ScalingGroupRow(
+                    id=new_sgroup_id,
+                    name=new_sgroup_name,
+                    description="Second scaling group",
+                    is_active=True,
+                    is_public=True,
+                    driver="static",
+                    driver_opts={},
+                    scheduler="fifo",
+                    scheduler_opts=ScalingGroupOpts(),
+                    use_host_network=False,
+                )
+            )
+        moved_agent_info = sample_agent_info.model_copy(update={"scaling_group": new_sgroup_name})
+        upsert_data = AgentHeartbeatUpsert.from_agent_info(
+            agent_id=alive_agent.agent_id,
+            agent_info=moved_agent_info,
+            heartbeat_received=datetime.now(tzutc()),
+        )
+
+        await agent_repository.sync_agent_heartbeat(alive_agent.agent_id, upsert_data)
+
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            row = (
+                await db_sess.execute(
+                    sa.select(AgentRow.scaling_group, AgentRow.resource_group_id).where(
+                        AgentRow.id == alive_agent.agent_id
+                    )
+                )
+            ).one()
+        assert row.scaling_group == new_sgroup_name
+        assert row.resource_group_id == new_sgroup_id
 
     async def test_sync_agent_heartbeat_scaling_group_not_found(
         self,
@@ -649,14 +709,24 @@ class TestAgentDBSourceKernelFiltering:
             yield database_connection
 
     @pytest.fixture
+    def test_domain_id(self) -> DomainID:
+        return DomainID(uuid4())
+
+    @pytest.fixture
+    def test_scaling_group_id(self) -> ResourceGroupID:
+        return ResourceGroupID(uuid4())
+
+    @pytest.fixture
     async def test_domain(
         self,
         db_with_tables: ExtendedAsyncSAEngine,
+        test_domain_id: DomainID,
     ) -> AsyncGenerator[str, None]:
         """Create default domain"""
         domain_name = str(uuid4())
         async with db_with_tables.begin_session() as db_sess:
             domain = DomainRow(
+                id=test_domain_id,
                 name=domain_name,
                 description="Test domain",
                 is_active=True,
@@ -707,11 +777,13 @@ class TestAgentDBSourceKernelFiltering:
     async def scaling_group(
         self,
         db_with_tables: ExtendedAsyncSAEngine,
+        test_scaling_group_id: ResourceGroupID,
     ) -> AsyncGenerator[str, None]:
         """Create default scaling group"""
         name = str(uuid4())
         async with db_with_tables.begin_session() as db_sess:
             scaling_group = ScalingGroupRow(
+                id=test_scaling_group_id,
                 name=name,
                 description="Test scaling group",
                 is_active=True,
@@ -731,7 +803,9 @@ class TestAgentDBSourceKernelFiltering:
         request: pytest.FixtureRequest,
         db_with_tables: ExtendedAsyncSAEngine,
         test_group: tuple[str, str],
+        test_domain_id: DomainID,
         scaling_group: str,
+        test_scaling_group_id: ResourceGroupID,
     ) -> AsyncGenerator[KernelFilteringTestCase, None]:
         """Create ONE agent with kernels based on the test case from indirect parametrization"""
         test_case: KernelFilteringTestCase = request.param
@@ -753,6 +827,7 @@ class TestAgentDBSourceKernelFiltering:
                 status_changed=datetime.now(tzutc()),
                 region="us-west-1",
                 scaling_group=scaling_group,
+                resource_group_id=test_scaling_group_id,
                 available_slots=ResourceSlot({SlotName("cpu"): 16.0}),
                 occupied_slots=ResourceSlot({}),
                 addr=f"tcp://{random_ip}:6001",
@@ -786,8 +861,10 @@ class TestAgentDBSourceKernelFiltering:
                 id=session_id,
                 name=session_name,
                 session_type=SessionTypes.INTERACTIVE,
+                domain_id=test_domain_id,
                 domain_name=domain_name,
                 group_id=UUID(group_id_str),
+                resource_group_id=test_scaling_group_id,
                 scaling_group_name=scaling_group,
                 status=SessionStatus.RUNNING,
                 status_info="test",
@@ -816,6 +893,7 @@ class TestAgentDBSourceKernelFiltering:
                     agent=actual_agent_id,
                     agent_addr=f"{random_ip}:6001",
                     scaling_group=scaling_group,
+                    resource_group_id=test_scaling_group_id,
                     cluster_idx=i,
                     cluster_role="main",
                     cluster_hostname=f"main{i}-{uuid4().hex[:6]}",
@@ -854,6 +932,7 @@ class TestAgentDBSourceKernelFiltering:
                     agent=actual_agent_id,
                     agent_addr=f"{random_ip}:6001",
                     scaling_group=scaling_group,
+                    resource_group_id=test_scaling_group_id,
                     cluster_idx=test_case.occupied_kernel_count + i,
                     cluster_role="main",
                     cluster_hostname=f"main{test_case.occupied_kernel_count + i}-{uuid4().hex[:6]}",

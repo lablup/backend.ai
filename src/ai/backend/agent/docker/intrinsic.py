@@ -8,7 +8,7 @@ import platform
 from collections.abc import Collection, Iterable, Mapping, Sequence
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, cast, override
 
 import aiohttp
 import psutil
@@ -200,15 +200,19 @@ class CPUPlugin(AbstractComputePlugin):
 
     _docker: Docker
 
+    @override
     async def init(self, context: Any | None = None) -> None:
         self._docker = Docker()
 
+    @override
     async def cleanup(self) -> None:
         await self._docker.close()
 
+    @override
     async def update_plugin_config(self, new_plugin_config: Mapping[str, Any]) -> None:
         pass
 
+    @override
     async def list_devices(self) -> Collection[CPUDevice]:
         cores = await libnuma.get_available_cores()
         overcommit_factor = int(os.environ.get("BACKEND_CPU_OVERCOMMIT_FACTOR", "1"))
@@ -227,15 +231,18 @@ class CPUPlugin(AbstractComputePlugin):
             for core_idx in sorted(cores)
         ]
 
+    @override
     async def available_slots(self) -> Mapping[SlotName, Decimal]:
         devices = await self.list_devices()
         return {
             SlotName("cpu"): Decimal(sum(dev.processing_units for dev in devices)),
         }
 
+    @override
     def get_version(self) -> str:
         return __version__
 
+    @override
     async def extra_info(self) -> Mapping[str, str]:
         return {
             "agent_version": __version__,
@@ -243,6 +250,7 @@ class CPUPlugin(AbstractComputePlugin):
             "os_type": platform.system(),
         }
 
+    @override
     async def gather_node_measures(self, ctx: StatContext) -> Sequence[NodeMeasurement]:
         _cstat = psutil.cpu_times(True)
         q = Decimal("0.000")
@@ -269,6 +277,7 @@ class CPUPlugin(AbstractComputePlugin):
             ),
         ]
 
+    @override
     async def gather_container_measures(
         self,
         ctx: StatContext,
@@ -356,6 +365,7 @@ class CPUPlugin(AbstractComputePlugin):
             ),
         ]
 
+    @override
     async def gather_process_measures(
         self, ctx: StatContext, pid_map: Mapping[int, str]
     ) -> Sequence[ProcessMeasurement]:
@@ -421,6 +431,7 @@ class CPUPlugin(AbstractComputePlugin):
             ),
         ]
 
+    @override
     async def create_alloc_map(self) -> AbstractAllocMap:
         devices = await self.list_devices()
         return DiscretePropertyAllocMap(
@@ -432,10 +443,12 @@ class CPUPlugin(AbstractComputePlugin):
             },
         )
 
+    @override
     async def get_hooks(self, distro: str, arch: str) -> Sequence[Path]:
         # TODO: move the sysconf hook in libbaihook.so here
         return []
 
+    @override
     async def generate_docker_args(
         self,
         docker: Docker,
@@ -451,6 +464,7 @@ class CPUPlugin(AbstractComputePlugin):
             },
         }
 
+    @override
     async def restore_from_container(
         self,
         container: Container,
@@ -469,6 +483,7 @@ class CPUPlugin(AbstractComputePlugin):
             SlotName("cpu"): resource_spec.allocations[DeviceName("cpu")][SlotName("cpu")],
         })
 
+    @override
     async def get_attached_devices(
         self,
         device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
@@ -485,16 +500,19 @@ class CPUPlugin(AbstractComputePlugin):
                 })
         return attached_devices
 
+    @override
     async def get_docker_networks(
         self, device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]]
     ) -> list[str]:
         return []
 
+    @override
     async def generate_mounts(
         self, source_path: Path, device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]]
     ) -> list[MountInfo]:
         return []
 
+    @override
     def get_metadata(self) -> AcceleratorMetadata:
         return {
             "slot_name": "cpu",
@@ -527,15 +545,19 @@ class MemoryPlugin(AbstractComputePlugin):
 
     _docker: Docker
 
+    @override
     async def init(self, context: Any | None = None) -> None:
         self._docker = Docker()
 
+    @override
     async def cleanup(self) -> None:
         await self._docker.close()
 
+    @override
     async def update_plugin_config(self, new_plugin_config: Mapping[str, Any]) -> None:
         pass
 
+    @override
     async def list_devices(self) -> Collection[MemoryDevice]:
         memory_size = psutil.virtual_memory().total
         overcommit_factor = int(os.environ.get("BACKEND_MEM_OVERCOMMIT_FACTOR", "1"))
@@ -550,18 +572,22 @@ class MemoryPlugin(AbstractComputePlugin):
             ),
         ]
 
+    @override
     async def available_slots(self) -> Mapping[SlotName, Decimal]:
         devices = await self.list_devices()
         return {
             SlotName("mem"): Decimal(sum(dev.memory_size for dev in devices)),
         }
 
+    @override
     def get_version(self) -> str:
         return __version__
 
+    @override
     async def extra_info(self) -> Mapping[str, str]:
         return {}
 
+    @override
     async def gather_node_measures(self, ctx: StatContext) -> Sequence[NodeMeasurement]:
         _mstat = psutil.virtual_memory()
         total_mem_used_bytes = Decimal(_mstat.total - _mstat.available)
@@ -632,6 +658,7 @@ class MemoryPlugin(AbstractComputePlugin):
             ),
         ]
 
+    @override
     async def gather_container_measures(
         self, ctx: StatContext, container_ids: Sequence[str]
     ) -> Sequence[ContainerMeasurement]:
@@ -912,6 +939,7 @@ class MemoryPlugin(AbstractComputePlugin):
             ),
         ]
 
+    @override
     async def gather_process_measures(
         self, ctx: StatContext, pid_map: Mapping[int, str]
     ) -> Sequence[ProcessMeasurement]:
@@ -998,6 +1026,7 @@ class MemoryPlugin(AbstractComputePlugin):
             ),
         ]
 
+    @override
     async def create_alloc_map(self) -> AbstractAllocMap:
         devices = await self.list_devices()
         return DiscretePropertyAllocMap(
@@ -1010,9 +1039,11 @@ class MemoryPlugin(AbstractComputePlugin):
             },
         )
 
+    @override
     async def get_hooks(self, distro: str, arch: str) -> Sequence[Path]:
         return []
 
+    @override
     async def generate_docker_args(
         self,
         docker: Docker,
@@ -1026,6 +1057,7 @@ class MemoryPlugin(AbstractComputePlugin):
             },
         }
 
+    @override
     async def restore_from_container(
         self,
         container: Container,
@@ -1040,6 +1072,7 @@ class MemoryPlugin(AbstractComputePlugin):
             SlotName("mem"): {DeviceId("root"): memory_limit},
         })
 
+    @override
     async def get_attached_devices(
         self,
         device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
@@ -1056,16 +1089,19 @@ class MemoryPlugin(AbstractComputePlugin):
                 })
         return attached_devices
 
+    @override
     async def get_docker_networks(
         self, device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]]
     ) -> list[str]:
         return []
 
+    @override
     async def generate_mounts(
         self, source_path: Path, device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]]
     ) -> list[MountInfo]:
         return []
 
+    @override
     def get_metadata(self) -> AcceleratorMetadata:
         return {
             "slot_name": "ram",
@@ -1078,18 +1114,23 @@ class MemoryPlugin(AbstractComputePlugin):
 
 
 class OverlayNetworkPlugin(AbstractNetworkAgentPlugin[DockerKernel]):
+    @override
     async def init(self, context: Any = None) -> None:
         pass
 
+    @override
     async def cleanup(self) -> None:
         pass
 
+    @override
     async def update_plugin_config(self, plugin_config: Mapping[str, Any]) -> None:
         return await super().update_plugin_config(plugin_config)
 
+    @override
     async def get_capabilities(self) -> set[ContainerNetworkCapability]:
         return set()
 
+    @override
     async def join_network(
         self,
         kernel_config: KernelCreationConfig,
@@ -1111,23 +1152,29 @@ class OverlayNetworkPlugin(AbstractNetworkAgentPlugin[DockerKernel]):
             },
         }
 
+    @override
     async def leave_network(self, kernel: DockerKernel) -> None:
         pass
 
 
 class HostNetworkPlugin(AbstractNetworkAgentPlugin[DockerKernel]):
+    @override
     async def init(self, context: Any = None) -> None:
         pass
 
+    @override
     async def cleanup(self) -> None:
         pass
 
+    @override
     async def update_plugin_config(self, plugin_config: Mapping[str, Any]) -> None:
         return await super().update_plugin_config(plugin_config)
 
+    @override
     async def get_capabilities(self) -> set[ContainerNetworkCapability]:
         return {ContainerNetworkCapability.GLOBAL}
 
+    @override
     async def join_network(
         self, kernel_config: KernelCreationConfig, cluster_info: ClusterInfo, **kwargs: Any
     ) -> dict[str, Any]:
@@ -1147,9 +1194,11 @@ class HostNetworkPlugin(AbstractNetworkAgentPlugin[DockerKernel]):
             },
         }
 
+    @override
     async def leave_network(self, kernel: DockerKernel) -> None:
         pass
 
+    @override
     async def prepare_port_forward(
         self, kernel: DockerKernel, bind_host: str, ports: Iterable[tuple[int, int]], **kwargs: Any
     ) -> None:
@@ -1173,6 +1222,7 @@ class HostNetworkPlugin(AbstractNetworkAgentPlugin[DockerKernel]):
             lambda: (config_dir / "intrinsic-ports.json").write_bytes(dump_json(intrinsic_ports)),
         )
 
+    @override
     async def expose_ports(
         self, kernel: DockerKernel, bind_host: str, ports: Iterable[tuple[int, int]], **kwargs: Any
     ) -> ContainerNetworkInfo:

@@ -18,7 +18,11 @@ __all__ = ("AppConfigFragmentRow",)
 
 
 class AppConfigFragmentRow(Base):  # type: ignore[misc]
-    """One scoped app config fragment — a single JSON document at ``(config_name, scope_type, scope_id)``."""
+    """One scoped app config fragment — a single JSON document at ``(config_name, scope_type, scope_id)``.
+
+    A fragment's merge priority is its allow-list entry's ``rank`` — the fragment
+    row carries no rank of its own.
+    """
 
     __tablename__ = "app_config_fragments"
     __table_args__ = (
@@ -27,6 +31,12 @@ class AppConfigFragmentRow(Base):  # type: ignore[misc]
             "scope_type",
             "scope_id",
             name="uq_app_config_fragments_config_name_scope_type_scope_id",
+        ),
+        sa.ForeignKeyConstraint(
+            ["config_name", "scope_type"],
+            ["app_config_allow_list.config_name", "app_config_allow_list.scope_type"],
+            name="fk_app_config_fragments_config_name_scope_type",
+            ondelete="CASCADE",
         ),
     )
 
@@ -39,7 +49,6 @@ class AppConfigFragmentRow(Base):  # type: ignore[misc]
     config_name: Mapped[str] = mapped_column(
         "config_name",
         sa.String(length=128),
-        sa.ForeignKey("app_config_definitions.config_name", ondelete="NO ACTION"),
         nullable=False,
     )
     scope_type: Mapped[AppConfigScopeType] = mapped_column(
@@ -50,11 +59,6 @@ class AppConfigFragmentRow(Base):  # type: ignore[misc]
     scope_id: Mapped[str] = mapped_column(
         "scope_id",
         sa.String(length=255),
-        nullable=False,
-    )
-    rank: Mapped[int] = mapped_column(
-        "rank",
-        sa.Integer,
         nullable=False,
     )
     config: Mapped[dict[str, Any]] = mapped_column(
@@ -82,7 +86,6 @@ class AppConfigFragmentRow(Base):  # type: ignore[misc]
             config_name=self.config_name,
             scope_type=self.scope_type,
             scope_id=self.scope_id,
-            rank=self.rank,
             config=self.config,
             created_at=self.created_at,
             updated_at=self.updated_at,

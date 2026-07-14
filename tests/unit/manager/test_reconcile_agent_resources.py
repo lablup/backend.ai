@@ -16,6 +16,8 @@ import sqlalchemy as sa
 from dateutil.tz import tzutc
 
 from ai.backend.common.auth import PublicKey, SecretKey
+from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import ResourceSlot, SlotName
 from ai.backend.manager.data.agent.types import AgentStatus
@@ -35,9 +37,22 @@ from ai.backend.manager.models.resource_slot import (
 )
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, create_async_engine
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.registry import AgentRegistry
+from ai.backend.manager.repositories.db.engine import create_async_engine
 from ai.backend.testutils.db import with_tables
+
+
+@dataclass(frozen=True)
+class SeededInfra:
+    """Explicit ids/names for the seeded domain, project, scaling group, and agent."""
+
+    domain_name: str
+    domain_id: DomainID
+    project_id: uuid.UUID
+    sg_name: str
+    resource_group_id: ResourceGroupID
+    agent_id: str
 
 
 class TestReconcileAgentResources:
@@ -121,14 +136,16 @@ class TestReconcileAgentResources:
             db_sess.add(ResourceSlotTypeRow(slot_name="cpu", slot_type="count", rank=0))
             db_sess.add(ResourceSlotTypeRow(slot_name="mem", slot_type="bytes", rank=1))
 
-    async def _seed_infrastructure(self, db: ExtendedAsyncSAEngine) -> tuple[str, uuid.UUID, str]:
+    async def _seed_infrastructure(self, db: ExtendedAsyncSAEngine) -> SeededInfra:
         """Create domain, project, scaling group, and agent."""
         domain_name = "test-domain"
+        domain_id = DomainID(uuid4())
         project_id = uuid4()
         sg_name = "test-sg"
+        resource_group_id = ResourceGroupID(uuid4())
         agent_id = "i-test-agent"
         async with db.begin_session() as db_sess:
-            db_sess.add(DomainRow(name=domain_name))
+            db_sess.add(DomainRow(id=domain_id, name=domain_name))
         async with db.begin_session() as db_sess:
             db_sess.add(
                 ProjectResourcePolicyRow(
@@ -141,6 +158,7 @@ class TestReconcileAgentResources:
         async with db.begin_session() as db_sess:
             db_sess.add(
                 ScalingGroupRow(
+                    id=resource_group_id,
                     name=sg_name,
                     driver="static",
                     driver_opts={},
@@ -165,6 +183,7 @@ class TestReconcileAgentResources:
                     status_changed=datetime.now(tzutc()),
                     region="test-region",
                     scaling_group=sg_name,
+                    resource_group_id=resource_group_id,
                     available_slots=ResourceSlot({SlotName("cpu"): "8", SlotName("mem"): "32768"}),
                     occupied_slots=ResourceSlot({}),
                     addr="tcp://127.0.0.1:6001",
@@ -173,7 +192,14 @@ class TestReconcileAgentResources:
                     compute_plugins={},
                 )
             )
-        return domain_name, project_id, agent_id
+        return SeededInfra(
+            domain_name=domain_name,
+            domain_id=domain_id,
+            project_id=project_id,
+            sg_name=sg_name,
+            resource_group_id=resource_group_id,
+            agent_id=agent_id,
+        )
 
     async def _seed_agent_resources(
         self,
@@ -197,9 +223,7 @@ class TestReconcileAgentResources:
         self,
         db: ExtendedAsyncSAEngine,
         *,
-        domain_name: str,
-        project_id: uuid.UUID,
-        agent_id: str,
+        infra: SeededInfra,
         status: KernelStatus,
         allocations: dict[str, tuple[Decimal, Decimal | None]],
         free_at: datetime | None = None,
@@ -211,9 +235,12 @@ class TestReconcileAgentResources:
             db_sess.add(
                 SessionRow(
                     id=session_id,
-                    domain_name=domain_name,
-                    group_id=project_id,
+                    domain_id=infra.domain_id,
+                    domain_name=infra.domain_name,
+                    group_id=infra.project_id,
                     user_uuid=uuid4(),
+                    resource_group_id=infra.resource_group_id,
+                    scaling_group_name=infra.sg_name,
                     occupying_slots=empty_slots,
                     requested_slots=empty_slots,
                 )
@@ -223,8 +250,8 @@ class TestReconcileAgentResources:
                 KernelRow(
                     id=kernel_id,
                     session_id=session_id,
-                    domain_name=domain_name,
-                    group_id=project_id,
+                    domain_name=infra.domain_name,
+                    group_id=infra.project_id,
                     user_uuid=uuid4(),
                     status=status,
                     occupied_slots=empty_slots,
@@ -233,8 +260,9 @@ class TestReconcileAgentResources:
                     repl_out_port=0,
                     stdin_port=0,
                     stdout_port=0,
-                    scaling_group="test-sg",
-                    agent=agent_id,
+                    scaling_group=infra.sg_name,
+                    resource_group_id=infra.resource_group_id,
+                    agent=infra.agent_id,
                 )
             )
             await db_sess.flush()
@@ -274,14 +302,12 @@ class TestReconcileAgentResources:
         """When agent_resources.used matches actual allocations, no corrections are made."""
         db = db_with_tables
         await self._seed_slot_types(db)
-        domain_name, project_id, agent_id = await self._seed_infrastructure(db)
+        infra = await self._seed_infrastructure(db)
 
         # Actual usage: cpu=2, mem=1024
         await self._create_kernel_with_allocations(
             db,
-            domain_name=domain_name,
-            project_id=project_id,
-            agent_id=agent_id,
+            infra=infra,
             status=KernelStatus.RUNNING,
             allocations={
                 "cpu": (Decimal("2"), Decimal("2")),
@@ -292,7 +318,7 @@ class TestReconcileAgentResources:
         # Set agent_resources.used to match actual
         await self._seed_agent_resources(
             db,
-            agent_id,
+            infra.agent_id,
             {
                 "cpu": (Decimal("8"), Decimal("2")),
                 "mem": (Decimal("32768"), Decimal("1024")),
@@ -304,7 +330,7 @@ class TestReconcileAgentResources:
 
         assert "agent_resources drift detected" not in caplog.text
 
-        used = await self._get_agent_resource_used(db, agent_id)
+        used = await self._get_agent_resource_used(db, infra.agent_id)
         assert used["cpu"] == Decimal("2")
         assert used["mem"] == Decimal("1024")
 
@@ -317,14 +343,12 @@ class TestReconcileAgentResources:
         """When agent_resources.used > actual, it is corrected down."""
         db = db_with_tables
         await self._seed_slot_types(db)
-        domain_name, project_id, agent_id = await self._seed_infrastructure(db)
+        infra = await self._seed_infrastructure(db)
 
         # Actual usage: cpu=2
         await self._create_kernel_with_allocations(
             db,
-            domain_name=domain_name,
-            project_id=project_id,
-            agent_id=agent_id,
+            infra=infra,
             status=KernelStatus.RUNNING,
             allocations={"cpu": (Decimal("2"), Decimal("2"))},
         )
@@ -332,7 +356,7 @@ class TestReconcileAgentResources:
         # Tracked as 100 but actual is 2
         await self._seed_agent_resources(
             db,
-            agent_id,
+            infra.agent_id,
             {
                 "cpu": (Decimal("200"), Decimal("100")),
             },
@@ -342,9 +366,9 @@ class TestReconcileAgentResources:
             await registry._reconcile_agent_resources()
 
         assert "agent_resources drift detected" in caplog.text
-        assert agent_id in caplog.text
+        assert infra.agent_id in caplog.text
 
-        used = await self._get_agent_resource_used(db, agent_id)
+        used = await self._get_agent_resource_used(db, infra.agent_id)
         assert used["cpu"] == Decimal("2")
 
     async def test_under_count_corrected_up(
@@ -356,22 +380,18 @@ class TestReconcileAgentResources:
         """When agent_resources.used < actual, it is corrected up."""
         db = db_with_tables
         await self._seed_slot_types(db)
-        domain_name, project_id, agent_id = await self._seed_infrastructure(db)
+        infra = await self._seed_infrastructure(db)
 
         # Actual usage: cpu=6 (two kernels)
         await self._create_kernel_with_allocations(
             db,
-            domain_name=domain_name,
-            project_id=project_id,
-            agent_id=agent_id,
+            infra=infra,
             status=KernelStatus.RUNNING,
             allocations={"cpu": (Decimal("4"), Decimal("4"))},
         )
         await self._create_kernel_with_allocations(
             db,
-            domain_name=domain_name,
-            project_id=project_id,
-            agent_id=agent_id,
+            infra=infra,
             status=KernelStatus.RUNNING,
             allocations={"cpu": (Decimal("2"), Decimal("2"))},
         )
@@ -379,7 +399,7 @@ class TestReconcileAgentResources:
         # Tracked as 1 but actual is 6
         await self._seed_agent_resources(
             db,
-            agent_id,
+            infra.agent_id,
             {
                 "cpu": (Decimal("8"), Decimal("1")),
             },
@@ -390,7 +410,7 @@ class TestReconcileAgentResources:
 
         assert "agent_resources drift detected" in caplog.text
 
-        used = await self._get_agent_resource_used(db, agent_id)
+        used = await self._get_agent_resource_used(db, infra.agent_id)
         assert used["cpu"] == Decimal("6")
 
     async def test_no_allocations_resets_used_to_zero(
@@ -402,12 +422,12 @@ class TestReconcileAgentResources:
         """When there are no active allocations but used > 0, it is corrected to 0."""
         db = db_with_tables
         await self._seed_slot_types(db)
-        domain_name, _, agent_id = await self._seed_infrastructure(db)
+        infra = await self._seed_infrastructure(db)
 
         # No allocations exist, but agent_resources says used=50
         await self._seed_agent_resources(
             db,
-            agent_id,
+            infra.agent_id,
             {
                 "cpu": (Decimal("8"), Decimal("50")),
             },
@@ -418,7 +438,7 @@ class TestReconcileAgentResources:
 
         assert "agent_resources drift detected" in caplog.text
 
-        used = await self._get_agent_resource_used(db, agent_id)
+        used = await self._get_agent_resource_used(db, infra.agent_id)
         assert used["cpu"] == Decimal("0")
 
 
@@ -514,18 +534,20 @@ class TestOrphanedAllocationCleanup:
     async def infra(
         self,
         db: ExtendedAsyncSAEngine,
-    ) -> tuple[str, uuid.UUID, str]:
+    ) -> SeededInfra:
         """Seed slot types, domain, project, scaling group, agent."""
         domain_name = "test-domain"
+        domain_id = DomainID(uuid4())
         project_id = uuid4()
         sg_name = "test-sg"
+        resource_group_id = ResourceGroupID(uuid4())
         agent_id = "i-test-agent"
 
         async with db.begin_session() as db_sess:
             db_sess.add(ResourceSlotTypeRow(slot_name="cpu", slot_type="count", rank=0))
             db_sess.add(ResourceSlotTypeRow(slot_name="mem", slot_type="bytes", rank=1))
         async with db.begin_session() as db_sess:
-            db_sess.add(DomainRow(name=domain_name))
+            db_sess.add(DomainRow(id=domain_id, name=domain_name))
         async with db.begin_session() as db_sess:
             db_sess.add(
                 ProjectResourcePolicyRow(
@@ -538,6 +560,7 @@ class TestOrphanedAllocationCleanup:
         async with db.begin_session() as db_sess:
             db_sess.add(
                 ScalingGroupRow(
+                    id=resource_group_id,
                     name=sg_name,
                     driver="static",
                     driver_opts={},
@@ -562,6 +585,7 @@ class TestOrphanedAllocationCleanup:
                     status_changed=datetime.now(tzutc()),
                     region="test-region",
                     scaling_group=sg_name,
+                    resource_group_id=resource_group_id,
                     available_slots=ResourceSlot({SlotName("cpu"): "8", SlotName("mem"): "32768"}),
                     occupied_slots=ResourceSlot({}),
                     addr="tcp://127.0.0.1:6001",
@@ -570,18 +594,24 @@ class TestOrphanedAllocationCleanup:
                     compute_plugins={},
                 )
             )
-        return domain_name, project_id, agent_id
+        return SeededInfra(
+            domain_name=domain_name,
+            domain_id=domain_id,
+            project_id=project_id,
+            sg_name=sg_name,
+            resource_group_id=resource_group_id,
+            agent_id=agent_id,
+        )
 
     @pytest.fixture
     async def kernel(
         self,
         request: pytest.FixtureRequest,
         db: ExtendedAsyncSAEngine,
-        infra: tuple[str, uuid.UUID, str],
+        infra: SeededInfra,
     ) -> uuid.UUID:
         """Create a kernel from a KernelSpec passed via indirect parametrize."""
         spec: KernelSpec = request.param
-        domain_name, project_id, agent_id = infra
         session_id = uuid4()
         kernel_id = uuid4()
         empty_slots = ResourceSlot({})
@@ -589,9 +619,12 @@ class TestOrphanedAllocationCleanup:
             db_sess.add(
                 SessionRow(
                     id=session_id,
-                    domain_name=domain_name,
-                    group_id=project_id,
+                    domain_id=infra.domain_id,
+                    domain_name=infra.domain_name,
+                    group_id=infra.project_id,
                     user_uuid=uuid4(),
+                    resource_group_id=infra.resource_group_id,
+                    scaling_group_name=infra.sg_name,
                     occupying_slots=empty_slots,
                     requested_slots=empty_slots,
                 )
@@ -601,8 +634,8 @@ class TestOrphanedAllocationCleanup:
                 KernelRow(
                     id=kernel_id,
                     session_id=session_id,
-                    domain_name=domain_name,
-                    group_id=project_id,
+                    domain_name=infra.domain_name,
+                    group_id=infra.project_id,
                     user_uuid=uuid4(),
                     status=spec.status,
                     occupied_slots=empty_slots,
@@ -611,8 +644,9 @@ class TestOrphanedAllocationCleanup:
                     repl_out_port=0,
                     stdin_port=0,
                     stdout_port=0,
-                    scaling_group="test-sg",
-                    agent=agent_id,
+                    scaling_group=infra.sg_name,
+                    resource_group_id=infra.resource_group_id,
+                    agent=infra.agent_id,
                 )
             )
             await db_sess.flush()
@@ -629,7 +663,7 @@ class TestOrphanedAllocationCleanup:
         async with db.begin_session() as db_sess:
             db_sess.add(
                 AgentResourceRow(
-                    agent_id=agent_id,
+                    agent_id=infra.agent_id,
                     slot_name="cpu",
                     capacity=Decimal("8"),
                     used=Decimal("0"),
@@ -749,13 +783,12 @@ class TestOrphanedAllocationCleanup:
     async def orphan_with_drift(
         self,
         db: ExtendedAsyncSAEngine,
-        infra: tuple[str, uuid.UUID, str],
+        infra: SeededInfra,
     ) -> tuple[uuid.UUID, str]:
         """RUNNING kernel(cpu=2) + CANCELLED orphan(cpu=4) + agent used=6 (stale).
 
         Returns (orphan_kernel_id, agent_id).
         """
-        domain_name, project_id, agent_id = infra
         empty_slots = ResourceSlot({})
 
         # RUNNING kernel: legitimate cpu=2
@@ -764,9 +797,12 @@ class TestOrphanedAllocationCleanup:
             db_sess.add(
                 SessionRow(
                     id=running_sid,
-                    domain_name=domain_name,
-                    group_id=project_id,
+                    domain_id=infra.domain_id,
+                    domain_name=infra.domain_name,
+                    group_id=infra.project_id,
                     user_uuid=uuid4(),
+                    resource_group_id=infra.resource_group_id,
+                    scaling_group_name=infra.sg_name,
                     occupying_slots=empty_slots,
                     requested_slots=empty_slots,
                 )
@@ -776,8 +812,8 @@ class TestOrphanedAllocationCleanup:
                 KernelRow(
                     id=running_kid,
                     session_id=running_sid,
-                    domain_name=domain_name,
-                    group_id=project_id,
+                    domain_name=infra.domain_name,
+                    group_id=infra.project_id,
                     user_uuid=uuid4(),
                     status=KernelStatus.RUNNING,
                     occupied_slots=empty_slots,
@@ -786,8 +822,9 @@ class TestOrphanedAllocationCleanup:
                     repl_out_port=0,
                     stdin_port=0,
                     stdout_port=0,
-                    scaling_group="test-sg",
-                    agent=agent_id,
+                    scaling_group=infra.sg_name,
+                    resource_group_id=infra.resource_group_id,
+                    agent=infra.agent_id,
                 )
             )
             await db_sess.flush()
@@ -806,9 +843,12 @@ class TestOrphanedAllocationCleanup:
             db_sess.add(
                 SessionRow(
                     id=orphan_sid,
-                    domain_name=domain_name,
-                    group_id=project_id,
+                    domain_id=infra.domain_id,
+                    domain_name=infra.domain_name,
+                    group_id=infra.project_id,
                     user_uuid=uuid4(),
+                    resource_group_id=infra.resource_group_id,
+                    scaling_group_name=infra.sg_name,
                     occupying_slots=empty_slots,
                     requested_slots=empty_slots,
                 )
@@ -818,8 +858,8 @@ class TestOrphanedAllocationCleanup:
                 KernelRow(
                     id=orphan_kid,
                     session_id=orphan_sid,
-                    domain_name=domain_name,
-                    group_id=project_id,
+                    domain_name=infra.domain_name,
+                    group_id=infra.project_id,
                     user_uuid=uuid4(),
                     status=KernelStatus.CANCELLED,
                     occupied_slots=empty_slots,
@@ -828,8 +868,9 @@ class TestOrphanedAllocationCleanup:
                     repl_out_port=0,
                     stdin_port=0,
                     stdout_port=0,
-                    scaling_group="test-sg",
-                    agent=agent_id,
+                    scaling_group=infra.sg_name,
+                    resource_group_id=infra.resource_group_id,
+                    agent=infra.agent_id,
                 )
             )
             await db_sess.flush()
@@ -845,14 +886,14 @@ class TestOrphanedAllocationCleanup:
         async with db.begin_session() as db_sess:
             db_sess.add(
                 AgentResourceRow(
-                    agent_id=agent_id,
+                    agent_id=infra.agent_id,
                     slot_name="cpu",
                     capacity=Decimal("8"),
                     used=Decimal("6"),
                 )
             )
 
-        return orphan_kid, agent_id
+        return orphan_kid, infra.agent_id
 
     async def test_orphan_cleanup_runs_before_drift_correction(
         self,
@@ -967,16 +1008,18 @@ class TestTerminalSessionKernelReconciliation:
     async def infra(
         self,
         db: ExtendedAsyncSAEngine,
-    ) -> tuple[str, uuid.UUID, str]:
+    ) -> SeededInfra:
         domain_name = "test-domain"
+        domain_id = DomainID(uuid4())
         project_id = uuid4()
         sg_name = "test-sg"
+        resource_group_id = ResourceGroupID(uuid4())
         agent_id = "i-test-agent"
         async with db.begin_session() as db_sess:
             db_sess.add(ResourceSlotTypeRow(slot_name="cpu", slot_type="count", rank=0))
             db_sess.add(ResourceSlotTypeRow(slot_name="mem", slot_type="bytes", rank=1))
         async with db.begin_session() as db_sess:
-            db_sess.add(DomainRow(name=domain_name))
+            db_sess.add(DomainRow(id=domain_id, name=domain_name))
         async with db.begin_session() as db_sess:
             db_sess.add(
                 ProjectResourcePolicyRow(
@@ -989,6 +1032,7 @@ class TestTerminalSessionKernelReconciliation:
         async with db.begin_session() as db_sess:
             db_sess.add(
                 ScalingGroupRow(
+                    id=resource_group_id,
                     name=sg_name,
                     driver="static",
                     driver_opts={},
@@ -1013,6 +1057,7 @@ class TestTerminalSessionKernelReconciliation:
                     status_changed=datetime.now(tzutc()),
                     region="test-region",
                     scaling_group=sg_name,
+                    resource_group_id=resource_group_id,
                     available_slots=ResourceSlot({SlotName("cpu"): "8", SlotName("mem"): "32768"}),
                     occupied_slots=ResourceSlot({}),
                     addr="tcp://127.0.0.1:6001",
@@ -1021,12 +1066,19 @@ class TestTerminalSessionKernelReconciliation:
                     compute_plugins={},
                 )
             )
-        return domain_name, project_id, agent_id
+        return SeededInfra(
+            domain_name=domain_name,
+            domain_id=domain_id,
+            project_id=project_id,
+            sg_name=sg_name,
+            resource_group_id=resource_group_id,
+            agent_id=agent_id,
+        )
 
     async def _seed_drift(
         self,
         db: ExtendedAsyncSAEngine,
-        infra: tuple[str, uuid.UUID, str],
+        infra: SeededInfra,
         *,
         session_status: SessionStatus,
         kernel_status: KernelStatus,
@@ -1039,7 +1091,6 @@ class TestTerminalSessionKernelReconciliation:
 
         Returns (session_id, kernel_id, agent_id).
         """
-        domain_name, project_id, agent_id = infra
         empty_slots = ResourceSlot({})
         session_id = uuid4()
         kernel_id = uuid4()
@@ -1047,9 +1098,12 @@ class TestTerminalSessionKernelReconciliation:
             db_sess.add(
                 SessionRow(
                     id=session_id,
-                    domain_name=domain_name,
-                    group_id=project_id,
+                    domain_id=infra.domain_id,
+                    domain_name=infra.domain_name,
+                    group_id=infra.project_id,
                     user_uuid=uuid4(),
+                    resource_group_id=infra.resource_group_id,
+                    scaling_group_name=infra.sg_name,
                     status=session_status,
                     occupying_slots=empty_slots,
                     requested_slots=empty_slots,
@@ -1060,8 +1114,8 @@ class TestTerminalSessionKernelReconciliation:
                 KernelRow(
                     id=kernel_id,
                     session_id=session_id,
-                    domain_name=domain_name,
-                    group_id=project_id,
+                    domain_name=infra.domain_name,
+                    group_id=infra.project_id,
                     user_uuid=uuid4(),
                     status=kernel_status,
                     occupied_slots=empty_slots,
@@ -1070,8 +1124,9 @@ class TestTerminalSessionKernelReconciliation:
                     repl_out_port=0,
                     stdin_port=0,
                     stdout_port=0,
-                    scaling_group="test-sg",
-                    agent=agent_id,
+                    scaling_group=infra.sg_name,
+                    resource_group_id=infra.resource_group_id,
+                    agent=infra.agent_id,
                 )
             )
             await db_sess.flush()
@@ -1086,13 +1141,13 @@ class TestTerminalSessionKernelReconciliation:
         async with db.begin_session() as db_sess:
             db_sess.add(
                 AgentResourceRow(
-                    agent_id=agent_id,
+                    agent_id=infra.agent_id,
                     slot_name="cpu",
                     capacity=Decimal("8"),
                     used=agent_used,
                 )
             )
-        return session_id, kernel_id, agent_id
+        return session_id, kernel_id, infra.agent_id
 
     @pytest.mark.parametrize(
         ("session_status", "kernel_status"),
@@ -1118,7 +1173,7 @@ class TestTerminalSessionKernelReconciliation:
         self,
         db: ExtendedAsyncSAEngine,
         registry: AgentRegistry,
-        infra: tuple[str, uuid.UUID, str],
+        infra: SeededInfra,
         session_status: SessionStatus,
         kernel_status: KernelStatus,
     ) -> None:
@@ -1166,7 +1221,7 @@ class TestTerminalSessionKernelReconciliation:
         self,
         db: ExtendedAsyncSAEngine,
         registry: AgentRegistry,
-        infra: tuple[str, uuid.UUID, str],
+        infra: SeededInfra,
     ) -> None:
         """Session is still RUNNING — kernel state must not be touched by Step 1."""
         _, kernel_id, _ = await self._seed_drift(

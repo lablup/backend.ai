@@ -950,7 +950,10 @@ class TestForceDeleteVFolderAction:
 
         assert isinstance(result, ForceDeleteVFolderActionResult)
         assert result.vfolder_uuid == vfolder_uuid
-        mock_vfolder_repository.delete_vfolders_forever.assert_called_once_with([vfolder_uuid])
+        # force_delete is the explicit escape hatch: it must bypass the in-use guards.
+        mock_vfolder_repository.delete_vfolders_forever.assert_called_once_with(
+            [vfolder_uuid], force=True
+        )
         mock_client = mock_storage_manager.get_manager_facing_client.return_value
         mock_client.delete_folder.assert_called_once()
 

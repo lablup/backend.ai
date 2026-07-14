@@ -12,10 +12,22 @@ from ai.backend.common.docker import ImageRef
 from ai.backend.common.types import ImageAlias
 from ai.backend.manager.data.image.types import ImageIdentifier, ImageStatus, ImageType
 from ai.backend.manager.errors.image import ImageNotFound
+from ai.backend.manager.models.agent import AgentRow
+
+# ORM cluster registration: configure_mappers() (triggered when this isolated
+# test registers a domain-cluster row) resolves string relationships against the
+# registry. These rows are reachable via relationships but are not otherwise
+# imported/registered by this test; _ORM_CLUSTER keeps them live.
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.image import ImageAliasRow, ImageRow
+from ai.backend.manager.models.scaling_group import ScalingGroupForProjectRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.db import with_tables
+
+_ORM_CLUSTER = (
+    AgentRow,
+    ScalingGroupForProjectRow,
+)
 
 
 class TestImageRowResolve:

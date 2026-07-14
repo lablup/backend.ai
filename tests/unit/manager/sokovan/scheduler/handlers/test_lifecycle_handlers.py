@@ -4,19 +4,22 @@ Based on BEP-1033 test scenarios for handler-level testing.
 
 Test Scenarios:
 - SC-SS-001 ~ SC-SS-005: ScheduleSessionsLifecycleHandler
-- SC-CP-001 ~ SC-CP-004: CheckPreconditionLifecycleHandler
+- SC-CP-001 ~ SC-CP-006: CheckPreconditionLifecycleHandler
 - SC-ST-001 ~ SC-ST-005: StartSessionsLifecycleHandler
 - SC-TE-001 ~ SC-TE-005: TerminateSessionsLifecycleHandler
 """
 
 from __future__ import annotations
 
+import uuid
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.sokovan import (
     SessionsForPullWithImages,
     SessionsForStartWithImages,
@@ -89,7 +92,7 @@ class TestScheduleSessionsLifecycleHandler:
         )
 
         # Act
-        result = await handler.execute("default", pending_sessions_multiple)
+        result = await handler.execute(ResourceGroupID(uuid.uuid4()), pending_sessions_multiple)
 
         # Assert
         assert len(result.successes) == len(pending_sessions_multiple)
@@ -123,7 +126,7 @@ class TestScheduleSessionsLifecycleHandler:
         )
 
         # Act
-        result = await handler.execute("default", pending_sessions_multiple)
+        result = await handler.execute(ResourceGroupID(uuid.uuid4()), pending_sessions_multiple)
 
         # Assert
         assert len(result.successes) == 1
@@ -157,7 +160,7 @@ class TestScheduleSessionsLifecycleHandler:
         )
 
         # Act
-        result = await handler.execute("default", pending_sessions_multiple)
+        result = await handler.execute(ResourceGroupID(uuid.uuid4()), pending_sessions_multiple)
 
         # Assert
         assert len(result.successes) == 0
@@ -196,7 +199,7 @@ class TestScheduleSessionsLifecycleHandler:
         )
 
         # Act
-        result = await handler.execute("default", pending_sessions_multiple)
+        result = await handler.execute(ResourceGroupID(uuid.uuid4()), pending_sessions_multiple)
 
         # Assert
         assert len(result.successes) == 0
@@ -233,7 +236,7 @@ class TestScheduleSessionsLifecycleHandler:
         )
 
         # Act
-        result = await handler.execute("default", pending_sessions_multiple)
+        result = await handler.execute(ResourceGroupID(uuid.uuid4()), pending_sessions_multiple)
 
         # Assert
         assert [s.session_id for s in result.successes] == [
@@ -260,7 +263,7 @@ class TestScheduleSessionsLifecycleHandler:
         Then: Returns empty result without calling provisioner
         """
         # Act
-        result = await handler.execute("default", [])
+        result = await handler.execute(ResourceGroupID(uuid.uuid4()), [])
 
         # Assert
         assert len(result.successes) == 0
@@ -288,7 +291,7 @@ class TestScheduleSessionsLifecycleHandler:
         mock_repository.get_scheduling_data.return_value = None
 
         # Act
-        result = await handler.execute("default", pending_sessions_multiple)
+        result = await handler.execute(ResourceGroupID(uuid.uuid4()), pending_sessions_multiple)
 
         # Assert
         assert len(result.successes) == 0
@@ -304,15 +307,16 @@ class TestScheduleSessionsLifecycleHandler:
 
 
 # =============================================================================
-# CheckPreconditionLifecycleHandler Tests (SC-CP-001 ~ SC-CP-004)
+# CheckPreconditionLifecycleHandler Tests (SC-CP-001 ~ SC-CP-006)
 # =============================================================================
 
 
 class TestCheckPreconditionLifecycleHandler:
     """Tests for CheckPreconditionLifecycleHandler.
 
-    Verifies the handler correctly triggers image pulling via launcher
-    and marks all sessions as successful.
+    Verifies the handler correctly triggers image pulling via launcher,
+    marks SCHEDULED sessions as successful, and reports re-triggered
+    PREPARING sessions as skipped.
     """
 
     @pytest.fixture
@@ -346,7 +350,7 @@ class TestCheckPreconditionLifecycleHandler:
         mock_repository.get_sessions_for_pull_by_ids.return_value = sessions_for_pull
 
         # Act
-        result = await handler.execute("default", scheduled_sessions_multiple)
+        result = await handler.execute(ResourceGroupID(uuid.uuid4()), scheduled_sessions_multiple)
 
         # Assert
         assert len(result.successes) == len(scheduled_sessions_multiple)
@@ -376,7 +380,7 @@ class TestCheckPreconditionLifecycleHandler:
         Then: Returns empty result without triggering image pulling
         """
         # Act
-        result = await handler.execute("default", [])
+        result = await handler.execute(ResourceGroupID(uuid.uuid4()), [])
 
         # Assert
         assert len(result.successes) == 0
@@ -408,7 +412,7 @@ class TestCheckPreconditionLifecycleHandler:
 
         # Act & Assert
         with pytest.raises(RuntimeError, match="Agent connection failed"):
-            await handler.execute("default", [scheduled_session])
+            await handler.execute(ResourceGroupID(uuid.uuid4()), [scheduled_session])
 
     async def test_repository_query_extracts_correct_session_ids(
         self,
@@ -429,10 +433,84 @@ class TestCheckPreconditionLifecycleHandler:
         mock_repository.get_sessions_for_pull_by_ids.return_value = sessions_for_pull
 
         # Act
-        await handler.execute("default", scheduled_sessions_multiple)
+        await handler.execute(ResourceGroupID(uuid.uuid4()), scheduled_sessions_multiple)
 
         # Assert
         expected_ids = [s.session_info.identity.id for s in scheduled_sessions_multiple]
+        mock_repository.get_sessions_for_pull_by_ids.assert_awaited_once_with(expected_ids)
+
+    async def test_retriggered_preparing_session_reported_as_skipped(
+        self,
+        handler: CheckPreconditionLifecycleHandler,
+        mock_launcher: AsyncMock,
+        mock_repository: AsyncMock,
+        preparing_session_with_pulling_kernel: SessionWithKernels,
+        sessions_for_pull_factory: Callable[..., SessionsForPullWithImages],
+    ) -> None:
+        """SC-CP-005: Re-triggered PREPARING session is skipped, not success.
+
+        Given: A PREPARING session (re-triggered for a potentially stuck pull)
+        When: Handler is invoked
+        Then: Image pulling is re-triggered but the session is reported as
+              skipped so the coordinator does not re-apply the PREPARING
+              transition
+        """
+        # Arrange
+        sessions = [preparing_session_with_pulling_kernel]
+        sessions_for_pull = sessions_for_pull_factory(sessions)
+        mock_repository.get_sessions_for_pull_by_ids.return_value = sessions_for_pull
+
+        # Act
+        result = await handler.execute(ResourceGroupID(uuid.uuid4()), sessions)
+
+        # Assert
+        assert len(result.successes) == 0
+        assert len(result.failures) == 0
+        assert len(result.skipped) == 1
+        assert result.skipped[0].from_status == SessionStatus.PREPARING
+
+        # Image pulling is still re-triggered for the skipped session
+        mock_launcher.trigger_image_pulling.assert_awaited_once_with(
+            sessions_for_pull.sessions,
+            sessions_for_pull.image_configs,
+        )
+
+    async def test_mixed_scheduled_and_preparing_sessions_categorized(
+        self,
+        handler: CheckPreconditionLifecycleHandler,
+        mock_launcher: AsyncMock,
+        mock_repository: AsyncMock,
+        scheduled_session: SessionWithKernels,
+        preparing_session_with_pulling_kernel: SessionWithKernels,
+        sessions_for_pull_factory: Callable[..., SessionsForPullWithImages],
+    ) -> None:
+        """SC-CP-006: SCHEDULED sessions succeed while PREPARING ones are skipped.
+
+        Given: A SCHEDULED session and a re-triggered PREPARING session
+        When: Handler is invoked
+        Then: The SCHEDULED session is reported as success and the PREPARING
+              session as skipped, with image pulling triggered for both
+        """
+        # Arrange
+        sessions = [scheduled_session, preparing_session_with_pulling_kernel]
+        sessions_for_pull = sessions_for_pull_factory(sessions)
+        mock_repository.get_sessions_for_pull_by_ids.return_value = sessions_for_pull
+
+        # Act
+        result = await handler.execute(ResourceGroupID(uuid.uuid4()), sessions)
+
+        # Assert
+        assert len(result.successes) == 1
+        assert result.successes[0].session_id == scheduled_session.session_info.identity.id
+        assert len(result.skipped) == 1
+        assert (
+            result.skipped[0].session_id
+            == preparing_session_with_pulling_kernel.session_info.identity.id
+        )
+        assert len(result.failures) == 0
+
+        # Image pulling is triggered for both sessions
+        expected_ids = [s.session_info.identity.id for s in sessions]
         mock_repository.get_sessions_for_pull_by_ids.assert_awaited_once_with(expected_ids)
 
 
@@ -479,7 +557,7 @@ class TestStartSessionsLifecycleHandler:
         mock_repository.search_sessions_with_kernels_and_user.return_value = sessions_for_start
 
         # Act
-        result = await handler.execute("default", prepared_sessions_multiple)
+        result = await handler.execute(ResourceGroupID(uuid.uuid4()), prepared_sessions_multiple)
 
         # Assert
         assert len(result.successes) == len(prepared_sessions_multiple)
@@ -509,7 +587,7 @@ class TestStartSessionsLifecycleHandler:
         Then: Returns empty result without starting any sessions
         """
         # Act
-        result = await handler.execute("default", [])
+        result = await handler.execute(ResourceGroupID(uuid.uuid4()), [])
 
         # Assert
         assert len(result.successes) == 0
@@ -543,7 +621,7 @@ class TestStartSessionsLifecycleHandler:
 
         # Act & Assert
         with pytest.raises(RuntimeError, match="Kernel creation failed"):
-            await handler.execute("default", [prepared_session])
+            await handler.execute(ResourceGroupID(uuid.uuid4()), [prepared_session])
 
     async def test_repository_query_uses_batch_querier(
         self,
@@ -564,7 +642,7 @@ class TestStartSessionsLifecycleHandler:
         mock_repository.search_sessions_with_kernels_and_user.return_value = sessions_for_start
 
         # Act
-        await handler.execute("default", prepared_sessions_multiple)
+        await handler.execute(ResourceGroupID(uuid.uuid4()), prepared_sessions_multiple)
 
         # Assert - verify repository was called
         mock_repository.search_sessions_with_kernels_and_user.assert_awaited_once()
@@ -595,7 +673,7 @@ class TestStartSessionsLifecycleHandler:
         mock_repository.search_sessions_with_kernels_and_user.return_value = sessions_for_start
 
         # Act
-        result = await handler.execute("default", [prepared_session])
+        result = await handler.execute(ResourceGroupID(uuid.uuid4()), [prepared_session])
 
         # Assert
         assert len(result.successes) == 1
@@ -645,7 +723,7 @@ class TestTerminateSessionsLifecycleHandler:
         mock_repository.get_terminating_sessions_by_ids.return_value = terminating_data
 
         # Act
-        result = await handler.execute("default", terminating_sessions_multiple)
+        result = await handler.execute(ResourceGroupID(uuid.uuid4()), terminating_sessions_multiple)
 
         # Assert - Result should be empty (status updates via agent events)
         assert len(result.successes) == 0
@@ -668,7 +746,7 @@ class TestTerminateSessionsLifecycleHandler:
         Then: Returns empty result without calling terminator
         """
         # Act
-        result = await handler.execute("default", [])
+        result = await handler.execute(ResourceGroupID(uuid.uuid4()), [])
 
         # Assert
         assert len(result.successes) == 0
@@ -696,7 +774,7 @@ class TestTerminateSessionsLifecycleHandler:
         mock_repository.get_terminating_sessions_by_ids.return_value = []
 
         # Act
-        result = await handler.execute("default", [terminating_session])
+        result = await handler.execute(ResourceGroupID(uuid.uuid4()), [terminating_session])
 
         # Assert
         assert len(result.successes) == 0
@@ -729,7 +807,7 @@ class TestTerminateSessionsLifecycleHandler:
 
         # Act & Assert
         with pytest.raises(RuntimeError, match="Agent unreachable"):
-            await handler.execute("default", [terminating_session])
+            await handler.execute(ResourceGroupID(uuid.uuid4()), [terminating_session])
 
     async def test_repository_query_extracts_correct_session_ids(
         self,
@@ -750,7 +828,7 @@ class TestTerminateSessionsLifecycleHandler:
         mock_repository.get_terminating_sessions_by_ids.return_value = terminating_data
 
         # Act
-        await handler.execute("default", terminating_sessions_multiple)
+        await handler.execute(ResourceGroupID(uuid.uuid4()), terminating_sessions_multiple)
 
         # Assert
         expected_ids = [s.session_info.identity.id for s in terminating_sessions_multiple]

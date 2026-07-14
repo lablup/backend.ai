@@ -5,7 +5,6 @@ from .row import (
     EndpointAutoScalingRuleRow,
     EndpointRow,
     EndpointTokenRow,
-    ModelServiceHelper,
 )
 
 __all__ = (
@@ -15,5 +14,4 @@ __all__ = (
     "EndpointLifecycle",
     "EndpointRow",
     "EndpointTokenRow",
-    "ModelServiceHelper",
 )

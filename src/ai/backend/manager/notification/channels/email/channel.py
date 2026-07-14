@@ -7,6 +7,7 @@ import logging
 import smtplib
 from email.mime.text import MIMEText
 from functools import partial
+from typing import override
 
 from ai.backend.common.data.notification.types import EmailSpec
 from ai.backend.logging import BraceStyleAdapter
@@ -28,6 +29,7 @@ class EmailChannel(AbstractNotificationChannel):
         """Initialize email channel with configuration."""
         self._spec = email_spec
 
+    @override
     async def send(self, message: NotificationMessage) -> SendResult:
         """
         Send notification via email using SMTP.

@@ -2,6 +2,7 @@
 
 import logging
 from collections.abc import Sequence
+from typing import override
 
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.logging import BraceStyleAdapter
@@ -36,26 +37,31 @@ class RunningRouteHandler(RouteHandler):
         self._event_producer = event_producer
 
     @classmethod
+    @override
     def name(cls) -> str:
         """Get the name of the handler."""
         return "check-running-routes"
 
     @property
+    @override
     def lock_id(self) -> LockID | None:
         """Lock for checking running routes."""
         return LockID.LOCKID_DEPLOYMENT_RUNNING_ROUTES
 
     @classmethod
+    @override
     def category(cls) -> RouteHandlerCategory:
         return RouteHandlerCategory.LIFECYCLE
 
     @classmethod
+    @override
     def target_statuses(cls) -> RouteTargetStatuses:
         return RouteTargetStatuses(
             lifecycle=[RouteStatus.RUNNING],
         )
 
     @classmethod
+    @override
     def status_transitions(cls) -> RouteStatusTransitions:
         """Running check: success=no change, failure=TERMINATING (session died) + reset health."""
         return RouteStatusTransitions(
@@ -68,6 +74,7 @@ class RunningRouteHandler(RouteHandler):
             stale=None,
         )
 
+    @override
     async def execute(self, routes: Sequence[RouteData]) -> RouteExecutionResult:
         """Execute health check for running routes."""
         log.debug("Checking health for {} running routes", len(routes))
@@ -75,6 +82,7 @@ class RunningRouteHandler(RouteHandler):
         # Execute route health check logic via executor
         return await self._route_executor.check_running_routes(routes)
 
+    @override
     async def post_process(self, result: RouteExecutionResult) -> None:
         """Handle post-processing after checking running routes."""
         if result.errors:

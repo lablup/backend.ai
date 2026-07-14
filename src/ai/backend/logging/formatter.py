@@ -7,7 +7,7 @@ import traceback
 from collections.abc import Sequence
 from datetime import UTC, datetime
 from types import TracebackType
-from typing import Any, cast
+from typing import Any, cast, override
 
 import coloredlogs
 from pythonjsonlogger.json import JsonFormatter
@@ -34,14 +34,17 @@ def format_exception(
 
 
 class SerializedExceptionFormatter(logging.Formatter):
+    @override
     def formatException(self, ei: Sequence[str] | _SysExcInfoType) -> str:
         return format_exception(self, ei)
 
 
 class ConsoleFormatter(logging.Formatter):
+    @override
     def formatException(self, ei: Sequence[str] | _SysExcInfoType) -> str:
         return format_exception(self, ei)
 
+    @override
     def formatTime(self, record: logging.LogRecord, datefmt: str | None = None) -> str:
         ct = self.converter(record.created)
         if datefmt:
@@ -52,9 +55,11 @@ class ConsoleFormatter(logging.Formatter):
 
 
 class CustomJsonFormatter(JsonFormatter):
+    @override
     def formatException(self, ei: Sequence[str] | _SysExcInfoType) -> str:
         return format_exception(self, ei)
 
+    @override
     def add_fields(
         self,
         log_record: dict[str, Any],  # the manipulated entry object
@@ -84,5 +89,6 @@ class pretty:
     def __init__(self, obj: Any) -> None:
         self.obj = obj
 
+    @override
     def __repr__(self) -> str:
         return pprint.pformat(self.obj)

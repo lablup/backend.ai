@@ -211,6 +211,7 @@ class CommaSeparatedListType[TScalar: SingleValueConstructorType | click.ParamTy
         super().__init__()
         self.type_ = type_ if type_ is not None else str
 
+    @override
     def convert(
         self, value: str | int, param: click.Parameter | None, ctx: click.Context | None
     ) -> int | list[Any]:
@@ -239,6 +240,7 @@ class OptionalType[TScalar: SingleValueConstructorType | click.ParamType](click.
         super().__init__()
         self.type_ = type_
 
+    @override
     def convert(
         self,
         value: str | Undefined,

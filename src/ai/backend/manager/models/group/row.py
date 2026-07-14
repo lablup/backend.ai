@@ -34,6 +34,7 @@ from ai.backend.common import msgpack
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.group.types import GroupData, ProjectType
+from ai.backend.manager.data.permission.permission_defs import ProjectPermission
 from ai.backend.manager.defs import RESERVED_DOTFILES
 from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.models.association_container_registries_groups import (
@@ -60,7 +61,6 @@ from ai.backend.manager.models.rbac import (
     required_permission,
 )
 from ai.backend.manager.models.rbac.context import ClientContext
-from ai.backend.manager.models.rbac.permission_defs import ProjectPermission
 from ai.backend.manager.models.types import (
     QueryCondition,
     QueryOption,
@@ -391,6 +391,7 @@ class ProjectModel(RBACModel[ProjectPermission]):
     _permissions: frozenset[ProjectPermission] = field(default_factory=frozenset)
 
     @property
+    @override
     def permissions(self) -> Container[ProjectPermission]:
         return self._permissions
 
@@ -605,12 +606,14 @@ class ProjectPermissionContext(AbstractPermissionContext[ProjectPermission, Grou
             )
         return cond
 
+    @override
     async def build_query(self) -> sa.sql.Select[Any] | None:
         cond = self.query_condition
         if cond is None:
             return None
         return sa.select(GroupRow).where(cond)
 
+    @override
     async def calculate_final_permission(self, rbac_obj: GroupRow) -> frozenset[ProjectPermission]:
         project_row = rbac_obj
         project_id = project_row.id

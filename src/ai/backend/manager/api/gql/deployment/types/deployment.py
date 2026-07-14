@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from datetime import datetime
-from typing import TYPE_CHECKING, Annotated, Any, Self, cast
+from typing import TYPE_CHECKING, Annotated, Any, Self, cast, override
 from uuid import UUID
 
 import strawberry
@@ -49,6 +49,9 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     ReplaceDeploymentOptionsGQLInput as ReplaceDeploymentOptionsGQLInputDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
+    ReplicaNestedFilter as ReplicaNestedFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
     SyncReplicaInput as SyncReplicaInputDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
@@ -91,6 +94,7 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
 from ai.backend.common.dto.manager.v2.deployment.types import (
     ProjectDeploymentScope as ProjectDeploymentScopeDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
     NullableDateTimeFilter,
@@ -239,7 +243,7 @@ class ModelDeploymentMetadata:
     @gql_added_field(
         BackendAIGQLMeta(
             added_version="26.4.4",
-            description="The resource group this deployment runs in, resolved via DataLoader.",
+            description="The resource group this deployment runs in.",
         )
     )  # type: ignore[misc]
     async def resource_group(
@@ -265,7 +269,7 @@ class ModelDeploymentMetadata:
     @gql_added_field(
         BackendAIGQLMeta(
             added_version="26.4.3",
-            description="The project this deployment belongs to, resolved via DataLoader.",
+            description="The project this deployment belongs to.",
         )
     )  # type: ignore[misc]
     async def project_v2(
@@ -291,7 +295,7 @@ class ModelDeploymentMetadata:
     @gql_added_field(
         BackendAIGQLMeta(
             added_version="26.4.3",
-            description="The domain this deployment belongs to, resolved via DataLoader.",
+            description="The domain this deployment belongs to.",
         )
     )  # type: ignore[misc]
     async def domain_v2(
@@ -352,7 +356,7 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
     @gql_added_field(
         BackendAIGQLMeta(
             added_version="26.4.3",
-            description="The current active revision of this deployment, resolved via DataLoader.",
+            description="The current active revision of this deployment.",
         )
     )  # type: ignore[misc]
     async def current_revision(self, info: Info[StrawberryGQLContext]) -> ModelRevision | None:
@@ -365,7 +369,7 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
     @gql_added_field(
         BackendAIGQLMeta(
             added_version="26.4.3",
-            description="The revision currently being deployed (in progress, not yet active), resolved via DataLoader.",
+            description="The revision currently being deployed (in progress, not yet active).",
         )
     )  # type: ignore[misc]
     async def deploying_revision(self, info: Info[StrawberryGQLContext]) -> ModelRevision | None:
@@ -378,7 +382,7 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
     @gql_added_field(
         BackendAIGQLMeta(
             added_version="26.4.3",
-            description="The user who created this deployment, resolved via DataLoader.",
+            description="The user who created this deployment.",
         )
     )  # type: ignore[misc]
     async def creator(
@@ -573,6 +577,7 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
         )
 
     @classmethod
+    @override
     async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
         cls,
         *,
@@ -615,6 +620,31 @@ class ProjectDeploymentScopeGQL(PydanticInputMixin[ProjectDeploymentScopeDTO]):
 
 
 @gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter deployments by conditions on their replicas.",
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="ReplicaNestedFilter",
+)
+class ReplicaNestedFilterGQL(PydanticInputMixin[ReplicaNestedFilterDTO]):
+    some: ReplicaFilter | None = gql_field(
+        description="Matches parents with at least one replica satisfying all conditions.",
+        default=None,
+    )
+    every: ReplicaFilter | None = gql_field(
+        description=(
+            "Matches parents where every replica satisfies all conditions "
+            "(also true when the parent has no replica)."
+        ),
+        default=None,
+    )
+    none: ReplicaFilter | None = gql_field(
+        description="Matches parents with no replica satisfying all conditions.",
+        default=None,
+    )
+
+
+@gql_pydantic_input(
     BackendAIGQLMeta(description="", added_version="25.19.0"),
     name="DeploymentFilter",
 )
@@ -654,6 +684,13 @@ class DeploymentFilter(PydanticInputMixin[DeploymentFilterDTO]):
         BackendAIGQLMeta(
             added_version="26.4.3",
             description="Filter by deployment destruction datetime. Supports IS NULL / IS NOT NULL.",
+        ),
+        default=None,
+    )
+    replicas: ReplicaNestedFilterGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by conditions on deployment replicas.",
         ),
         default=None,
     )

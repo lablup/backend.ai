@@ -31,6 +31,7 @@ from ai.backend.manager.data.session.creation import DeploymentContext
 from ai.backend.manager.data.session.draft import (
     KernelExecutionSpecDraft,
     KernelGroupDraft,
+    KernelResourceInput,
     SchedulingTargetDraft,
     SessionClassificationDraft,
     SessionIdentityDraft,
@@ -42,7 +43,6 @@ from ai.backend.manager.data.session.draft import (
 from ai.backend.manager.data.session.options import (
     InternalDataExtras,
     ResourceOpts,
-    SessionHandlerOptions,
 )
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.errors.deployment import RevisionMissingModelVFolder
@@ -71,8 +71,9 @@ class DeploymentSessionDraftBuilder:
         startup_command = target_revision.execution.startup_command
         mounts = cls._resolve_mounts(target_revision)
         resource_entries = cls._resource_entries(target_revision)
-        resource_opts = ResourceOpts.model_validate(
-            dict(target_revision.resource_config.resource_opts) or {}
+        resource_opts_payload = dict(target_revision.resource_config.resource_opts) or {}
+        resource_opts = (
+            ResourceOpts.model_validate(resource_opts_payload) if resource_opts_payload else None
         )
         model_definition_payload = cls._model_definition_payload(target_revision, context)
 
@@ -83,9 +84,11 @@ class DeploymentSessionDraftBuilder:
         kernel_groups = cls._resolve_kernel_groups(
             cluster_size=target_revision.cluster_config.size,
             execution_spec=KernelExecutionSpecDraft(
-                image_id=target_revision.image_id,
-                resources=resource_entries,
-                resource_opts=resource_opts,
+                resource_input=KernelResourceInput(
+                    image_id=target_revision.image_id,
+                    resources=resource_entries,
+                    resource_opts=resource_opts,
+                ),
                 environ=environ,
                 mounts=mounts,
                 startup_command=startup_command,
@@ -102,8 +105,10 @@ class DeploymentSessionDraftBuilder:
                 user_uuid=context.session_owner.uuid,
             ),
             scope=SessionScopeDraft(
+                domain_id=context.domain_id,
                 domain_name=DomainName(deployment_info.metadata.domain),
                 project_id=ProjectID(context.group_id),
+                resource_group_id=context.resource_group_id,
                 resource_group_name=ResourceGroupName(deployment_info.metadata.resource_group),
             ),
             classification=SessionClassificationDraft(
@@ -119,7 +124,7 @@ class DeploymentSessionDraftBuilder:
                 cluster_size=target_revision.cluster_config.size,
                 scheduling_target=SchedulingTargetDraft(),
                 kernel_groups=kernel_groups,
-                handler_options=SessionHandlerOptions(),
+                handler_options=None,
             ),
             internal_data_extras=InternalDataExtras(
                 sudo_session_enabled=context.session_owner.sudo_session_enabled,
@@ -212,7 +217,7 @@ class DeploymentSessionDraftBuilder:
         ``service.start_command`` is taken as-is from the revision snapshot
         (the controller has already resolved any ``{model_path}`` placeholder
         against ``models[0].model_path`` at revision creation time). Preset
-        ARGS are appended as separate argv tokens via
+        ARGS are shell-quoted and appended to the command string via
         :meth:`ModelDefinition.with_args_appended` so the merge stays on
         typed objects up to the final ``model_dump``.
         """

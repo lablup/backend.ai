@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from datetime import datetime
 from enum import StrEnum
-from typing import TYPE_CHECKING, Annotated, Any, Self, cast
+from typing import TYPE_CHECKING, Annotated, Any, Self, cast, override
 from uuid import UUID
 
 import strawberry
@@ -26,6 +26,7 @@ from ai.backend.common.dto.manager.v2.kernel.response import (
 from ai.backend.common.dto.manager.v2.kernel.types import (
     KernelStatusFilter,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import AgentId, KernelId, SessionTypes
 from ai.backend.manager.api.gql.base import OrderDirection, UUIDFilter
 from ai.backend.manager.api.gql.decorators import (
@@ -59,7 +60,7 @@ from ai.backend.manager.api.gql.domain_v2.types.node import DomainV2GQL
 from ai.backend.manager.api.gql.fair_share.types.common import ResourceSlotGQL
 from ai.backend.manager.api.gql.image.types import ImageV2GQL
 from ai.backend.manager.api.gql.project_v2.types.node import ProjectV2GQL
-from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
+from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
 from ai.backend.manager.api.gql.resource_group.types import ResourceGroupGQL
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.user.types.node import UserV2GQL
@@ -207,12 +208,22 @@ class KernelV2UserInfoGQL:
     model=ResourceAllocationGQLDTO,
     name="ResourceAllocation",
 )
-class ResourceAllocationGQL:
+class ResourceAllocationGQL(PydanticOutputMixin[ResourceAllocationGQLDTO]):
     requested: ResourceSlotGQL = gql_field(
         description="The resource slots originally requested for this kernel."
     )
     used: ResourceSlotGQL | None = gql_field(
         description="The resource slots currently used by this kernel. May be null if not yet allocated."
+    )
+    allocated: ResourceSlotGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "The resource slots actually allocated, computed from the "
+                "resource_allocations table. Unlike `used`, this persists after the "
+                "session/kernel is freed or terminated (for statistics and billing)."
+            ),
+        )
     )
 
 
@@ -398,6 +409,22 @@ class KernelV2GQL(PydanticNodeMixin[KernelNode]):
         return resource_group_data
 
     @gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Resource allocation (requested / used / allocated) computed on-demand "
+                "from the resource_allocations table. Unlike the deprecated eager "
+                "`resource.allocation`, `allocated` here persists after the kernel is "
+                "freed or terminated (for statistics and billing)."
+            ),
+        )
+    )  # type: ignore[misc]
+    async def resource_allocation(self, info: Info[StrawberryGQLContext]) -> ResourceAllocationGQL:
+        return await info.context.data_loaders.kernel_resource_allocation_loader.load(
+            KernelId(UUID(str(self.id)))
+        )
+
+    @gql_added_field(
         BackendAIGQLMeta(added_version="26.3.0", description="The session this kernel belongs to.")
     )  # type: ignore[misc]
     async def session(
@@ -529,6 +556,7 @@ class KernelV2GQL(PydanticNodeMixin[KernelNode]):
         )
 
     @classmethod
+    @override
     async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
         cls,
         *,

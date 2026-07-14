@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from uuid import UUID
 
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
@@ -15,7 +16,7 @@ from ai.backend.common.types import (
     SessionResult,
     SessionTypes,
 )
-from ai.backend.manager.models.session import SessionStatus
+from ai.backend.manager.data.session.types import SessionStatus
 
 
 @dataclass(frozen=True)
@@ -89,6 +90,8 @@ class SessionWorkload:
     domain_name: str
     # Scaling group name
     scaling_group: str
+    # Scaling group id
+    resource_group_id: ResourceGroupID
     # Priority level (higher value = higher priority)
     priority: int = 0
     # Session type (INTERACTIVE, BATCH, INFERENCE)

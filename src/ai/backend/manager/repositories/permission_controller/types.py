@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, override
 
 import sqlalchemy as sa
 
@@ -35,6 +35,7 @@ class PermissionSearchScope(SearchScope):
 
     role_id: uuid.UUID
 
+    @override
     def to_condition(self) -> QueryCondition:
         role_id = self.role_id
 
@@ -44,6 +45,7 @@ class PermissionSearchScope(SearchScope):
         return inner
 
     @property
+    @override
     def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
         return [
             ExistenceCheck(
@@ -61,6 +63,7 @@ class ScopedRoleSearchScope(SearchScope):
     element_type: RBACElementType
     scope_id: str
 
+    @override
     def to_condition(self) -> QueryCondition:
         element_type = self.element_type
         scope_id = self.scope_id
@@ -76,6 +79,7 @@ class ScopedRoleSearchScope(SearchScope):
         return inner
 
     @property
+    @override
     def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
         return []
 
@@ -86,6 +90,7 @@ class ObjectPermissionSearchScope(SearchScope):
 
     role_id: uuid.UUID
 
+    @override
     def to_condition(self) -> QueryCondition:
         role_id = self.role_id
 
@@ -95,6 +100,7 @@ class ObjectPermissionSearchScope(SearchScope):
         return inner
 
     @property
+    @override
     def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
         return [
             ExistenceCheck(

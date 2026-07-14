@@ -7,9 +7,8 @@ from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.app_config_fragment.types import AppConfigFragmentData
 from ai.backend.manager.data.permission.types import RBACElementRef
-from ai.backend.manager.models.app_config_allow_list.row import AppConfigAllowListRow
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
-from ai.backend.manager.repositories.base import ExistsQuerier, Purger
+from ai.backend.manager.repositories.base import Purger
 from ai.backend.manager.services.app_config_fragment.actions.base import (
     AppConfigFragmentSingleEntityAction,
     AppConfigFragmentSingleEntityActionResult,
@@ -20,13 +19,13 @@ from ai.backend.manager.services.app_config_fragment.actions.base import (
 class PurgeAppConfigFragmentAction(AppConfigFragmentSingleEntityAction):
     """Purge a fragment — not admin-only.
 
-    Gated by the allow-list write-gate (``only_if``) against the fragment's
-    ``(config_name, scope_type)``, so an allow-listed user may purge their own
-    ``user``-scope fragment.
+    No allow-list gate is needed — a fragment row exists only while its
+    ``(config_name, scope_type)`` allow-list entry does (FK with cascade), so an
+    existing fragment is always removable at its own scope. Purging the allow-list
+    entry itself cascades to its fragments without going through this action.
     """
 
     purger: Purger[AppConfigFragmentRow]
-    only_if: ExistsQuerier[AppConfigAllowListRow]
 
     @override
     @classmethod

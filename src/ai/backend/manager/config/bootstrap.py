@@ -1,6 +1,6 @@
 from pathlib import Path
 from pprint import pformat
-from typing import Any, Self
+from typing import Any, Self, override
 
 from pydantic import Field
 
@@ -75,6 +75,7 @@ class BootstrapConfig(BackendAISchema):
         """,
     )
 
+    @override
     def __repr__(self) -> str:
         return pformat(self.model_dump())
 

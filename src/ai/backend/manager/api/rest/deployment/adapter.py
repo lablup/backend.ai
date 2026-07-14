@@ -46,8 +46,8 @@ from ai.backend.common.dto.manager.deployment.types import (
     RevisionOrderField,
     RouteOrderField,
 )
-from ai.backend.common.dto.manager.v2.deployment.types import IntOrPercent
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
+from ai.backend.common.schema.deployment import BlueGreenSpec, IntOrPercent, RollingUpdateSpec
 from ai.backend.common.types import ClusterMode, RuntimeVariant
 from ai.backend.manager.data.deployment.creator import (
     DeploymentPolicyConfig,
@@ -74,11 +74,9 @@ from ai.backend.manager.data.deployment.types import (
     RouteTrafficStatus as ManagerRouteTrafficStatus,
 )
 from ai.backend.manager.data.deployment.upserter import DeploymentPolicyUpserter
-from ai.backend.manager.data.filter.adapter import BaseFilterAdapter
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.deployment import IncompleteRevisionData
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUpdateSpec
 from ai.backend.manager.models.deployment_revision.conditions import RevisionConditions
 from ai.backend.manager.models.deployment_revision.orders import RevisionOrders
 from ai.backend.manager.models.endpoint.conditions import DeploymentConditions
@@ -86,6 +84,7 @@ from ai.backend.manager.models.endpoint.orders import DeploymentOrders
 from ai.backend.manager.models.routing.conditions import RouteConditions
 from ai.backend.manager.models.routing.orders import RouteOrders
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
+from ai.backend.manager.repositories.base.filter_adapter import BaseFilterAdapter
 
 __all__ = (
     "AddRevisionAdapter",

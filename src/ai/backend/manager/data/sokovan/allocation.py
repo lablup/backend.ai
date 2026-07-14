@@ -7,6 +7,7 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
@@ -43,6 +44,8 @@ class KernelAllocation:
     agent_addr: str
     # Scaling group that the agent belongs to
     scaling_group: str
+    # Scaling group id
+    resource_group_id: ResourceGroupID
     # Host ports allocated for this kernel (empty set if none)
     allocated_host_ports: set[int] = field(default_factory=set)
 
@@ -69,6 +72,8 @@ class SessionAllocation:
     cluster_mode: ClusterMode
     # Scaling group that the session belongs to
     scaling_group: str
+    # Scaling group id
+    resource_group_id: ResourceGroupID
     # List of kernel allocations for this session
     kernel_allocations: list[KernelAllocation]
     # List of agent allocations for this session

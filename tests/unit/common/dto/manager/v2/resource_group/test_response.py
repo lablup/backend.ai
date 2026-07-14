@@ -70,9 +70,11 @@ def _make_resource_group_detail_node(name: str = "test-group") -> ResourceGroupD
         scheduler=ResourceGroupSchedulerConfigInfo(
             type=SchedulerTypeDTO.FIFO,
             preemption=PreemptionConfigInfo(
+                enabled=False,
                 preemptible_priority=5,
                 order=PreemptionOrderDTO.OLDEST,
                 mode=PreemptionModeDTO.TERMINATE,
+                preemption_min_runtime=0.0,
             ),
         ),
         default_deployment_options=DeploymentOptionsInfo(

@@ -26,9 +26,9 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from ai.backend.common.clients.agent.client import AgentClient
+from ai.backend.common.clients.agent.peer import PeerInvoker
 from ai.backend.common.types import AgentId
-from ai.backend.manager.agent_cache import PeerInvoker
-from ai.backend.manager.clients.agent.client import AgentClient
 from ai.backend.manager.clients.agent.pool import AgentClientPool
 from ai.backend.manager.clients.agent.types import AgentPoolSpec
 from ai.backend.manager.errors.agent import AgentConnectionUnavailable

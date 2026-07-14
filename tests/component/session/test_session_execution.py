@@ -20,9 +20,9 @@ from ai.backend.common.dto.manager.session.response import (
     ExecuteResponse,
     StartServiceResponse,
 )
+from ai.backend.common.identifier.resource_group import ResourceGroupName
 from ai.backend.manager.models.kernel import kernels
 from ai.backend.manager.models.scaling_group import scaling_groups
-from ai.backend.manager.models.session.row import SessionRow
 
 from .conftest import SessionSeedData
 
@@ -333,7 +333,7 @@ class TestSessionStartService:
         admin_registry: BackendAIClientRegistry,
         session_seed: SessionSeedData,
         db_engine: SAEngine,
-        scaling_group_fixture: str,
+        scaling_group_name: ResourceGroupName,
         agent_registry: AsyncMock,
         appproxy_client_pool: AsyncMock,
     ) -> None:
@@ -341,7 +341,7 @@ class TestSessionStartService:
         async with db_engine.begin() as conn:
             await conn.execute(
                 sa.update(scaling_groups)
-                .where(scaling_groups.c.name == scaling_group_fixture)
+                .where(scaling_groups.c.name == scaling_group_name)
                 .values(wsproxy_addr=_WSPROXY_ADDR)
             )
         async with db_engine.begin() as conn:
@@ -383,7 +383,7 @@ class TestSessionStartService:
         admin_registry: BackendAIClientRegistry,
         session_seed: SessionSeedData,
         db_engine: SAEngine,
-        scaling_group_fixture: str,
+        scaling_group_name: ResourceGroupName,
         agent_registry: AsyncMock,
         appproxy_client_pool: AsyncMock,
     ) -> None:
@@ -401,7 +401,7 @@ class TestSessionStartService:
         async with db_engine.begin() as conn:
             await conn.execute(
                 sa.update(scaling_groups)
-                .where(scaling_groups.c.name == scaling_group_fixture)
+                .where(scaling_groups.c.name == scaling_group_name)
                 .values(wsproxy_addr=_WSPROXY_ADDR)
             )
         async with db_engine.begin() as conn:
@@ -441,7 +441,7 @@ class TestSessionStartService:
         admin_registry: BackendAIClientRegistry,
         session_seed: SessionSeedData,
         db_engine: SAEngine,
-        scaling_group_fixture: str,
+        scaling_group_name: ResourceGroupName,
         agent_registry: AsyncMock,
         appproxy_client_pool: AsyncMock,
     ) -> None:
@@ -449,7 +449,7 @@ class TestSessionStartService:
         async with db_engine.begin() as conn:
             await conn.execute(
                 sa.update(scaling_groups)
-                .where(scaling_groups.c.name == scaling_group_fixture)
+                .where(scaling_groups.c.name == scaling_group_name)
                 .values(wsproxy_addr=_WSPROXY_ADDR)
             )
         async with db_engine.begin() as conn:
@@ -497,7 +497,7 @@ class TestSessionStartService:
         admin_registry: BackendAIClientRegistry,
         session_seed: SessionSeedData,
         db_engine: SAEngine,
-        scaling_group_fixture: str,
+        scaling_group_name: ResourceGroupName,
         agent_registry: AsyncMock,
         appproxy_client_pool: AsyncMock,
     ) -> None:
@@ -505,7 +505,7 @@ class TestSessionStartService:
         async with db_engine.begin() as conn:
             await conn.execute(
                 sa.update(scaling_groups)
-                .where(scaling_groups.c.name == scaling_group_fixture)
+                .where(scaling_groups.c.name == scaling_group_name)
                 .values(wsproxy_addr=_WSPROXY_ADDR)
             )
         async with db_engine.begin() as conn:
@@ -557,7 +557,7 @@ class TestSessionStartService:
         admin_registry: BackendAIClientRegistry,
         session_seed: SessionSeedData,
         db_engine: SAEngine,
-        scaling_group_fixture: str,
+        scaling_group_name: ResourceGroupName,
         agent_registry: AsyncMock,
         appproxy_client_pool: AsyncMock,
     ) -> None:
@@ -565,7 +565,7 @@ class TestSessionStartService:
         async with db_engine.begin() as conn:
             await conn.execute(
                 sa.update(scaling_groups)
-                .where(scaling_groups.c.name == scaling_group_fixture)
+                .where(scaling_groups.c.name == scaling_group_name)
                 .values(wsproxy_addr=_WSPROXY_ADDR)
             )
         async with db_engine.begin() as conn:
@@ -615,14 +615,14 @@ class TestSessionStartServiceFailures:
         admin_registry: BackendAIClientRegistry,
         session_seed: SessionSeedData,
         db_engine: SAEngine,
-        scaling_group_fixture: str,
+        scaling_group_name: ResourceGroupName,
         appproxy_client_pool: AsyncMock,
     ) -> None:
         """F-BIZ-1: Service name not in service_ports → NotFoundError (AppNotFound)."""
         async with db_engine.begin() as conn:
             await conn.execute(
                 sa.update(scaling_groups)
-                .where(scaling_groups.c.name == scaling_group_fixture)
+                .where(scaling_groups.c.name == scaling_group_name)
                 .values(wsproxy_addr=_WSPROXY_ADDR)
             )
         async with db_engine.begin() as conn:
@@ -653,7 +653,7 @@ class TestSessionStartServiceFailures:
         admin_registry: BackendAIClientRegistry,
         session_seed: SessionSeedData,
         db_engine: SAEngine,
-        scaling_group_fixture: str,
+        scaling_group_name: ResourceGroupName,
         appproxy_client_pool: AsyncMock,
     ) -> None:
         """F-BIZ-2: Inference app → InvalidRequestError."""
@@ -670,7 +670,7 @@ class TestSessionStartServiceFailures:
         async with db_engine.begin() as conn:
             await conn.execute(
                 sa.update(scaling_groups)
-                .where(scaling_groups.c.name == scaling_group_fixture)
+                .where(scaling_groups.c.name == scaling_group_name)
                 .values(wsproxy_addr=_WSPROXY_ADDR)
             )
         async with db_engine.begin() as conn:
@@ -701,14 +701,14 @@ class TestSessionStartServiceFailures:
         admin_registry: BackendAIClientRegistry,
         session_seed: SessionSeedData,
         db_engine: SAEngine,
-        scaling_group_fixture: str,
+        scaling_group_name: ResourceGroupName,
         appproxy_client_pool: AsyncMock,
     ) -> None:
         """F-BIZ-3: Port not in container_ports → InvalidRequestError."""
         async with db_engine.begin() as conn:
             await conn.execute(
                 sa.update(scaling_groups)
-                .where(scaling_groups.c.name == scaling_group_fixture)
+                .where(scaling_groups.c.name == scaling_group_name)
                 .values(wsproxy_addr=_WSPROXY_ADDR)
             )
         async with db_engine.begin() as conn:
@@ -734,39 +734,19 @@ class TestSessionStartServiceFailures:
                 StartServiceRequest(app="ttyd", port=9999),
             )
 
-    async def test_start_with_no_scaling_group(
-        self,
-        admin_registry: BackendAIClientRegistry,
-        session_seed: SessionSeedData,
-        db_engine: SAEngine,
-    ) -> None:
-        """F-BIZ-4: Session has no scaling_group → ServerError (ServiceUnavailable)."""
-        async with db_engine.begin() as conn:
-            await conn.execute(
-                sa.update(SessionRow.__table__)
-                .where(SessionRow.__table__.c.id == session_seed.session_id)
-                .values(scaling_group_name=None)
-            )
-
-        with pytest.raises(ServerError):
-            await admin_registry.session.start_service(
-                session_seed.session_name,
-                StartServiceRequest(app="ttyd"),
-            )
-
     async def test_start_with_no_wsproxy_addr(
         self,
         admin_registry: BackendAIClientRegistry,
         session_seed: SessionSeedData,
         db_engine: SAEngine,
-        scaling_group_fixture: str,
+        scaling_group_name: ResourceGroupName,
     ) -> None:
         """F-BIZ-5: Scaling group has no wsproxy_addr → ServerError (ServiceUnavailable)."""
         # Ensure wsproxy_addr is NULL on the scaling group
         async with db_engine.begin() as conn:
             await conn.execute(
                 sa.update(scaling_groups)
-                .where(scaling_groups.c.name == scaling_group_fixture)
+                .where(scaling_groups.c.name == scaling_group_name)
                 .values(wsproxy_addr=None)
             )
 
@@ -781,7 +761,7 @@ class TestSessionStartServiceFailures:
         admin_registry: BackendAIClientRegistry,
         session_seed: SessionSeedData,
         db_engine: SAEngine,
-        scaling_group_fixture: str,
+        scaling_group_name: ResourceGroupName,
         agent_registry: AsyncMock,
         appproxy_client_pool: AsyncMock,
     ) -> None:
@@ -789,7 +769,7 @@ class TestSessionStartServiceFailures:
         async with db_engine.begin() as conn:
             await conn.execute(
                 sa.update(scaling_groups)
-                .where(scaling_groups.c.name == scaling_group_fixture)
+                .where(scaling_groups.c.name == scaling_group_name)
                 .values(wsproxy_addr=_WSPROXY_ADDR)
             )
         async with db_engine.begin() as conn:

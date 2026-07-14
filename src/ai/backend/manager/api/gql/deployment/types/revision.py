@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from datetime import datetime
 from enum import StrEnum
-from typing import TYPE_CHECKING, Annotated, Any, Self, cast
+from typing import TYPE_CHECKING, Annotated, Any, Self, cast, override
 from uuid import UUID
 
 import strawberry
@@ -13,6 +13,9 @@ from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, NodeID
 from strawberry.scalars import JSON
 
+from ai.backend.common.config import (
+    DEFAULT_SHELL,
+)
 from ai.backend.common.config import (
     PreStartAction as PreStartActionDTO,
 )
@@ -105,7 +108,6 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
     RuntimeVariantPresetValueInfoDTO,
 )
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import MountPermission as CommonMountPermission
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
@@ -241,9 +243,7 @@ class RuntimeVariantPresetValueGQL:
     preset_id: UUID = gql_field(description="The preset this value is bound to.")
     value: str = gql_field(description="Value bound to the preset.")
 
-    @gql_field(
-        description="The runtime variant preset this value is bound to, resolved via DataLoader."
-    )  # type: ignore[misc]
+    @gql_field(description="The runtime variant preset this value is bound to.")  # type: ignore[misc]
     async def preset(
         self, info: Info[StrawberryGQLContext]
     ) -> (
@@ -427,7 +427,7 @@ class ModelServiceConfigGQL:
     )
     command: str | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.7.0",
             description="Single-string command to start the model service.",
         ),
         default=None,
@@ -438,7 +438,11 @@ class ModelServiceConfigGQL:
         deprecation_reason="Use `command` instead.",
     )
     shell: str | None = gql_field(
-        description="Shell configured for the model service.", default="/bin/bash"
+        description=(
+            "Shell used to run the command. If set, the kernel runs "
+            "`[shell, '-c', command]`; null or empty disables shell wrapping."
+        ),
+        default=None,
     )
     port: int = gql_field(description="Port number for the model service.")
     health_check: ModelHealthCheckGQL | None = gql_field(
@@ -586,7 +590,7 @@ class ModelRevision(PydanticNodeMixin[RevisionNodeDTO]):
     @gql_added_field(
         BackendAIGQLMeta(
             added_version="26.4.3",
-            description="The container image used by this revision, resolved via DataLoader.",
+            description="The container image used by this revision.",
         )
     )  # type: ignore[misc]
     async def image_v2(
@@ -606,8 +610,8 @@ class ModelRevision(PydanticNodeMixin[RevisionNodeDTO]):
         BackendAIGQLMeta(
             added_version="26.4.4",
             description=(
-                "The deployment-level preset that produced this revision, "
-                "resolved via DataLoader. ``None`` when the revision was "
+                "The deployment-level preset that produced this revision. "
+                "``None`` when the revision was "
                 "created without a preset, when the originating preset row "
                 "has since been deleted (SET NULL FK), or for legacy rows "
                 "that predate this field."
@@ -630,7 +634,7 @@ class ModelRevision(PydanticNodeMixin[RevisionNodeDTO]):
     @gql_added_field(
         BackendAIGQLMeta(
             added_version="26.4.4",
-            description="The parent deployment owning this revision, resolved via DataLoader.",
+            description="The parent deployment owning this revision.",
         )
     )  # type: ignore[misc]
     async def deployment(
@@ -665,6 +669,7 @@ class ModelRevision(PydanticNodeMixin[RevisionNodeDTO]):
         return [AllocatedResourceSlotGQL.from_pydantic(item) for item in payload.items]
 
     @classmethod
+    @override
     async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
         cls,
         *,
@@ -983,7 +988,7 @@ class ModelServiceConfigInputGQL(PydanticInputMixin[ModelServiceConfigInputDTO])
     )
     command: str | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.7.0",
             description="Single-string command to start the model service.",
         ),
         default=None,
@@ -998,7 +1003,11 @@ class ModelServiceConfigInputGQL(PydanticInputMixin[ModelServiceConfigInputDTO])
         deprecation_reason="Use `command` instead.",
     )
     shell: str | None = gql_field(
-        description="Shell configured for the model service.", default=None
+        description=(
+            "Shell used to run the command. If set, the kernel runs "
+            "`[shell, '-c', command]`; null or empty disables shell wrapping."
+        ),
+        default=DEFAULT_SHELL,
     )
     port: int | None = gql_field(description="Port number for the model service.", default=None)
     health_check: ModelHealthCheckInputGQL | None = gql_field(

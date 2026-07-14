@@ -502,6 +502,7 @@ class NewUserGracePeriodChecker(AbstractIdleCheckReporter):
         },
     ).allow_extra("*")
 
+    @override
     async def populate_config(self, raw_config: Mapping[str, Any]) -> None:
         config = self._config_iv.check(raw_config)
         self.user_initial_grace_period = config["user_initial_grace_period"]
@@ -516,6 +517,7 @@ class NewUserGracePeriodChecker(AbstractIdleCheckReporter):
             _grace_period,
         )
 
+    @override
     async def get_extra_info(
         self, _redis_obj: ValkeyLiveClient, _session_id: SessionId
     ) -> dict[str, Any] | None:
@@ -548,6 +550,7 @@ class NewUserGracePeriodChecker(AbstractIdleCheckReporter):
             else 0
         )
 
+    @override
     async def get_checker_result(
         self,
         redis_obj: ValkeyLiveClient,
@@ -738,6 +741,7 @@ class NetworkTimeoutIdleChecker(BaseIdleChecker):
     def terminate_reason(self) -> KernelLifecycleEventReason:
         return KernelLifecycleEventReason.IDLE_TIMEOUT
 
+    @override
     async def populate_config(self, raw_config: Mapping[str, Any]) -> None:
         config = self._config_iv.check(raw_config)
         self.idle_timeout = config["threshold"] or DEFAULT_NETWORK_CHECKER_IDLE_TIMEOUT
@@ -746,6 +750,7 @@ class NetworkTimeoutIdleChecker(BaseIdleChecker):
             self.idle_timeout.total_seconds(),
         )
 
+    @override
     async def get_extra_info(
         self, _redis_obj: ValkeyLiveClient, _session_id: SessionId
     ) -> dict[str, Any] | None:
@@ -798,6 +803,7 @@ class NetworkTimeoutIdleChecker(BaseIdleChecker):
         )
         return remaining >= 0
 
+    @override
     async def get_checker_result(
         self,
         redis_obj: ValkeyLiveClient,
@@ -814,9 +820,11 @@ class SessionLifetimeChecker(BaseIdleChecker):
     report_key: ClassVar[str] = "session_lifetime"
     extra_info_key: ClassVar[str] = "session_lifetime_extra"
 
+    @override
     async def populate_config(self, raw_config: Mapping[str, Any]) -> None:
         pass
 
+    @override
     async def get_extra_info(
         self, _redis_obj: ValkeyLiveClient, _session_id: SessionId
     ) -> dict[str, Any] | None:
@@ -856,6 +864,7 @@ class SessionLifetimeChecker(BaseIdleChecker):
             return remaining > 0
         return True
 
+    @override
     async def get_checker_result(
         self,
         redis_obj: ValkeyLiveClient,
@@ -969,6 +978,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
     def terminate_reason(self) -> KernelLifecycleEventReason:
         return KernelLifecycleEventReason.IDLE_UTILIZATION
 
+    @override
     async def populate_config(self, raw_config: Mapping[str, Any]) -> None:
         config = UtilizationConfig(**config_key_to_snake_case(raw_config))
         self.resource_thresholds = config.resource_thresholds
@@ -996,9 +1006,11 @@ class UtilizationIdleChecker(BaseIdleChecker):
         )
 
     @classmethod
+    @override
     def get_extra_info_key(cls, session_id: SessionId) -> str | None:
         return f"session.{session_id}.{cls.extra_info_key}"
 
+    @override
     async def get_extra_info(
         self, redis_obj: ValkeyLiveClient, session_id: SessionId
     ) -> dict[str, Any] | None:
@@ -1275,6 +1287,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
             log.warning(_msg, exc_info=e)
             return None
 
+    @override
     async def get_checker_result(
         self,
         redis_obj: ValkeyLiveClient,

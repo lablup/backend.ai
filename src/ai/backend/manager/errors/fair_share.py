@@ -4,6 +4,8 @@ Fair share domain exceptions.
 
 from __future__ import annotations
 
+from typing import override
+
 from ai.backend.common.exception import (
     BackendAIError,
     ErrorCode,
@@ -19,6 +21,7 @@ class FairShareError(BackendAIError):
     error_type = "https://api.backend.ai/probs/fair-share-error"
     error_title = "Fair share operation failed."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.BACKENDAI,
@@ -33,6 +36,7 @@ class FairShareNotFoundError(FairShareError):
     error_type = "https://api.backend.ai/probs/fair-share-not-found"
     error_title = "Fair share entity not found."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.DATABASE,
@@ -51,6 +55,7 @@ class InvalidResourceWeightError(FairShareError):
         self.invalid_types = invalid_types
         super().__init__(f"Resource types not available in capacity: {', '.join(invalid_types)}")
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.SCALING_GROUP,

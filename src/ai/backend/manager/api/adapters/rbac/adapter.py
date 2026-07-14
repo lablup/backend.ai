@@ -86,6 +86,9 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
     EntityOrderBy as EntityOrderByDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.request import (
+    MappedScopeNestedFilter as MappedScopeNestedFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.rbac.request import (
     PermissionFilter as PermissionFilterDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.request import (
@@ -1404,6 +1407,8 @@ class RBACAdapter(BaseAdapter):
                 )
         if f.assigned_user is not None:
             conditions.extend(self._convert_user_nested_filter(f.assigned_user))
+        if f.mapped_scope is not None:
+            conditions.extend(self._convert_mapped_scope_nested_filter(f.mapped_scope))
         if f.AND:
             for sub in f.AND:
                 conditions.extend(self._convert_role_filter_gql(sub))
@@ -1447,6 +1452,61 @@ class RBACAdapter(BaseAdapter):
             not_conditions: list[QueryCondition] = []
             for sub in f.NOT:
                 not_conditions.extend(self._convert_user_nested_filter(sub))
+            if not_conditions:
+                conditions.append(negate_conditions(not_conditions))
+        return conditions
+
+    def _convert_mapped_scope_nested_filter(
+        self, f: MappedScopeNestedFilterDTO
+    ) -> list[QueryCondition]:
+        raw_conditions: list[QueryCondition] = []
+        if f.scope_type is not None:
+            st = f.scope_type
+            if st.equals is not None:
+                raw_conditions.append(
+                    EntityScopeConditions.by_scope_type_equals(RBACElementType(st.equals))
+                )
+            if st.in_ is not None and st.in_:
+                raw_conditions.append(
+                    EntityScopeConditions.by_scope_type_in([RBACElementType(s) for s in st.in_])
+                )
+            if st.not_equals is not None:
+                raw_conditions.append(
+                    EntityScopeConditions.by_scope_type_not_equals(RBACElementType(st.not_equals))
+                )
+            if st.not_in is not None and st.not_in:
+                raw_conditions.append(
+                    EntityScopeConditions.by_scope_type_not_in([
+                        RBACElementType(s) for s in st.not_in
+                    ])
+                )
+        if f.scope_id is not None:
+            condition = self.convert_string_filter(
+                f.scope_id,
+                contains_factory=EntityScopeConditions.by_scope_id_contains,
+                equals_factory=EntityScopeConditions.by_scope_id_equals,
+                starts_with_factory=EntityScopeConditions.by_scope_id_starts_with,
+                ends_with_factory=EntityScopeConditions.by_scope_id_ends_with,
+                in_factory=EntityScopeConditions.by_scope_id_in,
+            )
+            if condition is not None:
+                raw_conditions.append(condition)
+        conditions: list[QueryCondition] = []
+        if raw_conditions:
+            conditions.append(RoleConditions.by_mapped_scope(raw_conditions))
+        if f.AND:
+            for sub in f.AND:
+                conditions.extend(self._convert_mapped_scope_nested_filter(sub))
+        if f.OR:
+            or_conditions: list[QueryCondition] = []
+            for sub in f.OR:
+                or_conditions.extend(self._convert_mapped_scope_nested_filter(sub))
+            if or_conditions:
+                conditions.append(combine_conditions_or(or_conditions))
+        if f.NOT:
+            not_conditions: list[QueryCondition] = []
+            for sub in f.NOT:
+                not_conditions.extend(self._convert_mapped_scope_nested_filter(sub))
             if not_conditions:
                 conditions.append(negate_conditions(not_conditions))
         return conditions
@@ -1684,6 +1744,27 @@ class RBACAdapter(BaseAdapter):
                 starts_with_factory=EntityScopeConditions.by_entity_id_starts_with,
                 ends_with_factory=EntityScopeConditions.by_entity_id_ends_with,
                 in_factory=EntityScopeConditions.by_entity_id_in,
+            )
+            if condition is not None:
+                conditions.append(condition)
+        if f.scope_type is not None:
+            conditions.extend(
+                self._convert_rbac_element_type_filter(
+                    f.scope_type,
+                    equals_factory=EntityScopeConditions.by_scope_type_equals,
+                    not_equals_factory=EntityScopeConditions.by_scope_type_not_equals,
+                    in_factory=EntityScopeConditions.by_scope_type_in,
+                    not_in_factory=EntityScopeConditions.by_scope_type_not_in,
+                )
+            )
+        if f.scope_id is not None:
+            condition = self.convert_string_filter(
+                f.scope_id,
+                contains_factory=EntityScopeConditions.by_scope_id_contains,
+                equals_factory=EntityScopeConditions.by_scope_id_equals,
+                starts_with_factory=EntityScopeConditions.by_scope_id_starts_with,
+                ends_with_factory=EntityScopeConditions.by_scope_id_ends_with,
+                in_factory=EntityScopeConditions.by_scope_id_in,
             )
             if condition is not None:
                 conditions.append(condition)

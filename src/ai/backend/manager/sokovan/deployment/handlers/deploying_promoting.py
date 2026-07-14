@@ -4,13 +4,13 @@ from collections.abc import Sequence
 from typing import override
 
 from ai.backend.common.identifier.replica_group import ReplicaGroupID
+from ai.backend.common.schema.deployment import TrafficStepInput
 from ai.backend.manager.data.deployment.types import (
     DeploymentHandlerCategory,
     DeploymentLifecycleStatus,
     DeploymentLifecycleSubStep,
     DeploymentStatusTransitions,
     DeploymentTargetStatuses,
-    TrafficStepInput,
 )
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle
 from ai.backend.manager.defs import LockID

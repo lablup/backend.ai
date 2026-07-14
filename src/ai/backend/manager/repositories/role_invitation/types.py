@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
+from typing import override
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -30,6 +31,7 @@ class InviteeSearchScope(SearchScope):
 
     invitee_user_id: UUID
 
+    @override
     def to_condition(self) -> QueryCondition:
         invitee_user_id = self.invitee_user_id
 
@@ -39,6 +41,7 @@ class InviteeSearchScope(SearchScope):
         return inner
 
     @property
+    @override
     def existence_checks(self) -> Sequence[ExistenceCheck[UUID]]:
         # Invitee existence is guaranteed by RBAC authentication before reaching here.
         return []
@@ -50,6 +53,7 @@ class InviterSearchScope(SearchScope):
 
     inviter_user_id: UUID
 
+    @override
     def to_condition(self) -> QueryCondition:
         inviter_user_id = self.inviter_user_id
 
@@ -59,6 +63,7 @@ class InviterSearchScope(SearchScope):
         return inner
 
     @property
+    @override
     def existence_checks(self) -> Sequence[ExistenceCheck[UUID]]:
         # Inviter existence is guaranteed by RBAC authentication before reaching here.
         return []
@@ -70,6 +75,7 @@ class RoleInvitationSearchScope(SearchScope):
 
     role_id: UUID
 
+    @override
     def to_condition(self) -> QueryCondition:
         role_id = self.role_id
 
@@ -79,6 +85,7 @@ class RoleInvitationSearchScope(SearchScope):
         return inner
 
     @property
+    @override
     def existence_checks(self) -> Sequence[ExistenceCheck[UUID]]:
         # Role existence is validated by the RBAC permission check before reaching here.
         return []

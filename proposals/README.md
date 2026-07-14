@@ -125,6 +125,13 @@ BEP numbers start from 1000.
 | [1052](BEP-1052-scoped-app-config-redesign.md) | Scoped App Config Redesign | Gyubong Lee | Draft |
 | [1053](BEP-1053-router-frontend-mode.md) | Router Frontend Mode | Gyubong Lee | Draft |
 | [1054](BEP-1054-reconciler-based-idle-checker.md) | Reconciler Based Idle Checker | BoKeum Kim | Draft |
+| [1055](BEP-1055-preemption-scheduler-mechanics.md) | Preemption Scheduler Mechanics | HyeokJin Kim | Draft |
+| [1056](BEP-1056-scope-linked-metric-catalog.md) | Scope-Linked Metric Catalog & Dashboards | HyeokJin Kim | Draft |
+| [1057](BEP-1057-agent-re-architecture.md) | Agent Re-architecture | HyeokJin Kim | Draft |
+| [1058](BEP-1058-super-admin-impersonation.md) | Super-Admin User Impersonation | HyeokJin Kim | Draft |
+| [1059](BEP-1059-agent-resource-group-source-of-truth.md) | Agent↔Resource Group Source of Truth | HyeokJin Kim | Draft |
+| [1060](BEP-1060-v2-connection-type-nested-filters.md) | Standardizing v2 Connection-Type Nested Filters | HyeokJin Kim | Draft |
+| [1061](BEP-1061-agent-kernel-lifecycle.md) | Agent Kernel Lifecycle Structuring | HyeokJin Kim | Draft |
 | _next_ | _(reserve your number here)_ | | |
 
 ## File Structure

@@ -13,6 +13,7 @@ from decimal import Decimal
 
 import pytest
 
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import AgentId, ResourceSlot
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.models.agent import AgentRow
@@ -24,18 +25,20 @@ from ai.backend.testutils.db import with_tables
 
 @dataclass(frozen=True)
 class ScalingGroupFixture:
-    """Named resource groups used by the mixed-agent scenario."""
+    """Resource-group ids used by the mixed-agent scenario."""
 
-    schedulable: str
-    unschedulable: str
-    lost: str
-    empty: str
+    schedulable: ResourceGroupID
+    unschedulable: ResourceGroupID
+    lost: ResourceGroupID
+    empty: ResourceGroupID
 
 
-async def _make_scaling_group(db: ExtendedAsyncSAEngine, name: str) -> None:
+async def _make_scaling_group(db: ExtendedAsyncSAEngine, name: str) -> ResourceGroupID:
+    scaling_group_id = ResourceGroupID(uuid.uuid4())
     async with db.begin_session() as db_sess:
         db_sess.add(
             ScalingGroupRow(
+                id=scaling_group_id,
                 name=name,
                 driver="static",
                 scheduler="fifo",
@@ -48,11 +51,13 @@ async def _make_scaling_group(db: ExtendedAsyncSAEngine, name: str) -> None:
                 is_active=True,
             )
         )
+    return scaling_group_id
 
 
 async def _make_agent(
     db: ExtendedAsyncSAEngine,
     scaling_group: str,
+    resource_group_id: ResourceGroupID,
     *,
     status: AgentStatus,
     schedulable: bool,
@@ -65,6 +70,7 @@ async def _make_agent(
                 status=status,
                 region="local",
                 scaling_group=scaling_group,
+                resource_group_id=resource_group_id,
                 available_slots=ResourceSlot({
                     "cpu": Decimal("10"),
                     "mem": Decimal("10240"),
@@ -80,7 +86,7 @@ async def _make_agent(
 
 
 class TestScalingGroupQueries:
-    """Tests for get_schedulable_scaling_groups / get_all_scaling_groups."""
+    """Tests for get_all_scaling_groups."""
 
     @pytest.fixture
     async def db_with_cleanup(
@@ -108,48 +114,41 @@ class TestScalingGroupQueries:
         - ``lost``: LOST + schedulable=True (included only in the all-groups query)
         - ``empty``: no agents at all (must still be included in the all-groups query)
         """
-        fixture = ScalingGroupFixture(
-            schedulable=f"sg-sched-{uuid.uuid4().hex[:8]}",
-            unschedulable=f"sg-unsched-{uuid.uuid4().hex[:8]}",
-            lost=f"sg-lost-{uuid.uuid4().hex[:8]}",
-            empty=f"sg-empty-{uuid.uuid4().hex[:8]}",
-        )
-        await _make_scaling_group(db_with_cleanup, fixture.schedulable)
-        await _make_scaling_group(db_with_cleanup, fixture.unschedulable)
-        await _make_scaling_group(db_with_cleanup, fixture.lost)
-        await _make_scaling_group(db_with_cleanup, fixture.empty)
+        schedulable_name = f"sg-sched-{uuid.uuid4().hex[:8]}"
+        unschedulable_name = f"sg-unsched-{uuid.uuid4().hex[:8]}"
+        lost_name = f"sg-lost-{uuid.uuid4().hex[:8]}"
+        empty_name = f"sg-empty-{uuid.uuid4().hex[:8]}"
+        schedulable_id = await _make_scaling_group(db_with_cleanup, schedulable_name)
+        unschedulable_id = await _make_scaling_group(db_with_cleanup, unschedulable_name)
+        lost_id = await _make_scaling_group(db_with_cleanup, lost_name)
+        empty_id = await _make_scaling_group(db_with_cleanup, empty_name)
         await _make_agent(
             db_with_cleanup,
-            fixture.schedulable,
+            schedulable_name,
+            schedulable_id,
             status=AgentStatus.ALIVE,
             schedulable=True,
         )
         await _make_agent(
             db_with_cleanup,
-            fixture.unschedulable,
+            unschedulable_name,
+            unschedulable_id,
             status=AgentStatus.ALIVE,
             schedulable=False,
         )
         await _make_agent(
             db_with_cleanup,
-            fixture.lost,
+            lost_name,
+            lost_id,
             status=AgentStatus.LOST,
             schedulable=True,
         )
-        return fixture
-
-    async def test_schedulable_query_excludes_unschedulable_agents(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        mixed_agents_scenario: ScalingGroupFixture,
-    ) -> None:
-        db_source = ScheduleDBSource(db_with_cleanup)
-        schedulable = set(await db_source.get_schedulable_scaling_groups())
-
-        assert mixed_agents_scenario.schedulable in schedulable
-        assert mixed_agents_scenario.unschedulable not in schedulable
-        assert mixed_agents_scenario.lost not in schedulable
-        assert mixed_agents_scenario.empty not in schedulable
+        return ScalingGroupFixture(
+            schedulable=schedulable_id,
+            unschedulable=unschedulable_id,
+            lost=lost_id,
+            empty=empty_id,
+        )
 
     async def test_all_scaling_groups_query_includes_unschedulable_and_lost_agents(
         self,
@@ -163,9 +162,9 @@ class TestScalingGroupQueries:
         promotion and termination checks still visit sessions pinned there.
         """
         db_source = ScheduleDBSource(db_with_cleanup)
-        scaling_groups = set(await db_source.get_all_scaling_groups())
+        resource_group_ids = set(await db_source.get_all_scaling_groups())
 
-        assert mixed_agents_scenario.schedulable in scaling_groups
-        assert mixed_agents_scenario.unschedulable in scaling_groups
-        assert mixed_agents_scenario.lost in scaling_groups
-        assert mixed_agents_scenario.empty in scaling_groups
+        assert mixed_agents_scenario.schedulable in resource_group_ids
+        assert mixed_agents_scenario.unschedulable in resource_group_ids
+        assert mixed_agents_scenario.lost in resource_group_ids
+        assert mixed_agents_scenario.empty in resource_group_ids

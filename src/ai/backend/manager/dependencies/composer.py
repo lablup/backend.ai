@@ -4,6 +4,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from pathlib import Path
+from typing import override
 
 from ai.backend.common.dependencies import DependencyComposer, DependencyStack
 from ai.backend.logging.types import LogLevel
@@ -101,10 +102,12 @@ class ManagerDependencyComposer(DependencyComposer[DependencyInput, DependencyRe
     """
 
     @property
+    @override
     def stage_name(self) -> str:
         return "manager-dependencies"
 
     @asynccontextmanager
+    @override
     async def compose(
         self,
         stack: DependencyStack,
@@ -267,6 +270,7 @@ class ManagerDependencyComposer(DependencyComposer[DependencyInput, DependencyRe
                 scheduler_repository=domain.repositories.scheduler.repository,
                 deployment_repository=domain.repositories.deployment.repository,
                 replica_group_repository=domain.repositories.replica_group.repository,
+                idle_checker_repository=domain.repositories.idle_checker.repository,
                 fair_share_repository=domain.repositories.fair_share.repository,
                 resource_usage_repository=domain.repositories.resource_usage_history.repository,
                 agent_client_pool=agents.agent_client_pool,

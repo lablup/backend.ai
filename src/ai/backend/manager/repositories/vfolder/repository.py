@@ -24,6 +24,7 @@ from ai.backend.common.types import (
     VFolderHostPermissionMap,
     VFolderID,
 )
+from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.group.types import ProjectResourceInfo
 from ai.backend.manager.data.kernel.types import KernelStatus
@@ -82,7 +83,6 @@ from ai.backend.manager.models.rbac_models.permission.permission import Permissi
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.resource_policy import keypair_resource_policies
-from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import (
     ACTIVE_USER_STATUSES,
     UserRole,
@@ -142,6 +142,7 @@ from ai.backend.manager.repositories.base.rbac.revoker import (
 )
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 from ai.backend.manager.repositories.vfolder.creators import VFolderCreatorSpec
+from ai.backend.manager.repositories.vfolder.purge_guards import find_active_vfolder_references
 from ai.backend.manager.repositories.vfolder.types import (
     BulkVFolderPurgeResult,
     ProjectVFolderSearchScope,
@@ -693,12 +694,44 @@ class VfolderRepository:
                 record.model_card_rows.append(card_row)
         return list(grouped.values())
 
+    async def _ensure_vfolder_purgeable(
+        self, session: SASession, vfolder_row: VFolderRow, *, force: bool
+    ) -> None:
+        """Raise when the vfolder must not be purged; return normally otherwise.
+
+        Enforces a purgable-status precondition and rejects the purge while the
+        vfolder is actively referenced anywhere in
+        :data:`VFOLDER_REFERENCE_CHECKS` (live session/kernel mounts, active
+        model-service endpoints via ``model`` or ``extra_mounts``). All checks
+        are skipped when ``force`` is True.
+
+        Raises:
+            VFolderFilterStatusFailed: The vfolder status is not purgable.
+            VFolderDeletionNotAllowed: The vfolder is still actively referenced.
+        """
+        if force:
+            return
+        if vfolder_row.status not in vfolder_status_map[VFolderStatusSet.PURGABLE]:
+            raise VFolderFilterStatusFailed(
+                f"Cannot purge the vfolder(id: {vfolder_row.id}). Its status "
+                f"({vfolder_row.status.value}) is not purgable. Soft-delete it "
+                "first or set force=True."
+            )
+        hits = await find_active_vfolder_references(session, vfolder_row)
+        if hits:
+            details = "; ".join(f"{hit.describe} {hit.referrer_ids}" for hit in hits)
+            raise VFolderDeletionNotAllowed(
+                f"Cannot purge the vfolder(id: {vfolder_row.id}); it is still in use: "
+                f"{details}. Remove the reference(s) first or set force=True."
+            )
+
     @vfolder_repository_resilience.apply()
     async def delete_vfolders_forever(
         self,
         vfolder_ids: list[uuid.UUID],
         *,
         cascade_model_card: bool = False,
+        force: bool = False,
     ) -> BulkVFolderPurgeResult:
         """
         Delete VFolders forever with partial-success semantics.
@@ -708,6 +741,11 @@ class VfolderRepository:
         ``VFolderHasLinkedModelCard``) when ``cascade_model_card`` is False;
         otherwise the cards are deleted and the vfolder transitions to
         ``DELETE_ONGOING`` like any other success.
+
+        Unless ``force`` is True, a vfolder that is mounted by a live session,
+        referenced by an active model-service endpoint, or not in a purgable
+        status also becomes a failure (carrying the blocking error) and is
+        skipped — its storage is left intact.
         """
 
         result = BulkVFolderPurgeResult()
@@ -720,6 +758,17 @@ class VfolderRepository:
                 succeeded_ids: list[uuid.UUID] = []
                 succeeded_rows: list[VFolderRow] = []
                 for rec in records:
+                    # Partial-success semantics: a per-vfolder blocker becomes a
+                    # failure entry rather than aborting the whole batch.
+                    try:
+                        await self._ensure_vfolder_purgeable(
+                            db_session, rec.vfolder_row, force=force
+                        )
+                    except BackendAIError as e:
+                        result.failures.append(
+                            VFolderPurgeFailure(vfolder_id=rec.vfolder_row.id, exception=e)
+                        )
+                        continue
                     if rec.model_card_rows and not cascade_model_card:
                         result.failures.append(
                             VFolderPurgeFailure(
@@ -767,24 +816,30 @@ class VfolderRepository:
             return result
 
     @vfolder_repository_resilience.apply()
-    async def purge_vfolder(self, purger: RBACEntityPurger[VFolderRow]) -> VFolderData:
+    async def purge_vfolder(
+        self, purger: RBACEntityPurger[VFolderRow], *, force: bool = False
+    ) -> VFolderData:
         """
         Permanently delete a VFolder from DB.
         Only VFolders with purgable status (DELETE_PENDING, DELETE_COMPLETE) can be purged.
 
+        Unless ``force`` is True, the purge is rejected when the vfolder is
+        mounted by a live session, referenced by an active model-service
+        endpoint, or not in a purgable status.
+
         Raises:
             VFolderNotFound: If the vfolder doesn't exist.
             VFolderFilterStatusFailed: If the vfolder status is not purgable.
+            VFolderDeletionNotAllowed: If the vfolder is mounted or endpoint-referenced.
             VFolderHasLinkedModelCard: If a model card still references the vfolder.
         """
         vfolder_uuid = cast(uuid.UUID, purger.pk_value)
         async with self._db.begin_session() as session:
-            # Fetch vfolder first to validate status before purging.
+            # Fetch vfolder first to validate status/in-use before purging.
             vfolder_row = await self._get_vfolder_by_id(session, vfolder_uuid)
             if vfolder_row is None:
                 raise VFolderNotFound(extra_data=str(vfolder_uuid))
-            if vfolder_row.status not in vfolder_status_map[VFolderStatusSet.PURGABLE]:
-                raise VFolderFilterStatusFailed
+            await self._ensure_vfolder_purgeable(session, vfolder_row, force=force)
             try:
                 await execute_rbac_entity_purger(session, purger)
             except RepositoryIntegrityError as e:

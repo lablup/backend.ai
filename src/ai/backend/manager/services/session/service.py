@@ -54,6 +54,7 @@ from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.session.draft import (
     KernelExecutionSpecDraft,
     KernelGroupDraft,
+    KernelResourceInput,
     SchedulingTargetDraft,
     SessionClassificationDraft,
     SessionIdentityDraft,
@@ -65,7 +66,6 @@ from ai.backend.manager.data.session.draft import (
 from ai.backend.manager.data.session.options import (
     InternalDataExtras,
     ResourceOpts,
-    SessionHandlerOptions,
 )
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.defs import DEFAULT_ROLE
@@ -101,6 +101,14 @@ from ai.backend.manager.repositories.scheduler.repository import SchedulerReposi
 from ai.backend.manager.repositories.session.repository import SessionRepository
 from ai.backend.manager.repositories.session.updaters import SessionUpdaterSpec
 from ai.backend.manager.repositories.user.repository import UserRepository
+from ai.backend.manager.services.session.actions.batch_get_kernel_resource_allocation import (
+    BatchGetKernelResourceAllocationAction,
+    BatchGetKernelResourceAllocationActionResult,
+)
+from ai.backend.manager.services.session.actions.batch_get_session_resource_allocation import (
+    BatchGetSessionResourceAllocationAction,
+    BatchGetSessionResourceAllocationActionResult,
+)
 from ai.backend.manager.services.session.actions.commit_session import (
     CommitSessionAction,
     CommitSessionActionResult,
@@ -1515,6 +1523,24 @@ class SessionService:
             has_previous_page=result.has_previous_page,
         )
 
+    async def batch_get_session_resource_allocation(
+        self, action: BatchGetSessionResourceAllocationAction
+    ) -> BatchGetSessionResourceAllocationActionResult:
+        """Aggregate resource_allocations per session (requested/used/allocated)."""
+        data = await self._session_repository.batch_get_resource_allocation_by_session(
+            action.session_ids
+        )
+        return BatchGetSessionResourceAllocationActionResult(data=data)
+
+    async def batch_get_kernel_resource_allocation(
+        self, action: BatchGetKernelResourceAllocationAction
+    ) -> BatchGetKernelResourceAllocationActionResult:
+        """Aggregate resource_allocations per kernel (requested/used/allocated)."""
+        data = await self._session_repository.batch_get_resource_allocation_by_kernel(
+            action.kernel_ids
+        )
+        return BatchGetKernelResourceAllocationActionResult(data=data)
+
     async def enqueue_session(self, action: EnqueueSessionAction) -> EnqueueSessionActionResult:
         """Enqueue a new compute session (PENDING) through the scheduler.
 
@@ -1557,7 +1583,9 @@ class SessionService:
         resource_opts_payload: dict[str, Any] = {}
         if action.resource.shmem is not None:
             resource_opts_payload["shmem"] = BinarySize.from_str(action.resource.shmem)
-        resource_opts = ResourceOpts.model_validate(resource_opts_payload)
+        resource_opts = (
+            ResourceOpts.model_validate(resource_opts_payload) if resource_opts_payload else None
+        )
 
         mount_entries = tuple(action.mounts or ())
 
@@ -1577,21 +1605,35 @@ class SessionService:
         dependencies = tuple(SessionID(dep_id) for dep_id in (action.scheduling.dependencies or ()))
         callback_url = yarl.URL(action.callback_url) if action.callback_url else None
 
-        if action.resource.resource_group:
+        if action.resource.resource_group_id is not None:
+            resource_group_id = action.resource.resource_group_id
+            resource_group_name = await self._scheduler_repository.get_resource_group_name_by_id(
+                resource_group_id
+            )
+        elif action.resource.resource_group:
             resource_group_name = ResourceGroupName(action.resource.resource_group)
+            resource_group_id = await self._scheduler_repository.get_resource_group_id_by_name(
+                resource_group_name
+            )
         else:
-            resource_group_name = await self._scheduler_repository.pick_default_resource_group(
+            resource_group_id = await self._scheduler_repository.pick_default_resource_group(
                 access_key=access_key,
                 domain_name=domain_name,
                 project_id=ProjectID(action.group_id),
             )
+            resource_group_name = await self._scheduler_repository.get_resource_group_name_by_id(
+                resource_group_id
+            )
+        domain_id = await self._scheduler_repository.get_domain_id_by_name(DomainName(domain_name))
         kernel_groups = await self._resolve_kernel_groups(
             cluster_size=action.resource.cluster_size,
             preopen_ports=preopen_ports,
             execution_spec=KernelExecutionSpecDraft(
-                image_id=ImageID(action.image_id),
-                resources=resource_entries,
-                resource_opts=resource_opts,
+                resource_input=KernelResourceInput(
+                    image_id=ImageID(action.image_id),
+                    resources=resource_entries,
+                    resource_opts=resource_opts,
+                ),
                 environ=environ,
                 mounts=mount_entries,
                 startup_command=startup_command,
@@ -1610,8 +1652,10 @@ class SessionService:
                 user_uuid=user_id,
             ),
             scope=SessionScopeDraft(
+                domain_id=domain_id,
                 domain_name=DomainName(domain_name),
                 project_id=ProjectID(action.group_id),
+                resource_group_id=resource_group_id,
                 resource_group_name=resource_group_name,
             ),
             classification=SessionClassificationDraft(
@@ -1638,7 +1682,7 @@ class SessionService:
                     ),
                 ),
                 kernel_groups=kernel_groups,
-                handler_options=SessionHandlerOptions(),
+                handler_options=None,
             ),
             internal_data_extras=InternalDataExtras(
                 sudo_session_enabled=False,

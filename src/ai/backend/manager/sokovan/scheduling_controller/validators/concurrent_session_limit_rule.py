@@ -10,6 +10,8 @@ adding one more session would push the user past the keypair policy's
 
 from __future__ import annotations
 
+from typing import override
+
 from ai.backend.manager.data.session.spec import SessionSpec
 from ai.backend.manager.errors.kernel import QuotaExceeded
 from ai.backend.manager.sokovan.scheduling_controller.validators.session_spec_base import (
@@ -21,9 +23,11 @@ from ai.backend.manager.sokovan.scheduling_controller.validators.session_spec_ba
 class ConcurrentSessionLimitRule(SessionSpecValidatorRule):
     """Reject enqueue when the keypair is already at its concurrent-session cap."""
 
+    @override
     def name(self) -> str:
         return "concurrent_session_limit"
 
+    @override
     def validate(
         self,
         spec: SessionSpec,

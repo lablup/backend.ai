@@ -25,6 +25,7 @@ from ai.backend.common.exception import (
 )
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.group.types import GroupData
+from ai.backend.manager.data.permission.permission_defs import ProjectPermission
 from ai.backend.manager.models.group import (
     GroupRow,
     ProjectType,
@@ -36,7 +37,6 @@ from ai.backend.manager.models.minilang.ordering import QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
 from ai.backend.manager.models.rbac import ProjectScope
 from ai.backend.manager.models.rbac.context import ClientContext
-from ai.backend.manager.models.rbac.permission_defs import ProjectPermission
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )

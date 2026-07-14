@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncGenerator, Sequence
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, override
 from uuid import UUID
 
 import aiohttp.web
@@ -101,6 +101,7 @@ class SimpleCreatorSpec(CreatorSpec[RBACEntityCreatorTestRow]):
         self._scope_id = scope_id
         self._entity_id = entity_id
 
+    @override
     def build_row(self) -> RBACEntityCreatorTestRow:
         row_kwargs: dict[str, Any] = {
             "name": self._name,
@@ -120,6 +121,7 @@ class CompositePKCreatorSpec(CreatorSpec[CompositePKTestRow]):
         self._item_id = item_id
         self._name = name
 
+    @override
     def build_row(self) -> CompositePKTestRow:
         return CompositePKTestRow(
             tenant_id=self._tenant_id,
@@ -871,6 +873,7 @@ class _TestRBACDuplicateNameError(BackendAIError, aiohttp.web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/test-rbac-duplicate-name"
     error_title = "Duplicate name."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.BACKENDAI,
@@ -886,6 +889,7 @@ class UniqueRBACCreatorSpec(CreatorSpec[RBACCreatorUniqueTestRow]):
         self._name = name
 
     @property
+    @override
     def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
         return (
             IntegrityErrorCheck(
@@ -895,6 +899,7 @@ class UniqueRBACCreatorSpec(CreatorSpec[RBACCreatorUniqueTestRow]):
             ),
         )
 
+    @override
     def build_row(self) -> RBACCreatorUniqueTestRow:
         return RBACCreatorUniqueTestRow(name=self._name)
 

@@ -6,7 +6,7 @@ import uuid
 from collections.abc import Iterable
 from datetime import datetime
 from enum import StrEnum
-from typing import Any, Self, cast
+from typing import Any, Self, cast, override
 
 from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
@@ -21,6 +21,7 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
 from ai.backend.common.dto.manager.v2.rbac.response import (
     AssociationScopesEntitiesNode,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -128,6 +129,7 @@ class EntityRefGQL(PydanticNodeMixin[AssociationScopesEntitiesNode]):
         return await _load_rbac_element(info, element_type, self.scope_id)
 
     @classmethod
+    @override
     async def resolve_nodes(  # type: ignore[override]
         cls,
         *,
@@ -152,6 +154,20 @@ class EntityRefGQL(PydanticNodeMixin[AssociationScopesEntitiesNode]):
 class EntityFilter(PydanticInputMixin[EntityFilterDTO], GQLFilter):
     entity_type: RBACElementTypeFilterGQL | None = None
     entity_id: StringFilter | None = None
+    scope_type: RBACElementTypeFilterGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by the type of scope the entity is registered in.",
+        ),
+        default=None,
+    )
+    scope_id: StringFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by the id of scope the entity is registered in.",
+        ),
+        default=None,
+    )
     AND: list[Self] | None = None
     OR: list[Self] | None = None
     NOT: list[Self] | None = None

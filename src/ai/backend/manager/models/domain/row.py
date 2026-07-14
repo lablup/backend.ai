@@ -24,6 +24,7 @@ from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.domain.types import DomainData
+from ai.backend.manager.data.permission.permission_defs import DomainPermission
 from ai.backend.manager.defs import RESERVED_DOTFILES
 from ai.backend.manager.models.base import (
     GUID,
@@ -44,7 +45,6 @@ from ai.backend.manager.models.rbac import (
     required_permission,
 )
 from ai.backend.manager.models.rbac.context import ClientContext
-from ai.backend.manager.models.rbac.permission_defs import DomainPermission
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.group import GroupRow
@@ -135,7 +135,11 @@ class DomainRow(Base):  # type: ignore[misc]
         "dotfiles", sa.LargeBinary(length=MAXIMUM_DOTFILE_SIZE), nullable=False, default=b"\x90"
     )
 
-    sessions: Mapped[list[SessionRow]] = relationship("SessionRow", back_populates="domain")
+    sessions: Mapped[list[SessionRow]] = relationship(
+        "SessionRow",
+        back_populates="domain",
+        foreign_keys="[SessionRow.domain_name]",
+    )
     users: Mapped[list[UserRow]] = relationship("UserRow", back_populates="domain")
     groups: Mapped[list[GroupRow]] = relationship("GroupRow", back_populates="domain")
     sgroup_for_domains_rows: Mapped[list[ScalingGroupForDomainRow]] = relationship(
@@ -176,6 +180,7 @@ class DomainModel(RBACModel[DomainPermission]):
     _permissions: frozenset[DomainPermission] = field(default_factory=frozenset)
 
     @property
+    @override
     def permissions(self) -> Container[DomainPermission]:
         return self._permissions
 
@@ -282,12 +287,14 @@ class DomainPermissionContext(AbstractPermissionContext[DomainPermission, Domain
             )
         return cond
 
+    @override
     async def build_query(self) -> sa.sql.Select[Any] | None:
         cond = self.query_condition
         if cond is None:
             return None
         return sa.select(DomainRow).where(cond)
 
+    @override
     async def calculate_final_permission(self, rbac_obj: DomainRow) -> frozenset[DomainPermission]:
         domain_row = rbac_obj
         domain_name = domain_row.name

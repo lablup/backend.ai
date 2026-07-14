@@ -12,9 +12,9 @@ from sqlalchemy import cast, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import array as pg_array
 
+from ai.backend.manager.data.scaling_group.types import FairShareScalingGroupSpec
 from ai.backend.manager.data.scaling_group.types import PreemptionConfig as DataPreemptionConfig
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
-from ai.backend.manager.models.scaling_group.types import FairShareScalingGroupSpec
 from ai.backend.manager.repositories.base.updater import UpdaterSpec
 from ai.backend.manager.types import OptionalState, TriState
 
@@ -143,9 +143,11 @@ class ScalingGroupSchedulerConfigUpdaterSpec(UpdaterSpec[ScalingGroupRow]):
             to_update["scheduler_opts"] = scheduler_opts
         if (preemption := self.preemption_config.optional_value()) is not None:
             preemption_dict = {
+                "enabled": preemption.enabled,
                 "preemptible_priority": preemption.preemptible_priority,
                 "order": preemption.order.value,
                 "mode": preemption.mode.value,
+                "preemption_min_runtime": preemption.preemption_min_runtime.total_seconds(),
             }
             to_update["scheduler_opts"] = func.jsonb_set(
                 sa.literal_column("scheduler_opts"),

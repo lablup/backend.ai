@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from datetime import datetime
-from typing import TYPE_CHECKING, Annotated, Any, Self, cast
+from typing import TYPE_CHECKING, Annotated, Any, Self, cast, override
 from uuid import UUID
 
 import strawberry
@@ -16,6 +16,9 @@ from ai.backend.common.data.model_deployment.types import LivenessStatus as Comm
 from ai.backend.common.data.model_deployment.types import ReadinessStatus as CommonReadinessStatus
 from ai.backend.common.dto.manager.v2.deployment.request import (
     ReplicaFilter as ReplicaFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    ReplicaHealthStatusFilter as ReplicaHealthStatusFilterDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
     ReplicaOrder as ReplicaOrderDTO,
@@ -35,6 +38,7 @@ from ai.backend.common.dto.manager.v2.deployment.response import (
 from ai.backend.common.dto.manager.v2.deployment.types import (
     ReplicaOrderField,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     OrderDirection,
 )
@@ -156,6 +160,26 @@ class TrafficStatusFilter(PydanticInputMixin[ReplicaTrafficStatusFilterDTO]):
     )
 
 
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter for replica health status.",
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="ReplicaHealthStatusFilter",
+)
+class ReplicaHealthStatusFilterGQL(PydanticInputMixin[ReplicaHealthStatusFilterDTO]):
+    in_: list[ReplicaHealthStatusGQL] | None = gql_field(
+        description="Health status is in the list.", name="in", default=None
+    )
+    equals: ReplicaHealthStatusGQL | None = None
+    not_in: list[ReplicaHealthStatusGQL] | None = gql_field(
+        description="Excludes health statuses in the list.", name="notIn", default=None
+    )
+    not_equals: ReplicaHealthStatusGQL | None = gql_field(
+        description="Excludes exact health status match.", name="notEquals", default=None
+    )
+
+
 # ========== ModelReplica Types ==========
 
 
@@ -165,6 +189,13 @@ class TrafficStatusFilter(PydanticInputMixin[ReplicaTrafficStatusFilterDTO]):
 )
 class ReplicaFilter(PydanticInputMixin[ReplicaFilterDTO]):
     status: ReplicaStatusFilter | None = None
+    health_status: ReplicaHealthStatusFilterGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by replica health status.",
+        ),
+        default=None,
+    )
     traffic_status: TrafficStatusFilter | None = None
 
     AND: list[Self] | None = None
@@ -239,7 +270,7 @@ class ModelReplica(PydanticNodeMixin[ReplicaNodeDTO]):
     @gql_added_field(
         BackendAIGQLMeta(
             added_version="26.4.3",
-            description="The compute session running this replica, resolved via DataLoader.",
+            description="The compute session running this replica.",
         )
     )  # type: ignore[misc]
     async def session_v2(
@@ -285,6 +316,7 @@ class ModelReplica(PydanticNodeMixin[ReplicaNodeDTO]):
         return await info.context.data_loaders.deployment_loader.load(UUID(str(self.deployment_id)))
 
     @classmethod
+    @override
     async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
         cls,
         *,

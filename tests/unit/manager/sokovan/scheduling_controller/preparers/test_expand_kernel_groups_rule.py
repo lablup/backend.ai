@@ -18,6 +18,7 @@ from ai.backend.common.types import ResourceSlotEntry
 from ai.backend.manager.data.session.draft import (
     KernelExecutionSpecDraft,
     KernelGroupDraft,
+    KernelResourceInput,
     SessionOptionsDraft,
     SessionSpecDraft,
 )
@@ -44,8 +45,10 @@ def context() -> SessionSpecPreparationContext:
 
 def _make_execution_spec(image_id: ImageID, cpu: str = "1") -> KernelExecutionSpecDraft:
     return KernelExecutionSpecDraft(
-        image_id=image_id,
-        resources=(ResourceSlotEntry(resource_type="cpu", quantity=cpu),),
+        resource_input=KernelResourceInput(
+            image_id=image_id,
+            resources=(ResourceSlotEntry(resource_type="cpu", quantity=cpu),),
+        ),
     )
 
 
@@ -167,8 +170,8 @@ class TestExpandKernelGroupsRule:
         result = await rule.prepare(draft, context)
 
         for kernel in result.kernel_specs:
-            assert kernel.execution_spec.image_id == image_id
-            assert kernel.execution_spec.resources == (
+            assert kernel.execution_spec.resource_input.image_id == image_id
+            assert kernel.execution_spec.resource_input.resources == (
                 ResourceSlotEntry(resource_type="cpu", quantity="4"),
             )
 

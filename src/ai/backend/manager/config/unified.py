@@ -182,7 +182,7 @@ from datetime import UTC, datetime
 from ipaddress import IPv4Network
 from pathlib import Path
 from pprint import pformat
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, Literal, override
 
 from pydantic import (
     AliasChoices,
@@ -3725,5 +3725,6 @@ class ManagerUnifiedConfig(BaseConfigSchema):
         extra="allow",
     )
 
+    @override
     def __repr__(self) -> str:
         return pformat(self.model_dump())

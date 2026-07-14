@@ -34,6 +34,9 @@ from ai.backend.common.types import (
     VFolderUsageMode,
 )
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.data.permission.permission_defs import (
+    VFolderPermission as VFolderRBACPermission,
+)
 from ai.backend.manager.data.permission.types import (
     EntityType as PermissionEntityType,
 )
@@ -55,9 +58,6 @@ from ai.backend.manager.models.rbac import (
     SystemScope,
 )
 from ai.backend.manager.models.rbac.context import ClientContext
-from ai.backend.manager.models.rbac.permission_defs import (
-    VFolderPermission as VFolderRBACPermission,
-)
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )

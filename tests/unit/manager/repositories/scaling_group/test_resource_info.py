@@ -9,6 +9,8 @@ from decimal import Decimal
 
 import pytest
 
+from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import ResourceSlot, SlotQuantity
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
@@ -52,6 +54,7 @@ def _create_kernel(
     group_id: uuid.UUID,
     user_uuid: uuid.UUID,
     scaling_group: str,
+    resource_group_id: ResourceGroupID,
     agent_id: str,
     status: KernelStatus,
     occupied_slots: ResourceSlot,
@@ -66,6 +69,7 @@ def _create_kernel(
         group_id=group_id,
         user_uuid=user_uuid,
         scaling_group=scaling_group,
+        resource_group_id=resource_group_id,
         agent=agent_id,
         status=status,
         occupied_slots=occupied_slots,
@@ -153,14 +157,24 @@ class TestResourceInfo:
         )
 
     @pytest.fixture
+    def base_scaling_group_id(self) -> ResourceGroupID:
+        return ResourceGroupID(uuid.uuid4())
+
+    @pytest.fixture
+    def test_domain_id(self) -> DomainID:
+        return DomainID(uuid.uuid4())
+
+    @pytest.fixture
     async def base_scaling_group(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        base_scaling_group_id: ResourceGroupID,
     ) -> AsyncGenerator[str, None]:
         """Create a basic scaling group for testing."""
         sgroup_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as db_sess:
             sgroup = ScalingGroupRow(
+                id=base_scaling_group_id,
                 name=sgroup_name,
                 description="Test scaling group",
                 is_active=True,
@@ -182,6 +196,7 @@ class TestResourceInfo:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         base_scaling_group: str,
+        base_scaling_group_id: ResourceGroupID,
     ) -> AsyncGenerator[tuple[str, list[ResourceSlot]], None]:
         """Create scaling group with ALIVE, schedulable agents.
 
@@ -200,6 +215,7 @@ class TestResourceInfo:
                     id=agent_id,
                     status=AgentStatus.ALIVE,
                     scaling_group=base_scaling_group,
+                    resource_group_id=base_scaling_group_id,
                     schedulable=True,
                     available_slots=slots,
                     occupied_slots=ResourceSlot(),
@@ -223,6 +239,7 @@ class TestResourceInfo:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         base_scaling_group: str,
+        base_scaling_group_id: ResourceGroupID,
     ) -> AsyncGenerator[tuple[str, ResourceSlot], None]:
         """Create scaling group with mixed agent statuses.
 
@@ -243,6 +260,7 @@ class TestResourceInfo:
                     id=alive_id,
                     status=AgentStatus.ALIVE,
                     scaling_group=base_scaling_group,
+                    resource_group_id=base_scaling_group_id,
                     schedulable=True,
                     available_slots=alive_slots,
                     occupied_slots=ResourceSlot(),
@@ -263,6 +281,7 @@ class TestResourceInfo:
                     id=lost_id,
                     status=AgentStatus.LOST,
                     scaling_group=base_scaling_group,
+                    resource_group_id=base_scaling_group_id,
                     schedulable=True,
                     available_slots=lost_slots,
                     occupied_slots=ResourceSlot(),
@@ -283,6 +302,7 @@ class TestResourceInfo:
                     id=terminated_id,
                     status=AgentStatus.TERMINATED,
                     scaling_group=base_scaling_group,
+                    resource_group_id=base_scaling_group_id,
                     schedulable=True,
                     available_slots=terminated_slots,
                     occupied_slots=ResourceSlot(),
@@ -313,6 +333,7 @@ class TestResourceInfo:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         base_scaling_group: str,
+        base_scaling_group_id: ResourceGroupID,
     ) -> AsyncGenerator[tuple[str, ResourceSlot], None]:
         """Create scaling group with schedulable and non-schedulable agents.
 
@@ -332,6 +353,7 @@ class TestResourceInfo:
                     id=sched_id,
                     status=AgentStatus.ALIVE,
                     scaling_group=base_scaling_group,
+                    resource_group_id=base_scaling_group_id,
                     schedulable=True,
                     available_slots=schedulable_slots,
                     occupied_slots=ResourceSlot(),
@@ -352,6 +374,7 @@ class TestResourceInfo:
                     id=non_sched_id,
                     status=AgentStatus.ALIVE,
                     scaling_group=base_scaling_group,
+                    resource_group_id=base_scaling_group_id,
                     schedulable=False,
                     available_slots=non_schedulable_slots,
                     occupied_slots=ResourceSlot(),
@@ -380,6 +403,7 @@ class TestResourceInfo:
     async def test_user_domain_group(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_id: DomainID,
     ) -> AsyncGenerator[tuple[uuid.UUID, str, uuid.UUID], None]:
         """Create test domain, user, and group for kernel tests.
 
@@ -394,6 +418,7 @@ class TestResourceInfo:
         async with db_with_cleanup.begin_session() as db_sess:
             # Create domain
             domain = DomainRow(
+                id=test_domain_id,
                 name=test_domain,
                 description="Test domain",
                 is_active=True,
@@ -461,6 +486,8 @@ class TestResourceInfo:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         base_scaling_group: str,
+        base_scaling_group_id: ResourceGroupID,
+        test_domain_id: DomainID,
         test_user_domain_group: tuple[uuid.UUID, str, uuid.UUID],
     ) -> AsyncGenerator[tuple[str, ResourceSlot, list[ResourceSlot]], None]:
         """Create scaling group with agent and RUNNING/TERMINATING kernels.
@@ -485,6 +512,7 @@ class TestResourceInfo:
                     id=agent_id,
                     status=AgentStatus.ALIVE,
                     scaling_group=base_scaling_group,
+                    resource_group_id=base_scaling_group_id,
                     schedulable=True,
                     available_slots=agent_capacity,
                     occupied_slots=ResourceSlot(),
@@ -509,9 +537,11 @@ class TestResourceInfo:
                 SessionRow(
                     id=session_id,
                     domain_name=domain_name,
+                    domain_id=test_domain_id,
                     group_id=group_id,
                     user_uuid=user_uuid,
                     scaling_group_name=base_scaling_group,
+                    resource_group_id=base_scaling_group_id,
                     cluster_size=2,
                     vfolder_mounts={},
                 )
@@ -526,6 +556,7 @@ class TestResourceInfo:
                     group_id=group_id,
                     user_uuid=user_uuid,
                     scaling_group=base_scaling_group,
+                    resource_group_id=base_scaling_group_id,
                     agent_id=agent_id,
                     status=KernelStatus.RUNNING,
                     occupied_slots=kernel_slots[0],
@@ -542,6 +573,7 @@ class TestResourceInfo:
                     group_id=group_id,
                     user_uuid=user_uuid,
                     scaling_group=base_scaling_group,
+                    resource_group_id=base_scaling_group_id,
                     agent_id=agent_id,
                     status=KernelStatus.TERMINATING,
                     occupied_slots=kernel_slots[1],
@@ -557,6 +589,8 @@ class TestResourceInfo:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         base_scaling_group: str,
+        base_scaling_group_id: ResourceGroupID,
+        test_domain_id: DomainID,
         test_user_domain_group: tuple[uuid.UUID, str, uuid.UUID],
     ) -> AsyncGenerator[tuple[str, ResourceSlot, ResourceSlot], None]:
         """Create scaling group with kernels in various statuses.
@@ -585,6 +619,7 @@ class TestResourceInfo:
                     id=agent_id,
                     status=AgentStatus.ALIVE,
                     scaling_group=base_scaling_group,
+                    resource_group_id=base_scaling_group_id,
                     schedulable=True,
                     available_slots=agent_capacity,
                     occupied_slots=ResourceSlot(),
@@ -609,9 +644,11 @@ class TestResourceInfo:
                 SessionRow(
                     id=session_id,
                     domain_name=domain_name,
+                    domain_id=test_domain_id,
                     group_id=group_id,
                     user_uuid=user_uuid,
                     scaling_group_name=base_scaling_group,
+                    resource_group_id=base_scaling_group_id,
                     cluster_size=4,
                     vfolder_mounts={},
                 )
@@ -626,6 +663,7 @@ class TestResourceInfo:
                     group_id=group_id,
                     user_uuid=user_uuid,
                     scaling_group=base_scaling_group,
+                    resource_group_id=base_scaling_group_id,
                     agent_id=agent_id,
                     status=KernelStatus.RUNNING,
                     occupied_slots=running_slots,
@@ -642,6 +680,7 @@ class TestResourceInfo:
                     group_id=group_id,
                     user_uuid=user_uuid,
                     scaling_group=base_scaling_group,
+                    resource_group_id=base_scaling_group_id,
                     agent_id=agent_id,
                     status=KernelStatus.TERMINATING,
                     occupied_slots=terminating_slots,
@@ -658,6 +697,7 @@ class TestResourceInfo:
                     group_id=group_id,
                     user_uuid=user_uuid,
                     scaling_group=base_scaling_group,
+                    resource_group_id=base_scaling_group_id,
                     agent_id=agent_id,
                     status=KernelStatus.TERMINATED,
                     occupied_slots=terminated_slots,
@@ -674,6 +714,7 @@ class TestResourceInfo:
                     group_id=group_id,
                     user_uuid=user_uuid,
                     scaling_group=base_scaling_group,
+                    resource_group_id=base_scaling_group_id,
                     agent_id=agent_id,
                     status=KernelStatus.PENDING,
                     occupied_slots=pending_slots,

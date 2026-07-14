@@ -45,6 +45,7 @@ class BgtaskUpdatedEvent(BaseBgtaskEvent):
     total_progress: float
     message: str | None = None
 
+    @override
     def serialize(self) -> tuple[Any, ...]:
         return (
             str(self.task_id),
@@ -54,6 +55,7 @@ class BgtaskUpdatedEvent(BaseBgtaskEvent):
         )
 
     @classmethod
+    @override
     def deserialize(cls, value: tuple[Any, ...]) -> Self:
         return cls(
             uuid.UUID(value[0]),

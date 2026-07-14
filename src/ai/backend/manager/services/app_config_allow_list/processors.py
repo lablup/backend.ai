@@ -22,6 +22,10 @@ from ai.backend.manager.services.app_config_allow_list.actions.search import (
     SearchAppConfigAllowListAction,
     SearchAppConfigAllowListActionResult,
 )
+from ai.backend.manager.services.app_config_allow_list.actions.update import (
+    UpdateAppConfigAllowListAction,
+    UpdateAppConfigAllowListActionResult,
+)
 from ai.backend.manager.services.app_config_allow_list.service import (
     AppConfigAllowListService,
 )
@@ -35,6 +39,9 @@ class AppConfigAllowListProcessors(AbstractProcessorPackage):
     search: ScopeActionProcessor[
         SearchAppConfigAllowListAction, SearchAppConfigAllowListActionResult
     ]
+    update: SingleEntityActionProcessor[
+        UpdateAppConfigAllowListAction, UpdateAppConfigAllowListActionResult
+    ]
     purge: SingleEntityActionProcessor[
         PurgeAppConfigAllowListAction, PurgeAppConfigAllowListActionResult
     ]
@@ -47,6 +54,7 @@ class AppConfigAllowListProcessors(AbstractProcessorPackage):
         self.create = ScopeActionProcessor(service.create, action_monitors)
         self.get = SingleEntityActionProcessor(service.get, action_monitors)
         self.search = ScopeActionProcessor(service.search, action_monitors)
+        self.update = SingleEntityActionProcessor(service.update, action_monitors)
         self.purge = SingleEntityActionProcessor(service.purge, action_monitors)
 
     @override
@@ -55,5 +63,6 @@ class AppConfigAllowListProcessors(AbstractProcessorPackage):
             CreateAppConfigAllowListAction.spec(),
             GetAppConfigAllowListAction.spec(),
             SearchAppConfigAllowListAction.spec(),
+            UpdateAppConfigAllowListAction.spec(),
             PurgeAppConfigAllowListAction.spec(),
         ]

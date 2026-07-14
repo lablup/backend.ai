@@ -2,6 +2,7 @@
 
 import logging
 from collections.abc import Sequence
+from typing import override
 
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.logging import BraceStyleAdapter
@@ -39,18 +40,22 @@ class StartingRouteHandler(RouteHandler):
         self._event_producer = event_producer
 
     @classmethod
+    @override
     def name(cls) -> str:
         return "check-starting-routes"
 
     @property
+    @override
     def lock_id(self) -> None:
         return None
 
     @classmethod
+    @override
     def category(cls) -> RouteHandlerCategory:
         return RouteHandlerCategory.LIFECYCLE
 
     @classmethod
+    @override
     def target_statuses(cls) -> RouteTargetStatuses:
         return RouteTargetStatuses(
             lifecycle=[RouteStatus.PROVISIONING],
@@ -58,6 +63,7 @@ class StartingRouteHandler(RouteHandler):
         )
 
     @classmethod
+    @override
     def status_transitions(cls) -> RouteStatusTransitions:
         """Host/port ready → sub_status=WARMING_UP; session dead → FAILED_TO_START."""
         return RouteStatusTransitions(
@@ -71,10 +77,12 @@ class StartingRouteHandler(RouteHandler):
             stale=None,
         )
 
+    @override
     async def execute(self, routes: Sequence[RouteData]) -> RouteExecutionResult:
         log.debug("Checking {} starting routes for host/port readiness", len(routes))
         return await self._route_executor.check_starting_routes(routes)
 
+    @override
     async def post_process(self, result: RouteExecutionResult) -> None:
         log.info(
             "Starting check: {} routes ready (→ warming_up), {} failed",

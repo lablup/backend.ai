@@ -101,6 +101,7 @@ from ai.backend.common.types import (
 from ai.backend.common.utils import str_to_timedelta
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.clients.appproxy.types import CreateEndpointRequestBody
+from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.image.types import ImageIdentifier
@@ -109,6 +110,7 @@ from ai.backend.manager.data.model_serving.types import EndpointData
 from ai.backend.manager.data.session.draft import (
     KernelExecutionSpecDraft,
     KernelGroupDraft,
+    KernelResourceInput,
     SchedulingTargetDraft,
     SessionClassificationDraft,
     SessionIdentityDraft,
@@ -120,7 +122,6 @@ from ai.backend.manager.data.session.draft import (
 from ai.backend.manager.data.session.options import (
     InternalDataExtras,
     ResourceOpts,
-    SessionHandlerOptions,
 )
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.models.resource_slot import ResourceAllocationRow
@@ -174,7 +175,6 @@ from .models.session import (
     SessionRow,
     handle_session_exception,
 )
-from .models.storage import StorageSessionManager
 from .models.user import UserRow
 from .models.utils import (
     ExtendedAsyncSAEngine,
@@ -1019,7 +1019,10 @@ class AgentRegistry:
         resource_entries = self._resource_entries_from_legacy_dict(
             creation_config.get("resources") or {}
         )
-        resource_opts = ResourceOpts.model_validate(creation_config.get("resource_opts") or {})
+        resource_opts_payload = creation_config.get("resource_opts") or {}
+        resource_opts = (
+            ResourceOpts.model_validate(resource_opts_payload) if resource_opts_payload else None
+        )
         environ_dict = dict(creation_config.get("environ") or {})
         preopen_ports = tuple(creation_config.get("preopen_ports") or ())
         # Session-level fields (callback, dependencies, etc.) flow onto
@@ -1068,9 +1071,11 @@ class AgentRegistry:
             kernel: KernelEnqueueingConfig,
         ) -> KernelExecutionSpecDraft:
             return KernelExecutionSpecDraft(
-                image_id=image_id_by_ref[kernel["image_ref"]],
-                resources=resource_entries,
-                resource_opts=resource_opts,
+                resource_input=KernelResourceInput(
+                    image_id=image_id_by_ref[kernel["image_ref"]],
+                    resources=resource_entries,
+                    resource_opts=resource_opts,
+                ),
                 environ=environ_dict,
                 mounts=mount_entries,
                 startup_command=kernel.get("startup_command") or startup_command,
@@ -1119,13 +1124,21 @@ class AgentRegistry:
         if not groups_by_role:
             raise InvalidAPIParameters("No kernel groups resolved from the enqueue request.")
 
+        domain_name = DomainName(user_scope.domain_name)
+        domain_id = await self._scheduler_repository.get_domain_id_by_name(domain_name)
         if scaling_group:
             resource_group_name = ResourceGroupName(scaling_group)
+            resource_group_id = await self._scheduler_repository.get_resource_group_id_by_name(
+                resource_group_name
+            )
         else:
-            resource_group_name = await self._scheduler_repository.pick_default_resource_group(
+            resource_group_id = await self._scheduler_repository.pick_default_resource_group(
                 access_key=access_key,
                 domain_name=user_scope.domain_name,
                 project_id=ProjectID(user_scope.group_id),
+            )
+            resource_group_name = await self._scheduler_repository.get_resource_group_name_by_id(
+                resource_group_id
             )
 
         draft = SessionSpecDraft(
@@ -1137,8 +1150,10 @@ class AgentRegistry:
                 user_uuid=user_scope.user_uuid,
             ),
             scope=SessionScopeDraft(
-                domain_name=DomainName(user_scope.domain_name),
+                domain_id=domain_id,
+                domain_name=domain_name,
                 project_id=ProjectID(user_scope.group_id),
+                resource_group_id=resource_group_id,
                 resource_group_name=resource_group_name,
             ),
             classification=SessionClassificationDraft(
@@ -1157,7 +1172,7 @@ class AgentRegistry:
                     designated_agents=tuple(AgentId(a) for a in (agent_list or ())),
                 ),
                 kernel_groups=tuple(groups_by_role.values()),
-                handler_options=SessionHandlerOptions(),
+                handler_options=None,
             ),
             internal_data_extras=InternalDataExtras(
                 sudo_session_enabled=sudo_session_enabled,

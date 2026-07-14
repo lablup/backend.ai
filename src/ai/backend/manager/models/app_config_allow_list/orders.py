@@ -28,6 +28,12 @@ class AppConfigAllowListOrders:
         return AppConfigAllowListRow.scope_type.desc()
 
     @staticmethod
+    def rank(ascending: bool = True) -> QueryOrder:
+        if ascending:
+            return AppConfigAllowListRow.rank.asc()
+        return AppConfigAllowListRow.rank.desc()
+
+    @staticmethod
     def created_at(ascending: bool = True) -> QueryOrder:
         if ascending:
             return AppConfigAllowListRow.created_at.asc()

@@ -15,6 +15,7 @@ from collections.abc import Sequence
 from datetime import date, timedelta
 from typing import TYPE_CHECKING, override
 
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.kernel.types import KernelInfo
 from ai.backend.manager.models.clauses import QueryCondition
@@ -82,7 +83,7 @@ class FairShareObserver(KernelObserver):
         return "FairShareObserver"
 
     @override
-    def get_query_condition(self, scaling_group: str) -> QueryCondition:
+    def get_query_condition(self, resource_group_id: ResourceGroupID) -> QueryCondition:
         """Get query condition for fair share observation.
 
         Returns a condition that matches:
@@ -92,17 +93,17 @@ class FairShareObserver(KernelObserver):
         The lookback_days is fetched from scaling_group's fair_share_spec via subquery.
 
         Args:
-            scaling_group: The scaling group being processed
+            resource_group_id: The id of the scaling group being processed
 
         Returns:
             QueryCondition for fair share observation targets
         """
-        return KernelConditions.for_fair_share_observation(scaling_group)
+        return KernelConditions.for_fair_share_observation(resource_group_id)
 
     @override
     async def observe(
         self,
-        scaling_group: str,
+        resource_group_id: ResourceGroupID,
         kernels: Sequence[KernelInfo],
     ) -> ObservationResult:
         """Observe kernel usage and update fair share data.
@@ -121,7 +122,7 @@ class FairShareObserver(KernelObserver):
         - DB write: factors + ranks (batched)
 
         Args:
-            scaling_group: The scaling group being processed
+            resource_group_id: The id of the scaling group being processed
             kernels: Kernels to observe (running + recently terminated with unobserved periods)
 
         Returns:
@@ -129,7 +130,7 @@ class FairShareObserver(KernelObserver):
         """
         log.debug(
             "[FairShareObserver] observe() called: scaling_group={}, kernel_count={}",
-            scaling_group,
+            resource_group_id,
             len(kernels),
         )
         if not kernels:
@@ -137,10 +138,14 @@ class FairShareObserver(KernelObserver):
             return ObservationResult(observed_count=0)
 
         now = await self._scheduler_repository.get_db_now()
+        # Fair share records and factor queries are keyed by name.
+        resource_group_name = await self._scheduler_repository.get_resource_group_name_by_id(
+            resource_group_id
+        )
 
         # ===== Phase 1: Record usage =====
         preparation_result = self._aggregator.prepare_kernel_usage_records(
-            kernels, scaling_group, now
+            kernels, resource_group_name, now
         )
 
         log.debug(
@@ -176,7 +181,7 @@ class FairShareObserver(KernelObserver):
         log.debug("[FairShareObserver] DB write completed")
 
         # ===== Phase 2: Calculate and update factors + ranks =====
-        await self._calculate_and_update_factors_and_ranks(scaling_group, now.date())
+        await self._calculate_and_update_factors_and_ranks(resource_group_name, now.date())
 
         log.debug(
             "[FairShareObserver] Observation complete: observed_count={}",

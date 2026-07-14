@@ -4,6 +4,8 @@ Agent-related exceptions.
 
 from __future__ import annotations
 
+from typing import override
+
 from aiohttp import web
 
 from ai.backend.common.exception import (
@@ -27,6 +29,7 @@ class AgentConnectionUnavailable(BackendAIError, web.HTTPServiceUnavailable):
         self.failure_reason = failure_reason
         super().__init__(f"Agent {agent_id} connection unavailable: {failure_reason}")
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,

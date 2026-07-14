@@ -22,6 +22,7 @@ from ai.backend.common.dto.manager.compute_session import (
     SearchComputeSessionsRequest,
 )
 from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import (
     ClusterMode,
     KernelId,
@@ -159,6 +160,7 @@ def create_kernel_info(
         ),
         resource=ResourceInfo(
             scaling_group="default",
+            resource_group_id=ResourceGroupID(uuid4()),
             agent=agent,
             agent_addr=None,
             container_id=None,

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from contextlib import AbstractAsyncContextManager
-from typing import TYPE_CHECKING, TypeVar, final
+from typing import TYPE_CHECKING, TypeVar, final, override
 
 if TYPE_CHECKING:
     from ai.backend.common.health_checker import ServiceHealthChecker
@@ -88,10 +88,12 @@ class NonMonitorableDependencyProvider(DependencyProvider[SetupInputT, ResourceT
     """
 
     @final
+    @override
     def gen_liveness_checker(self, resource: ResourceT) -> None:
         return None
 
     @final
+    @override
     def gen_readiness_checker(self, resource: ResourceT) -> None:
         return None
 

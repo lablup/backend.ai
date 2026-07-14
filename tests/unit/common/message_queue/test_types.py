@@ -1,8 +1,20 @@
 from uuid import UUID
 
+from ai.backend.common.contexts.user import current_user, triggered_user
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.json import dump_json, load_json
 from ai.backend.common.message_queue.types import MessageMetadata
+
+
+def _make_user(user_id: str, is_superadmin: bool = False) -> UserData:
+    return UserData(
+        user_id=UUID(user_id),
+        is_authorized=True,
+        is_admin=is_superadmin,
+        is_superadmin=is_superadmin,
+        role=UserRole.SUPERADMIN if is_superadmin else UserRole.USER,
+        domain_name="default",
+    )
 
 
 class TestMessageMetadata:
@@ -184,3 +196,28 @@ class TestMessageMetadata:
         assert deserialized.user.is_superadmin == original.user.is_superadmin
         assert deserialized.user.role == original.user.role
         assert deserialized.user.domain_name == original.user.domain_name
+
+    def test_roundtrip_preserves_triggered_user(self) -> None:
+        target = _make_user("11111111-1111-1111-1111-111111111111")
+        super_admin = _make_user("22222222-2222-2222-2222-222222222222", is_superadmin=True)
+        original = MessageMetadata(user=target, triggered_user=super_admin)
+
+        deserialized = MessageMetadata.deserialize(original.serialize())
+        assert deserialized.triggered_user is not None
+        assert str(deserialized.triggered_user.user_id) == str(super_admin.user_id)
+        assert deserialized.triggered_user.is_superadmin is True
+
+    def test_apply_context_restores_and_resets_both_users(self) -> None:
+        target = _make_user("11111111-1111-1111-1111-111111111111")
+        super_admin = _make_user("22222222-2222-2222-2222-222222222222", is_superadmin=True)
+        metadata = MessageMetadata(user=target, triggered_user=super_admin)
+
+        with metadata.apply_context():
+            effective = current_user()
+            trigger = triggered_user()
+            assert effective is not None and trigger is not None
+            assert str(effective.user_id) == str(target.user_id)
+            assert str(trigger.user_id) == str(super_admin.user_id)
+        # Reset after the block — also covers the system-event case (both None).
+        assert current_user() is None
+        assert triggered_user() is None

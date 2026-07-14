@@ -11,7 +11,6 @@ from typing import Any
 from ai.backend.common.api_handlers import Sentinel
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.dto.manager.v2.common import (
-    BinarySizeInfo,
     BinarySizeInput,
     ResourceLimitEntryInfo,
     ResourceSlotEntryInfo,
@@ -165,17 +164,6 @@ from ai.backend.manager.services.user_resource_policy.actions.search_user_resour
     SearchUserResourcePoliciesAction,
 )
 from ai.backend.manager.types import OptionalState, TriState
-
-
-def _humanize_bytes(value: int) -> str:
-    """Convert bytes integer to human-readable string (e.g., 1073741824 -> '1g')."""
-    return f"{BinarySize(value):s}"
-
-
-def _to_binary_size_info(value: int) -> BinarySizeInfo:
-    """Convert bytes integer to BinarySizeInfo DTO."""
-    return BinarySizeInfo(value=value, display=_humanize_bytes(value))
-
 
 _KEYPAIR_RP_PAGINATION_SPEC = PaginationSpec(
     forward_order=KeypairResourcePolicyOrders.created_at(ascending=False),
@@ -649,9 +637,10 @@ class ResourcePolicyAdapter(BaseAdapter):
         return UserResourcePolicyNode(
             id=data.name,
             name=data.name,
+            created_at=data.created_at,
             max_vfolder_count=data.max_vfolder_count,
             max_concurrent_logins=data.max_concurrent_logins,
-            max_quota_scope_size=_to_binary_size_info(data.max_quota_scope_size),
+            max_quota_scope_size=BinarySize.to_size_info(data.max_quota_scope_size),
             max_session_count_per_model_session=data.max_session_count_per_model_session,
             max_customized_image_count=data.max_customized_image_count,
         )
@@ -663,8 +652,9 @@ class ResourcePolicyAdapter(BaseAdapter):
         return ProjectResourcePolicyNode(
             id=data.name,
             name=data.name,
+            created_at=data.created_at,
             max_vfolder_count=data.max_vfolder_count,
-            max_quota_scope_size=_to_binary_size_info(data.max_quota_scope_size),
+            max_quota_scope_size=BinarySize.to_size_info(data.max_quota_scope_size),
             max_network_count=data.max_network_count,
         )
 

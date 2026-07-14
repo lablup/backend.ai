@@ -32,6 +32,7 @@ from ai.backend.common.dto.manager.session.response import (
     GetStatusHistoryResponse,
     MatchSessionsResponse,
 )
+from ai.backend.common.identifier.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.types import ResourceSlot, SessionId, SessionTypes
 from ai.backend.manager.api.rest.compute_sessions.handler import ComputeSessionsHandler
 from ai.backend.manager.api.rest.compute_sessions.registry import (
@@ -97,7 +98,8 @@ async def system_session_seed(
     domain_fixture: DomainFixtureData,
     group_fixture: uuid.UUID,
     admin_user_fixture: UserFixtureData,
-    scaling_group_fixture: str,
+    scaling_group_name: ResourceGroupName,
+    scaling_group_id: ResourceGroupID,
 ) -> AsyncIterator[SessionSeedData]:
     """Seed a RUNNING SYSTEM session with an agent row for direct access info tests.
 
@@ -133,7 +135,8 @@ async def system_session_seed(
                 id=agent_id,
                 status=AgentStatus.ALIVE,
                 region="local",
-                scaling_group=scaling_group_fixture,
+                scaling_group=scaling_group_name,
+                resource_group_id=scaling_group_id,
                 available_slots=ResourceSlot(),
                 occupied_slots=ResourceSlot(),
                 addr="tcp://127.0.0.1:6001",
@@ -152,10 +155,12 @@ async def system_session_seed(
                 cluster_size=1,
                 cluster_mode="single-node",
                 domain_name=domain_fixture.domain_name,
+                domain_id=domain_fixture.domain_id,
                 group_id=group_fixture,
                 user_uuid=admin_user_fixture.user_uuid,
                 access_key=admin_user_fixture.keypair.access_key,
-                scaling_group_name=scaling_group_fixture,
+                scaling_group_name=scaling_group_name,
+                resource_group_id=scaling_group_id,
                 status=SessionStatus.RUNNING,
                 status_info="",
                 status_history=status_history,
@@ -180,7 +185,8 @@ async def system_session_seed(
                 group_id=group_fixture,
                 user_uuid=admin_user_fixture.user_uuid,
                 access_key=admin_user_fixture.keypair.access_key,
-                scaling_group=scaling_group_fixture,
+                scaling_group=scaling_group_name,
+                resource_group_id=scaling_group_id,
                 status=KernelStatus.RUNNING,
                 status_info="",
                 occupied_slots=ResourceSlot(),
@@ -219,7 +225,8 @@ async def system_session_no_agent_seed(
     domain_fixture: DomainFixtureData,
     group_fixture: uuid.UUID,
     admin_user_fixture: UserFixtureData,
-    scaling_group_fixture: str,
+    scaling_group_name: ResourceGroupName,
+    scaling_group_id: ResourceGroupID,
 ) -> AsyncIterator[SessionSeedData]:
     """Seed a RUNNING SYSTEM session without an agent row.
 
@@ -247,10 +254,12 @@ async def system_session_no_agent_seed(
                 cluster_size=1,
                 cluster_mode="single-node",
                 domain_name=domain_fixture.domain_name,
+                domain_id=domain_fixture.domain_id,
                 group_id=group_fixture,
                 user_uuid=admin_user_fixture.user_uuid,
                 access_key=admin_user_fixture.keypair.access_key,
-                scaling_group_name=scaling_group_fixture,
+                scaling_group_name=scaling_group_name,
+                resource_group_id=scaling_group_id,
                 status=SessionStatus.RUNNING,
                 status_info="",
                 status_history=status_history,
@@ -275,7 +284,8 @@ async def system_session_no_agent_seed(
                 group_id=group_fixture,
                 user_uuid=admin_user_fixture.user_uuid,
                 access_key=admin_user_fixture.keypair.access_key,
-                scaling_group=scaling_group_fixture,
+                scaling_group=scaling_group_name,
+                resource_group_id=scaling_group_id,
                 status=KernelStatus.RUNNING,
                 status_info="",
                 occupied_slots=ResourceSlot(),
@@ -310,7 +320,8 @@ async def second_session_seed(
     domain_fixture: DomainFixtureData,
     group_fixture: uuid.UUID,
     admin_user_fixture: UserFixtureData,
-    scaling_group_fixture: str,
+    scaling_group_name: ResourceGroupName,
+    scaling_group_id: ResourceGroupID,
     session_seed: SessionSeedData,
 ) -> AsyncIterator[SessionSeedData]:
     """Seed a second INTERACTIVE session alongside session_seed.
@@ -340,10 +351,12 @@ async def second_session_seed(
                 cluster_size=1,
                 cluster_mode="single-node",
                 domain_name=domain_fixture.domain_name,
+                domain_id=domain_fixture.domain_id,
                 group_id=group_fixture,
                 user_uuid=admin_user_fixture.user_uuid,
                 access_key=admin_user_fixture.keypair.access_key,
-                scaling_group_name=scaling_group_fixture,
+                scaling_group_name=scaling_group_name,
+                resource_group_id=scaling_group_id,
                 status=SessionStatus.RUNNING,
                 status_info="",
                 status_history=status_history,
@@ -368,7 +381,8 @@ async def second_session_seed(
                 group_id=group_fixture,
                 user_uuid=admin_user_fixture.user_uuid,
                 access_key=admin_user_fixture.keypair.access_key,
-                scaling_group=scaling_group_fixture,
+                scaling_group=scaling_group_name,
+                resource_group_id=scaling_group_id,
                 status=KernelStatus.RUNNING,
                 status_info="",
                 occupied_slots=ResourceSlot(),

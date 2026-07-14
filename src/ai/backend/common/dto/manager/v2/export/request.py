@@ -12,7 +12,7 @@ from enum import StrEnum
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
-from ai.backend.common.dto.manager.query import DateTimeRangeFilter, StringFilter
+from ai.backend.common.dto.manager.query import DateTimeRangeFilter, StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.export.types import OrderDirection
 
 __all__ = (
@@ -511,6 +511,13 @@ class AuditLogExportFilter(BaseRequestModel):
         description=(
             "Filter audit logs by the user or system that triggered the action. "
             "Use this to export audit logs initiated by a specific actor."
+        ),
+    )
+    acted_as: UUIDFilter | None = Field(
+        default=None,
+        description=(
+            "Filter audit logs by the effective/acting user UUID the action ran as "
+            "(differs from triggered_by only during super-admin impersonation)."
         ),
     )
     request_id: StringFilter | None = Field(

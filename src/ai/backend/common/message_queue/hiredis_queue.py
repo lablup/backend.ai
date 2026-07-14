@@ -3,7 +3,7 @@ import hashlib
 import logging
 import socket
 from collections.abc import AsyncGenerator, Mapping
-from typing import Any, cast
+from typing import Any, cast, override
 
 import hiredis
 from aiotools.server import process_index
@@ -72,6 +72,7 @@ class HiRedisQueue(AbstractMessageQueue):
                 asyncio.create_task(self._read_broadcast_messages_loop(args.subscribe_channels))
             )
 
+    @override
     async def send(self, payload: dict[bytes, bytes]) -> None:
         async with RedisConnection(self._target, db=self._db) as client:
             pieces = _make_pieces(payload)
@@ -84,6 +85,7 @@ class HiRedisQueue(AbstractMessageQueue):
                 *pieces,
             ])
 
+    @override
     async def broadcast(self, payload: Mapping[str, str]) -> None:
         async with RedisConnection(self._target, db=self._db) as client:
             payload_bytes = dump_json(payload)
@@ -93,6 +95,7 @@ class HiRedisQueue(AbstractMessageQueue):
                 payload_bytes,
             ])
 
+    @override
     async def broadcast_with_cache(self, cache_id: str, payload: Mapping[str, str]) -> None:
         async with RedisConnection(self._target, db=self._db) as client:
             payload_bytes = dump_json(payload)
@@ -114,6 +117,7 @@ class HiRedisQueue(AbstractMessageQueue):
                 ],
             ])
 
+    @override
     async def fetch_cached_broadcast_message(self, cache_id: str) -> Mapping[str, str] | None:
         if self._closed:
             raise RuntimeError("Queue is closed")
@@ -123,6 +127,7 @@ class HiRedisQueue(AbstractMessageQueue):
                 return None
             return cast(Mapping[str, str] | None, load_json(reply))
 
+    @override
     async def broadcast_batch(self, events: list[BroadcastPayload]) -> None:
         """
         Broadcast multiple messages in a batch with optional caching.
@@ -184,6 +189,7 @@ class HiRedisQueue(AbstractMessageQueue):
             except asyncio.CancelledError:
                 break
 
+    @override
     async def done(self, msg_id: MessageId) -> None:
         await self._done(self._anycast_stream_key, msg_id)
 
@@ -196,6 +202,7 @@ class HiRedisQueue(AbstractMessageQueue):
                 msg_id,
             ])
 
+    @override
     async def close(self) -> None:
         if self._closed:
             return

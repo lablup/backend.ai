@@ -254,6 +254,15 @@ class ResourceAllocationGQLDTO(BaseResponseModel):
             "Typed as Any because this field holds a nested GQL type (ResourceSlotGQL)."
         ),
     )
+    allocated: Any = Field(
+        default=None,
+        description=(
+            "The resource slots actually allocated, computed from the "
+            "resource_allocations table. Unlike `used`, this persists after the "
+            "session/kernel is freed or terminated (for statistics and billing). "
+            "Typed as Any because this field holds a nested GQL type (ResourceSlotGQL)."
+        ),
+    )
 
 
 class KernelResourceInfoGQLDTO(BaseResponseModel):

@@ -62,7 +62,10 @@ if TYPE_CHECKING:
         ImageV2AliasGQL,
         ImageV2GQL,
     )
-    from ai.backend.manager.api.gql.kernel.types import KernelV2GQL  # pants: no-infer-dep
+    from ai.backend.manager.api.gql.kernel.types import (  # pants: no-infer-dep
+        KernelV2GQL,
+        ResourceAllocationGQL,
+    )
     from ai.backend.manager.api.gql.notification.types import (  # pants: no-infer-dep
         NotificationChannel,
         NotificationRule,
@@ -535,6 +538,38 @@ class DataLoaders:
 
             dtos = await adapter.batch_load_by_ids(session_ids)
             return [SG.from_pydantic(dto) if dto is not None else None for dto in dtos]
+
+        return DataLoader(load_fn=load_fn)
+
+    @cached_property
+    def session_resource_allocation_loader(
+        self,
+    ) -> DataLoader[SessionId, ResourceAllocationGQL]:
+        adapter = self._adapters.session
+
+        async def load_fn(session_ids: list[SessionId]) -> list[ResourceAllocationGQL]:
+            from ai.backend.manager.api.gql.kernel.types import (  # pants: no-infer-dep
+                ResourceAllocationGQL as RA,
+            )
+
+            dtos = await adapter.batch_resource_allocation_by_session(session_ids)
+            return [RA.from_pydantic(dto) for dto in dtos]
+
+        return DataLoader(load_fn=load_fn)
+
+    @cached_property
+    def kernel_resource_allocation_loader(
+        self,
+    ) -> DataLoader[KernelId, ResourceAllocationGQL]:
+        adapter = self._adapters.session
+
+        async def load_fn(kernel_ids: list[KernelId]) -> list[ResourceAllocationGQL]:
+            from ai.backend.manager.api.gql.kernel.types import (  # pants: no-infer-dep
+                ResourceAllocationGQL as RA,
+            )
+
+            dtos = await adapter.batch_resource_allocation_by_kernel(kernel_ids)
+            return [RA.from_pydantic(dto) for dto in dtos]
 
         return DataLoader(load_fn=load_fn)
 

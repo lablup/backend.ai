@@ -8,6 +8,7 @@ from datetime import datetime
 from typing import override
 from uuid import UUID
 
+from ai.backend.common.identifier.idle_checker import IdleCheckerID
 from ai.backend.common.types import SessionId
 from ai.backend.manager.data.reconciler.types import (
     BaseReconcilerCategory,
@@ -16,6 +17,7 @@ from ai.backend.manager.data.reconciler.types import (
 )
 from ai.backend.manager.data.session.options import HandlerPolicyResolver
 from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.repositories.idle_checker.types import IdleCheckBatchData
 from ai.backend.manager.sokovan.reconciler.base import (
     BaseReconcilerInfo,
     BaseReconcilerKind,
@@ -40,12 +42,12 @@ class IdleCheckTargetStatuses(BaseReconcilerTargetStatuses):
 
 @dataclass
 class IdleCheckReconcileInfo(BaseReconcilerInfo):
-    session_ids: Sequence[SessionId]
+    batch: IdleCheckBatchData
     current_time: datetime
 
     @override
     def entity_ids(self) -> Sequence[UUID]:
-        return self.session_ids
+        return [target.session.session_id for target in self.batch.targets]
 
     @override
     def now(self) -> datetime:
@@ -76,13 +78,29 @@ class IdleCheckDecision(ReconcilerDecision):
         return self.handler_policy
 
 
+@dataclass(frozen=True)
+class IdleReason:
+    """One checker's grounds for judging a session idle."""
+
+    checker_id: IdleCheckerID
+    message: str
+
+
+@dataclass(frozen=True)
+class IdleCheckReport:
+    """One session judged idle and every checker's reason for it."""
+
+    session_id: SessionId
+    reasons: Sequence[IdleReason]
+
+
 @dataclass
 class IdleCheckResult(BaseReconcilerResult):
-    idle_session_ids: list[SessionId] = field(default_factory=list)
+    reports: list[IdleCheckReport] = field(default_factory=list)
 
     @override
     def processed_count(self) -> int:
-        return len(self.idle_session_ids)
+        return len(self.reports)
 
     @override
     def failed_count(self) -> int:

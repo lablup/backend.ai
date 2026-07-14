@@ -49,8 +49,8 @@ from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.vfolder import (
     VFolderPermissionRow,
     VFolderRow,
-    prepare_vfolder_mounts,
 )
+from ai.backend.manager.repositories.vfolder.mount import prepare_vfolder_mounts
 from ai.backend.manager.types import UserScope
 from ai.backend.testutils.db import with_tables
 

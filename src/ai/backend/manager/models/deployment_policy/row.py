@@ -11,6 +11,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.schema.deployment import BlueGreenSpec, RollingUpdateSpec
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import DeploymentPolicyData
 from ai.backend.manager.errors.deployment import InvalidDeploymentStrategy
@@ -19,8 +20,6 @@ from ai.backend.manager.models.base import (
     Base,
     StrEnumType,
 )
-
-from .schema import BlueGreenSpec, RollingUpdateSpec
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.endpoint import EndpointRow

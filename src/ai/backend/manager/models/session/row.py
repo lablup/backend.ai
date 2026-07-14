@@ -12,7 +12,6 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Self,
-    cast,
     override,
 )
 from uuid import UUID
@@ -39,6 +38,8 @@ from sqlalchemy.orm.strategy_options import _AbstractLoad
 
 from ai.backend.common.defs.session import SESSION_PRIORITY_DEFAULT
 from ai.backend.common.exception import BackendAIError
+from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import (
     AccessKey,
     ClusterMode,
@@ -50,6 +51,7 @@ from ai.backend.common.types import (
     VFolderMount,
 )
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.data.permission.permission_defs import ComputeSessionPermission
 from ai.backend.manager.data.session.options import SessionStoredOptions
 from ai.backend.manager.data.session.types import (
     ImageSpec,
@@ -87,7 +89,6 @@ from ai.backend.manager.models.base import (
     URLColumn,
 )
 from ai.backend.manager.models.group import GroupRow
-from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.minilang.queryfilter import FieldSpecType, QueryFilterParser
 from ai.backend.manager.models.network import NetworkRow, NetworkType
@@ -103,7 +104,6 @@ from ai.backend.manager.models.rbac import (
     UserScope as UserRBACScope,
 )
 from ai.backend.manager.models.rbac.context import ClientContext
-from ai.backend.manager.models.rbac.permission_defs import ComputeSessionPermission
 from ai.backend.manager.models.resource_slot import ResourceAllocationRow
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.types import (
@@ -453,11 +453,20 @@ class SessionRow(Base):  # type: ignore[misc]
     kernels: Mapped[list[KernelRow]] = relationship("KernelRow", back_populates="session")
 
     # Resource ownership
-    scaling_group_name: Mapped[str | None] = mapped_column(
-        "scaling_group_name", sa.ForeignKey("scaling_groups.name"), index=True, nullable=True
+    resource_group_id: Mapped[ResourceGroupID] = mapped_column(
+        "resource_group_id",
+        GUID(ResourceGroupID),
+        sa.ForeignKey("scaling_groups.id"),
+        index=True,
+        nullable=False,
     )
-    scaling_group: Mapped[ScalingGroupRow | None] = relationship(
-        "ScalingGroupRow", back_populates="sessions"
+    scaling_group_name: Mapped[str] = mapped_column(
+        "scaling_group_name", sa.ForeignKey("scaling_groups.name"), index=True, nullable=False
+    )
+    scaling_group: Mapped[ScalingGroupRow] = relationship(
+        "ScalingGroupRow",
+        back_populates="sessions",
+        foreign_keys=[scaling_group_name],
     )
     target_sgroup_names: Mapped[list[str] | None] = mapped_column(
         "target_sgroup_names",
@@ -469,7 +478,18 @@ class SessionRow(Base):  # type: ignore[misc]
     domain_name: Mapped[str] = mapped_column(
         "domain_name", sa.String(length=64), sa.ForeignKey("domains.name"), nullable=False
     )
-    domain: Mapped[DomainRow] = relationship("DomainRow", back_populates="sessions")
+    domain_id: Mapped[DomainID] = mapped_column(
+        "domain_id",
+        GUID(DomainID),
+        sa.ForeignKey("domains.id"),
+        index=True,
+        nullable=False,
+    )
+    domain: Mapped[DomainRow] = relationship(
+        "DomainRow",
+        back_populates="sessions",
+        foreign_keys=[domain_name],
+    )
     group_id: Mapped[UUID] = mapped_column(
         "group_id", GUID, sa.ForeignKey("groups.id"), nullable=False
     )
@@ -779,50 +799,6 @@ class SessionRow(Base):  # type: ignore[misc]
             replica_id=self.replica_id,
         )
 
-    @classmethod
-    def from_session_info(cls, info: SessionInfo) -> Self:
-        return cls(
-            id=info.identity.id,
-            creation_id=info.identity.creation_id,
-            name=info.identity.name,
-            session_type=info.identity.session_type,
-            priority=info.identity.priority,
-            cluster_mode=info.resource.cluster_mode,
-            cluster_size=info.resource.cluster_size,
-            agent_ids=info.resource.agent_ids,
-            scaling_group_name=info.resource.scaling_group_name,
-            target_sgroup_names=info.resource.target_sgroup_names,
-            domain_name=info.metadata.domain_name,
-            group_id=info.metadata.group_id,
-            user_uuid=info.metadata.user_uuid,
-            access_key=info.metadata.access_key,
-            images=info.image.images,
-            tag=info.image.tag or info.metadata.tag,
-            occupying_slots=info.resource.occupying_slots,
-            requested_slots=info.resource.requested_slots,
-            vfolder_mounts=info.mounts.vfolder_mounts,
-            environ=info.execution.environ,
-            bootstrap_script=info.execution.bootstrap_script,
-            startup_command=info.execution.startup_command,
-            use_host_network=info.execution.use_host_network,
-            batch_timeout=info.lifecycle.batch_timeout,
-            created_at=info.lifecycle.created_at
-            or info.metadata.created_at
-            or datetime.now(tzutc()),
-            terminated_at=info.lifecycle.terminated_at,
-            starts_at=info.lifecycle.starts_at,
-            status=info.lifecycle.status or SessionStatus.PENDING,
-            status_info=info.lifecycle.status_info,
-            status_data=info.lifecycle.status_data,
-            status_history=info.lifecycle.status_history,
-            callback_url=info.execution.callback_url,
-            result=info.lifecycle.result,
-            num_queries=info.metrics.num_queries,
-            last_stat=info.metrics.last_stat,
-            network_type=info.network.network_type,
-            network_id=info.network.network_id,
-        )
-
     def to_session_info(self) -> SessionInfo:
         return SessionInfo(
             identity=SessionIdentity(
@@ -935,60 +911,6 @@ class SessionRow(Base):  # type: ignore[misc]
         if len(kerns) == 0:
             raise KernelNotFound(f"Session has no such kernel (sid:{self.id}, kid:{kernel_id}))")
         return kerns[0]
-
-    def get_kernel_by_cluster_name(self, cluster_name: str) -> KernelRow:
-        kerns = tuple(kern for kern in self.kernels if kern.cluster_name == cluster_name)
-        if len(kerns) > 1:
-            raise TooManyKernelsFound(
-                f"Session (id: {self.id}) has more than 1 kernel with {cluster_name = }",
-            )
-        if len(kerns) == 0:
-            raise MainKernelNotFound(
-                f"Session (id: {self.id}) has no kernel with {cluster_name = }.",
-            )
-        return kerns[0]
-
-    @classmethod
-    async def get_session_id_by_kernel(
-        cls, db: ExtendedAsyncSAEngine, kernel_id: KernelId
-    ) -> SessionId | None:
-        query = sa.select(KernelRow.session_id).where(KernelRow.id == kernel_id)
-        async with db.begin_readonly_session() as db_session:
-            result: SessionId | None = await db_session.scalar(query)
-            return result
-
-    @classmethod
-    async def get_sessions_by_status(
-        cls,
-        db_session: SASession,
-        status: SessionStatus,
-        *,
-        load_kernel_image: bool = False,
-    ) -> list[SessionRow]:
-        load_options = selectinload(SessionRow.kernels)
-        if load_kernel_image:
-            load_options = load_options.options(
-                joinedload(KernelRow.image_row).options(joinedload(ImageRow.registry_row))
-            )
-        stmt = sa.select(SessionRow).where(SessionRow.status == status).options(load_options)
-        return list((await db_session.scalars(stmt)).all())
-
-    @classmethod
-    async def get_session_to_determine_status(
-        cls,
-        db_session: SASession,
-        session_id: SessionId,
-    ) -> SessionRow:
-        stmt = (
-            sa.select(SessionRow)
-            .where(SessionRow.id == session_id)
-            # TODO: Add kernel loading strategy?
-            .options(selectinload(SessionRow.kernels))
-        )
-        session_row = cast(SessionRow | None, await db_session.scalar(stmt))
-        if session_row is None:
-            raise SessionNotFound(f"Session not found (id:{session_id})")
-        return session_row
 
     @classmethod
     async def list_session_by_condition(
@@ -1257,30 +1179,6 @@ class SessionRow(Base):  # type: ignore[misc]
         except IndexError as e:
             raise SessionNotFound(f"Session (id={session_id}) does not exist.") from e
 
-    @classmethod
-    async def get_sgroup_managed_sessions(
-        cls,
-        db_sess: SASession,
-        sgroup_name: str,
-    ) -> list[SessionRow]:
-        candidate_statues = (SessionStatus.PENDING, *AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES)
-        query = (
-            sa.select(SessionRow)
-            .where(
-                (SessionRow.scaling_group_name == sgroup_name)
-                & (SessionRow.status.in_(candidate_statues))
-            )
-            .options(
-                noload("*"),
-                selectinload(SessionRow.group).options(noload("*")),
-                selectinload(SessionRow.domain).options(noload("*")),
-                selectinload(SessionRow.access_key_row).options(noload("*")),
-                selectinload(SessionRow.kernels).options(noload("*")),
-            )
-        )
-        result = await db_sess.execute(query)
-        return list(result.scalars().all())
-
     async def get_network_ref(self, db_sess: SASession) -> str | None:
         if not self.network_id or not self.network_type:
             return None
@@ -1290,15 +1188,6 @@ class SessionRow(Base):  # type: ignore[misc]
             case NetworkType.PERSISTENT:
                 network_row = await NetworkRow.get(db_sess, UUID(self.network_id))
                 return network_row.ref_name
-
-    @classmethod
-    def get_status_elapsed_time(
-        cls, status: SessionStatus, until: datetime
-    ) -> sa.sql.elements.BinaryExpression[Any]:
-        result: sa.sql.elements.BinaryExpression[Any] = until - cls.status_history[
-            status.name
-        ].astext.cast(sa.types.DateTime(timezone=True))
-        return result
 
 
 def by_status(statuses: Iterable[SessionStatus]) -> QueryCondition:
@@ -1461,12 +1350,14 @@ class ComputeSessionPermissionContext(
             )
         return cond
 
+    @override
     async def build_query(self) -> sa.sql.Select[Any] | None:
         cond = self.query_condition
         if cond is None:
             return None
         return sa.select(SessionRow).where(cond)
 
+    @override
     async def calculate_final_permission(
         self, rbac_obj: SessionRow
     ) -> frozenset[ComputeSessionPermission]:

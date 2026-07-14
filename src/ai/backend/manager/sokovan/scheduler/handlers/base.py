@@ -5,6 +5,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
 
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.manager.data.session.types import StatusTransitions
 from ai.backend.manager.data.sokovan import SessionWithKernels
 from ai.backend.manager.defs import LockID
@@ -80,13 +81,13 @@ class SessionLifecycleHandler(ABC):
     @abstractmethod
     async def execute(
         self,
-        scaling_group: str,
+        resource_group_id: ResourceGroupID,
         sessions: Sequence[SessionWithKernels],
     ) -> SessionExecutionResult:
         """Execute the handler logic on the given sessions.
 
         Args:
-            scaling_group: The scaling group being processed
+            resource_group_id: The id of the resource group being processed
             sessions: Sessions with full SessionInfo and KernelInfo data
 
         Returns:

@@ -5,6 +5,7 @@ import pytest
 import tomli
 
 from ai.backend.common.config import (
+    DEFAULT_SHELL,
     ModelConfig,
     ModelConfigDraft,
     ModelDefinition,
@@ -107,7 +108,7 @@ class TestMergeFieldCoverage:
         base = ModelServiceConfig.model_construct(
             _fields_set=set(ModelServiceConfig.model_fields),
             pre_start_actions=[],
-            start_command=["base-cmd"],
+            start_command="base-cmd",
             shell="/bin/base",
             port=9999,
             health_check=None,
@@ -115,7 +116,7 @@ class TestMergeFieldCoverage:
         override = ModelServiceConfig.model_construct(
             _fields_set=set(),
             pre_start_actions=[],
-            start_command=[],
+            start_command="",
             shell="",
             port=2,
             health_check=None,
@@ -140,13 +141,13 @@ class TestMergeFieldCoverage:
         )
         base = ModelServiceConfig.model_construct(
             _fields_set={"health_check"},
-            start_command=[],
+            start_command="",
             port=2,
             health_check=base_hc,
         )
         override = ModelServiceConfig.model_construct(
             _fields_set={"health_check"},
-            start_command=[],
+            start_command="",
             port=2,
             health_check=override_hc,
         )
@@ -325,7 +326,7 @@ class TestHealthCheckEnable:
         """A disabled baseline is opted in when a higher-priority draft sets enable=True."""
         base = ModelServiceConfig.model_construct(
             _fields_set={"health_check"},
-            start_command=[],
+            start_command="",
             port=2,
             health_check=ModelHealthCheck.model_construct(
                 _fields_set=set(ModelHealthCheck.model_fields), enable=False, path="/health"
@@ -333,7 +334,7 @@ class TestHealthCheckEnable:
         )
         override = ModelServiceConfig.model_construct(
             _fields_set={"health_check"},
-            start_command=[],
+            start_command="",
             port=2,
             health_check=ModelHealthCheck.model_construct(_fields_set={"enable"}, enable=True),
         )
@@ -351,7 +352,7 @@ class TestModelDefinitionDraftMerge:
             model_path="/models",
             service=ModelServiceConfigDraft(
                 pre_start_actions=[],
-                start_command=["/models/start.sh"],
+                start_command="/models/start.sh",
                 shell="/bin/sh",
                 port=8000,
                 health_check=ModelHealthCheckDraft(
@@ -391,7 +392,7 @@ class TestModelDefinitionDraftMerge:
         assert merged.model_path == "/models"
         assert merged.service is not None
         assert merged.service.port == 8000
-        assert merged.service.start_command == ["/models/start.sh"]
+        assert merged.service.start_command == "/models/start.sh"
         assert merged.service.health_check is not None
         assert merged.service.health_check.enable is False
         assert merged.service.health_check.path == "/override"
@@ -480,6 +481,68 @@ class TestModelConfigs:
         assert service.start_command is None
         assert service.port == 8000
 
+    def test_to_resolved_preserves_explicit_null_shell(self) -> None:
+        draft = ModelDefinitionDraft.model_validate({
+            "models": [
+                {
+                    "name": "demo",
+                    "model_path": "/models/demo",
+                    "service": {
+                        "start_command": "python service.py",
+                        "shell": None,
+                        "port": 8000,
+                    },
+                }
+            ]
+        })
+
+        resolved = draft.to_resolved()
+
+        service = resolved.models[0].service
+        assert service is not None
+        assert service.shell is None
+
+    def test_merge_keeps_unset_shell_unset_and_resolves_default(self) -> None:
+        base = ModelDefinitionDraft.model_validate({
+            "models": [{"name": "demo", "service": {"port": 8080}}]
+        })
+        override = ModelDefinitionDraft.model_validate({
+            "models": [
+                {
+                    "model_path": "/models/demo",
+                    "service": {"start_command": "echo setup\npython service.py"},
+                }
+            ]
+        })
+
+        merged = base.merge(override)
+
+        merged_service = merged.models[0].service if merged.models else None
+        assert merged_service is not None
+        assert "shell" not in merged_service.model_fields_set
+        resolved_service = merged.to_resolved().models[0].service
+        assert resolved_service is not None
+        assert resolved_service.shell == DEFAULT_SHELL
+
+    def test_merge_preserves_explicit_null_shell(self) -> None:
+        base = ModelDefinitionDraft.model_validate({
+            "models": [{"name": "demo", "service": {"port": 8080}}]
+        })
+        override = ModelDefinitionDraft.model_validate({
+            "models": [
+                {
+                    "model_path": "/models/demo",
+                    "service": {"start_command": "python service.py", "shell": None},
+                }
+            ]
+        })
+
+        merged = base.merge(override)
+
+        resolved_service = merged.to_resolved().models[0].service
+        assert resolved_service is not None
+        assert resolved_service.shell is None
+
     def test_to_resolved_substitutes_model_path_placeholder(self) -> None:
         # The variant baseline keeps ``{model_path}`` so a single fixture
         # entry covers any mount destination; the placeholder is resolved
@@ -501,7 +564,7 @@ class TestModelConfigs:
 
         service = resolved.models[0].service
         assert service is not None
-        assert service.start_command == ["vllm", "serve", "/custom-mount"]
+        assert service.start_command == "vllm serve '/custom-mount'"
 
     def test_to_resolved_substitutes_placeholder_with_named_flag(self) -> None:
         # SGLang-style: ``{model_path}`` lands after a flag; the
@@ -529,13 +592,7 @@ class TestModelConfigs:
 
         service = resolved.models[0].service
         assert service is not None
-        assert service.start_command == [
-            "python",
-            "-m",
-            "sglang.launch_server",
-            "--model-path",
-            "/data",
-        ]
+        assert service.start_command == "python -m sglang.launch_server --model-path '/data'"
 
     def test_to_resolved_leaves_start_command_with_no_placeholder_unchanged(self) -> None:
         draft = ModelDefinitionDraft.model_validate({
@@ -555,7 +612,8 @@ class TestModelConfigs:
 
         service = resolved.models[0].service
         assert service is not None
-        assert service.start_command == ["my-server", "--bind", "0.0.0.0"]
+        # start command is changed to a string from a list, but the content is unchanged
+        assert service.start_command == "my-server --bind 0.0.0.0"
 
 
 class TestModelDefinitionWithArgsAppended:
@@ -568,7 +626,7 @@ class TestModelDefinitionWithArgsAppended:
                     model_path="/models",
                     service=ModelServiceConfig(
                         port=8000,
-                        start_command=["vllm", "serve", "/models"],
+                        start_command="vllm serve /models",
                     ),
                 )
             ]
@@ -599,12 +657,12 @@ class TestModelDefinitionWithArgsAppended:
                 ModelConfig(
                     name="a",
                     model_path="/models/a",
-                    service=ModelServiceConfig(port=8001, start_command=["a"]),
+                    service=ModelServiceConfig(port=8001, start_command="a"),
                 ),
                 ModelConfig(
                     name="b",
                     model_path="/models/b",
-                    service=ModelServiceConfig(port=8002, start_command=["b"]),
+                    service=ModelServiceConfig(port=8002, start_command="b"),
                 ),
             ]
         )
@@ -614,17 +672,17 @@ class TestModelDefinitionWithArgsAppended:
         [
             pytest.param(
                 ["--max-model-len", "4096"],
-                ["vllm", "serve", "/models", "--max-model-len", "4096"],
+                "vllm serve /models --max-model-len 4096",
                 id="single-flag-pair",
             ),
             pytest.param(
                 ["--port", "8000", "--max-model-len", "4096"],
-                ["vllm", "serve", "/models", "--port", "8000", "--max-model-len", "4096"],
+                "vllm serve /models --port 8000 --max-model-len 4096",
                 id="multiple-flag-pairs",
             ),
             pytest.param(
                 ["--trust-remote-code"],
-                ["vllm", "serve", "/models", "--trust-remote-code"],
+                "vllm serve /models --trust-remote-code",
                 id="bare-flag",
             ),
         ],
@@ -633,7 +691,7 @@ class TestModelDefinitionWithArgsAppended:
         self,
         vllm_definition: ModelDefinition,
         args: list[str],
-        expected: list[str],
+        expected: str,
     ) -> None:
         result = vllm_definition.with_args_appended(args)
 
@@ -660,7 +718,7 @@ class TestModelDefinitionWithArgsAppended:
 
         service = vllm_definition.models[0].service
         assert service is not None
-        assert service.start_command == ["vllm", "serve", "/models"]
+        assert service.start_command == "vllm serve /models"
 
     async def test_args_become_start_command_when_none(
         self,
@@ -670,7 +728,7 @@ class TestModelDefinitionWithArgsAppended:
 
         service = result.models[0].service
         assert service is not None
-        assert service.start_command == ["--port", "8000"]
+        assert service.start_command == "--port 8000"
 
     async def test_passes_through_models_without_service(
         self,
@@ -689,5 +747,5 @@ class TestModelDefinitionWithArgsAppended:
         first = result.models[0].service
         second = result.models[1].service
         assert first is not None and second is not None
-        assert first.start_command == ["a", "--shared", "true"]
-        assert second.start_command == ["b", "--shared", "true"]
+        assert first.start_command == "a --shared true"
+        assert second.start_command == "b --shared true"

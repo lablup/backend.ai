@@ -10,7 +10,7 @@ import time
 from collections.abc import AsyncIterator
 from contextlib import aclosing
 from pathlib import Path
-from typing import Any
+from typing import Any, override
 
 import aiofiles
 import aiofiles.os
@@ -83,6 +83,7 @@ class QTreeQuotaModel(BaseQuotaModel):
         self.volume_id = volume_id
         self.quota_enabled: bool = False
 
+    @override
     async def create_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
@@ -127,6 +128,7 @@ class QTreeQuotaModel(BaseQuotaModel):
                 )  # pass if "already on"
                 self.quota_enabled = True
 
+    @override
     async def describe_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
@@ -136,6 +138,7 @@ class QTreeQuotaModel(BaseQuotaModel):
             return None
         return await self.netapp_client.get_quota_report(self.svm_id, self.volume_id, qspath.name)
 
+    @override
     async def update_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
@@ -151,11 +154,13 @@ class QTreeQuotaModel(BaseQuotaModel):
         self.netapp_client.check_job_result(result, [])
 
     # FIXME: How do we implement unset_quota() for NetApp?
+    @override
     async def unset_quota(self, quota_scope_id: QuotaScopeID) -> None:
         raise InvalidQuotaScopeError(
             "Unsetting folder limit without removing quota scope is not possible for this backend"
         )
 
+    @override
     async def delete_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
@@ -212,6 +217,7 @@ class XCPFSOpModel(BaseFSOpModel):
             xcp_lic_check_path.write_bytes(b"0")
         return result
 
+    @override
     async def copy_tree(
         self,
         src_path: Path,
@@ -240,6 +246,7 @@ class XCPFSOpModel(BaseFSOpModel):
                 # TODO: line for bgtask
                 pass
 
+    @override
     async def delete_tree(self, path: Path) -> None:
         relpath = path.relative_to(self.mount_path)
         nfspath = f"{self.netapp_nfs_host}:{self.nas_path}/{relpath}"
@@ -255,6 +262,7 @@ class XCPFSOpModel(BaseFSOpModel):
                 # TODO: line for bgtask
                 pass
 
+    @override
     def scan_tree(
         self,
         path: Path,
@@ -369,6 +377,7 @@ class XCPFSOpModel(BaseFSOpModel):
 
         return aiter()
 
+    @override
     async def scan_tree_usage(
         self,
         path: Path,
@@ -417,6 +426,7 @@ class XCPFSOpModel(BaseFSOpModel):
                 await proc.wait()
         return TreeUsage(file_count=total_count, used_bytes=total_size)
 
+    @override
     async def scan_tree_size(
         self,
         path: Path,
@@ -436,6 +446,7 @@ class NetAppVolume(BaseVolume):
     volume_id: VolumeID
     nas_path: Path
 
+    @override
     async def create_quota_model(self) -> AbstractQuotaModel:
         return QTreeQuotaModel(
             self.mount_path,
@@ -444,6 +455,7 @@ class NetAppVolume(BaseVolume):
             self.volume_id,
         )
 
+    @override
     async def create_fsop_model(self) -> AbstractFSOpModel:
         xcp_fsop_model = XCPFSOpModel(
             self.mount_path,
@@ -464,6 +476,7 @@ class NetAppVolume(BaseVolume):
             self.local_config["storage-proxy"]["scandir-limit"],
         )
 
+    @override
     async def init(self) -> None:
         self.ontap_endpoint = self.config["netapp_ontap_endpoint"]
         self.netapp_client = NetAppClient(
@@ -505,12 +518,15 @@ class NetAppVolume(BaseVolume):
         # NOTE: The default qtree in the volume has no explicit path.
         await super().init()
 
+    @override
     async def shutdown(self) -> None:
         await self.netapp_client.aclose()
 
+    @override
     async def get_capabilities(self) -> frozenset[str]:
         return frozenset([CAP_VFOLDER, CAP_FAST_FS_SIZE, CAP_FAST_SIZE, CAP_QUOTA, CAP_METRIC])
 
+    @override
     async def get_hwinfo(self) -> HardwareMetadata:
         volume_info = await self.netapp_client.get_volume_by_id(self.volume_id, ["files", "quota"])
         metadata = {
@@ -519,6 +535,7 @@ class NetAppVolume(BaseVolume):
         }
         return {"status": "healthy", "status_info": None, "metadata": metadata}
 
+    @override
     async def get_fs_usage(self) -> CapacityUsage:
         volume_info = await self.netapp_client.get_volume_by_id(
             self.volume_id, ["space.size,space.used"]
@@ -530,6 +547,7 @@ class NetAppVolume(BaseVolume):
             used_bytes=BinarySize(volume_info["space"]["used"]),
         )
 
+    @override
     async def get_performance_metric(self) -> FSPerfMetric:
         volume_info = await self.netapp_client.get_volume_by_id(self.volume_id, ["statistics"])
         if "statistics" not in volume_info:

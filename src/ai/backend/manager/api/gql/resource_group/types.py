@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from decimal import Decimal
 from enum import StrEnum
-from typing import Self
+from typing import Self, override
 from uuid import UUID
 
 from strawberry import Info
@@ -80,6 +80,7 @@ from ai.backend.common.dto.manager.v2.resource_group.response import (
 from ai.backend.common.dto.manager.v2.resource_group.response import (
     ReplaceResourceGroupDefaultSessionOptionsPayload as ReplaceResourceGroupDefaultSessionOptionsPayloadDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -185,6 +186,12 @@ class PreemptionOrderGQL(StrEnum):
 class PreemptionConfigGQL(PydanticOutputMixin[PreemptionConfigInfo]):
     """Preemption configuration for GraphQL."""
 
+    enabled: bool = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Whether preemption is enabled for this resource group (opt-in).",
+        )
+    )
     preemptible_priority: int = gql_field(
         description="Sessions with priority <= this value are eligible for preemption."
     )
@@ -193,6 +200,14 @@ class PreemptionConfigGQL(PydanticOutputMixin[PreemptionConfigInfo]):
     )
     mode: PreemptionModeGQL = gql_field(
         description="How to preempt a session when preemption is triggered."
+    )
+    preemption_min_runtime: float = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Minimum session runtime in seconds before it becomes preemptible (0 = disabled)."
+            ),
+        )
     )
 
 
@@ -364,6 +379,7 @@ class ResourceGroupGQL(PydanticNodeMixin[ResourceGroupDetailNode]):
     )
 
     @classmethod
+    @override
     async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
         cls,
         *,
@@ -448,6 +464,13 @@ class ResourceGroupOrderByGQL(PydanticInputMixin[ResourceGroupOrderDTO]):
 class PreemptionConfigInput(PydanticInputMixin[PreemptionConfigInputDTO]):
     """Input for preemption configuration. Replaces entire preemption config when provided."""
 
+    enabled: bool = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Whether preemption is enabled for this resource group (opt-in). Default is false.",
+        ),
+        default=False,
+    )
     preemptible_priority: int = gql_field(
         description="Sessions with priority <= this value are preemptible. Default is 5.", default=5
     )
@@ -458,6 +481,16 @@ class PreemptionConfigInput(PydanticInputMixin[PreemptionConfigInputDTO]):
     mode: PreemptionModeGQL = gql_field(
         description="How to preempt sessions (TERMINATE, RESCHEDULE). Default is TERMINATE.",
         default=PreemptionModeGQL.TERMINATE,
+    )
+    preemption_min_runtime: float = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Minimum session runtime in seconds before it becomes preemptible "
+                "(0 = disabled). Default is 0."
+            ),
+        ),
+        default=0.0,
     )
 
 

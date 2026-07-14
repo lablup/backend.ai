@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import (
     Any,
     cast,
+    override,
 )
 
 import aiohttp
@@ -75,6 +76,7 @@ async def _coro_return[T](val: T) -> T:
 
 
 class ExtendedJSONEncoder(modjson.JSONEncoder):
+    @override
     def default(self, obj: Any) -> Any:
         if isinstance(obj, uuid.UUID):
             return str(obj)
@@ -126,7 +128,7 @@ class Request:
         content: RequestContent | None = None,
         *,
         content_type: str | None = None,
-        params: Mapping[str, str | int] | None = None,
+        params: Mapping[str, str | int | list[str]] | None = None,
         reporthook: Callable[..., Any] | None = None,
         override_api_version: str | None = None,
         session_mode: SessionMode = SessionMode.CLIENT,
@@ -657,14 +659,17 @@ class WebSocketResponse(BaseResponse):
         self._raw_ws = cast(aiohttp.ClientWebSocketResponse, underlying_response)
 
     @property
+    @override
     def content_type(self) -> str:
         raise AttributeError("WebSocketResponse does not have an explicit content type.")
 
     @property
+    @override
     def content_length(self) -> int | None:
         raise AttributeError("WebSocketResponse does not have a fixed content length.")
 
     @property
+    @override
     def content(self) -> aiohttp.StreamReader:
         raise AttributeError("WebSocketResponse does not support reading the content.")
 

@@ -4,6 +4,8 @@ Resource management exceptions (groups, domains, scaling groups, instances).
 
 from __future__ import annotations
 
+from typing import override
+
 from aiohttp import web
 
 from ai.backend.common.exception import (
@@ -20,6 +22,7 @@ from .common import ObjectNotFound
 class DomainNotFound(ObjectNotFound):
     object_name = "domain"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.DOMAIN,
@@ -32,6 +35,7 @@ class ProjectHasActiveKernelsError(BackendAIError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/project-has-active-kernels"
     error_title = "Project has active kernels."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.GROUP,
@@ -44,6 +48,7 @@ class ProjectHasVFoldersMountedError(BackendAIError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/project-has-vfolders-mounted"
     error_title = "Project has vfolders mounted to active kernels."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.GROUP,
@@ -56,6 +61,7 @@ class ProjectHasActiveEndpointsError(BackendAIError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/project-has-active-endpoints"
     error_title = "Project has active endpoints."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.GROUP,
@@ -67,6 +73,7 @@ class ProjectHasActiveEndpointsError(BackendAIError, web.HTTPConflict):
 class ScalingGroupNotFound(ObjectNotFound):
     object_name = "scaling group"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.SCALING_GROUP,
@@ -79,6 +86,7 @@ class ScalingGroupSessionTypeNotAllowed(BackendAIError, web.HTTPUnprocessableEnt
     error_type = "https://api.backend.ai/probs/scaling-group-session-type-not-allowed"
     error_title = "Scaling group does not allow this session type."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.SCALING_GROUP,
@@ -91,6 +99,7 @@ class ScalingGroupDeletionFailure(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/scaling-group-deletion-failure"
     error_title = "Failed to delete scaling group."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.SCALING_GROUP,
@@ -102,6 +111,7 @@ class ScalingGroupDeletionFailure(BackendAIError, web.HTTPInternalServerError):
 class InstanceNotFound(ObjectNotFound):
     object_name = "agent instance"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.INSTANCE,
@@ -114,6 +124,7 @@ class InstanceNotAvailable(BackendAIError, web.HTTPServiceUnavailable):
     error_type = "https://api.backend.ai/probs/instance-not-available"
     error_title = "There is no available instance."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.INSTANCE,
@@ -126,6 +137,7 @@ class ProjectNotFound(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/project-not-found"
     error_title = "Project not found."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.GROUP,
@@ -137,6 +149,7 @@ class ProjectNotFound(BackendAIError, web.HTTPNotFound):
 class TaskTemplateNotFound(ObjectNotFound):
     object_name = "task template"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.TEMPLATE,
@@ -148,6 +161,7 @@ class TaskTemplateNotFound(ObjectNotFound):
 class AppNotFound(ObjectNotFound):
     object_name = "app service"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.BACKENDAI,
@@ -165,6 +179,7 @@ class DomainDataProcessingError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/domain-data-processing-error"
     error_title = "Failed to process domain data."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.DOMAIN,
@@ -176,6 +191,7 @@ class DomainDataProcessingError(BackendAIError, web.HTTPInternalServerError):
 class ScalingGroupProxyTargetNotFound(ObjectNotFound):
     object_name = "scaling group proxy target"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.SCALING_GROUP,
@@ -187,6 +203,7 @@ class ScalingGroupProxyTargetNotFound(ObjectNotFound):
 class ResourcePresetNotFound(ObjectNotFound):
     object_name = "resource preset"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.RESOURCE_PRESET,
@@ -198,6 +215,7 @@ class ResourcePresetNotFound(ObjectNotFound):
 class RuntimeVariantNotFound(ObjectNotFound):
     object_name = "runtime variant"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.RUNTIME_VARIANT,
@@ -210,6 +228,7 @@ class RuntimeVariantConflict(BackendAIError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/duplicate-runtime-variant"
     error_title = "Duplicate Runtime Variant"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.RUNTIME_VARIANT,
@@ -221,6 +240,7 @@ class RuntimeVariantConflict(BackendAIError, web.HTTPConflict):
 class RuntimeVariantPresetNotFound(ObjectNotFound):
     object_name = "runtime variant preset"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.RUNTIME_VARIANT,
@@ -233,6 +253,7 @@ class RuntimeVariantPresetConflict(BackendAIError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/duplicate-runtime-variant-preset"
     error_title = "Duplicate Runtime Variant Preset"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.RUNTIME_VARIANT,
@@ -244,6 +265,7 @@ class RuntimeVariantPresetConflict(BackendAIError, web.HTTPConflict):
 class ModelCardNotFound(ObjectNotFound):
     object_name = "model card"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.MODEL_CARD,
@@ -256,6 +278,7 @@ class ModelCardConflict(BackendAIError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/duplicate-model-card"
     error_title = "Duplicate Model Card"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.MODEL_CARD,
@@ -268,6 +291,7 @@ class InvalidProjectTypeForModelCard(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/invalid-project-type-for-model-card"
     error_title = "Project is not a MODEL_STORE type."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.MODEL_CARD,
@@ -280,6 +304,7 @@ class NotAModelVFolder(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/not-a-model-vfolder"
     error_title = "VFolder usage_mode is not MODEL."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.MODEL_CARD,
@@ -291,6 +316,7 @@ class NotAModelVFolder(BackendAIError, web.HTTPBadRequest):
 class DeploymentRevisionPresetNotFound(ObjectNotFound):
     object_name = "deployment revision preset"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.MODEL_DEPLOYMENT,
@@ -303,6 +329,7 @@ class DeploymentRevisionPresetConflict(BackendAIError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/duplicate-deployment-revision-preset"
     error_title = "Duplicate Deployment Revision Preset"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.MODEL_DEPLOYMENT,
@@ -314,6 +341,7 @@ class DeploymentRevisionPresetConflict(BackendAIError, web.HTTPConflict):
 class AgentNotFound(ObjectNotFound):
     object_name = "agent"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,
@@ -326,6 +354,7 @@ class DomainCreationFailed(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/domain-creation-failed"
     error_title = "Failed to create domain."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.DOMAIN,
@@ -338,6 +367,7 @@ class DomainNodeCreationFailed(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/domain-node-creation-failed"
     error_title = "Failed to create domain node."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.DOMAIN,
@@ -350,6 +380,7 @@ class DomainHasActiveKernels(BackendAIError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/domain-has-active-kernels"
     error_title = "Domain has active kernels."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.DOMAIN,
@@ -362,6 +393,7 @@ class DomainHasUsers(BackendAIError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/domain-has-users"
     error_title = "Domain has associated users."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.DOMAIN,
@@ -374,6 +406,7 @@ class DomainHasGroups(BackendAIError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/domain-has-groups"
     error_title = "Domain has associated groups."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.DOMAIN,
@@ -386,6 +419,7 @@ class DomainDeletionFailed(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/domain-deletion-failed"
     error_title = "Failed to delete domain."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.DOMAIN,
@@ -398,6 +432,7 @@ class DomainUpdateNotAllowed(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/domain-update-not-allowed"
     error_title = "Domain update not allowed."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.DOMAIN,
@@ -410,6 +445,7 @@ class InvalidDomainConfiguration(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/invalid-domain-configuration"
     error_title = "Invalid domain configuration."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.DOMAIN,
@@ -422,6 +458,7 @@ class AllocationFailed(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/allocation-failed"
     error_title = "Failed to allocate resources."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.SESSION,
@@ -434,6 +471,7 @@ class InvalidUserUpdateMode(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/invalid-user-update-mode"
     error_title = "Invalid user update mode."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.GROUP,
@@ -446,6 +484,7 @@ class InvalidPresetQuery(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/invalid-preset-query"
     error_title = "Invalid resource preset query parameters."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.RESOURCE_PRESET,
@@ -458,6 +497,7 @@ class NoAvailableScalingGroup(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/no-available-scaling-group"
     error_title = "No scaling groups available for this session."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.SCALING_GROUP,
@@ -470,6 +510,7 @@ class AgentNotAllocated(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/agent-not-allocated"
     error_title = "Agent ID has not been allocated for the session."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,
@@ -482,6 +523,7 @@ class SessionNotAllocated(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/session-not-allocated"
     error_title = "Session ID is not available during allocation."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.SESSION,
@@ -494,6 +536,7 @@ class NoCurrentTaskContext(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/no-current-task-context"
     error_title = "No current asyncio task context available."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.BACKENDAI,
@@ -506,6 +549,7 @@ class DatabaseConnectionUnavailable(BackendAIError, web.HTTPInternalServerError)
     error_type = "https://api.backend.ai/probs/database-connection-unavailable"
     error_title = "Database connection is not available."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.DATABASE,
@@ -518,6 +562,7 @@ class InvalidSchedulerState(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/invalid-scheduler-state"
     error_title = "Scheduler is in an invalid state."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.SCALING_GROUP,
@@ -530,6 +575,7 @@ class ConfigurationLoadFailed(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/configuration-load-failed"
     error_title = "Failed to load configuration."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.BACKENDAI,
@@ -542,6 +588,7 @@ class DataTransformationFailed(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/data-transformation-failed"
     error_title = "Failed to transform data."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.DATABASE,
@@ -554,6 +601,7 @@ class DBOperationFailed(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/db-operation-failed"
     error_title = "Database operation failed."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.DATABASE,

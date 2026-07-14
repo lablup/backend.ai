@@ -18,7 +18,12 @@ from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPoli
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.common.types import AccessKey
-from ai.backend.manager.data.auth.login_session_types import LoginHistoryData, LoginSessionData
+from ai.backend.manager.data.auth.login_session_types import (
+    LoginAttemptResult,
+    LoginHistoryData,
+    LoginSessionData,
+    LoginSessionStatus,
+)
 from ai.backend.manager.data.auth.types import GroupMembershipData, UserData
 from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.permission.types import EntityType, ScopeType
@@ -32,7 +37,6 @@ from ai.backend.manager.errors.auth import (
 from ai.backend.manager.errors.common import InternalServerError
 from ai.backend.manager.models.hasher.types import HashInfo, PasswordInfo
 from ai.backend.manager.models.keypair import KeyPairRow, keypairs
-from ai.backend.manager.models.login_session.enums import LoginAttemptResult, LoginSessionStatus
 from ai.backend.manager.models.login_session.row import LoginHistoryRow, LoginSessionRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,

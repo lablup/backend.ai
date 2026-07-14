@@ -9,6 +9,7 @@ from typing import (
     Protocol,
     TypeVar,
     cast,
+    override,
 )
 
 __all__ = (
@@ -149,8 +150,10 @@ class closing_async(AbstractAsyncContextManager[_SupportsAsyncCloseT]):
     def __init__(self, obj: _SupportsAsyncCloseT) -> None:
         self.obj = obj
 
+    @override
     async def __aenter__(self) -> _SupportsAsyncCloseT:
         return self.obj
 
+    @override
     async def __aexit__(self, *exc_info: Any) -> None:
         await self.obj.close()

@@ -7,9 +7,9 @@ from typing import override
 
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
+from ai.backend.common.schema.deployment import ReplicaGroupRolloutSpec
 from ai.backend.manager.data.deployment.types import (
     ReplicaGroupLifecycle,
-    ReplicaGroupRolloutSpec,
     ReplicaGroupScalingStatus,
 )
 from ai.backend.manager.models.replica_group import ReplicaGroupRow

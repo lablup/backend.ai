@@ -1,3 +1,5 @@
+from typing import override
+
 from ai.backend.client.session import set_api_context
 from ai.backend.test.contexts.client_session import (
     ClientSessionContext,
@@ -13,6 +15,7 @@ from ai.backend.test.utils.exceptions import UnexpectedFailure
 
 
 class VFolderSharePermissionOverrideSuccess(TestCode):
+    @override
     async def test(self) -> None:
         vfolder_meta = CreatedVFolderMetaContext.current()
         # The session of the user who shared the vfolder

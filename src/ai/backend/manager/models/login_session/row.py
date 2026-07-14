@@ -7,12 +7,15 @@ from typing import TYPE_CHECKING
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
+from ai.backend.manager.data.auth.login_session_types import (
+    LoginAttemptResult,
+    LoginSessionStatus,
+)
 from ai.backend.manager.models.base import (
     GUID,
     Base,
     StrEnumType,
 )
-from ai.backend.manager.models.login_session.enums import LoginAttemptResult, LoginSessionStatus
 
 if TYPE_CHECKING:
     from ai.backend.manager.data.auth.login_session_types import LoginHistoryData, LoginSessionData

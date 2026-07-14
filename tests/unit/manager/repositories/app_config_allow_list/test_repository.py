@@ -6,6 +6,7 @@ import uuid
 from collections.abc import AsyncGenerator
 
 import pytest
+import sqlalchemy as sa
 
 from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.common.data.filter_specs import StringMatchSpec
@@ -24,12 +25,16 @@ from ai.backend.manager.models.app_config_allow_list.conditions import (
 from ai.backend.manager.models.app_config_allow_list.orders import AppConfigAllowListOrders
 from ai.backend.manager.models.app_config_allow_list.row import AppConfigAllowListRow
 from ai.backend.manager.models.app_config_definition.row import AppConfigDefinitionRow
+from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.app_config_allow_list.creators import (
     AppConfigAllowListCreatorSpec,
 )
 from ai.backend.manager.repositories.app_config_allow_list.repository import (
     AppConfigAllowListRepository,
+)
+from ai.backend.manager.repositories.app_config_allow_list.updaters import (
+    AppConfigAllowListUpdaterSpec,
 )
 from ai.backend.manager.repositories.app_config_definition.creators import (
     AppConfigDefinitionCreatorSpec,
@@ -42,11 +47,12 @@ from ai.backend.manager.repositories.base import (
     Creator,
     CursorBackwardPagination,
     CursorForwardPagination,
-    ExistsQuerier,
     OffsetPagination,
     Purger,
+    Updater,
 )
 from ai.backend.manager.repositories.ops import DBOpsProvider
+from ai.backend.manager.types import OptionalState
 from ai.backend.testutils.db import with_tables
 
 
@@ -54,8 +60,12 @@ from ai.backend.testutils.db import with_tables
 async def database(
     database_connection: ExtendedAsyncSAEngine,
 ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
-    # FK order: app_config_definitions (parent) before app_config_allow_list (child).
-    async with with_tables(database_connection, [AppConfigDefinitionRow, AppConfigAllowListRow]):
+    # FK order: app_config_definitions (parent), then the allow-list, then the
+    # fragments hanging off the allow-list (cascade tests need them).
+    async with with_tables(
+        database_connection,
+        [AppConfigDefinitionRow, AppConfigAllowListRow, AppConfigFragmentRow],
+    ):
         yield database_connection
 
 
@@ -80,9 +90,14 @@ async def _create_entry(
     repository: AppConfigAllowListRepository,
     config_name: str,
     scope_type: AppConfigScopeType,
+    rank: int | None = None,
 ) -> AppConfigAllowListData:
     return await repository.create(
-        Creator(spec=AppConfigAllowListCreatorSpec(config_name=config_name, scope_type=scope_type))
+        Creator(
+            spec=AppConfigAllowListCreatorSpec(
+                config_name=config_name, scope_type=scope_type, rank=rank
+            )
+        )
     )
 
 
@@ -149,6 +164,65 @@ class TestCreateAndGet:
             await _create_entry(repository, existing_entry.config_name, existing_entry.scope_type)
 
 
+class TestRankAssignment:
+    @pytest.mark.parametrize(
+        ("scope_type", "expected_rank"),
+        [
+            (AppConfigScopeType.PUBLIC, 100),
+            (AppConfigScopeType.DOMAIN, 200),
+            (AppConfigScopeType.USER, 300),
+        ],
+    )
+    async def test_rank_defaults_by_scope_type(
+        self,
+        repository: AppConfigAllowListRepository,
+        definition_repository: AppConfigDefinitionRepository,
+        scope_type: AppConfigScopeType,
+        expected_rank: int,
+    ) -> None:
+        await _register(definition_repository, "theme")
+        created = await _create_entry(repository, "theme", scope_type)
+        assert created.rank == expected_rank
+
+    async def test_explicit_rank_overrides_default(
+        self,
+        repository: AppConfigAllowListRepository,
+        definition_repository: AppConfigDefinitionRepository,
+    ) -> None:
+        await _register(definition_repository, "theme")
+        created = await _create_entry(repository, "theme", AppConfigScopeType.DOMAIN, rank=250)
+        assert created.rank == 250
+        assert (await repository.get_by_id(created.id)).rank == 250
+
+
+class TestUpdate:
+    async def test_update_changes_rank(
+        self,
+        repository: AppConfigAllowListRepository,
+        existing_entry: AppConfigAllowListData,
+    ) -> None:
+        updated = await repository.update(
+            Updater(
+                spec=AppConfigAllowListUpdaterSpec(rank=OptionalState.update(250)),
+                pk_value=existing_entry.id,
+            )
+        )
+        assert updated.rank == 250
+        assert (await repository.get_by_id(existing_entry.id)).rank == 250
+        # identity fields are untouched
+        assert updated.config_name == existing_entry.config_name
+        assert updated.scope_type is existing_entry.scope_type
+
+    async def test_update_missing_raises(self, repository: AppConfigAllowListRepository) -> None:
+        with pytest.raises(AppConfigAllowListNotFound):
+            await repository.update(
+                Updater(
+                    spec=AppConfigAllowListUpdaterSpec(rank=OptionalState.update(250)),
+                    pk_value=_missing_id(),
+                )
+            )
+
+
 class TestPurge:
     async def test_purge_removes_row(
         self,
@@ -165,6 +239,68 @@ class TestPurge:
     async def test_purge_missing_raises(self, repository: AppConfigAllowListRepository) -> None:
         with pytest.raises(AppConfigAllowListNotFound):
             await repository.purge(Purger(row_class=AppConfigAllowListRow, pk_value=_missing_id()))
+
+    async def test_purge_cascades_to_fragments(
+        self,
+        database: ExtendedAsyncSAEngine,
+        repository: AppConfigAllowListRepository,
+        existing_entry: AppConfigAllowListData,
+    ) -> None:
+        # existing_entry is ("theme", PUBLIC); a fragment under it must go with it.
+        async with database.begin_session() as db_sess:
+            db_sess.add(
+                AppConfigFragmentRow(
+                    config_name=existing_entry.config_name,
+                    scope_type=existing_entry.scope_type,
+                    scope_id="public",
+                    config={"k": "v"},
+                )
+            )
+            await db_sess.flush()
+
+        await repository.purge(Purger(row_class=AppConfigAllowListRow, pk_value=existing_entry.id))
+
+        async with database.begin_readonly_session() as db_sess:
+            remaining = await db_sess.scalar(
+                sa.select(sa.func.count()).select_from(AppConfigFragmentRow)
+            )
+        assert remaining == 0
+
+    async def test_definition_purge_cascades_to_allow_list_and_fragments(
+        self,
+        database: ExtendedAsyncSAEngine,
+        repository: AppConfigAllowListRepository,
+        definition_repository: AppConfigDefinitionRepository,
+    ) -> None:
+        # Deleting the definition cascades to its allow-list entry and its fragment.
+        definition = await definition_repository.create(
+            Creator(spec=AppConfigDefinitionCreatorSpec(config_name="theme"))
+        )
+        entry = await _create_entry(repository, "theme", AppConfigScopeType.PUBLIC)
+        async with database.begin_session() as db_sess:
+            db_sess.add(
+                AppConfigFragmentRow(
+                    config_name=entry.config_name,
+                    scope_type=entry.scope_type,
+                    scope_id="public",
+                    config={"k": "v"},
+                )
+            )
+            await db_sess.flush()
+
+        await definition_repository.purge(
+            Purger(row_class=AppConfigDefinitionRow, pk_value=definition.id)
+        )
+
+        async with database.begin_readonly_session() as db_sess:
+            remaining_entries = await db_sess.scalar(
+                sa.select(sa.func.count()).select_from(AppConfigAllowListRow)
+            )
+            remaining_fragments = await db_sess.scalar(
+                sa.select(sa.func.count()).select_from(AppConfigFragmentRow)
+            )
+        assert remaining_entries == 0
+        assert remaining_fragments == 0
 
 
 class TestSearch:
@@ -287,6 +423,20 @@ class TestSearch:
         )
         assert [item.id for item in result.items] == [target.id]
 
+    async def test_search_orders_by_rank_asc(
+        self,
+        repository: AppConfigAllowListRepository,
+        seeded_entries: list[AppConfigAllowListData],
+    ) -> None:
+        result = await repository.search(
+            BatchQuerier(
+                pagination=OffsetPagination(limit=10, offset=0),
+                orders=[AppConfigAllowListOrders.rank(ascending=True)],
+            )
+        )
+        expected = [entry.id for entry in sorted(seeded_entries, key=lambda e: e.rank)]
+        assert [item.id for item in result.items] == expected
+
     async def test_search_orders_by_created_at(
         self,
         repository: AppConfigAllowListRepository,
@@ -336,39 +486,3 @@ class TestSearch:
             )
         )
         assert {item.id for item in result.items} == {entry.id for entry in by_created_asc[1:]}
-
-
-class TestExists:
-    @staticmethod
-    def _querier(
-        config_name: str, scope_type: AppConfigScopeType
-    ) -> ExistsQuerier[AppConfigAllowListRow]:
-        return ExistsQuerier(
-            row_class=AppConfigAllowListRow,
-            conditions=[
-                AppConfigAllowListConditions.by_config_name_equals(
-                    StringMatchSpec(config_name, case_insensitive=False, negated=False)
-                ),
-                AppConfigAllowListConditions.by_scope_type_equals(scope_type),
-            ],
-        )
-
-    # existing_entry seeds a single ("theme", PUBLIC) row.
-    @pytest.mark.parametrize(
-        ("config_name", "scope_type", "expected"),
-        [
-            ("theme", AppConfigScopeType.PUBLIC, True),
-            ("theme", AppConfigScopeType.USER, False),
-            ("unregistered", AppConfigScopeType.PUBLIC, False),
-        ],
-    )
-    async def test_exists(
-        self,
-        repository: AppConfigAllowListRepository,
-        existing_entry: AppConfigAllowListData,
-        config_name: str,
-        scope_type: AppConfigScopeType,
-        expected: bool,
-    ) -> None:
-        querier = self._querier(config_name, scope_type)
-        assert await repository.exists(querier) is expected

@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, cast, override
 
 import aiofiles.os
 
@@ -64,6 +64,7 @@ class DellEMCOneFSQuotaModel(BaseQuotaModel):
         if quota_id_path.exists():
             await aiofiles.os.remove(quota_id_path)
 
+    @override
     async def create_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
@@ -75,6 +76,7 @@ class DellEMCOneFSQuotaModel(BaseQuotaModel):
         if options is not None:
             await self.update_quota_scope(quota_scope_id, options)
 
+    @override
     async def describe_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
@@ -99,6 +101,7 @@ class DellEMCOneFSQuotaModel(BaseQuotaModel):
             )
         return None
 
+    @override
     async def update_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
@@ -124,6 +127,7 @@ class DellEMCOneFSQuotaModel(BaseQuotaModel):
             )
             await self._set_quota_id(qspath, result["id"])
 
+    @override
     async def unset_quota(
         self,
         quota_scope_id: QuotaScopeID,
@@ -139,6 +143,7 @@ class DellEMCOneFSQuotaModel(BaseQuotaModel):
             await self.api_client.delete_quota(quota_id)
             await self._unset_quota_id(qspath)
 
+    @override
     async def delete_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
@@ -188,18 +193,22 @@ class DellEMCOneFSVolume(BaseVolume):
             system_name=self.dell_system_name,
         )
 
+    @override
     async def shutdown(self) -> None:
         await self.api_client.aclose()
 
+    @override
     async def create_quota_model(self) -> AbstractQuotaModel:
         ifs_path = Path(self.config["dell_ifs_path"])
         return DellEMCOneFSQuotaModel(
             self.mount_path, api_client=self.api_client, ifs_path=ifs_path
         )
 
+    @override
     async def get_capabilities(self) -> frozenset[str]:
         return frozenset([CAP_FAST_FS_SIZE, CAP_VFOLDER, CAP_QUOTA, CAP_METRIC])
 
+    @override
     async def get_hwinfo(self) -> HardwareMetadata:
         raw_metadata = await self.api_client.get_metadata()
         return {
@@ -208,6 +217,7 @@ class DellEMCOneFSVolume(BaseVolume):
             "metadata": {**raw_metadata},
         }
 
+    @override
     async def get_fs_usage(self) -> CapacityUsage:
         usage = await self.api_client.get_usage()
         return CapacityUsage(
@@ -215,6 +225,7 @@ class DellEMCOneFSVolume(BaseVolume):
             used_bytes=int(usage["used_bytes"]),
         )
 
+    @override
     async def get_performance_metric(self) -> FSPerfMetric:
         protocol_stats = await self.get_protocol_stats()
         workload = await self.get_workload_stats()

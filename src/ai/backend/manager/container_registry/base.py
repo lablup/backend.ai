@@ -181,7 +181,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
             log.info("No images found in registry {0}", self.registry_url)
         else:
             image_identifiers = [(k.canonical, k.architecture) for k in _all_updates.keys()]
-            async with self.db.begin_session() as session:
+            async with self.db.begin_session_read_committed() as session:
                 existing_images = await session.scalars(
                     sa.select(ImageRow).where(
                         sa.func.ROW(ImageRow.name, ImageRow.architecture).in_(image_identifiers),

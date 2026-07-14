@@ -3,12 +3,13 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
+from typing import override
 
 from ai.backend.common.dependencies import DependencyComposer, DependencyStack
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.manager.agent_cache import AgentRPCCache
+from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.unified import ManagerUnifiedConfig
-from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 from .agent_cache import AgentCacheDependency, AgentCacheInput
@@ -47,10 +48,12 @@ class ComponentsComposer(DependencyComposer[ComponentsInput, ComponentsResources
     """
 
     @property
+    @override
     def stage_name(self) -> str:
         return "components"
 
     @asynccontextmanager
+    @override
     async def compose(
         self,
         stack: DependencyStack,

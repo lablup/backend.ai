@@ -29,10 +29,11 @@ from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_preset import DeploymentPresetID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.replica import ReplicaID
 from ai.backend.common.identifier.replica_group import ReplicaGroupID
-from ai.backend.common.identifier.resource_group import ResourceGroupName
+from ai.backend.common.identifier.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import (
@@ -43,6 +44,7 @@ from ai.backend.common.types import (
     SlotName,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.deployment.creator import DeploymentPolicyConfig
 from ai.backend.manager.data.deployment.scale import (
@@ -105,6 +107,7 @@ from ai.backend.manager.errors.deployment import (
     UserNotFoundInDeployment,
 )
 from ai.backend.manager.errors.resource import (
+    DomainNotFound,
     ProjectNotFound,
     RuntimeVariantNotFound,
     ScalingGroupNotFound,
@@ -124,6 +127,7 @@ from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision_preset.row import (
     DeploymentRevisionPresetRow,
 )
+from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import (
     EndpointAutoScalingRuleRow,
     EndpointRow,
@@ -148,7 +152,6 @@ from ai.backend.manager.models.scheduling_history import (
     RouteHistoryRow,
 )
 from ai.backend.manager.models.session import SessionRow
-from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow, query_accessible_vfolders
@@ -2099,6 +2102,29 @@ class DeploymentDBSource:
             raise UserNotFoundInDeployment(f"{user_uuid} not found")
         raise NoActiveKeypairForDeployment(f"{user_uuid} has no active keypair")
 
+    async def _resolve_deployment_scope_ids(
+        self,
+        db_sess: SASession,
+        deployment_info: DeploymentInfo,
+    ) -> tuple[DomainID, ResourceGroupID]:
+        domain_id = await db_sess.scalar(
+            sa.select(DomainRow.id).where(DomainRow.name == deployment_info.metadata.domain)
+        )
+        if domain_id is None:
+            raise DomainNotFound(deployment_info.metadata.domain)
+
+        resource_group_id = await db_sess.scalar(
+            sa.select(ScalingGroupRow.id).where(
+                ScalingGroupRow.name == deployment_info.metadata.resource_group
+            )
+        )
+        if resource_group_id is None:
+            raise ScalingGroupNotFound(
+                f"Resource group {deployment_info.metadata.resource_group!r} not found"
+            )
+
+        return DomainID(domain_id), ResourceGroupID(resource_group_id)
+
     async def fetch_deployment_context(
         self,
         deployment_info: DeploymentInfo,
@@ -2146,6 +2172,10 @@ class DeploymentDBSource:
             )
             group_id = user_info.group_id
             resource_policy = user_info.resource_policy
+
+            domain_id, resource_group_id = await self._resolve_deployment_scope_ids(
+                db_sess, deployment_info
+            )
 
             revision_query = (
                 sa.select(DeploymentRevisionRow)
@@ -2212,7 +2242,9 @@ class DeploymentDBSource:
                     main_gid=session_owner_user.container_main_gid,
                     supplementary_gids=session_owner_user.container_gids or [],
                 ),
+                domain_id=domain_id,
                 group_id=group_id,
+                resource_group_id=resource_group_id,
                 resource_policy=dict(resource_policy),
                 image=ImageContext(
                     ref=image_row.image_ref,

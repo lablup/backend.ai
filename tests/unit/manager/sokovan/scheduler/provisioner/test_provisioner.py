@@ -15,6 +15,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from dateutil.tz import tzutc
 
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
@@ -58,6 +59,7 @@ def _create_scheduling_data_with_strategy(
     scheduler_opts = ScalingGroupOpts(agent_selection_strategy=strategy)
 
     scaling_group_meta = ScalingGroupMeta(
+        id=ResourceGroupID(uuid.uuid4()),
         name="test-sg",
         scheduler="fifo",
         scheduler_opts=scheduler_opts,
@@ -72,6 +74,7 @@ def _create_scheduling_data_with_strategy(
         group_id=uuid.uuid4(),
         domain_name="default",
         scaling_group_name="test-sg",
+        resource_group_id=ResourceGroupID(uuid.uuid4()),
         session_type=SessionTypes.INTERACTIVE,
         cluster_mode=ClusterMode.SINGLE_NODE,
         priority=0,
@@ -106,6 +109,7 @@ def _create_scheduling_data_with_strategy(
         addr="agent-1:6001",
         architecture="x86_64",
         available_slots=ResourceSlot({"cpu": Decimal("8"), "mem": Decimal("16384")}),
+        resource_group_id=ResourceGroupID(uuid.uuid4()),
         scaling_group="test-sg",
     )
 
@@ -127,6 +131,7 @@ def minimal_scheduling_data() -> SchedulingData:
     scheduler_opts = ScalingGroupOpts(agent_selection_strategy=AgentSelectionStrategy.DISPERSED)
 
     scaling_group_meta = ScalingGroupMeta(
+        id=ResourceGroupID(uuid.uuid4()),
         name="test-sg",
         scheduler="fifo",
         scheduler_opts=scheduler_opts,
@@ -278,9 +283,7 @@ class TestScheduleScalingGroup:
         # (In production, coordinator opens the scope before calling provisioner)
         provision_time = datetime.now(tzutc())
         with RecorderContext[SessionId].scope("test-provisioning", entity_ids=session_ids):
-            await test_provisioner.schedule_scaling_group(
-                "test-sg", scheduling_data, provision_time
-            )
+            await test_provisioner.schedule_scaling_group(scheduling_data, provision_time)
 
         # Then: The selector for the specified strategy was used
         used_selector = mock_selector_pool[strategy]

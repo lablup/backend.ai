@@ -5,11 +5,11 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.identifier.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.types import (
     SessionId,
     SlotName,
     SlotTypes,
-    VFolderMount,
 )
 from ai.backend.manager.data.dotfile.types import DotfileBundle
 from ai.backend.manager.data.resource.types import SlotTypePolicy
@@ -33,7 +33,8 @@ class SessionDependencyData:
 class AllowedScalingGroup:
     """Allowed scaling group for a user."""
 
-    name: str
+    id: ResourceGroupID
+    name: ResourceGroupName
     is_private: bool
     scheduler_opts: ScalingGroupOpts
 
@@ -55,12 +56,6 @@ class SessionSpecContextFetch:
     container_user_info: ContainerUserInfo
     image_infos: dict[ImageID, ImageInfo]
     resource_group_allow_fractional: bool
-    # Resolved vfolder mounts keyed by ``KernelGroup.role``. Each value
-    # is the ``VFolderMount`` tuple the controller's batch fetch
-    # materialized for that group — identical replicas share one entry,
-    # and task #33 (role-based mount override) can write distinct values
-    # per role without structural changes.
-    vfolder_mounts_by_role: dict[str, tuple[VFolderMount, ...]]
     dotfile_data: DotfileBundle
     keypair_resource_policy: Any | None  # KeyPairResourcePolicyData
     known_slot_types: Mapping[SlotName, SlotTypes] = field(default_factory=dict)

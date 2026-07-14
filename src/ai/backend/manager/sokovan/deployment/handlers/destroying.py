@@ -2,6 +2,7 @@
 
 import logging
 from collections.abc import Sequence
+from typing import override
 
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import (
@@ -40,25 +41,30 @@ class DestroyingDeploymentHandler(DeploymentHandler):
         self._route_controller = route_controller
 
     @classmethod
+    @override
     def name(cls) -> str:
         """Get the name of the handler."""
         return "destroying-deployments"
 
     @classmethod
+    @override
     def category(cls) -> DeploymentHandlerCategory:
         return DeploymentHandlerCategory.LIFECYCLE
 
     @property
+    @override
     def lock_id(self) -> LockID | None:
         """Lock for destroying deployments."""
         return LockID.LOCKID_DEPLOYMENT_DESTROYING
 
     @classmethod
+    @override
     def target_statuses(cls) -> DeploymentTargetStatuses:
         """Get the target deployment statuses for this handler."""
         return DeploymentTargetStatuses(lifecycle_stages=[EndpointLifecycle.DESTROYING])
 
     @classmethod
+    @override
     def status_transitions(cls) -> DeploymentStatusTransitions:
         """Define state transitions for destroying deployment handler (BEP-1030).
 
@@ -72,6 +78,7 @@ class DestroyingDeploymentHandler(DeploymentHandler):
             give_up=DeploymentLifecycleStatus(lifecycle=EndpointLifecycle.DESTROYED),
         )
 
+    @override
     async def execute(
         self, deployments: Sequence[DeploymentWithHistory]
     ) -> DeploymentExecutionResult:
@@ -81,6 +88,7 @@ class DestroyingDeploymentHandler(DeploymentHandler):
         # Execute destruction logic via executor
         return await self._deployment_executor.destroy_deployment(deployments)
 
+    @override
     async def post_process(self, result: DeploymentExecutionResult) -> None:
         """Handle post-processing after destroying deployments."""
         log.info("Destroyed {} deployments", len(result.successes))

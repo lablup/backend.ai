@@ -1,5 +1,7 @@
 """Validator for keypair resource limits."""
 
+from typing import override
+
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.sokovan import (
     SessionWorkload,
@@ -16,14 +18,17 @@ class KeypairResourceLimitValidator(ValidatorRule):
     This corresponds to check_keypair_resource_limit predicate.
     """
 
+    @override
     def name(self) -> str:
         """Return the validator name for predicates."""
         return "KeypairResourceLimitValidator"
 
+    @override
     def success_message(self) -> str:
         """Return a message describing successful validation."""
         return "Keypair has sufficient resource quota for the requested session"
 
+    @override
     def validate(self, snapshot: SystemSnapshot, workload: SessionWorkload) -> None:
         # Get the keypair's resource policy
         policy = snapshot.resource_policy.keypair_policies.get(workload.access_key)
