@@ -886,26 +886,46 @@ class ContainerdGrpcRuntime(OciRuntime):
                     "remove_container(c:{}): task did not exit; deleting its records anyway",
                     container_id,
                 )
-        for coro in (
+        # Delete the container, then its snapshot, each tolerating the same two codes as the task
+        # delete: already-gone (NOT_FOUND), and "still in use" (FAILED_PRECONDITION) — which is what
+        # a snapshot Remove returns while the stuck task above still has the overlay mounted.
+        # Aborting on the snapshot would delete the container record (that already ran) and leak the
+        # snapshot, the _rootfs entry and the logs — worse than before. So clean what we can and move
+        # on; the snapshot the live task pins is reclaimed when it finally dies, or by the sweep.
+        await self._delete_lifecycle_record(
+            container_id,
             self._containers_stub().Delete(
                 containers_pb2.DeleteContainerRequest(id=container_id),
                 metadata=self._md,
                 timeout=_LIFECYCLE_CALL_TIMEOUT,
             ),
+        )
+        await self._delete_lifecycle_record(
+            container_id,
             self._snapshots_stub().Remove(
                 snapshots_pb2.RemoveSnapshotRequest(snapshotter=_SNAPSHOTTER, key=container_id),
                 metadata=self._md,
                 timeout=_LIFECYCLE_CALL_TIMEOUT,
             ),
-        ):
-            try:
-                await coro
-            except grpc.aio.AioRpcError as e:
-                if e.code() is not grpc.StatusCode.NOT_FOUND:
-                    raise
+        )
         self._rootfs.pop(container_id, None)
         # The rotated files are as much this kernel's log as the active one.
         unlink_log_files(container_log_path(container_id))
+
+    async def _delete_lifecycle_record(self, container_id: str, coro: Any) -> None:
+        """Await a destroy RPC, tolerating already-gone and still-in-use so one leftover record
+        does not abort the clean of the rest."""
+        try:
+            await coro
+        except grpc.aio.AioRpcError as e:
+            if e.code() not in (grpc.StatusCode.NOT_FOUND, grpc.StatusCode.FAILED_PRECONDITION):
+                raise
+            if e.code() is grpc.StatusCode.FAILED_PRECONDITION:
+                log.warning(
+                    "remove_container(c:{}): a record is still in use ({}); cleaning the rest",
+                    container_id,
+                    e.details(),
+                )
 
     # --- container/task introspection (Phase 1) ---
 

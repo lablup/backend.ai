@@ -1172,7 +1172,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         # label stays within its 4 KiB size limit (duplicates only inflate it).
         seen_mounts: set[tuple[Any, ...]] = set()
         all_mounts = []
-        for m in (*resource_spec.mounts, *self._oci_mounts):
+        for m in (*resource_spec.mounts, *self._oci_mounts, *self._accel_spec.mounts):
             key = (str(m.source), str(m.target), m.permission, m.type)
             if key in seen_mounts:
                 continue

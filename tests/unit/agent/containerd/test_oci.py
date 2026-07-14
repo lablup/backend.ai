@@ -231,6 +231,27 @@ class TestTranslateAcceleratorHostConfig:
             {"type": "RLIMIT_MEMLOCK", "soft": 0xFFFFFFFFFFFFFFFF, "hard": 0xFFFFFFFFFFFFFFFF}
         ]
 
+    def test_a_plugins_bind_mount_survives(self) -> None:
+        # accelerator/tenstorrent/n300 binds /dev/hugepages-1G for its 1G hugepages; dropped, the
+        # card starts and misbehaves.
+        spec = translate_accelerator_args({
+            "HostConfig": {
+                "Mounts": [
+                    {
+                        "Type": "bind",
+                        "Source": "/dev/hugepages-1G",
+                        "Target": "/dev/hugepages-1G",
+                        "ReadOnly": False,
+                    }
+                ]
+            }
+        })
+        assert len(spec.mounts) == 1
+        m = spec.mounts[0]
+        assert str(m.source) == "/dev/hugepages-1G"
+        assert str(m.target) == "/dev/hugepages-1G"
+        assert m.permission is MountPermission.READ_WRITE
+
     def test_habana_uses_ipc_not_ipcmode(self) -> None:
         # accelerator/habana emits `Ipc`, everyone else `IpcMode`
         assert translate_accelerator_args({"HostConfig": {"Ipc": "host"}}).ipc_host is True

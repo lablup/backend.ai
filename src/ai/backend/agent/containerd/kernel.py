@@ -15,6 +15,7 @@ fetched from a kernel that has exited -- the one moment a user most wants them.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import io
 import logging
 import os
@@ -187,7 +188,10 @@ class ContainerdKernel(AbstractKernel):
             # ONLY the lock acquisition is caught here. A commit already in progress is a benign
             # no-op; a commit that RUNS OUT of time is a failure and must propagate — folding the
             # two together reported a timed-out commit as success, so the manager recorded an image
-            # that was never built.
+            # that was never built. FileLock leaves its file handle open when the acquire times out,
+            # so release() it (safe once acquire opened the file) to close that handle.
+            with contextlib.suppress(Exception):
+                lock.release()
             log.warning("commit(k:{}): already being committed", kernel_id)
             return
         try:

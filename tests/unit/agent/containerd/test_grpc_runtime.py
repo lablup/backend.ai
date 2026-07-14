@@ -165,6 +165,10 @@ class TestRemoveContainerWithAStuckTask:
         class _Snapshots:
             async def Remove(self, req: Any, metadata: Any = None, timeout: Any = None) -> Any:
                 deleted["snapshot"] = True
+                # the live task still has the overlay mounted, so the snapshot is "in use"
+                raise grpc.aio.AioRpcError(
+                    grpc.StatusCode.FAILED_PRECONDITION, None, None, "snapshot is in use"
+                )
 
         rt.kill_container = kill_container
         rt.container_status = container_status
@@ -176,9 +180,9 @@ class TestRemoveContainerWithAStuckTask:
 
     async def test_a_task_that_will_not_die_still_gets_its_records_cleaned(self) -> None:
         rt, deleted = self._runtime()
-        await rt.remove_container("c1")  # must not raise
-        assert deleted == {"task": True, "container": True, "snapshot": True}
-        assert "c1" not in rt._rootfs  # the rootfs entry is gone too
+        await rt.remove_container("c1")  # must not raise, though the snapshot is still mounted
+        assert deleted == {"task": True, "container": True, "snapshot": True}  # all attempted
+        assert "c1" not in rt._rootfs  # and the clean ran to completion regardless
 
 
 class TestExportImage:

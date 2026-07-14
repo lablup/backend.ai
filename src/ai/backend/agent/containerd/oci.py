@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any
 
 from ai.backend.agent.resources import Mount
-from ai.backend.common.types import KernelCreationConfig, MountPermission
+from ai.backend.common.types import KernelCreationConfig, MountPermission, MountTypes
 from ai.backend.logging import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -92,6 +92,7 @@ class AcceleratorSpec:
     Accumulated across ALL compute plugins (cpu, mem, accelerators):
     - ``devices``: explicit /dev node passthrough (AMD ROCm, Furiosa/Rebellions/Habana NPUs).
     - ``gpu_device_ids``: NVIDIA device IDs handled by nvidia-container-toolkit (`--gpus`).
+    - ``mounts``: extra bind mounts the plugin needs (Tenstorrent n300's hugepages).
     - ``env``: extra environment the plugin injects (e.g. NVIDIA_DRIVER_CAPABILITIES).
     - ``cpuset_cpus`` / ``cpuset_mems``: cgroup CPU/NUMA pinning (from the CPU plugin).
     - ``memory_limit`` / ``memory_swap``: cgroup memory limits in bytes (from the mem plugin).
@@ -99,6 +100,9 @@ class AcceleratorSpec:
 
     devices: list[DevicePassthrough] = field(default_factory=list)
     gpu_device_ids: list[str] = field(default_factory=list)
+    # Extra bind mounts the plugin needs (e.g. Tenstorrent n300 binds /dev/hugepages-1G for its
+    # 1G hugepages). Dropped silently, the accelerator starts and then misbehaves.
+    mounts: list[Mount] = field(default_factory=list)
     env: dict[str, str] = field(default_factory=dict)
     cpuset_cpus: str | None = None
     cpuset_mems: str | None = None
@@ -211,9 +215,22 @@ def translate_accelerator_args(docker_args: Mapping[str, Any]) -> AcceleratorSpe
         )
     # Habana emits `Ipc`, everyone else `IpcMode` — both are the Docker host-IPC switch.
     ipc = host_config.get("IpcMode") or host_config.get("Ipc")
+    mounts = [
+        Mount(
+            MountTypes.BIND,
+            Path(m["Source"]),
+            Path(m["Target"]),
+            MountPermission.READ_ONLY if m.get("ReadOnly") else MountPermission.READ_WRITE,
+        )
+        for m in host_config.get("Mounts") or []
+        # Only bind mounts: an accelerator plugin that needs a device path in the container (n300's
+        # hugepages) uses one, and it is the one type mount_to_oci materializes correctly.
+        if str(m.get("Type", "bind")) == "bind" and m.get("Source") and m.get("Target")
+    ]
     return AcceleratorSpec(
         devices=devices,
         gpu_device_ids=gpu_ids,
+        mounts=mounts,
         env=env,
         cpuset_cpus=host_config.get("CpusetCpus") or None,
         cpuset_mems=host_config.get("CpusetMems") or None,
