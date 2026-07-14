@@ -58,7 +58,7 @@ from ai.backend.agent.containerd._grpcapi.api.services.transfer.v1 import (
     transfer_pb2,
     transfer_pb2_grpc,
 )
-from ai.backend.agent.containerd._grpcapi.api.types import descriptor_pb2, mount_pb2
+from ai.backend.agent.containerd._grpcapi.api.types import descriptor_pb2, mount_pb2, platform_pb2
 from ai.backend.agent.containerd._grpcapi.api.types.transfer import imagestore_pb2, registry_pb2
 from ai.backend.agent.containerd.logs import logger_uri, unlink_log_files
 from ai.backend.agent.containerd.runtime.interface import (
@@ -1027,10 +1027,20 @@ class ContainerdGrpcRuntime(OciRuntime):
         # ImageStore destination (which also unpacks into the snapshotter). Pure containerd
         # API — no ctr/nerdctl.
         source = self._oci_registry(image_ref, auth)
+        # Pull THIS node's platform only. An empty platforms list means "all platforms" to the
+        # transfer service, so a multi-arch image (Backend.AI publishes amd64 + arm64) would fetch
+        # and store every architecture's layers — roughly 2x pull time and disk on every agent.
+        # Docker pulls the host platform; so do we. The same platform pins the unpack.
+        platform = platform_pb2.Platform(
+            os="linux", architecture=_GOARCH.get(CURRENT_ARCH, CURRENT_ARCH)
+        )
         destination = _containerd_any(
             imagestore_pb2.ImageStore(
                 name=image_ref,
-                unpacks=[imagestore_pb2.UnpackConfiguration(snapshotter=_SNAPSHOTTER)],
+                platforms=[platform],
+                unpacks=[
+                    imagestore_pb2.UnpackConfiguration(snapshotter=_SNAPSHOTTER, platform=platform)
+                ],
             )
         )
         await self._transfer_stub().Transfer(

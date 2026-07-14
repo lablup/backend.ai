@@ -8,7 +8,7 @@ from types import SimpleNamespace
 from typing import Any, cast
 
 from ai.backend.agent.containerd._grpcapi.api.types import mount_pb2
-from ai.backend.agent.containerd._grpcapi.api.types.transfer import registry_pb2
+from ai.backend.agent.containerd._grpcapi.api.types.transfer import imagestore_pb2, registry_pb2
 from ai.backend.agent.containerd.runtime.grpc import ContainerdGrpcRuntime, _chain_id
 
 _ACTIVE_MOUNT = mount_pb2.Mount(type="overlay", source="overlay", options=["upperdir=/active"])
@@ -420,6 +420,40 @@ class TestCommitContainer:
         labels = harness.config()["config"]["Labels"]
         assert labels["ai.backend.customized-image.name"] == "mine"
         assert labels["base"] == "yes"  # the base image's own labels survive
+
+
+class TestPullPlatform:
+    """A pull fetches only THIS node's platform. An empty platforms list means "all platforms" to
+    the transfer service, so a multi-arch image (Backend.AI publishes amd64 + arm64) would download
+    and store every architecture's layers — ~2x pull time and disk on every agent. (Verified live:
+    pulling a 7-arch image stored only the host arch's manifest + layers.)"""
+
+    async def _pulled_destination(self) -> Any:
+        rt = cast(Any, ContainerdGrpcRuntime.__new__(ContainerdGrpcRuntime))
+        rt._registry_hosts_dir = None
+        captured: dict[str, Any] = {}
+
+        class _Transfer:
+            async def Transfer(self, req: Any, metadata: Any = None) -> Any:
+                dest = imagestore_pb2.ImageStore()
+                dest.ParseFromString(req.destination.value)
+                captured["dest"] = dest
+                return SimpleNamespace()
+
+        rt._transfer_stub = lambda: _Transfer()
+        type(rt)._md = property(lambda self: [])
+        await rt.pull_image("reg/img:1")
+        return captured["dest"]
+
+    async def test_pull_pins_the_host_platform(self) -> None:
+        dest = await self._pulled_destination()
+        assert len(dest.platforms) == 1  # exactly one, not "all"
+        assert dest.platforms[0].os == "linux"
+        assert dest.platforms[0].architecture in ("amd64", "arm64")
+
+    async def test_the_unpack_is_pinned_to_the_same_platform(self) -> None:
+        dest = await self._pulled_destination()
+        assert dest.unpacks[0].platform.architecture == dest.platforms[0].architecture
 
 
 class TestRegistryResolution:
