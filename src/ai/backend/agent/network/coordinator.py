@@ -30,6 +30,11 @@ if TYPE_CHECKING:
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
+# The watch loop re-subscribes after any failure, backing off so a persistent error (a broken etcd,
+# a device op that always fails) does not spin, while a transient one recovers within a second.
+_WATCH_RETRY_BACKOFF = 1.0
+_WATCH_RETRY_BACKOFF_MAX = 30.0
+
 
 def _decode_member(agent_id: str, raw: str) -> Member:
     return Member.from_etcd_payload(agent_id, json.loads(raw))
@@ -174,11 +179,39 @@ class SessionNetworkCoordinator:
     async def _watch(self, session_id: str) -> None:
         # Watch the whole session subtree so both membership (peers/VTEPs) and endpoint
         # (IP/MAC) changes drive reconciliation.
-        try:
-            async for _ in self._etcd.watch_prefix(session_prefix(session_id)):
-                await self.reconcile_peers(session_id)
-                await self.reconcile_endpoints(session_id)
-        except asyncio.CancelledError:
-            raise
-        except Exception:
-            log.exception("session network watch for session {} failed", session_id)
+        #
+        # Re-established after any failure. A single `ip`/`bridge` error or a transient etcd hiccup
+        # used to end the loop for good, and the node would never learn about another peer for the
+        # rest of the session's life — a worker that started late (slow image pull) was silently
+        # left out of the mesh and torchrun hung at rendezvous. The stop() path cancels this task,
+        # so CancelledError still ends it cleanly. reconcile_* replay from etcd and every device op
+        # is idempotent, so re-running after a hiccup re-converges rather than double-programming.
+        backoff = _WATCH_RETRY_BACKOFF
+        resubscribing = False
+        while True:
+            try:
+                if resubscribing:
+                    # watch_prefix streams from the current revision, so a peer that joined or left
+                    # while we were not watching shows up in nothing but a fresh read. Catch up
+                    # before waiting on the new stream, or that change is lost for good.
+                    await self.reconcile_peers(session_id)
+                    await self.reconcile_endpoints(session_id)
+                async for _ in self._etcd.watch_prefix(session_prefix(session_id)):
+                    await self.reconcile_peers(session_id)
+                    await self.reconcile_endpoints(session_id)
+                    backoff = _WATCH_RETRY_BACKOFF  # events are flowing: the watch is healthy
+                log.warning(
+                    "session network watch for {} ended; re-subscribing in {}s", session_id, backoff
+                )
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                log.exception(
+                    "session network watch for {} failed; retrying in {}s", session_id, backoff
+                )
+            resubscribing = True
+            # Wait before re-subscribing on BOTH paths, not just the error one: a watch_prefix that
+            # hands back an already-exhausted stream (a closed/mocked etcd) would otherwise spin
+            # this task at full CPU and starve the event loop.
+            await asyncio.sleep(backoff)
+            backoff = min(backoff * 2, _WATCH_RETRY_BACKOFF_MAX)
