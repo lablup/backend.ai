@@ -87,6 +87,26 @@ class SubnetAddressPoolExhausted(BackendAIError, web.HTTPServiceUnavailable):
         )
 
 
+class StaticAddressUnavailable(BackendAIError, web.HTTPInternalServerError):
+    """A container could not be pinned at the specific address its peers expect.
+
+    A single-node cluster's peers resolve each other through a deterministic address map, so a
+    kernel that cannot take its own address is worse than a kernel that fails: the map would name
+    an address nothing answers on. Fail the kernel instead.
+    """
+
+    error_type = "https://api.backend.ai/probs/agent/static-address-unavailable"
+    error_title = "The requested container address is not available in the subnet."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AGENT,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.CONFLICT,
+        )
+
+
 class UnusableVtep(BackendAIError, web.HTTPInternalServerError):
     """This node cannot anchor a vxlan tunnel, so it must not join a multi-node overlay session.
 

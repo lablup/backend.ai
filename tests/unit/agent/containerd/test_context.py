@@ -208,12 +208,6 @@ class TestResolvConfMount:
             "nameserver 10.0.0.53"
         ]
 
-    async def test_is_unconditional_unlike_etc_hosts(self, tmp_path: Path) -> None:
-        # /etc/hosts is only injected for cluster sessions; every container needs a resolver.
-        ctx = self._ctx_with_scratch(tmp_path, ["10.0.0.53"])
-        assert ctx._prepare_etc_hosts(cast(Any, {})) is None  # no cluster peers
-        assert ctx._prepare_resolv_conf() is not None
-
     async def test_no_scratch_yields_no_mount(self) -> None:
         ctx = _context(FakeFacade())
         ctx._scratch_dir = None
@@ -1000,9 +994,7 @@ class TestReserveHostPortsBinding:
     def _reserve(self, ctx: Any, service_ports: list[Any]) -> dict[int, str | None]:
         ctx._reserve_host_ports(service_ports)
         # container_port -> host_ip, so a test can assert per service without depending on ordering
-        return {
-            container_port: host_ip for _hp, container_port, host_ip in ctx._host_port_map
-        }
+        return {container_port: host_ip for _hp, container_port, host_ip in ctx._host_port_map}
 
     def test_protected_service_binds_loopback_on_storage(self) -> None:
         ctx = self._ctx(rg=ResourceGroupType.STORAGE, bind_host="10.0.0.5")
@@ -1031,3 +1023,85 @@ class TestReserveHostPortsBinding:
         ctx = self._ctx(rg=ResourceGroupType.COMPUTE, bind_host="10.0.0.5")
         by_port = self._reserve(ctx, [{"name": "ttyd", "container_ports": (7681,)}])
         assert by_port[7681] == "10.0.0.5"
+
+
+class TestEtcHosts:
+    """containerd/runc synthesizes no /etc/hosts and provides no cluster DNS. The agent must write
+    the file itself: localhost + the kernel's own name for every session, and deterministic peer
+    addresses for a single-node cluster (there is no manager-assigned IP to fall back on)."""
+
+    def _ctx(self, tmp_path: Path, *, subnet: str | None = "172.30.0.0/26") -> Any:
+        ctx = _context(FakeFacade())
+        (tmp_path / "config").mkdir(parents=True, exist_ok=True)
+        ctx._scratch_dir = tmp_path
+        ctx._session_id = "sess-abc"
+
+        async def local_subnet_of(session_id: str) -> str | None:
+            return subnet
+
+        ctx._session_network = cast(Any, SimpleNamespace(local_subnet_of=local_subnet_of))
+        return ctx
+
+    def _hosts(self, tmp_path: Path) -> dict[str, str]:
+        # hostname -> ip, parsed back from the written file (skip the ipv6 localhost line)
+        out: dict[str, str] = {}
+        for line in (tmp_path / "config" / "hosts").read_text().splitlines():
+            ip, _, name = line.partition("\t")
+            if name and not name.startswith("localhost"):
+                out[name] = ip
+        return out
+
+    async def test_an_ordinary_session_still_gets_localhost_and_its_own_name(
+        self, tmp_path: Path
+    ) -> None:
+        ctx = self._ctx(tmp_path)
+        env = {"BACKENDAI_CLUSTER_HOST": "main1"}  # a lone kernel: no CLUSTER_HOSTS list
+        peers, static_ip = await ctx._peer_host_map(cast(Any, {}), env)
+        assert peers == {} and static_ip is None
+        mount = ctx._write_etc_hosts(peers, env)
+        assert mount is not None and str(mount.target) == "/etc/hosts"
+        text = (tmp_path / "config" / "hosts").read_text()
+        assert "127.0.0.1\tlocalhost" in text
+        assert "main1" in text  # own hostname resolves (to loopback, absent a peer map)
+
+    async def test_single_node_cluster_lays_out_deterministic_peers(self, tmp_path: Path) -> None:
+        ctx = self._ctx(tmp_path)
+        env = {
+            "BACKENDAI_CLUSTER_HOSTS": "main1,sub1,sub2",
+            "BACKENDAI_CLUSTER_HOST": "sub1",
+        }
+        peers, static_ip = await ctx._peer_host_map(cast(Any, {}), env)
+
+        assert peers == {"main1": "172.30.0.2", "sub1": "172.30.0.3", "sub2": "172.30.0.4"}
+        assert static_ip == "172.30.0.3"  # this kernel (sub1) is pinned at its own entry
+
+        ctx._write_etc_hosts(peers, env)
+        written = self._hosts(tmp_path)
+        assert written["main1"] == "172.30.0.2"
+        assert written["sub2"] == "172.30.0.4"
+        assert written["sub1"] == "172.30.0.3"  # own name -> own pinned IP, not loopback
+
+    async def test_multi_node_uses_the_managers_cluster_hosts_verbatim(
+        self, tmp_path: Path
+    ) -> None:
+        # Overlay sessions have central IPs; the agent must not re-lay them out.
+        ctx = self._ctx(tmp_path)
+        cluster_info = {"cluster_hosts": {"main1": "10.128.5.2", "sub1": "10.128.5.3"}}
+        env = {"BACKENDAI_CLUSTER_HOST": "main1"}
+        peers, static_ip = await ctx._peer_host_map(cast(Any, cluster_info), env)
+        assert peers == {"main1": "10.128.5.2", "sub1": "10.128.5.3"}
+        assert static_ip is None  # the overlay attach already put this kernel at its address
+
+        # ...and the kernel's OWN name must resolve to its overlay address, not to loopback:
+        # torchrun's master binds c10d at whatever `main1` resolves to on the master itself.
+        ctx._write_etc_hosts(peers, env)
+        written = self._hosts(tmp_path)
+        assert written["main1"] == "10.128.5.2"
+        assert written["sub1"] == "10.128.5.3"
+
+    async def test_helper_mode_skips_peer_layout(self, tmp_path: Path) -> None:
+        # Under a helper the subnet is None (the helper owns the pool); fall back to baseline only.
+        ctx = self._ctx(tmp_path, subnet=None)
+        env = {"BACKENDAI_CLUSTER_HOSTS": "main1,sub1", "BACKENDAI_CLUSTER_HOST": "main1"}
+        peers, own_ip = await ctx._peer_host_map(cast(Any, {}), env)
+        assert peers == {} and own_ip is None

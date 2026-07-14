@@ -75,6 +75,7 @@ from ai.backend.agent.kernel_registry.recovery.base_recovery import BaseKernelRe
 from ai.backend.agent.kernel_registry.writer.types import KernelRegistrySaveMetadata
 from ai.backend.agent.network.caps import publish_vtep
 from ai.backend.agent.network.helper.client import HelperClient, HelperPortForwarder
+from ai.backend.agent.network.local_subnet import cluster_host_ips
 from ai.backend.agent.network.port_forward import PortForwarder, PortPublisher, forwards_for
 from ai.backend.agent.port_pool import PortPool
 from ai.backend.agent.proxy import DomainSocketProxy, proxy_connection
@@ -755,16 +756,58 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
             self._session_id, network_config
         )
 
-    def _prepare_etc_hosts(self, cluster_info: ClusterInfo) -> Mount | None:
-        """Write an /etc/hosts carrying every cluster peer's ``hostname -> IP`` (BEP-1062 central
-        IPAM) and return a bind mount for it, so hostname-based cluster workloads (MPI/torchrun)
-        resolve peers. Returns None when there is no mapping to inject — single-node bridge
-        sessions use node-local IPAM with no manager-assigned addresses."""
-        cluster_hosts = cluster_info.get("cluster_hosts") or {}
-        if not cluster_hosts or self._scratch_dir is None:
+    async def _peer_host_map(
+        self, cluster_info: ClusterInfo, environ: Mapping[str, str]
+    ) -> tuple[dict[str, str], str | None]:
+        """``(hostname -> IP, the LOCAL address to pin this kernel at)`` for a cluster session.
+
+        The map goes into /etc/hosts and always covers *every* peer, this kernel included — a
+        kernel whose own name did not resolve to its real address would bind its rendezvous server
+        (torchrun/c10d, MPI OOB) at the wrong one and its peers could not reach it.
+
+        Two sources, by cluster mode:
+        - **Multi-node**: the manager pre-assigns overlay IPs and hands them down as ``cluster_hosts``
+          (central IPAM). Used verbatim, and nothing is pinned: the overlay attach already puts this
+          kernel at the address the manager assigned it.
+        - **Single-node**: there is no central assignment — every kernel is on this node's one LOCAL
+          bridge — so this agent lays the peers out deterministically in the session's LOCAL subnet
+          (`cluster_host_ips`) and pins each kernel at its own address, which is what makes the map
+          true rather than merely advertised. The ordered peer list is the session-wide
+          BACKENDAI_CLUSTER_HOSTS (identical for every kernel), so every kernel computes the same map
+          without coordinating.
+        """
+        if cluster_hosts := (cluster_info.get("cluster_hosts") or {}):
+            return dict(cluster_hosts), None
+        peers = [h for h in (environ.get("BACKENDAI_CLUSTER_HOSTS") or "").split(",") if h]
+        if len(peers) <= 1:
+            return {}, None  # not a cluster (or the lone kernel): only the baseline is needed
+        subnet = await self._session_network.local_subnet_of(self._session_id)
+        if subnet is None:
+            return {}, None  # helper mode owns the addresses; peer resolution is its to add
+        mapping = cluster_host_ips(subnet, peers)
+        own = environ.get("BACKENDAI_CLUSTER_HOST")
+        return mapping, (mapping.get(own) if own else None)
+
+    def _write_etc_hosts(
+        self, peers: Mapping[str, str], environ: Mapping[str, str]
+    ) -> Mount | None:
+        """Write /etc/hosts and return a bind mount for it.
+
+        Unconditional now, not only for cluster sessions: containerd/runc (unlike dockerd) does not
+        synthesize the file at all, so without this even an ordinary kernel has no ``localhost`` and
+        no entry for its own hostname — the hostname the agent set is then unresolvable. Cluster
+        peers (`_peer_host_map`) are added on top, this kernel's own entry among them.
+        """
+        if self._scratch_dir is None:
             return None
         lines = ["127.0.0.1\tlocalhost", "::1\tlocalhost ip6-localhost ip6-loopback"]
-        lines += [f"{ip}\t{hostname}" for hostname, ip in cluster_hosts.items()]
+        lines += [f"{ip}\t{hostname}" for hostname, ip in peers.items()]
+        own_hostname = environ.get("BACKENDAI_CLUSTER_HOST")
+        if own_hostname and own_hostname not in peers:
+            # A lone kernel has no peer map, but its own name must still resolve or a
+            # `gethostbyname(gethostname())` — a very common way for a process to find its own
+            # address — fails outright.
+            lines.append(f"127.0.1.1\t{own_hostname}")
         hosts_file = self._scratch_dir / "config" / "hosts"
         hosts_file.write_text("\n".join(lines) + "\n")
         return Mount(MountTypes.BIND, hosts_file, Path("/etc/hosts"), MountPermission.READ_ONLY)
@@ -1129,8 +1172,13 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         # registry credentials.
         await self._provision_internal_data(resource_spec)
         # containerd/runc (unlike Docker) neither synthesizes /etc/hosts nor provides cluster DNS,
-        # so inject peer hostname -> IP resolution for cluster sessions.
-        if (hosts_mount := self._prepare_etc_hosts(cluster_info)) is not None:
+        # so write one (localhost + own hostname) and add peer resolution for cluster sessions.
+        peers, static_ip = await self._peer_host_map(cluster_info, environ)
+        if static_ip is not None:
+            # Single-node cluster: pin this kernel at the address its peers expect, via the same
+            # kernel_config channel the overlay uses (the bridge backend reads it at attach).
+            cast(dict[str, Any], self.kernel_config)["local_static_ip"] = static_ip
+        if (hosts_mount := self._write_etc_hosts(peers, environ)) is not None:
             self._oci_mounts.append(hosts_mount)
         # containerd/runc provides no resolver either (dockerd synthesizes one per container).
         if (resolv_mount := self._prepare_resolv_conf()) is not None:

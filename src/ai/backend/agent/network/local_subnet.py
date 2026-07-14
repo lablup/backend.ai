@@ -41,6 +41,7 @@ from __future__ import annotations
 
 import asyncio
 import ipaddress
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import override
@@ -286,6 +287,12 @@ class LocalSubnetAllocator:
         """The CIDR of this session's block, claiming one if it holds none."""
         return self._layout.subnet(await self.allocate(session_id))
 
+    async def subnet_of(self, session_id: str) -> str | None:
+        """The CIDR of this session's block, or None if it holds none. Never allocates — a teardown
+        asking which subnet to clean up must not mint a fresh one."""
+        index = await self.lookup(session_id)
+        return self._layout.subnet(index) if index is not None else None
+
     async def sessions(self) -> frozenset[str]:
         """Every session the journal still names. Restart recovery diffs this against the live
         containers to reclaim blocks whose session died while the agent was down — without it a
@@ -311,3 +318,30 @@ class LocalSubnetAllocator:
             # again while the journal still names this session.
             await asyncio.to_thread((self._dir / str(index)).unlink, True)
             del self._indices[session_id]
+
+
+def cluster_host_ips(subnet: str, hostnames: Sequence[str]) -> dict[str, str]:
+    """Lay peer hostnames out at deterministic addresses in a session's LOCAL subnet.
+
+    Single-node cluster sessions have no manager-assigned overlay IPs (those are the multi-node
+    path), and containerd has no built-in cluster DNS, so peers can only find each other if every
+    kernel writes the same ``hostname -> IP`` map into /etc/hosts. The map has to be computable by
+    each kernel independently, before any of them has attached — so it is a pure function of the
+    (session-wide, identical for every kernel) ordered hostname list and the session's subnet.
+
+    Address ``i`` is the ``i``-th usable host after the gateway (``.1``); the caller pins each
+    kernel's own attachment at its address so the mapping is real, not just advertised. Raises if
+    the subnet cannot hold every peer — a caller must size the LOCAL block for the cluster.
+    """
+    hosts = iter(ipaddress.IPv4Network(subnet).hosts())
+    next(hosts)  # the first usable address is the bridge gateway (isGateway/isDefaultGateway)
+    mapping: dict[str, str] = {}
+    for hostname in hostnames:
+        try:
+            mapping[hostname] = str(next(hosts))
+        except StopIteration:
+            raise LocalSubnetPoolExhausted(
+                f"the LOCAL subnet {subnet} cannot hold {len(hostnames)} cluster peers; raise"
+                " container.local-network-block-size (a larger per-session block)"
+            ) from None
+    return mapping

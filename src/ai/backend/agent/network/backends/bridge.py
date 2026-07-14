@@ -13,7 +13,8 @@ endpoints), since a single node has no peers.
 from __future__ import annotations
 
 import logging
-from typing import Any, override
+from collections.abc import Mapping
+from typing import Any, cast, override
 
 from ai.backend.agent.kernel import AbstractKernel
 from ai.backend.agent.network.backends.vxlan import (
@@ -139,6 +140,11 @@ class BridgeNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         *,
         meta: SessionNetMeta,
     ) -> EndpointPlan:
+        # A single-node cluster session pins each kernel at a deterministic address so peers can be
+        # written into /etc/hosts; the agent computes it and passes it through kernel_config (the
+        # same channel the overlay uses for its manager-assigned IP). Absent for an ordinary
+        # single-kernel session — the host-local pool then picks the address.
+        static_ip = cast(Mapping[str, Any], kernel_config).get("local_static_ip")
         return EndpointPlan(
             attachments=[
                 NetworkAttachSpec(
@@ -150,6 +156,7 @@ class BridgeNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
                         meta.session_id,
                         bridge=await self._bridge(meta.session_id),
                         subnet=await self._subnet(meta.session_id),
+                        static_ip=str(static_ip) if static_ip else None,
                     ),
                 ),
             ]

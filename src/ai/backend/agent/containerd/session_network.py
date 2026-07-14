@@ -414,14 +414,33 @@ class ContainerdSessionNetwork:
         attachment = self._attachments.get(container_id)
         return attachment[0] if attachment is not None else None
 
+    async def local_subnet_of(self, session_id: str) -> str | None:
+        """This session's node-local LOCAL subnet (the /26 both backends carve from the node pool),
+        so a single-node cluster session can lay out deterministic peer IPs in it and write
+        /etc/hosts. None under a privileged helper, which owns the pool and assigns the addresses
+        itself — the agent cannot compute them, so peer resolution there is the helper's to add."""
+        if self._local_subnets is None:
+            return None
+        return await self._local_subnets.allocate_subnet(session_id)
+
     async def teardown_session(self, session_id: str) -> None:
         # Under the same per-session lock as setup, so a teardown racing the last kernel's setup
         # cannot tear down devices mid-creation (or leave a coordinator the setup is still filling).
         async with self._session_locked(session_id):
             coordinator = self._coordinators.pop(session_id, None)
             self._orchestrators.pop(session_id, None)
+            # Before the block goes back, not after: once released, the same CIDR can be handed to
+            # the next session, and purging it then would wipe *that* session's claims.
+            await self._purge_local_addresses(session_id)
             if coordinator is not None:
                 await coordinator.stop(session_id)
+
+    async def _purge_local_addresses(self, session_id: str) -> None:
+        """Drop the IPAM claims in this session's LOCAL block, whose containers are all gone."""
+        if self._ipam is None or self._local_subnets is None:
+            return  # a privileged helper owns both journals, and reclaims them itself
+        if (subnet := await self._local_subnets.subnet_of(session_id)) is not None:
+            await self._ipam.purge_subnet(subnet)
 
     async def launch_container(
         self,

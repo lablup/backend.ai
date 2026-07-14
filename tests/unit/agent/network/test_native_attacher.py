@@ -9,6 +9,7 @@ import pytest
 import ai.backend.agent.network.native_attacher as na
 from ai.backend.agent.errors.network import (
     NetworkStateStoreConflict,
+    StaticAddressUnavailable,
     SubnetAddressPoolExhausted,
 )
 from ai.backend.agent.network.native_attacher import (
@@ -71,6 +72,94 @@ class TestHostLocalIpam:
         await ipam.allocate("10.0.0.0/30", "cidA", "eth0", reserve=["10.0.0.1"])
         with pytest.raises(SubnetAddressPoolExhausted):
             await ipam.allocate("10.0.0.0/30", "cidB", "eth0", reserve=["10.0.0.1"])
+
+    async def test_a_requested_address_is_pinned(self, tmp_path: Path) -> None:
+        # Single-node cluster peers land on the deterministic address /etc/hosts advertises.
+        ipam = HostLocalIpam(tmp_path)
+        ip = await ipam.allocate(
+            "172.30.1.0/24", "cid", "eth0", reserve=["172.30.1.1"], requested="172.30.1.9"
+        )
+        assert ip == "172.30.1.9"
+
+    async def test_a_requested_address_is_idempotent(self, tmp_path: Path) -> None:
+        ipam = HostLocalIpam(tmp_path)
+        a = await ipam.allocate(
+            "172.30.1.0/24", "cid", "eth0", reserve=["172.30.1.1"], requested="172.30.1.9"
+        )
+        b = await ipam.allocate(
+            "172.30.1.0/24", "cid", "eth0", reserve=["172.30.1.1"], requested="172.30.1.9"
+        )
+        assert a == b == "172.30.1.9"
+
+    async def test_a_requested_address_already_taken_is_refused(self, tmp_path: Path) -> None:
+        # Two kernels never request the same IP by design, but if they did it must fail loudly
+        # rather than silently double-assign.
+        ipam = HostLocalIpam(tmp_path)
+        await ipam.allocate(
+            "172.30.1.0/24", "cidA", "eth0", reserve=["172.30.1.1"], requested="172.30.1.9"
+        )
+        with pytest.raises(StaticAddressUnavailable):
+            await ipam.allocate(
+                "172.30.1.0/24", "cidB", "eth0", reserve=["172.30.1.1"], requested="172.30.1.9"
+            )
+
+    async def test_an_owner_holding_another_address_is_refused_not_silently_kept(
+        self, tmp_path: Path
+    ) -> None:
+        # A re-attach whose DEL never landed (container_id is the kernel id, stable across a
+        # restart) must not quietly keep the old, dynamic address: its peers' /etc/hosts already
+        # names the pinned one, so the kernel would be unreachable under the name they use.
+        ipam = HostLocalIpam(tmp_path)
+        await ipam.allocate("172.30.1.0/24", "cid", "eth0", reserve=["172.30.1.1"])  # dynamic .2
+        with pytest.raises(StaticAddressUnavailable):
+            await ipam.allocate(
+                "172.30.1.0/24", "cid", "eth0", reserve=["172.30.1.1"], requested="172.30.1.9"
+            )
+
+    async def test_the_gateway_cannot_be_requested(self, tmp_path: Path) -> None:
+        ipam = HostLocalIpam(tmp_path)
+        with pytest.raises(StaticAddressUnavailable):
+            await ipam.allocate(
+                "172.30.1.0/24", "cid", "eth0", reserve=["172.30.1.1"], requested="172.30.1.1"
+            )
+
+    async def test_a_requested_address_outside_the_subnet_is_refused(self, tmp_path: Path) -> None:
+        ipam = HostLocalIpam(tmp_path)
+        with pytest.raises(StaticAddressUnavailable):
+            await ipam.allocate(
+                "172.30.1.0/24", "cid", "eth0", reserve=["172.30.1.1"], requested="10.0.0.5"
+            )
+
+    async def test_the_broadcast_address_cannot_be_requested(self, tmp_path: Path) -> None:
+        # It is *in* the network but is not a host address — the dynamic path never hands it out.
+        ipam = HostLocalIpam(tmp_path)
+        with pytest.raises(StaticAddressUnavailable):
+            await ipam.allocate(
+                "172.30.1.0/26", "cid", "eth0", reserve=["172.30.1.1"], requested="172.30.1.63"
+            )
+
+    async def test_purge_subnet_drops_leaked_claims_so_the_block_can_be_reused(
+        self, tmp_path: Path
+    ) -> None:
+        # A detach that never landed leaves a claim behind. Once the session's block is given back,
+        # that claim must not fail the next session's kernel that is pinned at the same address.
+        ipam = HostLocalIpam(tmp_path)
+        await ipam.allocate(
+            "172.30.1.0/24", "dead-kernel", "eth0", reserve=["172.30.1.1"], requested="172.30.1.2"
+        )
+        await ipam.purge_subnet("172.30.1.0/24")
+
+        assert await ipam.owners("172.30.1.0/24") == {}
+        assert (
+            await ipam.allocate(
+                "172.30.1.0/24",
+                "new-kernel",
+                "eth0",
+                reserve=["172.30.1.1"],
+                requested="172.30.1.2",
+            )
+            == "172.30.1.2"
+        )
 
 
 class TestHostLocalIpamJournal:

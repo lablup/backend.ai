@@ -12,6 +12,7 @@ from ai.backend.agent.network.local_subnet import (
     DEFAULT_LAYOUT,
     LocalSubnetAllocator,
     LocalSubnetLayout,
+    cluster_host_ips,
     get_local_subnet_allocator,
 )
 
@@ -275,3 +276,26 @@ class TestLookup:
         await alloc.allocate("s1")
         await alloc.release("s1")
         assert await alloc.lookup("s1") is None
+
+
+class TestClusterHostIps:
+    """Single-node cluster peers laid out at deterministic addresses in the session's LOCAL subnet.
+
+    Every kernel computes this independently from the same ordered hostname list (the session-wide
+    BACKENDAI_CLUSTER_HOSTS) and the same subnet, so they all agree on the map without coordinating —
+    which is what lets each write a correct /etc/hosts before any of them has attached.
+    """
+
+    def test_peers_start_after_the_gateway(self) -> None:
+        m = cluster_host_ips("172.30.0.0/26", ["main1", "sub1", "sub2"])
+        # .1 is the bridge gateway; peers take .2, .3, .4 in order
+        assert m == {"main1": "172.30.0.2", "sub1": "172.30.0.3", "sub2": "172.30.0.4"}
+
+    def test_the_layout_is_stable_regardless_of_who_computes_it(self) -> None:
+        peers = ["main1", "sub1", "sub2", "sub3"]
+        assert cluster_host_ips("10.42.0.0/24", peers) == cluster_host_ips("10.42.0.0/24", peers)
+
+    def test_a_subnet_too_small_for_the_cluster_is_refused(self) -> None:
+        # /30 has two usable hosts; one is the gateway, leaving room for exactly one peer.
+        with pytest.raises(LocalSubnetPoolExhausted):
+            cluster_host_ips("10.0.0.0/30", ["main1", "sub1"])

@@ -18,12 +18,14 @@ import hashlib
 import ipaddress
 import logging
 import re
+import shutil
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
 from ai.backend.agent.errors.network import (
     NetworkStateStoreConflict,
+    StaticAddressUnavailable,
     SubnetAddressPoolExhausted,
 )
 from ai.backend.logging import BraceStyleAdapter
@@ -132,15 +134,54 @@ class HostLocalIpam:
             ) from e
 
     async def allocate(
-        self, subnet: str, container_id: str, ifname: str, *, reserve: Sequence[str]
+        self,
+        subnet: str,
+        container_id: str,
+        ifname: str,
+        *,
+        reserve: Sequence[str],
+        requested: str | None = None,
     ) -> str:
+        """Claim an address in ``subnet`` for this owner, journalled.
+
+        ``requested`` pins a specific address instead of taking the next free one — how a
+        single-node cluster kernel lands on the deterministic IP its peers wrote into /etc/hosts.
+        It must be a usable host address of the subnet and not already held by a different owner;
+        the gateway is in ``reserve`` so it can never be requested. A pin that cannot be honoured
+        raises rather than falling back to a free address: the peers' /etc/hosts already names the
+        pinned address, so a kernel that quietly took a different one would be unreachable under
+        the name its peers use — a failed kernel is the better outcome."""
         owner = f"{container_id}/{ifname}"
         async with self._lock:
             d = self._subnet_dir(subnet)
             owners = await self._owners_of(d)
             if (existing := owners.get(owner)) is not None:
-                return existing  # idempotent re-ADD
+                # Idempotent re-ADD — but only if it lands where the caller asked. An owner already
+                # holding a *different* address (a re-attach whose DEL never landed; container_id is
+                # the kernel id, stable across a restart) must not silently keep it.
+                if requested is not None and existing != requested:
+                    raise StaticAddressUnavailable(
+                        f"{owner} already holds {existing} in {subnet}, but must be pinned at"
+                        f" {requested}; release the stale claim before re-attaching"
+                    )
+                return existing
             used = set(owners.values()) | set(reserve)
+            if requested is not None:
+                # Membership in the network is not enough: it also admits the network and broadcast
+                # addresses, which the dynamic path below (hosts()) excludes.
+                net = ipaddress.ip_network(subnet)
+                addr = ipaddress.ip_address(requested)
+                if addr not in net or addr in (net.network_address, net.broadcast_address):
+                    raise StaticAddressUnavailable(
+                        f"requested address {requested} is not a usable host address of {subnet}"
+                    )
+                if requested in used:
+                    raise StaticAddressUnavailable(
+                        f"requested address {requested} in {subnet} is already taken"
+                    )
+                await asyncio.to_thread(self._write_claim, d, requested, owner)
+                owners[owner] = requested
+                return requested
             for host in ipaddress.ip_network(subnet).hosts():
                 ip = str(host)
                 if ip in used:
@@ -163,6 +204,21 @@ class HostLocalIpam:
         died while the agent was down."""
         async with self._lock:
             return dict(await self._owners_of(self._subnet_dir(subnet)))
+
+    async def purge_subnet(self, subnet: str) -> None:
+        """Drop every record for a subnet whose block is about to be given back.
+
+        Per-container releases can be lost — a detach that failed, a container whose attachment
+        record did not survive — and a leftover claim used to be harmless: the next session to take
+        the block simply picked another free address. It is not harmless now that a single-node
+        cluster *pins* its kernels, since a stale claim on the address a peer is pinned at fails
+        that kernel outright, and would keep failing until the agent restarts. The block is only
+        reclaimed once the session's containers are gone, so nothing can still own these records.
+        """
+        async with self._lock:
+            d = self._subnet_dir(subnet)
+            await asyncio.to_thread(shutil.rmtree, d, True)
+            self._owners.pop(d, None)
 
     async def release(self, subnet: str, container_id: str, ifname: str) -> int:
         """Release this owner's address; return the number of addresses still allocated."""
@@ -216,7 +272,9 @@ class NativeBridgeAttachRunner:
         subnet = ipam["subnet"]
         network = ipaddress.ip_network(subnet)
         gateway = str(next(iter(network.hosts())))  # first host == the bridge gateway
-        ip = await self._ipam.allocate(subnet, container_id, ifname, reserve=[gateway])
+        ip = await self._ipam.allocate(
+            subnet, container_id, ifname, reserve=[gateway], requested=ipam.get("requested_ip")
+        )
         return ip, str(network.prefixlen), gateway, subnet
 
     async def _add(

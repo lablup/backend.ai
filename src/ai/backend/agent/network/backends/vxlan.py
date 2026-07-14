@@ -174,7 +174,9 @@ def local_bridge_dev(vni: int) -> str:
     return f"bailo{vni}"
 
 
-def local_cni_config(session_id: str, *, bridge: str, subnet: str) -> dict[str, Any]:
+def local_cni_config(
+    session_id: str, *, bridge: str, subnet: str, static_ip: str | None = None
+) -> dict[str, Any]:
     """CNI 'bridge' config for the host-local interface: agent<->container control
     channel plus egress NAT, carrying the default route.
 
@@ -183,7 +185,19 @@ def local_cni_config(session_id: str, *, bridge: str, subnet: str) -> dict[str, 
     comes from separate bridges (verified §8), not ICC-off firewall rules (the stock CNI
     bridge does not implement ICC-off — §9). A node-local subnet also avoids the
     stretched-L2 gateway conflict that folding egress into the overlay bridge would cause
-    (option C, rejected in §9)."""
+    (option C, rejected in §9).
+
+    ``static_ip`` pins the container at a specific address in the subnet (single-node cluster
+    peers, so /etc/hosts resolves) while keeping the gateway + MASQ that a plain static IPAM would
+    drop; None keeps the dynamic host-local pick for ordinary single-kernel sessions.
+
+    Note ``requested_ip`` is OUR extension, honoured by NativeBridgeAttachRunner (the only runner
+    the agent builds). The upstream host-local *binary* would ignore an unknown key and hand out a
+    dynamic address instead — silently breaking the pin — so a config carrying it must not be
+    driven through the real /opt/cni/bin plugin without teaching that path CNI_ARGS ``IP=``."""
+    ipam: dict[str, Any] = {"type": "host-local", "subnet": subnet}
+    if static_ip is not None:
+        ipam["requested_ip"] = static_ip
     return {
         "cniVersion": "1.0.0",
         "name": f"bai-local-{session_id}",
@@ -193,10 +207,7 @@ def local_cni_config(session_id: str, *, bridge: str, subnet: str) -> dict[str, 
         "isDefaultGateway": True,
         "ipMasq": True,
         "hairpinMode": False,
-        "ipam": {
-            "type": "host-local",
-            "subnet": subnet,
-        },
+        "ipam": ipam,
     }
 
 

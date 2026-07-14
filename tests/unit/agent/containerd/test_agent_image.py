@@ -606,32 +606,6 @@ class TestSeccompConversion:
         assert [n for sc in oci["syscalls"] for n in sc["names"]] == ["ptrace"]
 
 
-class TestEtcHosts:
-    def _ctx(self, scratch_dir: Path | None) -> Any:
-        ctx = agent_mod.ContainerdKernelCreationContext.__new__(
-            agent_mod.ContainerdKernelCreationContext
-        )
-        ctx._scratch_dir = scratch_dir
-        return ctx
-
-    def test_writes_cluster_peers_and_returns_mount(self, tmp_path: Any) -> None:
-        (tmp_path / "config").mkdir()
-        ctx = self._ctx(tmp_path)
-        cluster_info = cast(Any, {"cluster_hosts": {"main1": "10.0.0.2", "sub1": "10.0.0.3"}})
-        mount = ctx._prepare_etc_hosts(cluster_info)
-        assert mount is not None
-        assert str(mount.target) == "/etc/hosts"
-        content = (tmp_path / "config" / "hosts").read_text()
-        assert "127.0.0.1\tlocalhost" in content
-        assert "10.0.0.2\tmain1" in content
-        assert "10.0.0.3\tsub1" in content
-
-    def test_no_mount_without_cluster_hosts(self, tmp_path: Any) -> None:
-        ctx = self._ctx(tmp_path)
-        assert ctx._prepare_etc_hosts(cast(Any, {"cluster_hosts": {}})) is None
-        assert ctx._prepare_etc_hosts(cast(Any, {})) is None
-
-
 class TestSeccompResolvesAgainstTheContainersRealCaps:
     """The profile gates whole syscall groups on a capability. Resolving it against the DEFAULT
     caps while the container is granted EXTRA ones yields the nastiest failure mode available: the
