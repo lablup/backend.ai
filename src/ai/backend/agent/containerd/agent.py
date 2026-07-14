@@ -1452,7 +1452,6 @@ class ContainerdAgent(
             registry_hosts_dir=self.local_config.container.registry_hosts_dir,
         )
         self._event_monitor_task = None
-        self._event_task_group = aiotools.PersistentTaskGroup()
         # In-container helpers (libbaihook LD_PRELOAD hook, jail) talk back to the agent over
         # a per-agent socket for host<->container PID translation + jail status. Bind ZMQ REP
         # directly on this ipc:// UNIX socket and bind-mount it into each container as
@@ -1548,6 +1547,14 @@ class ContainerdAgent(
         # Real-time container-death/OOM detection via the containerd event stream (the
         # equivalent of DockerAgent.monitor_docker_events); the periodic reconciler is the
         # safety net.
+        # Constructed here, not in __init__: a PersistentTaskGroup binds to the running task at
+        # construction and raises without a running loop, and __init__ is a sync method that has no
+        # business requiring one. (The Docker backend builds its own group in __ainit__ likewise.)
+        self._event_task_group = aiotools.PersistentTaskGroup()
+        # Before anything can create a kernel: this directory is bind-mounted into every container,
+        # and a bind mount whose source does not exist fails the container outright. The socket
+        # server below creates it too, but it is a task — it has not necessarily run yet.
+        await asyncio.to_thread(self._agent_sock_path.parent.mkdir, parents=True, exist_ok=True)
         self._event_monitor_task = asyncio.create_task(self._monitor_task_events())
         self._agent_sock_task = asyncio.create_task(self._handle_agent_socket())
         # Advertise what this node's fabric can do, so the manager selects a data plane from facts
@@ -1904,7 +1911,16 @@ class ContainerdAgent(
         version = self.get_cgroup_version()
         if version == "2":
             return container_cgroup_fs_path(container_id)
-        return get_cgroup_mount_point(version, controller) / container_cgroup_parent(container_id)
+        try:
+            mount_point = get_cgroup_mount_point(version, controller)
+        except RuntimeError:
+            # This host mounts no such v1 hierarchy. Hand back a path that does not exist, which is
+            # what the readers already handle (a missing cgroup means "no measurement"); raising
+            # would abort the whole stat round for every container, since the callers resolve the
+            # path outside the try that guards the read.
+            log.debug("no cgroup v1 hierarchy for controller {} on this host", controller)
+            return container_cgroup_fs_path(container_id)
+        return mount_point / container_cgroup_parent(container_id)
 
     @override
     def get_cgroup_version(self) -> str:

@@ -151,10 +151,15 @@ else
   # from a kernel that outlived it: a bind-mounted socket FILE pins the inode it had at mount time,
   # and that inode dies with the agent process. The Docker backend mounts the file directly (its
   # inode is kept alive by a persistent relay container), so there is nothing to link there.
-  if [ -S /opt/kernel/agent-sock/agent.sock ]; then
+  if [ -d /opt/kernel/agent-sock ]; then
+    # Linked whether or not the socket is there right now: the link resolves at connect time, so a
+    # kernel that starts while the agent is between restarts still reaches the socket once it is
+    # back. (Testing for the socket itself would leave that kernel permanently unlinked.)
     ln -sf /opt/kernel/agent-sock/agent.sock /opt/kernel/agent.sock
     chown -h $USER_ID:$GROUP_ID /opt/kernel/agent.sock
-    chown $USER_ID:$GROUP_ID /opt/kernel/agent-sock/agent.sock
+    if [ -S /opt/kernel/agent-sock/agent.sock ]; then
+      chown $USER_ID:$GROUP_ID /opt/kernel/agent-sock/agent.sock
+    fi
   else
     # Correct the ownership of agent socket.
     chown $USER_ID:$GROUP_ID /opt/kernel/agent.sock

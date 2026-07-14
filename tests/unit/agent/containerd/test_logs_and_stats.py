@@ -144,6 +144,18 @@ class TestCgroupPath:
             "/sys/fs/cgroup/cpuacct/backend-ai/kern-1"
         )
 
+    def test_a_missing_v1_hierarchy_does_not_raise(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        # The stats readers resolve the path OUTSIDE the try that guards the read, so raising here
+        # would abort the measurement round for every container on the node. A path that does not
+        # exist is what they already know how to handle.
+        def no_such_hierarchy(version: str, controller: str) -> Path:
+            raise RuntimeError("could not find the cgroup mount point")
+
+        monkeypatch.setattr(agent_mod, "get_cgroup_mount_point", no_such_hierarchy)
+        agent = self._agent(monkeypatch, version="1")
+
+        assert agent.get_cgroup_path("blkio", "kern-1") == Path("/sys/fs/cgroup/backend-ai/kern-1")
+
 
 class TestEnumerateContainerPids:
     """Per-process stats must enumerate PIDs from the cgroup, not the (absent) Docker daemon."""
