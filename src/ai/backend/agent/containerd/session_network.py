@@ -171,9 +171,11 @@ class ContainerdSessionNetwork:
         """
         # Two different questions, two different scopes. What may this agent resume and track? Only
         # its own kernels. What is still alive on this node, and therefore not an orphan? Every
-        # kernel, whoever owns it — the journals the reclaim gives back to are host-global.
-        live = await self._live_containers()
-        ours = await self._own_containers(live)
+        # kernel, whoever owns it — the journals the reclaim gives back to are host-global. Both
+        # views come from ONE listing: asking containerd twice would let a container appear between
+        # the answers and end up in `ours` but not in `live`, or vanish and be reclaimed while this
+        # pass still treats it as live.
+        live, ours = await self._live_and_own_containers()
         metas: dict[str, SessionNetMeta] = {}
         for session_id in sorted(set(ours.values())):
             meta = await self._read_session_meta(session_id)
@@ -220,7 +222,7 @@ class ContainerdSessionNetwork:
 
         What must not be shared is *ownership*: resuming a session, tracking its containers and
         adopting its data plane are ours to do only for our own kernels. Those paths filter (see
-        `_own_containers` / `_live_containers_of`).
+        `_live_and_own_containers` / `_live_containers_of`).
         """
         live: dict[str, str] = {}
         for info in await self._runtime.list_container_infos():
@@ -228,15 +230,22 @@ class ContainerdSessionNetwork:
                 live[info.id] = session_id
         return live
 
-    async def _own_containers(self, live: Mapping[str, str]) -> dict[str, str]:
-        """The subset of `live` this agent owns — the ones it may resume, track and adopt."""
-        owners: dict[str, str] = {}
-        infos = {info.id: info for info in await self._runtime.list_container_infos()}
-        for container_id, session_id in live.items():
-            info = infos.get(container_id)
-            if info is not None and info.labels.get(OWNER_AGENT_LABEL) == self._agent_id:
-                owners[container_id] = session_id
-        return owners
+    async def _live_and_own_containers(self) -> tuple[dict[str, str], dict[str, str]]:
+        """``(every kernel container on this node, the subset this agent owns)``, from one listing.
+
+        The two scopes answer different questions — see `_live_containers` — and taking them from a
+        single snapshot is what keeps them consistent with each other.
+        """
+        live: dict[str, str] = {}
+        ours: dict[str, str] = {}
+        for info in await self._runtime.list_container_infos():
+            session_id = info.labels.get(SESSION_ID_LABEL)
+            if not session_id:
+                continue
+            live[info.id] = session_id
+            if info.labels.get(OWNER_AGENT_LABEL) == self._agent_id:
+                ours[info.id] = session_id
+        return live, ours
 
     async def _read_session_meta(self, session_id: str) -> SessionNetMeta | None:
         raw = await self._etcd.get(session_meta_key(session_id))
@@ -506,7 +515,7 @@ class ContainerdSessionNetwork:
         Ours only: adopting means taking the session's kernels as our own users and re-deriving
         their detach plans. Another agent's kernels are its business, not ours.
         """
-        ours = await self._own_containers(await self._live_containers())
+        _live, ours = await self._live_and_own_containers()
         running = []
         for container_id, sid in ours.items():
             if sid != session_id:
