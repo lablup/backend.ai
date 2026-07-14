@@ -400,9 +400,20 @@ class SchedulingController:
             )
             if scheduling_data is None:
                 resource_group_reason = "Resource group does not exist"
-                for result in kernel_data.values():
-                    result.success = False
-                return ComputeScheduleResult([], resource_group_reason=resource_group_reason)
+                return ComputeScheduleResult(
+                    [
+                        ComputeScheduleKernelResult(
+                            requested_slots=data.requested_slots,
+                            requested_architecture=data.resource_spec.image.architecture
+                            if data.resource_spec is not None
+                            else None,
+                            success=False,
+                            reason_hint=data.reason_hint,
+                        )
+                        for data in kernel_data.values()
+                    ],
+                    resource_group_reason=resource_group_reason,
+                )
             agent_occupancy = (
                 scheduling_data.snapshot_data.resource_occupancy.by_agent
                 if scheduling_data.snapshot_data
