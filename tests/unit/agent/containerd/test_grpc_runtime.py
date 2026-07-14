@@ -7,6 +7,9 @@ import tarfile
 from types import SimpleNamespace
 from typing import Any, cast
 
+import grpc
+import pytest
+
 from ai.backend.agent.containerd._grpcapi.api.types import mount_pb2
 from ai.backend.agent.containerd._grpcapi.api.types.transfer import imagestore_pb2, registry_pb2
 from ai.backend.agent.containerd.runtime.grpc import ContainerdGrpcRuntime, _chain_id
@@ -127,6 +130,57 @@ class TestStopContainer:
         assert signals == [signal.SIGINT]  # sent (swallows NOT_FOUND), no SIGKILL
 
 
+class TestRemoveContainerWithAStuckTask:
+    """A task wedged in D-state (a hung NFS vfolder) survives even SIGKILL, so Tasks.Delete fails
+    FAILED_PRECONDITION. That must not abort the clean and leak the container, its snapshot and its
+    logs — every stuck kernel would leave one behind."""
+
+    def _runtime(self) -> tuple[Any, dict[str, bool]]:
+        rt = cast(Any, ContainerdGrpcRuntime.__new__(ContainerdGrpcRuntime))
+        rt._rootfs = {"c1": []}
+        deleted = {"task": False, "container": False, "snapshot": False}
+
+        async def kill_container(
+            container_id: str, *, signal: int, all_processes: bool = True
+        ) -> None:
+            pass
+
+        async def container_status(container_id: str) -> str | None:
+            return "running"  # never dies
+
+        class _Tasks:
+            async def Delete(self, req: Any, metadata: Any = None, timeout: Any = None) -> Any:
+                deleted["task"] = True
+                raise grpc.aio.AioRpcError(
+                    grpc.StatusCode.FAILED_PRECONDITION,
+                    None,
+                    None,
+                    "cannot delete a running process",
+                )
+
+        class _Containers:
+            async def Delete(self, req: Any, metadata: Any = None, timeout: Any = None) -> Any:
+                deleted["container"] = True
+
+        class _Snapshots:
+            async def Remove(self, req: Any, metadata: Any = None, timeout: Any = None) -> Any:
+                deleted["snapshot"] = True
+
+        rt.kill_container = kill_container
+        rt.container_status = container_status
+        rt._tasks_stub = lambda: _Tasks()
+        rt._containers_stub = lambda: _Containers()
+        rt._snapshots_stub = lambda: _Snapshots()
+        type(rt)._md = property(lambda self: [])
+        return rt, deleted
+
+    async def test_a_task_that_will_not_die_still_gets_its_records_cleaned(self) -> None:
+        rt, deleted = self._runtime()
+        await rt.remove_container("c1")  # must not raise
+        assert deleted == {"task": True, "container": True, "snapshot": True}
+        assert "c1" not in rt._rootfs  # the rootfs entry is gone too
+
+
 class TestExportImage:
     """The session-export flow's downloadable artifact.
 
@@ -154,8 +208,16 @@ class TestExportImage:
         async def _read_content(digest: str) -> bytes:
             return blobs[digest]
 
+        async def _read_content_chunks(digest: str) -> Any:
+            # Layers are streamed a chunk at a time (never held whole in memory); emit two chunks
+            # so the streaming path is actually exercised, not just a single-shot read.
+            data = blobs[digest]
+            yield data[: len(data) // 2]
+            yield data[len(data) // 2 :]
+
         rt._resolve_manifest = _resolve_manifest  # type: ignore[method-assign]
         rt._read_content = _read_content  # type: ignore[method-assign]
+        rt._read_content_chunks = _read_content_chunks  # type: ignore[method-assign]
         return rt, manifest, blobs
 
     async def test_writes_a_gzipped_oci_layout(self, tmp_path: Any) -> None:
@@ -217,6 +279,8 @@ class _CommitHarness:
         self.written: dict[str, tuple[bytes, dict[str, str]]] = {}
         self.label_updates: list[tuple[str, list[str]]] = []
         self.created_images: list[Any] = []
+        self.deleted_content: list[str] = []
+        self.fail_image_create = False
 
     def runtime(self) -> Any:
         rt = cast(Any, ContainerdGrpcRuntime.__new__(ContainerdGrpcRuntime))
@@ -265,6 +329,10 @@ class _CommitHarness:
                 harness.label_updates.append((req.info.digest, list(req.update_mask.paths)))
                 return SimpleNamespace()
 
+            async def Delete(self, req: Any, metadata: Any = None) -> Any:
+                harness.deleted_content.append(req.digest)
+                return SimpleNamespace()
+
         class _Tasks:
             async def Pause(self, req: Any, metadata: Any = None) -> Any:
                 harness.paused.append(req.container_id)
@@ -276,6 +344,8 @@ class _CommitHarness:
 
         class _Images:
             async def Create(self, req: Any, metadata: Any = None) -> Any:
+                if harness.fail_image_create:
+                    raise grpc.aio.AioRpcError(grpc.StatusCode.INTERNAL, None, None, "boom")
                 harness.created_images.append(req.image)
                 return SimpleNamespace()
 
@@ -351,6 +421,29 @@ class TestCommitContainer:
         assert layers[0] == harness.BASE_LAYER  # the same blob, byte for byte: stored once
         assert layers[1]["digest"] == harness.NEW_LAYER_DIGEST
         assert layers[1]["mediaType"] == "application/vnd.oci.image.layer.v1.tar+gzip"
+
+    async def test_a_failure_after_the_diff_drops_the_gc_roots_and_deletes_the_blobs(self) -> None:
+        # A GC root is never collected, even after the image is deleted, so a commit that failed
+        # after writing the layer/config (here, Images.Create errors) would pin gigabytes forever.
+        harness = _CommitHarness()
+        harness.fail_image_create = True
+        rt = harness.runtime()
+
+        with pytest.raises(grpc.aio.AioRpcError):
+            await rt.commit_container(
+                "kern-1", base_image_ref="base:1", target_ref="committed:1", labels={}
+            )
+
+        # every blob the commit wrote had its gc.root label cleared...
+        cleared = {
+            digest
+            for digest, paths in harness.label_updates
+            if "labels.containerd.io/gc.root" in paths
+        }
+        assert harness.NEW_LAYER_DIGEST in cleared  # the layer
+        assert cleared & set(harness.written)  # the config/manifest it wrote
+        # ...and was deleted from the content store
+        assert harness.NEW_LAYER_DIGEST in harness.deleted_content
 
     async def test_the_config_records_the_uncompressed_digest_as_the_diff_id(self) -> None:
         # The blob's own digest is the COMPRESSED one. Recording it produces an image containerd

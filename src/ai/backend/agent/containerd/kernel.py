@@ -180,37 +180,51 @@ class ContainerdKernel(AbstractKernel):
         target_ref = canonical or f"localhost/committed-{kernel_id}:latest"
         await asyncio.to_thread(lock_path.parent.mkdir, parents=True, exist_ok=True)
         commit_timeout = float(self.agent_config["api"]["commit-timeout"])
+        lock = FileLock(path=lock_path, timeout=0.1, remove_when_unlock=True)
         try:
-            async with FileLock(path=lock_path, timeout=0.1, remove_when_unlock=True):
-                runtime = ContainerdGrpcRuntime(namespace="backend-ai")
-                await runtime.open()
-                try:
-                    async with asyncio.timeout(commit_timeout):
-                        await runtime.commit_container(
-                            str(self.data["container_id"]),
-                            base_image_ref=self.image.canonical,
-                            target_ref=target_ref,
-                            labels=extra_labels or {},
-                        )
-                        if filename:
-                            # Export the freshly committed image as the downloadable artifact,
-                            # then drop it: it only existed to be exported (the Docker backend
-                            # deletes its intermediate image the same way). Skipping this used to
-                            # leave the caller with a successful commit and no file at all.
-                            dest = (
-                                Path(self.agent_config["agent"]["image-commit-path"])
-                                / subdir
-                                / filename
-                            )
-                            try:
-                                await runtime.export_image(target_ref, dest)
-                            finally:
-                                if canonical is None:
-                                    await runtime.remove_image(target_ref)
-                finally:
-                    await runtime.close()
+            await lock.acquire()
         except TimeoutError:
+            # ONLY the lock acquisition is caught here. A commit already in progress is a benign
+            # no-op; a commit that RUNS OUT of time is a failure and must propagate — folding the
+            # two together reported a timed-out commit as success, so the manager recorded an image
+            # that was never built.
             log.warning("commit(k:{}): already being committed", kernel_id)
+            return
+        try:
+            runtime = ContainerdGrpcRuntime(namespace="backend-ai")
+            await runtime.open()
+            try:
+                async with asyncio.timeout(commit_timeout):
+                    await runtime.commit_container(
+                        str(self.data["container_id"]),
+                        base_image_ref=self.image.canonical,
+                        target_ref=target_ref,
+                        labels=extra_labels or {},
+                    )
+                    if filename:
+                        # Export the freshly committed image as the downloadable artifact, then
+                        # drop it: it only existed to be exported (the Docker backend deletes its
+                        # intermediate image the same way). Skipping this used to leave the caller
+                        # with a successful commit and no file at all.
+                        dest = (
+                            Path(self.agent_config["agent"]["image-commit-path"])
+                            / subdir
+                            / filename
+                        )
+                        try:
+                            await runtime.export_image(target_ref, dest)
+                        except BaseException:
+                            # A failed or timed-out export leaves a truncated archive behind; the
+                            # caller must not find a half-written file where a good one should be.
+                            await asyncio.to_thread(dest.unlink, True)
+                            raise
+                        finally:
+                            if canonical is None:
+                                await runtime.remove_image(target_ref)
+            finally:
+                await runtime.close()
+        finally:
+            lock.release()
 
     @override
     async def get_service_apps(self) -> dict[str, Any]:

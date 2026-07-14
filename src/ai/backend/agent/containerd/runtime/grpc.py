@@ -25,6 +25,7 @@ import json
 import logging
 import signal
 import tarfile
+import tempfile
 from collections.abc import AsyncIterator, Mapping, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
@@ -125,6 +126,16 @@ _TASK_STATUS = {0: "unknown", 1: "created", 2: "running", 3: "stopped", 4: "paus
 # Docker sets StopSignal=SIGINT for kernels; the kernel runner traps it to shut down cleanly.
 _STOP_SIGNAL = signal.SIGINT
 _KILL_SIGNAL = signal.SIGKILL
+
+
+# Default deadline for the lifecycle RPCs that a destroy/clean handler waits on. Nothing in this
+# client passed a timeout, so a wedged daemon (an overlayfs/snapshotter stall is the usual cause)
+# blocked those handlers forever — remove_container's own 10s poll does not help, since it is the
+# RPCs *inside* it that hang. Generous, because these are local-socket calls to a busy daemon, not
+# network round trips; it is a backstop against an indefinite hang, not a latency budget. Streaming
+# and legitimately long-running calls (content Read/Write, event Subscribe, transfer pull/push, exec
+# Wait) are left unbounded.
+_LIFECYCLE_CALL_TIMEOUT = 120.0
 
 
 def _containerd_any(msg: Any) -> any_pb2.Any:
@@ -344,6 +355,15 @@ class ContainerdGrpcRuntime(OciRuntime):
             metadata=self._md,
         )
 
+    async def _delete_content(self, digest: str) -> None:
+        """Delete a blob from the content store. Used to clean up the layer/config a failed commit
+        wrote — once its GC root is dropped it would be collectable anyway, but leaving a several-
+        gigabyte layer to sit until the next GC pass is worth avoiding."""
+        with contextlib.suppress(grpc.aio.AioRpcError):
+            await self._content_stub().Delete(
+                content_pb2.DeleteContentRequest(digest=digest), metadata=self._md
+            )
+
     @contextlib.asynccontextmanager
     async def _paused(self, container_id: str) -> AsyncIterator[None]:
         """Freeze the container's processes for the duration of the diff, the way `docker commit`
@@ -434,6 +454,36 @@ class ContainerdGrpcRuntime(OciRuntime):
                     metadata=self._md,
                 )
 
+        # From here the diff layer is a rooted blob in the content store. Every step that follows
+        # can fail — reading the diff_id back, writing the config/manifest, Images.Create — and a
+        # GC root is never collected, even after the image is deleted, so a failure that left these
+        # roots set would pin the layer (gigabytes) and the config forever. Roll them back on any
+        # exception; on success the image roots them and the temporary roots are dropped at the end.
+        rooted: list[str] = [layer.digest]
+        try:
+            await self._finish_commit(
+                container_id, target_ref, now, labels, base_config, base_diff_ids, base_layers,
+                layer, rooted,
+            )  # fmt: skip
+        except BaseException:
+            for digest in rooted:
+                with contextlib.suppress(grpc.aio.AioRpcError):
+                    await self._drop_gc_root(digest)
+                await self._delete_content(digest)
+            raise
+
+    async def _finish_commit(
+        self,
+        container_id: str,
+        target_ref: str,
+        now: str,
+        labels: Mapping[str, str] | None,
+        base_config: dict[str, Any],
+        base_diff_ids: list[str],
+        base_layers: list[dict[str, Any]],
+        layer: Any,
+        rooted: list[str],
+    ) -> None:
         # 2. New config: the base's, plus this layer's diff_id and a history entry.
         #
         #    The diff_id is the layer's UNCOMPRESSED digest, which for a gzipped layer is NOT the
@@ -456,6 +506,7 @@ class ContainerdGrpcRuntime(OciRuntime):
         config_desc = await self._write_content(
             json.dumps(config).encode(), _CONFIG_MEDIA_TYPE, labels={_GC_ROOT_LABEL: now}
         )
+        rooted.append(config_desc["digest"])
 
         # 3. New manifest: the base's layers plus ours. Its GC labels are what keep the config and
         #    every layer reachable once the image is the only thing rooting them.
@@ -479,6 +530,7 @@ class ContainerdGrpcRuntime(OciRuntime):
         manifest_desc = await self._write_content(
             json.dumps(manifest).encode(), _MANIFEST_MEDIA_TYPE, labels=gc_refs
         )
+        rooted.append(manifest_desc["digest"])
 
         # 4. Register the image pointing at the manifest.
         target = descriptor_pb2.Descriptor(
@@ -507,13 +559,34 @@ class ContainerdGrpcRuntime(OciRuntime):
 
     # --- image content helpers (read the manifest chain to resolve the rootfs) ---
 
-    async def _read_content(self, digest: str) -> bytes:
-        buf = bytearray()
+    async def _read_content_chunks(self, digest: str) -> AsyncIterator[bytes]:
+        """Stream a blob from the content store, one gRPC chunk at a time."""
         async for resp in self._content_stub().Read(
             content_pb2.ReadContentRequest(digest=digest), metadata=self._md
         ):
-            buf.extend(resp.data)
+            yield resp.data
+
+    async def _read_content(self, digest: str) -> bytes:
+        buf = bytearray()
+        async for chunk in self._read_content_chunks(digest):
+            buf.extend(chunk)
         return bytes(buf)
+
+    async def _spool_content(self, digest: str, dest: Path) -> int:
+        """Stream a blob from the content store to a file, a chunk at a time, and return its size.
+
+        `_read_content` holds the whole blob in memory; a rootfs layer is gigabytes, so export used
+        to need the entire image resident in the agent's RSS at once (OOM-killing it on a large
+        image). Spooling each blob to disk keeps the footprint to one gRPC chunk."""
+        size = 0
+        f = await asyncio.to_thread(dest.open, "wb")
+        try:
+            async for chunk in self._read_content_chunks(digest):
+                await asyncio.to_thread(f.write, chunk)
+                size += len(chunk)
+        finally:
+            await asyncio.to_thread(f.close)
+        return size
 
     @override
     async def export_image(self, image_ref: str, dest_path: Path) -> None:
@@ -530,10 +603,6 @@ class ContainerdGrpcRuntime(OciRuntime):
         manifest_bytes = json.dumps(manifest, separators=(",", ":")).encode()
         manifest_digest = "sha256:" + hashlib.sha256(manifest_bytes).hexdigest()
 
-        blobs: list[tuple[str, bytes]] = [(manifest_digest, manifest_bytes)]
-        for desc in [manifest["config"], *manifest.get("layers", [])]:
-            blobs.append((desc["digest"], await self._read_content(desc["digest"])))
-
         index = {
             "schemaVersion": 2,
             "mediaType": "application/vnd.oci.image.index.v1+json",
@@ -546,24 +615,46 @@ class ContainerdGrpcRuntime(OciRuntime):
                 }
             ],
         }
+        # The layer blobs are spooled to a temp dir first, one chunk at a time, so the whole
+        # (multi-gigabyte) image never sits in the agent's memory. Only the small metadata blobs
+        # (manifest, config, oci-layout, index.json) are held as bytes. The tar streams from disk.
+        await asyncio.to_thread(dest_path.parent.mkdir, parents=True, exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=dest_path.parent) as spool_dir:
+            spool = Path(spool_dir)
+            inline: list[tuple[str, bytes]] = [
+                (manifest_digest, manifest_bytes),
+                (manifest["config"]["digest"], await self._read_content(manifest["config"]["digest"])),
+            ]  # fmt: skip
+            layer_files: list[tuple[str, Path, int]] = []
+            for i, desc in enumerate(manifest.get("layers", [])):
+                blob = spool / f"layer-{i}"
+                size = await self._spool_content(desc["digest"], blob)
+                layer_files.append((desc["digest"], blob, size))
 
-        def _write() -> None:
-            dest_path.parent.mkdir(parents=True, exist_ok=True)
-            with gzip.open(dest_path, "wb") as gz:
-                with tarfile.open(fileobj=gz, mode="w|") as tar:
+            def _write() -> None:
+                dest_path.parent.mkdir(parents=True, exist_ok=True)
+                with gzip.open(dest_path, "wb") as gz, tarfile.open(fileobj=gz, mode="w|") as tar:
 
-                    def add(name: str, payload: bytes) -> None:
+                    def add_bytes(name: str, payload: bytes) -> None:
                         info = tarfile.TarInfo(name)
                         info.size = len(payload)
                         tar.addfile(info, io.BytesIO(payload))
 
-                    add("oci-layout", json.dumps({"imageLayoutVersion": "1.0.0"}).encode())
-                    add("index.json", json.dumps(index).encode())
-                    for digest, payload in blobs:
+                    def blob_name(digest: str) -> str:
                         algo, _, hexdigest = digest.partition(":")
-                        add(f"blobs/{algo}/{hexdigest}", payload)
+                        return f"blobs/{algo}/{hexdigest}"
 
-        await asyncio.to_thread(_write)
+                    add_bytes("oci-layout", json.dumps({"imageLayoutVersion": "1.0.0"}).encode())
+                    add_bytes("index.json", json.dumps(index).encode())
+                    for digest, payload in inline:
+                        add_bytes(blob_name(digest), payload)
+                    for digest, path, size in layer_files:
+                        info = tarfile.TarInfo(blob_name(digest))
+                        info.size = size
+                        with path.open("rb") as bf:
+                            tar.addfile(info, bf)  # streamed, not read into memory
+
+            await asyncio.to_thread(_write)
 
     async def _resolve_manifest(self, image_ref: str) -> dict[str, Any]:
         """The image's manifest for THIS platform, following a multi-arch index when present."""
@@ -638,36 +729,49 @@ class ContainerdGrpcRuntime(OciRuntime):
             metadata=self._md,
         )
         self._rootfs[container_id] = list(prepared.mounts)
-        # Merge the image's env (PATH, ...) *under* the kernel's env, and honor its WorkingDir.
-        cfg = image_config.get("config") or {}
-        env: dict[str, str] = {}
-        for entry in cfg.get("Env") or []:
-            key, _, value = str(entry).partition("=")
-            env[key] = value
-        env.update(oci_spec.get("env") or {})
-        runtime_spec = build_oci_runtime_spec(
-            {**oci_spec, "env": env},
-            command=command,
-            rootfs_path="rootfs",
-            # The caller pins both (Docker sets WorkingDir=/home/work and
-            # Hostname=cluster_hostname); fall back to the image / a container-id prefix only
-            # when it did not.
-            cwd=oci_spec.get("cwd") or cfg.get("WorkingDir") or "/",
-            hostname=oci_spec.get("hostname") or container_id[:12],
-        )
-        spec_any = any_pb2.Any(type_url=_SPEC_TYPE_URL, value=json.dumps(runtime_spec).encode())
-        container = containers_pb2.Container(
-            id=container_id,
-            image=image_ref,
-            runtime=containers_pb2.Container.Runtime(name=_RUNC_RUNTIME),
-            spec=spec_any,
-            snapshotter=_SNAPSHOTTER,
-            snapshot_key=container_id,
-            labels=dict(oci_spec.get("labels") or {}),
-        )
-        await self._containers_stub().Create(
-            containers_pb2.CreateContainerRequest(container=container), metadata=self._md
-        )
+        # The snapshot is now the container's, keyed on its id. If anything below fails — a bad
+        # spec, Containers.Create — that snapshot and the _rootfs entry survive, and a retry of the
+        # same kernel id then fails at Prepare with ALREADY_EXISTS forever. Undo the snapshot on any
+        # failure so the id is reusable.
+        try:
+            # Merge the image's env (PATH, ...) *under* the kernel's env, and honor its WorkingDir.
+            cfg = image_config.get("config") or {}
+            env: dict[str, str] = {}
+            for entry in cfg.get("Env") or []:
+                key, _, value = str(entry).partition("=")
+                env[key] = value
+            env.update(oci_spec.get("env") or {})
+            runtime_spec = build_oci_runtime_spec(
+                {**oci_spec, "env": env},
+                command=command,
+                rootfs_path="rootfs",
+                # The caller pins both (Docker sets WorkingDir=/home/work and
+                # Hostname=cluster_hostname); fall back to the image / a container-id prefix only
+                # when it did not.
+                cwd=oci_spec.get("cwd") or cfg.get("WorkingDir") or "/",
+                hostname=oci_spec.get("hostname") or container_id[:12],
+            )
+            spec_any = any_pb2.Any(type_url=_SPEC_TYPE_URL, value=json.dumps(runtime_spec).encode())
+            container = containers_pb2.Container(
+                id=container_id,
+                image=image_ref,
+                runtime=containers_pb2.Container.Runtime(name=_RUNC_RUNTIME),
+                spec=spec_any,
+                snapshotter=_SNAPSHOTTER,
+                snapshot_key=container_id,
+                labels=dict(oci_spec.get("labels") or {}),
+            )
+            await self._containers_stub().Create(
+                containers_pb2.CreateContainerRequest(container=container), metadata=self._md
+            )
+        except BaseException:
+            self._rootfs.pop(container_id, None)
+            with contextlib.suppress(grpc.aio.AioRpcError):
+                await self._snapshots_stub().Remove(
+                    snapshots_pb2.RemoveSnapshotRequest(snapshotter=_SNAPSHOTTER, key=container_id),
+                    metadata=self._md,
+                )
+            raise
 
     @override
     async def create_task(self, container_id: str, *, use_logger: bool = True) -> TaskHandle:
@@ -717,6 +821,7 @@ class ContainerdGrpcRuntime(OciRuntime):
             await self._tasks_stub().Kill(
                 tasks_pb2.KillRequest(container_id=container_id, signal=signal, all=all_processes),
                 metadata=self._md,
+                timeout=_LIFECYCLE_CALL_TIMEOUT,
             )
         except grpc.aio.AioRpcError as e:
             if e.code() is not grpc.StatusCode.NOT_FOUND:
@@ -750,22 +855,47 @@ class ContainerdGrpcRuntime(OciRuntime):
         # for HOSTFILE scratch: the loop mount can only be unmounted once the container's
         # bind-mount of it is gone.)
         await self.kill_container(container_id, signal=_KILL_SIGNAL)
+        exited = False
         for _ in range(100):  # up to ~10s
             status = await self.container_status(container_id)
             if status in (None, "stopped", "created", "unknown"):
+                exited = True
                 break
             await asyncio.sleep(0.1)
-        # task -> container -> snapshot; each best-effort (already-gone is fine).
+        # task -> container -> snapshot. Each is a no-op if already gone (NOT_FOUND). But the task
+        # delete can also fail FAILED_PRECONDITION when the task refused to die (a process wedged in
+        # D-state on a hung NFS vfolder outlives even SIGKILL): treat that like already-gone and go
+        # on, or the container record, its snapshot, the _rootfs entry and the logs would all be
+        # left behind — a leak on every stuck kernel — and the caller would see the whole clean
+        # fail. (containerd's DeleteTaskRequest here carries no force flag, so the shim's own task
+        # record may linger until the process finally dies; the container-level records still go.)
+        try:
+            await self._tasks_stub().Delete(
+                tasks_pb2.DeleteTaskRequest(container_id=container_id),
+                metadata=self._md,
+                timeout=_LIFECYCLE_CALL_TIMEOUT,
+            )
+        except grpc.aio.AioRpcError as e:
+            if e.code() not in (
+                grpc.StatusCode.NOT_FOUND,
+                grpc.StatusCode.FAILED_PRECONDITION,
+            ):
+                raise
+            if not exited:
+                log.warning(
+                    "remove_container(c:{}): task did not exit; deleting its records anyway",
+                    container_id,
+                )
         for coro in (
-            self._tasks_stub().Delete(
-                tasks_pb2.DeleteTaskRequest(container_id=container_id), metadata=self._md
-            ),
             self._containers_stub().Delete(
-                containers_pb2.DeleteContainerRequest(id=container_id), metadata=self._md
+                containers_pb2.DeleteContainerRequest(id=container_id),
+                metadata=self._md,
+                timeout=_LIFECYCLE_CALL_TIMEOUT,
             ),
             self._snapshots_stub().Remove(
                 snapshots_pb2.RemoveSnapshotRequest(snapshotter=_SNAPSHOTTER, key=container_id),
                 metadata=self._md,
+                timeout=_LIFECYCLE_CALL_TIMEOUT,
             ),
         ):
             try:
@@ -813,7 +943,9 @@ class ContainerdGrpcRuntime(OciRuntime):
     async def container_status(self, container_id: str) -> str | None:
         try:
             resp: tasks_pb2.GetResponse = await self._tasks_stub().Get(
-                tasks_pb2.GetRequest(container_id=container_id), metadata=self._md
+                tasks_pb2.GetRequest(container_id=container_id),
+                metadata=self._md,
+                timeout=_LIFECYCLE_CALL_TIMEOUT,
             )
         except grpc.aio.AioRpcError as e:
             if e.code() is grpc.StatusCode.NOT_FOUND:

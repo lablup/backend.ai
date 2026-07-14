@@ -1,5 +1,6 @@
 """Unit tests for ContainerdKernel runner-delegating methods (runner injected via __new__)."""
 
+import asyncio
 import io
 import json
 import tarfile
@@ -9,6 +10,7 @@ from typing import Any, cast
 
 import pytest
 
+import ai.backend.agent.containerd.kernel as kernel_mod
 from ai.backend.agent.containerd.kernel import ContainerdKernel
 from ai.backend.agent.errors.kernel import KernelRunnerNotInitializedError
 from ai.backend.agent.resources import Mount
@@ -81,6 +83,37 @@ class TestRunnerDelegation:
         await k.shutdown_service("jupyter")
         await k.get_service_apps()
         assert r.calls == ["shutdown:jupyter", "service_apps"]
+
+
+class TestCommit:
+    """A commit that runs out of time is a failure. Folding its timeout together with the
+    lock-acquisition timeout reported it as success, and the manager recorded an image that was
+    never built."""
+
+    def _kernel_for_commit(self, tmp_path: Path) -> ContainerdKernel:
+        k = ContainerdKernel.__new__(ContainerdKernel)
+        k.data = {"container_id": "c1"}
+        k.image = cast(Any, SimpleNamespace(canonical="img:1"))
+        k.agent_config = {
+            "agent": {"image-commit-path": str(tmp_path)},
+            "api": {"commit-timeout": 0.05},
+        }
+        return k
+
+    async def test_a_commit_that_times_out_propagates_not_swallowed(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        class _SlowRuntime:
+            async def open(self) -> None: ...
+            async def close(self) -> None: ...
+            async def commit_container(self, *a: Any, **kw: Any) -> None:
+                await asyncio.sleep(10)  # far longer than commit-timeout
+
+        monkeypatch.setattr(kernel_mod, "ContainerdGrpcRuntime", lambda **kw: _SlowRuntime())
+        k = self._kernel_for_commit(tmp_path)
+
+        with pytest.raises(TimeoutError):
+            await k.commit(cast(Any, "k1"), "sub", canonical="target:1")
 
 
 class TestStartService:
