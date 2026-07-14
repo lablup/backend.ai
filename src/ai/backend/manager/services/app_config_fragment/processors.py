@@ -80,19 +80,14 @@ class AppConfigFragmentProcessors(AbstractProcessorPackage):
         action_monitors: list[ActionMonitor],
         validators: ActionValidators,
     ) -> None:
-        # Writes are authorized by RBAC (BEP-1052): create acts at the fragment's target
-        # scope (own user / domain; a public fragment is global-scoped, so no role grants
-        # the write and only a superadmin passes), while update / purge act on the fragment
-        # entity whose scope is resolved through its scope binding. Reads stay on the
-        # allow-list read tiers, so get / admin_search / scoped_search carry no RBAC
-        # validator. Bulk create has no pre-existing targets, so the target-based bulk
-        # validator cannot authorize it — only bulk update / purge are wired.
         self.create = ScopeActionProcessor(
             service.create, action_monitors, validators=[validators.rbac.scope]
         )
         self.get = SingleEntityActionProcessor(service.get, action_monitors)
         self.admin_search = ScopeActionProcessor(service.admin_search, action_monitors)
-        self.scoped_search = BulkActionProcessor(service.scoped_search, monitors=action_monitors)
+        self.scoped_search = BulkActionProcessor(
+            service.scoped_search, monitors=action_monitors, validators=[validators.rbac.bulk]
+        )
         self.update = SingleEntityActionProcessor(
             service.update, action_monitors, validators=[validators.rbac.single_entity]
         )
