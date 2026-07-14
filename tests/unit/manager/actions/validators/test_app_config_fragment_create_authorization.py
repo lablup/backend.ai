@@ -28,6 +28,7 @@ from ai.backend.common.data.permission.types import (
     ScopeType,
 )
 from ai.backend.common.data.user.types import UserData, UserRole
+from ai.backend.common.identifier.user import UserID
 from ai.backend.manager.actions.action.base import BaseActionTriggerMeta
 from ai.backend.manager.actions.validators.rbac.scope import ScopeActionRBACValidator
 from ai.backend.manager.data.user.types import UserStatus
@@ -76,18 +77,7 @@ _ORM_CLUSTER = (
 _DOMAIN = "default"
 
 
-def _create_action(scope_type: AppConfigScopeType, scope_id: str) -> CreateAppConfigFragmentAction:
-    return CreateAppConfigFragmentAction(
-        creator_spec=AppConfigFragmentCreatorSpec(
-            config_name="cfg",
-            scope_type=scope_type,
-            scope_id=scope_id,
-            config={},
-        )
-    )
-
-
-def _user_data(user_id: uuid.UUID, *, is_superadmin: bool) -> UserData:
+def _user_data(user_id: UserID, *, is_superadmin: bool) -> UserData:
     return UserData(
         user_id=user_id,
         is_authorized=True,
@@ -101,7 +91,7 @@ def _user_data(user_id: uuid.UUID, *, is_superadmin: bool) -> UserData:
 async def _seed_user_with_role(
     db: ExtendedAsyncSAEngine,
     *,
-    user_id: uuid.UUID,
+    user_id: UserID,
     role_id: uuid.UUID,
 ) -> None:
     suffix = user_id.hex[:8]
@@ -212,7 +202,7 @@ def validator(repository: PermissionControllerRepository) -> _CreateValidatorCha
 @pytest.fixture
 async def owner_user(db_with_rbac_tables: ExtendedAsyncSAEngine) -> UserData:
     """A non-superadmin granted APP_CONFIG_FRAGMENT:CREATE on their own user scope."""
-    user_id = uuid.uuid4()
+    user_id = UserID(uuid.uuid4())
     role_id = uuid.uuid4()
     await _seed_user_with_role(db_with_rbac_tables, user_id=user_id, role_id=role_id)
     await _grant_fragment_create(db_with_rbac_tables, role_id=role_id, scope_id=str(user_id))
@@ -226,7 +216,14 @@ class TestCreateAuthorization:
         trigger_meta: BaseActionTriggerMeta,
         owner_user: UserData,
     ) -> None:
-        action = _create_action(AppConfigScopeType.USER, str(owner_user.user_id))
+        action = CreateAppConfigFragmentAction(
+            creator_spec=AppConfigFragmentCreatorSpec(
+                config_name="cfg",
+                scope_type=AppConfigScopeType.USER,
+                scope_id=str(owner_user.user_id),
+                config={},
+            )
+        )
         with with_user(owner_user):
             await validator.validate(action, trigger_meta)
 
@@ -236,8 +233,15 @@ class TestCreateAuthorization:
         trigger_meta: BaseActionTriggerMeta,
         owner_user: UserData,
     ) -> None:
-        other_user_id = uuid.uuid4()
-        action = _create_action(AppConfigScopeType.USER, str(other_user_id))
+        other_user_id = UserID(uuid.uuid4())
+        action = CreateAppConfigFragmentAction(
+            creator_spec=AppConfigFragmentCreatorSpec(
+                config_name="cfg",
+                scope_type=AppConfigScopeType.USER,
+                scope_id=str(other_user_id),
+                config={},
+            )
+        )
         with with_user(owner_user):
             with pytest.raises(NotEnoughPermission):
                 await validator.validate(action, trigger_meta)
@@ -251,7 +255,14 @@ class TestCreateAuthorization:
         # Public fragments are global-scoped (no RBAC scope element); the empty-id target
         # resolves to no scope, so a non-superadmin — even one that owns its user scope —
         # is denied.
-        action = _create_action(AppConfigScopeType.PUBLIC, "")
+        action = CreateAppConfigFragmentAction(
+            creator_spec=AppConfigFragmentCreatorSpec(
+                config_name="cfg",
+                scope_type=AppConfigScopeType.PUBLIC,
+                scope_id="",
+                config={},
+            )
+        )
         with with_user(owner_user):
             with pytest.raises(NotEnoughPermission):
                 await validator.validate(action, trigger_meta)
@@ -261,7 +272,14 @@ class TestCreateAuthorization:
         validator: _CreateValidatorChain,
         trigger_meta: BaseActionTriggerMeta,
     ) -> None:
-        superadmin = _user_data(uuid.uuid4(), is_superadmin=True)
-        action = _create_action(AppConfigScopeType.PUBLIC, "")
+        superadmin = _user_data(UserID(uuid.uuid4()), is_superadmin=True)
+        action = CreateAppConfigFragmentAction(
+            creator_spec=AppConfigFragmentCreatorSpec(
+                config_name="cfg",
+                scope_type=AppConfigScopeType.PUBLIC,
+                scope_id="",
+                config={},
+            )
+        )
         with with_user(superadmin):
             await validator.validate(action, trigger_meta)
