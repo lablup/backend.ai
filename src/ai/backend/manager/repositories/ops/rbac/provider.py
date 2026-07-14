@@ -39,6 +39,8 @@ from ai.backend.manager.repositories.base import (
 from ai.backend.manager.repositories.base.rbac.entity_creator import (
     RBACBulkEntityCreatorResult,
     RBACEntityCreator,
+    RBACEntityCreatorResult,
+    execute_rbac_entity_creator,
     execute_rbac_entity_creators,
 )
 from ai.backend.manager.repositories.base.rbac.scope_unbinder import (
@@ -127,6 +129,13 @@ class RBACWriteOps(WriteOps):
             ])
         )
         await self._sess.execute(stmt)
+
+    async def create_scoped[TRow: Base](
+        self,
+        creator: RBACEntityCreator[TRow],
+    ) -> RBACEntityCreatorResult[TRow]:
+        """Insert one row with its RBAC scope association (the creator carries its scope)."""
+        return await execute_rbac_entity_creator(self._sess, creator)
 
     async def bulk_create_scoped[TRow: Base](
         self,

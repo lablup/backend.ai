@@ -79,17 +79,14 @@ class AppConfigFragmentDBSource:
 
     @app_config_fragment_db_source_resilience.apply()
     async def create(self, spec: AppConfigFragmentCreatorSpec) -> AppConfigFragmentData:
-        # The allow-list FK gates existence (no row → ``AppConfigFragmentWriteNotAllowed``),
-        # and create binds the fragment to its RBAC scope in the same tx. A ``public``
-        # fragment is global-scoped (``scope_ref`` is ``None``) and carries no association.
         rbac_creator = RBACEntityCreator(
             spec=spec,
             element_type=RBACElementType.APP_CONFIG_FRAGMENT,
             scope_ref=fragment_rbac_scope_ref(spec.scope_type, spec.scope_id),
         )
         async with self._rbac_ops_provider.write_ops() as w:
-            created = await w.bulk_create_scoped([rbac_creator])
-            return created.rows[0].to_data()
+            created = await w.create_scoped(rbac_creator)
+            return created.row.to_data()
 
     @app_config_fragment_db_source_resilience.apply()
     async def get_by_id(self, fragment_id: AppConfigFragmentID) -> AppConfigFragmentData:
@@ -101,8 +98,6 @@ class AppConfigFragmentDBSource:
 
     @app_config_fragment_db_source_resilience.apply()
     async def update(self, updater: Updater[AppConfigFragmentRow]) -> AppConfigFragmentData:
-        # No write-gate: the allow-list FK keeps a fragment row alive only while its
-        # ``(config_name, scope_type)`` entry exists, so an existing fragment is writable.
         async with self._rbac_ops_provider.write_ops() as w:
             result = await w.update(updater)
             if result is None:
@@ -111,8 +106,6 @@ class AppConfigFragmentDBSource:
 
     @app_config_fragment_db_source_resilience.apply()
     async def purge(self, purger: Purger[AppConfigFragmentRow]) -> AppConfigFragmentData:
-        # Purge is an RBAC unbind: the row and its scope association are deleted atomically
-        # (no FK cascade; a ``public`` fragment has none). Fetch first for its scope and data.
         async with self._rbac_ops_provider.write_ops() as w:
             found = await w.query(Querier(row_class=AppConfigFragmentRow, pk_value=purger.pk_value))
             if found is None:
