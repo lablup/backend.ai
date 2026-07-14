@@ -469,27 +469,6 @@ class SessionProvisioner:
         # Build session allocation from selections
         return self._build_session_allocation(session_workload, selections)
 
-    # @staticmethod
-    # def _build_agent_info(
-    #     meta: AgentMeta,
-    #     occupancy_map: Mapping[AgentId, AgentOccupancy],
-    # ) -> AgentInfo:
-    #     """Create an AgentInfo from agent metadata and occupancy mapping."""
-    #     occupancy = occupancy_map.get(meta.id)
-    #     if occupancy:
-    #         occupied = ResourceSlot({sq.slot_name: sq.quantity for sq in occupancy.occupied_slots})
-    #     else:
-    #         occupied = ResourceSlot()
-    #     return AgentInfo(
-    #         agent_id=meta.id,
-    #         agent_addr=meta.addr,
-    #         architecture=meta.architecture,
-    #         scaling_group=meta.scaling_group,
-    #         available_slots=meta.available_slots,
-    #         occupied_slots=occupied,
-    #         container_count=occupancy.container_count if occupancy else 0,
-    #     )
-
     @staticmethod
     def _build_session_allocation(
         session_workload: SessionWorkload,
