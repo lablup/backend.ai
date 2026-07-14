@@ -19,7 +19,14 @@ from ai.backend.manager.models.base import (
 
 class EntityMembershipRow(Base):  # type: ignore[misc]
     __tablename__ = "entity_memberships"
-    __table_args__ = (sa.Index("ix_entity_memberships_entity", "entity_type", "entity_id"),)
+    __table_args__ = (
+        sa.Index(
+            "ix_entity_memberships_entity",
+            "entity_type",
+            "entity_id",
+            postgresql_include=["virtual_scope_id", "permission_cap"],
+        ),
+    )
 
     virtual_scope_id: Mapped[VirtualScopeID] = mapped_column(
         "virtual_scope_id",
