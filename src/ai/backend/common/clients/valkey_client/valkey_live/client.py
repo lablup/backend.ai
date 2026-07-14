@@ -196,14 +196,14 @@ class ValkeyLiveClient:
         reports: dict[str, str] = {}
         for remaining_time in remaining_times:
             key = self._idle_check_remaining_time_key(remaining_time)
+            # Format the remaining seconds as a string with fixed-point notation to avoid scientific notation
             reports[key] = format(remaining_time.remaining_seconds, "f")
         await self.store_multiple_live_data(
             reports,
             ex=_IDLE_CHECK_REMAINING_TIME_EXPIRATION,
         )
 
-    @staticmethod
-    def _idle_check_remaining_time_key(remaining_time: IdleCheckRemainingTime) -> str:
+    def _idle_check_remaining_time_key(self, remaining_time: IdleCheckRemainingTime) -> str:
         return (
             f"session.{remaining_time.session_id}.idle_checker."
             f"{remaining_time.checker_id}.remaining"
