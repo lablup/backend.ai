@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import contextlib
 import functools
 import logging
 import os
@@ -103,7 +102,12 @@ from ai.backend.common.metrics.http import (
     build_api_metric_middleware,
 )
 from ai.backend.common.metrics.metric import CommonMetricRegistry
-from ai.backend.common.metrics.profiler import Profiler, PyroscopeArgs
+from ai.backend.common.metrics.profiler import (
+    Profiler,
+    PyroscopeArgs,
+    close_memray_tracker_in_worker,
+    start_memray_tracker,
+)
 from ai.backend.common.service_discovery.etcd_discovery.service_discovery import (
     ETCDServiceDiscovery,
     ETCDServiceDiscoveryArgs,
@@ -1307,6 +1311,11 @@ async def server_main_logwrapper(
                 yield
     except Exception:
         traceback.print_exc(file=sys.stderr)
+    finally:
+        # Close this forked worker's own capture while it is still running Python:
+        # aiotools ends the child with a bare os._exit(), which runs no atexit
+        # handlers and no interpreter finalization.
+        close_memray_tracker_in_worker()
 
 
 def _build_agent_health_response(connectivity: ConnectivityCheckResponse) -> web.Response:
@@ -1780,25 +1789,10 @@ def main(
         raise click.Abort() from e
 
     if not is_invoked_subcommand:
-        memray_tracker: contextlib.AbstractContextManager[Any] | None = None
-        if server_config.memray.enabled:
-            import memray
-
-            # `aiotools.start_server()` forks the service worker, so follow it to
-            # capture the allocations of the process that does the actual work.
-            # The PID suffix keeps a restart from colliding with an earlier capture,
-            # which memray would refuse to overwrite.
-            memray_destination = server_config.memray.output_destination
-            memray_destination = memray_destination.with_name(
-                f"{memray_destination.stem}.{os.getpid()}{memray_destination.suffix}"
-            )
-            memray_destination.parent.mkdir(parents=True, exist_ok=True)
-            memray_tracker = memray.Tracker(
-                memray_destination,
-                follow_fork=True,
-                native_traces=server_config.memray.native_traces,
-            )
-            memray_tracker.__enter__()
+        # Started here, before `aiotools.start_server()` forks the service worker,
+        # so that `follow_fork` captures the process that does the actual work.
+        # The worker closes its own capture (see server_main_logwrapper).
+        memray_tracker = start_memray_tracker(server_config.memray)
 
         server_config.agent_common.pid_file.write_text(str(os.getpid()))
         image_commit_path = server_config.agent_common.image_commit_path

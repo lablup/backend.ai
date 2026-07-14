@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import contextlib
 import functools
 import grp
 import logging
@@ -46,6 +45,10 @@ from ai.backend.common.json import dump_json_str
 from ai.backend.common.metrics.http import build_prometheus_metrics_handler
 from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.common.metrics.multiprocess_setup import cleanup_prometheus_multiprocess_dir
+from ai.backend.common.metrics.profiler import (
+    close_memray_tracker_in_worker,
+    start_memray_tracker,
+)
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
@@ -468,6 +471,11 @@ async def server_main_logwrapper(
                 yield
     except Exception:
         traceback.print_exc(file=sys.stderr)
+    finally:
+        # Close this forked worker's own capture while it is still running Python:
+        # aiotools ends the child with a bare os._exit(), which runs no atexit
+        # handlers and no interpreter finalization.
+        close_memray_tracker_in_worker()
 
 
 @click.group(invoke_without_command=True)
@@ -510,25 +518,10 @@ def main(
     bootstrap_cfg = asyncio.run(BootstrapConfig.load_from_file(discovered_cfg_path, log_level))
 
     if ctx.invoked_subcommand is None:
-        memray_tracker: contextlib.AbstractContextManager[Any] | None = None
-        if bootstrap_cfg.memray.enabled:
-            import memray
-
-            # `aiotools.start_server()` forks the service workers, so follow them to
-            # capture the allocations of the processes that do the actual work.
-            # The PID suffix keeps a restart from colliding with an earlier capture,
-            # which memray would refuse to overwrite.
-            memray_destination = bootstrap_cfg.memray.output_destination
-            memray_destination = memray_destination.with_name(
-                f"{memray_destination.stem}.{os.getpid()}{memray_destination.suffix}"
-            )
-            memray_destination.parent.mkdir(parents=True, exist_ok=True)
-            memray_tracker = memray.Tracker(
-                memray_destination,
-                follow_fork=True,
-                native_traces=bootstrap_cfg.memray.native_traces,
-            )
-            memray_tracker.__enter__()
+        # Started here, before `aiotools.start_server()` forks the service workers,
+        # so that `follow_fork` captures the processes that do the actual work.
+        # Each worker closes its own capture (see server_main_logwrapper).
+        memray_tracker = start_memray_tracker(bootstrap_cfg.memray)
 
         bootstrap_cfg.manager.pid_file.write_text(str(os.getpid()))
         ipc_base_path = bootstrap_cfg.manager.ipc_base_path
