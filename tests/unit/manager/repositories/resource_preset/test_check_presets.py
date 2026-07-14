@@ -146,7 +146,6 @@ class TestCheckPresetsOccupiedSlots:
                 sgroups_for_domains,  # association table
                 sgroups_for_keypairs,  # association table
                 sgroups_for_groups,  # association table
-                AssociationScopesEntitiesRow,  # RBAC project membership
             ],
         ):
             # Seed default resource slot types (FK target for normalized tables)
@@ -298,16 +297,6 @@ class TestCheckPresetsOccupiedSlots:
             await db_sess.flush()
 
             # RBAC project membership (queried by check_presets)
-            db_sess.add(
-                AssociationScopesEntitiesRow(
-                    scope_type=ScopeType.PROJECT,
-                    scope_id=str(group_id),
-                    entity_type=EntityType.USER,
-                    entity_id=str(test_user_uuid),
-                )
-            )
-            # Record project membership in the RBAC association table, which
-            # check_presets now uses to resolve the user's group.
             db_sess.add(
                 AssociationScopesEntitiesRow(
                     scope_type=ScopeType.PROJECT,
@@ -1239,7 +1228,6 @@ class TestCheckPresetsZeroValues:
                 sgroups_for_domains,  # association table
                 sgroups_for_keypairs,  # association table
                 sgroups_for_groups,  # association table
-                AssociationScopesEntitiesRow,  # RBAC project membership
             ],
         ):
             # Seed default resource slot types (FK target for normalized tables)
@@ -1423,16 +1411,6 @@ class TestCheckPresetsZeroValues:
             await db_sess.flush()
 
             # RBAC project membership (queried by check_presets)
-            db_sess.add(
-                AssociationScopesEntitiesRow(
-                    scope_type=ScopeType.PROJECT,
-                    scope_id=str(group_id),
-                    entity_type=EntityType.USER,
-                    entity_id=str(test_user_uuid),
-                )
-            )
-            # Record project membership in the RBAC association table, which
-            # check_presets now uses to resolve the user's group.
             db_sess.add(
                 AssociationScopesEntitiesRow(
                     scope_type=ScopeType.PROJECT,
