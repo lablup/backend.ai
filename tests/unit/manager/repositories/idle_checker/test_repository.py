@@ -602,6 +602,11 @@ class TestFetchIdleCheckBatch:
         batch = await repository.fetch_idle_check_batch([SessionStatus.RUNNING])
         target_session_ids = {target.session.session_id for target in batch.targets}
 
+        assert target_session_ids == {
+            seeded_idle_check_data.resource_group_session_id,
+            seeded_idle_check_data.project_session_id,
+            seeded_idle_check_data.domain_session_id,
+        }
         assert seeded_idle_check_data.inference_session_id not in target_session_ids
 
     @pytest.mark.parametrize(
@@ -617,6 +622,11 @@ class TestFetchIdleCheckBatch:
         batch = await repository.fetch_idle_check_batch([SessionStatus.RUNNING])
         target_session_ids = {target.session.session_id for target in batch.targets}
 
+        assert target_session_ids == {
+            seeded_idle_check_data.resource_group_session_id,
+            seeded_idle_check_data.project_session_id,
+            seeded_idle_check_data.domain_session_id,
+        }
         assert seeded_idle_check_data.unstarted_session_id not in target_session_ids
 
     @pytest.fixture
