@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import override
 
+from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.dependencies import DependencyComposer, DependencyStack
@@ -59,6 +60,7 @@ class OrchestrationInput:
     valkey_profile_target: ValkeyProfileTarget
     valkey_schedule: ValkeyScheduleClient
     valkey_stat: ValkeyStatClient
+    valkey_live: ValkeyLiveClient
     pidx: int
     # Sokovan-specific
     scheduler_repository: SchedulerRepository
@@ -155,6 +157,7 @@ class OrchestrationComposer(DependencyComposer[OrchestrationInput, Orchestration
             valkey_schedule=setup_input.valkey_schedule,
             valkey_stat=setup_input.valkey_stat,
             agent_selector=setup_input.agent_selector,
+            valkey_live=setup_input.valkey_live,
             scheduling_controller=setup_input.scheduling_controller,
             deployment_controller=setup_input.deployment_controller,
             route_controller=setup_input.route_controller,

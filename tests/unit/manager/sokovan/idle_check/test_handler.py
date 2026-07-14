@@ -3,14 +3,18 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import replace
 from datetime import UTC, datetime
+from decimal import Decimal
 from typing import Final, override
+from unittest.mock import AsyncMock
 from uuid import uuid4
 
 import pytest
 
+from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.data.idle_checker.types import (
     CheckerType,
     IdleCheckerSpec,
+    IdleCheckRemainingTime,
     NetworkTimeoutSpec,
     SessionLifetimeSpec,
 )
@@ -35,6 +39,7 @@ from ai.backend.manager.sokovan.idle_check.handlers.reconcile import IdleCheckRe
 from ai.backend.manager.sokovan.idle_check.types import (
     IdleCheckReconcileInfo,
     IdleCheckReport,
+    IdleCheckResult,
     IdleReason,
 )
 
@@ -83,6 +88,9 @@ class FakeChecker(IdleChecker):
                     IdleJudgment(
                         checker_id=assignment.definition.checker_id,
                         session_id=session.session_id,
+                        remaining_seconds=Decimal(
+                            -1 if session.session_id in self.idle_session_ids else 1
+                        ),
                         is_idle=session.session_id in self.idle_session_ids,
                         message=self._message,
                     )
@@ -144,13 +152,23 @@ class TestIdleCheckReconcileHandler:
         return FakeChecker(message="no network activity")
 
     @pytest.fixture()
+    def valkey_live(self) -> AsyncMock:
+        return AsyncMock(spec=ValkeyLiveClient)
+
+    @pytest.fixture()
     def handler(
-        self, lifetime_checker: FakeChecker, network_checker: FakeChecker
+        self,
+        lifetime_checker: FakeChecker,
+        network_checker: FakeChecker,
+        valkey_live: AsyncMock,
     ) -> IdleCheckReconcileHandler:
-        return IdleCheckReconcileHandler({
-            CheckerType.SESSION_LIFETIME: lifetime_checker,
-            CheckerType.NETWORK_TIMEOUT: network_checker,
-        })
+        return IdleCheckReconcileHandler(
+            {
+                CheckerType.SESSION_LIFETIME: lifetime_checker,
+                CheckerType.NETWORK_TIMEOUT: network_checker,
+            },
+            valkey_live,
+        )
 
     async def test_batches_judgments_by_checker_type(
         self,
@@ -288,6 +306,18 @@ class TestIdleCheckReconcileHandler:
         assert network_checker.judge_calls == [
             [(network_bound.checker.checker_id, [first_session_id])]
         ]
+        assert result.remaining_times == [
+            IdleCheckRemainingTime(
+                session_id=first_session_id,
+                checker_id=lifetime_bound.checker.checker_id,
+                remaining_seconds=Decimal(1),
+            ),
+            IdleCheckRemainingTime(
+                session_id=first_session_id,
+                checker_id=network_bound.checker.checker_id,
+                remaining_seconds=Decimal(1),
+            ),
+        ]
 
     async def test_skips_unimplemented_checker_types(
         self,
@@ -295,9 +325,13 @@ class TestIdleCheckReconcileHandler:
         lifetime_bound: BoundCheckerData,
         network_bound: BoundCheckerData,
         lifetime_checker: FakeChecker,
+        valkey_live: AsyncMock,
     ) -> None:
         lifetime_checker.idle_session_ids = {first_session_id}
-        handler = IdleCheckReconcileHandler({CheckerType.SESSION_LIFETIME: lifetime_checker})
+        handler = IdleCheckReconcileHandler(
+            {CheckerType.SESSION_LIFETIME: lifetime_checker},
+            valkey_live,
+        )
         reconcile_info = IdleCheckReconcileInfo(
             batch=IdleCheckBatchData(
                 targets=(_target(first_session_id, [network_bound, lifetime_bound]),)
@@ -318,3 +352,54 @@ class TestIdleCheckReconcileHandler:
                 ],
             ),
         ]
+
+    async def test_post_process_writes_checker_reports_in_one_batch(
+        self,
+        handler: IdleCheckReconcileHandler,
+        valkey_live: AsyncMock,
+        first_session_id: SessionId,
+        lifetime_bound: BoundCheckerData,
+        second_lifetime_bound: BoundCheckerData,
+    ) -> None:
+        first_checker_id = lifetime_bound.checker.checker_id
+        second_checker_id = second_lifetime_bound.checker.checker_id
+        result = IdleCheckResult(
+            remaining_times=[
+                IdleCheckRemainingTime(
+                    checker_id=first_checker_id,
+                    session_id=first_session_id,
+                    remaining_seconds=Decimal("120.125"),
+                ),
+                IdleCheckRemainingTime(
+                    checker_id=second_checker_id,
+                    session_id=first_session_id,
+                    remaining_seconds=Decimal("-15.273421"),
+                ),
+            ]
+        )
+
+        await handler.post_process(result)
+
+        valkey_live.store_idle_check_remaining_times.assert_awaited_once()
+        remaining_times = list(valkey_live.store_idle_check_remaining_times.await_args.args[0])
+        assert remaining_times == [
+            IdleCheckRemainingTime(
+                session_id=first_session_id,
+                checker_id=first_checker_id,
+                remaining_seconds=Decimal("120.125"),
+            ),
+            IdleCheckRemainingTime(
+                session_id=first_session_id,
+                checker_id=second_checker_id,
+                remaining_seconds=Decimal("-15.273421"),
+            ),
+        ]
+
+    async def test_post_process_skips_empty_result(
+        self,
+        handler: IdleCheckReconcileHandler,
+        valkey_live: AsyncMock,
+    ) -> None:
+        await handler.post_process(IdleCheckResult())
+
+        valkey_live.store_idle_check_remaining_times.assert_not_awaited()

@@ -1,5 +1,5 @@
 import logging
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from typing import (
     Any,
     Final,
@@ -20,6 +20,7 @@ from ai.backend.common.clients.valkey_client.client import (
     AbstractValkeyClient,
     create_valkey_client,
 )
+from ai.backend.common.data.idle_checker.types import IdleCheckRemainingTime
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience import (
@@ -54,6 +55,7 @@ _DEFAULT_EXPIRATION = 3600  # 1 hour default expiration
 _SESSION_REQUESTS_SUFFIX: Final[str] = "requests"
 _SESSION_LAST_RESPONSE_SUFFIX: Final[str] = "last_response_time"
 _AGENT_LAST_SEEN_HASH: Final[str] = "agent.last_seen"
+_IDLE_CHECK_REMAINING_TIME_EXPIRATION: Final[int] = 150
 
 
 class ValkeyLiveClient:
@@ -185,6 +187,27 @@ class ValkeyLiveClient:
         for key, value in data.items():
             batch.set(key, value, conditional_set=conditional_set, expiry=expiry)
         await self._execute_batch(batch)
+
+    async def store_idle_check_remaining_times(
+        self,
+        remaining_times: Iterable[IdleCheckRemainingTime],
+    ) -> None:
+        """Store signed remaining seconds for each session and idle checker."""
+        reports: dict[str, str] = {}
+        for remaining_time in remaining_times:
+            key = self._idle_check_remaining_time_key(remaining_time)
+            reports[key] = format(remaining_time.remaining_seconds, "f")
+        await self.store_multiple_live_data(
+            reports,
+            ex=_IDLE_CHECK_REMAINING_TIME_EXPIRATION,
+        )
+
+    @staticmethod
+    def _idle_check_remaining_time_key(remaining_time: IdleCheckRemainingTime) -> str:
+        return (
+            f"session.{remaining_time.session_id}.idle_checker."
+            f"{remaining_time.checker_id}.remaining"
+        )
 
     @valkey_live_resilience.apply()
     async def delete_live_data(self, key: str) -> int:

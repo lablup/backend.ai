@@ -275,6 +275,7 @@ class ManagerDependencyComposer(DependencyComposer[DependencyInput, DependencyRe
                 valkey_profile_target=config.redis.to_valkey_profile_target(),
                 valkey_schedule=infrastructure.valkey.schedule,
                 valkey_stat=infrastructure.valkey.stat,
+                valkey_live=infrastructure.valkey.live,
                 pidx=setup_input.pidx,
                 scheduler_repository=domain.repositories.scheduler.repository,
                 deployment_repository=domain.repositories.deployment.repository,

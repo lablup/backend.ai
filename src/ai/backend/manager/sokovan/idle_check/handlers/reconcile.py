@@ -4,7 +4,8 @@ from collections import defaultdict
 from collections.abc import Mapping
 from typing import override
 
-from ai.backend.common.data.idle_checker.types import CheckerType
+from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
+from ai.backend.common.data.idle_checker.types import CheckerType, IdleCheckRemainingTime
 from ai.backend.common.identifier.idle_checker import IdleCheckerID
 from ai.backend.common.types import SessionId
 from ai.backend.manager.data.idle_checker.types import IdleCheckSession
@@ -29,20 +30,34 @@ class IdleCheckReconcileHandler(ReconcilerHandler[IdleCheckReconcileInfo, IdleCh
     """Drive checker-axis judgments and merge idle reasons into session reports."""
 
     _checkers: Mapping[CheckerType, IdleChecker]
+    _valkey_live: ValkeyLiveClient
 
-    def __init__(self, checkers: Mapping[CheckerType, IdleChecker]) -> None:
+    def __init__(
+        self,
+        checkers: Mapping[CheckerType, IdleChecker],
+        valkey_live: ValkeyLiveClient,
+    ) -> None:
         self._checkers = checkers
+        self._valkey_live = valkey_live
 
     @override
     async def execute(self, reconcile_info: IdleCheckReconcileInfo) -> IdleCheckResult:
         assignments_by_type = self._assignments_by_type(reconcile_info.batch)
         reasons_by_session: defaultdict[SessionId, list[IdleReason]] = defaultdict(list)
+        remaining_times: list[IdleCheckRemainingTime] = []
         for checker_type, assignments in assignments_by_type.items():
             checker = self._checkers.get(checker_type)
             if checker is None:
                 continue
             judgments = await checker.judge(assignments)
             for judgment in judgments:
+                remaining_times.append(
+                    IdleCheckRemainingTime(
+                        session_id=judgment.session_id,
+                        checker_id=judgment.checker_id,
+                        remaining_seconds=judgment.remaining_seconds,
+                    )
+                )
                 if not judgment.is_idle:
                     continue
                 reasons_by_session[judgment.session_id].append(
@@ -51,7 +66,7 @@ class IdleCheckReconcileHandler(ReconcilerHandler[IdleCheckReconcileInfo, IdleCh
         reports: list[IdleCheckReport] = []
         for session_id, reasons in reasons_by_session.items():
             reports.append(IdleCheckReport(session_id=session_id, reasons=reasons))
-        return IdleCheckResult(reports=reports)
+        return IdleCheckResult(reports=reports, remaining_times=remaining_times)
 
     def _assignments_by_type(
         self, batch: IdleCheckBatchData
@@ -79,4 +94,6 @@ class IdleCheckReconcileHandler(ReconcilerHandler[IdleCheckReconcileInfo, IdleCh
 
     @override
     async def post_process(self, result: IdleCheckResult) -> None:
-        pass
+        if not result.remaining_times:
+            return
+        await self._valkey_live.store_idle_check_remaining_times(result.remaining_times)

@@ -8,6 +8,7 @@ from datetime import datetime
 from typing import override
 from uuid import UUID
 
+from ai.backend.common.data.idle_checker.types import IdleCheckRemainingTime
 from ai.backend.common.identifier.idle_checker import IdleCheckerID
 from ai.backend.common.types import SessionId
 from ai.backend.manager.data.reconciler.types import (
@@ -97,6 +98,7 @@ class IdleCheckReport:
 @dataclass
 class IdleCheckResult(BaseReconcilerResult):
     reports: list[IdleCheckReport] = field(default_factory=list)
+    remaining_times: list[IdleCheckRemainingTime] = field(default_factory=list)
 
     @override
     def processed_count(self) -> int:

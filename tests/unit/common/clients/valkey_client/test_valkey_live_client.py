@@ -1,8 +1,13 @@
 from __future__ import annotations
 
 import random
+from decimal import Decimal
+from uuid import uuid4
 
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
+from ai.backend.common.data.idle_checker.types import IdleCheckRemainingTime
+from ai.backend.common.identifier.idle_checker import IdleCheckerID
+from ai.backend.common.types import SessionId
 
 
 async def test_valkey_live_hset_operations(test_valkey_live: ValkeyLiveClient) -> None:
@@ -42,6 +47,34 @@ async def test_valkey_live_multiple_data_operations(test_valkey_live: ValkeyLive
     results = await test_valkey_live.get_multiple_live_data(keys)
     assert len(results) == 3
     assert all(result is not None for result in results)
+
+
+async def test_store_idle_check_remaining_times(test_valkey_live: ValkeyLiveClient) -> None:
+    session_id = SessionId(uuid4())
+    active_checker_id = IdleCheckerID(uuid4())
+    idle_checker_id = IdleCheckerID(uuid4())
+
+    await test_valkey_live.store_idle_check_remaining_times([
+        IdleCheckRemainingTime(
+            session_id=session_id,
+            checker_id=active_checker_id,
+            remaining_seconds=Decimal("3E+1"),
+        ),
+        IdleCheckRemainingTime(
+            session_id=session_id,
+            checker_id=idle_checker_id,
+            remaining_seconds=Decimal("-15.273421"),
+        ),
+    ])
+
+    active_remaining = await test_valkey_live.get_live_data(
+        f"session.{session_id}.idle_checker.{active_checker_id}.remaining"
+    )
+    idle_remaining = await test_valkey_live.get_live_data(
+        f"session.{session_id}.idle_checker.{idle_checker_id}.remaining"
+    )
+    assert active_remaining == b"30"
+    assert idle_remaining == b"-15.273421"
 
 
 async def test_valkey_live_client_lifecycle(test_valkey_live: ValkeyLiveClient) -> None:

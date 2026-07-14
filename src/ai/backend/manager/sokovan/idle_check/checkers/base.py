@@ -5,6 +5,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from dataclasses import dataclass
+from decimal import Decimal
 
 from ai.backend.common.identifier.idle_checker import IdleCheckerID
 from ai.backend.common.types import SessionId
@@ -26,6 +27,7 @@ class IdleJudgment:
 
     checker_id: IdleCheckerID
     session_id: SessionId
+    remaining_seconds: Decimal
     is_idle: bool
     message: str
 
