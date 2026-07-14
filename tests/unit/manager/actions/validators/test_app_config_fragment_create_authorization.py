@@ -30,6 +30,7 @@ from ai.backend.common.data.permission.types import (
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.identifier.user import UserID
 from ai.backend.manager.actions.action.base import BaseActionTriggerMeta
+from ai.backend.manager.actions.validators.rbac.bulk_scope import BulkScopeActionRBACValidator
 from ai.backend.manager.actions.validators.rbac.scope import ScopeActionRBACValidator
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.errors.permission import NotEnoughPermission
@@ -59,6 +60,9 @@ from ai.backend.manager.repositories.app_config_fragment.creators import (
 )
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
+)
+from ai.backend.manager.services.app_config_fragment.actions.bulk_create import (
+    BulkCreateAppConfigFragmentAction,
 )
 from ai.backend.manager.services.app_config_fragment.actions.create import (
     CreateAppConfigFragmentAction,
@@ -179,6 +183,25 @@ def scope_validator(repository: PermissionControllerRepository) -> ScopeActionRB
 
 
 @pytest.fixture
+def bulk_scope_validator(
+    repository: PermissionControllerRepository,
+) -> BulkScopeActionRBACValidator:
+    # MagicMock config_provider → enforcement_enabled is truthy, so the check runs.
+    return BulkScopeActionRBACValidator(repository, MagicMock())
+
+
+def _bulk_create(*scopes: tuple[AppConfigScopeType, str]) -> BulkCreateAppConfigFragmentAction:
+    return BulkCreateAppConfigFragmentAction(
+        creator_specs=[
+            AppConfigFragmentCreatorSpec(
+                config_name="cfg", scope_type=scope_type, scope_id=scope_id, config={}
+            )
+            for scope_type, scope_id in scopes
+        ]
+    )
+
+
+@pytest.fixture
 async def owner_user(db_with_rbac_tables: ExtendedAsyncSAEngine) -> UserData:
     """A non-superadmin granted APP_CONFIG_FRAGMENT:CREATE on their own user scope."""
     user_id = UserID(uuid.uuid4())
@@ -264,3 +287,57 @@ class TestPublicScopeAuthorization:
         )
         with with_user(_user_data(UserID(uuid.uuid4()), is_superadmin=True)):
             await scope_validator.validate(action, trigger_meta)
+
+
+class TestBulkCreateAuthorization:
+    """Bulk create authorizes each new fragment at its scope via the bulk-scope validator."""
+
+    async def test_own_user_scope_is_allowed(
+        self,
+        bulk_scope_validator: BulkScopeActionRBACValidator,
+        trigger_meta: BaseActionTriggerMeta,
+        owner_user: UserData,
+    ) -> None:
+        action = _bulk_create((AppConfigScopeType.USER, str(owner_user.user_id)))
+        with with_user(owner_user):
+            result = await bulk_scope_validator.validate(action, trigger_meta)
+        assert not result.denied_entities
+
+    async def test_another_user_scope_is_denied(
+        self,
+        bulk_scope_validator: BulkScopeActionRBACValidator,
+        trigger_meta: BaseActionTriggerMeta,
+        owner_user: UserData,
+    ) -> None:
+        # One spec in the owner's scope, one in another user's scope: only the latter is denied.
+        action = _bulk_create(
+            (AppConfigScopeType.USER, str(owner_user.user_id)),
+            (AppConfigScopeType.USER, str(UserID(uuid.uuid4()))),
+        )
+        with with_user(owner_user):
+            result = await bulk_scope_validator.validate(action, trigger_meta)
+        assert len(result.denied_entities) == 1
+
+    async def test_public_scope_is_denied_for_non_superadmin(
+        self,
+        bulk_scope_validator: BulkScopeActionRBACValidator,
+        trigger_meta: BaseActionTriggerMeta,
+        owner_user: UserData,
+    ) -> None:
+        action = _bulk_create((AppConfigScopeType.PUBLIC, ""))
+        with with_user(owner_user):
+            result = await bulk_scope_validator.validate(action, trigger_meta)
+        assert len(result.denied_entities) == 1
+
+    async def test_superadmin_is_allowed(
+        self,
+        bulk_scope_validator: BulkScopeActionRBACValidator,
+        trigger_meta: BaseActionTriggerMeta,
+    ) -> None:
+        action = _bulk_create(
+            (AppConfigScopeType.USER, str(UserID(uuid.uuid4()))),
+            (AppConfigScopeType.PUBLIC, ""),
+        )
+        with with_user(_user_data(UserID(uuid.uuid4()), is_superadmin=True)):
+            result = await bulk_scope_validator.validate(action, trigger_meta)
+        assert not result.denied_entities

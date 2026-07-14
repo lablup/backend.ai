@@ -94,7 +94,14 @@ class AppConfigFragmentProcessors(AbstractProcessorPackage):
         self.purge = SingleEntityActionProcessor(
             service.purge, action_monitors, validators=[validators.rbac.single_entity]
         )
-        self.bulk_create = BulkActionProcessor(service.bulk_create, monitors=action_monitors)
+        # bulk_create writes into scopes (not existing entities), so it uses the bulk-scope
+        # validator (subject = the fragment entity type) rather than the entity-target one.
+        bulk_scope = validators.rbac.bulk_scope
+        self.bulk_create = BulkActionProcessor(
+            service.bulk_create,
+            monitors=action_monitors,
+            validators=[bulk_scope] if bulk_scope is not None else None,
+        )
         self.bulk_update = BulkActionProcessor(
             service.bulk_update, monitors=action_monitors, validators=[validators.rbac.bulk]
         )
