@@ -87,6 +87,27 @@ class SubnetAddressPoolExhausted(BackendAIError, web.HTTPServiceUnavailable):
         )
 
 
+class UnusableVtep(BackendAIError, web.HTTPInternalServerError):
+    """This node cannot anchor a vxlan tunnel, so it must not join a multi-node overlay session.
+
+    The VTEP is what peers program into their FDB. Publishing one that is empty, unspecified or
+    not held by this host yields an overlay that comes up, reports no error and carries no traffic
+    — the failure then surfaces as a hang at rendezvous, far from its cause. Refuse the session on
+    this node instead, naming the setting to fix.
+    """
+
+    error_type = "https://api.backend.ai/probs/agent/unusable-vtep"
+    error_title = "This agent has no usable VTEP address for a multi-node overlay session."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AGENT,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
 class PortForwardError(BackendAIError, web.HTTPInternalServerError):
     """Raised when installing or removing a container's host-port DNAT rule fails."""
 

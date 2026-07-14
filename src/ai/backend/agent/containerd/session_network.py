@@ -16,15 +16,18 @@ Each backend is instantiated per session with the backend the manager selected.
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import json
 import logging
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import AsyncIterator, Callable, Mapping, Sequence
 from typing import TYPE_CHECKING, Any, cast
 
 from ai.backend.agent.containerd.oci import SESSION_ID_LABEL
 from ai.backend.agent.containerd.orchestrator import ContainerdKernelOrchestrator, LaunchResult
 from ai.backend.agent.containerd.runtime.interface import ExecResult, OciRuntime
 from ai.backend.agent.containerd.session_tracker import SessionContainerTracker, TeardownScope
+from ai.backend.agent.errors.network import UnusableVtep
 from ai.backend.agent.network.cni import CniRunner
 from ai.backend.agent.network.coordinator import SessionNetworkCoordinator
 from ai.backend.agent.network.local_subnet import LocalSubnetAllocator, LocalSubnetLayout
@@ -93,6 +96,19 @@ class ContainerdSessionNetwork:
     # a privileged helper owns the host state (it keeps its own records and outlives the agent).
     _local_subnets: LocalSubnetAllocator | None
     _ipam: HostLocalIpam | None
+    # One lock per session, so the per-node data-plane setup runs once even when several kernels of
+    # the same session are created concurrently on this node (the agent gathers up to
+    # kernel_creation_concurrency create_kernel coroutines). Without it two ensure_session calls
+    # both pass the "already set up?" check across the setup await, and the second's
+    # setup_session_network deletes the vxlan/bridge the first just created.
+    _session_locks: dict[str, asyncio.Lock]
+    # How many tasks hold or wait on each session's lock, so it is dropped only when the last one
+    # leaves (see _session_locked for why its identity must outlive a single critical section).
+    _session_lock_users: dict[str, int]
+    # This node's validated VTEP, or None when it has no address that can anchor a vxlan tunnel.
+    # A vxlan session refuses to set up here in that case, rather than publishing a VTEP its peers
+    # cannot reach and building an overlay that carries nothing.
+    _vtep_ip: str | None
 
     def __init__(
         self,
@@ -106,10 +122,12 @@ class ContainerdSessionNetwork:
         provisioner_factory: Callable[[AbstractNetworkAgentPluginV2[Any], str], Any] | None = None,
         local_subnets: LocalSubnetAllocator | None = None,
         ipam: HostLocalIpam | None = None,
+        vtep_ip: str | None = None,
     ) -> None:
         self._etcd = etcd
         self._agent_id = agent_id
         self._host_ip = host_ip
+        self._vtep_ip = vtep_ip
         self._runtime = runtime
         self._cni_runner = cni_runner
         self._backends = backends
@@ -122,6 +140,8 @@ class ContainerdSessionNetwork:
         self._attachments = {}
         self._local_subnets = local_subnets
         self._ipam = ipam
+        self._session_locks = {}
+        self._session_lock_users = {}
 
     async def open(self) -> None:
         """Open the runtime client (e.g. establish the containerd gRPC channel)."""
@@ -309,12 +329,48 @@ class ContainerdSessionNetwork:
             ) from None
 
     def _self_member(self, meta: SessionNetMeta) -> Member:
+        """This node's membership record — the one every peer reads and programs into its FDB.
+
+        The VTEP published here is the *validated* one, never the raw configured address: a peer
+        guards on `vtep_ip is None` only, so an empty or unspecified string would sail through and
+        become `bridge fdb append ... dst ''` (fails) or `dst 0.0.0.0` (points nowhere). A vxlan
+        session on a node with no usable VTEP therefore does not start at all — see ensure_session.
+        """
         return Member(
             agent_id=self._agent_id,
             host_ip=self._host_ip,
-            vtep_ip=self._host_ip if meta.backend is NetworkBackendKind.VXLAN else None,
+            vtep_ip=self._vtep_ip if meta.backend is NetworkBackendKind.VXLAN else None,
             ip_range=None,
         )
+
+    @contextlib.asynccontextmanager
+    async def _session_locked(self, session_id: str) -> AsyncIterator[None]:
+        """Hold this session's setup/teardown lock.
+
+        The lock is refcounted rather than simply popped on teardown, because its *identity* has to
+        stay stable for as long as anyone holds or waits on it. `Lock.release()` only schedules the
+        first waiter — the releasing task runs on to its next await — so a teardown that dropped the
+        lock from the dict right after releasing it would leave the woken waiter holding an orphan,
+        while the next arrival minted a fresh lock and entered the critical section alongside it:
+        the very concurrent setup this lock exists to prevent. Registering as a user *before* the
+        first await, and dropping the entry only when the last user leaves, keeps one lock per
+        in-flight session and still lets the dict shrink to empty.
+        """
+        lock = self._session_locks.get(session_id)
+        if lock is None:
+            lock = asyncio.Lock()
+            self._session_locks[session_id] = lock
+        self._session_lock_users[session_id] = self._session_lock_users.get(session_id, 0) + 1
+        try:
+            async with lock:
+                yield
+        finally:
+            remaining = self._session_lock_users[session_id] - 1
+            if remaining:
+                self._session_lock_users[session_id] = remaining
+            else:
+                del self._session_lock_users[session_id]
+                self._session_locks.pop(session_id, None)
 
     async def ensure_session(
         self, session_id: str, network_config: Mapping[str, Any]
@@ -322,22 +378,35 @@ class ContainerdSessionNetwork:
         """Resolve the session's backend, set up this node's data plane, publish
         membership, and register the per-session coordinator + orchestrator."""
         meta = session_net_meta_from_network_config(session_id, network_config)
-        if session_id in self._coordinators:
-            # Already set up on this node (e.g. a second kernel of the same session placed
-            # here). Session-network setup is per node, not per kernel — do it once.
+        if meta.backend is NetworkBackendKind.VXLAN and self._vtep_ip is None:
+            # Refuse the session here rather than build an overlay this node cannot be reached on.
+            # Silently joining would strand the whole session: the peers program our unusable VTEP,
+            # their traffic to our kernels is dropped, and it surfaces as a hang at rendezvous.
+            raise UnusableVtep(
+                f"agent {self._agent_id} cannot join the multi-node overlay session {session_id}:"
+                " container.advertised-host/bind-host is not a routable unicast address this host"
+                " holds. Set it to the address peers reach this node on."
+            )
+        # Serialize per session: the "already set up?" check and the setup that follows straddle an
+        # await, so two concurrent kernels of one session would both set the data plane up and the
+        # second would delete the first's devices (setup_session_network clears leftovers by name).
+        async with self._session_locked(session_id):
+            if session_id in self._coordinators:
+                # Already set up on this node (e.g. a second kernel of the same session placed
+                # here). Session-network setup is per node, not per kernel — do it once.
+                return meta
+            backend = self._resolve_backend(meta)
+            coordinator = SessionNetworkCoordinator(self._etcd, backend, self._agent_id)
+            orchestrator = ContainerdKernelOrchestrator(
+                self._runtime, self._make_provisioner(backend, session_id)
+            )
+            # Register only AFTER a successful start, so a partial failure (which raises here)
+            # doesn't leave a half-set-up coordinator that the idempotency check above would
+            # then skip on retry — a retry must re-run the full setup cleanly.
+            await coordinator.start(meta, self._self_member(meta))
+            self._coordinators[session_id] = coordinator
+            self._orchestrators[session_id] = orchestrator
             return meta
-        backend = self._resolve_backend(meta)
-        coordinator = SessionNetworkCoordinator(self._etcd, backend, self._agent_id)
-        orchestrator = ContainerdKernelOrchestrator(
-            self._runtime, self._make_provisioner(backend, session_id)
-        )
-        # Register only AFTER a successful start, so a partial failure (which raises here)
-        # doesn't leave a half-set-up coordinator that the idempotency check above would
-        # then skip on retry — a retry must re-run the full setup cleanly.
-        await coordinator.start(meta, self._self_member(meta))
-        self._coordinators[session_id] = coordinator
-        self._orchestrators[session_id] = orchestrator
-        return meta
 
     def session_of(self, container_id: str) -> str | None:
         """The session a live container belongs to, from the attach record (rebuilt by `recover`
@@ -346,10 +415,13 @@ class ContainerdSessionNetwork:
         return attachment[0] if attachment is not None else None
 
     async def teardown_session(self, session_id: str) -> None:
-        coordinator = self._coordinators.pop(session_id, None)
-        self._orchestrators.pop(session_id, None)
-        if coordinator is not None:
-            await coordinator.stop(session_id)
+        # Under the same per-session lock as setup, so a teardown racing the last kernel's setup
+        # cannot tear down devices mid-creation (or leave a coordinator the setup is still filling).
+        async with self._session_locked(session_id):
+            coordinator = self._coordinators.pop(session_id, None)
+            self._orchestrators.pop(session_id, None)
+            if coordinator is not None:
+                await coordinator.stop(session_id)
 
     async def launch_container(
         self,
@@ -496,6 +568,7 @@ def build_containerd_session_network(
     backends: Mapping[str, AbstractNetworkAgentPluginV2[Any]] | None = None,
     helper_socket: str | None = None,
     local_subnet_layout: LocalSubnetLayout | None = None,
+    vtep_ip: str | None = None,
 ) -> ContainerdSessionNetwork:
     """Assemble a ContainerdSessionNetwork with default real collaborators.
 
@@ -571,4 +644,5 @@ def build_containerd_session_network(
         provisioner_factory=make_provisioner,
         local_subnets=owned_local_subnets,
         ipam=owned_ipam,
+        vtep_ip=vtep_ip,
     )

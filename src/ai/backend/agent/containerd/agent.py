@@ -319,21 +319,65 @@ def _registry_auth(registry_conf: ImageRegistry) -> dict[str, str] | None:
     return None
 
 
+def _live_iface_for_ip(host_ip: str) -> str | None:
+    """The UP interface that owns ``host_ip``, or None if this host cannot send from it.
+
+    "Owns" is not enough on its own: psutil reports the addresses of DOWN interfaces too, and a
+    vxlan device built on a down uplink comes up happily and carries nothing.
+    """
+    import socket
+
+    import psutil
+
+    stats = psutil.net_if_stats()
+    for iface, addrs in psutil.net_if_addrs().items():
+        for addr in addrs:
+            if addr.family == socket.AF_INET and addr.address == host_ip:
+                return iface if iface in stats and stats[iface].isup else None
+    return None
+
+
 def _uplink_for_ip(host_ip: str) -> str:
     """Resolve the local interface that owns ``host_ip`` (the VTEP address).
 
     The vxlan device must be created on the interface carrying the node's advertised
     (VTEP) IP so the overlay rides the same L2 the agents reach each other on. Falls back
     to ``eth0`` if no interface matches (single-node / misconfiguration)."""
-    import socket
+    return _live_iface_for_ip(host_ip) or "eth0"
 
-    import psutil
 
-    for iface, addrs in psutil.net_if_addrs().items():
-        for addr in addrs:
-            if addr.family == socket.AF_INET and addr.address == host_ip:
-                return iface
-    return "eth0"
+def _usable_vtep(host_ip: str) -> str | None:
+    """The node's VTEP address if it can actually anchor a vxlan tunnel, else None.
+
+    The VTEP is what every peer programs into its FDB. It comes from ``container.advertised-host``
+    (or ``bind-host``), whose defaults are the unusable ``""`` and ``0.0.0.0``: a peer that seeds
+    ``""`` into ``bridge fdb append ... dst ''`` fails outright, and ``0.0.0.0`` is accepted but
+    points nowhere, so the overlay is silently dead. So it must be a concrete unicast IPv4 —
+    routable off-link, and held by an interface of this host that is actually up.
+
+    Rejected, and why: ``""`` and an FQDN (neither is an address iproute2 can take as an FDB
+    destination); IPv6 (the vxlan path is IPv4-only end to end — see `_uplink_for_ip` and
+    `vxlan_link_add_args`); ``0.0.0.0``; loopback; multicast/reserved; and link-local (169.254/16,
+    what a host holds when DHCP failed — real, held, and unreachable from another subnet).
+
+    None means this node cannot join a multi-node overlay session; single-node sessions are
+    unaffected, which is why it is not fatal at startup.
+    """
+    import ipaddress
+
+    try:
+        addr = ipaddress.IPv4Address(host_ip)
+    except ipaddress.AddressValueError:
+        return None
+    if (
+        addr.is_unspecified
+        or addr.is_loopback
+        or addr.is_multicast
+        or addr.is_reserved
+        or addr.is_link_local
+    ):
+        return None
+    return host_ip if _live_iface_for_ip(host_ip) is not None else None
 
 
 class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKernel]):
@@ -1363,6 +1407,9 @@ class ContainerdAgent(
     _runtime: OciRuntime
     _session_network: ContainerdSessionNetwork
     _host_ip: str
+    # The validated VTEP (see _usable_vtep); None when this node holds no address that can anchor
+    # a vxlan tunnel, which disables multi-node overlay sessions here.
+    _vtep_ip: str | None
     _event_monitor_task: asyncio.Task[None] | None
     _agent_sock_path: Path
     _agent_sock_task: asyncio.Task[None] | None
@@ -1397,16 +1444,22 @@ class ContainerdAgent(
         # hard-coded eth0.
         container_cfg = self.local_config.container
         self._host_ip = str(container_cfg.advertised_host or container_cfg.bind_host)
+        # Validated once, here: it is what peers program into their FDB, so an address this node
+        # cannot be reached at must never reach a session's membership record. None disables the
+        # multi-node overlay on this node (ensure_session then refuses a vxlan session outright);
+        # single-node sessions never touch it.
+        self._vtep_ip = _usable_vtep(self._host_ip)
         # When a privileged network helper is configured, delegate all CAP_NET_ADMIN/
         # CAP_SYS_ADMIN host networking to it so this agent process needs no such privilege.
         self._session_network = build_containerd_session_network(
             self.etcd,
             agent_id=str(self.id),
             host_ip=self._host_ip,
-            uplink=_uplink_for_ip(self._host_ip),
+            uplink=_uplink_for_ip(self._vtep_ip or self._host_ip),
             runtime=self._runtime,
             helper_socket=self.local_config.agent.network_helper_socket,
             local_subnet_layout=container_cfg.local_subnet_layout(),
+            vtep_ip=self._vtep_ip,
         )
         # Host-port ingress is an iptables (CAP_NET_ADMIN) op, so only the process that owns the
         # host's networking may install it: this agent when it runs privileged, the helper when
@@ -1473,8 +1526,19 @@ class ContainerdAgent(
         self._event_monitor_task = asyncio.create_task(self._monitor_task_events())
         self._agent_sock_task = asyncio.create_task(self._handle_agent_socket())
         # Advertise this node's VTEP so the manager can pre-seed session membership and
-        # eliminate the peer-publish race for multi-node overlays (BEP-1062).
-        await publish_vtep(self.etcd, str(self.id), self._host_ip)
+        # eliminate the peer-publish race for multi-node overlays (BEP-1062). Only the validated
+        # address is ever published; with none, say so once at startup, where an operator can act on
+        # it, rather than only at the first vxlan session that ensure_session then refuses.
+        if self._vtep_ip is not None:
+            await publish_vtep(self.etcd, str(self.id), self._vtep_ip)
+        else:
+            log.warning(
+                "no usable VTEP: container.advertised-host/bind-host ({!r}) is not a routable"
+                " unicast IPv4 address held by an interface of this host that is up. Single-node"
+                " sessions work; a multi-node overlay (vxlan) session scheduled here will be"
+                " refused until it is set.",
+                self._host_ip,
+            )
         # dockerd loads its docker-default profile at startup and confines every container with it;
         # containerd loads nothing. Load ours here so kernels are no less confined than under
         # Docker. None means the host cannot give us AppArmor (already logged) — kernels then run

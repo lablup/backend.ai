@@ -1,3 +1,4 @@
+import asyncio
 import json
 from collections.abc import AsyncIterator, Mapping, Sequence
 from pathlib import Path
@@ -12,6 +13,7 @@ from ai.backend.agent.containerd.session_network import (
     build_containerd_session_network,
     session_net_meta_from_network_config,
 )
+from ai.backend.agent.errors.network import UnusableVtep
 from ai.backend.common.etcd import AbstractKVStore
 from ai.backend.common.network.types import (
     AgentNetworkCaps,
@@ -236,6 +238,7 @@ def _facade(
     *,
     backends: dict[str, Any] | None = None,
     runtime: FakeRuntime | None = None,
+    vtep_ip: str | None = "192.168.0.10",
 ) -> ContainerdSessionNetwork:
     return ContainerdSessionNetwork(
         cast(AbstractKVStore, etcd),
@@ -244,6 +247,7 @@ def _facade(
         runtime=runtime or FakeRuntime(),
         cni_runner=runner,
         backends=backends or {"vxlan": cast(Any, backend), "host-gw": cast(Any, backend)},
+        vtep_ip=vtep_ip,
     )
 
 
@@ -274,6 +278,80 @@ class TestEnsureSession:
             assert backend.last_self_member.vtep_ip is None
         finally:
             await facade.teardown_session("s2")
+
+    async def test_a_vxlan_session_is_refused_without_a_usable_vtep(self) -> None:
+        # Joining anyway would publish an unusable VTEP; peers guard on `is None` only, so they
+        # would program "" / 0.0.0.0 into their FDB and the session would hang at rendezvous with
+        # no error. Refusing here is what turns that into a diagnosable failure.
+        etcd, backend, runner = FakeEtcd(), RecordingBackend(), RecordingRunner()
+        facade = _facade(etcd, backend, runner, vtep_ip=None)
+        with pytest.raises(UnusableVtep):
+            await facade.ensure_session("s1", _VXLAN_NC)
+        assert backend.setup == []  # nothing was built
+        assert "network/session/s1/members/agent-1" not in etcd.store
+
+    async def test_a_single_node_session_still_works_without_a_vtep(self) -> None:
+        # A node with no routable address only ever runs single-node sessions; those must not care.
+        etcd, backend, runner = FakeEtcd(), RecordingBackend(), RecordingRunner()
+        facade = _facade(etcd, backend, runner, vtep_ip=None)
+        await facade.ensure_session("s2", _HOSTGW_NC)
+        try:
+            assert backend.setup == ["s2"]
+            assert backend.last_self_member is not None
+            assert backend.last_self_member.vtep_ip is None
+        finally:
+            await facade.teardown_session("s2")
+
+
+class TestSessionLockLifetime:
+    """The lock must keep its identity while anyone holds or waits on it. Dropping it on teardown
+    the moment the lock is released hands the woken waiter an orphan, and the next arrival mints a
+    fresh lock and sets the session up alongside it — the concurrent setup the lock exists to stop.
+    """
+
+    async def test_a_setup_arriving_after_a_teardown_cannot_overlap_the_one_it_woke(self) -> None:
+        etcd, backend, runner = FakeEtcd(), RecordingBackend(), RecordingRunner()
+        facade = _facade(etcd, backend, runner)
+        await facade.ensure_session("s1", _VXLAN_NC)
+
+        gate = asyncio.Event()
+        inflight = 0
+        overlapped = False
+        original = backend.setup_session_network
+
+        async def gated_setup(meta: Any, self_member: Any) -> None:
+            nonlocal inflight, overlapped
+            inflight += 1
+            overlapped |= inflight > 1
+            await gate.wait()  # stay inside setup, so a later arrival gets the chance to overlap
+            await original(meta, self_member)
+            inflight -= 1
+
+        backend.setup_session_network = gated_setup  # type: ignore[method-assign]
+
+        teardown = asyncio.create_task(facade.teardown_session("s1"))
+        await asyncio.sleep(0)  # the teardown takes the session's lock
+        first = asyncio.create_task(facade.ensure_session("s1", _VXLAN_NC))  # queues behind it
+        await teardown  # releases the lock — and must NOT drop it while `first` is waiting on it
+        for _ in range(3):
+            await asyncio.sleep(0)  # `first` wakes and enters setup
+        second = asyncio.create_task(facade.ensure_session("s1", _VXLAN_NC))  # arrives after
+        for _ in range(3):
+            await asyncio.sleep(0)  # a fresh lock here would let it set up alongside `first`
+
+        gate.set()
+        await asyncio.gather(first, second)
+        try:
+            assert not overlapped
+        finally:
+            await facade.teardown_session("s1")
+
+    async def test_the_lock_registry_empties_once_the_session_is_gone(self) -> None:
+        etcd, backend, runner = FakeEtcd(), RecordingBackend(), RecordingRunner()
+        facade = _facade(etcd, backend, runner)
+        await facade.ensure_session("s1", _VXLAN_NC)
+        await facade.teardown_session("s1")
+        assert facade._session_locks == {}  # no unbounded growth across a node's session churn
 
 
 class TestLaunchTerminate:
