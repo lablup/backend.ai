@@ -144,12 +144,7 @@ class SessionResourceSpec(_SpecBaseModel):
     """Scope-free resolved spec — the output of the preparer chain.
 
     Carries everything the draft-based preparer actually resolves
-    (identity, network, options, kernel specs, ...) but **not** the
-    ownership scope (domain / project / resource group): the preparer
-    never touches scope, so it is pass-through input that callers attach
-    afterward. The node-fitting dry-run consumes this type directly,
-    while the enqueue path wraps it with a scope via
-    :meth:`SessionSpec.from_resource_spec` before persisting.
+    (identity, network, options, kernel specs, ...).
     """
 
     identity: SessionIdentity
@@ -173,9 +168,6 @@ class SessionResourceSpec(_SpecBaseModel):
 
 class SessionSpec(_SpecBaseModel):
     """Full spec to create one ``SessionRow`` and its owned kernels.
-
-    Composed from a scope-free :class:`SessionResourceSpec` plus a
-    resolved :class:`SessionScope` via :meth:`from_resource_spec`.
 
     Vfolder mounts live on :attr:`KernelSpec.vfolder_mounts` —
     per-kernel at the spec level. The ``SessionRow.vfolder_mounts``
