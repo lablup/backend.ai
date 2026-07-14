@@ -1030,7 +1030,9 @@ class ContainerdGrpcRuntime(OciRuntime):
         # Pull THIS node's platform only. An empty platforms list means "all platforms" to the
         # transfer service, so a multi-arch image (Backend.AI publishes amd64 + arm64) would fetch
         # and store every architecture's layers — roughly 2x pull time and disk on every agent.
-        # Docker pulls the host platform; so do we. The same platform pins the unpack.
+        # Docker pulls the host platform; so do we. (The unpack platform is advisory: containerd
+        # picks the unpack config from its own server-side list. It is passed for correctness, but
+        # what actually bounds the fetch is ImageStore.platforms.)
         platform = platform_pb2.Platform(
             os="linux", architecture=_GOARCH.get(CURRENT_ARCH, CURRENT_ARCH)
         )
