@@ -365,6 +365,17 @@ class TestSetupUnderLiveContainers:
         assert backend.adopted == ["s1"]  # adopted the running data plane
         assert backend.setup == []  # never rebuilt it under the live container
 
+        # ...and the survivor is adopted as a *user* of the session, not just left running: it must
+        # keep the session open when the kernel that adopted it goes away, or the teardown would
+        # delete the devices and release the addresses out from under a container that is still up.
+        await facade.create_container("s1", "c2", image_ref="img", command=[], oci_spec={})
+        await facade.remove_container("c2")
+        assert backend.torndown == []
+        assert "s1" in facade._coordinators
+
+        await facade.remove_container("c1")  # the survivor finally goes
+        assert backend.torndown == ["s1"]
+
 
 class TestSessionLockLifetime:
     """The lock must keep its identity while anyone holds or waits on it. Dropping it on teardown

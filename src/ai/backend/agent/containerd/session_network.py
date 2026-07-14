@@ -430,7 +430,8 @@ class ContainerdSessionNetwork:
                 # this process knows nothing about it. Rebuilding under them would delete the very
                 # bridge they are enslaved to and purge the addresses they hold — so ask containerd,
                 # not our own memory, and adopt what is already carrying their traffic.
-                if await self._has_live_containers(session_id):
+                survivors = await self._live_containers_of(session_id)
+                if survivors:
                     await coordinator.resume(meta, self._self_member(meta))
                 else:
                     await coordinator.start(meta, self._self_member(meta))
@@ -455,12 +456,38 @@ class ContainerdSessionNetwork:
             # then skip on retry — a retry must re-run the full setup cleanly.
             self._coordinators[session_id] = coordinator
             self._orchestrators[session_id] = orchestrator
+            await self._adopt_containers(survivors, session_id, meta)
             return meta
 
-    async def _has_live_containers(self, session_id: str) -> bool:
-        """Does this node still run a container of this session? Asked of containerd, which is the
-        only thing that knows after a restart whose resume failed."""
-        return session_id in (await self._live_containers()).values()
+    async def _live_containers_of(self, session_id: str) -> list[str]:
+        """The containers this node still runs for a session. Asked of containerd, which is the only
+        thing that knows about a session this process failed to resume."""
+        live = await self._live_containers()
+        return [cid for cid, sid in live.items() if sid == session_id]
+
+    async def _adopt_containers(
+        self, container_ids: Sequence[str], session_id: str, meta: SessionNetMeta
+    ) -> None:
+        """Take over the kernels of a session this node was already running.
+
+        They are what hold the session network open, so a session adopted without them would be
+        torn down the moment the kernel that adopted it left — deleting the devices and releasing
+        the addresses of containers that are still running. Their detach inputs are re-derived the
+        same way a restart re-derives them (from etcd + the journals), so their removal can still
+        free the host veth and the address they hold.
+        """
+        for container_id in container_ids:
+            self._tracker.track(session_id, container_id)
+            try:
+                attachment = await self._recover_attachment(container_id, session_id, meta)
+            except Exception:
+                # As in recover(): one container's plan re-derivation failing leaves it tracked but
+                # detach-less (its host leftovers are reclaimed as orphans), and must not stop the
+                # session — or the kernel adopting it — from coming up.
+                log.exception("failed to adopt the attachment of container {}", container_id)
+                continue
+            if attachment is not None:
+                self._attachments[container_id] = attachment
 
     def session_of(self, container_id: str) -> str | None:
         """The session a live container belongs to, from the attach record (rebuilt by `recover`
