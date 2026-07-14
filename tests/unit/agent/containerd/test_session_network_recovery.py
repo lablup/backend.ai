@@ -82,6 +82,9 @@ class FakeRuntime:
 
     async def remove_container(self, container_id: str) -> None:
         self.removed.append(container_id)
+        # containerd forgets it: the record goes, and so does its task
+        self.containers = [c for c in self.containers if c.id != container_id]
+        self.pids.pop(container_id, None)
 
 
 class RecordingBackend:
@@ -262,20 +265,27 @@ class TestResumeLiveSessions:
         assert cni_config is not None
         assert cni_config["ip"] == "10.128.5.9"
 
-    async def test_a_container_without_a_live_task_yields_no_attachment(
+    async def test_a_container_without_a_live_task_can_still_be_detached(
         self, etcd: FakeEtcd
     ) -> None:
+        # Its containerd record survives, so the orphan sweep (which diffs against the records) does
+        # not see it — and returning no attachment here left its eventual clean with nothing to
+        # detach: the kernel's host veth and its address stayed held for the life of the node. The
+        # plan carries a sentinel PID, which the DEL side never opens.
         net, _ = _build(
             containers=[
                 _ContainerInfo("c1", {SESSION_ID_LABEL: "s1", OWNER_AGENT_LABEL: _AGENT_ID})
             ],
-            pids={"c1": None},
+            pids={"c1": None},  # the task died while the agent was down
             etcd=etcd,
             backend=RecordingBackend(),
             cni=CniRecorder(),
         )
         await net.recover()
-        assert "c1" not in net._attachments
+
+        assert "c1" in net._attachments
+        _session, _plan, task_pid = net._attachments["c1"]
+        assert task_pid == 0  # the sentinel
 
     async def test_one_containers_plan_failure_does_not_abort_the_rest(
         self, etcd: FakeEtcd

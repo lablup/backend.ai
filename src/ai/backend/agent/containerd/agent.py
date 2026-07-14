@@ -31,6 +31,7 @@ from functools import partial
 from importlib.resources import files
 from io import StringIO
 from pathlib import Path
+from types import TracebackType
 from typing import Any, cast, override
 from uuid import UUID, uuid4
 
@@ -1550,13 +1551,29 @@ class ContainerdAgent(
         # so the container-based loader can enumerate live containers.
         await self._kernel_recovery_adapter.adapt_recovery_data()
         await super().__ainit__()
+
         # Real-time container-death/OOM detection via the containerd event stream (the
         # equivalent of DockerAgent.monitor_docker_events); the periodic reconciler is the
         # safety net.
         # Constructed here, not in __init__: a PersistentTaskGroup binds to the running task at
         # construction and raises without a running loop, and __init__ is a sync method that has no
         # business requiring one. (The Docker backend builds its own group in __ainit__ likewise.)
-        self._event_task_group = aiotools.PersistentTaskGroup()
+        async def _event_task_exception_handler(
+            exc_type: type[BaseException],
+            exc_obj: BaseException,
+            exc_tb: TracebackType,
+        ) -> None:
+            # Without this, aiotools prints a bare traceback to stderr and the failure never reaches
+            # the structured log — an event handler that dies takes a kernel's death or OOM with it,
+            # silently, where nobody is looking.
+            log.exception(
+                "unexpected error while handling a containerd task event",
+                exc_info=(exc_type, exc_obj, exc_tb),
+            )
+
+        self._event_task_group = aiotools.PersistentTaskGroup(
+            exception_handler=_event_task_exception_handler
+        )
         # Before anything can create a kernel: this directory is bind-mounted into every container,
         # and a bind mount whose source does not exist fails the container outright. The socket
         # server below creates it too, but it is a task — it has not necessarily run yet.

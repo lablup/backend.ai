@@ -51,6 +51,11 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 _DEFAULT_MTU = 1500
 
+# The PID a detach plan carries for a container whose task is already gone. The detach turns it into
+# a netns path and the DEL side never opens it (the host veth goes by name, the address by owner),
+# so a dead kernel can still be detached — which is what frees its veth and its address.
+_DEAD_TASK_PID = 0
+
 
 def session_net_meta_from_network_config(
     session_id: str, network_config: Mapping[str, Any]
@@ -281,16 +286,23 @@ class ContainerdSessionNetwork:
         node-local /24 comes from the journal, which is idempotent per session. The task PID is
         asked of containerd. So the plan a restarted agent detaches with is the same plan the
         pre-restart agent attached with.
+
+        A container whose task is gone still gets a plan — with a sentinel PID. Its containerd
+        *record* survives, so it is not an orphan by the reclaim's reckoning (which diffs against
+        the records), and it will be cleaned the ordinary way: clean_kernel -> remove_container ->
+        detach. Returning None here instead left that path with nothing to detach with, so the
+        kernel's host veth and its address stayed held for the life of the node — the leak the
+        comment here used to promise the orphan sweep would catch, and it never did. The PID is
+        only turned into a netns path, which the DEL side ignores (the veth is deleted by name and
+        the address released by owner), so there is nothing for it to be wrong about.
         """
         pid = await self._runtime.container_pid(container_id)
-        if pid is None:
-            return None  # no live task; the host-side leftovers are reclaimed as an orphan
         backend = self._resolve_backend(meta)
         kernel_config: dict[str, Any] = {}
         if overlay_ip := await self._read_overlay_ip(session_id, container_id):
             kernel_config["cluster_network_ip"] = overlay_ip
         plan = await backend.attach_endpoint(cast(Any, kernel_config), cast(Any, {}), meta=meta)
-        return (session_id, plan, pid)
+        return (session_id, plan, pid if pid is not None else _DEAD_TASK_PID)
 
     async def _reclaim_orphans(self, live: Mapping[str, str]) -> None:
         """Give back what the journals still hold for containers and sessions that are gone.
@@ -467,8 +479,14 @@ class ContainerdSessionNetwork:
                 # this process knows nothing about it. Rebuilding under them would delete the very
                 # bridge they are enslaved to and purge the addresses they hold — so ask containerd,
                 # not our own memory, and adopt what is already carrying their traffic.
-                survivors = await self._live_containers_of(session_id)
-                if survivors:
+                #
+                # "Is the data plane up?" is a question about the NODE, not about this agent: the
+                # session's bridge and its LOCAL block are keyed on the block index in the node's
+                # shared journal, so a kernel of this session belonging to another agent on this
+                # host is running on the very same devices. Probing only our own kernels would have
+                # us take the setup path and delete them out from under it.
+                running, survivors = await self._running_containers_of(session_id)
+                if running:
                     adopted = True
                     await coordinator.resume(meta, self._self_member(meta))
                 else:
@@ -503,26 +521,35 @@ class ContainerdSessionNetwork:
             await self._adopt_containers(survivors, session_id, meta)
             return meta
 
-    async def _live_containers_of(self, session_id: str) -> list[str]:
-        """This agent's containers of a session that are still RUNNING on this node.
+    async def _running_containers_of(self, session_id: str) -> tuple[list[str], list[str]]:
+        """``(every running container of this session on the node, the ones this agent owns)``.
 
-        Asked of containerd, which is the only thing that knows about a session this process failed
-        to resume. A running *task* is the test, not a container record: containerd keeps the record
-        of a stopped container (and debug.skip-container-deletion keeps it forever), and one of
-        those must not make the session look alive — it would send every later kernel down the adopt
-        path, joining a data plane that was torn down long ago.
+        Two lists because the two questions are different, and conflating them is destructive:
 
-        Ours only: adopting means taking the session's kernels as our own users and re-deriving
-        their detach plans. Another agent's kernels are its business, not ours.
+        - **Is this session's data plane up?** A question about the NODE. The session's bridge and
+          its LOCAL block are keyed on the block index in the node's shared journal, so a kernel of
+          this session owned by another agent on this host runs on the very same devices. Probing
+          only our own would have us rebuild them under it.
+        - **Which kernels do I adopt?** Ours only: adopting means taking them as users of the
+          session and re-deriving their detach plans. Another agent's kernels are its business.
+
+        A running *task* is the test, not a container record: containerd keeps the record of a
+        stopped container (and debug.skip-container-deletion keeps it forever), and one of those
+        must not make the session look alive — it would send every later kernel down the adopt path,
+        joining a data plane that was torn down long ago.
         """
-        _live, ours = await self._live_and_own_containers()
-        running = []
-        for container_id, sid in ours.items():
+        live, ours = await self._live_and_own_containers()
+        running: list[str] = []
+        mine: list[str] = []
+        for container_id, sid in live.items():
             if sid != session_id:
                 continue
-            if await self._runtime.container_pid(container_id) is not None:
-                running.append(container_id)
-        return running
+            if await self._runtime.container_pid(container_id) is None:
+                continue
+            running.append(container_id)
+            if container_id in ours:
+                mine.append(container_id)
+        return running, mine
 
     async def _adopt_containers(
         self, container_ids: Sequence[str], session_id: str, meta: SessionNetMeta
@@ -578,11 +605,27 @@ class ContainerdSessionNetwork:
         async with self._session_locked(session_id):
             coordinator = self._coordinators.pop(session_id, None)
             self._orchestrators.pop(session_id, None)
+            if coordinator is None:
+                return
+            # OUR last kernel of the session is gone — but the devices and the LOCAL block are the
+            # NODE's, keyed on the shared journal's block index, so a kernel of this session
+            # belonging to another agent on this host is still running on them. Withdraw from the
+            # session (stop watching, drop our membership) without pulling the floor out from under
+            # it; the agent whose kernel outlives ours tears the data plane down when it goes.
+            running, _ours = await self._running_containers_of(session_id)
+            if running:
+                log.info(
+                    "session {} still has {} running container(s) of another agent on this node;"
+                    " withdrawing without tearing the data plane down",
+                    session_id,
+                    len(running),
+                )
+                await coordinator.stop(session_id, teardown_data_plane=False)
+                return
             # Before the block goes back, not after: once released, the same CIDR can be handed to
             # the next session, and purging it then would wipe *that* session's claims.
             await self._purge_local_addresses(session_id)
-            if coordinator is not None:
-                await coordinator.stop(session_id)
+            await coordinator.stop(session_id)
 
     async def _purge_local_addresses(self, session_id: str) -> None:
         """Drop the IPAM claims in this session's LOCAL block, whose containers are all gone."""

@@ -132,8 +132,14 @@ class SessionNetworkCoordinator:
             except Exception:
                 log.exception("periodic reconcile failed for session {}", session_id)
 
-    async def stop(self, session_id: str) -> None:
-        """Stop watching, remove this node's membership, and tear down the data plane."""
+    async def stop(self, session_id: str, *, teardown_data_plane: bool = True) -> None:
+        """Stop watching, remove this node's membership, and tear down the data plane.
+
+        `teardown_data_plane=False` withdraws from the session without touching the devices — for
+        the case where they are not this agent's alone to delete: two agents on one host share the
+        session's bridge and its LOCAL block (both keyed on the node's shared journal), so the one
+        whose kernels leave first must leave them standing for the other.
+        """
         for tasks in (self._watch_tasks, self._sweep_tasks):
             if task := tasks.pop(session_id, None):
                 # Await the cancellation so a trailing reconcile can't run after teardown and the
@@ -148,7 +154,8 @@ class SessionNetworkCoordinator:
                     # skip the teardown below and leak this node's membership key and its devices.
                     log.exception("session network task for {} ended in error", session_id)
         await self._etcd.delete(member_key(session_id, self._agent_id))
-        await self._backend.teardown_session_network(session_id)
+        if teardown_data_plane:
+            await self._backend.teardown_session_network(session_id)
         self._applied.pop(session_id, None)
         self._applied_endpoints.pop(session_id, None)
 

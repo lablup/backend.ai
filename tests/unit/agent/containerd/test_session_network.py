@@ -50,6 +50,9 @@ class FakeEtcd:
     def __init__(self) -> None:
         self.store: dict[str, str] = {}
 
+    async def get(self, key: str, **kwargs: Any) -> str | None:
+        return self.store.get(key)
+
     async def put(self, key: str, val: str, **kwargs: Any) -> None:
         self.store[key] = val
 
@@ -228,6 +231,7 @@ class FakeRuntime(OciRuntime):
     @override
     async def remove_container(self, container_id: str) -> None:
         self.calls.append(f"remove:{container_id}")
+        self.containers = [c for c in self.containers if c.id != container_id]
 
     @override
     async def list_containers(self) -> Sequence[str]:
@@ -371,6 +375,39 @@ class TestFailedAdopt:
 
         assert backend.torndown == []  # c1's devices, block and membership are untouched
         assert "s1" not in facade._coordinators
+
+
+class TestTwoAgentsShareTheNodesDevices:
+    """A session's bridge and its LOCAL block are keyed on the node's shared journal index, so a
+    kernel of that session owned by ANOTHER agent on this host runs on the very same devices.
+    "Is the data plane up?" is therefore a question about the node; "whose kernels do I adopt?" is
+    a question about this agent. Conflating them deletes a neighbour's live network."""
+
+    async def test_setup_does_not_rebuild_under_another_agents_kernel(self) -> None:
+        etcd, backend, runner = FakeEtcd(), RecordingBackend(), RecordingRunner()
+        rt = FakeRuntime([
+            _ContainerInfo("c1", {SESSION_ID_LABEL: "s1", OWNER_AGENT_LABEL: "other-agent"})
+        ])
+        facade = _facade(etcd, backend, runner, runtime=rt)
+
+        await facade.ensure_session("s1", "c2", _VXLAN_NC)  # our first kernel of that session
+
+        assert backend.setup == []  # setup would delete the bridge c1 is enslaved to
+        assert backend.adopted == ["s1"]
+
+    async def test_our_last_kernel_leaving_does_not_delete_their_devices(self) -> None:
+        etcd, backend, runner = FakeEtcd(), RecordingBackend(), RecordingRunner()
+        rt = FakeRuntime([
+            _ContainerInfo("c1", {SESSION_ID_LABEL: "s1", OWNER_AGENT_LABEL: "other-agent"})
+        ])
+        facade = _facade(etcd, backend, runner, runtime=rt)
+        await facade.ensure_session("s1", "c2", _VXLAN_NC)
+        await facade.create_container("s1", "c2", image_ref="img", command=[], oci_spec={})
+
+        await facade.remove_container("c2")  # our last kernel of the session goes
+
+        assert backend.torndown == []  # their kernel is still on those devices
+        assert "network/session/s1/members/agent-1" not in etcd.store  # but we did withdraw
 
 
 class TestSetupUnderLiveContainers:
