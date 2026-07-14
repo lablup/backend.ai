@@ -264,6 +264,7 @@ def _build_controller(
             valkey_schedule=valkey_schedule,
             network_plugin_ctx=network_plugin_ctx,
             hook_plugin_ctx=hook_plugin_ctx,
+            agent_selector=MagicMock(),
         )
     )
     return controller, event_producer, hook_plugin_ctx

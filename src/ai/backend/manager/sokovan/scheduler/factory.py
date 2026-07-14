@@ -59,9 +59,6 @@ from ai.backend.manager.sokovan.scheduler.provisioner.provisioner import (
     SessionProvisioner,
     SessionProvisionerArgs,
 )
-from ai.backend.manager.sokovan.scheduler.provisioner.selectors.concentrated import (
-    ConcentratedAgentSelector,
-)
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import AgentSelector
 from ai.backend.manager.sokovan.scheduler.provisioner.sequencers.fifo import FIFOSequencer
 from ai.backend.manager.sokovan.scheduler.provisioner.validators.concurrency import (
@@ -111,6 +108,7 @@ def create_default_scheduler_components(
     agent_client_pool: AgentClientPool,
     network_plugin_ctx: NetworkPluginContext,
     valkey_schedule: ValkeyScheduleClient,
+    agent_selector: AgentSelector,
 ) -> SchedulerComponents:
     """
     Create scheduler components with default configuration.
@@ -122,6 +120,7 @@ def create_default_scheduler_components(
         agent_client_pool: Pool for managing agent clients
         network_plugin_ctx: Network plugin context for network management
         valkey_schedule: Valkey client for scheduling operations
+        agent_selector: Agent selector shared with the scheduling controller
 
     Returns:
         A configured SchedulerComponents instance
@@ -139,8 +138,6 @@ def create_default_scheduler_components(
         ReservedBatchSessionValidator(),
         UserResourceLimitValidator(),
     ])
-    resource_priority = config_provider.config.manager.agent_selection_resource_priority
-    agent_selector = AgentSelector(ConcentratedAgentSelector(resource_priority))
     allocator = RepositoryAllocator(repository)
 
     # Create provisioner

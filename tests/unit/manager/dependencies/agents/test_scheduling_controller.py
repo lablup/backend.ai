@@ -30,6 +30,7 @@ class TestSchedulingControllerDependency:
             valkey_schedule=MagicMock(),
             network_plugin_ctx=MagicMock(),
             hook_plugin_ctx=MagicMock(),
+            agent_selector=MagicMock(),
         )
 
         dependency = SchedulingControllerDependency()
