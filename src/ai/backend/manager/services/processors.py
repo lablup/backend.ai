@@ -57,6 +57,12 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.app_config_definition.service import (
         AppConfigDefinitionService,
     )
+    from ai.backend.manager.services.app_config_fragment.processors import (
+        AppConfigFragmentProcessors,
+    )
+    from ai.backend.manager.services.app_config_fragment.service import (
+        AppConfigFragmentService,
+    )
     from ai.backend.manager.services.artifact.processors import (
         ArtifactProcessors,
     )
@@ -377,6 +383,7 @@ class Services:
     agent: AgentService
     app_config_allow_list: AppConfigAllowListService
     app_config_definition: AppConfigDefinitionService
+    app_config_fragment: AppConfigFragmentService
     domain: DomainService
     dotfile: DotfileService
     error_log: ErrorLogService
@@ -444,6 +451,7 @@ class Processors(AbstractProcessorPackage):
     agent: AgentProcessors
     app_config_allow_list: AppConfigAllowListProcessors
     app_config_definition: AppConfigDefinitionProcessors
+    app_config_fragment: AppConfigFragmentProcessors
     domain: DomainProcessors
     dotfile: DotfileProcessors
     error_log: ErrorLogProcessors
@@ -504,6 +512,7 @@ class Processors(AbstractProcessorPackage):
             *self.agent.supported_actions(),
             *self.app_config_allow_list.supported_actions(),
             *self.app_config_definition.supported_actions(),
+            *self.app_config_fragment.supported_actions(),
             *self.domain.supported_actions(),
             *self.dotfile.supported_actions(),
             *self.error_log.supported_actions(),
