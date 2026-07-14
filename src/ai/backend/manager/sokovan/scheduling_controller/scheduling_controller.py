@@ -110,20 +110,6 @@ class _KernelComputeScheduleResourceSpec:
 
 @dataclass
 class _KernelComputeScheduleData:
-    """Mutable, in-progress version of a single kernel's
-    :class:`ComputeScheduleKernelResult`, accumulated across
-    :meth:`SchedulingController.compute_schedule` and finalized at the end.
-
-    Held in a dict keyed by the kernel's unique cluster role (which the draft
-    builder assigns in request order, so the dict preserves that order):
-
-    - ``resolved`` becomes True once the kernel's image resolves; it stays
-      False for image-unresolved kernels, which are excluded from selection.
-    - ``reason_hint`` is set only for a kernel the selector could not place.
-    - a kernel is schedulable iff it ``resolved`` and the selector placed it
-      (``reason_hint is None``).
-    """
-
     resource_spec: _KernelComputeScheduleResourceSpec | None
 
     requested_slots: tuple[ResourceSlotEntry, ...]
