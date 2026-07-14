@@ -54,6 +54,20 @@ class SessionContainerTracker:
             if not pending:
                 self._session_pending.pop(session_id, None)
 
+    def release_pending(self, kernel_id: str) -> TeardownScope | None:
+        """Drop the claim of a kernel that never got a container; a no-op for one that did.
+
+        A kernel whose creation fails before its container exists never reaches `clean_kernel` (the
+        agent registers a kernel only once its container is prepared, and a destroy for one it has
+        never heard of returns without queueing a clean), so its claim has to be released where the
+        failure is seen. A kernel that DOES have a container is left alone here: its own removal is
+        what must decide the session's fate, and releasing the claim early would tear the session
+        network down under a container that is still running.
+        """
+        if kernel_id in self._session_containers.get(self._kernel_session.get(kernel_id, ""), ()):
+            return None
+        return self.untrack(kernel_id)
+
     def untrack(self, kernel_id: str) -> TeardownScope | None:
         """Drop a kernel, whether it got as far as a container or not; return its session's
         TeardownScope iff it was that session's last one on this node.

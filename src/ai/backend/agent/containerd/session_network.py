@@ -418,25 +418,49 @@ class ContainerdSessionNetwork:
                 # Already set up on this node (e.g. a second kernel of the same session placed
                 # here). Session-network setup is per node, not per kernel — do it once.
                 return meta
-            backend = self._resolve_backend(meta)
-            coordinator = SessionNetworkCoordinator(self._etcd, backend, self._agent_id)
-            orchestrator = ContainerdKernelOrchestrator(
-                self._runtime, self._make_provisioner(backend, session_id)
-            )
+            coordinator: SessionNetworkCoordinator | None = None
+            try:
+                backend = self._resolve_backend(meta)
+                coordinator = SessionNetworkCoordinator(self._etcd, backend, self._agent_id)
+                orchestrator = ContainerdKernelOrchestrator(
+                    self._runtime, self._make_provisioner(backend, session_id)
+                )
+                # "No coordinator" does not mean "no data plane": a session whose resume failed on
+                # the last restart (or whose meta briefly vanished) keeps running its kernels while
+                # this process knows nothing about it. Rebuilding under them would delete the very
+                # bridge they are enslaved to and purge the addresses they hold — so ask containerd,
+                # not our own memory, and adopt what is already carrying their traffic.
+                if await self._has_live_containers(session_id):
+                    await coordinator.resume(meta, self._self_member(meta))
+                else:
+                    await coordinator.start(meta, self._self_member(meta))
+                    # The block this session just claimed can only hold *stale* claims: it has no
+                    # containers. Clearing them is what makes a pinned address safe to hand out,
+                    # whichever way the block came back to the pool — a teardown purges it too, but
+                    # a block reclaimed as an orphan on restart does not, and a claim leaked by a
+                    # failed detach is exactly what a later pin would collide with (and, since a pin
+                    # that cannot be honoured fails its kernel, keep colliding with).
+                    await self._purge_local_addresses(session_id)
+            except Exception:
+                # Unwind: the coordinator may already have published this node's membership and
+                # started its watch tasks, and it is about to go out of scope unregistered — nobody
+                # could ever stop it. And the claim above must not outlive the kernel that made it.
+                if coordinator is not None:
+                    with contextlib.suppress(Exception):
+                        await coordinator.stop(session_id)
+                self._tracker.release_pending(kernel_id)
+                raise
             # Register only AFTER a successful start, so a partial failure (which raises here)
             # doesn't leave a half-set-up coordinator that the idempotency check above would
             # then skip on retry — a retry must re-run the full setup cleanly.
-            await coordinator.start(meta, self._self_member(meta))
-            # The block this session just claimed can only hold *stale* claims: its containers do
-            # not exist yet. Clearing them here is what makes a pinned address safe to hand out,
-            # whichever way the block came back to the pool — a teardown purges it too, but a block
-            # reclaimed as an orphan on restart does not, and a claim leaked by a failed detach or
-            # a half-finished attach is exactly what a later pin would collide with (and, since a
-            # pin that cannot be honoured fails its kernel, keep colliding with).
-            await self._purge_local_addresses(session_id)
             self._coordinators[session_id] = coordinator
             self._orchestrators[session_id] = orchestrator
             return meta
+
+    async def _has_live_containers(self, session_id: str) -> bool:
+        """Does this node still run a container of this session? Asked of containerd, which is the
+        only thing that knows after a restart whose resume failed."""
+        return session_id in (await self._live_containers()).values()
 
     def session_of(self, container_id: str) -> str | None:
         """The session a live container belongs to, from the attach record (rebuilt by `recover`
@@ -616,8 +640,27 @@ class ContainerdSessionNetwork:
                     await orchestrator.detach(container_id, plan=plan, task_pid=task_pid)
                 except Exception:
                     log.exception("network detach failed for container {}", container_id)
-        await self._runtime.remove_container(container_id)
-        scope = self._tracker.untrack(container_id)
+        try:
+            await self._runtime.remove_container(container_id)
+        finally:
+            # Untrack even if the runtime call failed (channel down, deadline): the clean event is
+            # not retried — the agent drops the kernel from its registry either way — so a kernel
+            # left tracked here would hold its session network open for good.
+            scope = self._tracker.untrack(container_id)
+            if scope is not None:
+                await self._teardown_session_network(scope)
+
+    async def release_kernel(self, kernel_id: str) -> None:
+        """Give up a kernel's claim on the session network when it will never reach removal.
+
+        A kernel that fails before its container exists is never cleaned by the agent (it enters the
+        kernel registry only once the container is prepared, and a destroy for a kernel it has never
+        heard of returns without queueing a clean), so nothing would ever release the claim its
+        `ensure_session` made — the session's devices, its LOCAL block and its etcd membership would
+        be pinned until the agent restarted. A no-op for a kernel that has a container: that one is
+        released by its own removal.
+        """
+        scope = self._tracker.release_pending(kernel_id)
         if scope is not None:
             await self._teardown_session_network(scope)
 

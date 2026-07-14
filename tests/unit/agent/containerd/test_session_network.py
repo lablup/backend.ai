@@ -6,6 +6,7 @@ from typing import Any, cast, override
 
 import pytest
 
+from ai.backend.agent.containerd.oci import SESSION_ID_LABEL
 from ai.backend.agent.containerd.runtime.interface import ExecResult, OciRuntime, TaskHandle
 from ai.backend.agent.containerd.session_network import (
     ContainerdSessionNetwork,
@@ -72,11 +73,16 @@ class RecordingBackend:
 
     def __init__(self) -> None:
         self.setup: list[str] = []
+        self.adopted: list[str] = []
         self.torndown: list[str] = []
         self.last_self_member: Member | None = None
 
     async def setup_session_network(self, meta: SessionNetMeta, self_member: Member) -> None:
         self.setup.append(meta.session_id)
+        self.last_self_member = self_member
+
+    async def adopt_session_network(self, meta: SessionNetMeta, self_member: Member) -> None:
+        self.adopted.append(meta.session_id)
         self.last_self_member = self_member
 
     async def teardown_session_network(self, session_id: str) -> None:
@@ -102,9 +108,20 @@ class RecordingBackend:
         )
 
 
+class _ContainerInfo:
+    """The subset of ContainerInfo the session network reads: id + session label."""
+
+    def __init__(self, container_id: str, labels: dict[str, str]) -> None:
+        self.id = container_id
+        self.labels = labels
+        self.image = "img:1"
+        self.status = "running"
+
+
 class FakeRuntime(OciRuntime):
-    def __init__(self) -> None:
+    def __init__(self, containers: list[_ContainerInfo] | None = None) -> None:
         self.calls: list[str] = []
+        self.containers = containers or []  # what containerd still runs for us
 
     @override
     async def image_exists(self, image_ref: str) -> bool:
@@ -136,7 +153,7 @@ class FakeRuntime(OciRuntime):
 
     @override
     async def list_container_infos(self) -> Sequence[Any]:
-        return []
+        return self.containers
 
     @override
     async def subscribe_task_events(self) -> Any:
@@ -301,6 +318,52 @@ class TestEnsureSession:
             assert backend.last_self_member.vtep_ip is None
         finally:
             await facade.teardown_session("s2")
+
+
+class TestFailedSetup:
+    async def test_a_failed_setup_leaves_no_claim_and_no_orphan_coordinator(self) -> None:
+        # The coordinator can already have published this node's membership and started its watch
+        # tasks when setup fails. It is about to go out of scope unregistered — nobody could ever
+        # stop it — and the claim its kernel made must not outlive the kernel either.
+        etcd, backend, runner, rt = FakeEtcd(), RecordingBackend(), RecordingRunner(), FakeRuntime()
+        facade = _facade(etcd, backend, runner, runtime=rt)
+
+        async def boom(meta: Any, self_member: Any) -> None:
+            raise RuntimeError("ip link add failed")
+
+        backend.setup_session_network = boom  # type: ignore[method-assign]
+        with pytest.raises(RuntimeError):
+            await facade.ensure_session("s1", "c1", _VXLAN_NC)
+
+        assert "s1" not in facade._coordinators
+        assert "network/session/s1/members/agent-1" not in etcd.store  # unwound, not left published
+        assert backend.torndown == ["s1"]  # the half-built data plane was torn back down
+
+        # ...and the claim is gone: a later kernel of the session sets it up and, when it leaves,
+        # the session is torn down — no stale claim from c1 holds it open.
+        backend.setup_session_network = RecordingBackend.setup_session_network.__get__(backend)  # type: ignore[method-assign]
+        await facade.ensure_session("s1", "c2", _VXLAN_NC)
+        await facade.create_container("s1", "c2", image_ref="img", command=[], oci_spec={})
+        assert backend.setup == ["s1"]
+
+        await facade.remove_container("c2")
+        assert backend.torndown == ["s1", "s1"]
+
+
+class TestSetupUnderLiveContainers:
+    async def test_a_session_whose_containers_survive_is_adopted_not_rebuilt(self) -> None:
+        # "No coordinator" does not mean "no data plane": a session whose resume failed on the last
+        # restart keeps running its kernels while this process knows nothing about it. Rebuilding
+        # would delete the bridge they are enslaved to (setup clears devices by name) and purge the
+        # addresses they hold — handing a live container's IP to the next kernel.
+        etcd, backend, runner = FakeEtcd(), RecordingBackend(), RecordingRunner()
+        rt = FakeRuntime([_ContainerInfo("c1", {SESSION_ID_LABEL: "s1"})])
+        facade = _facade(etcd, backend, runner, runtime=rt)
+
+        await facade.ensure_session("s1", "c2", _VXLAN_NC)  # a NEW kernel of that same session
+
+        assert backend.adopted == ["s1"]  # adopted the running data plane
+        assert backend.setup == []  # never rebuilt it under the live container
 
 
 class TestSessionLockLifetime:
@@ -514,6 +577,36 @@ class TestDeterministicTeardown:
 
         await facade.remove_container("c1")
         assert backend.torndown == ["s1"]  # no stale claim keeps the session alive
+
+    async def test_release_kernel_frees_a_claim_whose_kernel_never_got_a_container(self) -> None:
+        # A kernel that dies before its container exists never reaches clean_kernel (the agent
+        # registers a kernel only once its container is prepared, and a destroy for one it never
+        # heard of queues no clean). Its claim must be released where the failure IS seen, or the
+        # session network stays pinned for good — a permanent leak in place of a transient race.
+        etcd, backend, runner, rt = FakeEtcd(), RecordingBackend(), RecordingRunner(), FakeRuntime()
+        facade = _facade(etcd, backend, runner, runtime=rt)
+        await facade.ensure_session("s1", "c1", _VXLAN_NC)
+        await facade.ensure_session("s1", "c2", _VXLAN_NC)
+        await facade.create_container("s1", "c1", image_ref="img", command=[], oci_spec={})
+
+        await facade.release_kernel("c2")  # c2 blew up during the image pull
+        assert backend.torndown == []  # c1 is live
+
+        await facade.remove_container("c1")
+        assert backend.torndown == ["s1"]  # nothing left holding the session open
+
+    async def test_release_kernel_does_not_disturb_a_kernel_that_has_a_container(self) -> None:
+        # Releasing a claim for a kernel whose container is running would tear the session down
+        # under it. release_kernel must be a no-op there — that kernel's own removal decides.
+        etcd, backend, runner, rt = FakeEtcd(), RecordingBackend(), RecordingRunner(), FakeRuntime()
+        facade = _facade(etcd, backend, runner, runtime=rt)
+        await facade.ensure_session("s1", "c1", _VXLAN_NC)
+        await facade.create_container("s1", "c1", image_ref="img", command=[], oci_spec={})
+
+        await facade.release_kernel("c1")
+
+        assert backend.torndown == []
+        assert "s1" in facade._coordinators
 
     async def test_a_kernel_reaching_a_torn_down_session_gets_a_named_error(self) -> None:
         # The guard behind the reservation: a bare KeyError on the orchestrator dict said nothing.

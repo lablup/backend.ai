@@ -128,6 +128,7 @@ from ai.backend.common.types import (
     ImageConfig,
     ImageRegistry,
     KernelCreationConfig,
+    KernelCreationResult,
     KernelId,
     MountPermission,
     MountTypes,
@@ -1965,6 +1966,36 @@ class ContainerdAgent(
         return auto_pull is AutoPullBehavior.DIGEST and local_digest != image_id
 
     @override
+    async def create_kernel(
+        self,
+        ownership_data: KernelOwnershipData,
+        kernel_image: ImageRef,
+        kernel_config: KernelCreationConfig,
+        cluster_info: ClusterInfo,
+        *,
+        restarting: bool = False,
+        throttle_sema: asyncio.Semaphore | None = None,
+    ) -> KernelCreationResult:
+        try:
+            return await super().create_kernel(
+                ownership_data,
+                kernel_image,
+                kernel_config,
+                cluster_info,
+                restarting=restarting,
+                throttle_sema=throttle_sema,
+            )
+        except Exception:
+            # The kernel claimed this node's session network in apply_network, long before its
+            # container existed. If it dies before that container is prepared it never enters the
+            # kernel registry — and a destroy for a kernel the agent has never heard of returns
+            # without queueing a clean, so clean_kernel (which is what normally releases the claim)
+            # never runs. Release it here, or the session's devices, LOCAL block and etcd membership
+            # stay pinned for its siblings' whole lifetime and beyond, until the agent restarts.
+            await self._session_network.release_kernel(str(ownership_data.kernel_id))
+            raise
+
+    @override
     async def init_kernel_context(
         self,
         ownership_data: KernelOwnershipData,
@@ -2075,6 +2106,10 @@ class ContainerdAgent(
                 "clean_kernel(k:{}): skipping container removal (debug.skip-container-deletion)",
                 kernel_id,
             )
+            # Still give up the claim of a kernel that never got a container: the flag is about
+            # keeping containers around for inspection, not about pinning session networks that
+            # have none. (A kernel that HAS a container keeps its claim, as the flag intends.)
+            await self._session_network.release_kernel(str(kernel_id))
             return
         await self._session_network.remove_container(str(kernel_id))
         # Tear down the scratch (skipped on restart, which reuses it). HOSTFILE must be
