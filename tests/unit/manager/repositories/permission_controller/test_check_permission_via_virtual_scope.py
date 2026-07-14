@@ -305,11 +305,11 @@ class TestCheckPermissionViaVirtualScope:
         permission: Permission,
         expected: bool,
     ) -> None:
-        result = await db_source.check_permission_via_virtual_scope(
+        key = VirtualScopePermissionCheckKey(
             user_id=chain.user_id,
             entity=EntityRef(entity_type=_TARGET_ENTITY_TYPE, entity_id=chain.entity_id),
-            permission=permission,
         )
+        result = await db_source.check_permission_via_virtual_scope(key, permission)
         assert result is expected
 
     @pytest.mark.parametrize(
@@ -378,9 +378,9 @@ class TestCheckPermissionViaVirtualScope:
         db_source: PermissionDBSource,
         chain: VSChainFixture,
     ) -> None:
-        result = await db_source.check_permission_via_virtual_scope(
+        key = VirtualScopePermissionCheckKey(
             user_id=UserID(uuid.uuid4()),
             entity=EntityRef(entity_type=_TARGET_ENTITY_TYPE, entity_id=chain.entity_id),
-            permission=Permission.READ,
         )
+        result = await db_source.check_permission_via_virtual_scope(key, Permission.READ)
         assert result is False

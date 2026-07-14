@@ -13,9 +13,7 @@ from ai.backend.common.data.permission.types import (
     RBACElementType,
     RelationType,
 )
-from ai.backend.common.entity.types import EntityRef
 from ai.backend.common.identifier.entity import EntityID
-from ai.backend.common.identifier.user import UserID
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.actions.action.rbac_role_invitation import (
     CreateRoleInvitationResult,
@@ -1186,16 +1184,14 @@ class PermissionDBSource:
 
     async def check_permission_via_virtual_scope(
         self,
-        user_id: UserID,
-        entity: EntityRef,
+        key: VirtualScopePermissionCheckKey,
         permission: Permission,
     ) -> bool:
-        """Return whether the user holds *permission* on the entity via a virtual scope.
+        """Return whether the user holds *permission* on the key's entity via a virtual scope.
 
         Resolves the effective permission through the virtual-scope chain and tests
         it bitwise (``effective & permission != NONE``).
         """
-        key = VirtualScopePermissionCheckKey(user_id=user_id, entity=entity)
         resolved = await self.resolve_effective_permissions_via_virtual_scope([key])
         return bool(resolved.get(key, Permission.NONE) & permission)
 
@@ -1294,12 +1290,10 @@ class PermissionDBSource:
                 .join(user_roles, user_roles.c.role_id == roles.c.id)
             )
             .where(
-                sa.and_(
-                    em.c.entity_type == group_key.entity_type,
-                    em.c.entity_id.in_(entity_ids),
-                    user_roles.c.user_id == group_key.user_id,
-                    roles.c.status == RoleStatus.ACTIVE,
-                )
+                em.c.entity_type == group_key.entity_type,
+                em.c.entity_id.in_(entity_ids),
+                user_roles.c.user_id == group_key.user_id,
+                roles.c.status == RoleStatus.ACTIVE,
             )
         )
 
