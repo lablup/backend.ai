@@ -72,10 +72,10 @@ app_config_fragment_db_source_resilience = Resilience(
 class AppConfigFragmentDBSource:
     """Database source for app config fragment operations."""
 
-    _ops: RBACOpsProvider
+    _rbac_ops_provider: RBACOpsProvider
 
-    def __init__(self, ops_provider: RBACOpsProvider) -> None:
-        self._ops = ops_provider
+    def __init__(self, rbac_ops_provider: RBACOpsProvider) -> None:
+        self._rbac_ops_provider = rbac_ops_provider
 
     @app_config_fragment_db_source_resilience.apply()
     async def create(self, spec: AppConfigFragmentCreatorSpec) -> AppConfigFragmentData:
@@ -90,13 +90,13 @@ class AppConfigFragmentDBSource:
             element_type=RBACElementType.APP_CONFIG_FRAGMENT,
             scope_ref=fragment_rbac_scope_ref(spec.scope_type, spec.scope_id),
         )
-        async with self._ops.write_ops() as w:
+        async with self._rbac_ops_provider.write_ops() as w:
             created = await w.bulk_create_scoped([rbac_creator])
             return created.rows[0].to_data()
 
     @app_config_fragment_db_source_resilience.apply()
     async def get_by_id(self, fragment_id: AppConfigFragmentID) -> AppConfigFragmentData:
-        async with self._ops.read_ops() as r:
+        async with self._rbac_ops_provider.read_ops() as r:
             result = await r.query(Querier(row_class=AppConfigFragmentRow, pk_value=fragment_id))
             if result is None:
                 raise AppConfigFragmentNotFound(f"App config fragment {fragment_id} not found")
@@ -107,7 +107,7 @@ class AppConfigFragmentDBSource:
         # No write-gate here: the FK to the allow-list guarantees a fragment row exists
         # only while its ``(config_name, scope_type)`` entry does, so an existing
         # fragment is always writable at its own scope.
-        async with self._ops.write_ops() as w:
+        async with self._rbac_ops_provider.write_ops() as w:
             result = await w.update(updater)
             if result is None:
                 raise AppConfigFragmentNotFound(f"App config fragment {updater.pk_value} not found")
@@ -119,18 +119,23 @@ class AppConfigFragmentDBSource:
         # and its scope association are deleted atomically (the association table has no FK
         # cascade). A public fragment is global-scoped and simply has no association. The
         # row is fetched first to resolve its scope and to return its data.
-        async with self._ops.write_ops() as w:
+        async with self._rbac_ops_provider.write_ops() as w:
             found = await w.query(Querier(row_class=AppConfigFragmentRow, pk_value=purger.pk_value))
             if found is None:
                 raise AppConfigFragmentNotFound(f"App config fragment {purger.pk_value} not found")
             data = found.row.to_data()
-            await w.unbind_scope_entities(
+            result = await w.unbind_scope_entities(
                 AppConfigFragmentScopeUnbinder(
                     fragment_id=data.id,
                     fragment_scope_type=data.scope_type,
                     fragment_scope_id=data.scope_id,
                 )
             )
+            # The read and the delete are separate statements under READ COMMITTED, so a
+            # concurrent purge may remove the row in between. A zero delete count means the
+            # row was already gone: report not-found rather than a stale success.
+            if result.deleted_count == 0:
+                raise AppConfigFragmentNotFound(f"App config fragment {purger.pk_value} not found")
             return data
 
     @app_config_fragment_db_source_resilience.apply()
@@ -139,7 +144,7 @@ class AppConfigFragmentDBSource:
         bulk_creator: BulkCreator[AppConfigFragmentRow],
     ) -> AppConfigFragmentBulkResult:
         """Create many fragments with per-item partial success."""
-        async with self._ops.write_ops() as w:
+        async with self._rbac_ops_provider.write_ops() as w:
             result = await w.bulk_create_partial(bulk_creator)
             return AppConfigFragmentBulkResult(
                 succeeded=[row.to_data() for row in result.successes],
@@ -155,7 +160,7 @@ class AppConfigFragmentDBSource:
         updaters: Sequence[Updater[AppConfigFragmentRow]],
     ) -> AppConfigFragmentBulkResult:
         """Update many fragments with per-item partial success."""
-        async with self._ops.write_ops() as w:
+        async with self._rbac_ops_provider.write_ops() as w:
             result = await w.bulk_update_partial(updaters)
             succeeded = [row.to_data() for row in result.successes]
             succeeded_ids = {data.id for data in succeeded}
@@ -179,7 +184,7 @@ class AppConfigFragmentDBSource:
         purgers: Sequence[Purger[AppConfigFragmentRow]],
     ) -> AppConfigFragmentBulkResult:
         """Purge many fragments with per-item partial success."""
-        async with self._ops.write_ops() as w:
+        async with self._rbac_ops_provider.write_ops() as w:
             result = await w.bulk_purge_partial(list(purgers))
             succeeded = [row.to_data() for row in result.successes]
             succeeded_ids = {data.id for data in succeeded}
@@ -200,7 +205,7 @@ class AppConfigFragmentDBSource:
     @app_config_fragment_db_source_resilience.apply()
     async def admin_search(self, querier: BatchQuerier) -> AppConfigFragmentSearchResult:
         """Superadmin/internal path: query across all fragments with no scope filter."""
-        async with self._ops.read_ops() as r:
+        async with self._rbac_ops_provider.read_ops() as r:
             result = await r.batch_query_in_global(sa.select(AppConfigFragmentRow), querier)
             return AppConfigFragmentSearchResult(
                 items=[row.AppConfigFragmentRow.to_data() for row in result.rows],
@@ -216,7 +221,7 @@ class AppConfigFragmentDBSource:
         scopes: Sequence[SearchScope],
     ) -> AppConfigFragmentSearchResult:
         """Scoped path: query fragments restricted to ``scopes`` (combined with OR)."""
-        async with self._ops.read_ops() as r:
+        async with self._rbac_ops_provider.read_ops() as r:
             result = await r.batch_query_with_scopes(
                 sa.select(AppConfigFragmentRow), querier, scopes
             )
@@ -264,6 +269,6 @@ class AppConfigFragmentDBSource:
                 AppConfigAllowListRow.scope_type == AppConfigFragmentRow.scope_type,
             ),
         )
-        async with self._ops.read_ops() as r:
+        async with self._rbac_ops_provider.read_ops() as r:
             result = await r.batch_query_in_global(selector, querier)
             return [row.AppConfigFragmentRow.to_data() for row in result.rows]
