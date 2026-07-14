@@ -37,19 +37,21 @@ class RBACEntityCreator[TRow: Base]:
     """Creator for a single entity with scope associations for RBAC.
 
     Creates an entity row and associates it with one or more permission scopes.
-    The primary scope is required; additional scopes are optional.
 
     Attributes:
         spec: CreatorSpec implementation defining the row to create.
         element_type: The RBAC element type for this entity.
         scope_ref: Primary scope reference (scope_type + scope_id) for this entity.
+            ``None`` marks a *global-scoped* entity — one living outside the RBAC scope
+            hierarchy (e.g. a public app-config fragment) — which carries no scope
+            association (only a superadmin reaches it, bypassing scope resolution).
         additional_scope_refs: Additional scope references for multi-scope entities.
         relation_type: The relation type for the scope-entity association. Defaults to AUTO.
     """
 
     spec: CreatorSpec[TRow]
     element_type: RBACElementType
-    scope_ref: RBACElementRef
+    scope_ref: RBACElementRef | None
     additional_scope_refs: Sequence[RBACElementRef] = field(default_factory=list)
     relation_type: RelationType = RelationType.AUTO
 
@@ -106,7 +108,10 @@ async def execute_rbac_entity_creator[TRow: Base](
     instance_state = inspect(row)
     pk_value = instance_state.identity[0]
     entity_type = creator.element_type.to_entity_type()
-    all_scope_refs = [creator.scope_ref, *creator.additional_scope_refs]
+    # A None primary scope marks a global-scoped entity: no association row.
+    all_scope_refs = [
+        ref for ref in (creator.scope_ref, *creator.additional_scope_refs) if ref is not None
+    ]
     associations = [
         AssociationScopesEntitiesRow(
             scope_type=scope_ref.element_type.to_scope_type(),
@@ -117,7 +122,8 @@ async def execute_rbac_entity_creator[TRow: Base](
         )
         for scope_ref in all_scope_refs
     ]
-    await bulk_insert_on_conflict_do_nothing(db_sess, associations)
+    if associations:
+        await bulk_insert_on_conflict_do_nothing(db_sess, associations)
 
     return RBACEntityCreatorResult(row=row)
 
@@ -255,11 +261,14 @@ async def execute_rbac_entity_creators[TRow: Base](
         match_integrity_error(parsed, checks)
 
     # 3. Collect all associations from each creator's scope refs
+    # (a None primary scope marks a global-scoped entity: no association row)
     associations: list[AssociationScopesEntitiesRow] = []
     for creator, row in zip(creators, rows, strict=True):
         pk_value = inspect(row).identity[0]
         entity_type = creator.element_type.to_entity_type()
-        all_scope_refs = [creator.scope_ref, *creator.additional_scope_refs]
+        all_scope_refs = [
+            ref for ref in (creator.scope_ref, *creator.additional_scope_refs) if ref is not None
+        ]
         for scope_ref in all_scope_refs:
             associations.append(
                 AssociationScopesEntitiesRow(
@@ -270,6 +279,7 @@ async def execute_rbac_entity_creators[TRow: Base](
                     relation_type=creator.relation_type,
                 ),
             )
-    await bulk_insert_on_conflict_do_nothing(db_sess, associations)
+    if associations:
+        await bulk_insert_on_conflict_do_nothing(db_sess, associations)
 
     return RBACBulkEntityCreatorResult(rows=rows)

@@ -39,7 +39,14 @@ from ai.backend.manager.repositories.base import (
 from ai.backend.manager.repositories.base.rbac.entity_creator import (
     RBACBulkEntityCreatorResult,
     RBACEntityCreator,
+    RBACEntityCreatorResult,
+    execute_rbac_entity_creator,
     execute_rbac_entity_creators,
+)
+from ai.backend.manager.repositories.base.rbac.entity_purger import (
+    RBACEntityPurger,
+    RBACEntityPurgerResult,
+    execute_rbac_entity_purger,
 )
 from ai.backend.manager.repositories.ops.base.provider import DBOpsProvider, WriteOps
 from ai.backend.manager.repositories.permission_controller.role_manager import RoleManager
@@ -124,12 +131,31 @@ class RBACWriteOps(WriteOps):
         )
         await self._sess.execute(stmt)
 
+    async def create_scoped[TRow: Base](
+        self,
+        creator: RBACEntityCreator[TRow],
+    ) -> RBACEntityCreatorResult[TRow]:
+        """Insert one row with its RBAC scope association (the creator carries its scope)."""
+        return await execute_rbac_entity_creator(self._sess, creator)
+
     async def bulk_create_scoped[TRow: Base](
         self,
         creators: Sequence[RBACEntityCreator[TRow]],
     ) -> RBACBulkEntityCreatorResult[TRow]:
         """Insert rows with their RBAC scope associations (each creator carries its scope)."""
         return await execute_rbac_entity_creators(self._sess, creators)
+
+    async def purge_scoped[TRow: Base](
+        self,
+        purger: RBACEntityPurger[TRow],
+    ) -> RBACEntityPurgerResult[TRow] | None:
+        """Delete one row and its RBAC entries (the counterpart of :meth:`create_scoped`).
+
+        The association table has no FK to the entity tables, so a scope-bound row's
+        association is cleared in the same transaction. Returns ``None`` when the row is
+        already gone, so a concurrent purge reports not-found.
+        """
+        return await execute_rbac_entity_purger(self._sess, purger)
 
     async def add_users_to_scope(
         self,

@@ -53,8 +53,12 @@ class RBACScopeEntityUnbinder[TRow: Base](ABC):
 
     @property
     @abstractmethod
-    def scope_ref(self) -> RBACElementRef:
-        """RBAC element ref for the scope to unbind entities from."""
+    def scope_ref(self) -> RBACElementRef | None:
+        """RBAC element ref for the scope to unbind entities from.
+
+        ``None`` marks global-scoped entities (outside the RBAC scope hierarchy):
+        only the business rows are deleted — there is no scope association to remove.
+        """
         raise NotImplementedError
 
     @property
@@ -110,6 +114,12 @@ async def execute_rbac_scope_entity_unbinder[TRow: Base](
         db_sess, BatchPurger(spec=unbinder.build_purger_spec())
     )
     scope_ref = unbinder.scope_ref
+    if scope_ref is None:
+        # Global-scoped entities carry no scope association — nothing more to delete.
+        return RBACUnbinderResult(
+            deleted_count=purge_result.deleted_count,
+            association_rows=[],
+        )
     where_clauses = [
         AssociationScopesEntitiesRow.entity_type == unbinder.entity_type.to_entity_type(),
         AssociationScopesEntitiesRow.scope_type == scope_ref.element_type.to_scope_type(),
