@@ -30,7 +30,12 @@ from ai.backend.common.network.types import (
     NetworkRole,
     SessionNetMeta,
 )
-from ai.backend.common.types import MountPermission, MountTypes, ResourceGroupType
+from ai.backend.common.types import (
+    ClusterMode,
+    MountPermission,
+    MountTypes,
+    ResourceGroupType,
+)
 
 _VXLAN_NC = {"backend": "vxlan", "subnet": "10.128.5.0/24", "vni": 4097, "mtu": 1450}
 
@@ -1025,6 +1030,10 @@ class TestReserveHostPortsBinding:
         assert by_port[7681] == "10.0.0.5"
 
 
+_SINGLE_NODE = {"mode": ClusterMode.SINGLE_NODE}
+_MULTI_NODE = {"mode": ClusterMode.MULTI_NODE}
+
+
 class TestEtcHosts:
     """containerd/runc synthesizes no /etc/hosts and provides no cluster DNS. The agent must write
     the file itself: localhost + the kernel's own name for every session, and deterministic peer
@@ -1056,7 +1065,7 @@ class TestEtcHosts:
     ) -> None:
         ctx = self._ctx(tmp_path)
         env = {"BACKENDAI_CLUSTER_HOST": "main1"}  # a lone kernel: no CLUSTER_HOSTS list
-        peers, static_ip = await ctx._peer_host_map(cast(Any, {}), env)
+        peers, static_ip = await ctx._peer_host_map(cast(Any, _SINGLE_NODE), env)
         assert peers == {} and static_ip is None
         mount = ctx._write_etc_hosts(peers, env)
         assert mount is not None and str(mount.target) == "/etc/hosts"
@@ -1070,7 +1079,7 @@ class TestEtcHosts:
             "BACKENDAI_CLUSTER_HOSTS": "main1,sub1,sub2",
             "BACKENDAI_CLUSTER_HOST": "sub1",
         }
-        peers, static_ip = await ctx._peer_host_map(cast(Any, {}), env)
+        peers, static_ip = await ctx._peer_host_map(cast(Any, _SINGLE_NODE), env)
 
         assert peers == {"main1": "172.30.0.2", "sub1": "172.30.0.3", "sub2": "172.30.0.4"}
         assert static_ip == "172.30.0.3"  # this kernel (sub1) is pinned at its own entry
@@ -1103,5 +1112,23 @@ class TestEtcHosts:
         # Under a helper the subnet is None (the helper owns the pool); fall back to baseline only.
         ctx = self._ctx(tmp_path, subnet=None)
         env = {"BACKENDAI_CLUSTER_HOSTS": "main1,sub1", "BACKENDAI_CLUSTER_HOST": "main1"}
-        peers, own_ip = await ctx._peer_host_map(cast(Any, {}), env)
+        peers, own_ip = await ctx._peer_host_map(cast(Any, _SINGLE_NODE), env)
         assert peers == {} and own_ip is None
+
+    async def test_a_multi_node_session_is_never_laid_out_locally(self, tmp_path: Path) -> None:
+        # An empty cluster_hosts does NOT mean single-node: a MULTI_NODE session on a PERSISTENT
+        # network gets the bridge backend and no manager-assigned addresses either. Laying its peers
+        # out in THIS node's /26 would give every node a different map, naming addresses that exist
+        # only on its own bridge — worse than no map at all.
+        ctx = self._ctx(tmp_path)
+        env = {"BACKENDAI_CLUSTER_HOSTS": "main1,sub1", "BACKENDAI_CLUSTER_HOST": "sub1"}
+        peers, static_ip = await ctx._peer_host_map(cast(Any, _MULTI_NODE), env)
+        assert peers == {} and static_ip is None
+
+    async def test_a_kernel_missing_from_its_own_peer_list_is_refused(self, tmp_path: Path) -> None:
+        # No pin would be computed, so the kernel would take the first free address — which is the
+        # one the map hands peers[0] — and steal it from the peer pinned there. Fail instead.
+        ctx = self._ctx(tmp_path)
+        env = {"BACKENDAI_CLUSTER_HOSTS": "main1,sub1", "BACKENDAI_CLUSTER_HOST": "sub9"}
+        with pytest.raises(ContainerCreationError):
+            await ctx._peer_host_map(cast(Any, _SINGLE_NODE), env)

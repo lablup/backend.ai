@@ -118,6 +118,7 @@ from ai.backend.common.network.types import NetworkBackendKind, SessionNetMeta
 from ai.backend.common.types import (
     AutoPullBehavior,
     ClusterInfo,
+    ClusterMode,
     ClusterSSHPortMapping,
     ContainerId,
     ContainerStatus,
@@ -718,6 +719,13 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         """
         if cluster_hosts := (cluster_info.get("cluster_hosts") or {}):
             return dict(cluster_hosts), None
+        # Only a SINGLE_NODE session may be laid out locally, and the cluster mode is the only thing
+        # that says so. An empty cluster_hosts does NOT mean single-node: a MULTI_NODE session on a
+        # PERSISTENT network gets the bridge backend and no manager-assigned addresses either, and
+        # laying its peers out in THIS node's /26 would hand every node a different, wrong map
+        # naming addresses that exist only on its own bridge.
+        if cluster_info.get("mode") is not ClusterMode.SINGLE_NODE:
+            return {}, None
         peers = [h for h in (environ.get("BACKENDAI_CLUSTER_HOSTS") or "").split(",") if h]
         if len(peers) <= 1:
             return {}, None  # not a cluster (or the lone kernel): only the baseline is needed
@@ -726,7 +734,15 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
             return {}, None  # helper mode owns the addresses; peer resolution is its to add
         mapping = cluster_host_ips(subnet, peers)
         own = environ.get("BACKENDAI_CLUSTER_HOST")
-        return mapping, (mapping.get(own) if own else None)
+        if own not in mapping:
+            # Publishing a map this kernel is not in would be worse than failing: it would take a
+            # dynamic address — the first free one, which is the address the map gives peers[0] —
+            # and steal it from the peer pinned there.
+            raise ContainerCreationError(
+                f"a kernel of session {self._session_id} is not in its own session's peer list"
+                f" (BACKENDAI_CLUSTER_HOST={own!r}, BACKENDAI_CLUSTER_HOSTS={peers})"
+            )
+        return mapping, mapping[own]
 
     def _write_etc_hosts(
         self, peers: Mapping[str, str], environ: Mapping[str, str]
