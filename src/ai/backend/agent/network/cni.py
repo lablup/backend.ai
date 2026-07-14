@@ -72,6 +72,11 @@ class CniAttacher:
         applied: list[CniInvocation] = []
         try:
             for inv in plan_to_invocations(plan):
+                # Recorded BEFORE the ADD, so the rollback below covers the invocation that FAILED,
+                # not just the ones that succeeded before it. A failed ADD can still have wired up
+                # part of the container (that is the CNI contract's whole reason for requiring a DEL
+                # after a failed ADD), and DEL is idempotent, so covering it costs nothing.
+                applied.append(inv)
                 result = await self._runner(
                     "ADD",
                     ifname=inv.ifname,
@@ -79,7 +84,6 @@ class CniAttacher:
                     container_id=container_id,
                     config=inv.config,
                 )
-                applied.append(inv)
                 ip = _first_ip(result)
                 if ip is not None:
                     assigned[inv.role] = ip

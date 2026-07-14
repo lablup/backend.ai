@@ -81,6 +81,8 @@ class TestCniAttacher:
     async def test_attach_rolls_back_applied_adds_on_failure(self) -> None:
         # OVERLAY ADD fails after LOCAL ADD succeeded: the LOCAL ADD must be rolled back (DEL) so
         # no half-attached veth/IPAM/MASQ survives (the caller records the plan only on success).
+        # The FAILED ADD is rolled back too — a failed ADD can leave the container partly wired,
+        # which is exactly why CNI requires a DEL after one, and DEL is idempotent.
         class FailingRunner:
             def __init__(self) -> None:
                 self.calls: list[tuple[str, str]] = []
@@ -98,5 +100,6 @@ class TestCniAttacher:
         assert runner.calls == [
             ("ADD", "eth0"),
             ("ADD", "baimulti0"),  # failed
+            ("DEL", "baimulti0"),  # ...and is cleaned up: it may have wired part of the container
             ("DEL", "eth0"),  # rollback of the one that succeeded
         ]

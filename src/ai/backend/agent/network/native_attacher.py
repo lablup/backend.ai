@@ -14,6 +14,7 @@ bridge), ``isDefaultGateway`` (default route in the container) and ``ipMasq`` (e
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import hashlib
 import ipaddress
 import logging
@@ -291,31 +292,64 @@ class NativeBridgeAttachRunner:
         pid = _pid_from_netns(netns)
         host_veth = _veth_name(container_id, ifname, "h")
         tmp_veth = _veth_name(container_id, ifname, "c")
-        rc, _, _ = await _run(["ip", "link", "show", host_veth], check=False)
-        if rc != 0:  # not yet attached
-            await _run([
-                "ip", "link", "add", host_veth, "mtu", mtu,
-                "type", "veth", "peer", "name", tmp_veth, "mtu", mtu,
-            ])  # fmt: skip
-            await _run(["ip", "link", "set", tmp_veth, "netns", pid])
-            await _run(["ip", "link", "set", host_veth, "master", bridge])
-            await _run(["ip", "link", "set", host_veth, "up"])
-            ns = ["nsenter", "--net=" + netns, "--"]
-            await _run(ns + ["ip", "link", "set", tmp_veth, "name", ifname])
-            # Pin the NIC's MAC when the config specifies one (overlay endpoints): peers program
-            # FDB/ARP to this exact address, so the container NIC must own it or inbound unicast
-            # is dropped. Set while the link is down, before bringing it up.
-            if mac := config.get("mac"):
-                await _run(ns + ["ip", "link", "set", ifname, "address", str(mac)])
-            await _run(ns + ["ip", "addr", "add", f"{ip}/{prefix}", "dev", ifname])
-            await _run(ns + ["ip", "link", "set", ifname, "up"])
-            await _run(ns + ["ip", "link", "set", "lo", "up"], check=False)
-            if config.get("isDefaultGateway") and gateway:
-                await _run(ns + ["ip", "route", "replace", "default", "via", gateway], check=False)
+        if not await self._is_wired(host_veth, netns, ifname):
+            # The host end existing is NOT proof the container is wired: a half-finished attach
+            # (the task died mid-ADD, so the peer never made it into the netns) leaves it behind,
+            # and taking that as "already attached" would return success for a container that comes
+            # up with no interface at all — its REPL never binds and its published ports DNAT to an
+            # address nothing owns. Clear the leftover and wire it properly.
+            await _run(["ip", "link", "del", host_veth], check=False)
+            try:
+                await _run([
+                    "ip", "link", "add", host_veth, "mtu", mtu,
+                    "type", "veth", "peer", "name", tmp_veth, "mtu", mtu,
+                ])  # fmt: skip
+                await _run(["ip", "link", "set", tmp_veth, "netns", pid])
+                await _run(["ip", "link", "set", host_veth, "master", bridge])
+                await _run(["ip", "link", "set", host_veth, "up"])
+                ns = ["nsenter", "--net=" + netns, "--"]
+                await _run(ns + ["ip", "link", "set", tmp_veth, "name", ifname])
+                # Pin the NIC's MAC when the config specifies one (overlay endpoints): peers program
+                # FDB/ARP to this exact address, so the container NIC must own it or inbound unicast
+                # is dropped. Set while the link is down, before bringing it up.
+                if mac := config.get("mac"):
+                    await _run(ns + ["ip", "link", "set", ifname, "address", str(mac)])
+                await _run(ns + ["ip", "addr", "add", f"{ip}/{prefix}", "dev", ifname])
+                await _run(ns + ["ip", "link", "set", ifname, "up"])
+                await _run(ns + ["ip", "link", "set", "lo", "up"], check=False)
+                if config.get("isDefaultGateway") and gateway:
+                    await _run(
+                        ns + ["ip", "route", "replace", "default", "via", gateway], check=False
+                    )
+            except Exception:
+                # Undo our own half-attach. Nothing else will: the caller's rollback covers the
+                # attachments that SUCCEEDED, not the one that raised, and a veth pair whose peer
+                # never reached a netns is reaped by nothing — it sits in the host namespace, with
+                # its address still claimed, until someone notices. The container-side end goes with
+                # the host end, and the address claim is this owner's to give back.
+                await _run(["ip", "link", "del", host_veth], check=False)
+                if ipam.get("type") != "static" and subnet:
+                    with contextlib.suppress(Exception):
+                        await self._ipam.release(subnet, container_id, ifname)
+                raise
 
         if config.get("ipMasq") and subnet:
             await self._ensure_masq(subnet)
         return {"ips": [{"address": f"{ip}/{prefix}"}]}
+
+    async def _is_wired(self, host_veth: str, netns: str, ifname: str) -> bool:
+        """Is this container already attached — really attached, both ends?
+
+        Both halves are checked because an idempotent re-ADD (a retry, a restart) must be a no-op
+        while a half-finished one must be rebuilt, and only the container side tells them apart.
+        """
+        rc, _, _ = await _run(["ip", "link", "show", host_veth], check=False)
+        if rc != 0:
+            return False
+        rc, _, _ = await _run(
+            ["nsenter", "--net=" + netns, "--", "ip", "link", "show", ifname], check=False
+        )
+        return rc == 0
 
     async def _del(self, ifname: str, container_id: str, config: Mapping[str, Any]) -> None:
         # Deleting the host veth end removes the pair (the container end goes with the netns).

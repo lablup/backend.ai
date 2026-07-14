@@ -223,13 +223,26 @@ class TestHostLocalIpamOwnership:
 
 
 class _RunRecorder:
-    def __init__(self, existing: set[str] | None = None) -> None:
+    def __init__(
+        self,
+        existing: set[str] | None = None,
+        *,
+        in_netns: set[str] | None = None,
+        fail_on: list[str] | None = None,
+    ) -> None:
         self.calls: list[list[str]] = []
-        self._existing = existing or set()  # interface names that "exist" (rc 0 on show)
+        self._existing = existing or set()  # interface names that "exist" in the HOST netns
+        self._in_netns = in_netns or set()  # interface names that exist inside the CONTAINER netns
+        self._fail_on = fail_on  # the argv prefix that raises, to drive a mid-attach failure
 
     async def __call__(self, argv: Any, *, check: bool = True) -> tuple[int, bytes, bytes]:
         argv = list(argv)
         self.calls.append(argv)
+        if self._fail_on is not None and argv[: len(self._fail_on)] == self._fail_on:
+            raise RuntimeError(f"command failed: {' '.join(argv)}")
+        # emulate `nsenter --net=... -- ip link show <dev>` (the container side of the check)
+        if argv[0] == "nsenter" and argv[3:6] == ["ip", "link", "show"]:
+            return (0 if argv[6] in self._in_netns else 1), b"", b""
         # emulate `ip link show <dev>` / `iptables -C`: rc 0 if present, else 1
         if argv[:3] == ["ip", "link", "show"]:
             return (0 if argv[3] in self._existing else 1), b"", b""
@@ -309,6 +322,61 @@ class TestNativeAttachLocal:
             "iptables -t nat -A POSTROUTING -s 172.30.1.0/24 ! -d 172.30.1.0/24 -j MASQUERADE"
             in flat
         )
+
+    async def test_an_already_attached_container_is_a_noop(
+        self, tmp_path: Path, monkeypatch: Any
+    ) -> None:
+        # A re-ADD (a retry, a restart) of a container that IS wired must not touch the wiring.
+        host_veth = _veth_name("cid", "eth0", "h")
+        rec = _RunRecorder(existing={"bailo4097", host_veth}, in_netns={"eth0"})
+        monkeypatch.setattr(na, "_run", rec)
+        runner = NativeBridgeAttachRunner(ipam_state_dir=tmp_path)
+
+        await runner("ADD", ifname="eth0", netns=_NETNS, container_id="cid", config=_LOCAL_CFG)
+
+        assert "ip link add" not in rec.flat()
+        assert f"ip link del {host_veth}" not in rec.flat()
+
+    async def test_a_half_finished_attach_is_rebuilt_not_reported_as_success(
+        self, tmp_path: Path, monkeypatch: Any
+    ) -> None:
+        # The host end exists but the container was never wired (its task died mid-ADD). Taking
+        # that as "already attached" would return success for a container that comes up with NO
+        # interface: its REPL never binds and its published ports DNAT to an address nobody owns.
+        host_veth = _veth_name("cid", "eth0", "h")
+        rec = _RunRecorder(existing={"bailo4097", host_veth}, in_netns=set())
+        monkeypatch.setattr(na, "_run", rec)
+        runner = NativeBridgeAttachRunner(ipam_state_dir=tmp_path)
+
+        result = await runner(
+            "ADD", ifname="eth0", netns=_NETNS, container_id="cid", config=_LOCAL_CFG
+        )
+
+        flat = rec.flat()
+        assert f"ip link del {host_veth}" in flat  # the leftover is cleared...
+        assert f"ip link add {host_veth}" in flat  # ...and the container really wired
+        assert result == {"ips": [{"address": "172.30.1.2/24"}]}
+
+    async def test_a_failed_add_undoes_its_own_veth_and_address(
+        self, tmp_path: Path, monkeypatch: Any
+    ) -> None:
+        # The caller's rollback covers the attachments that SUCCEEDED, not the one that raised —
+        # and a veth pair whose peer never reached a netns is reaped by nothing. Clean up here.
+        host_veth = _veth_name("cid", "eth0", "h")
+        rec = _RunRecorder(
+            existing={"bailo4097"},
+            # the container's task dies between create_task and the attach
+            fail_on=["ip", "link", "set", _veth_name("cid", "eth0", "c"), "netns"],
+        )
+        monkeypatch.setattr(na, "_run", rec)
+        runner = NativeBridgeAttachRunner(ipam_state_dir=tmp_path)
+        ipam = get_host_local_ipam(tmp_path)  # the store that runner allocates from
+
+        with pytest.raises(RuntimeError):
+            await runner("ADD", ifname="eth0", netns=_NETNS, container_id="cid", config=_LOCAL_CFG)
+
+        assert f"ip link del {host_veth}" in rec.flat()  # no veth left in the host namespace
+        assert await ipam.owners("172.30.1.0/24") == {}  # and no address left claimed
 
     async def test_del_removes_veth_and_releases_ip(self, tmp_path: Path, monkeypatch: Any) -> None:
         rec = _RunRecorder(existing=set())
