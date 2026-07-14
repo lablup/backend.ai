@@ -71,14 +71,20 @@ RESOURCE_ENTITY_TYPES: tuple[str, ...] = (
     "resource_group",
     "artifact",
     "artifact_registry",
-    "app_config",
     "app_config_fragment",
     "notification_channel",
     "notification_rule",
     "model_deployment",
     "model_card",
 )
-MANAGED_ENTITY_TYPES: frozenset[str] = frozenset(RESOURCE_ENTITY_TYPES)
+
+# Entity types this script still owns but no longer emits. Their rows are stripped on every
+# run and never re-emitted, so a retired entity type cannot linger in the fixture. Dropping
+# a type from RESOURCE_ENTITY_TYPES alone would not remove it — it would fall through to
+# base_permissions and be preserved as an unmanaged row.
+RETIRED_ENTITY_TYPES: tuple[str, ...] = ("app_config",)
+
+MANAGED_ENTITY_TYPES: frozenset[str] = frozenset(RESOURCE_ENTITY_TYPES + RETIRED_ENTITY_TYPES)
 
 
 def derive_operations(role_name: str, scope_type: str) -> tuple[str, ...]:

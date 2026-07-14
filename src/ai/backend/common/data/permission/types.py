@@ -269,7 +269,6 @@ class EntityType(enum.StrEnum):
             cls.SESSION,
             cls.ARTIFACT,
             cls.ARTIFACT_REGISTRY,
-            cls.APP_CONFIG,
             cls.NOTIFICATION_CHANNEL,
             cls.NOTIFICATION_RULE,
             cls.MODEL_DEPLOYMENT,

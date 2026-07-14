@@ -129,14 +129,13 @@ class TestEntityType:
         # Verify scope types are exactly 3
         assert scope_types == {EntityType.USER, EntityType.PROJECT, EntityType.DOMAIN}
 
-        # Verify resource types are exactly 10
+        # Verify resource types are exactly 9
         assert resource_types == {
             EntityType.VFOLDER,
             EntityType.IMAGE,
             EntityType.SESSION,
             EntityType.ARTIFACT,
             EntityType.ARTIFACT_REGISTRY,
-            EntityType.APP_CONFIG,
             EntityType.NOTIFICATION_CHANNEL,
             EntityType.NOTIFICATION_RULE,
             EntityType.MODEL_DEPLOYMENT,
