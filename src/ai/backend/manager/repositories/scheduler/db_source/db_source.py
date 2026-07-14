@@ -84,7 +84,6 @@ from ai.backend.manager.data.sokovan import (
     UserResourcePolicy,
 )
 from ai.backend.manager.errors.api import InvalidAPIParameters
-from ai.backend.manager.errors.common import InternalServerError
 from ai.backend.manager.errors.image import ImageNotFound
 from ai.backend.manager.errors.resource import DomainNotFound, ScalingGroupNotFound
 from ai.backend.manager.errors.resource_slot import AgentResourceCapacityExceeded
@@ -1541,21 +1540,6 @@ class ScheduleDBSource:
                 )
                 sg_row = rg_bundle.sg_row
                 known_slot_types = rg_bundle.active_slot_types
-                # Every production caller of ``enqueue_session_from_draft`` populates
-                # access_key/domain_name/project_id alongside resource_group_id; this
-                # branch flags the contract violation rather than letting the RG
-                # access check silently degrade to fail-open.
-                if access_key is None or domain_name is None or project_id is None:
-                    raise InternalServerError(
-                        "Unreachable: resource_group_id supplied without identity context",
-                    )
-                # The draft's access_key is the owner's for delegated sessions, so
-                # this check enforces RG access against the owner's allowlist.
-                allowed_rgs = await self._query_allowed_scaling_groups(
-                    db_sess, domain_name, project_id, access_key
-                )
-                if sg_row.id not in {rg.id for rg in allowed_rgs}:
-                    raise InvalidAPIParameters(f"Resource group '{sg_row.name}' is not accessible")
                 network_info = ScalingGroupNetworkInfo(
                     use_host_network=sg_row.use_host_network,
                     wsproxy_addr=sg_row.wsproxy_addr,
@@ -1754,6 +1738,24 @@ class ScheduleDBSource:
         if not allowed_rgs:
             raise InvalidAPIParameters("No accessible scaling group available")
         return allowed_rgs[0].id
+
+    async def query_accessible_resource_group_ids(
+        self,
+        *,
+        domain_name: str,
+        project_id: ProjectID,
+        access_key: AccessKey,
+    ) -> frozenset[ResourceGroupID]:
+        """Return the resource-group ids accessible to the given single-project scope.
+
+        A pure DB read: the caller decides the scope and performs the
+        accessibility rejection, so this method neither validates nor raises.
+        """
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            allowed_rgs = await self._query_allowed_scaling_groups(
+                db_sess, domain_name, project_id, access_key
+            )
+        return frozenset(rg.id for rg in allowed_rgs)
 
     async def get_resource_group_id_by_name(self, name: ResourceGroupName) -> ResourceGroupID:
         async with self._begin_readonly_session_read_committed() as db_sess:

@@ -279,6 +279,26 @@ class SchedulerRepository:
         )
 
     @scheduler_repository_resilience.apply()
+    async def query_accessible_resource_group_ids(
+        self,
+        *,
+        domain_name: str,
+        project_id: ProjectID,
+        access_key: AccessKey,
+    ) -> frozenset[ResourceGroupID]:
+        """Return the resource-group ids accessible to the given single-project scope.
+
+        Thin passthrough to
+        :meth:`ScheduleDBSource.query_accessible_resource_group_ids`; the caller
+        performs the accessibility rejection.
+        """
+        return await self._db_source.query_accessible_resource_group_ids(
+            domain_name=domain_name,
+            project_id=project_id,
+            access_key=access_key,
+        )
+
+    @scheduler_repository_resilience.apply()
     async def get_resource_group_id_by_name(self, name: ResourceGroupName) -> ResourceGroupID:
         return await self._db_source.get_resource_group_id_by_name(name)
 
