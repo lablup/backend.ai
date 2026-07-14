@@ -19,7 +19,7 @@ from ai.backend.manager.data.session.creation import (
 )
 from ai.backend.manager.data.session.draft import (
     SessionNetworkDraft,
-    SessionSpecDraft,
+    SessionResourceSpecDraft,
 )
 from ai.backend.manager.data.session.options import DefaultSessionOptions
 from ai.backend.manager.models.network import NetworkType
@@ -50,7 +50,7 @@ def _context(
 class TestAssignNetworkConfigRule:
     async def test_persistent_when_network_id_set(self, rule: AssignNetworkConfigRule) -> None:
         """A caller-supplied ``network_id`` resolves to PERSISTENT."""
-        draft = SessionSpecDraft(
+        draft = SessionResourceSpecDraft(
             network=SessionNetworkDraft(network_id="net-123"),
         )
         result = await rule.prepare(draft, _context(use_host_network=True))
@@ -63,7 +63,7 @@ class TestAssignNetworkConfigRule:
         self, rule: AssignNetworkConfigRule
     ) -> None:
         """An empty network + RG host_network flag selects HOST."""
-        draft = SessionSpecDraft()
+        draft = SessionResourceSpecDraft()
         result = await rule.prepare(draft, _context(use_host_network=True))
         assert result.network.network_type == NetworkType.HOST
         assert result.network.use_host_network is True
@@ -71,7 +71,7 @@ class TestAssignNetworkConfigRule:
 
     async def test_volatile_default(self, rule: AssignNetworkConfigRule) -> None:
         """No network id and no host flag falls back to VOLATILE."""
-        draft = SessionSpecDraft()
+        draft = SessionResourceSpecDraft()
         result = await rule.prepare(draft, _context(use_host_network=False))
         assert result.network.network_type == NetworkType.VOLATILE
         assert result.network.use_host_network is False
@@ -81,7 +81,7 @@ class TestAssignNetworkConfigRule:
         self, rule: AssignNetworkConfigRule
     ) -> None:
         """An already-set ``network_type`` short-circuits the rule."""
-        draft = SessionSpecDraft(
+        draft = SessionResourceSpecDraft(
             network=SessionNetworkDraft(
                 network_type=NetworkType.VOLATILE,
                 network_id="leftover-id",  # intentionally inconsistent
@@ -96,6 +96,6 @@ class TestAssignNetworkConfigRule:
         self, rule: AssignNetworkConfigRule
     ) -> None:
         """No scaling-group info in the context still yields VOLATILE."""
-        draft = SessionSpecDraft()
+        draft = SessionResourceSpecDraft()
         result = await rule.prepare(draft, _context(scaling_group=False))
         assert result.network.network_type == NetworkType.VOLATILE

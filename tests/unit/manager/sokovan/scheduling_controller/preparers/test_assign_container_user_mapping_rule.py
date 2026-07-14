@@ -9,7 +9,7 @@ from ai.backend.manager.data.session.creation import (
 )
 from ai.backend.manager.data.session.draft import (
     KernelSpecDraft,
-    SessionSpecDraft,
+    SessionResourceSpecDraft,
 )
 from ai.backend.manager.data.session.options import DefaultSessionOptions
 from ai.backend.manager.sokovan.scheduling_controller.preparers.assign_container_user_mapping_rule import (
@@ -38,14 +38,14 @@ class TestAssignContainerUserMappingRule:
     async def test_noop_when_context_info_absent(
         self, rule: AssignContainerUserMappingRule
     ) -> None:
-        draft = SessionSpecDraft(kernel_specs=(KernelSpecDraft(cluster_role="main"),))
+        draft = SessionResourceSpecDraft(kernel_specs=(KernelSpecDraft(cluster_role="main"),))
         result = await rule.prepare(draft, _context(None))
         assert result is draft
 
     async def test_fills_unset_fields_from_context(
         self, rule: AssignContainerUserMappingRule
     ) -> None:
-        draft = SessionSpecDraft(
+        draft = SessionResourceSpecDraft(
             kernel_specs=(
                 KernelSpecDraft(cluster_role="main"),
                 KernelSpecDraft(cluster_role="worker"),
@@ -60,7 +60,7 @@ class TestAssignContainerUserMappingRule:
             assert kernel.supplementary_gids == (200, 300)
 
     async def test_preserves_caller_set_values(self, rule: AssignContainerUserMappingRule) -> None:
-        draft = SessionSpecDraft(
+        draft = SessionResourceSpecDraft(
             kernel_specs=(
                 KernelSpecDraft(
                     cluster_role="main",
@@ -80,7 +80,7 @@ class TestAssignContainerUserMappingRule:
 
     async def test_fills_partial_draft(self, rule: AssignContainerUserMappingRule) -> None:
         """A kernel with only ``uid`` set still picks up ``main_gid`` from the context."""
-        draft = SessionSpecDraft(
+        draft = SessionResourceSpecDraft(
             kernel_specs=(KernelSpecDraft(cluster_role="main", uid=2000),),
         )
         info = ContainerUserInfo(uid=1000, main_gid=100, supplementary_gids=[])

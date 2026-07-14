@@ -26,7 +26,7 @@ from ai.backend.manager.data.session.draft import (
     KernelResourceInput,
     SchedulingTargetDraft,
     SessionOptionsDraft,
-    SessionSpecDraft,
+    SessionResourceSpecDraft,
 )
 from ai.backend.manager.data.session.options import (
     AgentSelectionPolicy,
@@ -92,7 +92,7 @@ class TestMergeResourceGroupDefaultsRule:
         rg_defaults: DefaultSessionOptions,
     ) -> None:
         """Unset option-level fields absorb every RG default."""
-        result = await rule.prepare(SessionSpecDraft(), _context(rg_defaults))
+        result = await rule.prepare(SessionResourceSpecDraft(), _context(rg_defaults))
         opts = result.options
         assert opts.priority == 42
         assert opts.is_preemptible is False
@@ -109,7 +109,7 @@ class TestMergeResourceGroupDefaultsRule:
         rg_defaults: DefaultSessionOptions,
     ) -> None:
         """Caller-set option-level fields survive the overlay."""
-        draft = SessionSpecDraft(
+        draft = SessionResourceSpecDraft(
             options=SessionOptionsDraft(
                 priority=99,
                 cluster_mode=ClusterMode.SINGLE_NODE,
@@ -133,7 +133,7 @@ class TestMergeResourceGroupDefaultsRule:
         rg_image_id: ImageID,
     ) -> None:
         """A group without an execution_spec inherits every RG baseline field."""
-        draft = SessionSpecDraft(
+        draft = SessionResourceSpecDraft(
             options=SessionOptionsDraft(
                 kernel_groups=(KernelGroupDraft(role="main", replica_count=1),),
             ),
@@ -159,7 +159,7 @@ class TestMergeResourceGroupDefaultsRule:
     ) -> None:
         """Caller-set execution_spec fields win over the RG baseline."""
         caller_image = ImageID(uuid.uuid4())
-        draft = SessionSpecDraft(
+        draft = SessionResourceSpecDraft(
             options=SessionOptionsDraft(
                 kernel_groups=(
                     KernelGroupDraft(
@@ -192,7 +192,7 @@ class TestMergeResourceGroupDefaultsRule:
     ) -> None:
         """With no RG default_kernel_execution_spec, only option-level fill happens."""
         rg = DefaultSessionOptions(priority=7)
-        draft = SessionSpecDraft(
+        draft = SessionResourceSpecDraft(
             options=SessionOptionsDraft(
                 kernel_groups=(KernelGroupDraft(role="main", replica_count=1),),
             ),

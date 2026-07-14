@@ -207,6 +207,25 @@ class SessionClassificationDraft(_DraftBaseModel):
     tag: str | None = None
 
 
+class SessionResourceSpecDraft(_DraftBaseModel):
+    """Scope-free draft consumed by the preparer chain.
+
+    Mirrors :class:`~ai.backend.manager.data.session.spec.SessionResourceSpec`
+    (the finalized counterpart) and holds everything the preparer
+    resolves. Ownership scope is carried separately by the caller (see
+    :meth:`SessionSpecDraft.to_resource_draft`), so no rule needs it.
+    """
+
+    identity: SessionIdentityDraft = Field(default_factory=SessionIdentityDraft)
+    classification: SessionClassificationDraft = Field(default_factory=SessionClassificationDraft)
+    network: SessionNetworkDraft = Field(default_factory=SessionNetworkDraft)
+    callback_url: yarl.URL | None = None
+    dependencies: tuple[SessionID, ...] = ()
+    options: SessionOptionsDraft = Field(default_factory=SessionOptionsDraft)
+    kernel_specs: tuple[KernelSpecDraft, ...] = ()
+    internal_data_extras: InternalDataExtras = Field(default_factory=InternalDataExtras)
+
+
 class SessionSpecDraft(_DraftBaseModel):
     """Top-level draft mirroring ``SessionSpec``.
 
@@ -226,3 +245,20 @@ class SessionSpecDraft(_DraftBaseModel):
     options: SessionOptionsDraft = Field(default_factory=SessionOptionsDraft)
     kernel_specs: tuple[KernelSpecDraft, ...] = ()
     internal_data_extras: InternalDataExtras = Field(default_factory=InternalDataExtras)
+
+    def to_resource_draft(self) -> SessionResourceSpecDraft:
+        """Project onto the scope-free draft the preparer chain operates on.
+
+        Scope is dropped here — it is pass-through input the preparer
+        never touches; the caller re-attaches it after finalize.
+        """
+        return SessionResourceSpecDraft(
+            identity=self.identity,
+            classification=self.classification,
+            network=self.network,
+            callback_url=self.callback_url,
+            dependencies=self.dependencies,
+            options=self.options,
+            kernel_specs=self.kernel_specs,
+            internal_data_extras=self.internal_data_extras,
+        )

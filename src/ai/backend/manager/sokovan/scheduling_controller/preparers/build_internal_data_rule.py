@@ -29,7 +29,7 @@ from __future__ import annotations
 
 from typing import Any, override
 
-from ai.backend.manager.data.session.draft import SessionSpecDraft
+from ai.backend.manager.data.session.draft import SessionResourceSpecDraft
 from ai.backend.manager.sokovan.scheduling_controller.preparers.draft_rule import (
     SessionSpecDraftRule,
     SessionSpecPreparationContext,
@@ -46,9 +46,9 @@ class BuildInternalDataRule(SessionSpecDraftRule):
     @override
     async def prepare(
         self,
-        draft: SessionSpecDraft,
+        draft: SessionResourceSpecDraft,
         context: SessionSpecPreparationContext,
-    ) -> SessionSpecDraft:
+    ) -> SessionResourceSpecDraft:
         extras = draft.internal_data_extras
         overlay: dict[str, Any] = context.dotfile_data.to_internal_data()
         if extras.model_definition_path is not None:

@@ -44,6 +44,16 @@ from ai.backend.manager.data.session.options import (
 from ai.backend.manager.errors.kernel import IncompleteSessionSpec
 
 
+def _format_loc(loc: tuple[object, ...]) -> str:
+    parts: list[str] = []
+    for item in loc:
+        if isinstance(item, int):
+            parts.append(f"[{item}]")
+        else:
+            parts.append(f".{item}" if parts else str(item))
+    return "".join(parts)
+
+
 class _SpecBaseModel(BackendAISchema):
     """Base for resolved session-spec sub-models.
 
@@ -130,8 +140,42 @@ class KernelSpec(_SpecBaseModel):
     vfolder_mounts: tuple[VFolderMount, ...] = ()
 
 
+class SessionResourceSpec(_SpecBaseModel):
+    """Scope-free resolved spec — the output of the preparer chain.
+
+    Carries everything the draft-based preparer actually resolves
+    (identity, network, options, kernel specs, ...) but **not** the
+    ownership scope (domain / project / resource group): the preparer
+    never touches scope, so it is pass-through input that callers attach
+    afterward. The node-fitting dry-run consumes this type directly,
+    while the enqueue path wraps it with a scope via
+    :meth:`SessionSpec.from_resource_spec` before persisting.
+    """
+
+    identity: SessionIdentity
+    classification: SessionClassification
+    network: SessionNetwork
+    callback_url: yarl.URL | None = None
+    dependencies: tuple[SessionID, ...] = ()
+    options: SessionOptions
+    kernel_specs: tuple[KernelSpec, ...]
+    internal_data_extras: InternalDataExtras = Field(default_factory=InternalDataExtras)
+
+    @override
+    @classmethod
+    def build_validation_error(cls, info: SchemaValidationFailureInfo) -> BackendAIError:
+        missing_paths = [_format_loc(tuple(err["loc"])) for err in info.errors]
+        return IncompleteSessionSpec(
+            extra_msg="SessionResourceSpec fields not resolved: " + ", ".join(missing_paths),
+            extra_data={"missing": missing_paths},
+        )
+
+
 class SessionSpec(_SpecBaseModel):
     """Full spec to create one ``SessionRow`` and its owned kernels.
+
+    Composed from a scope-free :class:`SessionResourceSpec` plus a
+    resolved :class:`SessionScope` via :meth:`from_resource_spec`.
 
     Vfolder mounts live on :attr:`KernelSpec.vfolder_mounts` —
     per-kernel at the spec level. The ``SessionRow.vfolder_mounts``
@@ -149,21 +193,28 @@ class SessionSpec(_SpecBaseModel):
     kernel_specs: tuple[KernelSpec, ...]
     internal_data_extras: InternalDataExtras = Field(default_factory=InternalDataExtras)
 
+    @classmethod
+    def from_resource_spec(
+        cls, scope: SessionScope, resource_spec: SessionResourceSpec
+    ) -> SessionSpec:
+        """Attach an ownership ``scope`` to a prepared, scope-free spec."""
+        return cls(
+            identity=resource_spec.identity,
+            scope=scope,
+            classification=resource_spec.classification,
+            network=resource_spec.network,
+            callback_url=resource_spec.callback_url,
+            dependencies=resource_spec.dependencies,
+            options=resource_spec.options,
+            kernel_specs=resource_spec.kernel_specs,
+            internal_data_extras=resource_spec.internal_data_extras,
+        )
+
     @override
     @classmethod
     def build_validation_error(cls, info: SchemaValidationFailureInfo) -> BackendAIError:
-        missing_paths = [cls._format_loc(tuple(err["loc"])) for err in info.errors]
+        missing_paths = [_format_loc(tuple(err["loc"])) for err in info.errors]
         return IncompleteSessionSpec(
             extra_msg="SessionSpec fields not resolved: " + ", ".join(missing_paths),
             extra_data={"missing": missing_paths},
         )
-
-    @staticmethod
-    def _format_loc(loc: tuple[object, ...]) -> str:
-        parts: list[str] = []
-        for item in loc:
-            if isinstance(item, int):
-                parts.append(f"[{item}]")
-            else:
-                parts.append(f".{item}" if parts else str(item))
-        return "".join(parts)

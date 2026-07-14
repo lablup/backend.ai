@@ -5,6 +5,7 @@ from __future__ import annotations
 import uuid
 from decimal import Decimal
 
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import AgentId, KernelId, ResourceSlot
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.exceptions import (
     ContainerLimitExceededError,
@@ -80,7 +81,9 @@ class TestNoCompatibleAgentSuggestion:
 
 class TestNoAgentsInResourceGroupSuggestion:
     def test_empty_suggestion(self) -> None:
-        suggestion = NoAgentsInResourceGroupError("default").build_remediation_hint()
+        suggestion = NoAgentsInResourceGroupError(
+            ResourceGroupID(uuid.UUID(int=0))
+        ).build_remediation_hint()
         assert suggestion.available_archs is None
         assert suggestion.available_agent_ids is None
         assert suggestion.required_reduction is None

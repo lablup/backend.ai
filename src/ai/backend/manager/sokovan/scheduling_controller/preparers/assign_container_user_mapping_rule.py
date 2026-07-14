@@ -19,7 +19,7 @@ from __future__ import annotations
 
 from typing import override
 
-from ai.backend.manager.data.session.draft import SessionSpecDraft
+from ai.backend.manager.data.session.draft import SessionResourceSpecDraft
 from ai.backend.manager.sokovan.scheduling_controller.preparers.draft_rule import (
     SessionSpecDraftRule,
     SessionSpecPreparationContext,
@@ -36,9 +36,9 @@ class AssignContainerUserMappingRule(SessionSpecDraftRule):
     @override
     async def prepare(
         self,
-        draft: SessionSpecDraft,
+        draft: SessionResourceSpecDraft,
         context: SessionSpecPreparationContext,
-    ) -> SessionSpecDraft:
+    ) -> SessionResourceSpecDraft:
         info = context.container_user_info
         if info is None:
             return draft

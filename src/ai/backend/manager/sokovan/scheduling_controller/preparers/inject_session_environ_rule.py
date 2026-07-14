@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from typing import override
 
-from ai.backend.manager.data.session.draft import SessionSpecDraft
+from ai.backend.manager.data.session.draft import SessionResourceSpecDraft
 from ai.backend.manager.sokovan.scheduling_controller.preparers.draft_rule import (
     SessionSpecDraftRule,
     SessionSpecPreparationContext,
@@ -36,9 +36,9 @@ class InjectSessionEnvironRule(SessionSpecDraftRule):
     @override
     async def prepare(
         self,
-        draft: SessionSpecDraft,
+        draft: SessionResourceSpecDraft,
         context: SessionSpecPreparationContext,
-    ) -> SessionSpecDraft:
+    ) -> SessionResourceSpecDraft:
         if not draft.internal_data_extras.sudo_session_enabled:
             return draft
 

@@ -13,6 +13,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from uuid import UUID
 
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import (
     AgentId,
     BinarySize,
@@ -70,8 +71,8 @@ class SessionMetadata:
     session_id: SessionId
     # Type of the session (e.g., INTERACTIVE, BATCH, INFERENCE)
     session_type: SessionTypes
-    # Scaling group the session belongs to
-    scaling_group: str
+    # Resource group the session belongs to
+    resource_group_id: ResourceGroupID
     # Cluster mode (e.g., SINGLE, MULTI)
     cluster_mode: ClusterMode
 
@@ -281,7 +282,7 @@ class AgentSelector:
             # Empty list for sessions with no kernels
             return []
         if not agents:
-            raise NoAgentsInResourceGroupError(criteria.session_metadata.scaling_group)
+            raise NoAgentsInResourceGroupError(criteria.session_metadata.resource_group_id)
 
         # Track agent state changes as diffs using AgentStateTracker
         state_trackers = [AgentStateTracker(original_agent=agent) for agent in agents]

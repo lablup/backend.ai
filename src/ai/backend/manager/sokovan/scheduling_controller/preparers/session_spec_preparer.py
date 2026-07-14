@@ -18,8 +18,8 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 
-from ai.backend.manager.data.session.draft import SessionSpecDraft
-from ai.backend.manager.data.session.spec import SessionSpec
+from ai.backend.manager.data.session.draft import SessionResourceSpecDraft
+from ai.backend.manager.data.session.spec import SessionResourceSpec
 from ai.backend.manager.sokovan.scheduling_controller.preparers.draft_rule import (
     SessionSpecDraftRule,
     SessionSpecPreparationContext,
@@ -43,15 +43,15 @@ class SessionSpecPreparer:
 
     async def prepare(
         self,
-        initial_draft: SessionSpecDraft,
+        initial_draft: SessionResourceSpecDraft,
         context: SessionSpecPreparationContext,
-    ) -> SessionSpec:
+    ) -> SessionResourceSpec:
         """Run every rule in declaration order and finalize."""
         draft = initial_draft
         for rule in self._rules:
             draft = await rule.prepare(draft, context)
         return self._finalize(draft)
 
-    def _finalize(self, draft: SessionSpecDraft) -> SessionSpec:
-        """Project a fully-prepared draft into a frozen ``SessionSpec``."""
-        return SessionSpec.model_validate(draft.model_dump(exclude_none=True))
+    def _finalize(self, draft: SessionResourceSpecDraft) -> SessionResourceSpec:
+        """Project a fully-prepared draft into a frozen ``SessionResourceSpec``."""
+        return SessionResourceSpec.model_validate(draft.model_dump(exclude_none=True))

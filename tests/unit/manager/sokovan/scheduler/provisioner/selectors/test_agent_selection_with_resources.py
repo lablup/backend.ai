@@ -7,6 +7,7 @@ from decimal import Decimal
 
 import pytest
 
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import AgentId, ClusterMode, ResourceSlot, SessionId, SessionTypes
 from ai.backend.manager.data.sokovan import AgentInfo
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.concentrated import (
@@ -39,7 +40,7 @@ class TestAgentSelectionWithResources:
         session_metadata = SessionMetadata(
             session_id=SessionId(uuid.uuid4()),
             session_type=SessionTypes.INTERACTIVE,
-            scaling_group="default",
+            resource_group_id=ResourceGroupID(uuid.UUID(int=0)),
             cluster_mode=ClusterMode.SINGLE_NODE,
         )
 
@@ -104,7 +105,7 @@ class TestAgentSelectionWithResources:
         session_metadata = SessionMetadata(
             session_id=SessionId(uuid.uuid4()),
             session_type=SessionTypes.BATCH,
-            scaling_group="default",
+            resource_group_id=ResourceGroupID(uuid.UUID(int=0)),
             cluster_mode=ClusterMode.MULTI_NODE,
         )
 
@@ -164,7 +165,7 @@ class TestAgentSelectionWithResources:
         session_metadata = SessionMetadata(
             session_id=SessionId(uuid.uuid4()),
             session_type=SessionTypes.INTERACTIVE,
-            scaling_group="default",
+            resource_group_id=ResourceGroupID(uuid.UUID(int=0)),
             cluster_mode=ClusterMode.SINGLE_NODE,
         )
 
@@ -224,7 +225,7 @@ class TestAgentSelectionWithResources:
         session_metadata = SessionMetadata(
             session_id=SessionId(uuid.uuid4()),
             session_type=SessionTypes.BATCH,
-            scaling_group="default",
+            resource_group_id=ResourceGroupID(uuid.UUID(int=0)),
             cluster_mode=ClusterMode.SINGLE_NODE,
         )
 
@@ -269,7 +270,7 @@ class TestAgentSelectionWithResources:
         session_metadata = SessionMetadata(
             session_id=SessionId(uuid.uuid4()),
             session_type=SessionTypes.INTERACTIVE,
-            scaling_group="default",
+            resource_group_id=ResourceGroupID(uuid.UUID(int=0)),
             cluster_mode=ClusterMode.SINGLE_NODE,
         )
 

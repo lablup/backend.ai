@@ -13,6 +13,7 @@ from ai.backend.common.events.event_types.session.broadcast import SchedulingBro
 from ai.backend.common.events.types import AbstractBroadcastEvent
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
 from ai.backend.common.types import KernelId, ResourceSlot, ResourceSlotEntry, SessionId
 from ai.backend.logging.utils import BraceStyleAdapter
@@ -24,7 +25,11 @@ from ai.backend.manager.data.session.compute_schedule import (
     UnschedulableReasonHint,
 )
 from ai.backend.manager.data.session.draft import SessionSpecDraft
-from ai.backend.manager.data.session.spec import SessionSpec
+from ai.backend.manager.data.session.spec import (
+    SessionResourceSpec,
+    SessionScope,
+    SessionSpec,
+)
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.common import InternalServerError, RejectedByHook
 from ai.backend.manager.metrics.scheduler import (
@@ -278,7 +283,9 @@ class SchedulingController:
         with self._metric_observer.measure_phase(
             "scheduling_controller", rg_id, "spec_preparation"
         ):
-            spec = await self._spec_preparer.prepare(draft, prep_ctx)
+            resource_spec = await self._spec_preparer.prepare(draft.to_resource_draft(), prep_ctx)
+            scope = SessionScope.model_validate(draft.scope.model_dump(exclude_none=True))
+            spec = SessionSpec.from_resource_spec(scope, resource_spec)
 
         hook_result = await self._hook_plugin_ctx.dispatch(
             "PRE_ENQUEUE_SESSION",
@@ -328,7 +335,7 @@ class SchedulingController:
         return session_id
 
     def _prepare_kernel_data(
-        self, spec: SessionSpec, fetched: SessionSpecContextFetch
+        self, spec: SessionResourceSpec, fetched: SessionSpecContextFetch
     ) -> dict[KernelId, _KernelComputeScheduleData]:
         prepared_data: dict[KernelId, _KernelComputeScheduleData] = {}
         for kernel_spec in spec.kernel_specs:
@@ -367,7 +374,8 @@ class SchedulingController:
 
     async def _compute_schedule(
         self,
-        spec: SessionSpec,
+        spec: SessionResourceSpec,
+        resource_group_id: ResourceGroupID,
         kernel_data: dict[KernelId, _KernelComputeScheduleData],
     ) -> ComputeScheduleResult:
         kernel_requirements: dict[UUID, KernelResourceSpec] = {
@@ -382,7 +390,7 @@ class SchedulingController:
                 session_metadata=SessionMetadata(
                     session_id=SessionId(UUID(str(spec.identity.session_id))),
                     session_type=spec.classification.session_type,
-                    scaling_group=str(spec.scope.resource_group_name),
+                    resource_group_id=resource_group_id,
                     cluster_mode=spec.options.cluster_mode,
                 ),
                 kernel_requirements=kernel_requirements,
@@ -395,9 +403,7 @@ class SchedulingController:
             )
             # The selector mutates the agents list on full success; feed clones so
             # the live snapshot is never altered.
-            scheduling_data = await self._repository.get_scheduling_data(
-                spec.scope.resource_group_id
-            )
+            scheduling_data = await self._repository.get_scheduling_data(resource_group_id)
             if scheduling_data is None:
                 resource_group_reason = "Resource group does not exist"
                 return ComputeScheduleResult(
@@ -488,9 +494,9 @@ class SchedulingController:
             # storage-RPC resolution by leaving the per-role mount map empty.
             vfolder_mounts_by_role={},
         )
-        spec = await self._spec_preparer.prepare(draft, prep_ctx)
-        compute_schedule_kernel_data = self._prepare_kernel_data(spec, fetched)
-        return await self._compute_schedule(spec, compute_schedule_kernel_data)
+        resource_spec = await self._spec_preparer.prepare(draft.to_resource_draft(), prep_ctx)
+        compute_schedule_kernel_data = self._prepare_kernel_data(resource_spec, fetched)
+        return await self._compute_schedule(resource_spec, rg_id, compute_schedule_kernel_data)
 
     async def mark_scheduling_needed(self, schedule_types: Sequence[ScheduleType]) -> None:
         """

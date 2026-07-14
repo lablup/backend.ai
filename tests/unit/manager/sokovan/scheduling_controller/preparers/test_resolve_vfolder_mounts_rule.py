@@ -11,7 +11,7 @@ from ai.backend.common.types import (
     VFolderMount,
     VFolderUsageMode,
 )
-from ai.backend.manager.data.session.draft import KernelSpecDraft, SessionSpecDraft
+from ai.backend.manager.data.session.draft import KernelSpecDraft, SessionResourceSpecDraft
 from ai.backend.manager.data.session.options import DefaultSessionOptions
 from ai.backend.manager.sokovan.scheduling_controller.preparers.draft_rule import (
     SessionSpecPreparationContext,
@@ -45,7 +45,7 @@ def _context(
 class TestResolveVFolderMountsRule:
     async def test_noop_when_context_empty(self) -> None:
         rule = ResolveVFolderMountsRule()
-        draft = SessionSpecDraft(kernel_specs=(KernelSpecDraft(cluster_role="main"),))
+        draft = SessionResourceSpecDraft(kernel_specs=(KernelSpecDraft(cluster_role="main"),))
         result = await rule.prepare(draft, _context())
         assert result is draft
         assert result.kernel_specs[0].vfolder_mounts == ()
@@ -53,7 +53,7 @@ class TestResolveVFolderMountsRule:
     async def test_stamps_per_role_mounts_onto_matching_kernels(self) -> None:
         rule = ResolveVFolderMountsRule()
         mount = _mount("data")
-        draft = SessionSpecDraft(
+        draft = SessionResourceSpecDraft(
             kernel_specs=(
                 KernelSpecDraft(cluster_role="main"),
                 KernelSpecDraft(cluster_role="worker"),

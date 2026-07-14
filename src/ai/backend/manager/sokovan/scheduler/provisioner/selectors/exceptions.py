@@ -16,6 +16,7 @@ from ai.backend.common.exception import (
     ErrorDomain,
     ErrorOperation,
 )
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import AgentId, ResourceSlot
 from ai.backend.manager.data.sokovan import SchedulingPredicate
 from ai.backend.manager.sokovan.scheduler.exceptions import SchedulingError
@@ -76,9 +77,9 @@ class NoAgentsInResourceGroupError(AgentSelectionError):
     error_type = "https://api.backend.ai/probs/no-agents-in-resource-group"
     error_title = "Unavailable : Resource group has no candidate agents."
 
-    _resource_group: str
+    _resource_group: ResourceGroupID
 
-    def __init__(self, resource_group: str) -> None:
+    def __init__(self, resource_group: ResourceGroupID) -> None:
         self._resource_group = resource_group
         super().__init__(f"No agents available in resource group '{resource_group}'")
 
