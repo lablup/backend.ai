@@ -321,14 +321,9 @@ class SessionService:
         return ResolveSessionActionResult(session_id=session_id)
 
     async def compute_schedule(self, action: ComputeScheduleAction) -> ComputeScheduleActionResult:
-        """Compute whether a would-be session fits the target resource group's
-        nodes, without provisioning.
-
-        Builds a slim ``SessionSpecDraft`` from the request (one kernel group per
-        requested kernel, each with a unique role for positional correlation) and
-        delegates the node-fitting decision to the scheduling controller, which
-        runs the same spec preparer as enqueue (vfolder resolution skipped) and
-        drives the real agent selector.
+        """Build a slim ``SessionSpecDraft`` (one kernel group per requested
+        kernel, unique role for positional correlation) and delegate the
+        node-fitting decision to the scheduling controller.
         """
         resource_group_name = await self._scheduler_repository.get_resource_group_name_by_id(
             action.resource_group_id

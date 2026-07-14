@@ -469,20 +469,12 @@ class SchedulingController:
         self,
         draft: SessionSpecDraft,
     ) -> ComputeScheduleResult:
-        """Compute whether each kernel of a would-be session could be placed on
-        the target resource group, without provisioning or mutating any state.
+        """Compute whether each kernel of a would-be session fits the target
+        resource group's nodes, without provisioning.
 
-        Reuses the same spec-context fetch and preparer chain as the enqueue
-        path — only vfolder-mount resolution is neutralized (it needs a storage
-        RPC and is irrelevant to node fitting) by feeding an empty per-role
-        mount map. The finalized spec's per-kernel resource slots + architecture
-        then drive the real agent selector against a live snapshot of the
-        group's agents. Kernels the selector cannot place are returned with a
-        remediation hint; every other kernel is schedulable.
-
-        Results correspond positionally to ``draft.options.kernel_groups`` (each
-        group is one requested kernel with a unique ``role``), so callers match
-        results to their request by list index.
+        Reuses the enqueue prep chain (vfolder resolution skipped), then drives
+        the real agent selector against a live snapshot of the group's agents.
+        Results correspond positionally to ``draft.options.kernel_groups``.
         """
         rg_id = draft.scope.resource_group_id
         if rg_id is None:
