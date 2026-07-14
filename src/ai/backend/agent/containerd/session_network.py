@@ -419,6 +419,7 @@ class ContainerdSessionNetwork:
                 # here). Session-network setup is per node, not per kernel — do it once.
                 return meta
             coordinator: SessionNetworkCoordinator | None = None
+            adopted = False
             try:
                 backend = self._resolve_backend(meta)
                 coordinator = SessionNetworkCoordinator(self._etcd, backend, self._agent_id)
@@ -432,6 +433,7 @@ class ContainerdSessionNetwork:
                 # not our own memory, and adopt what is already carrying their traffic.
                 survivors = await self._live_containers_of(session_id)
                 if survivors:
+                    adopted = True
                     await coordinator.resume(meta, self._self_member(meta))
                 else:
                     await coordinator.start(meta, self._self_member(meta))
@@ -443,10 +445,16 @@ class ContainerdSessionNetwork:
                     # that cannot be honoured fails its kernel, keep colliding with).
                     await self._purge_local_addresses(session_id)
             except Exception:
-                # Unwind: the coordinator may already have published this node's membership and
-                # started its watch tasks, and it is about to go out of scope unregistered — nobody
-                # could ever stop it. And the claim above must not outlive the kernel that made it.
-                if coordinator is not None:
+                # Unwind what WE built, and nothing else. A failed *setup* leaves a coordinator that
+                # may already have published this node's membership and started its watch tasks, and
+                # that is about to go out of scope unregistered — nobody could ever stop it — so it
+                # is stopped (which also gives back the half-built devices and the LOCAL block).
+                #
+                # A failed *adopt* must not be stopped: stop() deletes the devices and releases the
+                # block of a data plane this node did not build and whose kernels are still running
+                # on it. And the failure that trips the adopt is the same transient etcd error that
+                # made the resume fail in the first place — correlated, not hypothetical.
+                if coordinator is not None and not adopted:
                     with contextlib.suppress(Exception):
                         await coordinator.stop(session_id)
                 self._tracker.release_pending(kernel_id)
@@ -460,10 +468,22 @@ class ContainerdSessionNetwork:
             return meta
 
     async def _live_containers_of(self, session_id: str) -> list[str]:
-        """The containers this node still runs for a session. Asked of containerd, which is the only
-        thing that knows about a session this process failed to resume."""
+        """The containers of a session that are still RUNNING on this node.
+
+        Asked of containerd, which is the only thing that knows about a session this process failed
+        to resume. A running *task* is the test, not a container record: containerd keeps the record
+        of a stopped container (and debug.skip-container-deletion keeps it forever), and one of
+        those must not make the session look alive — it would send every later kernel down the adopt
+        path, joining a data plane that was torn down long ago.
+        """
         live = await self._live_containers()
-        return [cid for cid, sid in live.items() if sid == session_id]
+        running = []
+        for container_id, sid in live.items():
+            if sid != session_id:
+                continue
+            if await self._runtime.container_pid(container_id) is not None:
+                running.append(container_id)
+        return running
 
     async def _adopt_containers(
         self, container_ids: Sequence[str], session_id: str, meta: SessionNetMeta
@@ -669,13 +689,25 @@ class ContainerdSessionNetwork:
                     log.exception("network detach failed for container {}", container_id)
         try:
             await self._runtime.remove_container(container_id)
-        finally:
-            # Untrack even if the runtime call failed (channel down, deadline): the clean event is
-            # not retried — the agent drops the kernel from its registry either way — so a kernel
-            # left tracked here would hold its session network open for good.
-            scope = self._tracker.untrack(container_id)
-            if scope is not None:
-                await self._teardown_session_network(scope)
+        except Exception:
+            # The clean event is not retried (the agent drops the kernel from its registry either
+            # way), so a kernel left tracked here holds its session network open for good. But
+            # untracking unconditionally is the worse trade: this call can fail *because* containerd
+            # is unreachable, and the teardown that would follow deletes devices and releases the
+            # LOCAL block of a container that may still be running. So untrack only if containerd
+            # confirms the container is gone; if it cannot be asked, keep the claim (a visible leak,
+            # reclaimed as an orphan on the next restart) rather than cut a live kernel off.
+            log.exception("removing container {} failed", container_id)
+            with contextlib.suppress(Exception):
+                if await self._runtime.container_status(container_id) is None:
+                    await self._release_container(container_id)
+            raise
+        await self._release_container(container_id)
+
+    async def _release_container(self, container_id: str) -> None:
+        scope = self._tracker.untrack(container_id)
+        if scope is not None:
+            await self._teardown_session_network(scope)
 
     async def release_kernel(self, kernel_id: str) -> None:
         """Give up a kernel's claim on the session network when it will never reach removal.

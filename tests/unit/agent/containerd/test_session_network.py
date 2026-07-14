@@ -350,6 +350,27 @@ class TestFailedSetup:
         assert backend.torndown == ["s1", "s1"]
 
 
+class TestFailedAdopt:
+    async def test_a_failed_adopt_does_not_tear_down_the_live_data_plane(self) -> None:
+        # The unwind may only give back what THIS call built. A failed adopt must not stop the
+        # coordinator: that deletes the devices and releases the LOCAL block of a data plane this
+        # node did not build and whose kernels are still running on it. And the failure that trips
+        # the adopt is the same transient etcd error that made the resume fail — correlated.
+        etcd, backend, runner = FakeEtcd(), RecordingBackend(), RecordingRunner()
+        rt = FakeRuntime([_ContainerInfo("c1", {SESSION_ID_LABEL: "s1"})])
+        facade = _facade(etcd, backend, runner, runtime=rt)
+
+        async def boom(meta: Any, self_member: Any) -> None:
+            raise RuntimeError("etcd is having a moment")
+
+        backend.adopt_session_network = boom  # type: ignore[method-assign]
+        with pytest.raises(RuntimeError):
+            await facade.ensure_session("s1", "c2", _VXLAN_NC)
+
+        assert backend.torndown == []  # c1's devices, block and membership are untouched
+        assert "s1" not in facade._coordinators
+
+
 class TestSetupUnderLiveContainers:
     async def test_a_session_whose_containers_survive_is_adopted_not_rebuilt(self) -> None:
         # "No coordinator" does not mean "no data plane": a session whose resume failed on the last

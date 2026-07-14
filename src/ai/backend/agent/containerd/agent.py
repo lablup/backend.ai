@@ -51,7 +51,7 @@ from ai.backend.agent.containerd.logs import write_logger_launcher
 from ai.backend.agent.containerd.runtime.spec import _DEFAULT_CAPS, container_cgroup_fs_path
 from ai.backend.agent.errors import UnsupportedResource
 from ai.backend.agent.errors.agent import ContainerCreationError
-from ai.backend.agent.errors.resources import PortPoolExhaustedError
+from ai.backend.agent.errors.resources import PortPoolExhaustedError, ResourceError
 from ai.backend.agent.fs import create_scratch_filesystem, destroy_scratch_filesystem
 from ai.backend.agent.image_distro import (
     UnknownImageLibc,
@@ -1985,13 +1985,22 @@ class ContainerdAgent(
                 restarting=restarting,
                 throttle_sema=throttle_sema,
             )
-        except Exception:
+        except ResourceError:
+            # "Kernel creation already in progress" — this call never got as far as claiming
+            # anything; the claim belongs to the creation that IS in progress. Releasing it here
+            # would tear the session network down under that live creation, turning a duplicate RPC
+            # into a killed kernel.
+            raise
+        except BaseException:
             # The kernel claimed this node's session network in apply_network, long before its
             # container existed. If it dies before that container is prepared it never enters the
             # kernel registry — and a destroy for a kernel the agent has never heard of returns
             # without queueing a clean, so clean_kernel (which is what normally releases the claim)
             # never runs. Release it here, or the session's devices, LOCAL block and etcd membership
             # stay pinned for its siblings' whole lifetime and beyond, until the agent restarts.
+            # BaseException, not Exception: a creation cancelled at shutdown leaks the claim just as
+            # surely. (A kernel that already has a container keeps its claim — that one is released
+            # by its own removal.)
             await self._session_network.release_kernel(str(ownership_data.kernel_id))
             raise
 
