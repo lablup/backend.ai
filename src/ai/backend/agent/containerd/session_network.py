@@ -169,9 +169,13 @@ class ContainerdSessionNetwork:
         container that died while the agent was down still holds its /24 block, its address and
         its host veth, and only this pass can give them back.
         """
+        # Two different questions, two different scopes. What may this agent resume and track? Only
+        # its own kernels. What is still alive on this node, and therefore not an orphan? Every
+        # kernel, whoever owns it — the journals the reclaim gives back to are host-global.
         live = await self._live_containers()
+        ours = await self._own_containers(live)
         metas: dict[str, SessionNetMeta] = {}
-        for session_id in sorted(set(live.values())):
+        for session_id in sorted(set(ours.values())):
             meta = await self._read_session_meta(session_id)
             if meta is None:
                 # The manager dropped the session's meta while we were down; its containers are
@@ -185,7 +189,7 @@ class ContainerdSessionNetwork:
                 continue
             metas[session_id] = meta
 
-        for container_id, session_id in live.items():
+        for container_id, session_id in ours.items():
             meta = metas.get(session_id)
             if meta is None:
                 continue
@@ -204,19 +208,35 @@ class ContainerdSessionNetwork:
         await self._reclaim_orphans(live)
 
     async def _live_containers(self) -> dict[str, str]:
-        """``{container_id: session_id}`` for every container this node still runs **for us**.
+        """``{container_id: session_id}`` for every kernel container still running on this NODE —
+        including another agent's.
 
-        Ours only: a containerd namespace can be shared by two agents on one host, and this map
-        decides what gets resumed, adopted and reclaimed. Taking another agent's containers for our
-        own would have us publish membership for its sessions and hold its blocks against reclaim.
+        Deliberately unfiltered, because this is the ground truth the *reclaim* pass diffs against,
+        and the journals it reclaims from (the node's LOCAL subnet pool and its host-local IPAM) are
+        host-global: one store, shared by every agent on the machine. Take only our own containers
+        here and a second agent's live kernels look like orphans — their addresses get released,
+        their host veths deleted, and their sessions' /26 blocks handed to the next session, which
+        then deletes the bridge they are still on.
+
+        What must not be shared is *ownership*: resuming a session, tracking its containers and
+        adopting its data plane are ours to do only for our own kernels. Those paths filter (see
+        `_own_containers` / `_live_containers_of`).
         """
         live: dict[str, str] = {}
         for info in await self._runtime.list_container_infos():
-            if info.labels.get(OWNER_AGENT_LABEL) != self._agent_id:
-                continue
             if session_id := info.labels.get(SESSION_ID_LABEL):
                 live[info.id] = session_id
         return live
+
+    async def _own_containers(self, live: Mapping[str, str]) -> dict[str, str]:
+        """The subset of `live` this agent owns — the ones it may resume, track and adopt."""
+        owners: dict[str, str] = {}
+        infos = {info.id: info for info in await self._runtime.list_container_infos()}
+        for container_id, session_id in live.items():
+            info = infos.get(container_id)
+            if info is not None and info.labels.get(OWNER_AGENT_LABEL) == self._agent_id:
+                owners[container_id] = session_id
+        return owners
 
     async def _read_session_meta(self, session_id: str) -> SessionNetMeta | None:
         raw = await self._etcd.get(session_meta_key(session_id))
@@ -475,17 +495,20 @@ class ContainerdSessionNetwork:
             return meta
 
     async def _live_containers_of(self, session_id: str) -> list[str]:
-        """The containers of a session that are still RUNNING on this node.
+        """This agent's containers of a session that are still RUNNING on this node.
 
         Asked of containerd, which is the only thing that knows about a session this process failed
         to resume. A running *task* is the test, not a container record: containerd keeps the record
         of a stopped container (and debug.skip-container-deletion keeps it forever), and one of
         those must not make the session look alive — it would send every later kernel down the adopt
         path, joining a data plane that was torn down long ago.
+
+        Ours only: adopting means taking the session's kernels as our own users and re-deriving
+        their detach plans. Another agent's kernels are its business, not ours.
         """
-        live = await self._live_containers()
+        ours = await self._own_containers(await self._live_containers())
         running = []
-        for container_id, sid in live.items():
+        for container_id, sid in ours.items():
             if sid != session_id:
                 continue
             if await self._runtime.container_pid(container_id) is not None:

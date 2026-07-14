@@ -603,7 +603,13 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
                     MountTypes.BIND,
                     self._agent_sock_path.parent,
                     Path("/opt/kernel/agent-sock"),
-                    MountPermission.READ_WRITE,
+                    # Read-only: a unix socket can be connected to through a read-only mount, but
+                    # not unlinked through one. Mounted read-write, anything running as root in a
+                    # kernel — the entrypoint, the user's own bootstrap.sh, a sudo-enabled image —
+                    # could delete the agent's live socket and cut every OTHER kernel of this agent
+                    # off from PID translation until the agent restarted. (Verified: connect()
+                    # succeeds through an ro bind mount, unlink() gets EROFS.)
+                    MountPermission.READ_ONLY,
                 )
             )
         # Timezone parity: /etc/localtime + /etc/timezone (read-only, if present on the host).
@@ -1676,15 +1682,13 @@ class ContainerdAgent(
         while True:
             try:
                 async for ev in self._runtime.subscribe_task_events():
-                    # Dispatched, not awaited: handling an exit runs the CLEAN path, which can spend
-                    # up to _LOG_COLLECTION_TIMEOUT persisting the kernel's logs. Awaiting it here
-                    # put every other kernel's death and OOM behind that one — a node where one
-                    # kernel dies badly stops noticing the others. (The Docker backend shields its
-                    # handlers into a task group for the same reason.) Shielded so a cancellation of
-                    # this loop at shutdown does not kill a clean that is already running.
-                    await asyncio.shield(
-                        self._event_task_group.create_task(self._handle_task_event(ev))
-                    )
+                    # Dispatched, NOT awaited. Handling an event for a container the registry does
+                    # not know (one that outlived a restart) asks containerd who it belongs to —
+                    # a gRPC round trip — and awaiting that here puts every other kernel's death
+                    # and OOM behind it. The task group owns the handler's lifetime and reports its
+                    # exceptions; awaiting what create_task returns would just re-serialize the
+                    # loop, since that future resolves only when the handler is done.
+                    self._event_task_group.create_task(self._handle_task_event(ev))
                 log.info("containerd event stream ended; re-subscribing")
             except asyncio.CancelledError:
                 raise

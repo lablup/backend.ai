@@ -378,6 +378,54 @@ class TestCleanupAfterRecovery:
         assert backend.torndown == []
 
 
+class TestTwoAgentsOnOneNode:
+    """The node's LOCAL subnet pool and its host-local IPAM are ONE store, shared by every agent on
+    the machine — while resuming a session, tracking its containers and adopting its data plane are
+    strictly per-agent. Confusing those two scopes destroys a neighbour's running kernels."""
+
+    async def test_a_neighbours_live_session_is_not_reclaimed_as_an_orphan(
+        self, etcd: FakeEtcd, tmp_path: Path
+    ) -> None:
+        allocator = LocalSubnetAllocator(tmp_path / "subnets")
+        await allocator.allocate("s1")  # ours
+        await allocator.allocate("s2")  # the other agent's, and very much alive
+
+        net, _ = _build(
+            containers=[
+                _ContainerInfo("c1", {SESSION_ID_LABEL: "s1", OWNER_AGENT_LABEL: _AGENT_ID}),
+                _ContainerInfo("c2", {SESSION_ID_LABEL: "s2", OWNER_AGENT_LABEL: "other-agent"}),
+            ],
+            pids={"c1": 4242, "c2": 4343},
+            etcd=etcd,
+            backend=RecordingBackend(),
+            cni=CniRecorder(),
+            local_subnets=allocator,
+        )
+        await net.recover()
+
+        # s2's block is NOT given back: its kernel is running, and the next session to take that
+        # block would delete the bridge it is on.
+        assert await allocator.sessions() == frozenset({"s1", "s2"})
+
+    async def test_a_neighbours_session_is_not_resumed_as_ours(self, etcd: FakeEtcd) -> None:
+        etcd.store[session_meta_key("s2")] = _META_JSON
+        backend = RecordingBackend()
+        net, _ = _build(
+            containers=[
+                _ContainerInfo("c2", {SESSION_ID_LABEL: "s2", OWNER_AGENT_LABEL: "other-agent"})
+            ],
+            pids={"c2": 4343},
+            etcd=etcd,
+            backend=backend,
+            cni=CniRecorder(),
+        )
+        await net.recover()
+
+        # We do not adopt its data plane, and we do not publish membership for its session.
+        assert backend.adopted == [] and backend.setup == []
+        assert member_key("s2", _AGENT_ID) not in etcd.store
+
+
 class TestJournalReclamation:
     async def test_reclaims_the_subnet_block_of_a_dead_session(
         self, etcd: FakeEtcd, tmp_path: Path

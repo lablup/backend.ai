@@ -157,9 +157,8 @@ else
     # back. (Testing for the socket itself would leave that kernel permanently unlinked.)
     ln -sf /opt/kernel/agent-sock/agent.sock /opt/kernel/agent.sock
     chown -h $USER_ID:$GROUP_ID /opt/kernel/agent.sock
-    if [ -S /opt/kernel/agent-sock/agent.sock ]; then
-      chown $USER_ID:$GROUP_ID /opt/kernel/agent-sock/agent.sock
-    fi
+    # The socket itself is NOT chowned: it is the agent's, on the host, shared by every kernel (the
+    # agent already opens it 0777), and the mount is read-only anyway.
   else
     # Correct the ownership of agent socket.
     chown $USER_ID:$GROUP_ID /opt/kernel/agent.sock
