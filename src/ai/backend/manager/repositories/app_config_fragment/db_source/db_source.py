@@ -107,9 +107,6 @@ class AppConfigFragmentDBSource:
 
     @app_config_fragment_db_source_resilience.apply()
     async def purge(self, purger: Purger[AppConfigFragmentRow]) -> AppConfigFragmentData:
-        # Purge deletes the fragment row and clears its RBAC scope association atomically
-        # (no FK cascade; a ``public`` fragment has none). A concurrent purge that already
-        # removed the row yields no result, so this reports not-found.
         async with self._rbac_ops_provider.write_ops() as w:
             result = await w.purge_scoped(purger, RBACElementType.APP_CONFIG_FRAGMENT)
             if result is None:

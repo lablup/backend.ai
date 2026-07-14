@@ -43,10 +43,6 @@ from ai.backend.manager.repositories.base.rbac.entity_creator import (
     execute_rbac_entity_creator,
     execute_rbac_entity_creators,
 )
-from ai.backend.manager.repositories.base.rbac.scope_unbinder import (
-    RBACScopeEntityUnbinder,
-    RBACUnbinderResult,
-)
 from ai.backend.manager.repositories.ops.base.provider import DBOpsProvider, WriteOps
 from ai.backend.manager.repositories.permission_controller.role_manager import RoleManager
 
@@ -166,50 +162,6 @@ class RBACWriteOps(WriteOps):
             )
         )
         return result
-
-    async def unbind_scope_entities[TRow: Base](
-        self,
-        unbinder: RBACScopeEntityUnbinder[TRow],
-    ) -> RBACUnbinderResult:
-        """Delete the business rows and their RBAC scope associations atomically.
-
-        The counterpart of :meth:`bulk_create_scoped` on the delete side: the association
-        table has no FK to the entity tables, so removing a scope-bound row must clear its
-        association in the same transaction. Implemented here directly — the standalone
-        ``execute_rbac_*`` helpers are transitional and their logic is being folded into
-        the ops providers.
-        """
-        purge_result = await self.batch_purge(BatchPurger(spec=unbinder.build_purger_spec()))
-        scope_ref = unbinder.scope_ref
-        if scope_ref is None:
-            # Global-scoped entities carry no scope association — nothing more to delete.
-            return RBACUnbinderResult(
-                deleted_count=purge_result.deleted_count,
-                association_rows=[],
-            )
-        where_clauses = [
-            AssociationScopesEntitiesRow.entity_type == unbinder.entity_type.to_entity_type(),
-            AssociationScopesEntitiesRow.scope_type == scope_ref.element_type.to_scope_type(),
-            AssociationScopesEntitiesRow.scope_id == scope_ref.element_id,
-        ]
-        entity_ids = unbinder.entity_ids
-        if entity_ids is not None:
-            if not entity_ids:
-                return RBACUnbinderResult(
-                    deleted_count=purge_result.deleted_count,
-                    association_rows=[],
-                )
-            where_clauses.append(AssociationScopesEntitiesRow.entity_id.in_(entity_ids))
-        assoc_stmt = (
-            sa.delete(AssociationScopesEntitiesRow)
-            .where(*where_clauses)
-            .returning(AssociationScopesEntitiesRow)
-        )
-        association_rows = list((await self._sess.scalars(assoc_stmt)).all())
-        return RBACUnbinderResult(
-            deleted_count=purge_result.deleted_count,
-            association_rows=association_rows,
-        )
 
     async def add_users_to_scope(
         self,
