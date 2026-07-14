@@ -31,6 +31,7 @@ from ai.backend.manager.actions.monitors.reporter import ReporterMonitor
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.actions.validators.rbac import LegacyRBACValidators, RBACValidators
 from ai.backend.manager.actions.validators.rbac.bulk import BulkActionRBACValidator
+from ai.backend.manager.actions.validators.rbac.bulk_scope import BulkScopeActionRBACValidator
 from ai.backend.manager.actions.validators.rbac.legacy import (
     LegacyScopeActionRBACValidator,
     LegacySingleEntityActionRBACValidator,
@@ -269,6 +270,9 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
                 permission_controller_repository, config_provider
             ),
             bulk=BulkActionRBACValidator(permission_controller_repository, config_provider),
+            bulk_scope=BulkScopeActionRBACValidator(
+                permission_controller_repository, config_provider
+            ),
         )
         legacy_rbac_validators = LegacyRBACValidators(
             scope=LegacyScopeActionRBACValidator(permission_controller_repository),

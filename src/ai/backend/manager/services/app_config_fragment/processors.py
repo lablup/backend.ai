@@ -7,6 +7,7 @@ from ai.backend.manager.actions.processor.bulk import BulkActionProcessor
 from ai.backend.manager.actions.processor.scope import ScopeActionProcessor
 from ai.backend.manager.actions.processor.single_entity import SingleEntityActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
+from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.app_config_fragment.actions.admin_search import (
     AdminSearchAppConfigFragmentAction,
     AdminSearchAppConfigFragmentActionResult,
@@ -77,16 +78,36 @@ class AppConfigFragmentProcessors(AbstractProcessorPackage):
         self,
         service: AppConfigFragmentService,
         action_monitors: list[ActionMonitor],
+        validators: ActionValidators,
     ) -> None:
-        self.create = ScopeActionProcessor(service.create, action_monitors)
+        self.create = ScopeActionProcessor(
+            service.create, action_monitors, validators=[validators.rbac.scope]
+        )
         self.get = SingleEntityActionProcessor(service.get, action_monitors)
         self.admin_search = ScopeActionProcessor(service.admin_search, action_monitors)
-        self.scoped_search = BulkActionProcessor(service.scoped_search, monitors=action_monitors)
-        self.update = SingleEntityActionProcessor(service.update, action_monitors)
-        self.purge = SingleEntityActionProcessor(service.purge, action_monitors)
-        self.bulk_create = BulkActionProcessor(service.bulk_create, monitors=action_monitors)
-        self.bulk_update = BulkActionProcessor(service.bulk_update, monitors=action_monitors)
-        self.bulk_purge = BulkActionProcessor(service.bulk_purge, monitors=action_monitors)
+        self.scoped_search = BulkActionProcessor(
+            service.scoped_search, monitors=action_monitors, validators=[validators.rbac.bulk]
+        )
+        self.update = SingleEntityActionProcessor(
+            service.update, action_monitors, validators=[validators.rbac.single_entity]
+        )
+        self.purge = SingleEntityActionProcessor(
+            service.purge, action_monitors, validators=[validators.rbac.single_entity]
+        )
+        # bulk_create writes into scopes (not existing entities), so it uses the bulk-scope
+        # validator (subject = the fragment entity type) rather than the entity-target one.
+        bulk_scope = validators.rbac.bulk_scope
+        self.bulk_create = BulkActionProcessor(
+            service.bulk_create,
+            monitors=action_monitors,
+            validators=[bulk_scope] if bulk_scope is not None else None,
+        )
+        self.bulk_update = BulkActionProcessor(
+            service.bulk_update, monitors=action_monitors, validators=[validators.rbac.bulk]
+        )
+        self.bulk_purge = BulkActionProcessor(
+            service.bulk_purge, monitors=action_monitors, validators=[validators.rbac.bulk]
+        )
 
     @override
     def supported_actions(self) -> list[ActionSpec]:

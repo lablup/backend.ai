@@ -18,6 +18,12 @@ from ai.backend.manager.services.app_config_definition.processors import (
 from ai.backend.manager.services.app_config_definition.service import (
     AppConfigDefinitionService,
 )
+from ai.backend.manager.services.app_config_fragment.processors import (
+    AppConfigFragmentProcessors,
+)
+from ai.backend.manager.services.app_config_fragment.service import (
+    AppConfigFragmentService,
+)
 from ai.backend.manager.services.artifact.processors import ArtifactProcessors
 from ai.backend.manager.services.artifact.service import ArtifactService
 from ai.backend.manager.services.artifact_registry.processors import ArtifactRegistryProcessors
@@ -344,6 +350,9 @@ def create_services(args: ServiceArgs) -> Services:
         app_config_definition=AppConfigDefinitionService(
             repository=repositories.app_config_definition.repository,
         ),
+        app_config_fragment=AppConfigFragmentService(
+            repository=repositories.app_config_fragment.repository,
+        ),
         login_client_type=LoginClientTypeService(
             repository=repositories.auth.login_client_type,
         ),
@@ -510,6 +519,9 @@ def create_processors(
         auth=AuthProcessors(services.auth, action_monitors, validators),
         app_config_definition=AppConfigDefinitionProcessors(
             services.app_config_definition, action_monitors
+        ),
+        app_config_fragment=AppConfigFragmentProcessors(
+            services.app_config_fragment, action_monitors, validators
         ),
         login_client_type=LoginClientTypeProcessors(services.login_client_type, action_monitors),
         login_client_type_admin=LoginClientTypeAdminProcessors(
