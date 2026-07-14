@@ -43,6 +43,7 @@ _VXLAN_NC = {"backend": "vxlan", "subnet": "10.128.5.0/24", "vni": 4097, "mtu": 
 class FakeFacade:
     def __init__(self, exec_exit_code: int = 0) -> None:
         self.ensured: list[tuple[str, dict[str, Any]]] = []
+        self.reserved: list[tuple[str, str]] = []  # (session, kernel) claims made before creation
         self.started: list[tuple[str, str]] = []
         self.execs: list[tuple[list[str], int | None]] = []
         self._exec_exit_code = exec_exit_code
@@ -58,8 +59,11 @@ class FakeFacade:
         self.execs.append((list(args), uid))
         return ExecResult(exit_code=self._exec_exit_code, stdout=b"", stderr=b"denied")
 
-    async def ensure_session(self, session_id: str, network_config: Any) -> SessionNetMeta:
+    async def ensure_session(
+        self, session_id: str, kernel_id: str, network_config: Any
+    ) -> SessionNetMeta:
         self.ensured.append((session_id, dict(network_config)))
+        self.reserved.append((session_id, kernel_id))
         return SessionNetMeta(
             session_id=session_id,
             subnet=network_config["subnet"],

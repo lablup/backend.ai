@@ -13,7 +13,7 @@ from ai.backend.agent.containerd.session_network import (
     build_containerd_session_network,
     session_net_meta_from_network_config,
 )
-from ai.backend.agent.errors.network import UnusableVtep
+from ai.backend.agent.errors.network import SessionNetworkGone, UnusableVtep
 from ai.backend.common.etcd import AbstractKVStore
 from ai.backend.common.network.types import (
     AgentNetworkCaps,
@@ -255,7 +255,7 @@ class TestEnsureSession:
     async def test_sets_up_and_publishes_self_member_with_vtep(self) -> None:
         etcd, backend, runner = FakeEtcd(), RecordingBackend(), RecordingRunner()
         facade = _facade(etcd, backend, runner)
-        meta = await facade.ensure_session("s1", _VXLAN_NC)
+        meta = await facade.ensure_session("s1", "k1", _VXLAN_NC)
         try:
             assert backend.setup == ["s1"]
             # vxlan -> self member advertises its vtep = host_ip
@@ -272,7 +272,7 @@ class TestEnsureSession:
     async def test_host_gw_self_member_has_no_vtep(self) -> None:
         etcd, backend, runner = FakeEtcd(), RecordingBackend(), RecordingRunner()
         facade = _facade(etcd, backend, runner)
-        await facade.ensure_session("s2", _HOSTGW_NC)
+        await facade.ensure_session("s2", "k1", _HOSTGW_NC)
         try:
             assert backend.last_self_member is not None
             assert backend.last_self_member.vtep_ip is None
@@ -286,7 +286,7 @@ class TestEnsureSession:
         etcd, backend, runner = FakeEtcd(), RecordingBackend(), RecordingRunner()
         facade = _facade(etcd, backend, runner, vtep_ip=None)
         with pytest.raises(UnusableVtep):
-            await facade.ensure_session("s1", _VXLAN_NC)
+            await facade.ensure_session("s1", "k1", _VXLAN_NC)
         assert backend.setup == []  # nothing was built
         assert "network/session/s1/members/agent-1" not in etcd.store
 
@@ -294,7 +294,7 @@ class TestEnsureSession:
         # A node with no routable address only ever runs single-node sessions; those must not care.
         etcd, backend, runner = FakeEtcd(), RecordingBackend(), RecordingRunner()
         facade = _facade(etcd, backend, runner, vtep_ip=None)
-        await facade.ensure_session("s2", _HOSTGW_NC)
+        await facade.ensure_session("s2", "k1", _HOSTGW_NC)
         try:
             assert backend.setup == ["s2"]
             assert backend.last_self_member is not None
@@ -312,7 +312,7 @@ class TestSessionLockLifetime:
     async def test_a_setup_arriving_after_a_teardown_cannot_overlap_the_one_it_woke(self) -> None:
         etcd, backend, runner = FakeEtcd(), RecordingBackend(), RecordingRunner()
         facade = _facade(etcd, backend, runner)
-        await facade.ensure_session("s1", _VXLAN_NC)
+        await facade.ensure_session("s1", "k1", _VXLAN_NC)
 
         gate = asyncio.Event()
         inflight = 0
@@ -331,11 +331,13 @@ class TestSessionLockLifetime:
 
         teardown = asyncio.create_task(facade.teardown_session("s1"))
         await asyncio.sleep(0)  # the teardown takes the session's lock
-        first = asyncio.create_task(facade.ensure_session("s1", _VXLAN_NC))  # queues behind it
+        first = asyncio.create_task(
+            facade.ensure_session("s1", "k1", _VXLAN_NC)
+        )  # queues behind it
         await teardown  # releases the lock — and must NOT drop it while `first` is waiting on it
         for _ in range(3):
             await asyncio.sleep(0)  # `first` wakes and enters setup
-        second = asyncio.create_task(facade.ensure_session("s1", _VXLAN_NC))  # arrives after
+        second = asyncio.create_task(facade.ensure_session("s1", "k1", _VXLAN_NC))  # arrives after
         for _ in range(3):
             await asyncio.sleep(0)  # a fresh lock here would let it set up alongside `first`
 
@@ -349,7 +351,7 @@ class TestSessionLockLifetime:
     async def test_the_lock_registry_empties_once_the_session_is_gone(self) -> None:
         etcd, backend, runner = FakeEtcd(), RecordingBackend(), RecordingRunner()
         facade = _facade(etcd, backend, runner)
-        await facade.ensure_session("s1", _VXLAN_NC)
+        await facade.ensure_session("s1", "k1", _VXLAN_NC)
         await facade.teardown_session("s1")
         assert facade._session_locks == {}  # no unbounded growth across a node's session churn
 
@@ -358,7 +360,7 @@ class TestLaunchTerminate:
     async def test_launch_attaches_to_task_pid(self) -> None:
         etcd, backend, runner = FakeEtcd(), RecordingBackend(), RecordingRunner()
         facade = _facade(etcd, backend, runner)
-        meta = await facade.ensure_session("s1", _VXLAN_NC)  # registers the orchestrator
+        meta = await facade.ensure_session("s1", "k1", _VXLAN_NC)  # registers the orchestrator
         try:
             result = await facade.launch_container(
                 "s1",
@@ -381,7 +383,7 @@ class TestLaunchTerminate:
         # IPAM address and MASQ rule are released (otherwise they leak across the node).
         etcd, backend, runner, rt = FakeEtcd(), RecordingBackend(), RecordingRunner(), FakeRuntime()
         facade = _facade(etcd, backend, runner, runtime=rt)
-        meta = await facade.ensure_session("s1", _VXLAN_NC)
+        meta = await facade.ensure_session("s1", "k1", _VXLAN_NC)
         await facade.launch_container(
             "s1",
             "c1",
@@ -402,7 +404,7 @@ class TestSplitAndTeardown:
     async def test_create_container_routes_to_runtime(self) -> None:
         etcd, backend, runner, rt = FakeEtcd(), RecordingBackend(), RecordingRunner(), FakeRuntime()
         facade = _facade(etcd, backend, runner, runtime=rt)
-        await facade.ensure_session("s1", _VXLAN_NC)
+        await facade.ensure_session("s1", "k1", _VXLAN_NC)
         try:
             await facade.create_container(
                 "s1", "c1", image_ref="img:1", command=["sleep", "1"], oci_spec={}
@@ -414,7 +416,7 @@ class TestSplitAndTeardown:
     async def test_start_and_attach_starts_then_attaches(self) -> None:
         etcd, backend, runner, rt = FakeEtcd(), RecordingBackend(), RecordingRunner(), FakeRuntime()
         facade = _facade(etcd, backend, runner, runtime=rt)
-        meta = await facade.ensure_session("s1", _VXLAN_NC)
+        meta = await facade.ensure_session("s1", "k1", _VXLAN_NC)
         try:
             await facade.create_container("s1", "c1", image_ref="img", command=[], oci_spec={})
             result = await facade.start_and_attach_container(
@@ -438,7 +440,7 @@ class TestDeterministicTeardown:
     async def test_removing_last_kernel_tears_down_session_network(self) -> None:
         etcd, backend, runner, rt = FakeEtcd(), RecordingBackend(), RecordingRunner(), FakeRuntime()
         facade = _facade(etcd, backend, runner, runtime=rt)
-        await facade.ensure_session("s1", _VXLAN_NC)
+        await facade.ensure_session("s1", "c1", _VXLAN_NC)
         await facade.create_container("s1", "c1", image_ref="img", command=[], oci_spec={})
         assert "network/session/s1/members/agent-1" in etcd.store
 
@@ -452,7 +454,8 @@ class TestDeterministicTeardown:
     async def test_teardown_only_after_last_kernel_removed(self) -> None:
         etcd, backend, runner, rt = FakeEtcd(), RecordingBackend(), RecordingRunner(), FakeRuntime()
         facade = _facade(etcd, backend, runner, runtime=rt)
-        await facade.ensure_session("s1", _VXLAN_NC)
+        await facade.ensure_session("s1", "c1", _VXLAN_NC)
+        await facade.ensure_session("s1", "c2", _VXLAN_NC)
         await facade.create_container("s1", "c1", image_ref="img", command=[], oci_spec={})
         await facade.create_container("s1", "c2", image_ref="img", command=[], oci_spec={})
 
@@ -470,14 +473,65 @@ class TestDeterministicTeardown:
         assert backend.torndown == []
         assert rt.calls == ["remove:unknown"]
 
+    async def test_a_kernel_still_being_created_holds_the_session_open(self) -> None:
+        # A kernel is created in stages (image pull, scratch, container) and the agent runs those
+        # stages for several kernels of a session concurrently. Counting only *containers* made a
+        # sibling that dies early look like the session's last kernel: it tore the data plane down
+        # under a kernel that was still being built on it, which then found no orchestrator and
+        # had no network.
+        etcd, backend, runner, rt = FakeEtcd(), RecordingBackend(), RecordingRunner(), FakeRuntime()
+        facade = _facade(etcd, backend, runner, runtime=rt)
+        await facade.ensure_session("s1", "c1", _VXLAN_NC)
+        await facade.ensure_session("s1", "c2", _VXLAN_NC)  # c2: still pulling its image
+        await facade.create_container("s1", "c1", image_ref="img", command=[], oci_spec={})
+
+        await facade.remove_container("c1")  # c1 dies at start; it is the only *container*
+
+        assert backend.torndown == []  # c2 is still being created: the session stays up
+        assert "s1" in facade._coordinators
+
+        # c2 can still be built on it...
+        await facade.create_container("s1", "c2", image_ref="img", command=[], oci_spec={})
+        assert backend.torndown == []
+        # ...and taking it away tears the session down, exactly once.
+        await facade.remove_container("c2")
+        assert backend.torndown == ["s1"]
+
+    async def test_a_kernel_that_fails_before_its_container_still_releases_the_session(
+        self,
+    ) -> None:
+        # The claim must not outlive a kernel that never got a container, or the session network
+        # would be held open forever. clean_kernel removes every kernel the agent accepted, whether
+        # its container was created or not (and a container's id IS its kernel id).
+        etcd, backend, runner, rt = FakeEtcd(), RecordingBackend(), RecordingRunner(), FakeRuntime()
+        facade = _facade(etcd, backend, runner, runtime=rt)
+        await facade.ensure_session("s1", "c1", _VXLAN_NC)
+        await facade.ensure_session("s1", "c2", _VXLAN_NC)
+        await facade.create_container("s1", "c1", image_ref="img", command=[], oci_spec={})
+
+        await facade.remove_container("c2")  # c2 failed during the pull: no container was created
+        assert backend.torndown == []  # c1 is live
+
+        await facade.remove_container("c1")
+        assert backend.torndown == ["s1"]  # no stale claim keeps the session alive
+
+    async def test_a_kernel_reaching_a_torn_down_session_gets_a_named_error(self) -> None:
+        # The guard behind the reservation: a bare KeyError on the orchestrator dict said nothing.
+        etcd, backend, runner, rt = FakeEtcd(), RecordingBackend(), RecordingRunner(), FakeRuntime()
+        facade = _facade(etcd, backend, runner, runtime=rt)
+        await facade.ensure_session("s1", "c1", _VXLAN_NC)
+        await facade.teardown_session("s1")
+        with pytest.raises(SessionNetworkGone):
+            await facade.create_container("s1", "c1", image_ref="img", command=[], oci_spec={})
+
 
 class TestBackendResolution:
     async def test_selects_backend_by_session_config(self) -> None:
         etcd, runner = FakeEtcd(), RecordingRunner()
         vxlan_b, hostgw_b = RecordingBackend(), RecordingBackend()
         facade = _facade(etcd, vxlan_b, runner, backends={"vxlan": vxlan_b, "host-gw": hostgw_b})
-        await facade.ensure_session("sv", _VXLAN_NC)
-        await facade.ensure_session("sh", _HOSTGW_NC)
+        await facade.ensure_session("sv", "k1", _VXLAN_NC)
+        await facade.ensure_session("sh", "k1", _HOSTGW_NC)
         try:
             assert vxlan_b.setup == ["sv"]  # vxlan config -> vxlan backend only
             assert hostgw_b.setup == ["sh"]  # host-gw config -> host-gw backend only
@@ -489,7 +543,7 @@ class TestBackendResolution:
         etcd, backend, runner = FakeEtcd(), RecordingBackend(), RecordingRunner()
         facade = _facade(etcd, backend, runner, backends={"vxlan": cast(Any, backend)})
         with pytest.raises(UnknownNetworkBackend):
-            await facade.ensure_session("s1", _HOSTGW_NC)  # host-gw not registered
+            await facade.ensure_session("s1", "k1", _HOSTGW_NC)  # host-gw not registered
 
 
 class TestFactory:

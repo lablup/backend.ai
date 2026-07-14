@@ -87,6 +87,25 @@ class SubnetAddressPoolExhausted(BackendAIError, web.HTTPServiceUnavailable):
         )
 
 
+class SessionNetworkGone(BackendAIError, web.HTTPInternalServerError):
+    """A kernel reached for its session's network on this node and it was not there.
+
+    The kernels of a session are created in stages and concurrently, so this names the case where
+    the session was torn down while this kernel was still being built on top of it.
+    """
+
+    error_type = "https://api.backend.ai/probs/agent/session-network-gone"
+    error_title = "The session's network is not set up on this node."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AGENT,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
 class StaticAddressUnavailable(BackendAIError, web.HTTPInternalServerError):
     """A container could not be pinned at the specific address its peers expect.
 

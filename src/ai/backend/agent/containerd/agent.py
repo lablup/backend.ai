@@ -693,8 +693,11 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
                 "backend": str(NetworkBackendKind.BRIDGE),
                 "subnet": str(self.local_config.container.local_subnet_layout().pool),
             }
+        # The container id IS the kernel id here, and the kernel claims the session network from
+        # this moment — long before its container exists — so a sibling that dies during the pull
+        # cannot take the session's data plane down under it.
         self._net_meta = await self._session_network.ensure_session(
-            self._session_id, network_config
+            self._session_id, self._container_id, network_config
         )
 
     async def _peer_host_map(

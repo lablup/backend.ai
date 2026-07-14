@@ -27,7 +27,7 @@ from ai.backend.agent.containerd.oci import SESSION_ID_LABEL
 from ai.backend.agent.containerd.orchestrator import ContainerdKernelOrchestrator, LaunchResult
 from ai.backend.agent.containerd.runtime.interface import ExecResult, OciRuntime
 from ai.backend.agent.containerd.session_tracker import SessionContainerTracker, TeardownScope
-from ai.backend.agent.errors.network import UnusableVtep
+from ai.backend.agent.errors.network import SessionNetworkGone, UnusableVtep
 from ai.backend.agent.network.cni import CniRunner
 from ai.backend.agent.network.coordinator import SessionNetworkCoordinator
 from ai.backend.agent.network.local_subnet import LocalSubnetAllocator, LocalSubnetLayout
@@ -386,10 +386,17 @@ class ContainerdSessionNetwork:
                 self._session_locks.pop(session_id, None)
 
     async def ensure_session(
-        self, session_id: str, network_config: Mapping[str, Any]
+        self, session_id: str, kernel_id: str, network_config: Mapping[str, Any]
     ) -> SessionNetMeta:
-        """Resolve the session's backend, set up this node's data plane, publish
-        membership, and register the per-session coordinator + orchestrator."""
+        """Resolve the session's backend, set up this node's data plane, publish membership, and
+        register the per-session coordinator + orchestrator.
+
+        The kernel is registered as a *user* of the session network here, before its container
+        exists: a kernel is created in stages (image pull, scratch, container), and the agent runs
+        those stages for several kernels of a session concurrently. Counting only containers would
+        make a sibling that dies early look like the session's last kernel and tear the whole data
+        plane down under the ones still being built (see SessionContainerTracker.reserve).
+        """
         meta = session_net_meta_from_network_config(session_id, network_config)
         if meta.backend is NetworkBackendKind.VXLAN and self._vtep_ip is None:
             # Refuse the session here rather than build an overlay this node cannot be reached on.
@@ -404,6 +411,9 @@ class ContainerdSessionNetwork:
         # await, so two concurrent kernels of one session would both set the data plane up and the
         # second would delete the first's devices (setup_session_network clears leftovers by name).
         async with self._session_locked(session_id):
+            # Claim the session before the idempotency check, so a teardown of this session cannot
+            # be decided (by a sibling's removal) between our check and the kernel we are here for.
+            self._tracker.reserve(session_id, kernel_id)
             if session_id in self._coordinators:
                 # Already set up on this node (e.g. a second kernel of the same session placed
                 # here). Session-network setup is per node, not per kernel — do it once.
@@ -471,6 +481,22 @@ class ContainerdSessionNetwork:
         if (subnet := await self._local_subnets.subnet_of(session_id)) is not None:
             await self._ipam.purge_subnet(subnet)
 
+    def _orchestrator_of(self, session_id: str) -> ContainerdKernelOrchestrator:
+        """The session's orchestrator, or a diagnosable error if its network is gone.
+
+        It can be gone under a kernel that is still being created: a sibling that fails early used
+        to look like the session's last kernel and take the whole session network with it. The
+        tracker's reservation is what prevents that now — this is the guard that keeps the leftover
+        case a named error rather than a bare KeyError from a dict lookup.
+        """
+        orchestrator = self._orchestrators.get(session_id)
+        if orchestrator is None:
+            raise SessionNetworkGone(
+                f"the network of session {session_id} is not set up on this node (it was torn down"
+                " while this kernel was being created)"
+            )
+        return orchestrator
+
     async def launch_container(
         self,
         session_id: str,
@@ -483,7 +509,7 @@ class ContainerdSessionNetwork:
         kernel_config: KernelCreationConfig,
         cluster_info: ClusterInfo,
     ) -> LaunchResult:
-        result = await self._orchestrators[session_id].launch(
+        result = await self._orchestrator_of(session_id).launch(
             container_id,
             image_ref=image_ref,
             command=command,
@@ -506,7 +532,7 @@ class ContainerdSessionNetwork:
         oci_spec: dict[str, Any],
     ) -> None:
         """Create the container (not started) — maps to AbstractAgent.prepare_container."""
-        await self._orchestrators[session_id].create(
+        await self._orchestrator_of(session_id).create(
             container_id, image_ref=image_ref, command=command, oci_spec=oci_spec
         )
         self._tracker.track(session_id, container_id)
@@ -521,7 +547,7 @@ class ContainerdSessionNetwork:
         cluster_info: ClusterInfo,
     ) -> LaunchResult:
         """Start the container + attach CNI — maps to AbstractAgent.start_container."""
-        result = await self._orchestrators[session_id].start_and_attach(
+        result = await self._orchestrator_of(session_id).start_and_attach(
             container_id, meta=meta, kernel_config=kernel_config, cluster_info=cluster_info
         )
         self._attachments[container_id] = (session_id, result.plan, result.handle.pid)
@@ -530,7 +556,9 @@ class ContainerdSessionNetwork:
     async def terminate_container(
         self, session_id: str, container_id: str, *, plan: EndpointPlan, task_pid: int
     ) -> None:
-        await self._orchestrators[session_id].terminate(container_id, plan=plan, task_pid=task_pid)
+        await self._orchestrator_of(session_id).terminate(
+            container_id, plan=plan, task_pid=task_pid
+        )
 
     async def exec_in_container(
         self,
