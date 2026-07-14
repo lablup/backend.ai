@@ -14,8 +14,7 @@ class AppConfigFragmentRepositories:
 
     @classmethod
     def create(cls, args: RepositoryArgs) -> Self:
-        # Fragment writes bind the fragment to its RBAC scope (see the db_source), so the
-        # repository runs on the RBAC-scoped ops provider rather than the plain one.
+        # Fragment writes bind to an RBAC scope (see db_source), so use the RBAC ops provider.
         return cls(
             repository=AppConfigFragmentRepository(RBACOpsProvider(args.db)),
         )

@@ -79,12 +79,9 @@ class AppConfigFragmentDBSource:
 
     @app_config_fragment_db_source_resilience.apply()
     async def create(self, spec: AppConfigFragmentCreatorSpec) -> AppConfigFragmentData:
-        # The FK to the allow-list gates *existence* (a missing allow-list row for the
-        # ``(config_name, scope_type)`` raises ``AppConfigFragmentWriteNotAllowed``). Create
-        # also binds the fragment to its owning RBAC scope via
-        # ``association_scopes_entities`` (same tx) so a later update/purge can resolve its
-        # scope for the RBAC write check; a ``public`` fragment is global-scoped
-        # (``scope_ref`` is ``None``) and carries no association.
+        # The allow-list FK gates existence (no row → ``AppConfigFragmentWriteNotAllowed``),
+        # and create binds the fragment to its RBAC scope in the same tx. A ``public``
+        # fragment is global-scoped (``scope_ref`` is ``None``) and carries no association.
         rbac_creator = RBACEntityCreator(
             spec=spec,
             element_type=RBACElementType.APP_CONFIG_FRAGMENT,
@@ -104,9 +101,8 @@ class AppConfigFragmentDBSource:
 
     @app_config_fragment_db_source_resilience.apply()
     async def update(self, updater: Updater[AppConfigFragmentRow]) -> AppConfigFragmentData:
-        # No write-gate here: the FK to the allow-list guarantees a fragment row exists
-        # only while its ``(config_name, scope_type)`` entry does, so an existing
-        # fragment is always writable at its own scope.
+        # No write-gate: the allow-list FK keeps a fragment row alive only while its
+        # ``(config_name, scope_type)`` entry exists, so an existing fragment is writable.
         async with self._rbac_ops_provider.write_ops() as w:
             result = await w.update(updater)
             if result is None:
@@ -115,10 +111,8 @@ class AppConfigFragmentDBSource:
 
     @app_config_fragment_db_source_resilience.apply()
     async def purge(self, purger: Purger[AppConfigFragmentRow]) -> AppConfigFragmentData:
-        # A fragment is a config bound at a scope, so purging is an RBAC *unbind*: the row
-        # and its scope association are deleted atomically (the association table has no FK
-        # cascade). A public fragment is global-scoped and simply has no association. The
-        # row is fetched first to resolve its scope and to return its data.
+        # Purge is an RBAC unbind: the row and its scope association are deleted atomically
+        # (no FK cascade; a ``public`` fragment has none). Fetch first for its scope and data.
         async with self._rbac_ops_provider.write_ops() as w:
             found = await w.query(Querier(row_class=AppConfigFragmentRow, pk_value=purger.pk_value))
             if found is None:
@@ -131,9 +125,8 @@ class AppConfigFragmentDBSource:
                     fragment_scope_id=data.scope_id,
                 )
             )
-            # The read and the delete are separate statements under READ COMMITTED, so a
-            # concurrent purge may remove the row in between. A zero delete count means the
-            # row was already gone: report not-found rather than a stale success.
+            # Read and delete are separate statements under READ COMMITTED: a zero count
+            # means a concurrent purge already removed the row — not-found, not stale success.
             if result.deleted_count == 0:
                 raise AppConfigFragmentNotFound(f"App config fragment {purger.pk_value} not found")
             return data
