@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-from ai.backend.manager.errors.common import GenericBadRequest, GenericForbidden, ObjectNotFound
+from ai.backend.manager.errors.common import GenericForbidden, ObjectNotFound
 
 __all__ = (
     "AppConfigAllowListNotFound",
     "AppConfigDefinitionNotFound",
-    "AppConfigFragmentBulkScopeMismatch",
     "AppConfigFragmentNotFound",
     "AppConfigFragmentWriteNotAllowed",
 )
@@ -35,8 +34,3 @@ class AppConfigFragmentWriteNotAllowed(GenericForbidden):
 
     error_type = "https://api.backend.ai/probs/app-config-fragment-write-not-allowed"
     error_title = "App config fragment write is not allowed for this config/scope."
-
-
-class AppConfigFragmentBulkScopeMismatch(GenericBadRequest):
-    error_type = "https://api.backend.ai/probs/app-config-fragment-bulk-scope-mismatch"
-    error_title = "All fragments in a bulk create must share the same scope."

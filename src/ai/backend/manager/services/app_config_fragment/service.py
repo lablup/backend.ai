@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from ai.backend.manager.errors.app_config import AppConfigFragmentBulkScopeMismatch
+from ai.backend.manager.repositories.app_config_fragment.creators import (
+    AppConfigFragmentCreatorSpec,
+)
 from ai.backend.manager.repositories.app_config_fragment.repository import (
     AppConfigFragmentRepository,
 )
@@ -110,13 +112,16 @@ class AppConfigFragmentService:
     async def bulk_create(
         self, action: BulkCreateAppConfigFragmentAction
     ) -> BulkCreateAppConfigFragmentActionResult:
-        scopes = {(spec.scope_type, spec.scope_id) for spec in action.creator_specs}
-        if len(scopes) > 1:
-            raise AppConfigFragmentBulkScopeMismatch(
-                f"A bulk create must target a single scope, but received {len(scopes)}: "
-                f"{sorted((scope_type.value, scope_id) for scope_type, scope_id in scopes)}."
+        specs = [
+            AppConfigFragmentCreatorSpec(
+                config_name=item.config_name,
+                scope_type=action.scope_type,
+                scope_id=action.scope_id,
+                config=item.config,
             )
-        result = await self._repository.bulk_create(BulkCreator(specs=action.creator_specs))
+            for item in action.items
+        ]
+        result = await self._repository.bulk_create(BulkCreator(specs=specs))
         return BulkCreateAppConfigFragmentActionResult(
             succeeded=result.succeeded, failed=result.failed
         )

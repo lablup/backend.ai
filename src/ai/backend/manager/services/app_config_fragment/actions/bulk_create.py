@@ -2,12 +2,10 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import override
+from typing import Any, override
 
+from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.repositories.app_config_fragment.creators import (
-    AppConfigFragmentCreatorSpec,
-)
 from ai.backend.manager.services.app_config_fragment.actions.base import (
     AppConfigFragmentBulkAction,
     AppConfigFragmentBulkActionResult,
@@ -16,10 +14,20 @@ from ai.backend.manager.services.app_config_fragment.actions.base import (
 
 
 @dataclass
-class BulkCreateAppConfigFragmentAction(AppConfigFragmentBulkAction):
-    """Create many fragments with per-item partial success; the FK to the allow-list gates each write."""
+class AppConfigFragmentBulkCreateItem:
+    """One fragment to create; it carries no scope because all items share the action's scope."""
 
-    creator_specs: Sequence[AppConfigFragmentCreatorSpec]
+    config_name: str
+    config: dict[str, Any]
+
+
+@dataclass
+class BulkCreateAppConfigFragmentAction(AppConfigFragmentBulkAction):
+    """Create many fragments at one shared scope with per-item partial success."""
+
+    scope_type: AppConfigScopeType
+    scope_id: str
+    items: Sequence[AppConfigFragmentBulkCreateItem]
 
     @override
     @classmethod
@@ -28,7 +36,6 @@ class BulkCreateAppConfigFragmentAction(AppConfigFragmentBulkAction):
 
     @override
     def targets(self) -> Sequence[AppConfigFragmentBulkTarget]:
-        # Fragments do not exist yet, so there are no per-entity targets to validate.
         return []
 
 
