@@ -212,12 +212,7 @@ class RBACWriteOps(WriteOps):
         self,
         purger: RBACEntityPurger[TRow],
     ) -> RBACEntityPurgerResult[TRow] | None:
-        """Delete one row and its RBAC entries (the counterpart of :meth:`create_scoped`).
-
-        The association table has no FK to the entity tables, so a scope-bound row's
-        association is cleared in the same transaction. Returns ``None`` when the row is
-        already gone, so a concurrent purge reports not-found.
-        """
+        """Delete one row and its RBAC entries; ``None`` if the row is already gone."""
         return await execute_rbac_entity_purger(self._sess, purger)
 
     async def bulk_purge_scoped_partial[TRow: Base](

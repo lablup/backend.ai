@@ -42,16 +42,11 @@ class TestCreateTargetElement:
         assert action.scope_type() == ScopeType.DOMAIN
 
     def test_public_scope_has_no_scope_element(self) -> None:
-        # A public fragment is global-scoped: its target carries the fragment element type
-        # with an empty id, so the scope-chain check finds no scope and denies any
-        # non-superadmin writer (public writes are superadmin-only).
         action = _action(AppConfigScopeType.PUBLIC, "")
         assert action.target_element() == RBACElementRef(RBACElementType.APP_CONFIG_FRAGMENT, "")
         assert action.scope_type() == ScopeType.GLOBAL
 
     def test_target_element_uses_the_spec_scope_id(self) -> None:
-        # Cross-user create: the target scope is the *supplied* user id, so RBAC checks the
-        # writer's permission on that other user's scope (which they lack) — not their own.
         other: Any = "victim-user"
         action = _action(AppConfigScopeType.USER, other)
         assert action.target_element() == RBACElementRef(RBACElementType.USER, other)

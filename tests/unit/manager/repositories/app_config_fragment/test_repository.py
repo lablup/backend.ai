@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncGenerator
+from dataclasses import dataclass, field
 
 import pytest
 import sqlalchemy as sa
@@ -70,10 +71,6 @@ _OTHER_USER_ID = str(uuid.uuid4())
 async def database(
     database_connection: ExtendedAsyncSAEngine,
 ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
-    # FK order: app_config_definitions (parent) before the allow-list and fragments (children).
-    # AssociationScopesEntitiesRow holds the RBAC scope↔fragment binding written on create;
-    # RoleRow + PermissionRow back the entity-as-scope purge, which clears any permissions
-    # granted at the fragment's own scope when it is purged.
     async with with_tables(
         database_connection,
         [
@@ -719,6 +716,27 @@ class TestApplicableFragments:
         assert applicable == []
 
 
+@dataclass(frozen=True)
+class _ScopeBinding:
+    """One RBAC scope a fragment is bound to (a row of ``association_scopes_entities``)."""
+
+    scope_type: ScopeType
+    scope_id: str
+
+
+@dataclass(frozen=True)
+class _FragmentScopeCase:
+    """A fragment scope to write at, with the bindings a create at that scope must produce.
+
+    ``expected_bindings`` is empty for ``public``: it is GLOBAL-scoped and has no RBAC scope
+    element to bind to.
+    """
+
+    scope_type: AppConfigScopeType
+    scope_id: str
+    expected_bindings: list[_ScopeBinding] = field(default_factory=list)
+
+
 class TestRBACScopeAssociation:
     """Create binds a ``user`` / ``domain`` fragment to its RBAC scope so the RBAC validator can
     resolve ownership on a later update/purge; ``public`` (GLOBAL, no RBAC scope) gets none."""
@@ -726,7 +744,8 @@ class TestRBACScopeAssociation:
     @staticmethod
     async def _scope_bindings(
         database: ExtendedAsyncSAEngine, entity_id: str
-    ) -> list[AssociationScopesEntitiesRow]:
+    ) -> list[_ScopeBinding]:
+        """The RBAC scopes the fragment is currently bound to."""
         async with database.begin_readonly_session() as db_sess:
             rows = await db_sess.scalars(
                 sa.select(AssociationScopesEntitiesRow).where(
@@ -734,49 +753,77 @@ class TestRBACScopeAssociation:
                     AssociationScopesEntitiesRow.entity_id == entity_id,
                 )
             )
-            return list(rows)
+            return [_ScopeBinding(scope_type=row.scope_type, scope_id=row.scope_id) for row in rows]
 
-    @staticmethod
-    async def _create(
-        repository: AppConfigFragmentRepository, scope_type: AppConfigScopeType, scope_id: str
-    ) -> AppConfigFragmentData:
-        return await repository.create(
+    @pytest.mark.parametrize(
+        "case",
+        [
+            _FragmentScopeCase(
+                scope_type=AppConfigScopeType.USER,
+                scope_id=_USER_ID,
+                expected_bindings=[_ScopeBinding(scope_type=ScopeType.USER, scope_id=_USER_ID)],
+            ),
+            _FragmentScopeCase(
+                scope_type=AppConfigScopeType.DOMAIN,
+                scope_id=_DOMAIN_ID,
+                expected_bindings=[_ScopeBinding(scope_type=ScopeType.DOMAIN, scope_id=_DOMAIN_ID)],
+            ),
+            _FragmentScopeCase(scope_type=AppConfigScopeType.PUBLIC, scope_id="public"),
+        ],
+        ids=lambda case: case.scope_type.value,
+    )
+    async def test_create_binds_to_its_rbac_scope(
+        self,
+        repository: AppConfigFragmentRepository,
+        database: ExtendedAsyncSAEngine,
+        theme_registered: None,
+        case: _FragmentScopeCase,
+    ) -> None:
+        created = await repository.create(
             AppConfigFragmentCreatorSpec(
                 config_name="theme",
-                scope_type=scope_type,
-                scope_id=scope_id,
+                scope_type=case.scope_type,
+                scope_id=case.scope_id,
                 config={"k": "v"},
             )
         )
+        assert await self._scope_bindings(database, str(created.id)) == case.expected_bindings
 
-    async def test_user_scope_create_binds_to_user_scope(
+    @pytest.mark.parametrize(
+        "case",
+        [
+            _FragmentScopeCase(
+                scope_type=AppConfigScopeType.USER,
+                scope_id=_USER_ID,
+                expected_bindings=[_ScopeBinding(scope_type=ScopeType.USER, scope_id=_USER_ID)],
+            ),
+            _FragmentScopeCase(
+                scope_type=AppConfigScopeType.DOMAIN,
+                scope_id=_DOMAIN_ID,
+                expected_bindings=[_ScopeBinding(scope_type=ScopeType.DOMAIN, scope_id=_DOMAIN_ID)],
+            ),
+            _FragmentScopeCase(scope_type=AppConfigScopeType.PUBLIC, scope_id="public"),
+        ],
+        ids=lambda case: case.scope_type.value,
+    )
+    async def test_purge_removes_the_row_and_its_scope_binding(
         self,
         repository: AppConfigFragmentRepository,
         database: ExtendedAsyncSAEngine,
         theme_registered: None,
+        case: _FragmentScopeCase,
     ) -> None:
-        created = await self._create(repository, AppConfigScopeType.USER, _USER_ID)
-        bindings = await self._scope_bindings(database, str(created.id))
-        assert len(bindings) == 1
-        assert bindings[0].scope_type is ScopeType.USER
-        assert bindings[0].scope_id == _USER_ID
-
-    async def test_public_scope_create_binds_nothing(
-        self,
-        repository: AppConfigFragmentRepository,
-        database: ExtendedAsyncSAEngine,
-        theme_registered: None,
-    ) -> None:
-        created = await self._create(repository, AppConfigScopeType.PUBLIC, "public")
+        created = await repository.create(
+            AppConfigFragmentCreatorSpec(
+                config_name="theme",
+                scope_type=case.scope_type,
+                scope_id=case.scope_id,
+                config={"k": "v"},
+            )
+        )
+        assert await self._scope_bindings(database, str(created.id)) == case.expected_bindings
+        purged = await repository.purge(AppConfigFragmentPurgerSpec(fragment_id=created.id))
+        assert purged.id == created.id
         assert await self._scope_bindings(database, str(created.id)) == []
-
-    async def test_purge_removes_the_scope_binding(
-        self,
-        repository: AppConfigFragmentRepository,
-        database: ExtendedAsyncSAEngine,
-        theme_registered: None,
-    ) -> None:
-        created = await self._create(repository, AppConfigScopeType.USER, _USER_ID)
-        assert len(await self._scope_bindings(database, str(created.id))) == 1
-        await repository.purge(AppConfigFragmentPurgerSpec(fragment_id=created.id))
-        assert await self._scope_bindings(database, str(created.id)) == []
+        with pytest.raises(AppConfigFragmentNotFound):
+            await repository.get_by_id(created.id)

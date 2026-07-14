@@ -111,8 +111,6 @@ class AppConfigFragmentDBSource:
 
     @app_config_fragment_db_source_resilience.apply()
     async def purge(self, purger_spec: AppConfigFragmentPurgerSpec) -> AppConfigFragmentData:
-        # Purge is an RBAC unbind: the fragment row, its scope associations, and any
-        # permissions granted at its own scope are deleted together (entity-as-scope).
         rbac_purger = RBACEntityPurger(
             row_class=AppConfigFragmentRow,
             pk_value=purger_spec.fragment_id,

@@ -44,10 +44,6 @@ class CreateAppConfigFragmentAction(AppConfigFragmentScopeAction):
 
     @override
     def target_element(self) -> RBACElementRef:
-        # The scope this create acts on, so RBAC checks the writer's permission there:
-        # a user/domain fragment targets its USER/DOMAIN scope. A public fragment is
-        # global-scoped (no RBAC scope element) and is superadmin-only — its target has
-        # no scope to resolve, so a non-superadmin write fails the scope-chain check.
         element = self.creator_spec.scope_type.to_rbac_element_type()
         if element is None:
             return RBACElementRef(RBACElementType.APP_CONFIG_FRAGMENT, "")
