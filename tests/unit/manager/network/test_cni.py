@@ -208,16 +208,23 @@ class TestSelectBackend:
         plugin = _plugin_with(FakeEtcd())
         assert await plugin._select_backend([], None) is NetworkBackendKind.VXLAN
 
-    async def test_all_native_would_resolve_host_gw_but_it_is_unimplemented(self) -> None:
-        # the capability auto-select still resolves to host-gw internally, but host-gw has no
-        # agent-side implementation, so selection refuses it rather than crashing the agent later
+    async def test_auto_select_falls_back_when_it_resolves_an_unimplemented_backend(self) -> None:
+        # The capability auto-select still resolves host-gw internally, but host-gw has no
+        # agent-side implementation. Auto-selection must not fail every session of the cluster over
+        # a capability nobody asked for: it picks the working data plane and says so.
         etcd = FakeEtcd()
         for agent_id in ("a1", "a2"):
             etcd.store[f"network/agent/{agent_id}/caps"] = json.dumps({"native_routing_ok": True})
         plugin = _plugin_with(etcd)
         assert await plugin._resolve_backend(["a1", "a2"], None) is NetworkBackendKind.HOST_GW
+        assert await plugin._select_backend(["a1", "a2"], None) is NetworkBackendKind.VXLAN
+
+    async def test_an_operator_asking_for_an_unimplemented_backend_is_refused(self) -> None:
+        # The operator named it explicitly: running something else instead would be worse than
+        # failing, since they would never know they did not get what they configured.
+        plugin = _plugin_with(FakeEtcd())
         with pytest.raises(UnsupportedNetworkBackend):
-            await plugin._select_backend(["a1", "a2"], None)
+            await plugin._select_backend(["a1"], NetworkBackendKind.HOST_GW)
 
     async def test_one_non_native_falls_back_to_vxlan(self) -> None:
         etcd = FakeEtcd()

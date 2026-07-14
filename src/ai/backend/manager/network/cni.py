@@ -232,16 +232,33 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         self, member_agents: list[str], forced_backend: NetworkBackendKind | None
     ) -> NetworkBackendKind:
         """Operator override wins; otherwise host-gw only if every member advertises
-        native-routing capability, else the portable vxlan default. The chosen backend is
-        validated against the set that actually has an agent-side implementation, so an
-        unimplemented one (host-gw / wireguard) is refused here rather than crashing the agent."""
+        native-routing capability, else the portable vxlan default.
+
+        The chosen backend is validated against the set that actually has an agent-side
+        implementation. What happens to an unimplemented one depends on who chose it:
+
+        - the **operator** (forced_backend) asked for something that does not exist — refuse, so a
+          typo or a premature config does not silently run on a backend they did not ask for;
+        - the **selector** resolved to one from the agents' advertised capabilities — fall back to
+          vxlan and say so. Auto-selection exists to pick the best *working* data plane; failing
+          every session on the cluster because the capability it detected has no implementation yet
+          is not a service the selector should be offering.
+        """
         backend = await self._resolve_backend(member_agents, forced_backend)
-        if backend not in IMPLEMENTED_NETWORK_BACKENDS:
+        if backend in IMPLEMENTED_NETWORK_BACKENDS:
+            return backend
+        if forced_backend is not None:
             raise UnsupportedNetworkBackend(
                 f"cluster-network backend '{backend}' is declared but not implemented "
                 f"(implemented: {sorted(b.value for b in IMPLEMENTED_NETWORK_BACKENDS)})"
             )
-        return backend
+        log.warning(
+            "the agents' capabilities select the '{}' backend, which has no agent-side "
+            "implementation yet; falling back to '{}'",
+            backend.value,
+            NetworkBackendKind.VXLAN.value,
+        )
+        return NetworkBackendKind.VXLAN
 
     async def _resolve_backend(
         self, member_agents: list[str], forced_backend: NetworkBackendKind | None
