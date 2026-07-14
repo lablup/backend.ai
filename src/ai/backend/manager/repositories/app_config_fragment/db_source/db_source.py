@@ -19,6 +19,7 @@ from ai.backend.manager.data.app_config_fragment.types import (
     AppConfigFragmentData,
     AppConfigFragmentSearchResult,
 )
+from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.app_config import (
     AppConfigFragmentNotFound,
 )
@@ -28,10 +29,6 @@ from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentR
 from ai.backend.manager.models.scopes import SearchScope
 from ai.backend.manager.repositories.app_config_fragment.creators import (
     AppConfigFragmentCreatorSpec,
-)
-from ai.backend.manager.repositories.app_config_fragment.scope_binders import (
-    AppConfigFragmentScopeUnbinder,
-    fragment_rbac_scope_ref,
 )
 from ai.backend.manager.repositories.app_config_fragment.types import (
     AppConfigScopeArguments,
@@ -79,10 +76,14 @@ class AppConfigFragmentDBSource:
 
     @app_config_fragment_db_source_resilience.apply()
     async def create(self, spec: AppConfigFragmentCreatorSpec) -> AppConfigFragmentData:
+        scope_element = spec.scope_type.to_rbac_element_type()
+        scope_ref = (
+            RBACElementRef(scope_element, spec.scope_id) if scope_element is not None else None
+        )
         rbac_creator = RBACEntityCreator(
             spec=spec,
             element_type=RBACElementType.APP_CONFIG_FRAGMENT,
-            scope_ref=fragment_rbac_scope_ref(spec.scope_type, spec.scope_id),
+            scope_ref=scope_ref,
         )
         async with self._rbac_ops_provider.write_ops() as w:
             created = await w.create_scoped(rbac_creator)
@@ -106,23 +107,14 @@ class AppConfigFragmentDBSource:
 
     @app_config_fragment_db_source_resilience.apply()
     async def purge(self, purger: Purger[AppConfigFragmentRow]) -> AppConfigFragmentData:
+        # Purge deletes the fragment row and clears its RBAC scope association atomically
+        # (no FK cascade; a ``public`` fragment has none). A concurrent purge that already
+        # removed the row yields no result, so this reports not-found.
         async with self._rbac_ops_provider.write_ops() as w:
-            found = await w.query(Querier(row_class=AppConfigFragmentRow, pk_value=purger.pk_value))
-            if found is None:
+            result = await w.purge_scoped(purger, RBACElementType.APP_CONFIG_FRAGMENT)
+            if result is None:
                 raise AppConfigFragmentNotFound(f"App config fragment {purger.pk_value} not found")
-            data = found.row.to_data()
-            result = await w.unbind_scope_entities(
-                AppConfigFragmentScopeUnbinder(
-                    fragment_id=data.id,
-                    fragment_scope_type=data.scope_type,
-                    fragment_scope_id=data.scope_id,
-                )
-            )
-            # Read and delete are separate statements under READ COMMITTED: a zero count
-            # means a concurrent purge already removed the row — not-found, not stale success.
-            if result.deleted_count == 0:
-                raise AppConfigFragmentNotFound(f"App config fragment {purger.pk_value} not found")
-            return data
+            return result.row.to_data()
 
     @app_config_fragment_db_source_resilience.apply()
     async def bulk_create(

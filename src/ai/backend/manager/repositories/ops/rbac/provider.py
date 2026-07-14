@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
-from ai.backend.common.data.permission.types import Permission, RelationType
+from ai.backend.common.data.permission.types import Permission, RBACElementType, RelationType
 from ai.backend.common.entity.types import EntityRef, ScopeRef
 from ai.backend.common.identifier.user import UserID
 from ai.backend.common.identifier.virtual_scope import VirtualScopeID
@@ -143,6 +143,29 @@ class RBACWriteOps(WriteOps):
     ) -> RBACBulkEntityCreatorResult[TRow]:
         """Insert rows with their RBAC scope associations (each creator carries its scope)."""
         return await execute_rbac_entity_creators(self._sess, creators)
+
+    async def purge_scoped[TRow: Base](
+        self,
+        purger: Purger[TRow],
+        element_type: RBACElementType,
+    ) -> PurgerResult[TRow] | None:
+        """Delete one row via its entity purger and clear its RBAC scope association.
+
+        The counterpart of :meth:`create_scoped` on the delete side: the association table
+        has no FK to the entity tables, so a scope-bound row's association is removed in the
+        same transaction. A global-scoped (association-less) row matches nothing. Returns
+        ``None`` when the row is already gone, so a concurrent purge reports not-found.
+        """
+        result = await self.purge(purger)
+        if result is None:
+            return None
+        await self._sess.execute(
+            sa.delete(AssociationScopesEntitiesRow).where(
+                AssociationScopesEntitiesRow.entity_type == element_type.to_entity_type(),
+                AssociationScopesEntitiesRow.entity_id == str(purger.pk_value),
+            )
+        )
+        return result
 
     async def unbind_scope_entities[TRow: Base](
         self,
