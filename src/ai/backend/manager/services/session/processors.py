@@ -23,6 +23,10 @@ from ai.backend.manager.services.session.actions.complete import (
     CompleteAction,
     CompleteActionResult,
 )
+from ai.backend.manager.services.session.actions.compute_schedule import (
+    ComputeScheduleAction,
+    ComputeScheduleActionResult,
+)
 from ai.backend.manager.services.session.actions.convert_session_to_image import (
     ConvertSessionToImageAction,
     ConvertSessionToImageActionResult,
@@ -152,6 +156,7 @@ from ai.backend.manager.services.session.service import SessionService
 
 class SessionProcessors(AbstractProcessorPackage):
     commit_session: ActionProcessor[CommitSessionAction, CommitSessionActionResult]
+    compute_schedule: ActionProcessor[ComputeScheduleAction, ComputeScheduleActionResult]
     complete: ActionProcessor[CompleteAction, CompleteActionResult]
     convert_session_to_image: ActionProcessor[
         ConvertSessionToImageAction, ConvertSessionToImageActionResult
@@ -214,6 +219,7 @@ class SessionProcessors(AbstractProcessorPackage):
 
         # Actions without RBAC validation (internal/legacy)
         self.commit_session = ActionProcessor(service.commit_session, action_monitors)
+        self.compute_schedule = ActionProcessor(service.compute_schedule, action_monitors)
         self.complete = ActionProcessor(service.complete, action_monitors)
         self.convert_session_to_image = ActionProcessor(
             service.convert_session_to_image, action_monitors
@@ -318,6 +324,7 @@ class SessionProcessors(AbstractProcessorPackage):
     def supported_actions(self) -> list[ActionSpec]:
         return [
             CommitSessionAction.spec(),
+            ComputeScheduleAction.spec(),
             CompleteAction.spec(),
             ConvertSessionToImageAction.spec(),
             CreateClusterAction.spec(),

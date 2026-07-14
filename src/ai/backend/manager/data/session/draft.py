@@ -77,7 +77,7 @@ class _DraftBaseModel(BackendAISchema):
 class KernelResourceInput(_DraftBaseModel):
     """Minimal per-kernel resource inputs for requested-slots resolution.
 
-    A standalone input consumed by the scheduler dry-run; ``image_id`` may be
+    A standalone input consumed by the compute-schedule flow; ``image_id`` may be
     ``None`` when a resource-group default supplies it downstream.
     """
 
@@ -90,7 +90,7 @@ class KernelExecutionSpecDraft(_DraftBaseModel):
     """Optional-heavy mirror of ``KernelExecutionSpec``.
 
     ``resource_input`` groups the slot-resolution inputs (image + resource
-    slots) shared with the scheduler dry-run.
+    slots) shared with the compute-schedule flow.
     """
 
     resource_input: KernelResourceInput = Field(default_factory=KernelResourceInput)
