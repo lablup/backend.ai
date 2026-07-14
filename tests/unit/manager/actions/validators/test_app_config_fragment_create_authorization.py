@@ -63,9 +63,6 @@ from ai.backend.manager.repositories.permission_controller.repository import (
 from ai.backend.manager.services.app_config_fragment.actions.create import (
     CreateAppConfigFragmentAction,
 )
-from ai.backend.manager.services.app_config_fragment.validators import (
-    PublicAppConfigFragmentWriteValidator,
-)
 from ai.backend.testutils.db import with_tables
 
 _ORM_CLUSTER = (
@@ -182,12 +179,6 @@ def scope_validator(repository: PermissionControllerRepository) -> ScopeActionRB
 
 
 @pytest.fixture
-def public_guard() -> PublicAppConfigFragmentWriteValidator:
-    # MagicMock config_provider → enforcement_enabled is truthy, so the guard runs.
-    return PublicAppConfigFragmentWriteValidator(MagicMock())
-
-
-@pytest.fixture
 async def owner_user(db_with_rbac_tables: ExtendedAsyncSAEngine) -> UserData:
     """A non-superadmin granted APP_CONFIG_FRAGMENT:CREATE on their own user scope."""
     user_id = UserID(uuid.uuid4())
@@ -237,12 +228,13 @@ class TestScopeAuthorization:
                 await scope_validator.validate(action, trigger_meta)
 
 
-class TestPublicWriteGuard:
-    """public fragments are global-scoped, so their writes are superadmin-only."""
+class TestPublicScopeAuthorization:
+    """A public fragment is global-scoped: no role grants the write, so the scope-chain
+    check denies everyone and only a superadmin bypasses it."""
 
     async def test_non_superadmin_is_denied(
         self,
-        public_guard: PublicAppConfigFragmentWriteValidator,
+        scope_validator: ScopeActionRBACValidator,
         trigger_meta: BaseActionTriggerMeta,
     ) -> None:
         action = CreateAppConfigFragmentAction(
@@ -255,11 +247,11 @@ class TestPublicWriteGuard:
         )
         with with_user(_user_data(UserID(uuid.uuid4()), is_superadmin=False)):
             with pytest.raises(NotEnoughPermission):
-                await public_guard.validate(action, trigger_meta)
+                await scope_validator.validate(action, trigger_meta)
 
     async def test_superadmin_is_allowed(
         self,
-        public_guard: PublicAppConfigFragmentWriteValidator,
+        scope_validator: ScopeActionRBACValidator,
         trigger_meta: BaseActionTriggerMeta,
     ) -> None:
         action = CreateAppConfigFragmentAction(
@@ -271,4 +263,4 @@ class TestPublicWriteGuard:
             )
         )
         with with_user(_user_data(UserID(uuid.uuid4()), is_superadmin=True)):
-            await public_guard.validate(action, trigger_meta)
+            await scope_validator.validate(action, trigger_meta)

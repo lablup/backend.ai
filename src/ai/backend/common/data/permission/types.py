@@ -359,6 +359,7 @@ class ScopeType(enum.StrEnum):
     ROLE = "role"
     ROLE_ASSIGNMENT = "role:assignment"
     NOTIFICATION_CHANNEL = "notification_channel"
+    APP_CONFIG_FRAGMENT = "app_config_fragment"
     KEYPAIR = "keypair"
     KEYPAIR_RESOURCE_POLICY = "keypair_resource_policy"
 

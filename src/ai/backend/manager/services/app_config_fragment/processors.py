@@ -8,7 +8,6 @@ from ai.backend.manager.actions.processor.scope import ScopeActionProcessor
 from ai.backend.manager.actions.processor.single_entity import SingleEntityActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.actions.validators import ActionValidators
-from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.services.app_config_fragment.actions.admin_search import (
     AdminSearchAppConfigFragmentAction,
     AdminSearchAppConfigFragmentActionResult,
@@ -48,9 +47,6 @@ from ai.backend.manager.services.app_config_fragment.actions.update import (
 from ai.backend.manager.services.app_config_fragment.service import (
     AppConfigFragmentService,
 )
-from ai.backend.manager.services.app_config_fragment.validators import (
-    PublicAppConfigFragmentWriteValidator,
-)
 
 
 class AppConfigFragmentProcessors(AbstractProcessorPackage):
@@ -83,23 +79,16 @@ class AppConfigFragmentProcessors(AbstractProcessorPackage):
         service: AppConfigFragmentService,
         action_monitors: list[ActionMonitor],
         validators: ActionValidators,
-        config_provider: ManagerConfigProvider,
     ) -> None:
         # Writes are authorized by RBAC (BEP-1052): create acts at the fragment's target
-        # scope (own user / domain / superadmin-only public), while update / purge act on
-        # the fragment entity whose scope is resolved through its scope binding. Reads stay
-        # on the allow-list read tiers, so get / admin_search / scoped_search carry no RBAC
+        # scope (own user / domain; a public fragment is global-scoped, so no role grants
+        # the write and only a superadmin passes), while update / purge act on the fragment
+        # entity whose scope is resolved through its scope binding. Reads stay on the
+        # allow-list read tiers, so get / admin_search / scoped_search carry no RBAC
         # validator. Bulk create has no pre-existing targets, so the target-based bulk
         # validator cannot authorize it — only bulk update / purge are wired.
-        #
-        # A public fragment is global-scoped and has no RBAC scope element, so the generic
-        # scope-chain validator cannot represent it; the public guard runs first to keep
-        # public writes superadmin-only and defers user / domain scopes to the scope check.
-        public_write_guard = PublicAppConfigFragmentWriteValidator(config_provider)
         self.create = ScopeActionProcessor(
-            service.create,
-            action_monitors,
-            validators=[public_write_guard, validators.rbac.scope],
+            service.create, action_monitors, validators=[validators.rbac.scope]
         )
         self.get = SingleEntityActionProcessor(service.get, action_monitors)
         self.admin_search = ScopeActionProcessor(service.admin_search, action_monitors)

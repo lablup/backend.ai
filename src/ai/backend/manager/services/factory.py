@@ -521,10 +521,7 @@ def create_processors(
             services.app_config_definition, action_monitors
         ),
         app_config_fragment=AppConfigFragmentProcessors(
-            services.app_config_fragment,
-            action_monitors,
-            validators,
-            args.service_args.config_provider,
+            services.app_config_fragment, action_monitors, validators
         ),
         login_client_type=LoginClientTypeProcessors(services.login_client_type, action_monitors),
         login_client_type_admin=LoginClientTypeAdminProcessors(

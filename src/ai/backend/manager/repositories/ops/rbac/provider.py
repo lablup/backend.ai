@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
-from ai.backend.common.data.permission.types import Permission, RBACElementType, RelationType
+from ai.backend.common.data.permission.types import Permission, RelationType
 from ai.backend.common.entity.types import EntityRef, ScopeRef
 from ai.backend.common.identifier.user import UserID
 from ai.backend.common.identifier.virtual_scope import VirtualScopeID
@@ -42,6 +42,11 @@ from ai.backend.manager.repositories.base.rbac.entity_creator import (
     RBACEntityCreatorResult,
     execute_rbac_entity_creator,
     execute_rbac_entity_creators,
+)
+from ai.backend.manager.repositories.base.rbac.entity_purger import (
+    RBACEntityPurger,
+    RBACEntityPurgerResult,
+    execute_rbac_entity_purger,
 )
 from ai.backend.manager.repositories.ops.base.provider import DBOpsProvider, WriteOps
 from ai.backend.manager.repositories.permission_controller.role_manager import RoleManager
@@ -142,26 +147,15 @@ class RBACWriteOps(WriteOps):
 
     async def purge_scoped[TRow: Base](
         self,
-        purger: Purger[TRow],
-        element_type: RBACElementType,
-    ) -> PurgerResult[TRow] | None:
-        """Delete one row via its entity purger and clear its RBAC scope association.
+        purger: RBACEntityPurger[TRow],
+    ) -> RBACEntityPurgerResult[TRow] | None:
+        """Delete one row and its RBAC entries (the counterpart of :meth:`create_scoped`).
 
-        The counterpart of :meth:`create_scoped` on the delete side: the association table
-        has no FK to the entity tables, so a scope-bound row's association is removed in the
-        same transaction. A global-scoped (association-less) row matches nothing. Returns
-        ``None`` when the row is already gone, so a concurrent purge reports not-found.
+        The association table has no FK to the entity tables, so a scope-bound row's
+        association is cleared in the same transaction. Returns ``None`` when the row is
+        already gone, so a concurrent purge reports not-found.
         """
-        result = await self.purge(purger)
-        if result is None:
-            return None
-        await self._sess.execute(
-            sa.delete(AssociationScopesEntitiesRow).where(
-                AssociationScopesEntitiesRow.entity_type == element_type.to_entity_type(),
-                AssociationScopesEntitiesRow.entity_id == str(purger.pk_value),
-            )
-        )
-        return result
+        return await execute_rbac_entity_purger(self._sess, purger)
 
     async def add_users_to_scope(
         self,

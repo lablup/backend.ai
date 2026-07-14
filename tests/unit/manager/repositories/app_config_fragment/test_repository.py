@@ -28,6 +28,8 @@ from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentR
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
+from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
+from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.app_config_fragment.creators import (
     AppConfigFragmentCreatorSpec,
@@ -66,7 +68,9 @@ async def database(
     database_connection: ExtendedAsyncSAEngine,
 ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
     # FK order: app_config_definitions (parent) before the allow-list and fragments (children).
-    # AssociationScopesEntitiesRow holds the RBAC scope↔fragment binding written on create.
+    # AssociationScopesEntitiesRow holds the RBAC scope↔fragment binding written on create;
+    # RoleRow + PermissionRow back the entity-as-scope purge, which clears any permissions
+    # granted at the fragment's own scope when it is purged.
     async with with_tables(
         database_connection,
         [
@@ -74,6 +78,8 @@ async def database(
             AppConfigAllowListRow,
             AppConfigFragmentRow,
             AssociationScopesEntitiesRow,
+            RoleRow,
+            PermissionRow,
         ],
     ):
         yield database_connection

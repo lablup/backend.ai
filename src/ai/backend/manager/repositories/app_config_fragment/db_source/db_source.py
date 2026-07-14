@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from typing import cast
 
 import sqlalchemy as sa
 
@@ -30,6 +31,9 @@ from ai.backend.manager.models.scopes import SearchScope
 from ai.backend.manager.repositories.app_config_fragment.creators import (
     AppConfigFragmentCreatorSpec,
 )
+from ai.backend.manager.repositories.app_config_fragment.purgers import (
+    AppConfigFragmentPurgerSpec,
+)
 from ai.backend.manager.repositories.app_config_fragment.types import (
     AppConfigScopeArguments,
 )
@@ -42,6 +46,7 @@ from ai.backend.manager.repositories.base import (
     Updater,
 )
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
+from ai.backend.manager.repositories.base.rbac.entity_purger import RBACEntityPurger
 from ai.backend.manager.repositories.ops.rbac.provider import RBACOpsProvider
 
 __all__ = ("AppConfigFragmentDBSource",)
@@ -107,8 +112,14 @@ class AppConfigFragmentDBSource:
 
     @app_config_fragment_db_source_resilience.apply()
     async def purge(self, purger: Purger[AppConfigFragmentRow]) -> AppConfigFragmentData:
+        fragment_id = cast(AppConfigFragmentID, purger.pk_value)
+        rbac_purger = RBACEntityPurger(
+            row_class=purger.row_class,
+            pk_value=purger.pk_value,
+            spec=AppConfigFragmentPurgerSpec(fragment_id=fragment_id),
+        )
         async with self._rbac_ops_provider.write_ops() as w:
-            result = await w.purge_scoped(purger, RBACElementType.APP_CONFIG_FRAGMENT)
+            result = await w.purge_scoped(rbac_purger)
             if result is None:
                 raise AppConfigFragmentNotFound(f"App config fragment {purger.pk_value} not found")
             return result.row.to_data()
