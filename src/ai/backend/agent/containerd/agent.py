@@ -48,7 +48,11 @@ from ai.backend.agent.config.unified import ContainerSandboxType, ScratchType
 from ai.backend.agent.containerd.apparmor import ensure_profile_loaded
 from ai.backend.agent.containerd.dns import resolve_container_dns
 from ai.backend.agent.containerd.logs import write_logger_launcher
-from ai.backend.agent.containerd.runtime.spec import _DEFAULT_CAPS, container_cgroup_fs_path
+from ai.backend.agent.containerd.runtime.spec import (
+    _DEFAULT_CAPS,
+    container_cgroup_fs_path,
+    container_cgroup_parent,
+)
 from ai.backend.agent.errors import UnsupportedResource
 from ai.backend.agent.errors.agent import ContainerCreationError
 from ai.backend.agent.errors.resources import PortPoolExhaustedError, ResourceError
@@ -73,7 +77,7 @@ from ai.backend.agent.kernel_registry.pickle.creator import (
 )
 from ai.backend.agent.kernel_registry.recovery.base_recovery import BaseKernelRegistryRecovery
 from ai.backend.agent.kernel_registry.writer.types import KernelRegistrySaveMetadata
-from ai.backend.agent.network.caps import publish_vtep, withdraw_vtep
+from ai.backend.agent.network.caps import probe_caps, publish_caps, publish_vtep, withdraw_vtep
 from ai.backend.agent.network.helper.client import HelperClient, HelperPortForwarder
 from ai.backend.agent.network.local_subnet import cluster_host_ips
 from ai.backend.agent.network.port_forward import PortForwarder, PortPublisher, forwards_for
@@ -100,6 +104,7 @@ from ai.backend.agent.types import (
 )
 from ai.backend.agent.utils import container_pid_to_host_pid, host_pid_to_container_pid
 from ai.backend.common.arch import CURRENT_ARCH
+from ai.backend.common.cgroup import get_cgroup_mount_point
 from ai.backend.common.data.image.types import InstalledImageInfo
 from ai.backend.common.docker import (
     MAX_KERNELSPEC,
@@ -146,6 +151,7 @@ from .kernel import ContainerdKernel
 from .oci import (
     KERNEL_ID_LABEL,
     KRUNNER_ENTRYPOINT,
+    OWNER_AGENT_LABEL,
     SESSION_ID_LABEL,
     AcceleratorSpec,
     infiniband_devices,
@@ -584,13 +590,19 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
                 )
             )
         # The in-container agent socket (host<->container PID translation, jail status) for
-        # libbaihook/jail, bind-mounted directly (no socat relay).
+        # libbaihook/jail. The *directory* is mounted, not the socket file, and the entrypoint links
+        # /opt/kernel/agent.sock to it: a bind-mounted socket file pins the inode it had at mount
+        # time, and that inode dies with the agent process — so every kernel that outlived an agent
+        # restart was left holding a dangling socket, and its hook and jail lost PID translation
+        # with no error anywhere. Through the directory, the socket the restarted agent re-creates
+        # is resolved at connect time. The directory is per agent, so a kernel cannot reach the
+        # socket of another agent on the same host.
         if self._agent_sock_path is not None:
             mounts.append(
                 Mount(
                     MountTypes.BIND,
-                    self._agent_sock_path,
-                    Path("/opt/kernel/agent.sock"),
+                    self._agent_sock_path.parent,
+                    Path("/opt/kernel/agent-sock"),
                     MountPermission.READ_WRITE,
                 )
             )
@@ -1419,6 +1431,8 @@ class ContainerdAgent(
     # a vxlan tunnel, which disables multi-node overlay sessions here.
     _vtep_ip: str | None
     _event_monitor_task: asyncio.Task[None] | None
+    # Where each containerd task event is handled, off the subscribe loop (see _monitor_task_events).
+    _event_task_group: aiotools.PersistentTaskGroup
     _agent_sock_path: Path
     _agent_sock_task: asyncio.Task[None] | None
     _port_forwarder: PortPublisher
@@ -1438,12 +1452,15 @@ class ContainerdAgent(
             registry_hosts_dir=self.local_config.container.registry_hosts_dir,
         )
         self._event_monitor_task = None
+        self._event_task_group = aiotools.PersistentTaskGroup()
         # In-container helpers (libbaihook LD_PRELOAD hook, jail) talk back to the agent over
         # a per-agent socket for host<->container PID translation + jail status. Bind ZMQ REP
         # directly on this ipc:// UNIX socket and bind-mount it into each container as
         # /opt/kernel/agent.sock — no socat relay / TCP hop (cf. DockerAgent).
         ipc_base_path = self.local_config.agent.ipc_base_path
-        self._agent_sock_path = ipc_base_path / "container" / f"agent.{self.id}.sock"
+        # Its own directory, because that directory is what gets mounted into every kernel (see
+        # get_intrinsic_mounts): a shared one would expose every agent's socket on the host.
+        self._agent_sock_path = ipc_base_path / "container" / f"agent-{self.id}" / "agent.sock"
         self._agent_sock_task = None
         # Cluster networking is delegated to the BEP-1062 agent.network stack via a
         # (verified) facade; the kernel-creation lifecycle will drive it. The vxlan uplink
@@ -1533,6 +1550,20 @@ class ContainerdAgent(
         # safety net.
         self._event_monitor_task = asyncio.create_task(self._monitor_task_events())
         self._agent_sock_task = asyncio.create_task(self._handle_agent_socket())
+        # Advertise what this node's fabric can do, so the manager selects a data plane from facts
+        # rather than from a default. Without this the capability key never exists and the whole
+        # selector is inert — it silently answers "vxlan" for every session whatever the host is.
+        # native_routing_ok stays conservative (False): a single-node boot probe cannot confirm the
+        # fabric forwards container-IP frames, and asserting it would select a backend the agent
+        # does not implement.
+        try:
+            await publish_caps(
+                self.etcd,
+                str(self.id),
+                await probe_caps(uplink_for_ip(self._vtep_ip or self._host_ip)),
+            )
+        except Exception:
+            log.exception("could not publish this agent's network capabilities")
         # Advertise this node's VTEP so the manager can pre-seed session membership and
         # eliminate the peer-publish race for multi-node overlays (BEP-1062). Only the validated
         # address is ever published; with none, say so once at startup, where an operator can act on
@@ -1575,6 +1606,8 @@ class ContainerdAgent(
                 task.cancel()
                 with contextlib.suppress(asyncio.CancelledError):
                     await task
+        # After the monitor is gone, so nothing new is dispatched into it.
+        await self._event_task_group.shutdown()
         await super().shutdown(stop_signal)
 
     async def _handle_agent_socket(self) -> None:
@@ -1583,6 +1616,11 @@ class ContainerdAgent(
         zmq_ctx = zmq.asyncio.Context()
         endpoint = f"ipc://{self._agent_sock_path}"
         await asyncio.to_thread(self._agent_sock_path.parent.mkdir, parents=True, exist_ok=True)
+        # An unclean shutdown leaves the socket file behind, and an ipc:// bind onto an existing
+        # path fails with EADDRINUSE — which this loop would then retry forever, silently, leaving
+        # every kernel on the node without PID translation. The path is this agent's alone, so a
+        # leftover can only be our own.
+        await asyncio.to_thread(self._agent_sock_path.unlink, True)
         try:
             while True:
                 sock = zmq_ctx.socket(zmq.REP)
@@ -1631,7 +1669,15 @@ class ContainerdAgent(
         while True:
             try:
                 async for ev in self._runtime.subscribe_task_events():
-                    await self._handle_task_event(ev)
+                    # Dispatched, not awaited: handling an exit runs the CLEAN path, which can spend
+                    # up to _LOG_COLLECTION_TIMEOUT persisting the kernel's logs. Awaiting it here
+                    # put every other kernel's death and OOM behind that one — a node where one
+                    # kernel dies badly stops noticing the others. (The Docker backend shields its
+                    # handlers into a task group for the same reason.) Shielded so a cancellation of
+                    # this loop at shutdown does not kill a clean that is already running.
+                    await asyncio.shield(
+                        self._event_task_group.create_task(self._handle_task_event(ev))
+                    )
                 log.info("containerd event stream ended; re-subscribing")
             except asyncio.CancelledError:
                 raise
@@ -1738,6 +1784,14 @@ class ContainerdAgent(
             raw_kid = ci.labels.get(KERNEL_ID_LABEL)
             if not raw_kid:
                 continue
+            # Ours only. A containerd namespace can be shared by two agents on one host (and the
+            # namespace is a config value, not a per-agent fact), and every caller of this treats
+            # what it returns as its own: reconstruct_resource_usage re-accounts the allocations,
+            # the lifecycle sync destroys what it cannot match to a kernel, and the port reclaim
+            # takes their host ports. Without this filter each agent quietly adopts — and then
+            # tears down — the other's kernels. The Docker backend has always filtered on this.
+            if ci.labels.get(OWNER_AGENT_LABEL) != str(self.id):
+                continue
             status = _CONTAINERD_TO_STATUS.get(ci.status, _UNRECOGNIZED_STATUS)
             if status_filter and status not in status_filter:
                 continue
@@ -1838,11 +1892,19 @@ class ContainerdAgent(
 
     @override
     def get_cgroup_path(self, controller: str, container_id: str) -> Path:
-        # The container's cgroup path is set explicitly in the OCI spec (runtime/spec.py sets
-        # ``linux.cgroupsPath`` from this same derivation), so we know exactly where it lives
-        # regardless of the runtime's cgroup driver. container_id == kernel_id here (see
-        # __init__), which is what the spec keys the cgroup on. cgroup v2 unified hierarchy.
-        return container_cgroup_fs_path(container_id)
+        # The container's cgroup is set explicitly in the OCI spec (runtime/spec.py writes
+        # ``linux.cgroupsPath`` from the same constants), so we know its name regardless of the
+        # runtime's cgroup driver. container_id == kernel_id here, which is what the spec keys on.
+        #
+        # Where that name is rooted differs by hierarchy, and the controller matters on v1: the
+        # unified v2 tree holds every controller at one mount point, while v1 gives each controller
+        # its own. Ignoring the controller (and assuming v2) made every read on a v1 host land on a
+        # path that does not exist — cpuacct/memory/blkio utilization silently absent for the life
+        # of the node, and enumerate_container_pids reading an empty cgroup.procs.
+        version = self.get_cgroup_version()
+        if version == "2":
+            return container_cgroup_fs_path(container_id)
+        return get_cgroup_mount_point(version, controller) / container_cgroup_parent(container_id)
 
     @override
     def get_cgroup_version(self) -> str:

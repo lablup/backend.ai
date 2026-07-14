@@ -41,9 +41,20 @@ _CGROUP_PARENT = "backend-ai"
 _CGROUP_ROOT = "/sys/fs/cgroup"
 
 
+def container_cgroup_parent(kernel_id: str) -> str:
+    """The container's cgroup, relative to whichever hierarchy root it is read under.
+
+    On cgroup v2 there is one root for every controller; on v1 each controller has its own mount
+    point, and only this relative part is common to them — which is why the stats reader composes
+    it with `get_cgroup_mount_point(version, controller)` rather than hard-coding a root.
+    """
+    return f"{_CGROUP_PARENT}/{kernel_id}"
+
+
 def container_cgroup_fs_path(kernel_id: str) -> Path:
-    """On-disk cgroup path for a container, matching the ``cgroupsPath`` set in the OCI spec."""
-    return Path(_CGROUP_ROOT) / _CGROUP_PARENT / kernel_id
+    """On-disk cgroup path for a container on a cgroup-v2 host, matching the ``cgroupsPath`` set in
+    the OCI spec."""
+    return Path(_CGROUP_ROOT) / container_cgroup_parent(kernel_id)
 
 
 # Minimal default capability set (runc's default bounded set for non-privileged).

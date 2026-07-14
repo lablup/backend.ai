@@ -11,6 +11,7 @@ from typing import Any, cast
 
 import pytest
 
+import ai.backend.agent.containerd.agent as agent_mod
 import ai.backend.agent.containerd.runtime.grpc as grpc_mod
 from ai.backend.agent.containerd.agent import ContainerdAgent, _read_container_log
 from ai.backend.agent.stats import StatModes
@@ -112,6 +113,36 @@ def _async_return(value: Any) -> Any:
         return value
 
     return _fn
+
+
+class TestCgroupPath:
+    """Where the stats reader looks for a kernel's cgroup. The controller matters on v1: each has
+    its own mount point, while the v2 unified tree holds them all at one root. Ignoring it (and
+    assuming v2) made every read on a v1 host land on a path that does not exist — utilization
+    silently absent for the life of the node."""
+
+    def _agent(self, monkeypatch: pytest.MonkeyPatch, *, version: str) -> ContainerdAgent:
+        agent = ContainerdAgent.__new__(ContainerdAgent)
+        monkeypatch.setattr(agent, "get_cgroup_version", lambda: version)
+        return agent
+
+    def test_v2_reads_the_unified_hierarchy(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        agent = self._agent(monkeypatch, version="2")
+        path = agent.get_cgroup_path("memory", "kern-1")
+        assert path == Path("/sys/fs/cgroup/backend-ai/kern-1")
+
+    def test_v1_reads_the_controllers_own_hierarchy(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(
+            agent_mod, "get_cgroup_mount_point", lambda v, c: Path(f"/sys/fs/cgroup/{c}")
+        )
+        agent = self._agent(monkeypatch, version="1")
+
+        assert agent.get_cgroup_path("memory", "kern-1") == Path(
+            "/sys/fs/cgroup/memory/backend-ai/kern-1"
+        )
+        assert agent.get_cgroup_path("cpuacct", "kern-1") == Path(
+            "/sys/fs/cgroup/cpuacct/backend-ai/kern-1"
+        )
 
 
 class TestEnumerateContainerPids:
