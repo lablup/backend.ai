@@ -2,8 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import replace
-from datetime import UTC, datetime
-from decimal import Decimal
+from datetime import UTC, datetime, timedelta
 from typing import Final, override
 from unittest.mock import AsyncMock
 from uuid import uuid4
@@ -13,8 +12,8 @@ import pytest
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.data.idle_checker.types import (
     CheckerType,
+    IdleCheckDeadline,
     IdleCheckerSpec,
-    IdleCheckRemainingTime,
     NetworkTimeoutSpec,
     SessionLifetimeSpec,
 )
@@ -88,8 +87,9 @@ class FakeChecker(IdleChecker):
                     IdleJudgment(
                         checker_id=assignment.definition.checker_id,
                         session_id=session.session_id,
-                        remaining_seconds=Decimal(
-                            -1 if session.session_id in self.idle_session_ids else 1
+                        deadline_at=_NOW
+                        + timedelta(
+                            seconds=-1 if session.session_id in self.idle_session_ids else 1
                         ),
                         is_idle=session.session_id in self.idle_session_ids,
                         message=self._message,
@@ -306,16 +306,16 @@ class TestIdleCheckReconcileHandler:
         assert network_checker.judge_calls == [
             [(network_bound.checker.checker_id, [first_session_id])]
         ]
-        assert result.remaining_times == [
-            IdleCheckRemainingTime(
+        assert result.deadlines == [
+            IdleCheckDeadline(
                 session_id=first_session_id,
                 checker_id=lifetime_bound.checker.checker_id,
-                remaining_seconds=Decimal(1),
+                deadline_at=_NOW + timedelta(seconds=1),
             ),
-            IdleCheckRemainingTime(
+            IdleCheckDeadline(
                 session_id=first_session_id,
                 checker_id=network_bound.checker.checker_id,
-                remaining_seconds=Decimal(1),
+                deadline_at=_NOW + timedelta(seconds=1),
             ),
         ]
 
@@ -364,34 +364,34 @@ class TestIdleCheckReconcileHandler:
         first_checker_id = lifetime_bound.checker.checker_id
         second_checker_id = second_lifetime_bound.checker.checker_id
         result = IdleCheckResult(
-            remaining_times=[
-                IdleCheckRemainingTime(
+            deadlines=[
+                IdleCheckDeadline(
                     checker_id=first_checker_id,
                     session_id=first_session_id,
-                    remaining_seconds=Decimal("120.125"),
+                    deadline_at=datetime(2026, 1, 2, 0, 2, 0, 125000, tzinfo=UTC),
                 ),
-                IdleCheckRemainingTime(
+                IdleCheckDeadline(
                     checker_id=second_checker_id,
                     session_id=first_session_id,
-                    remaining_seconds=Decimal("-15.273421"),
+                    deadline_at=datetime(2026, 1, 1, 23, 59, 44, 726579, tzinfo=UTC),
                 ),
             ]
         )
 
         await handler.post_process(result)
 
-        valkey_live.store_idle_check_remaining_times.assert_awaited_once()
-        remaining_times = list(valkey_live.store_idle_check_remaining_times.await_args.args[0])
-        assert remaining_times == [
-            IdleCheckRemainingTime(
+        valkey_live.store_idle_check_deadlines.assert_awaited_once()
+        deadlines = list(valkey_live.store_idle_check_deadlines.await_args.args[0])
+        assert deadlines == [
+            IdleCheckDeadline(
                 session_id=first_session_id,
                 checker_id=first_checker_id,
-                remaining_seconds=Decimal("120.125"),
+                deadline_at=datetime(2026, 1, 2, 0, 2, 0, 125000, tzinfo=UTC),
             ),
-            IdleCheckRemainingTime(
+            IdleCheckDeadline(
                 session_id=first_session_id,
                 checker_id=second_checker_id,
-                remaining_seconds=Decimal("-15.273421"),
+                deadline_at=datetime(2026, 1, 1, 23, 59, 44, 726579, tzinfo=UTC),
             ),
         ]
 
@@ -402,4 +402,4 @@ class TestIdleCheckReconcileHandler:
     ) -> None:
         await handler.post_process(IdleCheckResult())
 
-        valkey_live.store_idle_check_remaining_times.assert_not_awaited()
+        valkey_live.store_idle_check_deadlines.assert_not_awaited()

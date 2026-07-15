@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import enum
 from dataclasses import dataclass
-from decimal import Decimal
+from datetime import datetime
 from typing import Self
 
 from pydantic import Field, model_validator
@@ -12,10 +12,10 @@ from ai.backend.common.types import BackendAISchema, SessionId
 
 
 @dataclass(frozen=True)
-class IdleCheckRemainingTime:
+class IdleCheckDeadline:
     session_id: SessionId
     checker_id: IdleCheckerID
-    remaining_seconds: Decimal
+    deadline_at: datetime
 
 
 class CheckerType(enum.StrEnum):

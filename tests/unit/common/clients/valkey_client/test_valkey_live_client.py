@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import random
-from decimal import Decimal
+from datetime import UTC, datetime
 from uuid import uuid4
 
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
-from ai.backend.common.data.idle_checker.types import IdleCheckRemainingTime
+from ai.backend.common.data.idle_checker.types import IdleCheckDeadline
 from ai.backend.common.identifier.idle_checker import IdleCheckerID
 from ai.backend.common.types import SessionId
 
@@ -49,32 +49,32 @@ async def test_valkey_live_multiple_data_operations(test_valkey_live: ValkeyLive
     assert all(result is not None for result in results)
 
 
-async def test_store_idle_check_remaining_times(test_valkey_live: ValkeyLiveClient) -> None:
+async def test_store_idle_check_deadlines(test_valkey_live: ValkeyLiveClient) -> None:
     session_id = SessionId(uuid4())
     active_checker_id = IdleCheckerID(uuid4())
     idle_checker_id = IdleCheckerID(uuid4())
 
-    await test_valkey_live.store_idle_check_remaining_times([
-        IdleCheckRemainingTime(
+    await test_valkey_live.store_idle_check_deadlines([
+        IdleCheckDeadline(
             session_id=session_id,
             checker_id=active_checker_id,
-            remaining_seconds=Decimal("3E+1"),
+            deadline_at=datetime(2026, 1, 2, 0, 0, 30, tzinfo=UTC),
         ),
-        IdleCheckRemainingTime(
+        IdleCheckDeadline(
             session_id=session_id,
             checker_id=idle_checker_id,
-            remaining_seconds=Decimal("-15.273421"),
+            deadline_at=datetime(2026, 1, 1, 23, 59, 44, 726579, tzinfo=UTC),
         ),
     ])
 
-    active_remaining = await test_valkey_live.get_live_data(
-        f"session.{session_id}.idle_checker.{active_checker_id}.remaining"
+    active_deadline = await test_valkey_live.get_live_data(
+        f"session.{session_id}.idle_checker.{active_checker_id}.deadline_at"
     )
-    idle_remaining = await test_valkey_live.get_live_data(
-        f"session.{session_id}.idle_checker.{idle_checker_id}.remaining"
+    idle_deadline = await test_valkey_live.get_live_data(
+        f"session.{session_id}.idle_checker.{idle_checker_id}.deadline_at"
     )
-    assert active_remaining == b"30"
-    assert idle_remaining == b"-15.273421"
+    assert active_deadline == b"2026-01-02T00:00:30+00:00"
+    assert idle_deadline == b"2026-01-01T23:59:44.726579+00:00"
 
 
 async def test_valkey_live_client_lifecycle(test_valkey_live: ValkeyLiveClient) -> None:
