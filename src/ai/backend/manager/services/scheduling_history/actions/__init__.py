@@ -9,6 +9,14 @@ from .search_deployment_scoped_history import (
     SearchDeploymentScopedHistoryAction,
     SearchDeploymentScopedHistoryActionResult,
 )
+from .search_kernel_history import (
+    SearchKernelHistoryAction,
+    SearchKernelHistoryActionResult,
+)
+from .search_kernel_scoped_history import (
+    SearchKernelScopedHistoryAction,
+    SearchKernelScopedHistoryActionResult,
+)
 from .search_route_history import (
     SearchRouteHistoryAction,
     SearchRouteHistoryActionResult,
@@ -31,6 +39,8 @@ __all__ = (
     # Admin actions
     "SearchSessionHistoryAction",
     "SearchSessionHistoryActionResult",
+    "SearchKernelHistoryAction",
+    "SearchKernelHistoryActionResult",
     "SearchDeploymentHistoryAction",
     "SearchDeploymentHistoryActionResult",
     "SearchRouteHistoryAction",
@@ -38,6 +48,8 @@ __all__ = (
     # Scoped actions (added in 26.2.0)
     "SearchSessionScopedHistoryAction",
     "SearchSessionScopedHistoryActionResult",
+    "SearchKernelScopedHistoryAction",
+    "SearchKernelScopedHistoryActionResult",
     "SearchDeploymentScopedHistoryAction",
     "SearchDeploymentScopedHistoryActionResult",
     "SearchRouteScopedHistoryAction",

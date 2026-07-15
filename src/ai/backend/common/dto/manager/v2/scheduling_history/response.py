@@ -16,9 +16,11 @@ from .types import SubStepResultInfo
 
 __all__ = (
     "AdminSearchDeploymentHistoriesPayload",
+    "AdminSearchKernelHistoriesPayload",
     "AdminSearchRouteHistoriesPayload",
     "AdminSearchSessionHistoriesPayload",
     "DeploymentHistoryNode",
+    "KernelHistoryNode",
     "ListDeploymentHistoryPayload",
     "ListRouteHistoryPayload",
     "ListSessionHistoryPayload",
@@ -41,6 +43,26 @@ class SessionHistoryNode(BaseResponseModel):
     sub_steps: list[SubStepResultInfo] = Field(
         default_factory=list, description="Sub-step results within this scheduling attempt"
     )
+    attempts: int = Field(description="Number of scheduling attempts made")
+    created_at: datetime = Field(description="Timestamp when the history record was created")
+    updated_at: datetime = Field(description="Timestamp when the history record was last updated")
+
+
+class KernelHistoryNode(BaseResponseModel):
+    """Node model representing a kernel scheduling history record.
+
+    Has no ``sub_steps``: the ``kernel_scheduling_history`` table carries no such column.
+    """
+
+    id: UUID = Field(description="History record ID")
+    kernel_id: UUID = Field(description="Kernel ID this history belongs to")
+    session_id: UUID = Field(description="Session owning the kernel")
+    phase: str = Field(description="Scheduling phase")
+    from_status: str | None = Field(default=None, description="Status before transition")
+    to_status: str | None = Field(default=None, description="Status after transition")
+    result: str = Field(description="Result of the scheduling attempt")
+    error_code: str | None = Field(default=None, description="Error code if scheduling failed")
+    message: str | None = Field(default=None, description="Human-readable message or error detail")
     attempts: int = Field(description="Number of scheduling attempts made")
     created_at: datetime = Field(description="Timestamp when the history record was created")
     updated_at: datetime = Field(description="Timestamp when the history record was last updated")
@@ -122,6 +144,15 @@ class AdminSearchSessionHistoriesPayload(BaseResponseModel):
     """Payload for admin search of session scheduling histories."""
 
     items: list[SessionHistoryNode] = Field(description="List of session history nodes.")
+    total_count: int = Field(description="Total number of records matching the filter.")
+    has_next_page: bool = Field(description="Whether there is a next page.")
+    has_previous_page: bool = Field(description="Whether there is a previous page.")
+
+
+class AdminSearchKernelHistoriesPayload(BaseResponseModel):
+    """Payload for admin and scoped search of kernel scheduling histories."""
+
+    items: list[KernelHistoryNode] = Field(description="List of kernel history nodes.")
     total_count: int = Field(description="Total number of records matching the filter.")
     has_next_page: bool = Field(description="Whether there is a next page.")
     has_previous_page: bool = Field(description="Whether there is a previous page.")

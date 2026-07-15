@@ -12,6 +12,10 @@ from .actions import (
     SearchDeploymentHistoryActionResult,
     SearchDeploymentScopedHistoryAction,
     SearchDeploymentScopedHistoryActionResult,
+    SearchKernelHistoryAction,
+    SearchKernelHistoryActionResult,
+    SearchKernelScopedHistoryAction,
+    SearchKernelScopedHistoryActionResult,
     SearchRouteHistoryAction,
     SearchRouteHistoryActionResult,
     SearchRouteScopedHistoryAction,
@@ -31,6 +35,9 @@ class SchedulingHistoryProcessors(AbstractProcessorPackage):
     search_session_history: ActionProcessor[
         SearchSessionHistoryAction, SearchSessionHistoryActionResult
     ]
+    search_kernel_history: ActionProcessor[
+        SearchKernelHistoryAction, SearchKernelHistoryActionResult
+    ]
     search_deployment_history: ActionProcessor[
         SearchDeploymentHistoryAction, SearchDeploymentHistoryActionResult
     ]
@@ -39,6 +46,9 @@ class SchedulingHistoryProcessors(AbstractProcessorPackage):
     # Scoped processors (added in 26.2.0)
     search_session_scoped_history: ActionProcessor[
         SearchSessionScopedHistoryAction, SearchSessionScopedHistoryActionResult
+    ]
+    search_kernel_scoped_history: ActionProcessor[
+        SearchKernelScopedHistoryAction, SearchKernelScopedHistoryActionResult
     ]
     search_deployment_scoped_history: ActionProcessor[
         SearchDeploymentScopedHistoryAction, SearchDeploymentScopedHistoryActionResult
@@ -57,6 +67,7 @@ class SchedulingHistoryProcessors(AbstractProcessorPackage):
         self.search_session_history = ActionProcessor(
             service.search_session_history, action_monitors
         )
+        self.search_kernel_history = ActionProcessor(service.search_kernel_history, action_monitors)
         self.search_deployment_history = ActionProcessor(
             service.search_deployment_history, action_monitors
         )
@@ -65,6 +76,9 @@ class SchedulingHistoryProcessors(AbstractProcessorPackage):
         # Scoped processors (added in 26.2.0)
         self.search_session_scoped_history = ActionProcessor(
             service.search_session_scoped_history, action_monitors
+        )
+        self.search_kernel_scoped_history = ActionProcessor(
+            service.search_kernel_scoped_history, action_monitors
         )
         self.search_deployment_scoped_history = ActionProcessor(
             service.search_deployment_scoped_history, action_monitors
@@ -78,10 +92,12 @@ class SchedulingHistoryProcessors(AbstractProcessorPackage):
         return [
             # Admin actions
             SearchSessionHistoryAction.spec(),
+            SearchKernelHistoryAction.spec(),
             SearchDeploymentHistoryAction.spec(),
             SearchRouteHistoryAction.spec(),
             # Scoped actions (added in 26.2.0)
             SearchSessionScopedHistoryAction.spec(),
+            SearchKernelScopedHistoryAction.spec(),
             SearchDeploymentScopedHistoryAction.spec(),
             SearchRouteScopedHistoryAction.spec(),
         ]
