@@ -413,6 +413,16 @@ class TestStartContainer:
             await ctx.start_container(cast(Any, None), [], None, [], cast(Any, {}))
         assert len(ctx._port_pool) == before + 1  # 30003 returned to the pool
 
+    async def test_missing_net_meta_still_releases_the_reserved_ports(self) -> None:
+        # The net-meta guard used to raise BEFORE start_container's try, so its RuntimeError leaked
+        # the ports _reserve_host_ports had already taken. It is inside the try now.
+        ctx = _context(FakeFacade(), port_forwarder=FakePortForwarder())
+        ctx._net_meta = None  # apply_network never ran
+        before = len(ctx._port_pool)
+        with pytest.raises(RuntimeError):
+            await ctx.start_container(cast(Any, None), [], None, [], cast(Any, {}))
+        assert len(ctx._port_pool) == before + 1  # 30003 given back
+
     async def test_a_successful_start_does_not_release_the_pool(self) -> None:
         # the published launch releases via clean_kernel later; releasing here too would double-free
         ctx = _context(FakeFacade(), port_forwarder=FakePortForwarder())

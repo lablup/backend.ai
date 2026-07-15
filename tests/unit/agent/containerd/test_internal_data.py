@@ -7,6 +7,7 @@ login, dotfiles, the bootstrap script and registry credentials.
 """
 
 import json
+import os
 from pathlib import Path
 from typing import Any, cast
 
@@ -32,10 +33,11 @@ def _context(
     return ctx
 
 
-def _scratch(tmp_path: Path) -> Path:
-    (tmp_path / "work").mkdir()
-    (tmp_path / "config").mkdir()
-    return tmp_path
+def _scratch(base: Path) -> Path:
+    base.mkdir(parents=True, exist_ok=True)
+    (base / "work").mkdir()
+    (base / "config").mkdir()
+    return base
 
 
 def _spec(mounts: list[Mount] | None = None) -> KernelResourceSpec:
@@ -179,6 +181,34 @@ class TestDotfiles:
         assert (work / ".config" / "nvim" / "init.vim").stat().st_mode & 0o777 == 0o644
         for d in (work / ".config", work / ".config" / "nvim"):
             assert d.stat().st_mode & 0o100, f"{d} is not traversable by its owner"
+
+    async def test_a_relative_dotdot_path_is_refused(self, tmp_path: Path) -> None:
+        # `../../evil` escapes the scratch; as root that is an arbitrary host write. The scratch is
+        # a SUBdir of tmp_path so the escape target (a sibling of the scratch) is genuinely outside.
+        scratch = _scratch(tmp_path / "scratch")
+        escape_target = tmp_path / "evil-outside"
+        rel = os.path.relpath(escape_target, scratch / "work")
+        ctx = _context(
+            scratch,
+            internal_data={"dotfiles": [{"path": rel, "data": "PWNED", "perm": "600"}]},
+        )
+        await ctx._provision_internal_data(_spec())
+
+        assert not escape_target.exists()  # the write outside the scratch never happened
+
+    async def test_an_absolute_home_dotdot_path_is_refused(self, tmp_path: Path) -> None:
+        # /home/work/../../evil also escapes once the /home prefix is stripped and joined.
+        scratch = _scratch(tmp_path / "scratch")
+        escape_target = tmp_path / "evil-outside"
+        # after stripping the /home prefix, the path is joined under scratch; ../.. climbs out
+        path = "/home/work/../../evil-outside"
+        ctx = _context(
+            scratch,
+            internal_data={"dotfiles": [{"path": path, "data": "PWNED", "perm": "600"}]},
+        )
+        await ctx._provision_internal_data(_spec())
+
+        assert not escape_target.exists()
 
     async def test_absolute_home_path_maps_into_the_scratch(self, tmp_path: Path) -> None:
         # /home/work/x and /home/config/x are this kernel's scratch dirs on the host.

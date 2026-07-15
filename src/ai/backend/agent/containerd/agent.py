@@ -1084,6 +1084,17 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
                         continue
                 else:
                     file_path = work_dir / path
+                # Containment check: a `..` in the path (the manager does not reject one) resolves
+                # out of the scratch, and with the agent running as root the write lands anywhere it
+                # can reach — an arbitrary host-file write that _chown_paths_if_root may then hand to
+                # the kernel's uid. Refuse anything that does not resolve inside this kernel's
+                # scratch. (resolve() is lexical enough here: the parents do not exist yet.)
+                resolved = file_path.resolve()
+                if not resolved.is_relative_to(scratch_dir.resolve()):
+                    log.warning(
+                        "ignoring dotfile at {}: it escapes the kernel's scratch directory", path
+                    )
+                    continue
                 file_path.parent.mkdir(parents=True, exist_ok=True)
                 content = dotfile["data"]
                 if not content.endswith("\n"):
@@ -1224,6 +1235,27 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         # REPL, which the agent itself dials at kernel_host) on a host port, DNAT'd to the container
         # once its address is known at start. Same contract as the Docker backend's PortBindings.
         self._reserve_host_ports(service_ports)
+        # From here to the return, everything is fallible — the cluster_hostname lookup, reading and
+        # parsing the seccomp profile, building the kernel object — and the ports just reserved are
+        # not published until start_container, nor recorded anywhere clean_kernel can find them (it
+        # reclaims only *published* ports, off the live DNAT rules). So a failure in this tail would
+        # leak them from the agent-wide pool until a restart. Give them back on any failure here.
+        try:
+            return self._build_prepared_kernel(
+                oci_spec, service_ports, environ, extra_caps, resource_spec
+            )
+        except Exception:
+            self._port_pool.release_many([hp for hp, _, _ in self._host_port_map])
+            raise
+
+    def _build_prepared_kernel(
+        self,
+        oci_spec: dict[str, Any],
+        service_ports: list[ServicePort],
+        environ: Mapping[str, str],
+        extra_caps: list[str],
+        resource_spec: Any,
+    ) -> ContainerdKernel:
         # Identify the container the way the Docker backend does. These labels are the only thing
         # external tooling (the watcher, operators' `ctr`/`nerdctl ps` filters) and our own
         # restart-time scan have to go on; with just kernel-id/session-id, scan_running_kernels
@@ -1323,15 +1355,16 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         # then start it.
         spec = self._pending_spec
         command = [KRUNNER_ENTRYPOINT, *cmdargs]
-        if self._net_meta is None:
-            raise RuntimeError("apply_network must run before start_container (no net meta)")
         # _reserve_host_ports (in prepare_container) already took host ports from the pool. Any
         # failure here means they were never published — publish is atomic, so nothing survives in
         # iptables for clean_kernel to reclaim from — so release them right here, mirroring the
         # Docker backend's _rollback_container_creation. A published launch releases via clean_kernel
-        # instead, and `published` keeps the two paths from double-releasing.
+        # instead, and `published` keeps the two paths from double-releasing. The net-meta guard is
+        # INSIDE the try for the same reason: raising it outside would leak the reserved ports.
         published = False
         try:
+            if self._net_meta is None:
+                raise RuntimeError("apply_network must run before start_container (no net meta)")
             await self._session_network.create_container(
                 self._session_id,
                 self._container_id,
