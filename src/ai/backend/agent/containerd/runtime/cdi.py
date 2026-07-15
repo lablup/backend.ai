@@ -65,8 +65,11 @@ def load_device_edits(dirs: Sequence[str] = CDI_DEFAULT_DIRS) -> dict[str, dict[
             if not isinstance(spec, dict) or not (kind := spec.get("kind")):
                 continue
             spec_edits = spec.get("containerEdits") or {}
-            for dev in spec.get("devices") or []:
-                if (name := dev.get("name")) is None:
+            devices = spec.get("devices")
+            if not isinstance(devices, list):
+                continue  # a structurally odd spec is skipped, like an unparseable one
+            for dev in devices:
+                if not isinstance(dev, Mapping) or (name := dev.get("name")) is None:
                     continue
                 result[f"{kind}={name}"] = _merge_edits(spec_edits, dev.get("containerEdits") or {})
     return result
@@ -104,10 +107,15 @@ def _device_node_to_oci(dn: Mapping[str, Any]) -> tuple[dict[str, Any] | None, d
     return oci_dev, rule
 
 
-def _mount_to_oci(m: Mapping[str, Any]) -> dict[str, Any]:
+def _mount_to_oci(m: Mapping[str, Any]) -> dict[str, Any] | None:
+    """A CDI mount as an OCI mount, or None if it lacks a required path — a malformed entry is
+    skipped, not raised, so one bad mount does not fail the kernel that a hook fallback would run."""
+    container_path, host_path = m.get("containerPath"), m.get("hostPath")
+    if not container_path or not host_path:
+        return None
     return {
-        "destination": m["containerPath"],
-        "source": m["hostPath"],
+        "destination": container_path,
+        "source": host_path,
         "type": m.get("type") or "bind",
         "options": list(m.get("options") or ["rbind", "ro"]),
     }
@@ -145,7 +153,9 @@ def apply_device_edits(spec: dict[str, Any], edits_list: Sequence[Mapping[str, A
             seen_dev.add(oci_dev["path"])
             devices.append(oci_dev)
             dev_rules.append(rule)
-        mounts.extend(_mount_to_oci(m) for m in edits.get("mounts") or [])
+        mounts.extend(
+            oci for m in edits.get("mounts") or [] if (oci := _mount_to_oci(m)) is not None
+        )
         for raw in edits.get("env") or []:
             key = str(raw).split("=", 1)[0]
             env[:] = [e for e in env if e.split("=", 1)[0] != key]

@@ -114,17 +114,23 @@ async def ensure_profile_loaded(name: str = PROFILE_NAME) -> str | None:
                 text=True,
                 timeout=30,
             )
-            if proc.returncode != 0:
-                log.warning(
-                    "could not load the '{}' AppArmor profile ({}); containers will run"
-                    " unconfined. Loading a profile needs privilege — run the agent as root, or"
-                    " preload the profile out of band.",
-                    name,
-                    proc.stderr.strip() or f"exit {proc.returncode}",
-                )
-                return None
-            return name
+        except (subprocess.SubprocessError, OSError) as e:
+            # A hung parser (TimeoutExpired) or a failed spawn must not abort agent startup: this is
+            # awaited unguarded during init, and the module's contract is to degrade to unconfined,
+            # not to refuse to start. Same trade as a non-zero exit below.
+            log.warning("could not run apparmor_parser ({}); containers will run unconfined", e)
+            return None
         finally:
             Path(profile_path).unlink(missing_ok=True)
+        if proc.returncode != 0:
+            log.warning(
+                "could not load the '{}' AppArmor profile ({}); containers will run"
+                " unconfined. Loading a profile needs privilege — run the agent as root, or"
+                " preload the profile out of band.",
+                name,
+                proc.stderr.strip() or f"exit {proc.returncode}",
+            )
+            return None
+        return name
 
     return await asyncio.to_thread(_load)
