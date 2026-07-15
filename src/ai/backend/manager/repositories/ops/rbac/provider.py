@@ -124,6 +124,34 @@ class RBACWriteOps(WriteOps):
         )
         await self._sess.execute(stmt)
 
+    async def _insert_scope_self_memberships(self, scopes: Sequence[ScopeRef]) -> None:
+        """Register each scope as an entity member of its own virtual scope (idempotent).
+
+        Access to the scope object itself then resolves as an ordinary entity through the
+        single-path permission resolution. ``permission_cap`` is NULL (ownership, no ceiling).
+        """
+        if not scopes:
+            return
+        membership_source = sa.select(
+            VirtualScopeRow.id,
+            VirtualScopeRow.scope_type,
+            VirtualScopeRow.scope_id,
+            sa.null(),
+        ).where(
+            sa.tuple_(VirtualScopeRow.scope_type, VirtualScopeRow.scope_id).in_([
+                (s.scope_type, s.scope_id) for s in scopes
+            ])
+        )
+        stmt = (
+            pg_insert(EntityMembershipRow)
+            .from_select(
+                ["virtual_scope_id", "entity_type", "entity_id", "permission_cap"],
+                membership_source,
+            )
+            .on_conflict_do_nothing()
+        )
+        await self._sess.execute(stmt)
+
     async def bulk_create_scoped[TRow: Base](
         self,
         creators: Sequence[RBACEntityCreator[TRow]],
@@ -174,6 +202,7 @@ class RBACWriteOps(WriteOps):
         """
         result = await self.create(creation.creator)
         await self._insert_virtual_scopes([creation.scope])
+        await self._insert_scope_self_memberships([creation.scope])
         return result
 
     async def bulk_create_scopes[TRow: Base](
@@ -189,7 +218,9 @@ class RBACWriteOps(WriteOps):
         result = await self.bulk_create(
             BulkCreator(specs=[creation.creator.spec for creation in creations]),
         )
-        await self._insert_virtual_scopes([creation.scope for creation in creations])
+        scopes = [creation.scope for creation in creations]
+        await self._insert_virtual_scopes(scopes)
+        await self._insert_scope_self_memberships(scopes)
         return result
 
     async def delete_scope[TRow: Base](
