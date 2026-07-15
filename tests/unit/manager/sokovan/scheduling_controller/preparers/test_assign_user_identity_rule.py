@@ -10,7 +10,7 @@ from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.manager.data.session.draft import (
     SessionIdentityDraft,
-    SessionSpecDraft,
+    SessionResourceSpecDraft,
 )
 from ai.backend.manager.data.session.options import DefaultSessionOptions
 from ai.backend.manager.sokovan.scheduling_controller.preparers.assign_user_identity_rule import (
@@ -52,7 +52,7 @@ class TestAssignUserIdentityRule:
     ) -> None:
         creator = uuid.uuid4()
         with with_user(_user(creator)):
-            result = await rule.prepare(SessionSpecDraft(), context)
+            result = await rule.prepare(SessionResourceSpecDraft(), context)
         assert result.identity.user_uuid == creator
 
     async def test_preserves_caller_user_uuid(
@@ -62,7 +62,7 @@ class TestAssignUserIdentityRule:
     ) -> None:
         """Defensive: if the draft already has user_uuid, the rule is a no-op."""
         prefilled = uuid.uuid4()
-        draft = SessionSpecDraft(
+        draft = SessionResourceSpecDraft(
             identity=SessionIdentityDraft(user_uuid=prefilled),
         )
         with with_user(_user(uuid.uuid4())):
@@ -75,5 +75,5 @@ class TestAssignUserIdentityRule:
         context: SessionSpecPreparationContext,
     ) -> None:
         # No with_user block — ambient ctx is empty.
-        result = await rule.prepare(SessionSpecDraft(), context)
+        result = await rule.prepare(SessionResourceSpecDraft(), context)
         assert result.identity.user_uuid is None

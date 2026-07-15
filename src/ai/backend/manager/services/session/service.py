@@ -60,6 +60,7 @@ from ai.backend.manager.data.session.draft import (
     SessionIdentityDraft,
     SessionNetworkDraft,
     SessionOptionsDraft,
+    SessionResourceSpecDraft,
     SessionScopeDraft,
     SessionSpecDraft,
 )
@@ -339,22 +340,24 @@ class SessionService:
         )
 
         draft = SessionSpecDraft(
-            identity=SessionIdentityDraft(
-                session_id=SessionID(uuid.uuid4()),
-                creation_id=uuid.uuid4().hex,
-                session_name="compute-schedule",
-                access_key=action.access_key,
-                user_uuid=action.user_uuid,
+            resource_spec=SessionResourceSpecDraft(
+                identity=SessionIdentityDraft(
+                    session_id=SessionID(uuid.uuid4()),
+                    creation_id=uuid.uuid4().hex,
+                    session_name="compute-schedule",
+                    access_key=action.access_key,
+                    user_uuid=action.user_uuid,
+                ),
+                classification=SessionClassificationDraft(session_type=SessionTypes.INTERACTIVE),
+                options=SessionOptionsDraft(
+                    cluster_mode=action.cluster_mode,
+                    cluster_size=len(action.kernels),
+                    kernel_groups=kernel_groups,
+                ),
             ),
             scope=SessionScopeDraft(
                 resource_group_id=action.resource_group_id,
                 resource_group_name=resource_group_name,
-            ),
-            classification=SessionClassificationDraft(session_type=SessionTypes.INTERACTIVE),
-            options=SessionOptionsDraft(
-                cluster_mode=action.cluster_mode,
-                cluster_size=len(action.kernels),
-                kernel_groups=kernel_groups,
             ),
         )
 
@@ -1689,12 +1692,43 @@ class SessionService:
         )
 
         draft = SessionSpecDraft(
-            identity=SessionIdentityDraft(
-                session_id=SessionID(uuid.uuid4()),
-                creation_id=secrets.token_urlsafe(16),
-                session_name=action.session_name,
-                access_key=access_key,
-                user_uuid=user_id,
+            resource_spec=SessionResourceSpecDraft(
+                identity=SessionIdentityDraft(
+                    session_id=SessionID(uuid.uuid4()),
+                    creation_id=secrets.token_urlsafe(16),
+                    session_name=action.session_name,
+                    access_key=access_key,
+                    user_uuid=user_id,
+                ),
+                classification=SessionClassificationDraft(
+                    session_type=action.session_type,
+                    tag=action.tag,
+                ),
+                network=SessionNetworkDraft(
+                    network_id=(
+                        str(action.scheduling.attach_network)
+                        if action.scheduling.attach_network is not None
+                        else None
+                    ),
+                ),
+                callback_url=callback_url,
+                dependencies=dependencies,
+                options=SessionOptionsDraft(
+                    priority=action.scheduling.priority or SESSION_PRIORITY_DEFAULT,
+                    is_preemptible=action.scheduling.is_preemptible,
+                    cluster_mode=action.resource.cluster_mode,
+                    cluster_size=action.resource.cluster_size,
+                    scheduling_target=SchedulingTargetDraft(
+                        designated_agents=tuple(
+                            AgentId(a) for a in (action.scheduling.agent_list or ())
+                        ),
+                    ),
+                    kernel_groups=kernel_groups,
+                    handler_options=None,
+                ),
+                internal_data_extras=InternalDataExtras(
+                    sudo_session_enabled=False,
+                ),
             ),
             scope=SessionScopeDraft(
                 domain_id=domain_id,
@@ -1702,35 +1736,6 @@ class SessionService:
                 project_id=ProjectID(action.group_id),
                 resource_group_id=resource_group_id,
                 resource_group_name=resource_group_name,
-            ),
-            classification=SessionClassificationDraft(
-                session_type=action.session_type,
-                tag=action.tag,
-            ),
-            network=SessionNetworkDraft(
-                network_id=(
-                    str(action.scheduling.attach_network)
-                    if action.scheduling.attach_network is not None
-                    else None
-                ),
-            ),
-            callback_url=callback_url,
-            dependencies=dependencies,
-            options=SessionOptionsDraft(
-                priority=action.scheduling.priority or SESSION_PRIORITY_DEFAULT,
-                is_preemptible=action.scheduling.is_preemptible,
-                cluster_mode=action.resource.cluster_mode,
-                cluster_size=action.resource.cluster_size,
-                scheduling_target=SchedulingTargetDraft(
-                    designated_agents=tuple(
-                        AgentId(a) for a in (action.scheduling.agent_list or ())
-                    ),
-                ),
-                kernel_groups=kernel_groups,
-                handler_options=None,
-            ),
-            internal_data_extras=InternalDataExtras(
-                sudo_session_enabled=False,
             ),
         )
 

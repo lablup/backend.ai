@@ -33,9 +33,9 @@ class InferenceModelFolderRule(SessionSpecValidatorRule):
         spec: SessionSpec,
         _context: SessionSpecValidationContext,
     ) -> None:
-        if spec.classification.session_type != SessionTypes.INFERENCE:
+        if spec.resource_spec.classification.session_type != SessionTypes.INFERENCE:
             return
-        for kernel in spec.kernel_specs:
+        for kernel in spec.resource_spec.kernel_specs:
             for mount in kernel.vfolder_mounts:
                 if mount.usage_mode == VFolderUsageMode.MODEL:
                     return

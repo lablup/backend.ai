@@ -24,7 +24,7 @@ from typing import override
 
 from ai.backend.manager.data.session.draft import (
     KernelSpecDraft,
-    SessionSpecDraft,
+    SessionResourceSpecDraft,
 )
 from ai.backend.manager.sokovan.scheduling_controller.preparers.draft_rule import (
     SessionSpecDraftRule,
@@ -47,9 +47,9 @@ class ExpandKernelGroupsRule(SessionSpecDraftRule):
     @override
     async def prepare(
         self,
-        draft: SessionSpecDraft,
+        draft: SessionResourceSpecDraft,
         context: SessionSpecPreparationContext,
-    ) -> SessionSpecDraft:
+    ) -> SessionResourceSpecDraft:
         groups = draft.options.kernel_groups
         if groups is None:
             return draft

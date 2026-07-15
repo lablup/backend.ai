@@ -69,6 +69,7 @@ from ai.backend.manager.data.session.draft import (
     SessionIdentityDraft,
     SessionNetworkDraft,
     SessionOptionsDraft,
+    SessionResourceSpecDraft,
     SessionScopeDraft,
     SessionSpecDraft,
 )
@@ -98,12 +99,6 @@ def image_id() -> ImageID:
 def draft(image_id: ImageID) -> SessionSpecDraft:
     """A minimal but valid draft that satisfies every preparer rule."""
     return SessionSpecDraft(
-        identity=SessionIdentityDraft(
-            session_id=SessionID(uuid.uuid4()),
-            creation_id="ci-1",
-            session_name="module-test-session",
-            access_key=AccessKey("AKIAIOSFODNN7EXAMPLE"),
-        ),
         scope=SessionScopeDraft(
             domain_id=DomainID(uuid.uuid4()),
             domain_name=DomainName("default"),
@@ -111,43 +106,55 @@ def draft(image_id: ImageID) -> SessionSpecDraft:
             resource_group_id=ResourceGroupID(uuid.uuid4()),
             resource_group_name=ResourceGroupName("default"),
         ),
-        classification=SessionClassificationDraft(session_type=SessionTypes.INTERACTIVE),
-        network=SessionNetworkDraft(),
-        options=SessionOptionsDraft(
-            priority=10,
-            is_preemptible=True,
-            cluster_mode=ClusterMode.SINGLE_NODE,
-            cluster_size=1,
-            scheduling_target=SchedulingTargetDraft(),
-            kernel_groups=(
-                KernelGroupDraft(
-                    role="main",
-                    replica_count=1,
-                    execution_spec=KernelExecutionSpecDraft(
-                        resource_input=KernelResourceInput(
-                            image_id=image_id,
-                            resources=(
-                                ResourceSlotEntry(resource_type="cpu", quantity=str(Decimal(2))),
-                                ResourceSlotEntry(
-                                    resource_type="mem",
-                                    quantity=str(Decimal(2 * 1024 * 1024 * 1024)),
+        resource_spec=SessionResourceSpecDraft(
+            identity=SessionIdentityDraft(
+                session_id=SessionID(uuid.uuid4()),
+                creation_id="ci-1",
+                session_name="module-test-session",
+                access_key=AccessKey("AKIAIOSFODNN7EXAMPLE"),
+            ),
+            classification=SessionClassificationDraft(session_type=SessionTypes.INTERACTIVE),
+            network=SessionNetworkDraft(),
+            options=SessionOptionsDraft(
+                priority=10,
+                is_preemptible=True,
+                cluster_mode=ClusterMode.SINGLE_NODE,
+                cluster_size=1,
+                scheduling_target=SchedulingTargetDraft(),
+                kernel_groups=(
+                    KernelGroupDraft(
+                        role="main",
+                        replica_count=1,
+                        execution_spec=KernelExecutionSpecDraft(
+                            resource_input=KernelResourceInput(
+                                image_id=image_id,
+                                resources=(
+                                    ResourceSlotEntry(
+                                        resource_type="cpu", quantity=str(Decimal(2))
+                                    ),
+                                    ResourceSlotEntry(
+                                        resource_type="mem",
+                                        quantity=str(Decimal(2 * 1024 * 1024 * 1024)),
+                                    ),
                                 ),
+                                resource_opts=ResourceOpts(),
                             ),
-                            resource_opts=ResourceOpts(),
-                        ),
-                        mounts=(
-                            MountInfoEntry(
-                                vfolder_id=VFolderUUID(
-                                    VFolderID(quota_scope_id=None, folder_id=uuid.uuid4()).folder_id
+                            mounts=(
+                                MountInfoEntry(
+                                    vfolder_id=VFolderUUID(
+                                        VFolderID(
+                                            quota_scope_id=None, folder_id=uuid.uuid4()
+                                        ).folder_id
+                                    ),
+                                    mount_destination="/home/work/data",
+                                    mount_perm=MountPermission.READ_WRITE,
                                 ),
-                                mount_destination="/home/work/data",
-                                mount_perm=MountPermission.READ_WRITE,
                             ),
                         ),
                     ),
                 ),
+                handler_options=SessionHandlerOptions(),
             ),
-            handler_options=SessionHandlerOptions(),
         ),
     )
 
@@ -310,11 +317,17 @@ class TestEnqueueSessionFromDraft:
         repository.enqueue_session_from_spec.assert_awaited_once()
         enqueued_spec = repository.enqueue_session_from_spec.await_args.args[0]
         assert isinstance(enqueued_spec, SessionSpec)
-        assert enqueued_spec.identity.session_id == draft.identity.session_id
-        assert enqueued_spec.identity.session_name == draft.identity.session_name
-        assert enqueued_spec.options.cluster_size == 1
-        assert len(enqueued_spec.kernel_specs) == 1
-        kernel = enqueued_spec.kernel_specs[0]
+        assert (
+            enqueued_spec.resource_spec.identity.session_id
+            == draft.resource_spec.identity.session_id
+        )
+        assert (
+            enqueued_spec.resource_spec.identity.session_name
+            == draft.resource_spec.identity.session_name
+        )
+        assert enqueued_spec.resource_spec.options.cluster_size == 1
+        assert len(enqueued_spec.resource_spec.kernel_specs) == 1
+        kernel = enqueued_spec.resource_spec.kernel_specs[0]
         assert kernel.cluster_role == "main"
         assert kernel.execution_spec.resource_input.image_id == image_id
         # vfolder mounts flowed through context → resolved on the kernel spec
@@ -377,7 +390,7 @@ class TestEnqueueSessionFromDraft:
             await controller.enqueue_session_from_draft(draft)
 
         enqueued_spec = repository.enqueue_session_from_spec.await_args.args[0]
-        assert enqueued_spec.network.network_type == NetworkType.VOLATILE
+        assert enqueued_spec.resource_spec.network.network_type == NetworkType.VOLATILE
 
 
 class TestResourceGroupAccessibility:
@@ -423,5 +436,5 @@ class TestResourceGroupAccessibility:
         repository.query_accessible_resource_group_ids.assert_awaited_once()
         assert (
             repository.query_accessible_resource_group_ids.await_args.kwargs["access_key"]
-            == draft.identity.access_key
+            == draft.resource_spec.identity.access_key
         )

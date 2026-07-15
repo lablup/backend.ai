@@ -24,7 +24,7 @@ from ai.backend.manager.data.dotfile.types import (
 )
 from ai.backend.manager.data.session.draft import (
     KernelSpecDraft,
-    SessionSpecDraft,
+    SessionResourceSpecDraft,
 )
 from ai.backend.manager.data.session.options import (
     DefaultSessionOptions,
@@ -55,8 +55,8 @@ def _draft(
     sudo_session_enabled: bool = False,
     model_definition_path: str | None = None,
     model_definition: Mapping[str, Any] | None = None,
-) -> SessionSpecDraft:
-    return SessionSpecDraft(
+) -> SessionResourceSpecDraft:
+    return SessionResourceSpecDraft(
         kernel_specs=kernels,
         internal_data_extras=InternalDataExtras(
             sudo_session_enabled=sudo_session_enabled,

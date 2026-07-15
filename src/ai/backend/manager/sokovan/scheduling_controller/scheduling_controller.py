@@ -13,6 +13,7 @@ from ai.backend.common.events.event_types.session.broadcast import SchedulingBro
 from ai.backend.common.events.types import AbstractBroadcastEvent
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
 from ai.backend.common.types import KernelId, ResourceSlot, ResourceSlotEntry, SessionId
 from ai.backend.logging.utils import BraceStyleAdapter
@@ -24,7 +25,11 @@ from ai.backend.manager.data.session.compute_schedule import (
     UnschedulableReasonHint,
 )
 from ai.backend.manager.data.session.draft import SessionSpecDraft
-from ai.backend.manager.data.session.spec import SessionSpec
+from ai.backend.manager.data.session.spec import (
+    SessionResourceSpec,
+    SessionScope,
+    SessionSpec,
+)
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.common import InternalServerError, RejectedByHook
 from ai.backend.manager.metrics.scheduler import (
@@ -194,7 +199,7 @@ class SchedulingController:
             return
         domain_name = str(draft.scope.domain_name) if draft.scope.domain_name else None
         project_id = draft.scope.project_id
-        access_key = draft.identity.access_key
+        access_key = draft.resource_spec.identity.access_key
         if access_key is None or domain_name is None or project_id is None:
             raise InternalServerError(
                 "Unreachable: resource_group_id supplied without identity context",
@@ -216,7 +221,7 @@ class SchedulingController:
 
         Only input is the :class:`SessionSpecDraft` — request-envelope
         extras (sudo, model-definition overlay) ride on
-        ``draft.internal_data_extras``. Validation-adjacent DB reads (image
+        ``draft.resource_spec.internal_data_extras``. Validation-adjacent DB reads (image
         metadata, keypair policy, resource-group network, container uid/gid,
         dotfiles, active session count) flow through
         :meth:`SchedulerRepository.fetch_session_spec_contexts`; vfolder mounts
@@ -278,14 +283,16 @@ class SchedulingController:
         with self._metric_observer.measure_phase(
             "scheduling_controller", rg_id, "spec_preparation"
         ):
-            spec = await self._spec_preparer.prepare(draft, prep_ctx)
+            resource_spec = await self._spec_preparer.prepare(draft.resource_spec, prep_ctx)
+            scope = SessionScope.model_validate(draft.scope.model_dump(exclude_none=True))
+            spec = SessionSpec(resource_spec=resource_spec, scope=scope)
 
         hook_result = await self._hook_plugin_ctx.dispatch(
             "PRE_ENQUEUE_SESSION",
             (
-                spec.identity.session_id,
-                spec.identity.session_name,
-                spec.identity.access_key,
+                spec.resource_spec.identity.session_id,
+                spec.resource_spec.identity.session_name,
+                spec.resource_spec.identity.access_key,
             ),
             return_when=ALL_COMPLETED,
         )
@@ -300,14 +307,14 @@ class SchedulingController:
 
         log.info(
             "Session {} ({}) enqueued successfully via draft path",
-            spec.identity.session_name,
+            spec.resource_spec.identity.session_name,
             session_id,
         )
 
         await self._event_producer.broadcast_events_batch([
             SchedulingBroadcastEvent(
                 session_id=session_id,
-                creation_id=spec.identity.creation_id,
+                creation_id=spec.resource_spec.identity.creation_id,
                 status_transition=str(SessionStatus.PENDING),
                 reason="Session enqueued",
             )
@@ -323,12 +330,16 @@ class SchedulingController:
             )
         await self._hook_plugin_ctx.notify(
             "POST_ENQUEUE_SESSION",
-            (session_id, spec.identity.session_name, spec.identity.access_key),
+            (
+                session_id,
+                spec.resource_spec.identity.session_name,
+                spec.resource_spec.identity.access_key,
+            ),
         )
         return session_id
 
     def _prepare_kernel_data(
-        self, spec: SessionSpec, fetched: SessionSpecContextFetch
+        self, spec: SessionResourceSpec, fetched: SessionSpecContextFetch
     ) -> dict[KernelId, _KernelComputeScheduleData]:
         prepared_data: dict[KernelId, _KernelComputeScheduleData] = {}
         for kernel_spec in spec.kernel_specs:
@@ -367,7 +378,8 @@ class SchedulingController:
 
     async def _compute_schedule(
         self,
-        spec: SessionSpec,
+        spec: SessionResourceSpec,
+        resource_group_id: ResourceGroupID,
         kernel_data: dict[KernelId, _KernelComputeScheduleData],
     ) -> ComputeScheduleResult:
         kernel_requirements: dict[UUID, KernelResourceSpec] = {
@@ -382,7 +394,7 @@ class SchedulingController:
                 session_metadata=SessionMetadata(
                     session_id=SessionId(UUID(str(spec.identity.session_id))),
                     session_type=spec.classification.session_type,
-                    scaling_group=str(spec.scope.resource_group_name),
+                    resource_group_id=resource_group_id,
                     cluster_mode=spec.options.cluster_mode,
                 ),
                 kernel_requirements=kernel_requirements,
@@ -395,9 +407,7 @@ class SchedulingController:
             )
             # The selector mutates the agents list on full success; feed clones so
             # the live snapshot is never altered.
-            scheduling_data = await self._repository.get_scheduling_data(
-                spec.scope.resource_group_id
-            )
+            scheduling_data = await self._repository.get_scheduling_data(resource_group_id)
             if scheduling_data is None:
                 resource_group_reason = "Resource group does not exist"
                 return ComputeScheduleResult(
@@ -471,7 +481,7 @@ class SchedulingController:
 
         Reuses the enqueue prep chain (vfolder resolution skipped), then drives
         the real agent selector against a live snapshot of the group's agents.
-        Results correspond positionally to ``draft.options.kernel_groups``.
+        Results correspond positionally to ``draft.resource_spec.options.kernel_groups``.
         """
         rg_id = draft.scope.resource_group_id
         if rg_id is None:
@@ -488,9 +498,9 @@ class SchedulingController:
             # storage-RPC resolution by leaving the per-role mount map empty.
             vfolder_mounts_by_role={},
         )
-        spec = await self._spec_preparer.prepare(draft, prep_ctx)
-        compute_schedule_kernel_data = self._prepare_kernel_data(spec, fetched)
-        return await self._compute_schedule(spec, compute_schedule_kernel_data)
+        resource_spec = await self._spec_preparer.prepare(draft.resource_spec, prep_ctx)
+        compute_schedule_kernel_data = self._prepare_kernel_data(resource_spec, fetched)
+        return await self._compute_schedule(resource_spec, rg_id, compute_schedule_kernel_data)
 
     async def mark_scheduling_needed(self, schedule_types: Sequence[ScheduleType]) -> None:
         """

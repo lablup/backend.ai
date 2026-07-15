@@ -25,7 +25,7 @@ from ai.backend.manager.data.session.draft import (
     KernelGroupDraft,
     KernelResourceInput,
     SessionOptionsDraft,
-    SessionSpecDraft,
+    SessionResourceSpecDraft,
 )
 from ai.backend.manager.data.session.options import DefaultSessionOptions, ResourceOpts
 from ai.backend.manager.sokovan.scheduling_controller.preparers.compute_kernel_resources_rule import (
@@ -70,8 +70,8 @@ def _context(
     )
 
 
-def _draft(group: KernelGroupDraft) -> SessionSpecDraft:
-    return SessionSpecDraft(options=SessionOptionsDraft(kernel_groups=(group,)))
+def _draft(group: KernelGroupDraft) -> SessionResourceSpecDraft:
+    return SessionResourceSpecDraft(options=SessionOptionsDraft(kernel_groups=(group,)))
 
 
 class TestComputeKernelResourcesRule:
@@ -244,6 +244,6 @@ class TestComputeKernelResourcesRule:
 
     async def test_noop_when_kernel_groups_unset(self, rule: ComputeKernelResourcesRule) -> None:
         """With no ``kernel_groups``, the draft is returned unchanged."""
-        draft = SessionSpecDraft()
+        draft = SessionResourceSpecDraft()
         result = await rule.prepare(draft, _context({}))
         assert result is draft

@@ -31,7 +31,7 @@ class ContainerLimitRule(SessionSpecValidatorRule):
         limit = policy.max_containers_per_session
         if limit <= 0:
             return
-        count = len(spec.kernel_specs)
+        count = len(spec.resource_spec.kernel_specs)
         if count > limit:
             raise QuotaExceeded(
                 extra_msg=(

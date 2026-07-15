@@ -14,6 +14,7 @@ from uuid import UUID
 
 import pytest
 
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import (
     AgentId,
     ClusterMode,
@@ -114,7 +115,7 @@ class TestNoAvailableAgentErrorAggregationFormat:
             session_metadata=SessionMetadata(
                 session_id=SessionId(uuid.uuid4()),
                 session_type=SessionTypes.INTERACTIVE,
-                scaling_group="default",
+                resource_group_id=ResourceGroupID(uuid.UUID(int=0)),
                 cluster_mode=ClusterMode.SINGLE_NODE,
             ),
             kernel_requirements={
@@ -238,7 +239,7 @@ class TestDesignatedAgentFailureFormat:
             session_metadata=SessionMetadata(
                 session_id=SessionId(uuid.uuid4()),
                 session_type=SessionTypes.INTERACTIVE,
-                scaling_group="default",
+                resource_group_id=ResourceGroupID(uuid.UUID(int=0)),
                 cluster_mode=ClusterMode.SINGLE_NODE,
             ),
             kernel_requirements={
@@ -433,7 +434,7 @@ class TestGoldenNoAvailableAgentError:
             session_metadata=SessionMetadata(
                 session_id=SessionId(uuid.uuid4()),
                 session_type=SessionTypes.INTERACTIVE,
-                scaling_group="default",
+                resource_group_id=ResourceGroupID(uuid.UUID(int=0)),
                 cluster_mode=ClusterMode.SINGLE_NODE,
             ),
             kernel_requirements={
@@ -514,7 +515,7 @@ class TestGoldenNoDesignatedAgentCompatible:
             session_metadata=SessionMetadata(
                 session_id=SessionId(uuid.uuid4()),
                 session_type=SessionTypes.INTERACTIVE,
-                scaling_group="default",
+                resource_group_id=ResourceGroupID(uuid.UUID(int=0)),
                 cluster_mode=ClusterMode.SINGLE_NODE,
             ),
             kernel_requirements={
@@ -629,5 +630,8 @@ class TestGoldenNoAvailableAgentDirectConstruction:
 
 class TestGoldenNoAgentsInResourceGroupError:
     def test_full_message(self) -> None:
-        err = NoAgentsInResourceGroupError("default")
-        assert err.extra_msg == "No agents available in resource group 'default'"
+        err = NoAgentsInResourceGroupError(ResourceGroupID(uuid.UUID(int=0)))
+        assert (
+            err.extra_msg
+            == "No agents available in resource group '00000000-0000-0000-0000-000000000000'"
+        )

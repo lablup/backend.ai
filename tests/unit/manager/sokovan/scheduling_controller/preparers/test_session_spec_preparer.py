@@ -22,10 +22,7 @@ from typing import override
 
 import pytest
 
-from ai.backend.common.identifier.domain import DomainID, DomainName
 from ai.backend.common.identifier.image import ImageID
-from ai.backend.common.identifier.project import ProjectID
-from ai.backend.common.identifier.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.identifier.session import SessionID
 from ai.backend.common.types import AccessKey, ClusterMode, ResourceSlotEntry, SessionTypes
 from ai.backend.manager.data.session.draft import (
@@ -37,8 +34,7 @@ from ai.backend.manager.data.session.draft import (
     SessionIdentityDraft,
     SessionNetworkDraft,
     SessionOptionsDraft,
-    SessionScopeDraft,
-    SessionSpecDraft,
+    SessionResourceSpecDraft,
 )
 from ai.backend.manager.data.session.options import (
     DefaultSessionOptions,
@@ -65,7 +61,7 @@ class _TransformRule(SessionSpecDraftRule):
         self,
         tag: str,
         log: list[str],
-        transform: Callable[[SessionSpecDraft], SessionSpecDraft],
+        transform: Callable[[SessionResourceSpecDraft], SessionResourceSpecDraft],
     ) -> None:
         self._tag = tag
         self._log = log
@@ -78,9 +74,9 @@ class _TransformRule(SessionSpecDraftRule):
     @override
     async def prepare(
         self,
-        draft: SessionSpecDraft,
+        draft: SessionResourceSpecDraft,
         context: SessionSpecPreparationContext,
-    ) -> SessionSpecDraft:
+    ) -> SessionResourceSpecDraft:
         self._log.append(self._tag)
         return self._transform(draft)
 
@@ -112,22 +108,17 @@ def minimal_kernel_group(image_id: ImageID) -> KernelGroupDraft:
 
 
 @pytest.fixture
-def complete_draft(image_id: ImageID, minimal_kernel_group: KernelGroupDraft) -> SessionSpecDraft:
+def complete_draft(
+    image_id: ImageID, minimal_kernel_group: KernelGroupDraft
+) -> SessionResourceSpecDraft:
     """A finalize-ready draft for tests that only care about the happy path."""
-    return SessionSpecDraft(
+    return SessionResourceSpecDraft(
         identity=SessionIdentityDraft(
             session_id=SessionID(uuid.uuid4()),
             creation_id="test-creation-id",
             session_name="test-session",
             access_key=AccessKey("AKIAIOSFODNN7EXAMPLE"),
             user_uuid=uuid.uuid4(),
-        ),
-        scope=SessionScopeDraft(
-            domain_id=DomainID(uuid.uuid4()),
-            domain_name=DomainName("default"),
-            project_id=ProjectID(uuid.uuid4()),
-            resource_group_id=ResourceGroupID(uuid.uuid4()),
-            resource_group_name=ResourceGroupName("default"),
         ),
         classification=SessionClassificationDraft(
             session_type=SessionTypes.INTERACTIVE,
@@ -166,7 +157,7 @@ class TestRuleChain:
     async def test_empty_rule_chain_just_finalizes(
         self,
         context: SessionSpecPreparationContext,
-        complete_draft: SessionSpecDraft,
+        complete_draft: SessionResourceSpecDraft,
     ) -> None:
         """With no rules, the input draft must already be finalize-ready."""
         preparer = SessionSpecPreparer([])
@@ -176,7 +167,7 @@ class TestRuleChain:
     async def test_runs_rules_in_declaration_order(
         self,
         context: SessionSpecPreparationContext,
-        complete_draft: SessionSpecDraft,
+        complete_draft: SessionResourceSpecDraft,
     ) -> None:
         """Rules execute in the order they are passed to the constructor."""
         log: list[str] = []
@@ -195,12 +186,12 @@ class TestRuleChain:
         """Each rule sees the draft emitted by the previous rule."""
         log: list[str] = []
 
-        def set_priority(d: SessionSpecDraft) -> SessionSpecDraft:
+        def set_priority(d: SessionResourceSpecDraft) -> SessionResourceSpecDraft:
             return d.model_copy(update={"options": d.options.model_copy(update={"priority": 7})})
 
         captured: dict[str, int | None] = {}
 
-        def capture_priority(d: SessionSpecDraft) -> SessionSpecDraft:
+        def capture_priority(d: SessionResourceSpecDraft) -> SessionResourceSpecDraft:
             captured["priority"] = d.options.priority
             return d
 
@@ -211,7 +202,7 @@ class TestRuleChain:
         with pytest.raises(IncompleteSessionSpec):
             # Draft stays incomplete (identity / scope / etc. still
             # unset), but the rule chain runs to completion first.
-            await preparer.prepare(SessionSpecDraft(), context)
+            await preparer.prepare(SessionResourceSpecDraft(), context)
 
         assert captured["priority"] == 7
         assert log == ["set", "capture"]
@@ -219,7 +210,7 @@ class TestRuleChain:
     async def test_end_to_end_with_real_rule(
         self,
         context: SessionSpecPreparationContext,
-        complete_draft: SessionSpecDraft,
+        complete_draft: SessionResourceSpecDraft,
     ) -> None:
         """``MergeResourceGroupDefaultsRule`` wired through the runner fills
         unset options and produces a valid ``SessionSpec``."""
@@ -246,7 +237,7 @@ class TestFinalization:
     ) -> None:
         """An empty draft surfaces every required-spec field as a missing path."""
         with pytest.raises(IncompleteSessionSpec) as exc_info:
-            await preparer.prepare(SessionSpecDraft(), context)
+            await preparer.prepare(SessionResourceSpecDraft(), context)
         extra_data = exc_info.value.extra_data
         assert extra_data is not None
         missing: list[str] = extra_data["missing"]
@@ -256,9 +247,6 @@ class TestFinalization:
         assert "identity.session_name" in missing
         assert "identity.access_key" in missing
         assert "identity.user_uuid" in missing
-        assert "scope.domain_name" in missing
-        assert "scope.project_id" in missing
-        assert "scope.resource_group_name" in missing
         assert "classification.session_type" in missing
         assert "network.network_type" in missing
         assert "options.priority" in missing
@@ -272,15 +260,13 @@ class TestFinalization:
         self,
         preparer: SessionSpecPreparer,
         context: SessionSpecPreparationContext,
-        complete_draft: SessionSpecDraft,
+        complete_draft: SessionResourceSpecDraft,
     ) -> None:
         """A fully populated draft projects cleanly into a SessionSpec."""
         spec = await preparer.prepare(complete_draft, context)
 
         assert spec.identity.session_name == "test-session"
         assert spec.identity.access_key == AccessKey("AKIAIOSFODNN7EXAMPLE")
-        assert spec.scope.domain_name == DomainName("default")
-        assert spec.scope.resource_group_name == ResourceGroupName("default")
         assert spec.classification.session_type == SessionTypes.INTERACTIVE
         assert spec.options.priority == 10
         assert spec.options.cluster_mode == ClusterMode.SINGLE_NODE
@@ -296,7 +282,7 @@ class TestFinalization:
         self,
         preparer: SessionSpecPreparer,
         context: SessionSpecPreparationContext,
-        complete_draft: SessionSpecDraft,
+        complete_draft: SessionResourceSpecDraft,
     ) -> None:
         """Optional spec fields not set on the draft land as None on the spec."""
         spec = await preparer.prepare(complete_draft, context)
@@ -313,7 +299,7 @@ class TestFinalization:
         context: SessionSpecPreparationContext,
     ) -> None:
         """Only genuinely unset fields surface; set fields stay off the list."""
-        draft = SessionSpecDraft(
+        draft = SessionResourceSpecDraft(
             identity=SessionIdentityDraft(
                 session_id=SessionID(uuid.uuid4()),
                 # session_name intentionally unset
@@ -333,7 +319,7 @@ class TestFinalization:
         self,
         preparer: SessionSpecPreparer,
         context: SessionSpecPreparationContext,
-        complete_draft: SessionSpecDraft,
+        complete_draft: SessionResourceSpecDraft,
         image_id: ImageID,
     ) -> None:
         """Missing fields inside a ``kernel_specs`` entry report with index."""
@@ -361,7 +347,7 @@ class TestFinalization:
         self,
         preparer: SessionSpecPreparer,
         context: SessionSpecPreparationContext,
-        complete_draft: SessionSpecDraft,
+        complete_draft: SessionResourceSpecDraft,
     ) -> None:
         """Missing fields inside an ``execution_spec`` sub-draft report the full path."""
         broken_kernel = KernelSpecDraft(

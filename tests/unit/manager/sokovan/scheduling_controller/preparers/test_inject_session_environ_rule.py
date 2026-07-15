@@ -7,7 +7,7 @@ import pytest
 from ai.backend.manager.data.session.draft import (
     KernelExecutionSpecDraft,
     KernelSpecDraft,
-    SessionSpecDraft,
+    SessionResourceSpecDraft,
 )
 from ai.backend.manager.data.session.options import (
     DefaultSessionOptions,
@@ -32,8 +32,10 @@ def _context() -> SessionSpecPreparationContext:
     )
 
 
-def _draft_with_sudo(*, sudo: bool, kernel_specs: tuple[KernelSpecDraft, ...]) -> SessionSpecDraft:
-    return SessionSpecDraft(
+def _draft_with_sudo(
+    *, sudo: bool, kernel_specs: tuple[KernelSpecDraft, ...]
+) -> SessionResourceSpecDraft:
+    return SessionResourceSpecDraft(
         kernel_specs=kernel_specs,
         internal_data_extras=InternalDataExtras(sudo_session_enabled=sudo),
     )

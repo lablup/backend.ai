@@ -1378,7 +1378,7 @@ class ScheduleDBSource:
         async with self._begin_session_read_committed() as db_sess:
             image_ids = {
                 kernel.execution_spec.resource_input.image_id
-                for kernel in spec.kernel_specs
+                for kernel in spec.resource_spec.kernel_specs
                 if kernel.execution_spec.resource_input.image_id is not None
             }
             image_metadata: dict[ImageID, ImageInfo] = {}
@@ -1400,7 +1400,7 @@ class ScheduleDBSource:
                     for row in rows
                 }
 
-            for kernel in spec.kernel_specs:
+            for kernel in spec.resource_spec.kernel_specs:
                 image_id = kernel.execution_spec.resource_input.image_id
                 if image_id is not None and image_id not in image_metadata:
                     raise ImageNotFound(
@@ -1410,7 +1410,7 @@ class ScheduleDBSource:
 
             # Validate dependencies — each dependency session must exist.
             matched_dependency_ids: list[SessionId] = []
-            for dependency_id in spec.dependencies:
+            for dependency_id in spec.resource_spec.dependencies:
                 result = await db_sess.execute(
                     sa.select(SessionRow.id).where(SessionRow.id == dependency_id)
                 )
@@ -1437,7 +1437,7 @@ class ScheduleDBSource:
                     ),
                     enqueue_time=enqueue_time,
                 )
-                for kernel in spec.kernel_specs
+                for kernel in spec.resource_spec.kernel_specs
             ]
 
             rbac_creator = RBACEntityCreator(
@@ -1445,7 +1445,7 @@ class ScheduleDBSource:
                 element_type=RBACElementType.SESSION,
                 scope_ref=RBACElementRef(
                     element_type=RBACElementType.USER,
-                    element_id=str(spec.identity.user_uuid),
+                    element_id=str(spec.resource_spec.identity.user_uuid),
                 ),
                 additional_scope_refs=[
                     RBACElementRef(
@@ -1461,7 +1461,7 @@ class ScheduleDBSource:
                 element_type=RBACElementType.KERNEL,
                 scope_ref=RBACElementRef(
                     element_type=RBACElementType.SESSION,
-                    element_id=str(spec.identity.session_id),
+                    element_id=str(spec.resource_spec.identity.session_id),
                 ),
             )
             kernel_result = await execute_rbac_bulk_entity_creator(db_sess, kernel_rbac_creator)
@@ -1484,7 +1484,7 @@ class ScheduleDBSource:
             if matched_dependency_ids:
                 dependency_rows = [
                     SessionDependencyRow(
-                        session_id=spec.identity.session_id,
+                        session_id=spec.resource_spec.identity.session_id,
                         depends_on=depend_id,
                     )
                     for depend_id in matched_dependency_ids
@@ -1492,7 +1492,7 @@ class ScheduleDBSource:
                 db_sess.add_all(dependency_rows)
 
             history_spec = SessionSchedulingHistoryCreatorSpec(
-                session_id=SessionId(spec.identity.session_id),
+                session_id=SessionId(spec.resource_spec.identity.session_id),
                 phase="enqueue",
                 result=SchedulingResult.SUCCESS,
                 message="enqueue success",
@@ -1503,7 +1503,7 @@ class ScheduleDBSource:
 
             await db_sess.commit()
 
-        return SessionId(spec.identity.session_id)
+        return SessionId(spec.resource_spec.identity.session_id)
 
     async def fetch_session_spec_contexts(
         self,
@@ -1521,12 +1521,12 @@ class ScheduleDBSource:
         ``scheduling_controller`` subtree.
         """
         resource_group_id = draft.scope.resource_group_id
-        access_key = draft.identity.access_key
-        user_uuid = draft.identity.user_uuid
+        access_key = draft.resource_spec.identity.access_key
+        user_uuid = draft.resource_spec.identity.user_uuid
         domain_name = str(draft.scope.domain_name) if draft.scope.domain_name else None
         project_id = draft.scope.project_id
 
-        kernel_specs = tuple(draft.options.kernel_groups or ())
+        kernel_specs = tuple(draft.resource_spec.options.kernel_groups or ())
 
         async with self._begin_readonly_session_read_committed() as db_sess:
             network_info: ScalingGroupNetworkInfo | None = None
@@ -1661,11 +1661,11 @@ class ScheduleDBSource:
         request list resolves to a single ``VFolderMount`` tuple that every
         replica sharing the role copies verbatim.
         """
-        user_uuid = draft.identity.user_uuid
+        user_uuid = draft.resource_spec.identity.user_uuid
         domain_name = str(draft.scope.domain_name) if draft.scope.domain_name else None
         project_id = draft.scope.project_id
-        access_key = draft.identity.access_key
-        kernel_specs = tuple(draft.options.kernel_groups or ())
+        access_key = draft.resource_spec.identity.access_key
+        kernel_specs = tuple(draft.resource_spec.options.kernel_groups or ())
 
         vfolder_mounts_by_role: dict[str, tuple[VFolderMount, ...]] = {}
         if domain_name is None or user_uuid is None:

@@ -28,7 +28,7 @@ class ServicePortRule(SessionSpecValidatorRule):
         spec: SessionSpec,
         context: SessionSpecValidationContext,
     ) -> None:
-        for idx, kernel in enumerate(spec.kernel_specs):
+        for idx, kernel in enumerate(spec.resource_spec.kernel_specs):
             preopen = set(kernel.preopen_ports)
             if not preopen:
                 continue

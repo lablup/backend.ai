@@ -16,7 +16,7 @@ from __future__ import annotations
 from typing import override
 
 from ai.backend.common.contexts.user import current_user
-from ai.backend.manager.data.session.draft import SessionSpecDraft
+from ai.backend.manager.data.session.draft import SessionResourceSpecDraft
 from ai.backend.manager.sokovan.scheduling_controller.preparers.draft_rule import (
     SessionSpecDraftRule,
     SessionSpecPreparationContext,
@@ -33,9 +33,9 @@ class AssignUserIdentityRule(SessionSpecDraftRule):
     @override
     async def prepare(
         self,
-        draft: SessionSpecDraft,
-        _context: SessionSpecPreparationContext,
-    ) -> SessionSpecDraft:
+        draft: SessionResourceSpecDraft,
+        context: SessionSpecPreparationContext,
+    ) -> SessionResourceSpecDraft:
         if draft.identity.user_uuid is not None:
             return draft
         user = current_user()

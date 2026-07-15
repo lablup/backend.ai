@@ -438,7 +438,7 @@ class SessionProvisioner:
         session_metadata = SessionMetadata(
             session_id=session_workload.session_id,
             session_type=session_workload.session_type,
-            scaling_group=session_workload.scaling_group,
+            resource_group_id=session_workload.resource_group_id,
             cluster_mode=session_workload.cluster_mode,
         )
 

@@ -20,7 +20,7 @@ from ai.backend.manager.data.session.draft import (
     KernelGroupDraft,
     KernelResourceInput,
     SessionOptionsDraft,
-    SessionSpecDraft,
+    SessionResourceSpecDraft,
 )
 from ai.backend.manager.data.session.options import DefaultSessionOptions
 from ai.backend.manager.sokovan.scheduling_controller.preparers.draft_rule import (
@@ -62,8 +62,8 @@ def _make_group(
     )
 
 
-def _draft_with_groups(groups: tuple[KernelGroupDraft, ...]) -> SessionSpecDraft:
-    return SessionSpecDraft(options=SessionOptionsDraft(kernel_groups=groups))
+def _draft_with_groups(groups: tuple[KernelGroupDraft, ...]) -> SessionResourceSpecDraft:
+    return SessionResourceSpecDraft(options=SessionOptionsDraft(kernel_groups=groups))
 
 
 class TestExpandKernelGroupsRule:
@@ -73,7 +73,7 @@ class TestExpandKernelGroupsRule:
         context: SessionSpecPreparationContext,
     ) -> None:
         """With no kernel_groups on the draft, kernel_specs stays empty."""
-        draft = SessionSpecDraft()
+        draft = SessionResourceSpecDraft()
         result = await rule.prepare(draft, context)
         assert result.kernel_specs == ()
 

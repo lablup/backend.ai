@@ -32,7 +32,7 @@ from typing import override
 
 from ai.backend.manager.data.session.draft import (
     KernelExecutionSpecDraft,
-    SessionSpecDraft,
+    SessionResourceSpecDraft,
 )
 from ai.backend.manager.data.session.options import KernelExecutionSpec
 from ai.backend.manager.sokovan.scheduling_controller.preparers.draft_rule import (
@@ -51,9 +51,9 @@ class MergeResourceGroupDefaultsRule(SessionSpecDraftRule):
     @override
     async def prepare(
         self,
-        draft: SessionSpecDraft,
+        draft: SessionResourceSpecDraft,
         context: SessionSpecPreparationContext,
-    ) -> SessionSpecDraft:
+    ) -> SessionResourceSpecDraft:
         rg = context.resource_group_defaults
 
         # Option-level fill.
