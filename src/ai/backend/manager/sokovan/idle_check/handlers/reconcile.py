@@ -15,6 +15,7 @@ from ai.backend.manager.repositories.idle_checker.types import (
 from ai.backend.manager.sokovan.idle_check.checkers.base import (
     CheckerAssignment,
     IdleChecker,
+    IdleCheckerContext,
 )
 from ai.backend.manager.sokovan.idle_check.types import (
     IdleCheckReconcileInfo,
@@ -36,12 +37,16 @@ class IdleCheckReconcileHandler(ReconcilerHandler[IdleCheckReconcileInfo, IdleCh
     @override
     async def execute(self, reconcile_info: IdleCheckReconcileInfo) -> IdleCheckResult:
         assignments_by_type = self._assignments_by_type(reconcile_info.batch)
+        context = IdleCheckerContext(current_time=reconcile_info.current_time)
         reasons_by_session: defaultdict[SessionId, list[IdleReason]] = defaultdict(list)
         for checker_type, assignments in assignments_by_type.items():
             checker = self._checkers.get(checker_type)
             if checker is None:
                 continue
-            judgments = await checker.judge(assignments)
+            judgments = await checker.judge(
+                assignments,
+                context=context,
+            )
             for judgment in judgments:
                 if not judgment.is_idle:
                     continue

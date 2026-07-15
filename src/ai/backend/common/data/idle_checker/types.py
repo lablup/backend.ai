@@ -17,10 +17,16 @@ class CheckerType(enum.StrEnum):
 
 
 class SessionLifetimeSpec(BackendAISchema):
-    """Config for ``CheckerType.SESSION_LIFETIME``.
+    """Config for ``CheckerType.SESSION_LIFETIME``."""
 
-    Concrete fields (e.g. max lifetime) land with the checker-logic stories.
-    """
+    max_lifetime_seconds: int = Field(
+        ge=0,
+        description=(
+            "Maximum time in seconds that a session may remain running. "
+            "Zero disables this checker definition. This is the sole lifetime limit "
+            "used by the reconciler idle checker."
+        ),
+    )
 
 
 class NetworkTimeoutSpec(BackendAISchema):
