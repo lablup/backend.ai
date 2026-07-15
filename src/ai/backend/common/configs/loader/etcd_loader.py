@@ -18,5 +18,6 @@ class EtcdConfigLoader(AbstractConfigLoader):
         return await self._etcd.get_prefix(self._prefix)
 
     @property
+    @override
     def source_name(self) -> str:
         return f"etcd:{self._prefix}"

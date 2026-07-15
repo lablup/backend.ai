@@ -300,7 +300,7 @@
   # Jupyter, and other services. In multi-agent mode, ensure non-overlapping
   # ranges.
   # Added in 25.12.0
-  port-range = "[30000, 32000]"
+  port-range = [30000, 32000]
   # Minimum seconds between releasing a host port and reallocating it to a new
   # container. Mitigates TCP TIME_WAIT and stale firewall/monitoring state by
   # ensuring recently freed ports are not immediately reused. Set to 0 to

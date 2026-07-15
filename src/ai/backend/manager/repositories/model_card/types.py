@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
+from typing import override
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -60,6 +61,7 @@ class ProjectModelCardSearchScope(SearchScope):
     project_id: UUID
     user_id: UUID
 
+    @override
     def to_condition(self) -> QueryCondition:
         project_id = self.project_id
 
@@ -69,6 +71,7 @@ class ProjectModelCardSearchScope(SearchScope):
         return inner
 
     @property
+    @override
     def existence_checks(self) -> Sequence[ExistenceCheck[UUID]]:
         return [
             ExistenceCheck(
@@ -101,6 +104,7 @@ class VFolderModelCardSearchScope(SearchScope):
 
     vfolder_id: VFolderUUID
 
+    @override
     def to_condition(self) -> QueryCondition:
         vfolder_id = self.vfolder_id
 
@@ -110,5 +114,6 @@ class VFolderModelCardSearchScope(SearchScope):
         return inner
 
     @property
+    @override
     def existence_checks(self) -> Sequence[ExistenceCheck[UUID]]:
         return ()

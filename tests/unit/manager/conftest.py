@@ -18,7 +18,6 @@ from ai.backend.logging import LocalLogger, LogLevel
 from ai.backend.logging.config import ConsoleConfig, LogDriver, LoggingConfig
 from ai.backend.logging.types import LogFormat
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
-from ai.backend.manager.models.domain import domains
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.bootstrap import (  # noqa: F401
@@ -147,6 +146,9 @@ def domain_factory() -> DomainFactory:
     exposes both ``domain_name`` and ``domain_id`` so call sites are ready for
     the upcoming domain PK migration to UUID.
     """
+    from ai.backend.manager.models.domain import (
+        domains,
+    )  # lazy: avoid registering DomainRow globally
 
     async def _create(
         engine: ExtendedAsyncSAEngine,

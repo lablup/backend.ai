@@ -12,7 +12,7 @@ from __future__ import annotations
 import logging
 import threading
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, override
 
 from prometheus_client import Counter, Gauge, Histogram
 
@@ -138,6 +138,7 @@ class SafeLabeledMetric:
 class SafeCounter(Counter):
     """Counter that becomes no-op on any recording error."""
 
+    @override
     def labels(self, *args: Any, **kwargs: Any) -> Any:
         if _metrics_disabled:
             return _NOOP_LABELED
@@ -147,6 +148,7 @@ class SafeCounter(Counter):
             _trip(e)
             return _NOOP_LABELED
 
+    @override
     def inc(self, amount: float = 1, exemplar: dict[str, str] | None = None) -> None:
         if _metrics_disabled:
             return
@@ -159,6 +161,7 @@ class SafeCounter(Counter):
 class SafeGauge(Gauge):
     """Gauge that becomes no-op on any recording error."""
 
+    @override
     def labels(self, *args: Any, **kwargs: Any) -> Any:
         if _metrics_disabled:
             return _NOOP_LABELED
@@ -168,6 +171,7 @@ class SafeGauge(Gauge):
             _trip(e)
             return _NOOP_LABELED
 
+    @override
     def inc(self, amount: float = 1) -> None:
         if _metrics_disabled:
             return
@@ -176,6 +180,7 @@ class SafeGauge(Gauge):
         except Exception as e:
             _trip(e)
 
+    @override
     def dec(self, amount: float = 1) -> None:
         if _metrics_disabled:
             return
@@ -184,6 +189,7 @@ class SafeGauge(Gauge):
         except Exception as e:
             _trip(e)
 
+    @override
     def set(self, value: float) -> None:
         if _metrics_disabled:
             return
@@ -196,6 +202,7 @@ class SafeGauge(Gauge):
 class SafeHistogram(Histogram):
     """Histogram that becomes no-op on any recording error."""
 
+    @override
     def labels(self, *args: Any, **kwargs: Any) -> Any:
         if _metrics_disabled:
             return _NOOP_LABELED
@@ -205,6 +212,7 @@ class SafeHistogram(Histogram):
             _trip(e)
             return _NOOP_LABELED
 
+    @override
     def observe(self, amount: float, exemplar: dict[str, str] | None = None) -> None:
         if _metrics_disabled:
             return

@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Awaitable, Callable
 from http import HTTPStatus
-from typing import Any, Self
+from typing import Any, Self, override
 
 from aiohttp import web
 from pydantic import AliasChoices, Field
@@ -281,6 +281,7 @@ class TestAuthInfo(MiddlewareParam):
     is_authorized: bool = Field(default=False)
 
     @classmethod
+    @override
     async def from_request(cls, request: web.Request) -> Self:
         return cls(is_authorized=request.get("is_authorized", False))
 
@@ -356,6 +357,7 @@ class TestMiddlewareModel(MiddlewareParam):
     is_authorized: bool
 
     @classmethod
+    @override
     async def from_request(cls, request: web.Request) -> Self:
         return cls(is_authorized=request.get("is_authorized", False))
 

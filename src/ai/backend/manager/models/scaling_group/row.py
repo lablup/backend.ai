@@ -40,7 +40,8 @@ from ai.backend.common.types import (
     SessionTypes,
 )
 from ai.backend.manager.data.deployment.types import DeploymentOptions
-from ai.backend.manager.data.scaling_group.types import ScalingGroupData
+from ai.backend.manager.data.permission.permission_defs import ScalingGroupPermission
+from ai.backend.manager.data.scaling_group.types import FairShareScalingGroupSpec, ScalingGroupData
 from ai.backend.manager.data.session.options import DefaultSessionOptions
 from ai.backend.manager.models.base import (
     GUID,
@@ -59,8 +60,6 @@ from ai.backend.manager.models.rbac import (
     get_predefined_roles_in_scope,
 )
 from ai.backend.manager.models.rbac.context import ClientContext
-from ai.backend.manager.models.rbac.permission_defs import ScalingGroupPermission
-from ai.backend.manager.models.scaling_group.types import FairShareScalingGroupSpec
 from ai.backend.manager.models.types import QueryCondition
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -89,6 +88,9 @@ __all__: Sequence[str] = (
 class PreemptionConfig(BackendAISchema):
     model_config = ConfigDict(frozen=True)
 
+    enabled: bool = False
+    """Whether preemption is enabled for this resource group (opt-in)"""
+
     preemptible_priority: int = 5
     """Sessions with priority <= this value are preemptible"""
 
@@ -98,6 +100,9 @@ class PreemptionConfig(BackendAISchema):
     mode: PreemptionMode = PreemptionMode.TERMINATE
     """How to preempt sessions"""
 
+    preemption_min_runtime: timedelta = timedelta(seconds=0)
+    """Minimum session runtime before it becomes preemptible (0 = disabled)"""
+
     @field_serializer("order", mode="plain")
     def serialize_order(self, value: PreemptionOrder) -> str:
         return value.value
@@ -105,6 +110,10 @@ class PreemptionConfig(BackendAISchema):
     @field_serializer("mode", mode="plain")
     def serialize_mode(self, value: PreemptionMode) -> str:
         return value.value
+
+    @field_serializer("preemption_min_runtime", mode="plain")
+    def serialize_preemption_min_runtime(self, value: timedelta) -> float:
+        return value.total_seconds()
 
 
 class ScalingGroupOpts(BackendAISchema):
@@ -330,8 +339,16 @@ class ScalingGroupRow(Base):  # type: ignore[misc]
         default=DefaultSessionOptions,
     )
 
-    sessions: Mapped[list[SessionRow]] = relationship("SessionRow", back_populates="scaling_group")
-    agents: Mapped[list[AgentRow]] = relationship("AgentRow", back_populates="scaling_group_row")
+    sessions: Mapped[list[SessionRow]] = relationship(
+        "SessionRow",
+        back_populates="scaling_group",
+        foreign_keys="[SessionRow.scaling_group_name]",
+    )
+    agents: Mapped[list[AgentRow]] = relationship(
+        "AgentRow",
+        back_populates="scaling_group_row",
+        foreign_keys="[AgentRow.scaling_group]",
+    )
 
     sgroup_for_domains_rows: Mapped[list[ScalingGroupForDomainRow]] = relationship(
         "ScalingGroupForDomainRow",
@@ -398,9 +415,11 @@ class ScalingGroupRow(Base):  # type: ignore[misc]
                     allow_fractional_resource_fragmentation=self.scheduler_opts.allow_fractional_resource_fragmentation,
                     route_cleanup_target_statuses=self.scheduler_opts.route_cleanup_target_statuses,
                     preemption=DataPreemptionConfig(
+                        enabled=self.scheduler_opts.preemption.enabled,
                         preemptible_priority=self.scheduler_opts.preemption.preemptible_priority,
                         order=self.scheduler_opts.preemption.order,
                         mode=self.scheduler_opts.preemption.mode,
+                        preemption_min_runtime=self.scheduler_opts.preemption.preemption_min_runtime,
                     ),
                 ),
             ),
@@ -452,6 +471,7 @@ class ScalingGroupModel(RBACModel[ScalingGroupPermission]):
     _permissions: frozenset[ScalingGroupPermission] = field(default_factory=frozenset)
 
     @property
+    @override
     def permissions(self) -> Container[ScalingGroupPermission]:
         return self._permissions
 
@@ -623,12 +643,14 @@ class ScalingGroupPermissionContext(AbstractPermissionContext[ScalingGroupPermis
             )
         return cond
 
+    @override
     async def build_query(self) -> sa.sql.Select[Any] | None:
         cond = self.query_condition
         if cond is None:
             return None
         return sa.select(ScalingGroupRow).where(cond)
 
+    @override
     async def calculate_final_permission(self, rbac_obj: str) -> frozenset[ScalingGroupPermission]:
         host_name = rbac_obj
         return self.object_id_to_additional_permission_map.get(host_name, frozenset())

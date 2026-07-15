@@ -19,6 +19,10 @@ from ai.backend.manager.services.app_config_allow_list.actions.search import (
     SearchAppConfigAllowListAction,
     SearchAppConfigAllowListActionResult,
 )
+from ai.backend.manager.services.app_config_allow_list.actions.update import (
+    UpdateAppConfigAllowListAction,
+    UpdateAppConfigAllowListActionResult,
+)
 
 __all__ = ("AppConfigAllowListService",)
 
@@ -49,6 +53,12 @@ class AppConfigAllowListService:
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,
         )
+
+    async def update(
+        self, action: UpdateAppConfigAllowListAction
+    ) -> UpdateAppConfigAllowListActionResult:
+        data = await self._repository.update(action.updater)
+        return UpdateAppConfigAllowListActionResult(allow_list=data)
 
     async def purge(
         self, action: PurgeAppConfigAllowListAction

@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from datetime import datetime
 from enum import StrEnum
-from typing import TYPE_CHECKING, Annotated, Any, Self, cast
+from typing import TYPE_CHECKING, Annotated, Any, Self, cast, override
 from uuid import UUID
 
 import strawberry
@@ -51,6 +51,7 @@ from ai.backend.common.dto.manager.v2.session.types import (
     ProjectSessionScope,
     SessionStatusFilter,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import ImageID, SessionId
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, UUIDFilter, encode_cursor
 from ai.backend.manager.api.gql.common.types import (
@@ -104,6 +105,7 @@ class SessionV2StatusGQL(StrEnum):
     CREATING = "CREATING"
     RUNNING = "RUNNING"
     DEPRIORITIZING = "DEPRIORITIZING"
+    PREEMPTED = "PREEMPTED"
     TERMINATING = "TERMINATING"
     TERMINATED = "TERMINATED"
     CANCELLED = "CANCELLED"
@@ -465,9 +467,26 @@ class SessionV2GQL(PydanticNodeMixin[SessionNode]):
             return None
         return await info.context.data_loaders.replica_loader.load(UUID(str(self.replica_id)))
 
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Resource allocation (requested / used / allocated) computed on-demand "
+                "from the resource_allocations table. Unlike the deprecated eager "
+                "`resource.allocation`, `allocated` here persists after the session is "
+                "freed or terminated (for statistics and billing)."
+            ),
+        )
+    )  # type: ignore[misc]
+    async def resource_allocation(self, info: Info[StrawberryGQLContext]) -> ResourceAllocationGQL:
+        return await info.context.data_loaders.session_resource_allocation_loader.load(
+            SessionId(UUID(str(self.id)))
+        )
+
     # TODO: Add `vfolder_mounts` dynamic field (VFolder connection type needed)
 
     @classmethod
+    @override
     async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
         cls,
         *,
@@ -602,7 +621,18 @@ class EnqueueSessionInputGQL(PydanticInputMixin[EnqueueSessionInputDTO]):
     resource_entries: list[SessionResourceSlotEntryInputGQL] = gql_field(
         description="Resource slot allocations."
     )
-    resource_group: str | None = gql_field(default=None, description="Scaling group name.")
+    resource_group: str | None = gql_field(
+        default=None,
+        description=f"Deprecated since {NEXT_RELEASE_VERSION}. Use resource_group_id instead. Resource group name.",
+        deprecation_reason="Use resource_group_id instead.",
+    )
+    resource_group_id: ID | None = gql_added_field(
+        BackendAIGQLMeta(
+            description="Resource group UUID. Auto-selected if omitted.",
+            added_version=NEXT_RELEASE_VERSION,
+        ),
+        default=None,
+    )
     resource_opts: SessionResourceOptsInputGQL | None = gql_field(
         default=None, description="Additional resource options."
     )

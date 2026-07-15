@@ -31,7 +31,6 @@ from sqlalchemy.orm import (
 )
 from sqlalchemy.sql.expression import true
 
-from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import (
@@ -44,11 +43,10 @@ from ai.backend.common.types import (
     ImageRegistry,
     ResourceSlot,
     SlotName,
+    SlotTypes,
 )
 from ai.backend.common.utils import join_non_empty
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
-from ai.backend.manager.container_registry import get_container_registry_cls
 from ai.backend.manager.data.image.types import (
     ImageAliasData,
     ImageData,
@@ -60,9 +58,10 @@ from ai.backend.manager.data.image.types import (
     ImageTagEntry,
     ImageType,
     KVPair,
-    RescanImagesResult,
     ResourceLimit,
+    Resources,
 )
+from ai.backend.manager.data.permission.permission_defs import ImagePermission
 from ai.backend.manager.data.permission.types import EntityType
 from ai.backend.manager.data.permission.types import ScopeType as PermissionScopeType
 from ai.backend.manager.defs import INTRINSIC_SLOTS, INTRINSIC_SLOTS_MIN
@@ -86,15 +85,12 @@ from ai.backend.manager.models.rbac import (
 )
 from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.rbac.exceptions import InvalidScope
-from ai.backend.manager.models.rbac.permission_defs import ImagePermission
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
 from ai.backend.manager.models.user import UserRole, UserRow
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 if TYPE_CHECKING:
-    from ai.backend.common.bgtask.reporter import ProgressReporter
     from ai.backend.manager.models.container_registry import ContainerRegistryRow
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -106,7 +102,6 @@ __all__ = (
     "ImageLoadFilter",
     "ImageRow",
     "PublicImageLoadFilter",
-    "rescan_images",
 )
 
 
@@ -149,160 +144,6 @@ def _apply_loading_option(
             case RelationLoadingOption.REGISTRY:
                 query_stmt = query_stmt.options(joinedload(ImageRow.registry_row))
     return query_stmt
-
-
-async def load_configured_registries(
-    db: ExtendedAsyncSAEngine,
-    project: str | None,
-) -> dict[str, ContainerRegistryRow]:
-    join = functools.partial(join_non_empty, sep="/")
-
-    async with db.begin_readonly_session() as session:
-        result = await session.execute(sa.select(ContainerRegistryRow))
-        if project:
-            registries = cast(
-                dict[str, ContainerRegistryRow],
-                {
-                    join(row.registry_name, row.project): row
-                    for row in result.scalars().all()
-                    if row.project == project
-                },
-            )
-        else:
-            registries = {
-                join(row.registry_name, row.project): row for row in result.scalars().all()
-            }
-
-    return registries
-
-
-async def scan_registries(
-    db: ExtendedAsyncSAEngine,
-    registries: dict[str, ContainerRegistryRow],
-    reporter: ProgressReporter | None = None,
-) -> RescanImagesResult:
-    """
-    Performs an image rescan for all images in the registries.
-    """
-    from ai.backend.manager.data.image.types import RescanImagesResult
-
-    images, errors = [], []
-
-    for registry_key, registry_row in registries.items():
-        registry_name = ImageRef.parse_image_str(registry_key, "*").registry
-        log.info('Scanning kernel images from the registry "{0}"', registry_name)
-
-        scanner_cls = get_container_registry_cls(registry_row)
-        scanner = scanner_cls(db, registry_name, registry_row)
-
-        try:
-            scan_result = await scanner.rescan_single_registry(reporter)
-            images.extend(scan_result.images or [])
-            errors.extend(scan_result.errors or [])
-        except Exception as e:
-            errors.append(str(e))
-
-    return RescanImagesResult(images=images, errors=errors)
-
-
-async def scan_single_image(
-    db: ExtendedAsyncSAEngine,
-    registry_key: str,
-    registry_row: ContainerRegistryRow,
-    image_canonical: str,
-) -> RescanImagesResult:
-    """
-    Performs a scan for a single image.
-    """
-    registry_name = ImageRef.parse_image_str(registry_key, "*").registry
-    image_name = image_canonical.removeprefix(registry_name + "/")
-
-    log.debug("running a per-image metadata scan: {}, {}", registry_name, image_name)
-
-    scanner_cls = get_container_registry_cls(registry_row)
-    scanner = scanner_cls(db, registry_name, registry_row)
-    return await scanner.scan_single_ref(image_name)
-
-
-def filter_registry_dict(
-    registries: dict[str, ContainerRegistryRow],
-    condition: Callable[[str, ContainerRegistryRow], bool],
-) -> dict[str, ContainerRegistryRow]:
-    return {
-        registry_key: registry_row
-        for registry_key, registry_row in registries.items()
-        if condition(registry_key, registry_row)
-    }
-
-
-def filter_registries_by_img_canonical(
-    registries: dict[str, ContainerRegistryRow], registry_or_image: str
-) -> dict[str, ContainerRegistryRow]:
-    """
-    Filters the matching registry assuming `registry_or_image` is an image canonical name.
-    """
-    return filter_registry_dict(
-        registries,
-        lambda registry_key, _row: registry_or_image.startswith(registry_key + "/"),
-    )
-
-
-def filter_registries_by_registry_name(
-    registries: dict[str, ContainerRegistryRow], registry_or_image: str
-) -> dict[str, ContainerRegistryRow]:
-    """
-    Filters the matching registry assuming `registry_or_image` is a registry name.
-    """
-    return filter_registry_dict(
-        registries,
-        lambda registry_key, _row: registry_key.startswith(registry_or_image),
-    )
-
-
-async def rescan_images(
-    db: ExtendedAsyncSAEngine,
-    registry_or_image: str | None = None,
-    project: str | None = None,
-    *,
-    reporter: ProgressReporter | None = None,
-) -> RescanImagesResult:
-    """
-    Rescan container registries and the update images table.
-    Refer to the comments below for details on the function's behavior.
-
-    If registry name is provided for `registry_or_image`, scans all images in the specified registry.
-    If image canonical name is provided for `registry_or_image`, only scan the image.
-    If the `registry_or_image` is not provided, scan all configured registries.
-
-    If `project` is provided, only scan the registries associated with the project.
-    """
-    registries = await load_configured_registries(db, project)
-
-    if registry_or_image is None:
-        return await scan_registries(db, registries, reporter=reporter)
-
-    matching_registries = filter_registries_by_img_canonical(registries, registry_or_image)
-
-    if matching_registries:
-        if len(matching_registries) > 1:
-            raise RuntimeError(
-                "ContainerRegistryRows exist with the same registry_name and project!",
-            )
-
-        registry_key, registry_row = next(iter(matching_registries.items()))
-        return await scan_single_image(db, registry_key, registry_row, registry_or_image)
-
-    matching_registries = filter_registries_by_registry_name(registries, registry_or_image)
-
-    if not matching_registries:
-        raise RuntimeError("It is an unknown registry.", registry_or_image)
-
-    log.debug("running a per-registry metadata scan")
-    return await scan_registries(db, matching_registries, reporter=reporter)
-    # TODO: delete images removed from registry?
-
-
-type Resources = dict[SlotName, dict[str, Any]]
 
 
 def _get_container_registry_join_condition() -> sa.sql.elements.ColumnElement[Any]:
@@ -734,9 +575,11 @@ class ImageRow(Base):  # type: ignore[misc]
         result = await session.execute(query)
         return list(result.scalars().all())
 
+    @override
     def __str__(self) -> str:
         return self.image_ref.canonical + f" ({self.image_ref.architecture})"
 
+    @override
     def __repr__(self) -> str:
         return self.__str__()
 
@@ -796,8 +639,7 @@ class ImageRow(Base):  # type: ignore[misc]
         result: dict[SlotName, dict[str, Any]] = ImageRow._resources.type._schema.check(resources)
         return result
 
-    async def get_min_slot(self, etcd_loader: LegacyEtcdLoader) -> ResourceSlot:
-        slot_units = await etcd_loader.get_resource_slots()
+    async def get_min_slot(self, slot_units: Mapping[SlotName, SlotTypes]) -> ResourceSlot:
         min_slot = ResourceSlot()
 
         for slot_key, resource in self.resources.items():
@@ -953,25 +795,6 @@ class ImageRow(Base):  # type: ignore[misc]
             hash=self.trimmed_digest or None,
         )
 
-    async def untag_image_from_registry(
-        self, db: ExtendedAsyncSAEngine, session: AsyncSession
-    ) -> None:
-        """
-        Works only for HarborV2 registries.
-        """
-        from ai.backend.manager.container_registry.harbor import HarborRegistry_v2
-
-        query = sa.select(ContainerRegistryRow).where(ContainerRegistryRow.id == self.registry_id)
-
-        registry_info = (await session.execute(query)).scalar()
-        if registry_info is None:
-            raise RuntimeError(f"Registry not found for image {self.name}")
-        if registry_info.type != ContainerRegistryType.HARBOR2:
-            raise NotImplementedError("This feature is only supported for Harbor 2 registries")
-
-        scanner = HarborRegistry_v2(db, self.image_ref.registry, registry_info)
-        await scanner.untag(self.image_ref)
-
 
 async def bulk_get_image_configs(
     image_refs: Iterable[ImageRef],
@@ -1107,12 +930,14 @@ class ImagePermissionContext(AbstractPermissionContext[ImagePermission, ImageRow
             )
         return cond
 
+    @override
     async def build_query(self) -> sa.sql.Select[Any] | None:
         cond = self.query_condition
         if cond is None:
             return None
         return sa.select(ImageRow).where(cond)
 
+    @override
     async def calculate_final_permission(self, rbac_obj: ImageRow) -> frozenset[ImagePermission]:
         image_row = rbac_obj
         image_id = image_row.id

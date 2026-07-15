@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Sequence
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, override
 
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import AccessKey
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.kernel.types import KernelStatus
@@ -46,21 +47,25 @@ class ScheduleSessionsLifecycleHandler(SessionLifecycleHandler):
         self._repository = repository
 
     @classmethod
+    @override
     def name(cls) -> str:
         """Get the name of the handler."""
         return "schedule-sessions"
 
     @classmethod
+    @override
     def target_statuses(cls) -> list[SessionStatus]:
         """Sessions in PENDING state."""
         return [SessionStatus.PENDING]
 
     @classmethod
+    @override
     def target_kernel_statuses(cls) -> list[KernelStatus] | None:
         """No kernel filtering for scheduling."""
         return None
 
     @classmethod
+    @override
     def status_transitions(cls) -> StatusTransitions:
         """Define state transitions for scheduling handler (BEP-1030).
 
@@ -86,13 +91,15 @@ class ScheduleSessionsLifecycleHandler(SessionLifecycleHandler):
         )
 
     @property
+    @override
     def lock_id(self) -> LockID | None:
         """Lock for operations targeting PENDING sessions."""
         return LockID.LOCKID_SOKOVAN_TARGET_PENDING
 
+    @override
     async def execute(
         self,
-        scaling_group: str,
+        resource_group_id: ResourceGroupID,
         sessions: Sequence[SessionWithKernels],
     ) -> SessionExecutionResult:
         """Schedule pending sessions for a scaling group.
@@ -112,11 +119,11 @@ class ScheduleSessionsLifecycleHandler(SessionLifecycleHandler):
             return result
 
         # Fetch scheduling data required by Provisioner
-        scheduling_data = await self._repository.get_scheduling_data(scaling_group)
+        scheduling_data = await self._repository.get_scheduling_data(resource_group_id)
         if scheduling_data is None:
             log.debug(
                 "No scheduling data for scaling group {}. Skipping all sessions.",
-                scaling_group,
+                resource_group_id,
             )
             # All sessions are skipped when no scheduling data available
             result.skipped.extend(
@@ -127,7 +134,7 @@ class ScheduleSessionsLifecycleHandler(SessionLifecycleHandler):
         # Delegate to Provisioner with pre-fetched data
         provision_time = await self._repository.get_db_now()
         schedule_result = await self._provisioner.schedule_scaling_group(
-            scaling_group, scheduling_data, provision_time
+            scheduling_data, provision_time
         )
         scheduled_ids = set(schedule_result.scheduled_session_ids)
         failure_map = {

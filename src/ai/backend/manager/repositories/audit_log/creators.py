@@ -23,6 +23,7 @@ class AuditLogCreatorSpec(CreatorSpec[AuditLogRow]):
     entity_id: str | None
     request_id: str | None
     triggered_by: str | None
+    acted_as: uuid.UUID | None
     duration: timedelta | None
 
     @override
@@ -37,5 +38,6 @@ class AuditLogCreatorSpec(CreatorSpec[AuditLogRow]):
             entity_id=self.entity_id,
             request_id=self.request_id,
             triggered_by=self.triggered_by,
+            acted_as=self.acted_as,
             duration=self.duration,
         )

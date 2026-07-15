@@ -5,7 +5,7 @@ Tests that session status updates and history records are created atomically.
 
 import uuid
 from collections.abc import AsyncGenerator
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
 
 import pytest
@@ -13,6 +13,8 @@ import sqlalchemy as sa
 from dateutil.tz import tzutc
 
 from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import (
     AccessKey,
     ClusterMode,
@@ -34,7 +36,7 @@ from ai.backend.manager.models.resource_policy import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.scaling_group import ScalingGroupRow
+from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.scheduling_history.row import SessionSchedulingHistoryRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRow
@@ -79,15 +81,25 @@ class TestUpdateWithHistory:
             yield database_connection
 
     @pytest.fixture
+    def test_domain_id(self) -> DomainID:
+        return DomainID(uuid.uuid4())
+
+    @pytest.fixture
+    def test_scaling_group_id(self) -> ResourceGroupID:
+        return ResourceGroupID(uuid.uuid4())
+
+    @pytest.fixture
     async def test_domain_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_id: DomainID,
     ) -> AsyncGenerator[str, None]:
         """Create test domain and return domain name."""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as db_sess:
             domain = DomainRow(
+                id=test_domain_id,
                 name=domain_name,
                 total_resource_slots=ResourceSlot({
                     "cpu": Decimal("1000"),
@@ -98,6 +110,34 @@ class TestUpdateWithHistory:
             await db_sess.flush()
 
         yield domain_name
+
+    @pytest.fixture
+    async def test_scaling_group_name(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_scaling_group_id: ResourceGroupID,
+    ) -> AsyncGenerator[str, None]:
+        """Create test scaling group and return scaling group name."""
+        sg_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            sg = ScalingGroupRow(
+                id=test_scaling_group_id,
+                name=sg_name,
+                driver="static",
+                scheduler="fifo",
+                scheduler_opts=ScalingGroupOpts(
+                    allowed_session_types=[],
+                    pending_timeout=timedelta(hours=1),
+                    config={},
+                ),
+                driver_opts={},
+                is_active=True,
+            )
+            db_sess.add(sg)
+            await db_sess.flush()
+
+        yield sg_name
 
     @pytest.fixture
     async def test_resource_policy_name(
@@ -249,7 +289,10 @@ class TestUpdateWithHistory:
     async def test_session_id(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_id: DomainID,
         test_domain_name: str,
+        test_scaling_group_id: ResourceGroupID,
+        test_scaling_group_name: str,
         test_group_id: uuid.UUID,
     ) -> AsyncGenerator[SessionId, None]:
         """Create test session in PREPARING status and return session ID."""
@@ -261,8 +304,11 @@ class TestUpdateWithHistory:
                 creation_id=f"creation-{uuid.uuid4().hex[:8]}",
                 name=f"test-session-{uuid.uuid4().hex[:8]}",
                 session_type=SessionTypes.INTERACTIVE,
+                domain_id=test_domain_id,
                 domain_name=test_domain_name,
                 group_id=test_group_id,
+                resource_group_id=test_scaling_group_id,
+                scaling_group_name=test_scaling_group_name,
                 status=SessionStatus.PREPARING,
                 status_info="preparing",
                 result=SessionResult.UNDEFINED,
@@ -411,7 +457,10 @@ class TestUpdateWithHistory:
     async def test_update_with_history_multiple_sessions(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_id: DomainID,
         test_domain_name: str,
+        test_scaling_group_id: ResourceGroupID,
+        test_scaling_group_name: str,
         test_group_id: uuid.UUID,
     ) -> None:
         """Test update_with_history handles multiple sessions."""
@@ -427,8 +476,11 @@ class TestUpdateWithHistory:
                     creation_id=f"creation-{uuid.uuid4().hex[:8]}",
                     name=f"test-session-{uuid.uuid4().hex[:8]}",
                     session_type=SessionTypes.INTERACTIVE,
+                    domain_id=test_domain_id,
                     domain_name=test_domain_name,
                     group_id=test_group_id,
+                    resource_group_id=test_scaling_group_id,
+                    scaling_group_name=test_scaling_group_name,
                     status=SessionStatus.PREPARING,
                     status_info="preparing",
                     result=SessionResult.UNDEFINED,
@@ -899,7 +951,10 @@ class TestUpdateWithHistory:
     async def test_update_with_history_merge_multiple_sessions_batch(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_id: DomainID,
         test_domain_name: str,
+        test_scaling_group_id: ResourceGroupID,
+        test_scaling_group_name: str,
         test_group_id: uuid.UUID,
     ) -> None:
         """Test merge logic works correctly with multiple sessions in batch."""
@@ -914,8 +969,11 @@ class TestUpdateWithHistory:
                     creation_id=f"creation-{uuid.uuid4().hex[:8]}",
                     name=f"test-session-{uuid.uuid4().hex[:8]}",
                     session_type=SessionTypes.INTERACTIVE,
+                    domain_id=test_domain_id,
                     domain_name=test_domain_name,
                     group_id=test_group_id,
+                    resource_group_id=test_scaling_group_id,
+                    scaling_group_name=test_scaling_group_name,
                     status=SessionStatus.PREPARING,
                     status_info="preparing",
                     result=SessionResult.UNDEFINED,

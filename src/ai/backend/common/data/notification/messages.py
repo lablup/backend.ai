@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from abc import abstractmethod
 from collections.abc import Mapping
-from typing import Any
+from typing import Any, override
 
 from pydantic import Field
 
@@ -33,6 +33,7 @@ class NotifiableMessage(BackendAISchema):
 
     model_config = {"extra": "forbid"}  # Strict validation - reject unknown fields
 
+    @override
     def __init_subclass__(cls) -> None:
         """Automatically register subclasses by their rule type."""
         try:
@@ -96,6 +97,7 @@ class SessionStartedMessage(NotifiableMessage):
     """
 
     @classmethod
+    @override
     def rule_type(cls) -> NotificationRuleType:
         """Return the notification rule type for this message class."""
         return NotificationRuleType.SESSION_STARTED
@@ -121,6 +123,7 @@ class SessionTerminatedMessage(NotifiableMessage):
     """
 
     @classmethod
+    @override
     def rule_type(cls) -> NotificationRuleType:
         """Return the notification rule type for this message class."""
         return NotificationRuleType.SESSION_TERMINATED
@@ -151,6 +154,7 @@ class ArtifactDownloadCompletedMessage(NotifiableMessage):
     """
 
     @classmethod
+    @override
     def rule_type(cls) -> NotificationRuleType:
         """Return the notification rule type for this message class."""
         return NotificationRuleType.ARTIFACT_DOWNLOAD_COMPLETED
@@ -181,6 +185,7 @@ class EndpointLifecycleChangedMessage(NotifiableMessage):
     """
 
     @classmethod
+    @override
     def rule_type(cls) -> NotificationRuleType:
         """Return the notification rule type for this message class."""
         return NotificationRuleType.ENDPOINT_LIFECYCLE_CHANGED

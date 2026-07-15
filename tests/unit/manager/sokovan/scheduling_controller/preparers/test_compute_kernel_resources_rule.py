@@ -23,6 +23,7 @@ from ai.backend.manager.data.session.creation import ImageInfo
 from ai.backend.manager.data.session.draft import (
     KernelExecutionSpecDraft,
     KernelGroupDraft,
+    KernelResourceInput,
     SessionOptionsDraft,
     SessionSpecDraft,
 )
@@ -83,7 +84,9 @@ class TestComputeKernelResourcesRule:
             KernelGroupDraft(
                 role="main",
                 replica_count=1,
-                execution_spec=KernelExecutionSpecDraft(image_id=image_id),
+                execution_spec=KernelExecutionSpecDraft(
+                    resource_input=KernelResourceInput(image_id=image_id),
+                ),
             ),
         )
         ctx = _context({
@@ -97,7 +100,7 @@ class TestComputeKernelResourcesRule:
         result = await rule.prepare(draft, ctx)
 
         assert result.options.kernel_groups is not None
-        resources = result.options.kernel_groups[0].execution_spec.resources
+        resources = result.options.kernel_groups[0].execution_spec.resource_input.resources
         resource_map = {entry.resource_type: Decimal(entry.quantity) for entry in resources}
         assert resource_map["cpu"] == Decimal("2")
         # mem must include shmem so the result clears ResourceLimitRule's
@@ -114,7 +117,9 @@ class TestComputeKernelResourcesRule:
             KernelGroupDraft(
                 role="main",
                 replica_count=1,
-                execution_spec=KernelExecutionSpecDraft(image_id=image_id),
+                execution_spec=KernelExecutionSpecDraft(
+                    resource_input=KernelResourceInput(image_id=image_id),
+                ),
             ),
         )
         ctx = _context({
@@ -129,10 +134,11 @@ class TestComputeKernelResourcesRule:
         assert result.options.kernel_groups is not None
         exec_spec = result.options.kernel_groups[0].execution_spec
         resource_map = {
-            entry.resource_type: Decimal(entry.quantity) for entry in exec_spec.resources
+            entry.resource_type: Decimal(entry.quantity)
+            for entry in exec_spec.resource_input.resources
         }
-        assert exec_spec.resource_opts is not None
-        shmem = exec_spec.resource_opts.shmem
+        assert exec_spec.resource_input.resource_opts is not None
+        shmem = exec_spec.resource_input.resource_opts.shmem
         assert shmem is not None
         image_min_mem = Decimal(256 * 1024 * 1024)
         assert resource_map["mem"] >= image_min_mem + Decimal(int(shmem))
@@ -145,8 +151,10 @@ class TestComputeKernelResourcesRule:
                 role="main",
                 replica_count=1,
                 execution_spec=KernelExecutionSpecDraft(
-                    image_id=image_id,
-                    resources=(ResourceSlotEntry(resource_type="cpu", quantity="8"),),
+                    resource_input=KernelResourceInput(
+                        image_id=image_id,
+                        resources=(ResourceSlotEntry(resource_type="cpu", quantity="8"),),
+                    ),
                 ),
             ),
         )
@@ -154,7 +162,7 @@ class TestComputeKernelResourcesRule:
         result = await rule.prepare(draft, ctx)
 
         assert result.options.kernel_groups is not None
-        resources = result.options.kernel_groups[0].execution_spec.resources
+        resources = result.options.kernel_groups[0].execution_spec.resource_input.resources
         resource_map = {entry.resource_type: Decimal(entry.quantity) for entry in resources}
         assert resource_map["cpu"] == Decimal("8")
 
@@ -165,7 +173,9 @@ class TestComputeKernelResourcesRule:
             KernelGroupDraft(
                 role="main",
                 replica_count=1,
-                execution_spec=KernelExecutionSpecDraft(image_id=image_id),
+                execution_spec=KernelExecutionSpecDraft(
+                    resource_input=KernelResourceInput(image_id=image_id),
+                ),
             ),
         )
         ctx = _context({
@@ -177,7 +187,7 @@ class TestComputeKernelResourcesRule:
         result = await rule.prepare(draft, ctx)
 
         assert result.options.kernel_groups is not None
-        opts = result.options.kernel_groups[0].execution_spec.resource_opts
+        opts = result.options.kernel_groups[0].execution_spec.resource_input.resource_opts
         assert opts is not None
         assert opts.shmem is not None
         # 2g == 2 * 1024 MiB
@@ -192,8 +202,10 @@ class TestComputeKernelResourcesRule:
                 role="main",
                 replica_count=1,
                 execution_spec=KernelExecutionSpecDraft(
-                    image_id=image_id,
-                    resource_opts=ResourceOpts(shmem=caller_shmem),
+                    resource_input=KernelResourceInput(
+                        image_id=image_id,
+                        resource_opts=ResourceOpts(shmem=caller_shmem),
+                    ),
                 ),
             ),
         )
@@ -206,7 +218,7 @@ class TestComputeKernelResourcesRule:
         result = await rule.prepare(draft, ctx)
 
         assert result.options.kernel_groups is not None
-        opts = result.options.kernel_groups[0].execution_spec.resource_opts
+        opts = result.options.kernel_groups[0].execution_spec.resource_input.resource_opts
         assert opts is not None
         assert opts.shmem == caller_shmem
 
@@ -217,7 +229,9 @@ class TestComputeKernelResourcesRule:
             KernelGroupDraft(
                 role="main",
                 replica_count=1,
-                execution_spec=KernelExecutionSpecDraft(image_id=image_id),
+                execution_spec=KernelExecutionSpecDraft(
+                    resource_input=KernelResourceInput(image_id=image_id),
+                ),
             ),
         )
         ctx = _context({})  # no image infos supplied
@@ -225,8 +239,8 @@ class TestComputeKernelResourcesRule:
 
         assert result.options.kernel_groups is not None
         merged = result.options.kernel_groups[0].execution_spec
-        assert merged.resources == ()
-        assert merged.resource_opts is None
+        assert merged.resource_input.resources == ()
+        assert merged.resource_input.resource_opts is None
 
     async def test_noop_when_kernel_groups_unset(self, rule: ComputeKernelResourcesRule) -> None:
         """With no ``kernel_groups``, the draft is returned unchanged."""

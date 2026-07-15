@@ -9,6 +9,7 @@ the finalized ``SessionSpec``.
 from __future__ import annotations
 
 from decimal import Decimal
+from typing import override
 
 from ai.backend.manager.data.session.spec import SessionSpec
 from ai.backend.manager.errors.api import InvalidAPIParameters
@@ -22,9 +23,11 @@ from ai.backend.manager.sokovan.scheduling_controller.validators.session_spec_ba
 class RequiredResourceSlotRule(SessionSpecValidatorRule):
     """Every kernel request must include all globally required slots."""
 
+    @override
     def name(self) -> str:
         return "required_resource_slot"
 
+    @override
     def validate(
         self,
         spec: SessionSpec,
@@ -37,7 +40,7 @@ class RequiredResourceSlotRule(SessionSpecValidatorRule):
         for idx, kernel in enumerate(spec.kernel_specs):
             requested = {
                 entry.resource_type: parse_quantity(entry.quantity)
-                for entry in kernel.execution_spec.resources
+                for entry in kernel.execution_spec.resource_input.resources
             }
             missing = sorted(
                 str(slot_name)

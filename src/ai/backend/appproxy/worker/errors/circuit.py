@@ -4,6 +4,8 @@ Circuit-related exceptions for the worker.
 
 from __future__ import annotations
 
+from typing import override
+
 from ai.backend.common.exception import (
     BackendAIError,
     ErrorCode,
@@ -19,6 +21,7 @@ class InvalidCircuitDataError(BackendAIError):
     error_type = "https://api.backend.ai/probs/appproxy-worker/invalid-circuit-data"
     error_title = "Invalid circuit data."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,
@@ -33,6 +36,7 @@ class InvalidFrontendTypeError(BackendAIError):
     error_type = "https://api.backend.ai/probs/appproxy-worker/invalid-frontend-type"
     error_title = "Invalid frontend type."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,

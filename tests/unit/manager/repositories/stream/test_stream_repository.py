@@ -8,6 +8,8 @@ from datetime import datetime
 import pytest
 from dateutil.tz import tzutc
 
+from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import (
     AccessKey,
     ClusterMode,
@@ -59,7 +61,9 @@ def _make_session_row(
     user_uuid: uuid.UUID,
     access_key: AccessKey,
     status: SessionStatus,
+    domain_id: DomainID,
     domain_name: str,
+    resource_group_id: ResourceGroupID,
     group_id: uuid.UUID,
     created_at: datetime,
 ) -> SessionRow:
@@ -70,6 +74,7 @@ def _make_session_row(
         session_type=SessionTypes.INTERACTIVE,
         cluster_mode=ClusterMode.SINGLE_NODE,
         cluster_size=1,
+        domain_id=domain_id,
         domain_name=domain_name,
         group_id=group_id,
         user_uuid=user_uuid,
@@ -91,6 +96,7 @@ def _make_session_row(
         environ=None,
         bootstrap_script=None,
         use_host_network=False,
+        resource_group_id=resource_group_id,
         scaling_group_name="default",
     )
 
@@ -104,6 +110,7 @@ def _make_kernel_row(
     cluster_role: str,
     cluster_idx: int,
     domain_name: str,
+    resource_group_id: ResourceGroupID,
     group_id: uuid.UUID,
     created_at: datetime,
 ) -> KernelRow:
@@ -114,6 +121,8 @@ def _make_kernel_row(
         domain_name=domain_name,
         group_id=group_id,
         user_uuid=user_uuid,
+        scaling_group="default",
+        resource_group_id=resource_group_id,
         access_key=access_key,
         cluster_mode=ClusterMode.SINGLE_NODE.value,
         cluster_size=2,
@@ -158,6 +167,14 @@ class TestStreamRepository:
     """Tests for StreamRepository.get_streaming_session() using a real database."""
 
     @pytest.fixture
+    def test_domain_id(self) -> DomainID:
+        return DomainID(uuid.uuid4())
+
+    @pytest.fixture
+    def test_scaling_group_id(self) -> ResourceGroupID:
+        return ResourceGroupID(uuid.uuid4())
+
+    @pytest.fixture
     async def db_with_cleanup(
         self, database_connection: ExtendedAsyncSAEngine
     ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
@@ -188,7 +205,12 @@ class TestStreamRepository:
         return StreamRepository(db_with_cleanup)
 
     @pytest.fixture
-    async def stream_session(self, db_with_cleanup: ExtendedAsyncSAEngine) -> StreamSessionFixture:
+    async def stream_session(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_id: DomainID,
+        test_scaling_group_id: ResourceGroupID,
+    ) -> StreamSessionFixture:
         """
         Seed a RUNNING session with two kernels (main + sub) owned by a user
         who has both an active and an inactive keypair, plus an unrelated user
@@ -211,6 +233,7 @@ class TestStreamRepository:
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 DomainRow(
+                    id=test_domain_id,
                     name=domain_name,
                     description="Test domain",
                     is_active=True,
@@ -222,6 +245,7 @@ class TestStreamRepository:
             )
             db_sess.add(
                 ScalingGroupRow(
+                    id=test_scaling_group_id,
                     name="default",
                     is_active=True,
                     is_public=True,
@@ -359,7 +383,9 @@ class TestStreamRepository:
                     user_uuid=user_uuid,
                     access_key=inactive_access_key,
                     status=SessionStatus.RUNNING,
+                    domain_id=test_domain_id,
                     domain_name=domain_name,
+                    resource_group_id=test_scaling_group_id,
                     group_id=group_id,
                     created_at=now,
                 )
@@ -372,7 +398,9 @@ class TestStreamRepository:
                     user_uuid=user_uuid,
                     access_key=active_access_key,
                     status=SessionStatus.TERMINATED,
+                    domain_id=test_domain_id,
                     domain_name=domain_name,
+                    resource_group_id=test_scaling_group_id,
                     group_id=group_id,
                     created_at=now,
                 )
@@ -385,7 +413,9 @@ class TestStreamRepository:
                     user_uuid=other_user_uuid,
                     access_key=other_user_access_key,
                     status=SessionStatus.RUNNING,
+                    domain_id=test_domain_id,
                     domain_name=domain_name,
+                    resource_group_id=test_scaling_group_id,
                     group_id=group_id,
                     created_at=now,
                 )
@@ -401,6 +431,7 @@ class TestStreamRepository:
                     cluster_role="main",
                     cluster_idx=0,
                     domain_name=domain_name,
+                    resource_group_id=test_scaling_group_id,
                     group_id=group_id,
                     created_at=now,
                 )
@@ -414,6 +445,7 @@ class TestStreamRepository:
                     cluster_role="sub",
                     cluster_idx=1,
                     domain_name=domain_name,
+                    resource_group_id=test_scaling_group_id,
                     group_id=group_id,
                     created_at=now,
                 )

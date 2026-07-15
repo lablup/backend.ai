@@ -64,24 +64,21 @@ a  -->  d  -->  b  -->  c  -->  d'
 
 ### Release Version Comment
 
-Every migration file must include a comment indicating which release version
-(including the minor version, e.g., `26.3.0`) it belongs to. Place the comment
-next to the revision identifiers:
+Every migration file includes a comment marking which release it belongs to,
+placed next to the revision identifiers. Use the `NEXT_RELEASE_VERSION`
+placeholder instead of a hardcoded version:
 
 ```python
 # revision identifiers, used by Alembic.
 revision = "1cc9b47e0a8e"
 down_revision = "ffcf0ed13a26"
-# Part of: 26.3.0
+# Part of: NEXT_RELEASE_VERSION
 branch_labels = None
 depends_on = None
 ```
 
-For backport migrations, note both the target release branch and the main branch:
-
-```python
-# Part of: 26.2.1 (backport), 26.3.0 (main)
-```
+For backport migrations the placeholder freezes **per branch**: the backport migration `d` on the release branch freezes to the backport target version when that release is cut,
+and its main-branch duplicate `d'` freezes to the main release version.
 
 ### Idempotent Writing Rules
 
@@ -153,3 +150,12 @@ See the following migrations in the codebase for reference:
   -- Checks multiple possible enum states and fixes whichever scenario it finds.
 - `src/ai/backend/manager/models/alembic/versions/c4ea15b77136_ensure_auditlogs_table_exist.py`
   -- Uses `inspector.get_table_names()` to skip table creation when it already exists.
+
+## Large Data Migrations
+
+Always chunk bulk `INSERT`s — never insert every row in one statement. A single
+statement binds at most **32,767** parameters (PostgreSQL Int16 limit), and a multi-row
+`INSERT` binds `rows × columns`, so unbounded backfills overflow on large sites. Use the
+shared `insert_skip_on_conflict` helper in
+`src/ai/backend/manager/models/rbac_models/migration/utils.py`, which chunks by column
+count.

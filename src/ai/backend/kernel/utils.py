@@ -4,7 +4,7 @@ import os
 import site
 import traceback
 from pathlib import Path
-from typing import Any, Final
+from typing import Any, Final, override
 
 __all__ = (
     "current_loop",
@@ -45,6 +45,7 @@ class TracebackSourceFilter(logging.Filter):
         self.path_prefix = path_prefix
         self.site_prefix = site.getsitepackages()[0]
 
+    @override
     def filter(self, record: logging.LogRecord) -> bool:
         if record.exc_info:
             _, _, exc_tb = record.exc_info

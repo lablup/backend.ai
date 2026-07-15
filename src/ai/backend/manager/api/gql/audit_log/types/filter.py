@@ -8,9 +8,11 @@ from ai.backend.common.dto.manager.v2.audit_log.request import (
     AuditLogFilter,
     AuditLogStatusFilter,
 )
-from ai.backend.manager.api.gql.base import DateTimeFilter, StringFilter
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.manager.api.gql.base import DateTimeFilter, StringFilter, UUIDFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    gql_added_field,
     gql_field,
     gql_pydantic_input,
 )
@@ -47,6 +49,13 @@ class AuditLogFilterGQL(PydanticInputMixin[AuditLogFilter]):
     status: AuditLogStatusFilterGQL | None = None
     created_at: DateTimeFilter | None = None
     triggered_by: StringFilter | None = None
+    acted_as: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by acted_as (the effective/acting user UUID).",
+        ),
+        default=None,
+    )
 
     AND: list[Self] | None = None
     OR: list[Self] | None = None

@@ -20,7 +20,6 @@ from ai.backend.common.dto.manager.compute_session import (
     SearchComputeSessionsRequest,
 )
 from ai.backend.common.types import SessionId
-from ai.backend.manager.data.filter.adapter import BaseFilterAdapter
 from ai.backend.manager.data.kernel.types import KernelInfo
 from ai.backend.manager.data.session.types import SessionData, SessionStatus
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
@@ -28,6 +27,7 @@ from ai.backend.manager.models.kernel.conditions import KernelConditions
 from ai.backend.manager.models.session.conditions import SessionConditions
 from ai.backend.manager.models.session.orders import SessionOrders
 from ai.backend.manager.repositories.base import BatchQuerier, NoPagination, OffsetPagination
+from ai.backend.manager.repositories.base.filter_adapter import BaseFilterAdapter
 
 
 class ComputeSessionsAdapter(BaseFilterAdapter):

@@ -28,10 +28,13 @@ from ai.backend.common import msgpack
 from ai.backend.common.data.permission.types import (
     RBACElementType,
 )
-from ai.backend.common.docker import ImageRef
+from ai.backend.common.identifier.domain import DomainID, DomainName
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.project import ProjectID
-from ai.backend.common.identifier.resource_group import ResourceGroupName
+from ai.backend.common.identifier.resource_group import (
+    ResourceGroupID,
+    ResourceGroupName,
+)
 from ai.backend.common.resource.types import TotalResourceData
 from ai.backend.common.types import (
     AccessKey,
@@ -81,9 +84,8 @@ from ai.backend.manager.data.sokovan import (
     UserResourcePolicy,
 )
 from ai.backend.manager.errors.api import InvalidAPIParameters
-from ai.backend.manager.errors.common import InternalServerError
 from ai.backend.manager.errors.image import ImageNotFound
-from ai.backend.manager.errors.resource import ScalingGroupNotFound
+from ai.backend.manager.errors.resource import DomainNotFound, ScalingGroupNotFound
 from ai.backend.manager.errors.resource_slot import AgentResourceCapacityExceeded
 from ai.backend.manager.exceptions import ErrorStatusInfo
 from ai.backend.manager.models.agent import AgentRow
@@ -117,7 +119,6 @@ from ai.backend.manager.models.utils import (
     ExtendedAsyncSAEngine,
     sql_json_merge,
 )
-from ai.backend.manager.models.vfolder import prepare_vfolder_mounts
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     execute_batch_querier,
@@ -168,6 +169,7 @@ from ai.backend.manager.repositories.scheduler.types.snapshot import ResourcePol
 from ai.backend.manager.repositories.scheduling_history import (
     SessionSchedulingHistoryCreatorSpec,
 )
+from ai.backend.manager.repositories.vfolder.mount import prepare_vfolder_mounts
 from ai.backend.manager.types import UserScope
 
 from .types import KeypairConcurrencyData
@@ -269,17 +271,19 @@ class ScheduleDBSource:
                 yield session
                 await session.commit()
 
-    async def get_scheduling_data(self, scaling_group: str, spec: SchedulingSpec) -> SchedulingData:
+    async def get_scheduling_data(
+        self, resource_group_id: ResourceGroupID, spec: SchedulingSpec
+    ) -> SchedulingData:
         """
         Fetch all scheduling data from database in a single session.
         Raises ScalingGroupNotFound if scaling group doesn't exist.
         """
         async with self._begin_readonly_session_read_committed() as db_sess:
             # 1. Get scaling group
-            scaling_group_meta = await self._fetch_scaling_group(db_sess, scaling_group)
+            scaling_group_meta = await self._fetch_scaling_group(db_sess, resource_group_id)
 
             # 2. Get pending sessions
-            pending_sessions = await self._fetch_pending_sessions(db_sess, scaling_group)
+            pending_sessions = await self._fetch_pending_sessions(db_sess, scaling_group_meta.id)
             if not pending_sessions.sessions:
                 return SchedulingData(
                     scaling_group=scaling_group_meta,
@@ -290,11 +294,11 @@ class ScheduleDBSource:
                 )
 
             # 3. Get agents
-            agents = await self._fetch_agents(db_sess, scaling_group)
+            agents = await self._fetch_agents(db_sess, scaling_group_meta.id)
 
             # 4. Get snapshot data
             snapshot_data = await self._fetch_snapshot_data(
-                db_sess, scaling_group, pending_sessions, spec.known_slot_types
+                db_sess, scaling_group_meta.id, pending_sessions, spec.known_slot_types
             )
 
             return SchedulingData(
@@ -308,7 +312,7 @@ class ScheduleDBSource:
     async def _fetch_scaling_group_with_slot_inventory(
         self,
         db_sess: SASession,
-        name: str,
+        resource_group_id: ResourceGroupID,
     ) -> _ScalingGroupWithSlotInventory:
         """Load a scaling group together with its per-RG slot inventory.
 
@@ -329,11 +333,11 @@ class ScheduleDBSource:
                     .selectinload(AgentRow.agent_resource_rows)
                     .selectinload(AgentResourceRow.slot_type_row)
                 )
-                .where(ScalingGroupRow.name == name)
+                .where(ScalingGroupRow.id == resource_group_id)
             )
         ).one_or_none()
         if sg_row is None:
-            raise ScalingGroupNotFound(f"Resource group {name} not found")
+            raise ScalingGroupNotFound(f"Resource group {resource_group_id} not found")
         active_slot_types: dict[SlotName, SlotTypes] = {
             SlotName(ar.slot_name): SlotTypes(ar.slot_type_row.slot_type)
             for agent in sg_row.agents
@@ -363,7 +367,7 @@ class ScheduleDBSource:
         )
 
     async def _fetch_scaling_group(
-        self, db_sess: SASession, scaling_group: str
+        self, db_sess: SASession, resource_group_id: ResourceGroupID
     ) -> ScalingGroupMeta:
         """
         Fetch scaling group metadata.
@@ -371,23 +375,25 @@ class ScheduleDBSource:
         """
         sg_result = await db_sess.execute(
             sa.select(
+                ScalingGroupRow.id,
                 ScalingGroupRow.name,
                 ScalingGroupRow.scheduler,
                 ScalingGroupRow.scheduler_opts,
-            ).where(ScalingGroupRow.name == scaling_group)
+            ).where(ScalingGroupRow.id == resource_group_id)
         )
         sg_row = sg_result.one_or_none()
         if not sg_row:
-            raise ScalingGroupNotFound(scaling_group)
+            raise ScalingGroupNotFound(str(resource_group_id))
 
         return ScalingGroupMeta(
+            id=sg_row.id,
             name=sg_row.name,
             scheduler=sg_row.scheduler,
             scheduler_opts=sg_row.scheduler_opts,
         )
 
     async def _fetch_pending_sessions(
-        self, db_sess: SASession, scaling_group: str
+        self, db_sess: SASession, resource_group_id: ResourceGroupID
     ) -> PendingSessions:
         """
         Fetch pending sessions with kernels using single JOIN query.
@@ -402,6 +408,7 @@ class ScheduleDBSource:
                 SessionRow.group_id,
                 SessionRow.domain_name,
                 SessionRow.scaling_group_name,
+                SessionRow.resource_group_id,
                 SessionRow.priority,
                 SessionRow.is_preemptible,
                 SessionRow.session_type,
@@ -419,7 +426,7 @@ class ScheduleDBSource:
             .order_by(SessionRow.created_at.asc())
             .where(
                 sa.and_(
-                    SessionRow.scaling_group_name == scaling_group,
+                    SessionRow.resource_group_id == resource_group_id,
                     SessionRow.status == SessionStatus.PENDING,
                     KernelRow.status == KernelStatus.PENDING,
                 )
@@ -439,6 +446,7 @@ class ScheduleDBSource:
                     group_id=row.group_id,
                     domain_name=row.domain_name,
                     scaling_group_name=row.scaling_group_name,
+                    resource_group_id=row.resource_group_id,
                     priority=row.priority,
                     is_preemptible=row.is_preemptible,
                     session_type=row.session_type,
@@ -461,7 +469,9 @@ class ScheduleDBSource:
 
         return PendingSessions(sessions=list(sessions_map.values()))
 
-    async def _fetch_agents(self, db_sess: SASession, scaling_group: str) -> list[AgentMeta]:
+    async def _fetch_agents(
+        self, db_sess: SASession, resource_group_id: ResourceGroupID
+    ) -> list[AgentMeta]:
         """Fetch schedulable agent metadata in the scaling group."""
         agents_result = await db_sess.execute(
             sa.select(
@@ -469,11 +479,12 @@ class ScheduleDBSource:
                 AgentRow.addr,
                 AgentRow.architecture,
                 AgentRow.available_slots,
+                AgentRow.resource_group_id,
                 AgentRow.scaling_group,
             ).where(
                 sa.and_(
                     AgentRow.status == AgentStatus.ALIVE,
-                    AgentRow.scaling_group == scaling_group,
+                    AgentRow.resource_group_id == resource_group_id,
                     AgentRow.schedulable == sa.true(),
                 )
             )
@@ -487,6 +498,7 @@ class ScheduleDBSource:
                     addr=row.addr,
                     architecture=row.architecture,
                     available_slots=row.available_slots,
+                    resource_group_id=row.resource_group_id,
                     scaling_group=row.scaling_group,
                 )
             )
@@ -495,12 +507,12 @@ class ScheduleDBSource:
     async def _fetch_snapshot_data(
         self,
         db_sess: SASession,
-        scaling_group: str,
+        resource_group_id: ResourceGroupID,
         pending_sessions: PendingSessions,
         known_slot_types: Mapping[SlotName, SlotTypes],
     ) -> SnapshotData:
         """Fetch all snapshot data for system state."""
-        resource_occupancy = await self._fetch_kernel_occupancy(db_sess, scaling_group)
+        resource_occupancy = await self._fetch_kernel_occupancy(db_sess, resource_group_id)
 
         # Fetch resource policies for entities in pending sessions
         resource_policies = await self._fetch_resource_policies(
@@ -520,7 +532,7 @@ class ScheduleDBSource:
         )
 
     async def _fetch_kernel_occupancy(
-        self, db_sess: SASession, scaling_group: str
+        self, db_sess: SASession, resource_group_id: ResourceGroupID
     ) -> ResourceOccupancySnapshot:
         """Fetch kernel occupancy data from normalized resource_allocations table."""
         ra = ResourceAllocationRow.__table__
@@ -548,7 +560,7 @@ class ScheduleDBSource:
                 ra.join(k, ra.c.kernel_id == k.c.id).join(rst, ra.c.slot_name == rst.c.slot_name)
             )
             .where(
-                k.c.scaling_group == scaling_group,
+                k.c.resource_group_id == resource_group_id,
                 k.c.status.in_(all_resource_statuses),
                 ra.c.free_at.is_(None),
             )
@@ -1160,25 +1172,12 @@ class ScheduleDBSource:
 
         return force_terminated_sessions
 
-    async def get_schedulable_scaling_groups(self) -> list[str]:
-        """Get list of scaling groups that have schedulable agents."""
+    async def get_all_scaling_groups(self) -> list[ResourceGroupID]:
+        """Get ids of all defined scaling groups."""
         async with self._begin_readonly_session_read_committed() as session:
-            query = (
-                sa.select(AgentRow.scaling_group)
-                .where(
-                    sa.and_(AgentRow.status == AgentStatus.ALIVE, AgentRow.schedulable == sa.true())
-                )
-                .group_by(AgentRow.scaling_group)
-            )
+            query = sa.select(ScalingGroupRow.id)
             result = await session.execute(query)
-            return [row.scaling_group for row in result.fetchall()]
-
-    async def get_all_scaling_groups(self) -> list[str]:
-        """Get all defined scaling groups."""
-        async with self._begin_readonly_session_read_committed() as session:
-            query = sa.select(ScalingGroupRow.name)
-            result = await session.execute(query)
-            return [row.name for row in result.fetchall()]
+            return [row.id for row in result.fetchall()]
 
     async def get_terminating_sessions_by_ids(
         self,
@@ -1272,7 +1271,7 @@ class ScheduleDBSource:
                     ScalingGroupRow.scheduler_opts,
                 )
                 .select_from(SessionRow)
-                .join(ScalingGroupRow, SessionRow.scaling_group_name == ScalingGroupRow.name)
+                .join(ScalingGroupRow, SessionRow.resource_group_id == ScalingGroupRow.id)
                 .where(
                     SessionRow.id.in_(session_ids),
                     SessionRow.status == SessionStatus.PENDING,
@@ -1378,9 +1377,9 @@ class ScheduleDBSource:
 
         async with self._begin_session_read_committed() as db_sess:
             image_ids = {
-                kernel.execution_spec.image_id
+                kernel.execution_spec.resource_input.image_id
                 for kernel in spec.kernel_specs
-                if kernel.execution_spec.image_id is not None
+                if kernel.execution_spec.resource_input.image_id is not None
             }
             image_metadata: dict[ImageID, ImageInfo] = {}
             if image_ids:
@@ -1402,7 +1401,7 @@ class ScheduleDBSource:
                 }
 
             for kernel in spec.kernel_specs:
-                image_id = kernel.execution_spec.image_id
+                image_id = kernel.execution_spec.resource_input.image_id
                 if image_id is not None and image_id not in image_metadata:
                     raise ImageNotFound(
                         f"Image {image_id} referenced by kernel "
@@ -1432,8 +1431,8 @@ class ScheduleDBSource:
                     spec=spec,
                     kernel_spec=kernel,
                     image_info=(
-                        image_metadata.get(kernel.execution_spec.image_id)
-                        if kernel.execution_spec.image_id is not None
+                        image_metadata.get(kernel.execution_spec.resource_input.image_id)
+                        if kernel.execution_spec.resource_input.image_id is not None
                         else None
                     ),
                     enqueue_time=enqueue_time,
@@ -1509,11 +1508,8 @@ class ScheduleDBSource:
     async def fetch_session_spec_contexts(
         self,
         draft: SessionSpecDraft,
-        *,
-        storage_manager: StorageSessionManager,
-        allowed_vfolder_types: list[str],
     ) -> SessionSpecContextFetch:
-        """Batch-fetch every DB read the draft-based preparer and validator
+        """Batch-fetch the DB reads the draft-based preparer and validator
         rules depend on, inside a single readonly transaction.
 
         Returns raw fetched data as :class:`SessionSpecContextFetch` — the
@@ -1524,9 +1520,7 @@ class ScheduleDBSource:
         cycle between ``repositories.scheduler`` and the sokovan
         ``scheduling_controller`` subtree.
         """
-        resource_group_name = (
-            str(draft.scope.resource_group_name) if draft.scope.resource_group_name else None
-        )
+        resource_group_id = draft.scope.resource_group_id
         access_key = draft.identity.access_key
         user_uuid = draft.identity.user_uuid
         domain_name = str(draft.scope.domain_name) if draft.scope.domain_name else None
@@ -1540,29 +1534,12 @@ class ScheduleDBSource:
             resource_group_allow_fractional = False
             known_slot_types: Mapping[SlotName, SlotTypes] = {}
             slot_type_policy = await self._fetch_slot_type_policy(db_sess)
-            if resource_group_name:
+            if resource_group_id:
                 rg_bundle = await self._fetch_scaling_group_with_slot_inventory(
-                    db_sess, resource_group_name
+                    db_sess, resource_group_id
                 )
                 sg_row = rg_bundle.sg_row
                 known_slot_types = rg_bundle.active_slot_types
-                # Every production caller of ``enqueue_session_from_draft`` populates
-                # access_key/domain_name/project_id alongside resource_group_name; this
-                # branch flags the contract violation rather than letting the RG
-                # access check silently degrade to fail-open.
-                if access_key is None or domain_name is None or project_id is None:
-                    raise InternalServerError(
-                        "Unreachable: resource_group_name supplied without identity context",
-                    )
-                # The draft's access_key is the owner's for delegated sessions, so
-                # this check enforces RG access against the owner's allowlist.
-                allowed_rgs = await self._query_allowed_scaling_groups(
-                    db_sess, domain_name, project_id, access_key
-                )
-                if resource_group_name not in {rg.name for rg in allowed_rgs}:
-                    raise InvalidAPIParameters(
-                        f"Resource group '{resource_group_name}' is not accessible"
-                    )
                 network_info = ScalingGroupNetworkInfo(
                     use_host_network=sg_row.use_host_network,
                     wsproxy_addr=sg_row.wsproxy_addr,
@@ -1579,7 +1556,7 @@ class ScheduleDBSource:
             image_ids: list[UUID] = []
             seen_ids: set[UUID] = set()
             for group in kernel_specs:
-                img = group.execution_spec.image_id
+                img = group.execution_spec.resource_input.image_id
                 if img is None:
                     continue
                 img_uuid = UUID(str(img))
@@ -1613,7 +1590,6 @@ class ScheduleDBSource:
             )
 
             keypair_policy = None
-            resource_policy_dict: dict[str, Any] = {}
             if access_key is not None:
                 kp_row = (
                     await db_sess.scalars(
@@ -1624,50 +1600,6 @@ class ScheduleDBSource:
                 ).one_or_none()
                 if kp_row is not None and kp_row.resource_policy_row is not None:
                     keypair_policy = kp_row.resource_policy_row.to_dataclass()
-                    resource_policy_dict = {
-                        "allowed_vfolder_hosts": keypair_policy.allowed_vfolder_hosts,
-                    }
-
-            # Resolve mount requests per kernel group keyed by ``role``.
-            # Each group's request list resolves to a single
-            # ``VFolderMount`` tuple that every replica sharing the role
-            # copies verbatim. Task #33 (role-based mount override) can
-            # write distinct values per role without structural change.
-            vfolder_mounts_by_role: dict[str, tuple[VFolderMount, ...]] = {}
-            if domain_name is not None and user_uuid is not None:
-                user_scope_for_mounts = UserScope(
-                    domain_name=domain_name,
-                    group_id=project_id if project_id is not None else UUID(int=0),
-                    user_uuid=user_uuid,
-                    user_role="user",
-                )
-                for group in kernel_specs:
-                    per_group_requests: list[VFolderMountRequest] = []
-                    for entry in group.execution_spec.mounts:
-                        per_group_requests.append(
-                            VFolderMountRequest(
-                                ref=UUID(str(entry.vfolder_id)),
-                                dst_path=entry.mount_destination,
-                                options=VFolderMountOptions(
-                                    permission=entry.mount_perm,
-                                    subpath=entry.subpath,
-                                ),
-                            )
-                        )
-                    # Always resolve mounts even when the request list is
-                    # empty: ``prepare_vfolder_mounts`` injects dot-prefixed
-                    # auto-mount vfolders regardless of explicit requests, so
-                    # skipping here would silently drop them.
-                    vfolder_mounts_by_role[group.role] = tuple(
-                        await self._fetch_vfolder_mounts(
-                            db_sess,
-                            storage_manager,
-                            allowed_vfolder_types,
-                            user_scope_for_mounts,
-                            resource_policy_dict,
-                            per_group_requests,
-                        )
-                    )
 
             dotfile_bundle = DotfileBundle()
             if domain_name is not None and user_uuid is not None and access_key is not None:
@@ -1706,7 +1638,6 @@ class ScheduleDBSource:
             container_user_info=user_container,
             image_infos=image_infos,
             resource_group_allow_fractional=resource_group_allow_fractional,
-            vfolder_mounts_by_role=vfolder_mounts_by_role,
             dotfile_data=dotfile_bundle,
             active_session_count=active_session_count,
             keypair_resource_policy=keypair_policy,
@@ -1714,13 +1645,91 @@ class ScheduleDBSource:
             slot_type_policy=slot_type_policy,
         )
 
+    async def resolve_vfolder_mounts_by_role(
+        self,
+        draft: SessionSpecDraft,
+        *,
+        storage_manager: StorageSessionManager,
+        allowed_vfolder_types: list[str],
+    ) -> dict[str, tuple[VFolderMount, ...]]:
+        """Resolve each kernel group's vfolder mounts, keyed by ``role``.
+
+        Split out of :meth:`fetch_session_spec_contexts` because it is the only
+        part that needs the storage-manager RPC (and the etcd-sourced
+        ``allowed_vfolder_types``); kernel resource resolution does not depend on
+        it, so callers that only need slots/arch can skip this. Each group's
+        request list resolves to a single ``VFolderMount`` tuple that every
+        replica sharing the role copies verbatim.
+        """
+        user_uuid = draft.identity.user_uuid
+        domain_name = str(draft.scope.domain_name) if draft.scope.domain_name else None
+        project_id = draft.scope.project_id
+        access_key = draft.identity.access_key
+        kernel_specs = tuple(draft.options.kernel_groups or ())
+
+        vfolder_mounts_by_role: dict[str, tuple[VFolderMount, ...]] = {}
+        if domain_name is None or user_uuid is None:
+            return vfolder_mounts_by_role
+
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            resource_policy_dict: dict[str, Any] = {}
+            if access_key is not None:
+                kp_row = (
+                    await db_sess.scalars(
+                        sa.select(KeyPairRow)
+                        .options(selectinload(KeyPairRow.resource_policy_row))
+                        .where(KeyPairRow.access_key == access_key)
+                    )
+                ).one_or_none()
+                if kp_row is not None and kp_row.resource_policy_row is not None:
+                    resource_policy_dict = {
+                        "allowed_vfolder_hosts": (
+                            kp_row.resource_policy_row.to_dataclass().allowed_vfolder_hosts
+                        ),
+                    }
+
+            user_scope_for_mounts = UserScope(
+                domain_name=domain_name,
+                group_id=project_id if project_id is not None else UUID(int=0),
+                user_uuid=user_uuid,
+                user_role="user",
+            )
+            for group in kernel_specs:
+                per_group_requests: list[VFolderMountRequest] = []
+                for entry in group.execution_spec.mounts:
+                    per_group_requests.append(
+                        VFolderMountRequest(
+                            ref=UUID(str(entry.vfolder_id)),
+                            dst_path=entry.mount_destination,
+                            options=VFolderMountOptions(
+                                permission=entry.mount_perm,
+                                subpath=entry.subpath,
+                            ),
+                        )
+                    )
+                # Always resolve mounts even when the request list is empty:
+                # ``prepare_vfolder_mounts`` injects dot-prefixed auto-mount
+                # vfolders regardless of explicit requests, so skipping here
+                # would silently drop them.
+                vfolder_mounts_by_role[group.role] = tuple(
+                    await self._fetch_vfolder_mounts(
+                        db_sess,
+                        storage_manager,
+                        allowed_vfolder_types,
+                        user_scope_for_mounts,
+                        resource_policy_dict,
+                        per_group_requests,
+                    )
+                )
+        return vfolder_mounts_by_role
+
     async def pick_default_resource_group(
         self,
         *,
         access_key: AccessKey,
         domain_name: str,
         project_id: ProjectID,
-    ) -> ResourceGroupName:
+    ) -> ResourceGroupID:
         """Return the first resource group from the owner's allowlist."""
         async with self._begin_readonly_session_read_committed() as db_sess:
             allowed_rgs = await self._query_allowed_scaling_groups(
@@ -1728,64 +1737,52 @@ class ScheduleDBSource:
             )
         if not allowed_rgs:
             raise InvalidAPIParameters("No accessible scaling group available")
-        return ResourceGroupName(allowed_rgs[0].name)
+        return allowed_rgs[0].id
 
-    async def _get_scaling_group_network_info(
-        self, db_sess: SASession, scaling_group_name: str
-    ) -> ScalingGroupNetworkInfo:
+    async def query_accessible_resource_group_ids(
+        self,
+        *,
+        domain_name: str,
+        project_id: ProjectID,
+        access_key: AccessKey,
+    ) -> frozenset[ResourceGroupID]:
+        """Return the resource-group ids accessible to the given single-project scope.
+
+        A pure DB read: the caller decides the scope and performs the
+        accessibility rejection, so this method neither validates nor raises.
         """
-        Get network configuration from scaling group.
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            allowed_rgs = await self._query_allowed_scaling_groups(
+                db_sess, domain_name, project_id, access_key
+            )
+        return frozenset(rg.id for rg in allowed_rgs)
 
-        Args:
-            db_sess: Database session
-            scaling_group_name: Name of the scaling group
+    async def get_resource_group_id_by_name(self, name: ResourceGroupName) -> ResourceGroupID:
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            resource_group_id = await db_sess.scalar(
+                sa.select(ScalingGroupRow.id).where(ScalingGroupRow.name == name)
+            )
+        if resource_group_id is None:
+            raise ScalingGroupNotFound(name)
+        return ResourceGroupID(resource_group_id)
 
-        Returns:
-            ScalingGroupNetworkInfo with network configuration
-        """
-        query = sa.select(
-            ScalingGroupRow.use_host_network,
-            ScalingGroupRow.wsproxy_addr,
-        ).where(ScalingGroupRow.name == scaling_group_name)
+    async def get_resource_group_name_by_id(
+        self, resource_group_id: ResourceGroupID
+    ) -> ResourceGroupName:
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            resource_group_name = await db_sess.scalar(
+                sa.select(ScalingGroupRow.name).where(ScalingGroupRow.id == resource_group_id)
+            )
+        if resource_group_name is None:
+            raise ScalingGroupNotFound(f"Resource group not found (id:{resource_group_id})")
+        return ResourceGroupName(resource_group_name)
 
-        result = await db_sess.execute(query)
-        row = result.one_or_none()
-
-        if not row:
-            raise ScalingGroupNotFound(f"Scaling group {scaling_group_name} not found")
-
-        return ScalingGroupNetworkInfo(
-            use_host_network=row.use_host_network,
-            wsproxy_addr=row.wsproxy_addr,
-        )
-
-    async def _resolve_image_info(
-        self, db_sess: SASession, image_refs: list[ImageRef]
-    ) -> dict[str, ImageInfo]:
-        """
-        Resolve image references to image information.
-
-        Args:
-            db_sess: Database session
-            image_refs: List of ImageRef objects to resolve
-
-        Returns:
-            Dictionary mapping image canonical reference to ImageInfo
-        """
-        image_infos = {}
-        for image_ref in image_refs:
-            # Use the ImageRef object directly
-            image_row = await ImageRow.resolve(db_sess, [image_ref])
-            if image_row:
-                image_infos[image_ref.canonical] = ImageInfo(
-                    id=image_row.id,
-                    canonical=image_row.name,  # 'name' is the canonical reference in ImageRow
-                    architecture=image_row.architecture,
-                    registry=image_row.registry,
-                    labels=image_row.labels,
-                    resource_spec=cast(dict[str, Any], image_row.resources),  # Cast to match type
-                )
-        return image_infos
+    async def get_domain_id_by_name(self, name: DomainName) -> DomainID:
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            domain_id = await db_sess.scalar(sa.select(DomainRow.id).where(DomainRow.name == name))
+        if domain_id is None:
+            raise DomainNotFound(name)
+        return DomainID(domain_id)
 
     async def _fetch_vfolder_mounts(
         self,
@@ -1954,7 +1951,8 @@ class ScheduleDBSource:
 
         return [
             AllowedScalingGroup(
-                name=sg.name,
+                id=ResourceGroupID(sg.id),
+                name=ResourceGroupName(sg.name),
                 is_private=not sg.is_public,  # Convert is_public to is_private
                 scheduler_opts=sg.scheduler_opts,
             )
@@ -2006,7 +2004,7 @@ class ScheduleDBSource:
 
         Session status is NOT changed here: the coordinator owns session status
         transitions. Only resource-assignment metadata (scaling_group_name,
-        agent_ids) is written on the session.
+        resource_group_id, agent_ids) is written on the session.
 
         Raises AgentResourceCapacityExceeded if any kernel cannot be reserved;
         the caller rolls back the whole batch transaction and retries next tick.
@@ -2033,6 +2031,7 @@ class ScheduleDBSource:
                     agent=kernel_alloc.agent_id,
                     agent_addr=kernel_alloc.agent_addr,
                     scaling_group=kernel_alloc.scaling_group,
+                    resource_group_id=kernel_alloc.resource_group_id,
                 )
             )
             if cast(CursorResult[Any], promoted).rowcount == 0:
@@ -2047,6 +2046,7 @@ class ScheduleDBSource:
             .where(SessionRow.id == allocation.session_id)
             .values(
                 scaling_group_name=allocation.scaling_group,
+                resource_group_id=allocation.resource_group_id,
                 agent_ids=allocation.unique_agent_ids(),
             )
         )
@@ -3620,7 +3620,7 @@ class ScheduleDBSource:
 
     async def fetch_sessions_for_handler(
         self,
-        scaling_group: str,
+        resource_group_id: ResourceGroupID,
         session_statuses: list[SessionStatus],
         kernel_statuses: list[KernelStatus] | None,
     ) -> list[SessionWithKernels]:
@@ -3633,7 +3633,7 @@ class ScheduleDBSource:
         unified data representation across all handlers.
 
         Args:
-            scaling_group: The scaling group to filter by
+            resource_group_id: The scaling group id to filter by
             session_statuses: Session statuses to include
             kernel_statuses: If non-None, include sessions that have at least one
                            kernel in these statuses (simple filtering).
@@ -3646,7 +3646,7 @@ class ScheduleDBSource:
             stmt = (
                 sa.select(SessionRow)
                 .where(
-                    SessionRow.scaling_group_name == scaling_group,
+                    SessionRow.resource_group_id == resource_group_id,
                     SessionRow.status.in_(session_statuses),
                 )
                 .options(selectinload(SessionRow.kernels))
@@ -4241,7 +4241,7 @@ class ScheduleDBSource:
             querier = BatchQuerier(
                 pagination=NoPagination(),
                 conditions=[
-                    SessionConditions.by_scaling_group("default"),
+                    SessionConditions.by_resource_group_id(resource_group_id),
                     SessionConditions.by_statuses([SessionStatus.SCHEDULED]),
                 ],
                 orders=[SessionOrders.created_at()],
@@ -4386,7 +4386,7 @@ class ScheduleDBSource:
             querier = BatchQuerier(
                 pagination=NoPagination(),
                 conditions=[
-                    SessionConditions.by_scaling_group("default"),
+                    SessionConditions.by_resource_group_id(resource_group_id),
                     SessionConditions.by_statuses([SessionStatus.PREPARED]),
                 ],
                 orders=[SessionOrders.created_at()],

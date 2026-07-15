@@ -9,11 +9,9 @@ from ai.backend.manager.data.app_config_fragment.types import (
     AppConfigFragmentData,
 )
 from ai.backend.manager.data.permission.types import RBACElementRef
-from ai.backend.manager.models.app_config_allow_list.row import AppConfigAllowListRow
 from ai.backend.manager.repositories.app_config_fragment.creators import (
     AppConfigFragmentCreatorSpec,
 )
-from ai.backend.manager.repositories.base import ExistsQuerier
 from ai.backend.manager.services.app_config_fragment.actions.base import (
     AppConfigFragmentScopeAction,
     AppConfigFragmentScopeActionResult,
@@ -25,12 +23,11 @@ class CreateAppConfigFragmentAction(AppConfigFragmentScopeAction):
     """Create a fragment at its declared scope (``public`` / ``domain`` / ``user``).
 
     Acts at the RBAC scope of the fragment being written, so it is not admin-only: an
-    allow-listed user may create their own ``user``-scope fragment. The allow-list
-    write-gate (``only_if``) authorizes the actual write.
+    allow-listed user may create their own ``user``-scope fragment. The fragment's FK to
+    the allow-list authorizes the actual write.
     """
 
     creator_spec: AppConfigFragmentCreatorSpec
-    only_if: ExistsQuerier[AppConfigAllowListRow]
 
     @override
     @classmethod

@@ -2,19 +2,15 @@ from __future__ import annotations
 
 import logging
 import uuid
-from collections.abc import Iterable, Sequence
+from collections.abc import Sequence
 from datetime import datetime, tzinfo
 from typing import (
     TYPE_CHECKING,
     Any,
-    Self,
-    TypedDict,
-    cast,
 )
 
 import sqlalchemy as sa
 import yarl
-from dateutil.tz import tzutc
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import (
@@ -26,8 +22,8 @@ from sqlalchemy.orm import (
     selectinload,
 )
 
-from ai.backend.common.docker import ImageRef
 from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import (
     AccessKey,
     ClusterMode,
@@ -56,7 +52,6 @@ from ai.backend.manager.data.kernel.types import (
 )
 
 if TYPE_CHECKING:
-    from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
     from ai.backend.manager.models.agent import AgentRow
     from ai.backend.manager.models.group import GroupRow
     from ai.backend.manager.models.image import ImageRow
@@ -64,11 +59,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.models.user import UserRow
 
 from ai.backend.manager.defs import DEFAULT_ROLE
-from ai.backend.manager.errors.kernel import (
-    KernelNotFound,
-    SessionNotFound,
-)
-from ai.backend.manager.errors.resource import DataTransformationFailed
+from ai.backend.manager.errors.kernel import SessionNotFound
 from ai.backend.manager.models.base import (
     GUID,
     Base,
@@ -79,12 +70,9 @@ from ai.backend.manager.models.base import (
     StructuredJSONObjectListColumn,
     URLColumn,
 )
-from ai.backend.manager.models.types import QueryCondition
-from ai.backend.manager.models.user import users
 from ai.backend.manager.models.utils import (
     ExtendedAsyncSAEngine,
     execute_with_retry,
-    execute_with_txn_retry,
 )
 
 __all__ = (
@@ -94,9 +82,7 @@ __all__ = (
     "RESOURCE_USAGE_KERNEL_STATUSES",
     "USER_RESOURCE_OCCUPYING_KERNEL_STATUSES",
     "KernelRow",
-    "get_user_email",
     "kernels",
-    "recalc_concurrency_used",
 )
 
 log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.models.kernel"))
@@ -137,16 +123,6 @@ DEAD_KERNEL_STATUSES = (
 )
 
 LIVE_STATUS = (KernelStatus.RUNNING,)
-
-
-async def get_user_email(
-    db_session: SASession,
-    kernel: KernelRow,
-) -> str:
-    query = sa.select(users.c.email).select_from(users).where(users.c.uuid == kernel["user_uuid"])
-    result = await db_session.execute(query)
-    user_email = str(result.scalar())
-    return user_email.replace("@", "_")
 
 
 def default_hostname(context: Any) -> str:
@@ -221,8 +197,15 @@ class KernelRow(Base):  # type: ignore[misc]
     )
 
     # Resource ownership
-    scaling_group: Mapped[str | None] = mapped_column(
-        "scaling_group", sa.ForeignKey("scaling_groups.name"), index=True, nullable=True
+    scaling_group: Mapped[str] = mapped_column(
+        "scaling_group", sa.ForeignKey("scaling_groups.name"), index=True, nullable=False
+    )
+    resource_group_id: Mapped[ResourceGroupID] = mapped_column(
+        "resource_group_id",
+        GUID(ResourceGroupID),
+        sa.ForeignKey("scaling_groups.id"),
+        index=True,
+        nullable=False,
     )
     agent: Mapped[str | None] = mapped_column(
         "agent", sa.String(length=64), sa.ForeignKey("agents.id"), nullable=True
@@ -463,16 +446,6 @@ class KernelRow(Base):  # type: ignore[misc]
     )
 
     @property
-    def image_ref(self) -> ImageRef | None:
-        return self.image_row.image_ref if self.image_row else None
-
-    @property
-    def cluster_name(self) -> str:
-        if self.cluster_role == DEFAULT_ROLE:
-            return self.cluster_role
-        return self.cluster_role + str(self.cluster_idx)
-
-    @property
     def used_time(self) -> str | None:
         if self.terminated_at is not None and self.created_at is not None:
             return str(self.terminated_at - self.created_at)
@@ -486,30 +459,6 @@ class KernelRow(Base):  # type: ignore[misc]
                 + 1
             )
         return None
-
-    @classmethod
-    async def get_kernels(
-        cls,
-        conditions: Sequence[QueryCondition],
-        *,
-        db: ExtendedAsyncSAEngine,
-    ) -> Sequence[Self]:
-        query_stmt = sa.select(KernelRow)
-        for cond in conditions:
-            query_stmt = cond(query_stmt)
-
-        async def fetch(db_session: SASession) -> Sequence[KernelRow]:
-            return (await db_session.scalars(query_stmt)).all()
-
-        async with db.connect() as db_conn:
-            return await execute_with_txn_retry(fetch, db.begin_readonly_session, db_conn)
-
-    @staticmethod
-    async def batch_load_by_session_id(
-        session: SASession, session_ids: list[uuid.UUID]
-    ) -> Sequence[KernelRow]:
-        query = sa.select(KernelRow).where(KernelRow.session_id.in_(session_ids))
-        return (await session.execute(query)).scalars().all()
 
     @staticmethod
     async def batch_load_main_kernels_by_session_id(
@@ -554,104 +503,9 @@ class KernelRow(Base):  # type: ignore[misc]
 
         return await execute_with_retry(_query)
 
-    @classmethod
-    async def get_kernel_to_update_status(
-        cls,
-        db_session: SASession,
-        kernel_id: KernelId,
-        *,
-        for_update: bool = True,
-    ) -> KernelRow:
-        _stmt = sa.select(KernelRow).where(KernelRow.id == kernel_id)
-        if for_update:
-            _stmt = _stmt.with_for_update()
-        kernel_row = cast(KernelRow | None, await db_session.scalar(_stmt))
-        if kernel_row is None:
-            raise KernelNotFound(f"Kernel not found (id:{kernel_id})")
-        return kernel_row
-
-    @classmethod
-    async def get_bulk_kernels_to_update_status(
-        cls,
-        db_session: SASession,
-        kernel_ids: Iterable[KernelId],
-    ) -> Sequence[KernelRow]:
-        _stmt = sa.select(KernelRow).where(KernelRow.id.in_(kernel_ids))
-        return (await db_session.scalars(_stmt)).all()
-
     def delegate_ownership(self, user_uuid: uuid.UUID, access_key: AccessKey) -> None:
         self.user_uuid = user_uuid
         self.access_key = access_key
-
-    @classmethod
-    def from_kernel_info(cls, info: KernelInfo) -> Self:
-        return cls(
-            id=info.id,
-            session_id=uuid.UUID(info.session.session_id),
-            session_creation_id=info.session.creation_id,
-            session_name=info.session.name,
-            session_type=info.session.session_type,
-            cluster_mode=info.cluster.cluster_mode,
-            cluster_size=info.cluster.cluster_size,
-            cluster_role=info.cluster.cluster_role,
-            cluster_idx=info.cluster.cluster_idx,
-            local_rank=info.cluster.local_rank,
-            cluster_hostname=info.cluster.cluster_hostname,
-            uid=info.user_permission.uid,
-            main_gid=info.user_permission.main_gid,
-            gids=info.user_permission.gids,
-            scaling_group=info.resource.scaling_group,
-            agent=info.resource.agent,
-            agent_addr=info.resource.agent_addr,
-            domain_name=info.user_permission.domain_name,
-            group_id=info.user_permission.group_id,
-            user_uuid=info.user_permission.user_uuid,
-            access_key=info.user_permission.access_key,
-            image=info.image.identifier.canonical if info.image.identifier else None,
-            image_id=info.image.image_id,
-            architecture=info.image.identifier.architecture if info.image.identifier else None,
-            registry=info.image.registry,
-            tag=info.image.tag,
-            container_id=info.resource.container_id,
-            occupied_slots=ResourceSlot(info.resource.occupied_slots),
-            requested_slots=ResourceSlot(info.resource.requested_slots),
-            occupied_shares=info.resource.occupied_shares,
-            environ=info.runtime.environ,
-            mounts=info.runtime.mounts,
-            mount_map=info.runtime.mount_map,
-            vfolder_mounts=info.runtime.vfolder_mounts,
-            attached_devices=info.resource.attached_devices,
-            resource_opts=info.resource.resource_opts,
-            bootstrap_script=info.runtime.bootstrap_script,
-            kernel_host=info.network.kernel_host,
-            repl_in_port=info.network.repl_in_port,
-            repl_out_port=info.network.repl_out_port,
-            stdin_port=info.network.stdin_port,
-            stdout_port=info.network.stdout_port,
-            service_ports=info.network.service_ports,
-            preopen_ports=info.network.preopen_ports,
-            use_host_network=info.network.use_host_network,
-            created_at=info.lifecycle.created_at or datetime.now(tzutc()),
-            terminated_at=info.lifecycle.terminated_at,
-            starts_at=info.lifecycle.starts_at,
-            status=info.lifecycle.status or KernelStatus.PENDING,
-            status_changed=info.lifecycle.status_changed or datetime.now(tzutc()),
-            status_info=info.lifecycle.status_info,
-            status_data=info.lifecycle.status_data,
-            status_history=info.lifecycle.status_history
-            or {
-                (info.lifecycle.status or KernelStatus.PENDING).name: (
-                    info.lifecycle.status_changed or datetime.now(tzutc())
-                ).isoformat()
-            },
-            callback_url=info.metadata.callback_url,
-            startup_command=info.runtime.startup_command,
-            result=info.lifecycle.result,
-            internal_data=info.metadata.internal_data,
-            container_log=info.metrics.container_log,
-            num_queries=info.metrics.num_queries,
-            last_stat=info.metrics.last_stat,
-        )
 
     def to_kernel_info(self) -> KernelInfo:
         return KernelInfo(
@@ -703,6 +557,7 @@ class KernelRow(Base):  # type: ignore[misc]
             ),
             resource=ResourceInfo(
                 scaling_group=self.scaling_group,
+                resource_group_id=self.resource_group_id,
                 agent=self.agent,
                 agent_addr=self.agent_addr,
                 container_id=self.container_id,
@@ -759,94 +614,3 @@ DEFAULT_KERNEL_ORDERING = [
         )
     ),
 ]
-
-
-class SessionInfo(TypedDict):
-    session_id: SessionId
-    session_name: str
-    status: KernelStatus
-    created_at: datetime
-
-
-async def recalc_concurrency_used(
-    db_sess: SASession,
-    valkey_stat_client: ValkeyStatClient,
-    access_key: AccessKey,
-) -> None:
-    from ai.backend.manager.models.session import PRIVATE_SESSION_TYPES
-
-    async with db_sess.begin_nested():
-        result = await db_sess.execute(
-            sa.select(sa.func.count())
-            .select_from(KernelRow)
-            .where(
-                (KernelRow.access_key == access_key)
-                & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
-                & (KernelRow.session_type.not_in(PRIVATE_SESSION_TYPES))
-            ),
-        )
-        _concurrency_used = result.scalar()
-        result = await db_sess.execute(
-            sa.select(sa.func.count())
-            .select_from(KernelRow)
-            .where(
-                (KernelRow.access_key == access_key)
-                & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
-                & (KernelRow.session_type.in_(PRIVATE_SESSION_TYPES))
-            ),
-        )
-        _sftp_concurrency_used = result.scalar()
-        if not isinstance(_concurrency_used, int):
-            raise DataTransformationFailed(
-                f"Expected int for concurrency_used, got {type(_concurrency_used).__name__}"
-            )
-        if not isinstance(_sftp_concurrency_used, int):
-            raise DataTransformationFailed(
-                f"Expected int for sftp_concurrency_used, got {type(_sftp_concurrency_used).__name__}"
-            )
-        concurrency_used: int = _concurrency_used
-        sftp_concurrency_used: int = _sftp_concurrency_used
-
-    await valkey_stat_client.set_keypair_concurrency(
-        access_key=str(access_key),
-        concurrency_used=concurrency_used,
-        is_private=False,
-    )
-    await valkey_stat_client.set_keypair_concurrency(
-        access_key=str(access_key),
-        concurrency_used=sftp_concurrency_used,
-        is_private=True,
-    )
-
-
-def by_status(
-    status: Iterable[KernelStatus],
-) -> QueryCondition:
-    def _by_status(
-        query_stmt: sa.sql.Select[Any],
-    ) -> sa.sql.Select[Any]:
-        return query_stmt.where(KernelRow.status.in_(status))
-
-    return _by_status
-
-
-def by_agent_id(
-    agent_id: str,
-) -> QueryCondition:
-    def _by_agent_id(
-        query_stmt: sa.sql.Select[Any],
-    ) -> sa.sql.Select[Any]:
-        return query_stmt.where(KernelRow.agent == agent_id)
-
-    return _by_agent_id
-
-
-def by_kernel_ids(
-    kernel_ids: Iterable[KernelId],
-) -> QueryCondition:
-    def _by_kernel_id(
-        query_stmt: sa.sql.Select[Any],
-    ) -> sa.sql.Select[Any]:
-        return query_stmt.where(KernelRow.id.in_(kernel_ids))
-
-    return _by_kernel_id

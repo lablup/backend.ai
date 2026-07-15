@@ -27,6 +27,14 @@ from ai.backend.common.types import DefaultForUnspecified, ResourceSlot, VFolder
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.domain.row import DomainRow
+
+# Register ImageRow in the SQLAlchemy declarative registry. KernelRow (pulled in
+# transitively via the scaling_group models) declares a string-based
+# relationship("ImageRow"), which is resolved during mapper configuration when a
+# row is instantiated. Without this import the registry lacks ImageRow and mapper
+# configuration fails when this test target runs in isolation (outside the full
+# pytest batch that would otherwise import the image models).
+from ai.backend.manager.models.image import ImageRow  # noqa: F401
 from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
@@ -41,7 +49,8 @@ from ai.backend.manager.models.scaling_group import (
     ScalingGroupRow,
 )
 from ai.backend.manager.models.user.row import UserRow
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, create_async_engine
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.db.engine import create_async_engine
 from ai.backend.manager.repositories.scaling_group.repository import ScalingGroupRepository
 from ai.backend.manager.services.scaling_group.processors import ScalingGroupProcessors
 from ai.backend.manager.services.scaling_group.service import ScalingGroupService

@@ -14,6 +14,7 @@ from typing import (
     ParamSpec,
     TypeVar,
     overload,
+    override,
 )
 
 import sqlalchemy as sa
@@ -131,6 +132,7 @@ class ExtendedAsyncSAEngine(SAEngine):
                 self._readonly_txn_count -= 1
 
     @actxmgr
+    @override
     async def begin(self, bind: SAConnection | None = None) -> AsyncIterator[SAConnection]:
         if bind is None:
             async with self.connect() as _bind, self._begin(_bind) as conn:
@@ -355,6 +357,8 @@ async def connect_database(
         str(db_url),
         connect_args=pgsql_connect_opts,
         pool_size=db_config.pool_size,
+        pool_recycle=db_config.pool_recycle,
+        pool_pre_ping=db_config.pool_pre_ping,
         max_overflow=db_config.max_overflow,
         json_serializer=functools.partial(json.dumps, cls=ExtendedJSONEncoder),
         isolation_level=isolation_level,

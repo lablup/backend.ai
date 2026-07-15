@@ -58,10 +58,11 @@ from ai.backend.manager.models.resource_policy import (
     user_resource_policies,
 )
 from ai.backend.manager.models.user import UserRole, UserStatus, users
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, connect_database
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.plugin.openid.hook import OIDCHookPlugin
 from ai.backend.manager.plugin.openid.valkey_client import ValkeyOpenIDClient
 from ai.backend.manager.plugin.openid.webapp import OIDCWebAppPlugin
+from ai.backend.manager.repositories.db.engine import connect_database
 from ai.backend.testutils.bootstrap import (  # noqa: F401
     postgres_container,
     redis_container,

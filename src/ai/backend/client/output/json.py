@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Callable, Mapping, Sequence
-from typing import Any, TypeVar, cast
+from typing import Any, TypeVar, cast, override
 
 from ai.backend.client.exceptions import BackendAPIError
 from ai.backend.common.types import ResultSet
@@ -15,6 +15,7 @@ T = TypeVar("T")
 
 
 class JsonOutputHandler(BaseOutputHandler):
+    @override
     def print_item(
         self,
         item: Mapping[str, Any] | None,
@@ -49,6 +50,7 @@ class JsonOutputHandler(BaseOutputHandler):
             )
         )
 
+    @override
     def print_items(
         self,
         items: Sequence[Mapping[str, Any]],
@@ -75,12 +77,14 @@ class JsonOutputHandler(BaseOutputHandler):
             )
         )
 
+    @override
     def print_result_set(
         self,
         result_set: ResultSet,
     ) -> None:
         print(json.dumps(result_set))
 
+    @override
     def print_list(
         self,
         items: Sequence[Mapping[str, Any]],
@@ -118,6 +122,7 @@ class JsonOutputHandler(BaseOutputHandler):
             )
         )
 
+    @override
     def print_paginated_list(
         self,
         fetch_func: Callable[[int, int], PaginatedResult[T]],
@@ -148,6 +153,7 @@ class JsonOutputHandler(BaseOutputHandler):
             )
         )
 
+    @override
     def print_mutation_result(
         self,
         item: Mapping[str, Any],
@@ -172,6 +178,7 @@ class JsonOutputHandler(BaseOutputHandler):
             )
         )
 
+    @override
     def print_mutation_error(
         self,
         error: Exception | None = None,
@@ -196,6 +203,7 @@ class JsonOutputHandler(BaseOutputHandler):
             )
         )
 
+    @override
     def print_error(
         self,
         error: Exception,
@@ -225,6 +233,7 @@ class JsonOutputHandler(BaseOutputHandler):
                     )
                 )
 
+    @override
     def print_fail(
         self,
         message: str,

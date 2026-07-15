@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import override
 
 from aiodocker import Docker
 
@@ -36,10 +37,12 @@ class DockerHealthChecker(StaticServiceHealthChecker):
         self._timeout = timeout
 
     @property
+    @override
     def target_service_group(self) -> ServiceGroup:
         """The service group this checker monitors."""
         return CONTAINER
 
+    @override
     async def check_service(self) -> ServiceHealth:
         """
         Check Docker connection health by getting version info.
@@ -66,6 +69,7 @@ class DockerHealthChecker(StaticServiceHealthChecker):
         return ServiceHealth(results={CID_DOCKER: status})
 
     @property
+    @override
     def timeout(self) -> float:
         """The timeout for the health check in seconds."""
         return self._timeout

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, override
 
 from aiohttp import web
 
@@ -22,6 +22,7 @@ class URLNotFound(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/url-not-found"
     error_title = "Unknown URL path."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,
@@ -47,6 +48,7 @@ class ObjectNotFound(BackendAIError, web.HTTPNotFound):
             self.error_title = f"E00002: No such {object_name}."
         super().__init__(message, extra_data=extra_data)
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,
@@ -61,6 +63,7 @@ class GenericBadRequest(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/generic-bad-request"
     error_title = "Bad request."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,
@@ -75,6 +78,7 @@ class RejectedByHook(BackendAIError, web.HTTPForbidden):
     error_type = "https://api.backend.ai/probs/rejected-by-hook"
     error_title = "Operation rejected by a hook plugin."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,
@@ -98,6 +102,7 @@ class InvalidCredentials(BackendAIError, web.HTTPUnauthorized):
     error_type = "https://api.backend.ai/probs/invalid-credentials"
     error_title = "Authentication credentials not valid."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,
@@ -112,6 +117,7 @@ class GenericForbidden(BackendAIError, web.HTTPForbidden):
     error_type = "https://api.backend.ai/probs/generic-forbidden"
     error_title = "Forbidden operation."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,
@@ -127,6 +133,7 @@ class ClientIPNotAllowed(BackendAIError, web.HTTPForbidden):
     error_type = "https://api.backend.ai/probs/client-ip-not-allowed"
     error_title = "Client address not allowed."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.APPPROXY,
@@ -141,6 +148,7 @@ class InsufficientPrivilege(BackendAIError, web.HTTPForbidden):
     error_type = "https://api.backend.ai/probs/insufficient-privilege"
     error_title = "Insufficient privilege."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,
@@ -161,6 +169,7 @@ class MethodNotAllowed(BackendAIError):
     error_type = "https://api.backend.ai/probs/method-not-allowed"
     error_title = "HTTP Method Not Allowed."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,
@@ -175,6 +184,7 @@ class InternalServerError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/internal-server-error"
     error_title = "Internal server error."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,
@@ -189,6 +199,7 @@ class ServerMisconfiguredError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/server-misconfigured"
     error_title = "E00001: Service misconfigured."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,
@@ -203,6 +214,7 @@ class ServiceUnavailable(BackendAIError, web.HTTPServiceUnavailable):
     error_type = "https://api.backend.ai/probs/service-unavailable"
     error_title = "Service unavailable."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,
@@ -217,6 +229,7 @@ class QueryNotImplemented(BackendAIError, web.HTTPNotImplemented):
     error_type = "https://api.backend.ai/probs/not-implemented"
     error_title = "This API query is not implemented."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,
@@ -231,6 +244,7 @@ class InvalidAuthParameters(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/invalid-auth-params"
     error_title = "Missing or invalid authorization parameters."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,
@@ -245,6 +259,7 @@ class AuthorizationFailed(BackendAIError, web.HTTPUnauthorized):
     error_type = "https://api.backend.ai/probs/auth-failed"
     error_title = "Credential/signature mismatch."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,
@@ -259,6 +274,7 @@ class PasswordExpired(BackendAIError, web.HTTPUnauthorized):
     error_type = "https://api.backend.ai/probs/password-expired"
     error_title = "Password has expired."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,
@@ -273,6 +289,7 @@ class InvalidAPIParameters(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/invalid-api-params"
     error_title = "Missing or invalid API parameters."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,
@@ -287,6 +304,7 @@ class GraphQLError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/graphql-error"
     error_title = "GraphQL-generated error."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,

@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, override
 
 from ai.backend.common.dependencies import DependencyComposer, DependencyStack
 from ai.backend.common.events.dispatcher import EventProducer
@@ -12,10 +12,10 @@ from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.manager.agent_cache import AgentRPCCache
 from ai.backend.manager.clients.agent import AgentClientPool
 from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
+from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.config.unified import ManagerUnifiedConfig
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
-from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.registry import AgentRegistry
@@ -25,6 +25,7 @@ from ai.backend.manager.repositories.scheduler.repository import SchedulerReposi
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
 from ai.backend.manager.sokovan.deployment.revision_draft import RevisionDraftReader
 from ai.backend.manager.sokovan.deployment.route.route_controller import RouteController
+from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import AgentSelector
 from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
     SchedulingController,
 )
@@ -64,6 +65,7 @@ class AgentsInput:
     deployment_repository: DeploymentRepository
     deployment_revision_preset_repository: DeploymentRevisionPresetRepository | None
     runtime_variant_repository: RuntimeVariantRepository
+    agent_selector: AgentSelector
 
 
 @dataclass
@@ -86,10 +88,12 @@ class AgentsComposer(DependencyComposer[AgentsInput, AgentsResources]):
     """Composes all agent-layer dependencies (Layer 4)."""
 
     @property
+    @override
     def stage_name(self) -> str:
         return "agents"
 
     @asynccontextmanager
+    @override
     async def compose(
         self,
         stack: DependencyStack,
@@ -108,6 +112,7 @@ class AgentsComposer(DependencyComposer[AgentsInput, AgentsResources]):
                 valkey_schedule=valkey_schedule,
                 network_plugin_ctx=setup_input.network_plugin_ctx,
                 hook_plugin_ctx=setup_input.hook_plugin_ctx,
+                agent_selector=setup_input.agent_selector,
             ),
         )
 

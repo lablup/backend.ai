@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import enum
-import math
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -22,7 +21,6 @@ from ai.backend.common.data.model_deployment.types import (
     ModelDeploymentStatus,
     ReadinessStatus,
 )
-from ai.backend.common.dto.manager.v2.deployment.types import IntOrPercent
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_preset import DeploymentPresetID
@@ -36,8 +34,8 @@ from ai.backend.manager.data.reconciler.types import BaseReconcilerCategory
 from ai.backend.manager.data.session.options import HandlerOptions
 
 if TYPE_CHECKING:
+    from ai.backend.common.schema.deployment import BlueGreenSpec, RollingUpdateSpec
     from ai.backend.manager.data.session.types import SchedulingResult, SubStepResult
-    from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUpdateSpec
 
 from ai.backend.common.types import (
     AutoScalingMetricSource,
@@ -519,62 +517,6 @@ class DeploymentOptions(ConfiguredModel):
     """
 
     handler_options: DeploymentHandlerOptions = Field(default_factory=DeploymentHandlerOptions)
-
-
-class ReplicaGroupRolloutSpec(ConfiguredModel):
-    """Per-group rollout step config snapshot from the deployment strategy at
-    DEPLOYING_INITIALIZING; bounds how fast routes move toward the group's desired counts."""
-
-    max_surge: IntOrPercent
-    max_unavailable: IntOrPercent
-
-    def resolve_max_surge(self, total: int) -> int:
-        """Extra target replicas allowed above the goal (rounds up for percentages)."""
-        return self._resolve(self.max_surge, total, round_up=True)
-
-    def resolve_max_unavailable(self, total: int) -> int:
-        """Replicas allowed unavailable below the goal (rounds down for percentages)."""
-        return self._resolve(self.max_unavailable, total, round_up=False)
-
-    @staticmethod
-    def _resolve(value: IntOrPercent, total: int, *, round_up: bool) -> int:
-        if value.count is not None:
-            return value.count
-        result = total * (value.percent or 0.0)
-        return math.ceil(result) if round_up else math.floor(result)
-
-
-@dataclass(frozen=True)
-class TargetGroupSpec:
-    """How the deploying revision's target group is chosen. ``use_primary_group`` True rolls out
-    in place into the deployment's primary group (rolling) — the setup reads that group at creation
-    time and creates a fresh one if none exists yet. When False, a fresh group is always created
-    (blue-green/canary).
-
-    No traffic weight here: a freshly rolled-out group serves no traffic until PROMOTING shifts
-    it over, so PROVISIONING creates it at weight 0 and leaves a reused group's weight untouched."""
-
-    use_primary_group: bool
-    rollout: ReplicaGroupRolloutSpec
-
-
-@dataclass(frozen=True)
-class TrafficStepInput:
-    """Current traffic split + timing for one PROMOTING tick (step is relative to current)."""
-
-    target_traffic_weight: int
-    serving_traffic_weight: int
-    last_changed_at: datetime
-    now: datetime
-
-
-@dataclass(frozen=True)
-class TrafficStep:
-    """The next traffic split (target/serving) and whether promotion is complete."""
-
-    target_traffic_weight: int
-    serving_traffic_weight: int
-    completed: bool
 
 
 class ResourceSpec(ConfiguredModel):

@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Sequence
+from typing import override
 
 from ai.backend.common.defs.session import SESSION_PRIORITY_MIN
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import AccessKey
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.kernel.types import KernelStatus
@@ -44,21 +46,25 @@ class DeprioritizeSessionsLifecycleHandler(SessionLifecycleHandler):
         self._repository = repository
 
     @classmethod
+    @override
     def name(cls) -> str:
         """Get the name of the handler."""
         return "deprioritize-sessions"
 
     @classmethod
+    @override
     def target_statuses(cls) -> list[SessionStatus]:
         """Sessions in DEPRIORITIZING state."""
         return [SessionStatus.DEPRIORITIZING]
 
     @classmethod
+    @override
     def target_kernel_statuses(cls) -> list[KernelStatus] | None:
         """No kernel filtering for deprioritize."""
         return None
 
     @classmethod
+    @override
     def status_transitions(cls) -> StatusTransitions:
         """Define state transitions for deprioritize handler (BEP-1030).
 
@@ -86,13 +92,15 @@ class DeprioritizeSessionsLifecycleHandler(SessionLifecycleHandler):
         )
 
     @property
+    @override
     def lock_id(self) -> LockID | None:
         """No lock needed for deprioritizing sessions."""
         return None
 
+    @override
     async def execute(
         self,
-        scaling_group: str,
+        resource_group_id: ResourceGroupID,
         sessions: Sequence[SessionWithKernels],
     ) -> SessionExecutionResult:
         """Lower priority and prepare for re-scheduling.
@@ -117,7 +125,7 @@ class DeprioritizeSessionsLifecycleHandler(SessionLifecycleHandler):
             "Lowered priority by {} for {} sessions in scaling group {}",
             DEPRIORITIZE_AMOUNT,
             len(sessions),
-            scaling_group,
+            resource_group_id,
         )
 
         # Mark all sessions as success for status transition to PENDING

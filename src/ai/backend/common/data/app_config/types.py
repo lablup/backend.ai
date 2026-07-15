@@ -41,3 +41,19 @@ class AppConfigScopeType(enum.StrEnum):
         their own ``scope_id``.
         """
         return "" if self is AppConfigScopeType.PUBLIC else scope_id
+
+    def default_rank(self) -> int:
+        """Default merge rank for an allow-list entry at this scope type (BEP-1052).
+
+        The merge applies fragments in rank order (low → high; higher wins), so the
+        defaults order the scopes as ``public`` < ``domain`` < ``user`` — a user's own
+        fragment overrides the domain default, which overrides the public value. The
+        100 gap leaves room for admins to place custom ranks in between.
+        """
+        match self:
+            case AppConfigScopeType.PUBLIC:
+                return 100
+            case AppConfigScopeType.DOMAIN:
+                return 200
+            case AppConfigScopeType.USER:
+                return 300

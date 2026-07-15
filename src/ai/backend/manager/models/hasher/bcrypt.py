@@ -4,6 +4,8 @@ Bcrypt password hashing implementation.
 
 from __future__ import annotations
 
+from typing import override
+
 import bcrypt
 
 from .base import PasswordHasher
@@ -13,6 +15,7 @@ from .types import HashInfo, PasswordInfo
 class BcryptHasher(PasswordHasher):
     """Bcrypt password hashing implementation."""
 
+    @override
     def generate_new_hash(self, password_info: PasswordInfo) -> HashInfo:
         # Note: bcrypt generates its own salt, so salt_size is ignored
         hash_value = bcrypt.hashpw(
@@ -26,6 +29,7 @@ class BcryptHasher(PasswordHasher):
             hash_value=hash_value,
         )
 
+    @override
     def verify(self, password: str, hash_info: HashInfo) -> bool:
         try:
             # For bcrypt, the full hash is stored in hash_value

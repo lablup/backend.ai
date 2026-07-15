@@ -177,6 +177,7 @@ __all__ = (
 if TYPE_CHECKING:
     from ai.backend.common.configs.redis import RedisConfig
     from ai.backend.common.data.vfolder.types import VFolderMountData
+    from ai.backend.common.dto.manager.v2.common import BinarySizeInfo
 
     from .docker import ImageRef
 
@@ -243,6 +244,7 @@ class BackendAISchema(BaseModel):
         return SchemaValidationFailureInfo(summary=str(exc), errors=sanitized)
 
     @classmethod
+    @override
     def model_validate(cls, *args: Any, **kwargs: Any) -> Self:
         try:
             return super().model_validate(*args, **kwargs)
@@ -250,6 +252,7 @@ class BackendAISchema(BaseModel):
             raise cls.build_validation_error(cls._validation_failure_info(e)) from e
 
     @classmethod
+    @override
     def model_validate_json(cls, *args: Any, **kwargs: Any) -> Self:
         try:
             return super().model_validate_json(*args, **kwargs)
@@ -844,9 +847,11 @@ class MountExpression:
             self.escape_map.update(escape_map)
         # self.unescape_map = {v: k for k, v in self.escape_map.items()}
 
+    @override
     def __str__(self) -> str:
         return self.expression
 
+    @override
     def __repr__(self) -> str:
         return self.__str__()
 
@@ -865,6 +870,7 @@ class HostPortPair(namedtuple("HostPortPair", "host port")):
     def as_sockaddr(self) -> tuple[str, int]:
         return str(self.host), self.port
 
+    @override
     def __str__(self) -> str:
         if isinstance(self.host, ipaddress.IPv6Address):
             return f"[{self.host}]:{self.port}"
@@ -910,9 +916,11 @@ class ReadableCIDR[Address: ipaddress.IPv4Network | ipaddress.IPv6Network]:
     def address(self) -> Address | None:
         return self._address
 
+    @override
     def __str__(self) -> str:
         return str(self._address)
 
+    @override
     def __eq__(self, other: object) -> bool:
         if other is self:
             return True
@@ -1038,6 +1046,7 @@ class BinarySize(int):
             value = d.quantize(Decimal(".00")).normalize()
         return value
 
+    @override
     def __str__(self) -> str:
         suffix_idx = self._preformat()
         if suffix_idx == 0:
@@ -1049,6 +1058,7 @@ class BinarySize(int):
         value = self._quantize(self, multiplier)
         return f"{value:f} {suffix.upper()}iB"
 
+    @override
     def __format__(self, format_spec: str) -> str:
         if len(format_spec) != 1:
             raise ValueError("format-string for BinarySize can be only one character.")
@@ -1068,6 +1078,21 @@ class BinarySize(int):
             raise ValueError("Unsupported scale unit.", suffix)
         value = self._quantize(self, maybe_multiplier)
         return f"{value:f}{suffix.lower()}".strip()
+
+    def to_bytes_str(self) -> str:
+        """Exact byte count as a base-10 string (e.g. '1073741824').
+
+        Distinct from ``str()`` ('1 GiB') and ``format(_, 's')`` ('1g'), which humanize.
+        """
+        return str(int(self))
+
+    @classmethod
+    def to_size_info(cls, value: int) -> BinarySizeInfo:
+        """Build the BinarySizeInfo DTO from a byte count (exact string + humanized display)."""
+        from ai.backend.common.dto.manager.v2.common import BinarySizeInfo
+
+        size = cls(value)
+        return BinarySizeInfo(expr=size.to_bytes_str(), display=f"{size:s}")
 
 
 def _validate_binary_size(v: Any) -> BinarySize:
@@ -1124,6 +1149,7 @@ class ResourceSlot(UserDict[str, Decimal]):
             v = Decimal(value)
         return v
 
+    @override
     def __setitem__(self, key: str | SlotName, value: RawResourceValue | None) -> None:
         normalized_key = str(key)
         if value is None:
@@ -1131,10 +1157,12 @@ class ResourceSlot(UserDict[str, Decimal]):
             return
         self.data[normalized_key] = self._process_raw_value(normalized_key, value)
 
+    @override
     def __getitem__(self, key: str | SlotName) -> Decimal:
         normalized_key = str(key)
         return self.data[normalized_key]
 
+    @override
     def copy(self) -> Self:
         return type(self)(self.data.copy())
 
@@ -1163,6 +1191,7 @@ class ResourceSlot(UserDict[str, Decimal]):
     def __neg__(self) -> ResourceSlot:
         return type(self)({k: -v for k, v in self.data.items()})
 
+    @override
     def __eq__(self, other: object) -> bool:
         if other is self:
             return True
@@ -1173,6 +1202,7 @@ class ResourceSlot(UserDict[str, Decimal]):
         other_values = [other.data[k] for k in sorted(other.data.keys())]
         return self_values == other_values
 
+    @override
     def __ne__(self, other: object) -> bool:
         if not isinstance(other, ResourceSlot):
             return NotImplemented
@@ -1457,6 +1487,36 @@ class QuotaScopeID:
             case _:
                 raise ValueError(f"Invalid quota scope type: {scope_type!r}")
 
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls,
+        source_type: Any,
+        handler: Any,
+    ) -> Any:
+        """Provide Pydantic core schema for QuotaScopeID serialization/deserialization."""
+        from pydantic_core import core_schema
+
+        def validate_quota_scope_id(v: Any) -> QuotaScopeID:
+            if isinstance(v, QuotaScopeID):
+                return v
+            if isinstance(v, str):
+                return cls.parse(v)
+            raise ValueError(f"Invalid QuotaScopeID: {v}")
+
+        # Accept both QuotaScopeID objects and strings (e.g. "user:<uuid>")
+        return core_schema.no_info_after_validator_function(
+            validate_quota_scope_id,
+            core_schema.union_schema([
+                core_schema.is_instance_schema(cls),
+                core_schema.str_schema(),
+            ]),
+            serialization=core_schema.plain_serializer_function_ser_schema(
+                lambda v: str(v),
+                return_schema=core_schema.str_schema(),
+            ),
+        )
+
+    @override
     def __str__(self) -> str:
         match self.scope_id:
             case UUID():
@@ -1464,6 +1524,7 @@ class QuotaScopeID:
             case _:
                 raise ValueError(f"Invalid quota scope ID: {self.scope_id!r}")
 
+    @override
     def __repr__(self) -> str:
         return self.__str__()
 
@@ -1530,17 +1591,20 @@ class VFolderID:
             case None:
                 self.quota_scope_id = None
 
+    @override
     def __str__(self) -> str:
         if self.quota_scope_id is None:
             return self.folder_id.hex
         return f"{self.quota_scope_id}/{self.folder_id.hex}"
 
+    @override
     def __eq__(self, other: Any) -> bool:
         result: bool = (
             self.quota_scope_id == other.quota_scope_id and self.folder_id == other.folder_id
         )
         return result
 
+    @override
     def __hash__(self) -> int:
         qsid = str(self.quota_scope_id) if self.quota_scope_id is not None else None
         return hash((qsid, self.folder_id))
@@ -1570,6 +1634,7 @@ class VFolderMount(JSONSerializableMixin):
     mount_perm: MountPermission
     usage_mode: VFolderUsageMode
 
+    @override
     def to_json(self) -> dict[str, Any]:
         return {
             "name": self.name,
@@ -1582,6 +1647,7 @@ class VFolderMount(JSONSerializableMixin):
         }
 
     @classmethod
+    @override
     def from_json(cls, obj: Mapping[str, Any]) -> Self:
         base = cls.as_trafaret().check(obj)
         return cls(**base)
@@ -1612,6 +1678,7 @@ class VFolderMount(JSONSerializableMixin):
         )
 
     @classmethod
+    @override
     def as_trafaret(cls) -> t.Trafaret:
         from . import validators as tx
 
@@ -1638,6 +1705,7 @@ class VFolderHostPermissionMap(dict[str, set[VFolderHostPermission]], JSONSerial
         self, value: dict[T1, T2], /
     ) -> dict[str | T1, set[VFolderHostPermission] | T2]: ...
 
+    @override
     def __or__(
         self, value: dict[Any, Any], /
     ) -> dict[str, set[VFolderHostPermission]] | dict[str | Any, set[VFolderHostPermission] | Any]:
@@ -1654,16 +1722,19 @@ class VFolderHostPermissionMap(dict[str, set[VFolderHostPermission]], JSONSerial
             union_map[host] |= set(perm_list)
         return VFolderHostPermissionMap(union_map)
 
+    @override
     def to_json(self) -> dict[str, Any]:
         return {host: [perm.value for perm in perms] for host, perms in self.items()}
 
     @classmethod
+    @override
     def from_json(cls, obj: Mapping[str, Any]) -> Self:
         return cls({
             host: {VFolderHostPermission(perm) for perm in perms} for host, perms in obj.items()
         })
 
     @classmethod
+    @override
     def as_trafaret(cls) -> t.Trafaret:
         from . import validators as tx
 

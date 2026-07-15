@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import override
 
 from ai.backend.common.health_checker.abc import StaticServiceHealthChecker
 from ai.backend.common.health_checker.types import (
@@ -25,9 +26,11 @@ class PrometheusHealthChecker(StaticServiceHealthChecker):
         self._timeout = timeout
 
     @property
+    @override
     def target_service_group(self) -> ServiceGroup:
         return PROMETHEUS
 
+    @override
     async def check_service(self) -> ServiceHealth:
         from ai.backend.common.metrics.safe import is_metrics_disabled, metrics_trip_info
 
@@ -44,5 +47,6 @@ class PrometheusHealthChecker(StaticServiceHealthChecker):
         )
 
     @property
+    @override
     def timeout(self) -> float:
         return self._timeout

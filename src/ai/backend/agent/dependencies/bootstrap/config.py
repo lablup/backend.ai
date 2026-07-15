@@ -4,6 +4,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from pathlib import Path
+from typing import override
 
 from ai.backend.agent.config.unified import AgentConfigValidationContext, AgentUnifiedConfig
 from ai.backend.common import config as common_config
@@ -35,10 +36,12 @@ class AgentConfigLoaderDependency(
     """
 
     @property
+    @override
     def stage_name(self) -> str:
         return "config-loader"
 
     @asynccontextmanager
+    @override
     async def provide(
         self, setup_input: AgentConfigLoaderInput
     ) -> AsyncIterator[AgentUnifiedConfig]:

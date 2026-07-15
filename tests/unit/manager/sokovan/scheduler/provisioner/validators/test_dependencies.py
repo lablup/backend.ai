@@ -5,6 +5,7 @@ from decimal import Decimal
 
 import pytest
 
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import AccessKey, ResourceSlot, SessionId, SessionResult
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.sokovan import (
@@ -37,6 +38,7 @@ class TestDependenciesValidator:
             group_id=uuid.uuid4(),
             domain_name="default",
             scaling_group="default",
+            resource_group_id=ResourceGroupID(uuid.uuid4()),
         )
         snapshot = SystemSnapshot(
             total_capacity=ResourceSlot(cpu=Decimal("100"), mem=Decimal("100")),
@@ -66,6 +68,7 @@ class TestDependenciesValidator:
             group_id=uuid.uuid4(),
             domain_name="default",
             scaling_group="default",
+            resource_group_id=ResourceGroupID(uuid.uuid4()),
         )
         snapshot = SystemSnapshot(
             total_capacity=ResourceSlot(cpu=Decimal("100"), mem=Decimal("100")),
@@ -105,6 +108,7 @@ class TestDependenciesValidator:
             group_id=uuid.uuid4(),
             domain_name="default",
             scaling_group="default",
+            resource_group_id=ResourceGroupID(uuid.uuid4()),
         )
         snapshot = SystemSnapshot(
             total_capacity=ResourceSlot(cpu=Decimal("100"), mem=Decimal("100")),
@@ -149,6 +153,7 @@ class TestDependenciesValidator:
             group_id=uuid.uuid4(),
             domain_name="default",
             scaling_group="default",
+            resource_group_id=ResourceGroupID(uuid.uuid4()),
         )
         snapshot = SystemSnapshot(
             total_capacity=ResourceSlot(cpu=Decimal("100"), mem=Decimal("100")),

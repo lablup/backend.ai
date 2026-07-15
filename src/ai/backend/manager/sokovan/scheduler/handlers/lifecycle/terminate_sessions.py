@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Sequence
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, override
 
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus, StatusTransitions, TransitionStatus
@@ -43,21 +44,25 @@ class TerminateSessionsLifecycleHandler(SessionLifecycleHandler):
         self._repository = repository
 
     @classmethod
+    @override
     def name(cls) -> str:
         """Get the name of the handler."""
         return "terminate-sessions"
 
     @classmethod
+    @override
     def target_statuses(cls) -> list[SessionStatus]:
         """Sessions in TERMINATING state."""
         return [SessionStatus.TERMINATING]
 
     @classmethod
+    @override
     def target_kernel_statuses(cls) -> list[KernelStatus] | None:
         """No kernel filtering - termination applies to any kernel state."""
         return None
 
     @classmethod
+    @override
     def status_transitions(cls) -> StatusTransitions:
         """Define state transitions for terminate sessions handler (BEP-1030).
 
@@ -80,13 +85,15 @@ class TerminateSessionsLifecycleHandler(SessionLifecycleHandler):
         )
 
     @property
+    @override
     def lock_id(self) -> LockID | None:
         """Lock for operations targeting TERMINATING sessions."""
         return LockID.LOCKID_SOKOVAN_TARGET_TERMINATING
 
+    @override
     async def execute(
         self,
-        _scaling_group: str,
+        _resource_group_id: ResourceGroupID,
         sessions: Sequence[SessionWithKernels],
     ) -> SessionExecutionResult:
         """Send termination RPC calls for TERMINATING sessions.

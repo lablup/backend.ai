@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
+from typing import override
 
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
@@ -20,6 +21,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
 from ai.backend.manager.repositories.fair_share import FairShareRepository
+from ai.backend.manager.repositories.idle_checker.repository import IdleCheckerRepository
 from ai.backend.manager.repositories.prometheus_query_preset.repository import (
     PrometheusQueryPresetRepository,
 )
@@ -31,6 +33,7 @@ from ai.backend.manager.repositories.runtime_variant.repository import RuntimeVa
 from ai.backend.manager.repositories.scheduler import SchedulerRepository
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
 from ai.backend.manager.sokovan.deployment.route.route_controller import RouteController
+from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import AgentSelector
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 from ai.backend.manager.sokovan.sokovan import SokovanOrchestrator
 from ai.backend.manager.types import DistributedLockFactory
@@ -61,11 +64,13 @@ class OrchestrationInput:
     scheduler_repository: SchedulerRepository
     deployment_repository: DeploymentRepository
     replica_group_repository: ReplicaGroupRepository
+    idle_checker_repository: IdleCheckerRepository
     fair_share_repository: FairShareRepository
     resource_usage_repository: ResourceUsageHistoryRepository
     agent_client_pool: AgentClientPool
     appproxy_client_pool: AppProxyClientPool
     network_plugin_ctx: NetworkPluginContext
+    agent_selector: AgentSelector
     scheduling_controller: SchedulingController
     deployment_controller: DeploymentController
     route_controller: RouteController
@@ -100,10 +105,12 @@ class OrchestrationComposer(DependencyComposer[OrchestrationInput, Orchestration
     """
 
     @property
+    @override
     def stage_name(self) -> str:
         return "orchestration"
 
     @asynccontextmanager
+    @override
     async def compose(
         self,
         stack: DependencyStack,
@@ -137,6 +144,7 @@ class OrchestrationComposer(DependencyComposer[OrchestrationInput, Orchestration
             scheduler_repository=setup_input.scheduler_repository,
             deployment_repository=setup_input.deployment_repository,
             replica_group_repository=setup_input.replica_group_repository,
+            idle_checker_repository=setup_input.idle_checker_repository,
             fair_share_repository=setup_input.fair_share_repository,
             resource_usage_repository=setup_input.resource_usage_repository,
             config_provider=setup_input.config_provider,
@@ -146,6 +154,7 @@ class OrchestrationComposer(DependencyComposer[OrchestrationInput, Orchestration
             event_producer=setup_input.event_producer,
             valkey_schedule=setup_input.valkey_schedule,
             valkey_stat=setup_input.valkey_stat,
+            agent_selector=setup_input.agent_selector,
             scheduling_controller=setup_input.scheduling_controller,
             deployment_controller=setup_input.deployment_controller,
             route_controller=setup_input.route_controller,

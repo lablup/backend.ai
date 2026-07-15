@@ -2,6 +2,7 @@
 
 import logging
 from collections.abc import Sequence
+from typing import override
 
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.logging import BraceStyleAdapter
@@ -34,20 +35,24 @@ class ServiceDiscoverySyncHandler(RouteHandler):
         self._event_producer = event_producer
 
     @classmethod
+    @override
     def name(cls) -> str:
         """Get the name of the handler."""
         return "service-discovery-sync"
 
     @property
+    @override
     def lock_id(self) -> LockID | None:
         """No lock needed for service discovery sync."""
         return None
 
     @classmethod
+    @override
     def category(cls) -> RouteHandlerCategory:
         return RouteHandlerCategory.SYNC
 
     @classmethod
+    @override
     def target_statuses(cls) -> RouteTargetStatuses:
         return RouteTargetStatuses(
             lifecycle=[RouteStatus.RUNNING],
@@ -55,6 +60,7 @@ class ServiceDiscoverySyncHandler(RouteHandler):
         )
 
     @classmethod
+    @override
     def status_transitions(cls) -> RouteStatusTransitions:
         """Define state transitions for service discovery sync handler (BEP-1030).
 
@@ -67,6 +73,7 @@ class ServiceDiscoverySyncHandler(RouteHandler):
             stale=None,
         )
 
+    @override
     async def execute(self, routes: Sequence[RouteData]) -> RouteExecutionResult:
         """Execute service discovery synchronization for healthy routes."""
         log.debug("Syncing {} healthy routes to service discovery", len(routes))
@@ -74,6 +81,7 @@ class ServiceDiscoverySyncHandler(RouteHandler):
         # Execute service discovery sync logic via executor
         return await self._route_executor.sync_service_discovery(routes)
 
+    @override
     async def post_process(self, result: RouteExecutionResult) -> None:
         """Handle post-processing after service discovery sync."""
         synced_count = len(result.successes)

@@ -5,6 +5,7 @@ from datetime import datetime
 from functools import cached_property
 from uuid import UUID
 
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
@@ -50,6 +51,7 @@ class PendingSessionData:
     group_id: UUID
     domain_name: str
     scaling_group_name: str
+    resource_group_id: ResourceGroupID
     priority: int
     is_preemptible: bool
     session_type: SessionTypes
@@ -70,6 +72,7 @@ class PendingSessionData:
             group_id=self.group_id,
             domain_name=self.domain_name,
             scaling_group=self.scaling_group_name,
+            resource_group_id=self.resource_group_id,
             priority=self.priority,
             session_type=self.session_type,
             cluster_mode=self.cluster_mode,

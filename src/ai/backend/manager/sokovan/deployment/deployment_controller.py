@@ -18,6 +18,7 @@ from ai.backend.common.identifier.deployment_revision import DeploymentRevisionI
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.resource_group import ResourceGroupName
 from ai.backend.common.identifier.vfolder import VFolderUUID
+from ai.backend.common.schema.deployment import BlueGreenSpec, RollingUpdateSpec
 from ai.backend.common.types import (
     ClusterMode,
     MountInfoEntry,
@@ -25,6 +26,7 @@ from ai.backend.common.types import (
     ResourceSlot,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.deployment.creator import (
     DeploymentCreationDraft,
@@ -55,12 +57,10 @@ from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.deployment import EndpointNotFound
 from ai.backend.manager.errors.storage import VFolderPermissionError
-from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUpdateSpec
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.routing.conditions import RouteConditions
 from ai.backend.manager.models.runtime_variant_preset.types import RuntimeVariantPresetValueEntry
-from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.base.updater import Updater

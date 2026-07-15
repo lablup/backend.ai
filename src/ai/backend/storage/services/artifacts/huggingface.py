@@ -755,6 +755,7 @@ class HuggingFaceDownloadStep(ImportStep[None]):
         self._redis_client = redis_client
 
     @property
+    @override
     def step_type(self) -> ArtifactStorageImportStep:
         return ArtifactStorageImportStep.DOWNLOAD
 

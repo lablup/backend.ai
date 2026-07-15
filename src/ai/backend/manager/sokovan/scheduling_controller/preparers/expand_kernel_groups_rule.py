@@ -20,6 +20,8 @@ group's execution_spec before expansion runs.
 
 from __future__ import annotations
 
+from typing import override
+
 from ai.backend.manager.data.session.draft import (
     KernelSpecDraft,
     SessionSpecDraft,
@@ -38,9 +40,11 @@ class ExpandKernelGroupsRule(SessionSpecDraftRule):
     its attribute-path error message intact.
     """
 
+    @override
     def name(self) -> str:
         return "expand_kernel_groups"
 
+    @override
     async def prepare(
         self,
         draft: SessionSpecDraft,

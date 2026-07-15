@@ -9,10 +9,12 @@ from ai.backend.common.dto.manager.field import (
 )
 from ai.backend.common.dto.manager.request import VFolderCreateReq
 from ai.backend.common.types import VFolderUsageMode
-from ai.backend.manager.models.vfolder import (
+from ai.backend.manager.data.vfolder.types import (
+    VFolderMountPermission as VFolderPermission,
+)
+from ai.backend.manager.data.vfolder.types import (
     VFolderOperationStatus,
     VFolderOwnershipType,
-    VFolderPermission,
 )
 
 

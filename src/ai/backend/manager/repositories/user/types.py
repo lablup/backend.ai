@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
+from typing import override
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -41,6 +42,7 @@ class DomainUserSearchScope(SearchScope):
     domain_name: str
     """Required. The domain to search within."""
 
+    @override
     def to_condition(self) -> QueryCondition:
         """Convert scope to a query condition for UserRow."""
         domain_name = self.domain_name
@@ -51,6 +53,7 @@ class DomainUserSearchScope(SearchScope):
         return inner
 
     @property
+    @override
     def existence_checks(self) -> Sequence[ExistenceCheck[str]]:
         """Return existence checks for scope validation."""
         return [
@@ -73,6 +76,7 @@ class ProjectUserSearchScope(SearchScope):
     project_id: UUID
     """Required. The project (group) to search within."""
 
+    @override
     def to_condition(self) -> QueryCondition:
         """Convert scope to a query condition for AssociationScopesEntitiesRow.
 
@@ -87,6 +91,7 @@ class ProjectUserSearchScope(SearchScope):
         return inner
 
     @property
+    @override
     def existence_checks(self) -> Sequence[ExistenceCheck[UUID]]:
         """Return existence checks for scope validation."""
         return [
@@ -108,6 +113,7 @@ class RoleUserSearchScope(SearchScope):
     role_id: UUID
     """Required. The role to search within."""
 
+    @override
     def to_condition(self) -> QueryCondition:
         """Convert scope to a query condition for UserRoleRow."""
         role_id = self.role_id
@@ -118,6 +124,7 @@ class RoleUserSearchScope(SearchScope):
         return inner
 
     @property
+    @override
     def existence_checks(self) -> Sequence[ExistenceCheck[UUID]]:
         """Return existence checks for scope validation."""
         return [

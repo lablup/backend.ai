@@ -2,6 +2,7 @@
 
 import logging
 from collections.abc import Sequence
+from typing import override
 
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.logging import BraceStyleAdapter
@@ -35,20 +36,24 @@ class ProvisioningRouteHandler(RouteHandler):
         self._event_producer = event_producer
 
     @classmethod
+    @override
     def name(cls) -> str:
         """Get the name of the handler."""
         return "provision-routes"
 
     @property
+    @override
     def lock_id(self) -> LockID | None:
         """Lock for provisioning routes."""
         return LockID.LOCKID_DEPLOYMENT_PROVISIONING_ROUTES
 
     @classmethod
+    @override
     def category(cls) -> RouteHandlerCategory:
         return RouteHandlerCategory.LIFECYCLE
 
     @classmethod
+    @override
     def target_statuses(cls) -> RouteTargetStatuses:
         return RouteTargetStatuses(
             lifecycle=[RouteStatus.PROVISIONING],
@@ -56,6 +61,7 @@ class ProvisioningRouteHandler(RouteHandler):
         )
 
     @classmethod
+    @override
     def status_transitions(cls) -> RouteStatusTransitions:
         """Session enqueued → sub_status=STARTING; enqueue failed → FAILED_TO_START."""
         return RouteStatusTransitions(
@@ -68,6 +74,7 @@ class ProvisioningRouteHandler(RouteHandler):
             stale=None,
         )
 
+    @override
     async def execute(self, routes: Sequence[RouteData]) -> RouteExecutionResult:
         """Execute provisioning for routes."""
         log.debug("Provisioning {} routes", len(routes))
@@ -75,6 +82,7 @@ class ProvisioningRouteHandler(RouteHandler):
         # Execute route provisioning logic via executor
         return await self._route_executor.provision_routes(routes)
 
+    @override
     async def post_process(self, result: RouteExecutionResult) -> None:
         """Handle post-processing after provisioning routes."""
         log.info(

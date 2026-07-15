@@ -30,6 +30,7 @@ from ai.backend.common.types import (
     VFolderUsageMode,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.group.types import ProjectResourceInfo
 from ai.backend.manager.data.vfolder.dto import UserIdentity
@@ -57,7 +58,6 @@ from ai.backend.manager.errors.storage import (
 )
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.group import ProjectType
-from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.models.vfolder import (
     VFolderCloneInfo,
@@ -730,7 +730,10 @@ class VFolderService:
         vfolder_data = await self._vfolder_repository.get_by_id_validated(
             action.vfolder_uuid, user.id, user.domain_name
         )
-        result = await self._vfolder_repository.delete_vfolders_forever([action.vfolder_uuid])
+        # Explicit escape hatch: bypass the in-use / status guards.
+        result = await self._vfolder_repository.delete_vfolders_forever(
+            [action.vfolder_uuid], force=True
+        )
         if result.failures:
             raise result.failures[0].exception
         await self._remove_vfolder_from_storage(vfolder_data)
@@ -1123,7 +1126,9 @@ class VFolderService:
                     volume_usage["total"] = storage_capacity_bytes
                 if show_percentage:
                     try:
-                        volume_usage["percentage"] = storage_used_bytes / storage_capacity_bytes
+                        volume_usage["percentage"] = (
+                            storage_used_bytes / storage_capacity_bytes
+                        ) * 100
                     except ZeroDivisionError:
                         volume_usage["percentage"] = 0.0
 
@@ -1878,6 +1883,7 @@ class VFolderService:
         result = await self._vfolder_repository.delete_vfolders_forever(
             [action.vfolder_id],
             cascade_model_card=action.cascade_model_card,
+            force=action.force,
         )
         if result.failures:
             raise result.failures[0].exception

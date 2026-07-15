@@ -186,6 +186,10 @@ class ResourceWeightEntryInput(BaseRequestModel):
 class PreemptionConfigInputDTO(BaseRequestModel):
     """Input for preemption configuration."""
 
+    enabled: bool = Field(
+        default=False,
+        description="Whether preemption is enabled for this resource group (opt-in).",
+    )
     preemptible_priority: int = Field(
         default=5,
         description="Sessions with priority <= this value are eligible for preemption.",
@@ -197,6 +201,13 @@ class PreemptionConfigInputDTO(BaseRequestModel):
     mode: str = Field(
         default="terminate",
         description="How to preempt sessions (terminate/reschedule).",
+    )
+    preemption_min_runtime: float = Field(
+        default=0.0,
+        ge=0.0,
+        description=(
+            "Minimum session runtime in seconds before it becomes preemptible (0 = disabled)."
+        ),
     )
 
 

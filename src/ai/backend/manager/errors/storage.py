@@ -5,7 +5,7 @@ Storage and virtual folder-related exceptions.
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from typing import Any
+from typing import Any, override
 
 from aiohttp import web
 
@@ -24,6 +24,7 @@ class TooManyVFoldersFound(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/too-many-vfolders"
     error_title = "Multiple vfolders found for the operation for a single vfolder."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.VFOLDER,
@@ -49,6 +50,7 @@ class TooManyVFoldersFound(BackendAIError, web.HTTPNotFound):
 class VFolderNotFound(ObjectNotFound):
     object_name = "virtual folder"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.VFOLDER,
@@ -60,6 +62,7 @@ class VFolderNotFound(ObjectNotFound):
 class QuotaScopeNotFoundError(ObjectNotFound):
     object_name = "quota scope"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.QUOTA_SCOPE,
@@ -72,6 +75,7 @@ class ModelCardParseError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/model-card-parse-error"
     error_title = "Model Card Parse Error"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.MODEL_CARD,
@@ -84,6 +88,7 @@ class VFolderAlreadyExists(BackendAIError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/vfolder-already-exists"
     error_title = "The virtual folder already exists with the same name."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.VFOLDER,
@@ -96,6 +101,7 @@ class VFolderGone(BackendAIError, web.HTTPGone):
     error_type = "https://api.backend.ai/probs/vfolder-gone"
     error_title = "The virtual folder is gone."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.VFOLDER,
@@ -108,6 +114,7 @@ class VFolderBadRequest(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/vfolder-operation-failed"
     error_title = "Virtual folder operation has failed due to bad request."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.VFOLDER,
@@ -120,6 +127,7 @@ class VFolderOperationFailed(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/vfolder-operation-failed"
     error_title = "Virtual folder operation has failed."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.VFOLDER,
@@ -132,6 +140,7 @@ class VFolderFilterStatusFailed(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/vfolder-filter-status-failed"
     error_title = "Virtual folder status filtering has failed."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.VFOLDER,
@@ -144,6 +153,7 @@ class VFolderFilterStatusNotAvailable(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/vfolder-filter-status-not-available"
     error_title = "There is no available virtual folder to filter its status."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.VFOLDER,
@@ -156,6 +166,7 @@ class VFolderPermissionError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/vfolder-permission-error"
     error_title = "The virtual folder does not permit the specified permission."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.VFOLDER,
@@ -168,6 +179,7 @@ class VFolderInvitationNotFound(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/vfolder-invitation-not-found"
     error_title = "Virtual folder invitation not found."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.VFOLDER_INVITATION,
@@ -180,6 +192,7 @@ class VFolderCreationFailure(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/vfolder-creation-failed"
     error_title = "Virtual folder creation failed."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.VFOLDER,
@@ -192,6 +205,7 @@ class VFolderGrantAlreadyExists(BackendAIError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/vfolder-grant-already-exists"
     error_title = "Virtual folder grant already exists."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.VFOLDER,
@@ -204,6 +218,7 @@ class VFolderDeletionNotAllowed(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/vfolder-deletion-not-allowed"
     error_title = "Virtual folder deletion is not allowed."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.VFOLDER,
@@ -216,6 +231,7 @@ class VFolderHasLinkedModelCard(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/vfolder-has-linked-model-card"
     error_title = "Virtual folder has linked model card(s)."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.VFOLDER,
@@ -228,6 +244,7 @@ class InsufficientStoragePermission(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/storage-permission-not-allowed"
     error_title = "The specified storage permission is not allowed."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE,
@@ -240,6 +257,7 @@ class VFolderInvalidParameter(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/vfolder-invalid-parameter"
     error_title = "Invalid parameter for virtual folder operation."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.VFOLDER,
@@ -252,6 +270,7 @@ class DotfileCreationFailed(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/generic-bad-request"
     error_title = "Dotfile creation has failed."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.DOTFILE,
@@ -264,6 +283,7 @@ class DotfileAlreadyExists(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/generic-bad-request"
     error_title = "Dotfile already exists."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.DOTFILE,
@@ -275,6 +295,7 @@ class DotfileAlreadyExists(BackendAIError, web.HTTPBadRequest):
 class DotfileNotFound(ObjectNotFound):
     object_name = "dotfile"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.DOTFILE,
@@ -287,6 +308,7 @@ class DotfileVFolderPathConflict(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/dotfile-vfolder-path-conflict"
     error_title = "The dotfile path conflicts with a virtual folder path."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.DOTFILE,
@@ -299,6 +321,7 @@ class StorageProxyNotFound(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/storage-proxy-not-found"
     error_title = "Storage proxy not found."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE_PROXY,
@@ -311,6 +334,7 @@ class StorageProxyConnectionError(BackendAIError, web.HTTPServiceUnavailable):
     error_type = "https://api.backend.ai/probs/storage-proxy-connection-error"
     error_title = "Failed to connect to storage proxy."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE_PROXY,
@@ -323,6 +347,7 @@ class StorageProxyTimeoutError(BackendAIError, web.HTTPGatewayTimeout):
     error_type = "https://api.backend.ai/probs/storage-proxy-timeout"
     error_title = "Request to storage proxy timed out."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE_PROXY,
@@ -335,6 +360,7 @@ class UnexpectedStorageProxyResponseError(BackendAIError, web.HTTPInternalServer
     error_type = "https://api.backend.ai/probs/unexpected-storage-proxy-response"
     error_title = "Unexpected response from storage proxy."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE_PROXY,
@@ -347,6 +373,7 @@ class UnsupportedStorageTypeError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/unsupported-storage-type"
     error_title = "Unsupported storage type."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE,

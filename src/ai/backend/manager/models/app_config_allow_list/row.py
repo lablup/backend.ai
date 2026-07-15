@@ -18,10 +18,14 @@ __all__ = ("AppConfigAllowListRow",)
 class AppConfigAllowListRow(Base):  # type: ignore[misc]
     """Permission to write config fragments for one config name at one scope type.
 
-    A config fragment may be created, updated, or purged only when a matching row
-    exists here; without one, the write is rejected. Reads never consult this table.
-    There is at most one row per ``(config_name, scope_type)``, and only admins
-    create or remove these rows.
+    A config fragment may be created only when a matching row exists here.
+    Deletion cascades both ways: fragments reference this table by
+    ``(config_name, scope_type)`` and this table references
+    ``app_config_definitions`` by ``config_name``, both ``ON DELETE CASCADE`` —
+    so retiring a config name clears its entries and fragments. ``rank`` is the
+    merge priority the entry's fragments carry (low → high; higher wins) —
+    admin-owned so fragment owners cannot re-order the merge. At most one row per
+    ``(config_name, scope_type)``; only admins create or remove these rows.
     """
 
     __tablename__ = "app_config_allow_list"
@@ -40,12 +44,17 @@ class AppConfigAllowListRow(Base):  # type: ignore[misc]
     config_name: Mapped[str] = mapped_column(
         "config_name",
         sa.String(length=128),
-        sa.ForeignKey("app_config_definitions.config_name", ondelete="NO ACTION"),
+        sa.ForeignKey("app_config_definitions.config_name", ondelete="CASCADE"),
         nullable=False,
     )
     scope_type: Mapped[AppConfigScopeType] = mapped_column(
         "scope_type",
         StrEnumType(AppConfigScopeType),
+        nullable=False,
+    )
+    rank: Mapped[int] = mapped_column(
+        "rank",
+        sa.Integer,
         nullable=False,
     )
     created_at: Mapped[datetime] = mapped_column(
@@ -67,6 +76,7 @@ class AppConfigAllowListRow(Base):  # type: ignore[misc]
             id=self.id,
             config_name=self.config_name,
             scope_type=self.scope_type,
+            rank=self.rank,
             created_at=self.created_at,
             updated_at=self.updated_at,
         )

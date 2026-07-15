@@ -58,7 +58,6 @@ from .purger import (
 from .querier import (
     BatchQuerier,
     BatchQuerierResult,
-    ExistsQuerier,
     Querier,
     QuerierResult,
     execute_batch_querier,
@@ -124,7 +123,6 @@ __all__ = [
     "Querier",
     "QuerierResult",
     "execute_querier",
-    "ExistsQuerier",
     # BatchQuerier
     "BatchQuerier",
     "BatchQuerierResult",

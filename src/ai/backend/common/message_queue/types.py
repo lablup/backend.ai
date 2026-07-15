@@ -6,7 +6,7 @@ from typing import Self, cast
 
 from ai.backend.common import msgpack
 from ai.backend.common.contexts.request_id import with_request_id
-from ai.backend.common.contexts.user import with_user
+from ai.backend.common.contexts.user import with_triggered_user, with_user
 from ai.backend.common.data.user.types import UserData
 from ai.backend.common.json import dump_json, load_json
 from ai.backend.logging.utils import with_log_context_fields
@@ -59,6 +59,7 @@ class MQMessage:
 class MessageMetadata:
     request_id: str | None = None
     user: UserData | None = None
+    triggered_user: UserData | None = None
 
     def serialize(self) -> bytes:
         """
@@ -74,12 +75,13 @@ class MessageMetadata:
         result = load_json(data)
         if "user_id" in result:
             del result["user_id"]
-        if "user" in result:
-            user_data = result["user"]
-            if isinstance(user_data, dict):
-                result["user"] = UserData.from_dict(user_data)
-            else:
-                result["user"] = None
+        for key in ("user", "triggered_user"):
+            if key in result:
+                user_data = result[key]
+                if isinstance(user_data, dict):
+                    result[key] = UserData.from_dict(user_data)
+                else:
+                    result[key] = None
         return cls(**result)
 
     @contextmanager
@@ -95,6 +97,9 @@ class MessageMetadata:
             if self.user:
                 stack.enter_context(with_user(self.user))
                 log_fields["user_id"] = str(self.user.user_id)
+            if self.triggered_user:
+                stack.enter_context(with_triggered_user(self.triggered_user))
+                log_fields["triggered_user_id"] = str(self.triggered_user.user_id)
             if log_fields:
                 stack.enter_context(with_log_context_fields(log_fields))
             yield

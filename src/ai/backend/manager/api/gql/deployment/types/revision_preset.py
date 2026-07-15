@@ -78,7 +78,6 @@ from ai.backend.common.dto.manager.v2.deployment_revision_preset.response import
     UpdateDeploymentRevisionPresetPayload as UpdatePayloadDTO,
 )
 from ai.backend.common.identifier.image import ImageID
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import StringFilter as StringFilterGQL
 from ai.backend.manager.api.gql.base import UUIDFilter as UUIDFilterGQL
 from ai.backend.manager.api.gql.common.types import (
@@ -415,21 +414,15 @@ class DeploymentRevisionPresetFilterGQL(PydanticInputMixin[FilterDTO]):
         default=None, description="Variant ID filter."
     )
     AND: list[Self] | None = gql_added_field(
-        BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION, description="Match all of the given sub-filters."
-        ),
+        BackendAIGQLMeta(added_version="26.7.0", description="Match all of the given sub-filters."),
         default=None,
     )
     OR: list[Self] | None = gql_added_field(
-        BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION, description="Match any of the given sub-filters."
-        ),
+        BackendAIGQLMeta(added_version="26.7.0", description="Match any of the given sub-filters."),
         default=None,
     )
     NOT: list[Self] | None = gql_added_field(
-        BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION, description="Negate the given sub-filters."
-        ),
+        BackendAIGQLMeta(added_version="26.7.0", description="Negate the given sub-filters."),
         default=None,
     )
 
@@ -543,7 +536,7 @@ class PresetModelServiceConfigInputGQL(PydanticInputMixin[PresetModelServiceConf
     )
     command: str | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.7.0",
             description="Single-string command to start the model service.",
         ),
         default=None,
@@ -557,8 +550,12 @@ class PresetModelServiceConfigInputGQL(PydanticInputMixin[PresetModelServiceConf
         default=None,
         deprecation_reason="Use `command` instead.",
     )
-    shell: str = gql_field(
-        description="Shell configured for the model service.", default=DEFAULT_SHELL
+    shell: str | None = gql_field(
+        description=(
+            "Shell used to run the command. If set, the kernel runs "
+            "`[shell, '-c', command]`; null or empty disables shell wrapping."
+        ),
+        default=DEFAULT_SHELL,
     )
     port: int = gql_field(
         description="Port number for the model service. Must be greater than 1.",

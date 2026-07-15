@@ -19,9 +19,9 @@ each managed independently.
 
 **Reads are the hot path.** A user's effective configuration for a
 `config_name` is the **deep merge of every fragment that applies to
-them**, taken
-straight from `app_config_fragments` in `rank` order — a single-table
-query with **no joins and no permission lookup**.
+them**, taken from `app_config_fragments` ordered by the `rank` of each
+fragment's allow-list entry — one indexed join, **no permission
+lookup**.
 
 **Write authorization is set up ahead of time.** Every config name is
 **explicitly registered** in `app_config_definitions`, and `app_config_allow_list`
@@ -66,20 +66,27 @@ Three scopes cover the use cases (`public` for the pre-login shell):
   `domain` (same-domain read / admin write), `user` (owner+admin read /
   owner-modify + admin write).
 - **Explicitly registered names.** Every config name lives in
-  `app_config_definitions`; fragments and allow-list entries reference it by
-  foreign key. No fragment may exist for an unregistered `config_name`.
-- **Reads are join-free and unconditional.** The merge reads
-  `app_config_fragments` alone, ordering the existing fragments by
-  `rank`. No allow-list or policy is consulted at read time — the hot
-  path stays a single indexed scan.
-- **Allow-list = the write gate for every fragment.** `app_config_allow_list`
+  `app_config_definitions`; allow-list entries reference it by foreign key,
+  and fragments reference it transitively through their allow-list entry (a
+  fragment requires an entry, and the entry requires a registered name — so
+  no direct fragment FK is needed). No fragment may exist for an
+  unregistered `config_name`.
+- **Reads are unconditional.** The merge **must** join
+  `app_config_fragments` to `app_config_allow_list` — `rank` lives only on
+  the allow-list entry, so the ordering cannot be computed without it (an
+  indexed `(config_name, scope_type)` join). The join is for `rank` alone;
+  no permission or policy is evaluated at read time.
+- **Allow-list = the write gate and the merge order.** `app_config_allow_list`
   holds **one record per `(config_name, scope_type)`**; a fragment at
-  that scope may be created/updated/purged **only if** the record exists
-  — through the admin mutations and the regular ones alike. What sets
-  admins apart is that they alone manage the allow-list (and the
-  `app_config_definitions`) itself. It governs **writes only** — never reads.
-- **`rank` lives on the fragment.** A fragment's `rank` is its merge
-  priority within a `config_name`; the read merge orders fragments by it.
+  that scope may be created **only if** the record exists — through the
+  admin mutations and the regular ones alike. Fragments reference their
+  entry by FK (`ON DELETE CASCADE`), so removing an entry removes its
+  fragments. What sets admins apart is that they alone manage the
+  allow-list (and the `app_config_definitions`) itself.
+- **`rank` lives on the allow-list entry.** Merge priority is an
+  admin-owned policy: it sits on the (admin-managed) allow-list entry,
+  not on the fragment — a fragment owner editing their own fragment can
+  never re-order the merge (see §2).
 - **Single source-of-truth table.** One `app_config_fragments` table
   holds every scope; only the exposure layer is split.
 
@@ -108,9 +115,11 @@ Keyed by the natural composite `(scope_type, scope_id, config_name)`
 - `scope_type` — `public | domain | user`.
 - `scope_id` — the scope's identifier (see convention below).
 - `config_name` — FK → `app_config_definitions.config_name`.
+- `(config_name, scope_type)` — composite FK →
+  `app_config_allow_list` with `ON DELETE CASCADE`: a fragment exists
+  only while its allow-list entry does, and carries no rank of its own —
+  its merge priority is the entry's `rank` (see §2).
 - `config` — schema-less JSON payload.
-- `rank` — integer merge priority within the `config_name` (low → high;
-  higher wins). Assigned on create (see §2).
 - `created_at` / `updated_at`.
 
 ### `app_config_allow_list` — the per-`(config_name, scope_type)` write gate
@@ -125,12 +134,15 @@ advance.
   (`public | domain | user`). A user-overridable config carries a
   `(config_name, user)` row; an admin-only value carries
   `(config_name, domain)` and/or `(config_name, public)`.
+- `rank` — the merge priority every fragment under this entry carries
+  (low → high; higher wins). Defaults per scope type (see §2); admins
+  may set it explicitly.
 - `created_at` / `updated_at`.
 
-A row's **presence** is the entire signal — there is no `rank` here,
-because the allow-list never participates in the merge. It gates **both**
-write paths; admins, unlike users, may also create/update/purge the
-allow-list rows themselves.
+A row's **presence** is the write grant, and its `rank` is the merge
+order of its fragments. It gates **both** write paths; admins, unlike
+users, may also create/purge the allow-list rows themselves — and
+purging one cascades to its fragments.
 
 ### Scope-ID convention
 
@@ -142,20 +154,27 @@ allow-list rows themselves.
 
 ### Integrity
 
-- **Every** fragment write (admin or regular) requires (a) a registered
-  `config_name` (FK to `app_config_definitions`) and (b) an
+- **Every** fragment create (admin or regular) requires an
   `app_config_allow_list` row for the write's `(config_name,
-  scope_type)`. The service layer rejects per-row when either is missing.
+  scope_type)` — enforced both by the write gate (domain error) and by
+  the composite FK. That entry references a registered `config_name`, so
+  registration is guaranteed transitively; the fragment needs no direct
+  FK to `app_config_definitions`. Updates and purges of an existing
+  fragment need no gate: the FK guarantees the entry exists while the
+  fragment does.
 - A regular (non-admin) mutation is further restricted to the caller's
   own `user` row; admin mutations may target any scope (still gated by
   the allow-list) and are the only writes that may touch the allow-list
   and `app_config_definitions`.
-- `app_config_definitions` purge is rejected while any fragment or allow-list
-  entry still references the `config_name` (`ON DELETE NO ACTION`).
-- `app_config_allow_list` purge **revokes future writes** at that
-  `(config_name, scope_type)`. Because reads never consult the
-  allow-list, **existing fragments are untouched and keep merging** — to
-  actually drop a value, an admin purges the fragments themselves.
+- `app_config_definitions` purge **cascades down the whole subtree**: its
+  allow-list entries are removed by the `config_name` FK (`ON DELETE
+  CASCADE`), and their fragments cascade from those entries in turn — so
+  retiring a config name clears its allow-list and fragments in one
+  statement.
+- `app_config_allow_list` purge **revokes the grant and drops its data**:
+  the fragments at that `(config_name, scope_type)` are removed by the
+  `ON DELETE CASCADE` FK, so a revoked value disappears from the merge
+  in the same statement — no orphaned fragments to clean up separately.
 
 <a id="write-model"></a>
 ### Write model
@@ -185,32 +204,38 @@ boundary.
   merged value is the admin's (`public` / `domain` fragments only).
 - **Overridable**: the admin grants `(config_name, user)`. The admin
   sets the `domain` default; the user freely creates/updates/purges
-  their own `user` fragment, which (higher `rank`) wins on merge.
+  their own `user` fragment, which wins on merge (the `user` entry's
+  default `rank` is the highest).
 - **User-only**: the grant exists and no admin fragment is published.
 
 To promote a fixed value to user-customizable, the admin adds a single
 `(config_name, user)` grant — no data migration. To lock it back down,
-the admin removes the grant **and** purges any existing `user` fragments
-(removing the grant alone only blocks new writes; reads still merge what
-is already stored).
+the admin removes the grant: the cascade drops the existing `user`
+fragments with it, so the admin value applies again immediately.
 
 ---
 
 ## 2. `rank` — merge priority
 
-`rank` is the integer priority a **fragment** carries within a
-`config_name`; the read merge applies fragments in `rank` order (low →
-high, higher wins).
+`rank` is the integer priority an **allow-list entry** carries; every
+fragment written under the entry merges at that priority (low → high,
+higher wins). It lives on the allow-list — not the fragment — because
+merge order is admin policy: fragment writes are partly user-owned, and
+a rank on the fragment would let a user re-order the merge by editing
+their own row.
 
-- **Assignment.** A new fragment is placed after the existing ones for
-  the same `config_name`, so a later-created fragment outranks earlier ones by
-  default. Admins re-order by setting `rank` explicitly. (Publishing the
-  `domain` default before a user writes their own copy naturally gives
-  the `user` fragment the higher rank, so the user value wins.)
-- **No tier defaults.** Priority is the fragment's `rank`, not derived
-  from `scope_type` — a `user` fragment outranks a `domain` fragment
-  only because its `rank` is higher, not because `user` is "above"
-  `domain`.
+- **Scope-type defaults.** A new entry defaults its `rank` from its
+  `scope_type`: `public` = 100, `domain` = 200, `user` = 300. The
+  defaults order the scopes so a user's own fragment overrides the
+  domain default, which overrides the public value; the 100 gap leaves
+  room for custom placement in between.
+- **Admin override.** The admin may set `rank` explicitly when creating
+  the entry — e.g. a `domain` entry ranked above `user` yields a
+  domain-enforced value that user fragments cannot beat even where a
+  user grant exists.
+- **Per-caller totality.** For one caller and one `config_name`, at most
+  one fragment applies per scope type (§3), so the entry ranks totally
+  order every merge input.
 
 ---
 
@@ -219,7 +244,7 @@ high, higher wins).
 Two read shapes exist:
 
 - **`AppConfigFragment`** — one raw row, regardless of scope. Carries
-  `scopeType`, `scopeId`, `configName`, `rank`, and `config`. Callers
+  `scopeType`, `scopeId`, `configName`, and `config`. Callers
   disambiguate scope by reading `scopeType` (no per-scope wrapper
   types).
 - **`AppConfig`** — the merged per-user view for a `config_name`: the
@@ -235,10 +260,10 @@ those whose scope applies to them:
 - the user's `user` fragment (`scope_id = the user's id`).
 
 A single `app_config_fragments` query selects exactly those rows (the
-user's domain is known from the session — **no join, no allow-list
-lookup**), orders them by `rank` (low → high), and deep-merges: nested
-objects recurse, scalars and lists are wholesale-replaced, and the
-higher `rank` wins on conflict.
+user's domain is known from the session — no permission check), joins
+each to its allow-list entry for the `rank`, orders by it (low → high),
+and deep-merges: nested objects recurse, scalars and lists are
+wholesale-replaced, and the higher `rank` wins on conflict.
 
 **Null projection.** A stored `config` of `{}` reads back as `null`, and
 a merged `config` that is empty after combining every fragment is
@@ -276,7 +301,8 @@ likewise `null` — clients fall back to their built-in defaults.
   be written only after its scope's row exists.
 - **Pre-login public config** — anonymous read of `public` `theme`.
 - **Bootstrap after login** — read merged `AppConfig`s in one round of
-  queries; each is a single-table rank merge, no per-scope stitching.
+  queries; each is a rank merge over the fragments joined to their
+  allow-list entries, no per-scope stitching.
 - **User edits a config** — a regular create/update/purge on the
   caller's own `user` row (only where the grant exists); the response is
   the recomputed merge.
@@ -287,11 +313,11 @@ likewise `null` — clients fall back to their built-in defaults.
   user)` grant; users then create/update/purge their own copy. No data
   migration.
 - **Admin locks a value back down** — remove the `(config_name, user)`
-  grant **and** purge existing `user` fragments (the grant gates writes,
-  not reads).
-- **Admin reorders contributions** — adjust fragment `rank`s.
-- **Admin retires a config name** — purge the fragments, then the
-  allow-list entries, then the `app_config_definitions` row (purge is rejected
-  while references remain).
+  grant; the cascade drops the existing `user` fragments with it.
+- **Admin reorders contributions** — set the allow-list entries'
+  `rank`s (per `(config_name, scope_type)`, not per fragment).
+- **Admin retires a config name** — purge the `app_config_definitions`
+  row; the allow-list entries and their fragments cascade with it, so no
+  prior cleanup is needed.
 - **Admin audit** — cross-scope fragment search and cross-user merged
   search for support.

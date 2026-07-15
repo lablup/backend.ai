@@ -11,6 +11,30 @@ from ai.backend.common.data.filter_specs import StringInMatchSpec
 from ai.backend.manager.models.clauses import QueryCondition
 
 
+def make_correlated_exists(
+    child_row: type[Any],
+    correlate_row: type[Any],
+    join_predicate: sa.sql.expression.ColumnElement[bool],
+) -> Callable[[list[QueryCondition]], QueryCondition]:
+    """Create a factory for positive correlated ``EXISTS`` conditions."""
+
+    def factory(child_conditions: list[QueryCondition]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            subquery = (
+                sa.select(sa.literal(1))
+                .select_from(child_row)
+                .where(join_predicate)
+                .correlate(correlate_row)
+            )
+            for condition in child_conditions:
+                subquery = subquery.where(condition())
+            return sa.exists(subquery)
+
+        return inner
+
+    return factory
+
+
 def make_string_in_factory(
     column: sa.orm.InstrumentedAttribute[Any],
 ) -> Callable[[StringInMatchSpec], QueryCondition]:

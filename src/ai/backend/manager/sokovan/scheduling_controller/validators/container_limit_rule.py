@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import override
+
 from ai.backend.manager.data.session.spec import SessionSpec
 from ai.backend.manager.errors.kernel import QuotaExceeded
 from ai.backend.manager.sokovan.scheduling_controller.validators.session_spec_base import (
@@ -13,9 +15,11 @@ from ai.backend.manager.sokovan.scheduling_controller.validators.session_spec_ba
 class ContainerLimitRule(SessionSpecValidatorRule):
     """Session's total kernel count must not exceed the keypair limit."""
 
+    @override
     def name(self) -> str:
         return "container_limit"
 
+    @override
     def validate(
         self,
         spec: SessionSpec,

@@ -5,7 +5,7 @@ from decimal import Decimal
 from enum import Enum
 from importlib import import_module
 from types import FunctionType
-from typing import Any
+from typing import Any, override
 
 import click
 
@@ -63,6 +63,7 @@ class EnumChoice(click.Choice):
         super().__init__(enum_members)
         self.enum = enum
 
+    @override
     def convert(self, value: Any, param: click.Parameter | None, ctx: click.Context | None) -> Enum:
         if isinstance(value, self.enum):
             # for default value, it is already the enum type.
@@ -70,6 +71,7 @@ class EnumChoice(click.Choice):
         value = super().convert(value, param, ctx)
         return self.enum[value]
 
+    @override
     def get_metavar(self, param: click.Parameter) -> str:
         name = self.enum.__name__
         name = re.sub(r"([A-Z\d]+)([A-Z][a-z])", r"\1_\2", name)
@@ -80,6 +82,7 @@ class EnumChoice(click.Choice):
 class MinMaxRangeParamType(click.ParamType):
     name = "min-max decimal range"
 
+    @override
     def convert(
         self, value: Any, param: click.Parameter | None, ctx: click.Context | None
     ) -> tuple[Decimal | None, Decimal | None]:
@@ -97,6 +100,7 @@ class MinMaxRangeParamType(click.ParamType):
         except (ArithmeticError, ValueError):
             self.fail(f"{value!r} contains an invalid number", param, ctx)
 
+    @override
     def get_metavar(self, param: click.Parameter) -> str:
         return "MIN:MAX"
 

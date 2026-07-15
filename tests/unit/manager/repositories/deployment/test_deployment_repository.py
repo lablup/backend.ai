@@ -18,14 +18,16 @@ from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.data.permission.types import RBACElementType
-from ai.backend.common.dto.manager.v2.deployment.types import IntOrPercent
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.replica import ReplicaID
 from ai.backend.common.identifier.replica_group import ReplicaGroupID
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.common.identifier.vfolder import VFolderUUID
+from ai.backend.common.schema.deployment import BlueGreenSpec, IntOrPercent, RollingUpdateSpec
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
@@ -55,11 +57,7 @@ from ai.backend.manager.errors.deployment import DeploymentRevisionNotFound
 from ai.backend.manager.errors.service import DeploymentPolicyNotFound
 from ai.backend.manager.models.agent import AgentRow, AgentStatus
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
-from ai.backend.manager.models.deployment_policy import (
-    BlueGreenSpec,
-    DeploymentPolicyRow,
-    RollingUpdateSpec,
-)
+from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
 from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain import DomainRow
@@ -214,15 +212,25 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
             yield database_connection
 
     @pytest.fixture
+    def test_domain_id(self) -> DomainID:
+        return DomainID(uuid.uuid4())
+
+    @pytest.fixture
+    def test_scaling_group_id(self) -> ResourceGroupID:
+        return ResourceGroupID(uuid.uuid4())
+
+    @pytest.fixture
     async def test_domain_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_id: DomainID,
     ) -> str:
         """Create test domain and return domain name."""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as db_sess:
             domain = DomainRow(
+                id=test_domain_id,
                 name=domain_name,
                 description="Test domain for deployment",
                 is_active=True,
@@ -239,12 +247,14 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
     async def test_scaling_group_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        test_scaling_group_id: ResourceGroupID,
     ) -> str:
         """Create test scaling group and return name."""
         sgroup_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as db_sess:
             sgroup = ScalingGroupRow(
+                id=test_scaling_group_id,
                 name=sgroup_name,
                 description="Test scaling group",
                 is_active=True,
@@ -263,6 +273,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_scaling_group_name: str,
+        test_scaling_group_id: ResourceGroupID,
     ) -> AgentId:
         """Create test agent and return agent ID."""
         agent_id = AgentId(f"i-{uuid.uuid4().hex[:12]}")
@@ -274,6 +285,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                 status_changed=datetime.now(tzutc()),
                 region="local",
                 scaling_group=test_scaling_group_name,
+                resource_group_id=test_scaling_group_id,
                 schedulable=True,
                 available_slots=ResourceSlot({"cpu": Decimal("8.0"), "mem": Decimal("16384")}),
                 occupied_slots=ResourceSlot({"cpu": Decimal("0"), "mem": Decimal("0")}),
@@ -443,7 +455,9 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_access_key: AccessKey,
         test_scaling_group_name: str,
+        test_scaling_group_id: ResourceGroupID,
         test_domain_name: str,
+        test_domain_id: DomainID,
         test_user_uuid: uuid.UUID,
         test_group_id: uuid.UUID,
     ) -> SessionId:
@@ -455,10 +469,12 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                 id=session_id,
                 name=f"test-session-{uuid.uuid4().hex[:8]}",
                 session_type=SessionTypes.INTERACTIVE,
+                domain_id=test_domain_id,
                 domain_name=test_domain_name,
                 group_id=test_group_id,
                 user_uuid=test_user_uuid,
                 access_key=test_access_key,
+                resource_group_id=test_scaling_group_id,
                 scaling_group_name=test_scaling_group_name,
                 status=SessionStatus.RUNNING,
                 cluster_mode=ClusterMode.SINGLE_NODE,
@@ -482,6 +498,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
         test_agent_id: AgentId,
         test_access_key: AccessKey,
         test_scaling_group_name: str,
+        test_scaling_group_id: ResourceGroupID,
         test_domain_name: str,
         test_group_id: uuid.UUID,
         test_user_uuid: uuid.UUID,
@@ -509,6 +526,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                 agent=test_agent_id,
                 agent_addr="127.0.0.1:2001",
                 scaling_group=test_scaling_group_name,
+                resource_group_id=test_scaling_group_id,
                 cluster_role="main",
                 cluster_idx=1,
                 cluster_hostname=f"kernel-{kernel_id.hex[:8]}",
@@ -546,6 +564,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
         test_agent_id: AgentId,
         test_access_key: AccessKey,
         test_scaling_group_name: str,
+        test_scaling_group_id: ResourceGroupID,
         test_domain_name: str,
         test_group_id: uuid.UUID,
         test_user_uuid: uuid.UUID,
@@ -571,6 +590,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                 agent=test_agent_id,
                 agent_addr="127.0.0.1:2001",
                 scaling_group=test_scaling_group_name,
+                resource_group_id=test_scaling_group_id,
                 cluster_role="main",
                 cluster_idx=1,
                 cluster_hostname=f"kernel-{kernel_id.hex[:8]}",
@@ -839,7 +859,9 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
         deployment_repository: DeploymentRepository,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_name: str,
+        test_domain_id: DomainID,
         test_scaling_group_name: str,
+        test_scaling_group_id: ResourceGroupID,
         test_access_key: AccessKey,
         test_agent_id: AgentId,
         test_user_uuid: uuid.UUID,
@@ -940,10 +962,12 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                     id=session_id,
                     name=f"session-{i}",
                     session_type=SessionTypes.INTERACTIVE,
+                    domain_id=test_domain_id,
                     domain_name=test_domain_name,
                     group_id=test_group_id,
                     user_uuid=test_user_uuid,
                     access_key=test_access_key,
+                    resource_group_id=test_scaling_group_id,
                     scaling_group_name=test_scaling_group_name,
                     status=SessionStatus.RUNNING,
                     cluster_mode=ClusterMode.SINGLE_NODE,
@@ -974,6 +998,7 @@ class TestDeploymentRepositoryFetchRouteServiceDiscoveryInfo:
                     agent=test_agent_id,
                     agent_addr="127.0.0.1:2001",
                     scaling_group=test_scaling_group_name,
+                    resource_group_id=test_scaling_group_id,
                     cluster_role="main",
                     cluster_idx=1,
                     cluster_hostname=f"kernel-{i}",
@@ -1129,12 +1154,16 @@ class TestGetDefaultArchitectureFromScalingGroup:
         """Helper to create an agent with given properties."""
         agent_id = AgentId(f"i-{suffix or uuid.uuid4().hex[:8]}")
         async with db.begin_session() as db_sess:
+            resource_group_id = await db_sess.scalar(
+                sa.select(ScalingGroupRow.id).where(ScalingGroupRow.name == scaling_group)
+            )
             agent = AgentRow(
                 id=agent_id,
                 status=status,
                 status_changed=datetime.now(tzutc()),
                 region="local",
                 scaling_group=scaling_group,
+                resource_group_id=resource_group_id,
                 schedulable=schedulable,
                 available_slots=ResourceSlot({"cpu": Decimal("8.0"), "mem": Decimal("16384")}),
                 occupied_slots=ResourceSlot({"cpu": Decimal("0"), "mem": Decimal("0")}),

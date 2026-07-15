@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Sequence
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, override
 
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import AccessKey
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.kernel.types import KernelStatus
@@ -44,21 +45,38 @@ class CheckPreconditionLifecycleHandler(SessionLifecycleHandler):
         self._repository = repository
 
     @classmethod
+    @override
     def name(cls) -> str:
         """Get the name of the handler."""
         return "check-precondition"
 
     @classmethod
+    @override
     def target_statuses(cls) -> list[SessionStatus]:
-        """Sessions in SCHEDULED state."""
-        return [SessionStatus.SCHEDULED]
+        """Sessions in SCHEDULED or PREPARING state.
+
+        PREPARING is included so the handler re-queries sessions that have
+        already started preparation and re-triggers the idempotent image
+        pull. This recovers sessions stuck in PREPARING when a pull-related
+        event (e.g. ImagePullFinished) was lost in transit, since nothing
+        else re-sends check_and_pull once the session leaves SCHEDULED.
+        """
+        return [SessionStatus.SCHEDULED, SessionStatus.PREPARING]
 
     @classmethod
+    @override
     def target_kernel_statuses(cls) -> list[KernelStatus] | None:
-        """Include sessions where kernels are in SCHEDULED status."""
-        return [KernelStatus.SCHEDULED]
+        """Include sessions with kernels in SCHEDULED, PREPARING, or PULLING status.
+
+        PREPARING/PULLING cover kernels whose pull already finished on the
+        agent but were never updated to PREPARED because the ImagePullFinished
+        event was lost; re-triggering makes the agent re-emit the completion
+        event.
+        """
+        return [KernelStatus.SCHEDULED, KernelStatus.PREPARING, KernelStatus.PULLING]
 
     @classmethod
+    @override
     def status_transitions(cls) -> StatusTransitions:
         """Define state transitions for check precondition handler (BEP-1030).
 
@@ -91,13 +109,15 @@ class CheckPreconditionLifecycleHandler(SessionLifecycleHandler):
         )
 
     @property
+    @override
     def lock_id(self) -> LockID | None:
         """Lock for operations targeting SCHEDULED sessions transitioning to PREPARING."""
         return LockID.LOCKID_SOKOVAN_TARGET_PREPARING
 
+    @override
     async def execute(
         self,
-        _scaling_group: str,
+        _resource_group_id: ResourceGroupID,
         sessions: Sequence[SessionWithKernels],
     ) -> SessionExecutionResult:
         """Trigger image pulling for SCHEDULED sessions.
@@ -126,17 +146,22 @@ class CheckPreconditionLifecycleHandler(SessionLifecycleHandler):
             sessions_for_pull_data.image_configs,
         )
 
-        # Mark all sessions as success for status transition
+        # Report re-triggered PREPARING sessions as skipped so the coordinator
+        # does not re-apply the PREPARING transition (avoids racing against
+        # concurrent promotions and re-broadcasting the same status event).
         for session in sessions:
             session_info = session.session_info
-            result.successes.append(
-                SessionTransitionInfo(
-                    session_id=session_info.identity.id,
-                    from_status=session_info.lifecycle.status,
-                    reason="passed-preconditions",
-                    creation_id=session_info.identity.creation_id,
-                    access_key=AccessKey(session_info.metadata.access_key),
-                )
+            from_status = session_info.lifecycle.status
+            transition_info = SessionTransitionInfo(
+                session_id=session_info.identity.id,
+                from_status=from_status,
+                reason="passed-preconditions",
+                creation_id=session_info.identity.creation_id,
+                access_key=AccessKey(session_info.metadata.access_key),
             )
+            if from_status == SessionStatus.PREPARING:
+                result.skipped.append(transition_info)
+            else:
+                result.successes.append(transition_info)
 
         return result

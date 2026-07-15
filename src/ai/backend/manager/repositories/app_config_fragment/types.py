@@ -1,4 +1,4 @@
-"""Types for app config fragment repository operations (search scopes)."""
+"""Types for app config fragment repository operations (search scopes, resolve arguments)."""
 
 from __future__ import annotations
 
@@ -16,9 +16,23 @@ from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.scopes import ExistenceCheck, SearchScope
 
 __all__ = (
+    "AppConfigScopeArguments",
     "DomainAppConfigFragmentSearchScope",
     "UserAppConfigFragmentSearchScope",
 )
+
+
+@dataclass(frozen=True)
+class AppConfigScopeArguments:
+    """The principal an ``AppConfig`` is resolved for: the resolving user and its domain.
+
+    Bundles the scope-identifying arguments so they travel together (add new principal
+    dimensions here rather than growing method signatures). Plain value object — not a
+    :class:`SearchScope`.
+    """
+
+    domain_id: DomainID
+    user_id: UserID
 
 
 @dataclass(frozen=True)

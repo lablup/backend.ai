@@ -11,7 +11,7 @@ import uuid
 from collections.abc import Iterable
 from datetime import datetime
 from enum import StrEnum
-from typing import Any, Self, cast
+from typing import Any, Self, cast, override
 
 import strawberry
 from strawberry import Info
@@ -155,6 +155,7 @@ class ImageV2AliasGQL(PydanticNodeMixin[ImageAliasNode]):
     alias: str = gql_field(description="The alias string for the image.")
 
     @classmethod
+    @override
     async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
         cls,
         *,
@@ -335,6 +336,7 @@ class ImageV2GQL(PydanticNodeMixin[ImageNode]):
         )
 
     @classmethod
+    @override
     async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
         cls,
         *,

@@ -302,7 +302,7 @@ class AbstractATOMPlugin[TATOMDevice: AbstractATOMDevice](AbstractComputePlugin,
 
         if self._enable_rsd:
             try:
-                group_idx = await self.group_npus(assigned_devices)
+                group_idx = await self._group_npus(assigned_devices)
                 log.debug("Created NPU Group {} with members {}", group_idx, assigned_devices)
                 device_files.append((Path(f"/dev/rsd{group_idx}"), Path("/dev/rsd0")))
             except LibraryError as e:
@@ -434,7 +434,7 @@ class AbstractATOMPlugin[TATOMDevice: AbstractATOMDevice](AbstractComputePlugin,
         return data
 
     @abstractmethod
-    async def group_npus(self, devices: list[TATOMDevice]) -> int:
+    async def _group_npus(self, devices: list[TATOMDevice]) -> int:
         raise NotImplementedError
 
     async def cleanup(self) -> None:

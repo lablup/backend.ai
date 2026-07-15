@@ -7,7 +7,23 @@ from ai.backend.manager.data.deployment.types import (
     RouteStatus,
     RouteTrafficStatus,
 )
+from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.endpoint import EndpointRow
+from ai.backend.manager.models.image import ImageRow
+
+# ORM cluster registration: configure_mappers() (triggered when this isolated
+# test registers a domain-cluster row) resolves string relationships against the
+# registry. These rows are reachable via relationships but are not otherwise
+# imported/registered by this test; _ORM_CLUSTER keeps them live.
 from ai.backend.manager.models.routing.row import RoutingRow
+from ai.backend.manager.models.scaling_group import ScalingGroupForProjectRow
+
+_ORM_CLUSTER = (
+    AgentRow,
+    EndpointRow,
+    ImageRow,
+    ScalingGroupForProjectRow,
+)
 
 
 def test_to_route_info_carries_replica_group_id() -> None:

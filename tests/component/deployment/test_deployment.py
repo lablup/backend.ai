@@ -13,6 +13,8 @@ from typing import TYPE_CHECKING
 from unittest.mock import MagicMock
 
 import pytest
+import sqlalchemy as sa
+from sqlalchemy.ext.asyncio import AsyncEngine as SAEngine
 
 from ai.backend.client.v2.exceptions import NotFoundError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
@@ -20,6 +22,9 @@ from ai.backend.common.config import ModelDefinitionDraft
 from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy, ModelDeploymentStatus
+from ai.backend.common.data.model_deployment.types import (
+    RouteHealthStatus as CommonRouteHealthStatus,
+)
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.dto.manager.deployment import (
     CreateDeploymentRequest,
@@ -44,6 +49,9 @@ from ai.backend.common.dto.manager.deployment.request import ClusterConfigInput
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.v2.deployment.request import (
     AdminSearchDeploymentsInput,
+    ReplicaFilter,
+    ReplicaHealthStatusFilter,
+    ReplicaNestedFilter,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
     DeploymentFilter as DeploymentFilterV2,
@@ -53,6 +61,12 @@ from ai.backend.common.identifier.resource_group import ResourceGroupName
 from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import ClusterMode
 from ai.backend.manager.api.adapters.deployment.adapter import DeploymentAdapter
+from ai.backend.manager.data.deployment.types import (
+    RouteHealthStatus,
+    RouteStatus,
+    RouteTrafficStatus,
+)
+from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.services.deployment.processors import DeploymentProcessors
 from ai.backend.manager.services.deployment.service import _map_lifecycle_to_status
 from ai.backend.manager.services.processors import Processors
@@ -96,7 +110,7 @@ class TestSearchDeployments:
         admin_registry: BackendAIClientRegistry,
         group_fixture: uuid.UUID,
         domain_fixture: DomainFixtureData,
-        scaling_group_fixture: ResourceGroupName,
+        scaling_group_name: ResourceGroupName,
         deployment_seed_data: tuple[ImageID, VFolderUUID],
     ) -> None:
         """Search deployments with pagination returns correct page."""
@@ -108,7 +122,7 @@ class TestSearchDeployments:
                 metadata=DeploymentMetadataInput(
                     project_id=group_fixture,
                     domain_name=domain_fixture.domain_name,
-                    resource_group_name=scaling_group_fixture,
+                    resource_group_name=scaling_group_name,
                     name=f"test-deployment-{i}-{secrets.token_hex(4)}",
                 ),
                 network_access=NetworkAccessInput(open_to_public=False),
@@ -158,7 +172,7 @@ class TestGetDeployment:
         admin_registry: BackendAIClientRegistry,
         group_fixture: uuid.UUID,
         domain_fixture: DomainFixtureData,
-        scaling_group_fixture: ResourceGroupName,
+        scaling_group_name: ResourceGroupName,
         deployment_seed_data: tuple[ImageID, VFolderUUID],
     ) -> None:
         """Get deployment by ID returns correct deployment details."""
@@ -167,7 +181,7 @@ class TestGetDeployment:
             metadata=DeploymentMetadataInput(
                 project_id=group_fixture,
                 domain_name=domain_fixture.domain_name,
-                resource_group_name=scaling_group_fixture,
+                resource_group_name=scaling_group_name,
                 name=f"test-deployment-{secrets.token_hex(4)}",
             ),
             network_access=NetworkAccessInput(open_to_public=False),
@@ -269,7 +283,7 @@ class TestSearchRoutes:
         admin_registry: BackendAIClientRegistry,
         group_fixture: uuid.UUID,
         domain_fixture: DomainFixtureData,
-        scaling_group_fixture: ResourceGroupName,
+        scaling_group_name: ResourceGroupName,
         deployment_seed_data: tuple[ImageID, VFolderUUID],
     ) -> None:
         """Search routes for a deployment returns route list."""
@@ -278,7 +292,7 @@ class TestSearchRoutes:
             metadata=DeploymentMetadataInput(
                 project_id=group_fixture,
                 domain_name=domain_fixture.domain_name,
-                resource_group_name=scaling_group_fixture,
+                resource_group_name=scaling_group_name,
                 name=f"test-deployment-{secrets.token_hex(4)}",
             ),
             network_access=NetworkAccessInput(open_to_public=False),
@@ -401,6 +415,147 @@ class TestDeploymentAdapterFilter:
         response = await admin_registry.deployment.create_deployment(request)
         return response.deployment.id
 
+    @pytest.fixture
+    async def replica_filter_deployments(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        admin_user_fixture: UserFixtureData,
+        db_engine: SAEngine,
+        group_fixture: uuid.UUID,
+        domain_fixture: DomainFixtureData,
+        scaling_group_name: ResourceGroupName,
+        deployment_seed_data: tuple[ImageID, VFolderUUID],
+    ) -> dict[str, uuid.UUID]:
+        deployment_ids = {
+            name: await self._create_deployment_with_tags(
+                admin_registry,
+                group_fixture,
+                domain_fixture.domain_name,
+                scaling_group_name,
+                deployment_seed_data,
+                [name],
+            )
+            for name in ("zero", "healthy", "unhealthy", "mixed")
+        }
+        route_specs = (
+            (deployment_ids["healthy"], RouteHealthStatus.HEALTHY),
+            (deployment_ids["unhealthy"], RouteHealthStatus.UNHEALTHY),
+            (deployment_ids["mixed"], RouteHealthStatus.HEALTHY),
+            (deployment_ids["mixed"], RouteHealthStatus.UNHEALTHY),
+        )
+        async with db_engine.begin() as conn:
+            await conn.execute(
+                sa.insert(RoutingRow),
+                [
+                    {
+                        "id": uuid.uuid4(),
+                        "endpoint": deployment_id,
+                        "session": None,
+                        "session_owner": admin_user_fixture.user_uuid,
+                        "domain": domain_fixture.domain_name,
+                        "project": group_fixture,
+                        "status": RouteStatus.RUNNING,
+                        "health_status": health_status,
+                        "traffic_ratio": 1.0,
+                        "revision": uuid.uuid4(),
+                        "traffic_status": RouteTrafficStatus.ACTIVE,
+                    }
+                    for deployment_id, health_status in route_specs
+                ],
+            )
+        return deployment_ids
+
+    @pytest.mark.parametrize(
+        ("replicas_filter", "expected_names"),
+        [
+            pytest.param(
+                ReplicaNestedFilter(
+                    some=ReplicaFilter(
+                        health_status=ReplicaHealthStatusFilter(
+                            equals=CommonRouteHealthStatus.HEALTHY
+                        )
+                    )
+                ),
+                ("healthy", "mixed"),
+                id="some-matches-any-replica",
+            ),
+            pytest.param(
+                ReplicaNestedFilter(
+                    none=ReplicaFilter(
+                        health_status=ReplicaHealthStatusFilter(
+                            equals=CommonRouteHealthStatus.HEALTHY
+                        )
+                    )
+                ),
+                ("zero", "unhealthy"),
+                id="none-matches-no-replica",
+            ),
+            pytest.param(
+                ReplicaNestedFilter(
+                    every=ReplicaFilter(
+                        health_status=ReplicaHealthStatusFilter(
+                            equals=CommonRouteHealthStatus.HEALTHY
+                        )
+                    )
+                ),
+                ("zero", "healthy"),
+                id="every-includes-zero-replica",
+            ),
+        ],
+    )
+    async def test_replica_nested_filter_modes(
+        self,
+        deployment_adapter: DeploymentAdapter,
+        admin_user_fixture: UserFixtureData,
+        domain_fixture: DomainFixtureData,
+        replica_filter_deployments: dict[str, uuid.UUID],
+        replicas_filter: ReplicaNestedFilter,
+        expected_names: tuple[str, ...],
+    ) -> None:
+        with with_user(
+            self._admin_user_data(admin_user_fixture.user_uuid, domain_fixture.domain_name)
+        ):
+            payload = await deployment_adapter.my_search(
+                AdminSearchDeploymentsInput(
+                    filter=DeploymentFilterV2(
+                        replicas=replicas_filter,
+                    ),
+                    limit=50,
+                )
+            )
+
+        assert {item.id for item in payload.items} == {
+            replica_filter_deployments[name] for name in expected_names
+        }
+
+    async def test_replica_some_and_every_require_nonempty_all_match(
+        self,
+        deployment_adapter: DeploymentAdapter,
+        admin_user_fixture: UserFixtureData,
+        domain_fixture: DomainFixtureData,
+        replica_filter_deployments: dict[str, uuid.UUID],
+    ) -> None:
+        with with_user(
+            self._admin_user_data(admin_user_fixture.user_uuid, domain_fixture.domain_name)
+        ):
+            payload = await deployment_adapter.my_search(
+                AdminSearchDeploymentsInput(
+                    filter=DeploymentFilterV2(
+                        replicas=ReplicaNestedFilter(
+                            some=ReplicaFilter(),
+                            every=ReplicaFilter(
+                                health_status=ReplicaHealthStatusFilter(
+                                    equals=CommonRouteHealthStatus.HEALTHY
+                                )
+                            ),
+                        )
+                    ),
+                    limit=50,
+                )
+            )
+
+        assert {item.id for item in payload.items} == {replica_filter_deployments["healthy"]}
+
     async def test_my_search_and_filter_returns_intersection(
         self,
         admin_registry: BackendAIClientRegistry,
@@ -408,7 +563,7 @@ class TestDeploymentAdapterFilter:
         deployment_adapter: DeploymentAdapter,
         group_fixture: uuid.UUID,
         domain_fixture: DomainFixtureData,
-        scaling_group_fixture: ResourceGroupName,
+        scaling_group_name: ResourceGroupName,
         deployment_seed_data: tuple[ImageID, VFolderUUID],
     ) -> None:
         """AND clause must narrow results to deployments matching every nested filter."""
@@ -416,7 +571,7 @@ class TestDeploymentAdapterFilter:
             admin_registry,
             group_fixture,
             domain_fixture.domain_name,
-            scaling_group_fixture,
+            scaling_group_name,
             deployment_seed_data,
             ["alpha", "production"],
         )
@@ -424,7 +579,7 @@ class TestDeploymentAdapterFilter:
             admin_registry,
             group_fixture,
             domain_fixture.domain_name,
-            scaling_group_fixture,
+            scaling_group_name,
             deployment_seed_data,
             ["beta", "production"],
         )
@@ -432,7 +587,7 @@ class TestDeploymentAdapterFilter:
             admin_registry,
             group_fixture,
             domain_fixture.domain_name,
-            scaling_group_fixture,
+            scaling_group_name,
             deployment_seed_data,
             ["alpha", "beta"],
         )
@@ -460,7 +615,7 @@ class TestDeploymentAdapterFilter:
         deployment_adapter: DeploymentAdapter,
         group_fixture: uuid.UUID,
         domain_fixture: DomainFixtureData,
-        scaling_group_fixture: ResourceGroupName,
+        scaling_group_name: ResourceGroupName,
         deployment_seed_data: tuple[ImageID, VFolderUUID],
     ) -> None:
         """OR clause must widen results to deployments matching any nested filter."""
@@ -468,7 +623,7 @@ class TestDeploymentAdapterFilter:
             admin_registry,
             group_fixture,
             domain_fixture.domain_name,
-            scaling_group_fixture,
+            scaling_group_name,
             deployment_seed_data,
             ["alpha"],
         )
@@ -476,7 +631,7 @@ class TestDeploymentAdapterFilter:
             admin_registry,
             group_fixture,
             domain_fixture.domain_name,
-            scaling_group_fixture,
+            scaling_group_name,
             deployment_seed_data,
             ["beta"],
         )
@@ -484,7 +639,7 @@ class TestDeploymentAdapterFilter:
             admin_registry,
             group_fixture,
             domain_fixture.domain_name,
-            scaling_group_fixture,
+            scaling_group_name,
             deployment_seed_data,
             ["gamma"],
         )
@@ -512,7 +667,7 @@ class TestDeploymentAdapterFilter:
         deployment_adapter: DeploymentAdapter,
         group_fixture: uuid.UUID,
         domain_fixture: DomainFixtureData,
-        scaling_group_fixture: ResourceGroupName,
+        scaling_group_name: ResourceGroupName,
         deployment_seed_data: tuple[ImageID, VFolderUUID],
     ) -> None:
         """OR with multi-field sub-filters must AND fields within each branch.
@@ -527,7 +682,7 @@ class TestDeploymentAdapterFilter:
             admin_registry,
             group_fixture,
             domain_fixture.domain_name,
-            scaling_group_fixture,
+            scaling_group_name,
             deployment_seed_data,
             ["alpha"],
             name=f"bar-x-{suffix}",
@@ -536,7 +691,7 @@ class TestDeploymentAdapterFilter:
             admin_registry,
             group_fixture,
             domain_fixture.domain_name,
-            scaling_group_fixture,
+            scaling_group_name,
             deployment_seed_data,
             ["beta"],
             name=f"foo-x-{suffix}",
@@ -545,7 +700,7 @@ class TestDeploymentAdapterFilter:
             admin_registry,
             group_fixture,
             domain_fixture.domain_name,
-            scaling_group_fixture,
+            scaling_group_name,
             deployment_seed_data,
             ["beta"],
             name=f"bar-y-{suffix}",
@@ -554,7 +709,7 @@ class TestDeploymentAdapterFilter:
             admin_registry,
             group_fixture,
             domain_fixture.domain_name,
-            scaling_group_fixture,
+            scaling_group_name,
             deployment_seed_data,
             ["alpha"],
             name=f"foo-y-{suffix}",
@@ -589,7 +744,7 @@ class TestDeploymentAdapterFilter:
         deployment_adapter: DeploymentAdapter,
         group_fixture: uuid.UUID,
         domain_fixture: DomainFixtureData,
-        scaling_group_fixture: ResourceGroupName,
+        scaling_group_name: ResourceGroupName,
         deployment_seed_data: tuple[ImageID, VFolderUUID],
     ) -> None:
         """project_search must also honor AND across nested filters."""
@@ -597,7 +752,7 @@ class TestDeploymentAdapterFilter:
             admin_registry,
             group_fixture,
             domain_fixture.domain_name,
-            scaling_group_fixture,
+            scaling_group_name,
             deployment_seed_data,
             ["alpha"],
         )
@@ -605,7 +760,7 @@ class TestDeploymentAdapterFilter:
             admin_registry,
             group_fixture,
             domain_fixture.domain_name,
-            scaling_group_fixture,
+            scaling_group_name,
             deployment_seed_data,
             ["alpha", "beta"],
         )

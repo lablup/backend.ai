@@ -3,9 +3,22 @@ from __future__ import annotations
 from ai.backend.manager.repositories.app_config_fragment.repository import (
     AppConfigFragmentRepository,
 )
+from ai.backend.manager.repositories.base import BulkCreator, Creator
 from ai.backend.manager.services.app_config_fragment.actions.admin_search import (
     AdminSearchAppConfigFragmentAction,
     AdminSearchAppConfigFragmentActionResult,
+)
+from ai.backend.manager.services.app_config_fragment.actions.bulk_create import (
+    BulkCreateAppConfigFragmentAction,
+    BulkCreateAppConfigFragmentActionResult,
+)
+from ai.backend.manager.services.app_config_fragment.actions.bulk_purge import (
+    BulkPurgeAppConfigFragmentAction,
+    BulkPurgeAppConfigFragmentActionResult,
+)
+from ai.backend.manager.services.app_config_fragment.actions.bulk_update import (
+    BulkUpdateAppConfigFragmentAction,
+    BulkUpdateAppConfigFragmentActionResult,
 )
 from ai.backend.manager.services.app_config_fragment.actions.create import (
     CreateAppConfigFragmentAction,
@@ -34,12 +47,11 @@ __all__ = ("AppConfigFragmentService",)
 class AppConfigFragmentService:
     """Write/read paths for app config fragments (not admin-only).
 
-    ``create`` / ``update`` / ``purge`` are gated by the allow-list write-gate in the
-    repository: the gate check and the write run in a single transaction, so a fragment is
-    only written or removed when an ``app_config_allow_list`` row exists for its
-    ``(config_name, scope_type)``. Because an allow-list row requires a registered
-    ``config_name`` (FK), this also enforces registration. An allow-listed user may
-    therefore manage their own ``user``-scope fragment without admin privileges.
+    ``create`` is gated by the fragment's FK to ``app_config_allow_list``: an insert with
+    no allow-list row for its ``(config_name, scope_type)`` is rejected as a write-not-
+    allowed error. An allow-list row requires a registered ``config_name`` (FK), so this
+    also enforces registration. An allow-listed user may therefore manage their own
+    ``user``-scope fragment without admin privileges.
     """
 
     _repository: AppConfigFragmentRepository
@@ -50,7 +62,7 @@ class AppConfigFragmentService:
     async def create(
         self, action: CreateAppConfigFragmentAction
     ) -> CreateAppConfigFragmentActionResult:
-        data = await self._repository.create(action.creator_spec, action.only_if)
+        data = await self._repository.create(Creator(spec=action.creator_spec))
         return CreateAppConfigFragmentActionResult(fragment=data)
 
     async def get(self, action: GetAppConfigFragmentAction) -> GetAppConfigFragmentActionResult:
@@ -85,11 +97,35 @@ class AppConfigFragmentService:
     async def update(
         self, action: UpdateAppConfigFragmentAction
     ) -> UpdateAppConfigFragmentActionResult:
-        data = await self._repository.update(action.updater, action.only_if)
+        data = await self._repository.update(action.updater)
         return UpdateAppConfigFragmentActionResult(fragment=data)
 
     async def purge(
         self, action: PurgeAppConfigFragmentAction
     ) -> PurgeAppConfigFragmentActionResult:
-        data = await self._repository.purge(action.purger, action.only_if)
+        data = await self._repository.purge(action.purger)
         return PurgeAppConfigFragmentActionResult(fragment=data)
+
+    async def bulk_create(
+        self, action: BulkCreateAppConfigFragmentAction
+    ) -> BulkCreateAppConfigFragmentActionResult:
+        result = await self._repository.bulk_create(BulkCreator(specs=action.creator_specs))
+        return BulkCreateAppConfigFragmentActionResult(
+            succeeded=result.succeeded, failed=result.failed
+        )
+
+    async def bulk_update(
+        self, action: BulkUpdateAppConfigFragmentAction
+    ) -> BulkUpdateAppConfigFragmentActionResult:
+        result = await self._repository.bulk_update(action.updaters)
+        return BulkUpdateAppConfigFragmentActionResult(
+            succeeded=result.succeeded, failed=result.failed
+        )
+
+    async def bulk_purge(
+        self, action: BulkPurgeAppConfigFragmentAction
+    ) -> BulkPurgeAppConfigFragmentActionResult:
+        result = await self._repository.bulk_purge(action.purgers)
+        return BulkPurgeAppConfigFragmentActionResult(
+            succeeded=result.succeeded, failed=result.failed
+        )

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import math
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, override
 
 from .color import Colors
 
@@ -15,14 +15,17 @@ class Vec2D(tuple[float, float]):
     def __new__(cls, x: float | int, y: float | int) -> Vec2D:
         return tuple.__new__(cls, (x, y))
 
+    @override
     def __add__(self, other: Vec2D) -> Vec2D:  # type: ignore[override]
         return Vec2D(self[0] + other[0], self[1] + other[1])
 
+    @override
     def __mul__(self, other: Vec2D | float | int) -> Vec2D | float:  # type: ignore[override]
         if isinstance(other, Vec2D):
             return self[0] * other[0] + self[1] * other[1]
         return Vec2D(self[0] * other, self[1] * other)
 
+    @override
     def __rmul__(self, other: float | int) -> Vec2D:  # type: ignore[override]
         return Vec2D(self[0] * other, self[1] * other)
 
@@ -46,6 +49,7 @@ class Vec2D(tuple[float, float]):
     def __getnewargs__(self) -> tuple[float, float]:
         return (self[0], self[1])
 
+    @override
     def __repr__(self) -> str:
         return "({:.2f},{:.2f})".format(*self)
 

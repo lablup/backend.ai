@@ -91,6 +91,7 @@ from ai.backend.common.dto.manager.v2.vfolder.response import (
 from ai.backend.common.dto.manager.v2.vfolder.response import (
     RestoreVFolderPayload as RestorePayloadDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
@@ -458,6 +459,18 @@ class PurgeVFolderOptionsInputGQL(PydanticInputMixin[PurgeVFolderOptionsDTO]):
             "If true, also delete model card record(s) referencing the vfolder. "
             "If false, the request is rejected when any model card still references it."
         ),
+    )
+    force: bool = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "If true, bypass the in-use guards and purge the vfolder even when it is "
+                "mounted by a live session, referenced by an active model-service endpoint, "
+                "or not in a purgable status. Irreversible — use with caution. "
+                "If false (default), the request is rejected in those cases."
+            ),
+        ),
+        default=False,
     )
 
 

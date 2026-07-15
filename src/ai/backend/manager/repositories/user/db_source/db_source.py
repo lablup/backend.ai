@@ -21,6 +21,7 @@ from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import AccessKey, VFolderID
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.data.common.bulk import BulkCreateFailure, BulkUpdateFailure
 from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.keypair.types import (
@@ -77,7 +78,6 @@ from ai.backend.manager.models.session import (
     by_status,
     by_user_id,
 )
-from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.types import join_by_related_field
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus, users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine

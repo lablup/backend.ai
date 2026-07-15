@@ -48,9 +48,16 @@ class BinarySizeInput(BaseRequestModel):
 
 
 class BinarySizeInfo(BaseResponseModel):
-    """Binary size output with both raw bytes and human-readable format."""
+    """Binary size output with both the exact byte count and a human-readable form.
 
-    value: int = Field(description="Size in bytes.")
+    ``expr`` mirrors the ``expr`` input field: an exact decimal byte-count string
+    (e.g. '1073741824') that can be fed back into any ``BinarySizeInput``. It is a
+    string so sizes beyond the GraphQL ``Int`` range (2 GiB) serialize correctly.
+    """
+
+    expr: str = Field(
+        description="Exact size in bytes as a decimal string (e.g., '1073741824'); accepted as BinarySizeInput.expr.",
+    )
     display: str = Field(description="Size in human-readable format (e.g., '1g', '512m').")
 
 

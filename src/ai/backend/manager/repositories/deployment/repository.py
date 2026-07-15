@@ -38,6 +38,7 @@ from ai.backend.common.types import (
     VFolderUsageMode,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.clients.valkey_client.statistics import (
     EndpointStatistics,
     KernelStatistics,
@@ -92,7 +93,6 @@ from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.scheduling_history import (
     RouteHistoryRow,
 )
-from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderOwnershipType
 from ai.backend.manager.repositories.base import BatchQuerier

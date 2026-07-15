@@ -126,6 +126,7 @@ class _BaseInteractiveSessionTemplate(WrapperTestTemplate):
 
 class InteractiveSessionTemplate(_BaseInteractiveSessionTemplate):
     @property
+    @override
     def name(self) -> str:
         return "interactive_session"
 
@@ -136,6 +137,7 @@ class InteractiveSessionTemplate(_BaseInteractiveSessionTemplate):
 
 class InteractiveSessionWithBootstrapScriptTemplate(_BaseInteractiveSessionTemplate):
     @property
+    @override
     def name(self) -> str:
         return "interactive_session_with_bootstrap_script"
 
@@ -147,6 +149,7 @@ class InteractiveSessionWithBootstrapScriptTemplate(_BaseInteractiveSessionTempl
 
 class InteractiveSessionWithCustomGroupTemplate(_BaseInteractiveSessionTemplate):
     @property
+    @override
     def name(self) -> str:
         return "interactive_session_with_custom_group"
 

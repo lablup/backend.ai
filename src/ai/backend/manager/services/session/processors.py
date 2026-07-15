@@ -7,6 +7,14 @@ from ai.backend.manager.actions.processor.single_entity import SingleEntityActio
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.actions.validator.base import ActionValidator
 from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.manager.services.session.actions.batch_get_kernel_resource_allocation import (
+    BatchGetKernelResourceAllocationAction,
+    BatchGetKernelResourceAllocationActionResult,
+)
+from ai.backend.manager.services.session.actions.batch_get_session_resource_allocation import (
+    BatchGetSessionResourceAllocationAction,
+    BatchGetSessionResourceAllocationActionResult,
+)
 from ai.backend.manager.services.session.actions.commit_session import (
     CommitSessionAction,
     CommitSessionActionResult,
@@ -14,6 +22,10 @@ from ai.backend.manager.services.session.actions.commit_session import (
 from ai.backend.manager.services.session.actions.complete import (
     CompleteAction,
     CompleteActionResult,
+)
+from ai.backend.manager.services.session.actions.compute_schedule import (
+    ComputeScheduleAction,
+    ComputeScheduleActionResult,
 )
 from ai.backend.manager.services.session.actions.convert_session_to_image import (
     ConvertSessionToImageAction,
@@ -144,6 +156,7 @@ from ai.backend.manager.services.session.service import SessionService
 
 class SessionProcessors(AbstractProcessorPackage):
     commit_session: ActionProcessor[CommitSessionAction, CommitSessionActionResult]
+    compute_schedule: ActionProcessor[ComputeScheduleAction, ComputeScheduleActionResult]
     complete: ActionProcessor[CompleteAction, CompleteActionResult]
     convert_session_to_image: ActionProcessor[
         ConvertSessionToImageAction, ConvertSessionToImageActionResult
@@ -178,6 +191,12 @@ class SessionProcessors(AbstractProcessorPackage):
     resolve_session: ActionProcessor[ResolveSessionAction, ResolveSessionActionResult]
     resolve_session_name: ActionProcessor[ResolveSessionNameAction, ResolveSessionNameActionResult]
     search_kernels: ActionProcessor[SearchKernelsAction, SearchKernelsActionResult]
+    batch_get_session_resource_allocation: BulkActionProcessor[
+        BatchGetSessionResourceAllocationAction, BatchGetSessionResourceAllocationActionResult
+    ]
+    batch_get_kernel_resource_allocation: BulkActionProcessor[
+        BatchGetKernelResourceAllocationAction, BatchGetKernelResourceAllocationActionResult
+    ]
     search_sessions: ActionProcessor[SearchSessionsAction, SearchSessionsActionResult]
     search_sessions_in_project: ActionProcessor[
         SearchSessionsInProjectAction, SearchSessionsInProjectActionResult
@@ -200,6 +219,7 @@ class SessionProcessors(AbstractProcessorPackage):
 
         # Actions without RBAC validation (internal/legacy)
         self.commit_session = ActionProcessor(service.commit_session, action_monitors)
+        self.compute_schedule = ActionProcessor(service.compute_schedule, action_monitors)
         self.complete = ActionProcessor(service.complete, action_monitors)
         self.convert_session_to_image = ActionProcessor(
             service.convert_session_to_image, action_monitors
@@ -253,6 +273,16 @@ class SessionProcessors(AbstractProcessorPackage):
             action_monitors,
             validators=[cast(ActionValidator, scope_validator)],
         )
+        # Bulk read for GraphQL DataLoaders; ids come from already-authorized
+        # session/kernel nodes, so no per-target RBAC re-validation is applied.
+        self.batch_get_session_resource_allocation = BulkActionProcessor(
+            service.batch_get_session_resource_allocation,
+            monitors=action_monitors,
+        )
+        self.batch_get_kernel_resource_allocation = BulkActionProcessor(
+            service.batch_get_kernel_resource_allocation,
+            monitors=action_monitors,
+        )
         self.search_sessions = ActionProcessor(
             service.search, action_monitors, validators=[cast(ActionValidator, scope_validator)]
         )
@@ -294,6 +324,7 @@ class SessionProcessors(AbstractProcessorPackage):
     def supported_actions(self) -> list[ActionSpec]:
         return [
             CommitSessionAction.spec(),
+            ComputeScheduleAction.spec(),
             CompleteAction.spec(),
             ConvertSessionToImageAction.spec(),
             CreateClusterAction.spec(),
@@ -318,6 +349,8 @@ class SessionProcessors(AbstractProcessorPackage):
             ResolveSessionAction.spec(),
             ResolveSessionNameAction.spec(),
             SearchKernelsAction.spec(),
+            BatchGetSessionResourceAllocationAction.spec(),
+            BatchGetKernelResourceAllocationAction.spec(),
             SearchSessionsAction.spec(),
             SearchSessionsInProjectAction.spec(),
             ShutdownServiceAction.spec(),

@@ -5,7 +5,7 @@ import shutil
 import tempfile
 from collections.abc import Mapping
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, override
 
 import janus
 
@@ -34,6 +34,7 @@ class Runner(BaseRunner):
         self.input_queue: janus.Queue[tuple[str, str]] | None = None
         self.output_queue: janus.Queue[bytes] | None = None
 
+    @override
     async def init_with_loop(self) -> None:
         self.input_queue = janus.Queue[tuple[str, str]]()
         self.output_queue = janus.Queue[bytes]()
@@ -61,6 +62,7 @@ class Runner(BaseRunner):
         user_site_path.mkdir(parents=True, exist_ok=True)
         shutil.copy(str(sitecustomize_path), str(user_site_path / "sitecustomize.py"))
 
+    @override
     async def build_heuristic(self) -> int:
         if Path("setup.py").is_file():
             cmd = [
@@ -77,6 +79,7 @@ class Runner(BaseRunner):
         log.warning('skipping the build phase due to missing "setup.py" file')
         return 0
 
+    @override
     async def execute_heuristic(self) -> int:
         if Path("main.py").is_file():
             cmd = [
@@ -88,6 +91,7 @@ class Runner(BaseRunner):
         log.error('cannot find the main script ("main.py").')
         return 127
 
+    @override
     async def start_service(
         self, service_info: Mapping[str, Any]
     ) -> (

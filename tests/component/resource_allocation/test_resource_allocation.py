@@ -19,6 +19,7 @@ from ai.backend.common.dto.manager.v2.resource_allocation.response import (
     ProjectResourceAllocationPayload,
     ResourceGroupResourceAllocationPayload,
 )
+from ai.backend.common.identifier.resource_group import ResourceGroupName
 from ai.backend.testutils.fixtures import DomainFixtureData
 
 
@@ -102,11 +103,11 @@ class TestResourceGroupUsage:
     async def test_resource_group_usage_returns_structure(
         self,
         admin_v2_registry: V2ClientRegistry,
-        scaling_group_fixture: str,
+        scaling_group_name: ResourceGroupName,
     ) -> None:
         """Query resource group usage returns capacity, used, free, max_per_node fields."""
         result = await admin_v2_registry.resource_allocation.resource_group_usage(
-            scaling_group_fixture,
+            scaling_group_name,
         )
         assert isinstance(result, ResourceGroupResourceAllocationPayload)
         assert result.resource_group is not None
@@ -134,13 +135,13 @@ class TestEffectiveAllocation:
         self,
         admin_v2_registry: V2ClientRegistry,
         group_fixture: uuid.UUID,
-        scaling_group_fixture: str,
+        scaling_group_name: ResourceGroupName,
     ) -> None:
         """Effective allocation returns assignable list and breakdown structure."""
         result = await admin_v2_registry.resource_allocation.effective(
             EffectiveResourceAllocationInput(
                 project_id=group_fixture,
-                resource_group_name=scaling_group_fixture,
+                resource_group_name=scaling_group_name,
             ),
         )
         assert isinstance(result, EffectiveResourceAllocationPayload)
@@ -152,7 +153,7 @@ class TestEffectiveAllocation:
     async def test_effective_with_invalid_project_returns_error(
         self,
         admin_v2_registry: V2ClientRegistry,
-        scaling_group_fixture: str,
+        scaling_group_name: ResourceGroupName,
     ) -> None:
         """Effective allocation with non-existent project returns an error."""
         fake_id = uuid.uuid4()
@@ -160,7 +161,7 @@ class TestEffectiveAllocation:
             await admin_v2_registry.resource_allocation.effective(
                 EffectiveResourceAllocationInput(
                     project_id=fake_id,
-                    resource_group_name=scaling_group_fixture,
+                    resource_group_name=scaling_group_name,
                 ),
             )
         assert exc_info.value.status in (404, 500)
@@ -173,13 +174,13 @@ class TestPresetAvailability:
         self,
         admin_v2_registry: V2ClientRegistry,
         group_fixture: uuid.UUID,
-        scaling_group_fixture: str,
+        scaling_group_name: ResourceGroupName,
     ) -> None:
         """Check preset availability returns a list of presets with availability status."""
         result = await admin_v2_registry.resource_allocation.check_availability(
             CheckPresetAvailabilityInput(
                 project_id=group_fixture,
-                resource_group_name=scaling_group_fixture,
+                resource_group_name=scaling_group_name,
             ),
         )
         assert isinstance(result.presets, list)

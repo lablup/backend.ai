@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import uuid
 from datetime import datetime, timedelta
+from typing import override
 
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
@@ -49,6 +50,7 @@ class AuditLogRow(Base):  # type: ignore[misc]
     action_id: Mapped[uuid.UUID] = mapped_column("action_id", GUID, nullable=False)
     request_id: Mapped[str | None] = mapped_column("request_id", sa.String, nullable=True)
     triggered_by: Mapped[str | None] = mapped_column("triggered_by", sa.String, nullable=True)
+    acted_as: Mapped[uuid.UUID | None] = mapped_column("acted_as", GUID, nullable=True)
     description: Mapped[str] = mapped_column("description", sa.String, nullable=False)
     duration: Mapped[timedelta | None] = mapped_column("duration", sa.Interval, nullable=True)
 
@@ -69,6 +71,7 @@ class AuditLogRow(Base):  # type: ignore[misc]
         entity_id: str | uuid.UUID | None = None,
         request_id: str | None = None,
         triggered_by: str | None = None,
+        acted_as: uuid.UUID | None = None,
         duration: timedelta | None = None,
     ) -> None:
         self.entity_type = entity_type
@@ -77,11 +80,13 @@ class AuditLogRow(Base):  # type: ignore[misc]
         self.entity_id = str(entity_id) if isinstance(entity_id, uuid.UUID) else entity_id
         self.request_id = request_id
         self.triggered_by = triggered_by
+        self.acted_as = acted_as
         self.description = description
         self.duration = duration
         self.status = status
         self.created_at = created_at
 
+    @override
     def __str__(self) -> str:
         return (
             f"AuditLogRow("
@@ -92,12 +97,14 @@ class AuditLogRow(Base):  # type: ignore[misc]
             f"action_id: {self.action_id}, "
             f"request_id: {self.request_id}, "
             f"triggered_by: {self.triggered_by}, "
+            f"acted_as: {self.acted_as}, "
             f"description: {self.description}, "
             f"duration: {self.duration}, "
             f"status: {self.status.value}"
             f")"
         )
 
+    @override
     def __repr__(self) -> str:
         return self.__str__()
 
@@ -113,5 +120,6 @@ class AuditLogRow(Base):  # type: ignore[misc]
             entity_id=self.entity_id,
             request_id=self.request_id,
             triggered_by=self.triggered_by,
+            acted_as=self.acted_as,
             duration=self.duration,
         )

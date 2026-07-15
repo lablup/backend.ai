@@ -91,7 +91,7 @@ class TestCreateDeployment:
         admin_registry: BackendAIClientRegistry,
         group_fixture: uuid.UUID,
         domain_fixture: DomainFixtureData,
-        scaling_group_fixture: ResourceGroupName,
+        scaling_group_name: ResourceGroupName,
         deployment_seed_data: tuple[ImageID, VFolderUUID],
     ) -> None:
         """Creating a deployment with valid config returns deployment with initial status."""
@@ -100,7 +100,7 @@ class TestCreateDeployment:
             metadata=DeploymentMetadataInput(
                 project_id=group_fixture,
                 domain_name=domain_fixture.domain_name,
-                resource_group_name=scaling_group_fixture,
+                resource_group_name=scaling_group_name,
                 name=f"test-deployment-{secrets.token_hex(4)}",
             ),
             network_access=NetworkAccessInput(open_to_public=False),
@@ -158,7 +158,7 @@ class TestUpdateDeployment:
         admin_registry: BackendAIClientRegistry,
         group_fixture: uuid.UUID,
         domain_fixture: DomainFixtureData,
-        scaling_group_fixture: ResourceGroupName,
+        scaling_group_name: ResourceGroupName,
         deployment_seed_data: tuple[ImageID, VFolderUUID],
     ) -> None:
         """Updating deployment config (name, replica_count) succeeds."""
@@ -168,7 +168,7 @@ class TestUpdateDeployment:
             metadata=DeploymentMetadataInput(
                 project_id=group_fixture,
                 domain_name=domain_fixture.domain_name,
-                resource_group_name=scaling_group_fixture,
+                resource_group_name=scaling_group_name,
                 name=f"test-deployment-{secrets.token_hex(4)}",
             ),
             network_access=NetworkAccessInput(open_to_public=False),
@@ -228,7 +228,7 @@ class TestDestroyDeployment:
         admin_registry: BackendAIClientRegistry,
         group_fixture: uuid.UUID,
         domain_fixture: DomainFixtureData,
-        scaling_group_fixture: ResourceGroupName,
+        scaling_group_name: ResourceGroupName,
         deployment_seed_data: tuple[ImageID, VFolderUUID],
     ) -> None:
         """Destroying a deployment terminates it successfully."""
@@ -238,7 +238,7 @@ class TestDestroyDeployment:
             metadata=DeploymentMetadataInput(
                 project_id=group_fixture,
                 domain_name=domain_fixture.domain_name,
-                resource_group_name=scaling_group_fixture,
+                resource_group_name=scaling_group_name,
                 name=f"test-deployment-{secrets.token_hex(4)}",
             ),
             network_access=NetworkAccessInput(open_to_public=False),
@@ -294,7 +294,7 @@ class TestRevisionManagement:
         admin_registry: BackendAIClientRegistry,
         group_fixture: uuid.UUID,
         domain_fixture: DomainFixtureData,
-        scaling_group_fixture: ResourceGroupName,
+        scaling_group_name: ResourceGroupName,
         deployment_seed_data: tuple[ImageID, VFolderUUID],
     ) -> None:
         """Adding a revision and searching revisions works correctly."""
@@ -319,7 +319,7 @@ class TestRevisionManagement:
             metadata=DeploymentMetadataInput(
                 project_id=group_fixture,
                 domain_name=domain_fixture.domain_name,
-                resource_group_name=scaling_group_fixture,
+                resource_group_name=scaling_group_name,
                 name=f"test-deployment-{secrets.token_hex(4)}",
             ),
             network_access=NetworkAccessInput(open_to_public=False),
@@ -375,7 +375,7 @@ class TestReplicaManagement:
         admin_registry: BackendAIClientRegistry,
         group_fixture: uuid.UUID,
         domain_fixture: DomainFixtureData,
-        scaling_group_fixture: ResourceGroupName,
+        scaling_group_name: ResourceGroupName,
         deployment_seed_data: tuple[ImageID, VFolderUUID],
     ) -> None:
         """Changing replica_count updates the replica count."""
@@ -384,7 +384,7 @@ class TestReplicaManagement:
             metadata=DeploymentMetadataInput(
                 project_id=group_fixture,
                 domain_name=domain_fixture.domain_name,
-                resource_group_name=scaling_group_fixture,
+                resource_group_name=scaling_group_name,
                 name=f"test-deployment-{secrets.token_hex(4)}",
             ),
             network_access=NetworkAccessInput(open_to_public=False),

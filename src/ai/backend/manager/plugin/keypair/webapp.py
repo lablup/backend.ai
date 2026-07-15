@@ -1,7 +1,7 @@
 import json
 import logging
 from collections.abc import Mapping, Sequence
-from typing import Any
+from typing import Any, override
 
 import aiohttp_cors
 import yarl
@@ -65,15 +65,19 @@ async def _webapp_shutdown(app: web.Application) -> None:
 
 
 class KeypairAuthWebAppPlugin(WebappPlugin):
+    @override
     async def init(self, context: Any = None) -> None:
         pass
 
+    @override
     async def cleanup(self) -> None:
         pass
 
+    @override
     async def update_plugin_config(self, new_plugin_config: Mapping[str, Any]) -> None:
         self.plugin_config = new_plugin_config
 
+    @override
     async def create_app(
         self,
         cors_options: CORSOptions,

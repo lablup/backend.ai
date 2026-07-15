@@ -2,8 +2,10 @@
 Test to verify that ScheduleDBSource uses READ COMMITTED isolation level.
 """
 
+import uuid
 from unittest.mock import AsyncMock, MagicMock
 
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.manager.repositories.scheduler.db_source.db_source import ScheduleDBSource
 
 
@@ -97,7 +99,7 @@ async def test_session_methods_use_read_committed() -> None:
     mock_readonly_session.execute = AsyncMock(return_value=MagicMock())
 
     try:
-        await db_source.get_scheduling_data("test-scaling-group", MagicMock())
+        await db_source.get_scheduling_data(ResourceGroupID(uuid.uuid4()), MagicMock())
     except Exception:
         # We expect it to fail due to mocking, but we just want to verify the method was called
         pass

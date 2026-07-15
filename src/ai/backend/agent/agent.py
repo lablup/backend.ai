@@ -6,6 +6,7 @@ import errno
 import logging
 import pickle
 import re
+import shlex
 import signal
 import sys
 import time
@@ -42,6 +43,7 @@ from typing import (
     Literal,
     ParamSpec,
     cast,
+    override,
 )
 from uuid import UUID
 
@@ -636,7 +638,7 @@ class AbstractKernelCreationContext[KernelObjectType: AbstractKernel](aobject):
         mount_static_binary("bssh.1", "/usr/local/share/man/man1/bssh.1", skip_missing=True)
         mount_static_binary(f"bssh-server.{arch}.bin", "/opt/kernel/bssh-server", skip_missing=True)
         mount_static_binary(
-            "bssh-server.1", "/usr/local/share/man/man1/bssh-server.1", skip_missing=True
+            "bssh-server.8", "/usr/local/share/man/man8/bssh-server.8", skip_missing=True
         )
 
         jail_path: Path | None
@@ -950,6 +952,7 @@ class AbstractAgent[
         self._sync_container_lifecycle_observer = SyncContainerLifecycleObserver.instance()
         self._clean_kernel_registry_task = asyncio.create_task(self._clean_kernel_registry_loop())
 
+    @override
     async def __ainit__(self) -> None:
         """
         An implementation of AbstractAgent would define its own ``__ainit__()`` method.
@@ -2503,7 +2506,7 @@ class AbstractAgent[
                 image_command_loaded = True
             if not image_command:
                 continue
-            model.service.start_command = list(image_command)
+            model.service.start_command = shlex.join(image_command)
         return models
 
     def _append_legacy_inference_env_args(
@@ -2519,7 +2522,7 @@ class AbstractAgent[
             service = model.service
             if service is None or not service.start_command:
                 continue
-            service.start_command = [*service.start_command, *extra_args]
+            service.start_command = f"{service.start_command} {shlex.join(extra_args)}"
         return models
 
     async def create_kernel(

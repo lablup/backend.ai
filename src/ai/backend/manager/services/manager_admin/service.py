@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 from ai.backend.manager.data.manager_status.types import ManagerStatus
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.resource import InstanceNotFound
-from ai.backend.manager.models.health import get_manager_db_cxn_status
+from ai.backend.manager.repositories.manager_admin.health import get_manager_db_cxn_status
 
 from .actions.fetch_status import FetchManagerStatusAction, FetchManagerStatusActionResult
 from .actions.get_announcement import GetAnnouncementAction, GetAnnouncementActionResult

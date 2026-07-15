@@ -4,6 +4,8 @@ Common/shared exceptions for storage proxy.
 
 from __future__ import annotations
 
+from typing import override
+
 from aiohttp import web
 
 from ai.backend.common.exception import (
@@ -21,6 +23,7 @@ class InvalidAPIParameters(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/storage/invalid-api-params"
     error_title = "Invalid API parameters"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE_PROXY,
@@ -35,6 +38,7 @@ class StorageNotFoundError(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/storage/object-not-found"
     error_title = "Storage Config Not Found"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE,
@@ -49,6 +53,7 @@ class StorageTypeInvalidError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/storage/object-type-invalid"
     error_title = "Storage Config Invalid Type"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE,
@@ -63,6 +68,7 @@ class StorageTransferError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/storage/transfer/failed"
     error_title = "Storage Transfer Failed"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE_PROXY,
@@ -77,6 +83,7 @@ class StorageStepRequiredStepNotProvided(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/storage/step-mapping-not-provided"
     error_title = "Storage Step Mapping Not Provided"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE,
@@ -94,6 +101,7 @@ class InvalidPathError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/storage/path/invalid"
     error_title = "Invalid Path"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE_PROXY,
@@ -108,6 +116,7 @@ class InvalidSocketPathError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/storage/socket-path/invalid"
     error_title = "Invalid Socket Path"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE_PROXY,
@@ -122,6 +131,7 @@ class InvalidConfigurationSourceError(BackendAIError, web.HTTPInternalServerErro
     error_type = "https://api.backend.ai/probs/storage/config/invalid-source"
     error_title = "Invalid Configuration Source"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE_PROXY,
@@ -136,6 +146,7 @@ class InvalidDataLengthError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/storage/data/invalid-length"
     error_title = "Invalid Data Length"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE_PROXY,
@@ -150,6 +161,7 @@ class ServiceNotInitializedError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/storage/service/not-initialized"
     error_title = "Service Not Initialized"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE_PROXY,
@@ -164,6 +176,7 @@ class InvalidStorageTargetError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/storage/invalid-storage-target"
     error_title = "Invalid Storage Target"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE_PROXY,
@@ -181,6 +194,7 @@ class UploadOffsetMismatchError(BackendAIError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/storage/upload-offset-mismatch"
     error_title = "Upload Offset Mismatch"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE_PROXY,

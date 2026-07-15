@@ -14,7 +14,12 @@ from ai.backend.manager.models.app_config_allow_list.row import AppConfigAllowLi
 from ai.backend.manager.repositories.app_config_allow_list.db_source import (
     AppConfigAllowListDBSource,
 )
-from ai.backend.manager.repositories.base import BatchQuerier, Creator, ExistsQuerier, Purger
+from ai.backend.manager.repositories.base import (
+    BatchQuerier,
+    Creator,
+    Purger,
+    Updater,
+)
 from ai.backend.manager.repositories.ops import DBOpsProvider
 
 __all__ = ("AppConfigAllowListRepository",)
@@ -63,10 +68,9 @@ class AppConfigAllowListRepository:
         return await self._db_source.search(querier)
 
     @app_config_allow_list_repository_resilience.apply()
-    async def purge(self, purger: Purger[AppConfigAllowListRow]) -> AppConfigAllowListData:
-        return await self._db_source.purge(purger)
+    async def update(self, updater: Updater[AppConfigAllowListRow]) -> AppConfigAllowListData:
+        return await self._db_source.update(updater)
 
     @app_config_allow_list_repository_resilience.apply()
-    async def exists(self, querier: ExistsQuerier[AppConfigAllowListRow]) -> bool:
-        """Whether any allow-list row matches the querier's conditions."""
-        return await self._db_source.exists(querier)
+    async def purge(self, purger: Purger[AppConfigAllowListRow]) -> AppConfigAllowListData:
+        return await self._db_source.purge(purger)

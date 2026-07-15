@@ -28,6 +28,8 @@ so downstream expansion and finalize see fully-resolved options.
 
 from __future__ import annotations
 
+from typing import override
+
 from ai.backend.manager.data.session.draft import (
     KernelExecutionSpecDraft,
     SessionSpecDraft,
@@ -42,9 +44,11 @@ from ai.backend.manager.sokovan.scheduling_controller.preparers.draft_rule impor
 class MergeResourceGroupDefaultsRule(SessionSpecDraftRule):
     """Overlay RG defaults under caller-supplied draft values."""
 
+    @override
     def name(self) -> str:
         return "merge_resource_group_defaults"
 
+    @override
     async def prepare(
         self,
         draft: SessionSpecDraft,
@@ -102,16 +106,24 @@ class MergeResourceGroupDefaultsRule(SessionSpecDraftRule):
     ) -> KernelExecutionSpecDraft:
         return draft_exec.model_copy(
             update={
-                "image_id": (
-                    draft_exec.image_id if draft_exec.image_id is not None else rg_exec.image_id
-                ),
-                "resources": (
-                    draft_exec.resources if draft_exec.resources else tuple(rg_exec.resources)
-                ),
-                "resource_opts": (
-                    draft_exec.resource_opts
-                    if draft_exec.resource_opts is not None
-                    else rg_exec.resource_opts
+                "resource_input": draft_exec.resource_input.model_copy(
+                    update={
+                        "image_id": (
+                            draft_exec.resource_input.image_id
+                            if draft_exec.resource_input.image_id is not None
+                            else rg_exec.resource_input.image_id
+                        ),
+                        "resources": (
+                            draft_exec.resource_input.resources
+                            if draft_exec.resource_input.resources
+                            else tuple(rg_exec.resource_input.resources)
+                        ),
+                        "resource_opts": (
+                            draft_exec.resource_input.resource_opts
+                            if draft_exec.resource_input.resource_opts is not None
+                            else rg_exec.resource_input.resource_opts
+                        ),
+                    }
                 ),
                 "environ": (draft_exec.environ if draft_exec.environ else dict(rg_exec.environ)),
                 "mounts": (draft_exec.mounts if draft_exec.mounts else tuple(rg_exec.mounts)),

@@ -21,6 +21,8 @@ this rule keeps working unchanged.
 
 from __future__ import annotations
 
+from typing import override
+
 from ai.backend.manager.data.session.draft import SessionSpecDraft
 from ai.backend.manager.sokovan.scheduling_controller.preparers.draft_rule import (
     SessionSpecDraftRule,
@@ -31,9 +33,11 @@ from ai.backend.manager.sokovan.scheduling_controller.preparers.draft_rule impor
 class ResolveVFolderMountsRule(SessionSpecDraftRule):
     """Copy the per-role resolved vfolder mounts from context onto each kernel."""
 
+    @override
     def name(self) -> str:
         return "resolve_vfolder_mounts"
 
+    @override
     async def prepare(
         self,
         draft: SessionSpecDraft,

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import override
 
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.health_checker.abc import StaticServiceHealthChecker
@@ -35,10 +36,12 @@ class EtcdHealthChecker(StaticServiceHealthChecker):
         self._timeout = timeout
 
     @property
+    @override
     def target_service_group(self) -> ServiceGroup:
         """The service group this checker monitors."""
         return ETCD
 
+    @override
     async def check_service(self) -> ServiceHealth:
         """
         Check etcd connection health by pinging the server.
@@ -65,6 +68,7 @@ class EtcdHealthChecker(StaticServiceHealthChecker):
         return ServiceHealth(results={CID_ETCD: status})
 
     @property
+    @override
     def timeout(self) -> float:
         """The timeout for the health check in seconds."""
         return self._timeout

@@ -2,6 +2,7 @@
 
 import logging
 from collections.abc import Sequence
+from typing import override
 
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.logging import BraceStyleAdapter
@@ -41,20 +42,24 @@ class TerminatingRouteHandler(RouteHandler):
         self._event_producer = event_producer
 
     @classmethod
+    @override
     def name(cls) -> str:
         """Get the name of the handler."""
         return "terminate-routes"
 
     @property
+    @override
     def lock_id(self) -> LockID | None:
         """No lock needed for terminating routes."""
         return None
 
     @classmethod
+    @override
     def category(cls) -> RouteHandlerCategory:
         return RouteHandlerCategory.LIFECYCLE
 
     @classmethod
+    @override
     def target_statuses(cls) -> RouteTargetStatuses:
         return RouteTargetStatuses(
             lifecycle=[RouteStatus.TERMINATING],
@@ -62,6 +67,7 @@ class TerminatingRouteHandler(RouteHandler):
         )
 
     @classmethod
+    @override
     def status_transitions(cls) -> RouteStatusTransitions:
         """Terminating → TERMINATED on success, reset health to NOT_CHECKED.
 
@@ -77,6 +83,7 @@ class TerminatingRouteHandler(RouteHandler):
             stale=None,
         )
 
+    @override
     async def execute(self, routes: Sequence[RouteData]) -> RouteExecutionResult:
         """Execute termination for routes.
 
@@ -87,6 +94,7 @@ class TerminatingRouteHandler(RouteHandler):
         log.debug("Terminating {} routes", len(routes))
         return await self._route_executor.terminate_routes(routes)
 
+    @override
     async def post_process(self, result: RouteExecutionResult) -> None:
         """Handle post-processing after terminating routes."""
         log.info(

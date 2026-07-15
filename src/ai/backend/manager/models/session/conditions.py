@@ -15,8 +15,11 @@ if TYPE_CHECKING:
         UUIDInMatchSpec,
     )
 
-from ai.backend.common.types import SessionId
+from ai.backend.common.data.permission.types import ScopeType
+from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.types import SessionId, SessionTypes
 from ai.backend.manager.data.kernel.types import KernelStatus
+from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.data.session.types import KernelMatchType, SessionStatus
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.condition_utils import make_string_in_factory
@@ -43,9 +46,40 @@ class SessionConditions:
         return inner
 
     @staticmethod
+    def by_idle_check_candidates(
+        candidates: Collection[tuple[ScopeId, Collection[SessionTypes]]],
+    ) -> QueryCondition:
+        scope_columns = {
+            ScopeType.RESOURCE_GROUP: SessionRow.resource_group_id,
+            ScopeType.PROJECT: SessionRow.group_id,
+            ScopeType.DOMAIN: SessionRow.domain_id,
+        }
+        candidate_conditions = []
+        for scope, target_session_types in candidates:
+            scope_column = scope_columns[scope.scope_type]
+            candidate_conditions.append(
+                sa.and_(
+                    scope_column == scope.scope_id,
+                    SessionRow.session_type.in_(target_session_types),
+                )
+            )
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return sa.or_(*candidate_conditions) if candidate_conditions else sa.false()
+
+        return inner
+
+    @staticmethod
     def by_scaling_group(scaling_group: str) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return SessionRow.scaling_group_name == scaling_group
+
+        return inner
+
+    @staticmethod
+    def by_resource_group_id(resource_group_id: ResourceGroupID) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return SessionRow.resource_group_id == resource_group_id
 
         return inner
 

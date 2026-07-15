@@ -1,3 +1,5 @@
+from typing import override
+
 from ai.backend.common.events.reporter import (
     AbstractEventReporter,
     CompleteEventReportArgs,
@@ -12,6 +14,7 @@ class EventLogger(AbstractEventReporter):
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
 
+    @override
     async def prepare_event_report(
         self,
         event: AbstractEvent,
@@ -22,6 +25,7 @@ class EventLogger(AbstractEventReporter):
             session.add(event_log)
             await session.flush()
 
+    @override
     async def complete_event_report(
         self,
         event: AbstractEvent,

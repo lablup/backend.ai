@@ -7,7 +7,6 @@ from uuid import UUID
 
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
-from ai.backend.common.dto.manager.v2.common import BinarySizeInfo
 from ai.backend.common.dto.manager.v2.deployment.request import DeploymentStrategyInput
 from ai.backend.common.dto.manager.v2.vfolder.request import (
     BulkDeleteVFoldersInput,
@@ -58,6 +57,7 @@ from ai.backend.common.dto.manager.v2.vfolder.types import (
     VFolderUsageInfo as VFolderUsageInfoDTO,
 )
 from ai.backend.common.exception import BackendAIError, UnreachableError
+from ai.backend.common.schema.deployment import BlueGreenSpec, RollingUpdateSpec
 from ai.backend.common.types import BinarySize, MountPermission, VFolderUsageMode
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
@@ -79,7 +79,6 @@ from ai.backend.manager.data.vfolder.types import (
 from ai.backend.manager.errors.resource import NotAModelVFolder
 from ai.backend.manager.errors.storage import VFolderNotFound
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.deployment_policy import BlueGreenSpec, RollingUpdateSpec
 from ai.backend.manager.models.vfolder import VFolderPermission
 from ai.backend.manager.models.vfolder.conditions import VFolderConditions
 from ai.backend.manager.models.vfolder.orders import (
@@ -148,11 +147,6 @@ _VFOLDER_PAGINATION_SPEC = PaginationSpec(
 )
 
 
-def _to_binary_size_info(value: int) -> BinarySizeInfo:
-    """Convert bytes integer to BinarySizeInfo DTO."""
-    return BinarySizeInfo(value=value, display=f"{BinarySize(value):s}")
-
-
 def _build_policy_from_strategy_input(
     strategy_input: DeploymentStrategyInput | None,
 ) -> DeploymentPolicyConfig | None:
@@ -218,7 +212,9 @@ class VFolderAdapter(BaseAdapter):
                 creator_email=data.creator,
             ),
             quota=VFolderQuotaInfo(
-                max_size=_to_binary_size_info(data.max_size) if data.max_size is not None else None,
+                max_size=BinarySize.to_size_info(data.max_size)
+                if data.max_size is not None
+                else None,
                 max_files=data.max_files,
             ),
             unmanaged_path=data.unmanaged_path,
@@ -431,7 +427,7 @@ class VFolderAdapter(BaseAdapter):
             return None
         return VFolderUsageInfoDTO(
             num_files=usage.num_files,
-            used_bytes=_to_binary_size_info(usage.used_bytes),
+            used_bytes=BinarySize.to_size_info(usage.used_bytes),
         )
 
     async def delete(self, vfolder_id: UUID) -> DeleteVFolderPayload:
@@ -457,6 +453,7 @@ class VFolderAdapter(BaseAdapter):
         action = PurgeVFolderV2Action(
             vfolder_id=vfolder_id,
             cascade_model_card=input.options.cascade_model_card,
+            force=input.options.force,
         )
         await self._processors.vfolder.purge_v2.wait_for_complete(action)
         return PurgeVFolderPayload(id=vfolder_id)
@@ -561,6 +558,7 @@ class VFolderAdapter(BaseAdapter):
             action = PurgeVFolderV2Action(
                 vfolder_id=vfolder_id,
                 cascade_model_card=input.options.cascade_model_card,
+                force=input.options.force,
             )
             try:
                 await self._processors.vfolder.purge_v2.wait_for_complete(action)

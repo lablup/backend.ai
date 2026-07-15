@@ -903,6 +903,11 @@ type AppConfigAllowList implements Node
   """Scope type the entry permits writes at (public | domain | user)."""
   scopeType: AppConfigScopeType!
 
+  """
+  Added in 26.8.0. Merge rank applied to fragments under this entry (low to high; higher wins).
+  """
+  rank: Int!
+
   """Creation timestamp (UTC)."""
   createdAt: DateTime!
 
@@ -986,6 +991,7 @@ enum AppConfigAllowListOrderField
 {
   CONFIG_NAME @join__enumValue(graph: STRAWBERRY)
   SCOPE_TYPE @join__enumValue(graph: STRAWBERRY)
+  RANK @join__enumValue(graph: STRAWBERRY)
   CREATED_AT @join__enumValue(graph: STRAWBERRY)
   UPDATED_AT @join__enumValue(graph: STRAWBERRY)
 }
@@ -1652,6 +1658,9 @@ input AuditLogFilter
   status: AuditLogStatusFilter = null
   createdAt: DateTimeFilter = null
   triggeredBy: StringFilter = null
+
+  """Added in 26.8.0. Filter by acted_as (the effective/acting user UUID)."""
+  actedAs: UUIDFilter = null
   AND: [AuditLogFilter!] = null
   OR: [AuditLogFilter!] = null
   NOT: [AuditLogFilter!] = null
@@ -1805,6 +1814,11 @@ type AuditLogV2 implements Node
   """UUID string of the user who triggered the action."""
   triggeredBy: String
 
+  """
+  Added in 26.8.0. UUID of the effective (acting) user the action ran as. Differs from triggered_by only while a super admin is impersonating a target.
+  """
+  actedAs: UUID
+
   """Human-readable description of the operation."""
   description: String!
 
@@ -1818,6 +1832,11 @@ type AuditLogV2 implements Node
   The user who triggered this audit log entry, resolved from triggered_by UUID.
   """
   user: UserV2
+
+  """
+  Added in 26.8.0. The effective (acting) user the action ran as, resolved from acted_as UUID. Differs from user only while a super admin is impersonating a target.
+  """
+  actor: UserV2
 }
 
 """Added in 26.3.0. Connection type for paginated audit log results."""
@@ -2042,8 +2061,10 @@ Added in 26.4.2. Binary size with both raw bytes and human-readable format.
 type BinarySizeInfo
   @join__type(graph: STRAWBERRY)
 {
-  """Size in bytes."""
-  value: Int!
+  """
+  Exact size in bytes as a decimal string (e.g., '1073741824'); accepted as BinarySizeInput.expr.
+  """
+  expr: String!
 
   """Size in human-readable format (e.g., '1g', '512m')."""
   display: String!
@@ -2977,6 +2998,56 @@ type ComputePlugins
   entries: [ComputePluginEntry!]!
 }
 
+"""
+Added in 26.8.0. Compute a session's scheduling against a resource group without provisioning.
+"""
+input ComputeScheduleInput
+  @join__type(graph: STRAWBERRY)
+{
+  kernels: [ComputeScheduleKernelResourceInput!]!
+  clusterMode: SessionClusterMode!
+  resourceGroupId: ID!
+}
+
+"""
+Added in 26.8.0. Per-kernel resource request for a compute-schedule. The image is optional when a resource-group default supplies it downstream.
+"""
+input ComputeScheduleKernelResourceInput
+  @join__type(graph: STRAWBERRY)
+{
+  imageId: ID = null
+  resources: [ResourceSlotEntryInput!] = null
+}
+
+"""
+Added in 26.8.0. Compute-schedule outcome for a single kernel. Results correspond positionally to the requested kernels.
+"""
+type ComputeScheduleKernelResult
+  @join__type(graph: STRAWBERRY)
+{
+  """Resource slots resolved for this kernel after applying defaults."""
+  requestedSlots: [ResourceSlotEntry!]!
+
+  """Architecture resolved for this kernel."""
+  requestedArchitecture: String!
+
+  """Whether this kernel could be scheduled onto a target node."""
+  success: Boolean!
+
+  """What to change so the kernel would fit. Null when success is True."""
+  reasonHint: UnschedulableReasonHint
+}
+
+"""Added in 26.8.0. Result of a compute-schedule request."""
+type ComputeSchedulePayload
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  Per-kernel compute-schedule outcomes, correlated to the request by list index.
+  """
+  results: [ComputeScheduleKernelResult!]!
+}
+
 type ComputeSession implements Item
   @join__implements(graph: GRAPHENE, interface: "Item")
   @join__type(graph: GRAPHENE)
@@ -3448,6 +3519,11 @@ input CreateAppConfigAllowListInput
 
   """Scope at which fragments may be written (public | domain | user)."""
   scopeType: AppConfigScopeType!
+
+  """
+  Added in 26.8.0. Merge rank applied to fragments under this entry (low to high; higher wins). Defaults to the scope type's default rank (public=100, domain=200, user=300).
+  """
+  rank: Int = null
 }
 
 """Added in 26.7.0. Payload for app config allow-list entry creation."""
@@ -5577,6 +5653,9 @@ input DeploymentFilter
   Added in 26.4.3. Filter by deployment destruction datetime. Supports IS NULL / IS NOT NULL.
   """
   destroyedAt: NullableDateTimeFilter = null
+
+  """Added in 26.8.0. Filter by conditions on deployment replicas."""
+  replicas: ReplicaNestedFilter = null
   AND: [DeploymentFilter!] = null
   OR: [DeploymentFilter!] = null
   NOT: [DeploymentFilter!] = null
@@ -6949,8 +7028,13 @@ input EnqueueSessionInput
   """Resource slot allocations."""
   resourceEntries: [SessionResourceSlotEntryInput!]!
 
-  """Scaling group name."""
-  resourceGroup: String = null
+  """
+  Deprecated since 26.8.0. Use resource_group_id instead. Resource group name.
+  """
+  resourceGroup: String = null @deprecated(reason: "Use resource_group_id instead.")
+
+  """Added in 26.8.0. Resource group UUID. Auto-selected if omitted."""
+  resourceGroupId: ID = null
 
   """Additional resource options."""
   resourceOpts: SessionResourceOptsInput = null
@@ -7038,6 +7122,16 @@ input EntityFilter
 {
   entityType: RBACElementTypeFilter = null
   entityId: StringFilter = null
+
+  """
+  Added in 26.8.0. Filter by the type of scope the entity is registered in.
+  """
+  scopeType: RBACElementTypeFilter = null
+
+  """
+  Added in 26.8.0. Filter by the id of scope the entity is registered in.
+  """
+  scopeId: StringFilter = null
   AND: [EntityFilter!] = null
   OR: [EntityFilter!] = null
   NOT: [EntityFilter!] = null
@@ -8435,6 +8529,11 @@ type KernelV2 implements Node
   """Added in 26.2.0. The resource group this kernel is assigned to."""
   resourceGroup: ResourceGroup
 
+  """
+  Added in 26.8.0. Resource allocation (requested / used / allocated) computed on-demand from the resource_allocations table. Unlike the deprecated eager `resource.allocation`, `allocated` here persists after the kernel is freed or terminated (for statistics and billing).
+  """
+  resourceAllocation: ResourceAllocation!
+
   """Added in 26.3.0. The session this kernel belongs to."""
   session: SessionV2
 
@@ -9825,19 +9924,15 @@ type ModelDeployment implements Node
   """
   scalingState: ScalingState!
 
-  """
-  Added in 26.4.3. The current active revision of this deployment, resolved via DataLoader.
-  """
+  """Added in 26.4.3. The current active revision of this deployment."""
   currentRevision: ModelRevision
 
   """
-  Added in 26.4.3. The revision currently being deployed (in progress, not yet active), resolved via DataLoader.
+  Added in 26.4.3. The revision currently being deployed (in progress, not yet active).
   """
   deployingRevision: ModelRevision
 
-  """
-  Added in 26.4.3. The user who created this deployment, resolved via DataLoader.
-  """
+  """Added in 26.4.3. The user who created this deployment."""
   creator: UserV2
 
   """Added in 25.19.0. Deployment policy configuration."""
@@ -9885,25 +9980,19 @@ Added in 25.19.0. Contains metadata information for a model deployment including
 type ModelDeploymentMetadata
   @join__type(graph: STRAWBERRY)
 {
-  """
-  Added in 26.4.4. The resource group this deployment runs in, resolved via DataLoader.
-  """
+  """Added in 26.4.4. The resource group this deployment runs in."""
   resourceGroup: ResourceGroup
 
   """The project of this entity."""
   project: GroupNode @deprecated(reason: "Use project_v2 instead.")
 
-  """
-  Added in 26.4.3. The project this deployment belongs to, resolved via DataLoader.
-  """
+  """Added in 26.4.3. The project this deployment belongs to."""
   projectV2: ProjectV2
 
   """The domain of this entity."""
   domain: DomainNode @deprecated(reason: "Use domain_v2 instead.")
 
-  """
-  Added in 26.4.3. The domain this deployment belongs to, resolved via DataLoader.
-  """
+  """Added in 26.4.3. The domain this deployment belongs to."""
   domainV2: DomainV2
   projectId: ID!
   domainName: String!
@@ -10166,9 +10255,7 @@ type ModelReplica implements Node
   """
   session: ComputeSessionNode @deprecated(reason: "Use session_v2 instead.")
 
-  """
-  Added in 26.4.3. The compute session running this replica, resolved via DataLoader.
-  """
+  """Added in 26.4.3. The compute session running this replica."""
   sessionV2: SessionV2
 
   """The revision of this entity."""
@@ -10253,19 +10340,15 @@ type ModelRevision implements Node
   """The image of this entity."""
   image: ImageNode @deprecated(reason: "Use image_v2 instead.")
 
-  """
-  Added in 26.4.3. The container image used by this revision, resolved via DataLoader.
-  """
+  """Added in 26.4.3. The container image used by this revision."""
   imageV2: ImageV2
 
   """
-  Added in 26.4.4. The deployment-level preset that produced this revision, resolved via DataLoader. ``None`` when the revision was created without a preset, when the originating preset row has since been deleted (SET NULL FK), or for legacy rows that predate this field.
+  Added in 26.4.4. The deployment-level preset that produced this revision. ``None`` when the revision was created without a preset, when the originating preset row has since been deleted (SET NULL FK), or for legacy rows that predate this field.
   """
   revisionPreset: DeploymentRevisionPreset
 
-  """
-  Added in 26.4.4. The parent deployment owning this revision, resolved via DataLoader.
-  """
+  """Added in 26.4.4. The parent deployment owning this revision."""
   deployment: ModelDeployment
 
   """Added in 26.4.2. Resource slot allocations for this revision."""
@@ -10390,7 +10473,9 @@ type ModelServiceConfig
   """
   startCommand: [String!] @deprecated(reason: "Use `command` instead.")
 
-  """Shell configured for the model service."""
+  """
+  Shell used to run the command. If set, the kernel runs `[shell, '-c', command]`; null or empty disables shell wrapping.
+  """
   shell: String
 
   """Port number for the model service."""
@@ -10419,8 +10504,10 @@ input ModelServiceConfigInput
   """
   startCommand: [String!] = null @deprecated(reason: "Use `command` instead.")
 
-  """Shell configured for the model service."""
-  shell: String = null
+  """
+  Shell used to run the command. If set, the kernel runs `[shell, '-c', command]`; null or empty disables shell wrapping.
+  """
+  shell: String = "/bin/bash"
 
   """Port number for the model service."""
   port: Int = null
@@ -11357,6 +11444,11 @@ type Mutation
   Added in 26.7.0. Purge an app config allow-list entry by id (super admin only).
   """
   adminPurgeAppConfigAllowList(input: PurgeAppConfigAllowListInput!): PurgeAppConfigAllowListPayload @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.8.0. Update an app config allow-list entry's rank by id (super admin only).
+  """
+  adminUpdateAppConfigAllowList(input: UpdateAppConfigAllowListInput!): UpdateAppConfigAllowListPayload @join__field(graph: STRAWBERRY)
 
   """
   Added in 25.14.0. Scan external registries to discover available artifacts. Searches HuggingFace or Reservoir registries for artifacts matching the specified criteria and registers them in the system with SCANNED status. The artifacts become available for import but are not downloaded until explicitly imported. This is the first step in the artifact workflow: Scan → Import → Use
@@ -12660,6 +12752,9 @@ type PredefinedAtomicPermission
 type PreemptionConfig
   @join__type(graph: STRAWBERRY)
 {
+  """Whether preemption is enabled for this resource group (opt-in)."""
+  enabled: Boolean!
+
   """Sessions with priority <= this value are eligible for preemption."""
   preemptiblePriority: Int!
 
@@ -12668,12 +12763,22 @@ type PreemptionConfig
 
   """How to preempt a session when preemption is triggered."""
   mode: PreemptionMode!
+
+  """
+  Minimum session runtime in seconds before it becomes preemptible (0 = disabled).
+  """
+  preemptionMinRuntime: Float!
 }
 
 """Added in 26.3.0. Input for preemption configuration."""
 input PreemptionConfigInput
   @join__type(graph: STRAWBERRY)
 {
+  """
+  Added in 26.8.0. Whether preemption is enabled for this resource group (opt-in). Default is false.
+  """
+  enabled: Boolean! = false
+
   """Sessions with priority <= this value are preemptible. Default is 5."""
   preemptiblePriority: Int! = 5
 
@@ -12684,6 +12789,11 @@ input PreemptionConfigInput
 
   """How to preempt sessions (TERMINATE, RESCHEDULE). Default is TERMINATE."""
   mode: PreemptionMode! = TERMINATE
+
+  """
+  Added in 26.8.0. Minimum session runtime in seconds before it becomes preemptible (0 = disabled). Default is 0.
+  """
+  preemptionMinRuntime: Float! = 0
 }
 
 """
@@ -12931,8 +13041,10 @@ input PresetModelServiceConfigInput
   """
   startCommand: [String!] = null @deprecated(reason: "Use `command` instead.")
 
-  """Shell configured for the model service."""
-  shell: String! = "/bin/bash"
+  """
+  Shell used to run the command. If set, the kernel runs `[shell, '-c', command]`; null or empty disables shell wrapping.
+  """
+  shell: String = "/bin/bash"
 
   """Port number for the model service. Must be greater than 1."""
   port: Int!
@@ -13524,6 +13636,15 @@ type ProjectUsageBucket implements Node
   """
   usageCapacityRatio: ResourceSlot
 
+  """Added in 26.8.0. The project entity this usage bucket belongs to."""
+  project: ProjectV2
+
+  """Added in 26.8.0. The domain entity this usage bucket belongs to."""
+  domain: DomainV2
+
+  """Added in 26.8.0. The resource group this usage was recorded in."""
+  resourceGroup: ResourceGroup
+
   """
   Added in 26.1.0. User usage buckets belonging to this project. Returns paginated user-level usage history for all users in this project within the same scaling group.
   """
@@ -13997,6 +14118,11 @@ input PurgeVFolderOptionsInput
   If true, also delete model card record(s) referencing the vfolder. If false, the request is rejected when any model card still references it.
   """
   cascadeModelCard: Boolean! = false
+
+  """
+  Added in 26.8.0. If true, bypass the in-use guards and purge the vfolder even when it is mounted by a live session, referenced by an active model-service endpoint, or not in a purgable status. Irreversible — use with caution. If false (default), the request is rejected in those cases.
+  """
+  force: Boolean! = false
 }
 
 """
@@ -14320,7 +14446,7 @@ type Query
   """Added in 25.5.0."""
   total_resource_slot(
     """
-    `statuses` argument is an array of session statuses. Only sessions with the specified statuses will be queried to calculate the sum of total resource slots. The argument should be an array of the following valid status values: ['PENDING', 'DEPRIORITIZING', 'SCHEDULED', 'PREPARING', 'PULLING', 'PREPARED', 'CREATING', 'RUNNING', 'RESTARTING', 'RUNNING_DEGRADED', 'TERMINATING', 'TERMINATED', 'ERROR', 'CANCELLED'].
+    `statuses` argument is an array of session statuses. Only sessions with the specified statuses will be queried to calculate the sum of total resource slots. The argument should be an array of the following valid status values: ['PENDING', 'DEPRIORITIZING', 'SCHEDULED', 'PREPARING', 'PULLING', 'PREPARED', 'CREATING', 'RUNNING', 'RESTARTING', 'RUNNING_DEGRADED', 'PREEMPTED', 'TERMINATING', 'TERMINATED', 'ERROR', 'CANCELLED'].
     Default value is null.
     """
     statuses: [String] = null
@@ -14496,6 +14622,11 @@ type Query
   Added in 26.4.4. List all registered deployment scheduling handlers (superadmin only). The returned ``name`` values are valid keys for ``DeploymentOptions.handler_options.by_handler``.
   """
   schedulingHandlers: [SchedulingHandlerNode!] @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.8.0. Compute whether a session could be created on a resource group, without actually provisioning it. Checks each kernel's resource request against the group's agents and returns per-kernel admission outcomes, with hints on what to reduce for kernels that do not fit.
+  """
+  computeSchedule(input: ComputeScheduleInput!): ComputeSchedulePayload @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.4.2. Get allowed resource groups for a domain (admin only).
@@ -15547,6 +15678,9 @@ input ReplicaFilter
   @join__type(graph: STRAWBERRY)
 {
   status: ReplicaStatusFilter = null
+
+  """Added in 26.8.0. Filter by replica health status."""
+  healthStatus: ReplicaHealthStatusFilter = null
   trafficStatus: TrafficStatusFilter = null
   AND: [ReplicaFilter!] = null
   OR: [ReplicaFilter!] = null
@@ -15563,6 +15697,37 @@ enum ReplicaHealthStatus
   HEALTHY @join__enumValue(graph: STRAWBERRY)
   UNHEALTHY @join__enumValue(graph: STRAWBERRY)
   DEGRADED @join__enumValue(graph: STRAWBERRY)
+}
+
+"""Added in 26.8.0. Filter for replica health status."""
+input ReplicaHealthStatusFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """Health status is in the list."""
+  in: [ReplicaHealthStatus!] = null
+  equals: ReplicaHealthStatus = null
+
+  """Excludes health statuses in the list."""
+  notIn: [ReplicaHealthStatus!] = null
+
+  """Excludes exact health status match."""
+  notEquals: ReplicaHealthStatus = null
+}
+
+"""Added in 26.8.0. Filter deployments by conditions on their replicas."""
+input ReplicaNestedFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """Matches parents with at least one replica satisfying all conditions."""
+  some: ReplicaFilter = null
+
+  """
+  Matches parents where every replica satisfies all conditions (also true when the parent has no replica).
+  """
+  every: ReplicaFilter = null
+
+  """Matches parents with no replica satisfying all conditions."""
+  none: ReplicaFilter = null
 }
 
 """Added in 25.19.0. """
@@ -15697,6 +15862,11 @@ type ResourceAllocation
   The resource slots currently used. Typed as Any because this field holds a nested GQL type (ResourceSlotGQL).
   """
   used: ResourceSlot
+
+  """
+  The resource slots actually allocated, computed from the resource_allocations table. Unlike `used`, this persists after the session/kernel is freed or terminated (for statistics and billing). Typed as Any because this field holds a nested GQL type (ResourceSlotGQL).
+  """
+  allocated: ResourceSlot
 }
 
 """
@@ -16633,6 +16803,7 @@ input RoleFilter
   source: RoleSourceFilter = null
   status: RoleStatusFilter = null
   assignedUser: RoleUserNestedFilter = null
+  mappedScope: RoleMappedScopeNestedFilter = null
   AND: [RoleFilter!] = null
   OR: [RoleFilter!] = null
   NOT: [RoleFilter!] = null
@@ -16774,6 +16945,19 @@ input RoleInvitationUserNestedFilter
   @join__type(graph: STRAWBERRY)
 {
   email: StringFilter = null
+}
+
+"""
+Added in 26.8.0. Filter roles by the scope they are mapped (registered) to.
+"""
+input RoleMappedScopeNestedFilter
+  @join__type(graph: STRAWBERRY)
+{
+  scopeType: RBACElementTypeFilter = null
+  scopeId: StringFilter = null
+  AND: [RoleMappedScopeNestedFilter!] = null
+  OR: [RoleMappedScopeNestedFilter!] = null
+  NOT: [RoleMappedScopeNestedFilter!] = null
 }
 
 """Added in 26.3.0. Order by specification for roles"""
@@ -17134,9 +17318,7 @@ type Route implements Node
   """
   session: ID @deprecated(reason: "Use session_v2 instead.")
 
-  """
-  Added in 26.4.3. The compute session associated with this route, resolved via DataLoader.
-  """
+  """Added in 26.4.3. The compute session associated with this route."""
   sessionV2: SessionV2
 
   """The revision associated with the route."""
@@ -17497,6 +17679,11 @@ type RuntimeVariantPreset implements Node
 
   """Timestamp of the last modification to this preset."""
   updatedAt: DateTime
+
+  """
+  Added in 26.8.0. The runtime variant this preset belongs to. Fetch its name and other attributes in a single query alongside the preset list.
+  """
+  runtimeVariant: RuntimeVariant
 }
 
 """Added in 26.4.2. Paginated list of runtime variant presets."""
@@ -17568,9 +17755,7 @@ Added in 26.4.4. A runtime variant preset value materialised on a revision.
 type RuntimeVariantPresetValue
   @join__type(graph: STRAWBERRY)
 {
-  """
-  The runtime variant preset this value is bound to, resolved via DataLoader.
-  """
+  """The runtime variant preset this value is bound to."""
   preset: RuntimeVariantPreset
 
   """Runtime variant preset ID."""
@@ -18442,6 +18627,11 @@ type SessionV2 implements Node
   Added in 26.4.4. The model deployment replica served by this session: a single replica instance of a model deployment that runs in this compute session and serves inference requests. Null for non-inference sessions.
   """
   replica: ModelReplica
+
+  """
+  Added in 26.8.0. Resource allocation (requested / used / allocated) computed on-demand from the resource_allocations table. Unlike the deprecated eager `resource.allocation`, `allocated` here persists after the session is freed or terminated (for statistics and billing).
+  """
+  resourceAllocation: ResourceAllocation!
 }
 
 """Added in 26.3.0. Connection type for paginated session results."""
@@ -18628,6 +18818,7 @@ enum SessionV2Status
   CREATING @join__enumValue(graph: STRAWBERRY)
   RUNNING @join__enumValue(graph: STRAWBERRY)
   DEPRIORITIZING @join__enumValue(graph: STRAWBERRY)
+  PREEMPTED @join__enumValue(graph: STRAWBERRY)
   TERMINATING @join__enumValue(graph: STRAWBERRY)
   TERMINATED @join__enumValue(graph: STRAWBERRY)
   CANCELLED @join__enumValue(graph: STRAWBERRY)
@@ -19082,6 +19273,19 @@ type UnregisterStorageNamespacePayload
   id: UUID!
 }
 
+"""
+Added in 26.8.0. What the caller could change so an unschedulable kernel would fit. Present only when the kernel could not be scheduled.
+"""
+type UnschedulableReasonHint
+  @join__type(graph: STRAWBERRY)
+{
+  """Subtract these slots to fit the best-fitting node."""
+  requiredReduction: [ResourceSlotEntry!]
+
+  """Architectures that actually exist among the scheduling targets."""
+  availableArchs: [String!]
+}
+
 type UnsetQuotaScope
   @join__type(graph: GRAPHENE)
 {
@@ -19163,6 +19367,29 @@ input UpdateAllowedResourceGroupsForProjectInput
 
   """Resource group names to disallow."""
   remove: [String!] = null
+}
+
+"""
+Added in 26.8.0. Input for updating an app config allow-list entry (rank only).
+"""
+input UpdateAppConfigAllowListInput
+  @join__type(graph: STRAWBERRY)
+{
+  """App config allow-list entry id to update."""
+  id: UUID!
+
+  """
+  New merge rank applied to fragments under this entry (low to high; higher wins). Omit to leave unchanged.
+  """
+  rank: Int = null
+}
+
+"""Added in 26.8.0. Payload for app config allow-list entry update."""
+type UpdateAppConfigAllowListPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """Updated app config allow-list entry."""
+  appConfigAllowList: AppConfigAllowList!
 }
 
 """
@@ -20849,6 +21076,18 @@ type UserUsageBucket implements Node
   Added in 26.2.0. Usage ratio against total available capacity for each resource. Calculated as resource_usage divided by capacity_snapshot. Represents the fraction of total capacity consumed (resource-seconds / resource). The result is in seconds, where 86400 means full utilization for one day. Values can exceed this if usage exceeds capacity.
   """
   usageCapacityRatio: ResourceSlot
+
+  """Added in 26.8.0. The user entity this usage bucket belongs to."""
+  user: UserV2
+
+  """Added in 26.8.0. The project entity this usage bucket belongs to."""
+  project: ProjectV2
+
+  """Added in 26.8.0. The domain entity this usage bucket belongs to."""
+  domain: DomainV2
+
+  """Added in 26.8.0. The resource group this usage was recorded in."""
+  resourceGroup: ResourceGroup
 }
 
 """

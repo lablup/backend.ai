@@ -25,6 +25,7 @@ class ProjectType(enum.StrEnum):
     MODEL_STORE = "model-store"
 
     @classmethod
+    @override
     def _missing_(cls, value: Any) -> ProjectType | None:
         if not isinstance(value, str):
             raise DataTransformationFailed(

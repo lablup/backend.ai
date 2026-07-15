@@ -5,6 +5,7 @@ import socket
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
+from typing import override
 
 from ai.backend.common.clients.valkey_client.valkey_leader.client import ValkeyLeaderClient
 from ai.backend.common.defs import REDIS_STREAM_LOCK, RedisRole
@@ -47,10 +48,12 @@ class LeaderElectionDependency(
     """
 
     @property
+    @override
     def stage_name(self) -> str:
         return "leader-election"
 
     @asynccontextmanager
+    @override
     async def provide(
         self, setup_input: LeaderElectionInput
     ) -> AsyncIterator[ValkeyLeaderElection]:

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from contextlib import AbstractContextManager
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Self
+from typing import TYPE_CHECKING, Any, Self, override
 
 import click
 
@@ -19,6 +19,7 @@ class CLIContext(AbstractContextManager["CLIContext"]):
         self.config_path = config_path
         self.log_level = log_level
 
+    @override
     def __enter__(self) -> Self:
         from ai.backend.logging import LocalLogger
 
@@ -31,6 +32,7 @@ class CLIContext(AbstractContextManager["CLIContext"]):
             self._logger.__enter__()
         return self
 
+    @override
     def __exit__(self, *exc_info: Any) -> None:
         click_ctx = click.get_current_context()
         if click_ctx.invoked_subcommand != "start-server":

@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Any, Self
+from typing import TYPE_CHECKING, Annotated, Any, Self
 from uuid import UUID
 
+import strawberry
 from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
@@ -18,6 +19,7 @@ from ai.backend.common.dto.manager.v2.resource_usage.request import (
 from ai.backend.common.dto.manager.v2.resource_usage.response import (
     ProjectUsageBucketNode,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     DateFilter,
     OrderDirection,
@@ -51,6 +53,11 @@ from .user_usage import (
     UserUsageBucketGQL,
     UserUsageBucketOrderBy,
 )
+
+if TYPE_CHECKING:
+    from ai.backend.manager.api.gql.domain_v2.types.node import DomainV2GQL
+    from ai.backend.manager.api.gql.project_v2.types.node import ProjectV2GQL
+    from ai.backend.manager.api.gql.resource_group.types import ResourceGroupGQL
 
 
 @gql_node_type(
@@ -107,6 +114,60 @@ class ProjectUsageBucketGQL(PydanticNodeMixin[ProjectUsageBucketNode]):
             self.resource_usage,
             self.capacity_snapshot,
         )
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="The project entity this usage bucket belongs to.",
+        )
+    )  # type: ignore[misc]
+    async def project(
+        self,
+        info: Info[StrawberryGQLContext],
+    ) -> (
+        Annotated[
+            ProjectV2GQL,
+            strawberry.lazy("ai.backend.manager.api.gql.project_v2.types.node"),
+        ]
+        | None
+    ):
+        return await info.context.data_loaders.project_loader.load(self.project_id)
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="The domain entity this usage bucket belongs to.",
+        )
+    )  # type: ignore[misc]
+    async def domain(
+        self,
+        info: Info[StrawberryGQLContext],
+    ) -> (
+        Annotated[
+            DomainV2GQL,
+            strawberry.lazy("ai.backend.manager.api.gql.domain_v2.types.node"),
+        ]
+        | None
+    ):
+        return await info.context.data_loaders.domain_loader.load(self.domain_name)
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="The resource group this usage was recorded in.",
+        )
+    )  # type: ignore[misc]
+    async def resource_group(
+        self,
+        info: Info[StrawberryGQLContext],
+    ) -> (
+        Annotated[
+            ResourceGroupGQL,
+            strawberry.lazy("ai.backend.manager.api.gql.resource_group.types"),
+        ]
+        | None
+    ):
+        return await info.context.data_loaders.resource_group_loader.load(self.resource_group_name)
 
     @gql_added_field(
         BackendAIGQLMeta(

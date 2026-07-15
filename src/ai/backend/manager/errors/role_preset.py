@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import override
+
 from aiohttp import web
 
 from ai.backend.common.exception import (
@@ -18,6 +20,7 @@ from .common import ObjectNotFound
 class RolePresetNotFound(ObjectNotFound):
     object_name = "role_preset"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.ROLE,
@@ -30,6 +33,7 @@ class RolePermissionPresetConflict(BackendAIError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/duplicate-role-permission-preset"
     error_title = "Duplicate role permission preset entry."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.ROLE,

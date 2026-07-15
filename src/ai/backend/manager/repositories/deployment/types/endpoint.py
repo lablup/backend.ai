@@ -6,7 +6,7 @@ import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any
+from typing import Any, override
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -156,6 +156,7 @@ class ProjectDeploymentSearchScope(SearchScope):
 
     project_id: UUID
 
+    @override
     def to_condition(self) -> QueryCondition:
         project_id = self.project_id
 
@@ -165,6 +166,7 @@ class ProjectDeploymentSearchScope(SearchScope):
         return inner
 
     @property
+    @override
     def existence_checks(self) -> Sequence[ExistenceCheck[UUID]]:
         return [
             ExistenceCheck(

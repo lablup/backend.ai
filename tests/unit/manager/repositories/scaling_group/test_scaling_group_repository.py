@@ -420,14 +420,21 @@ class TestScalingGroupRepositoryDB:
             db_sess.add(sgroup)
             await db_sess.flush()  # Flush to ensure scaling group exists before creating references
 
+            domain_id = await db_sess.scalar(
+                sa.select(DomainRow.id).where(DomainRow.name == test_domain)
+            )
+            assert domain_id is not None
+
             # Create 2 sessions with this scaling group
             for i in range(2):
                 session_id = SessionId(uuid.uuid4())
                 session = SessionRow(
                     id=session_id,
                     domain_name=test_domain,
+                    domain_id=domain_id,
                     group_id=test_group_id,
                     user_uuid=test_user_uuid,
+                    resource_group_id=sgroup.id,
                     scaling_group_name=sgroup_name,
                     cluster_size=1,
                     vfolder_mounts={},
@@ -1274,12 +1281,25 @@ class TestScalingGroupRepositoryDB:
         test_user_uuid, test_domain, test_group_id = test_user_domain_group
         session_id = SessionId(uuid.uuid4())
         async with db_with_cleanup.begin_session() as db_sess:
+            domain_id = await db_sess.scalar(
+                sa.select(DomainRow.id).where(DomainRow.name == test_domain)
+            )
+            resource_group_id = await db_sess.scalar(
+                sa.select(ScalingGroupRow.id).where(
+                    ScalingGroupRow.name == sample_scaling_group_for_hierarchy
+                )
+            )
+            assert domain_id is not None
+            assert resource_group_id is not None
+
             db_sess.add(
                 SessionRow(
                     id=session_id,
                     domain_name=test_domain,
+                    domain_id=domain_id,
                     group_id=test_group_id,
                     user_uuid=test_user_uuid,
+                    resource_group_id=resource_group_id,
                     scaling_group_name=sample_scaling_group_for_hierarchy,
                     cluster_size=1,
                     vfolder_mounts={},
@@ -1293,12 +1313,19 @@ class TestScalingGroupRepositoryDB:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         sample_session: SessionId,
+        sample_scaling_group_for_hierarchy: str,
         test_user_domain_group: tuple[uuid.UUID, str, uuid.UUID],
     ) -> AsyncGenerator[uuid.UUID, None]:
         """Create a kernel for the session."""
         test_user_uuid, test_domain, test_group_id = test_user_domain_group
         kernel_id = uuid.uuid4()
         async with db_with_cleanup.begin_session() as db_sess:
+            resource_group_id = await db_sess.scalar(
+                sa.select(ScalingGroupRow.id).where(
+                    ScalingGroupRow.name == sample_scaling_group_for_hierarchy
+                )
+            )
+            assert resource_group_id is not None
             db_sess.add(
                 KernelRow(
                     id=kernel_id,
@@ -1306,6 +1333,8 @@ class TestScalingGroupRepositoryDB:
                     domain_name=test_domain,
                     group_id=test_group_id,
                     user_uuid=test_user_uuid,
+                    scaling_group=sample_scaling_group_for_hierarchy,
+                    resource_group_id=resource_group_id,
                     cluster_role=DEFAULT_ROLE,
                     occupied_slots=ResourceSlot(),
                     repl_in_port=0,

@@ -37,9 +37,11 @@ class NoopQuotaModel(AbstractQuotaModel):
     def __init__(self) -> None:
         pass
 
+    @override
     def mangle_qspath(self, ref: VFolderID | QuotaScopeID | str | None) -> Path:
         return Path()
 
+    @override
     async def create_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
@@ -48,12 +50,14 @@ class NoopQuotaModel(AbstractQuotaModel):
     ) -> None:
         pass
 
+    @override
     async def describe_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
     ) -> QuotaUsage | None:
         pass
 
+    @override
     async def update_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
@@ -61,12 +65,14 @@ class NoopQuotaModel(AbstractQuotaModel):
     ) -> None:
         pass
 
+    @override
     async def unset_quota(
         self,
         quota_scope_id: QuotaScopeID,
     ) -> None:
         pass
 
+    @override
     async def delete_quota_scope(
         self,
         quota_scope_id: QuotaScopeID,
@@ -78,6 +84,7 @@ class NoopFSOpModel(AbstractFSOpModel):
     def __init__(self) -> None:
         return
 
+    @override
     async def copy_tree(
         self,
         src_path: Path,
@@ -85,6 +92,7 @@ class NoopFSOpModel(AbstractFSOpModel):
     ) -> None:
         pass
 
+    @override
     async def move_tree(
         self,
         src_path: Path,
@@ -92,12 +100,14 @@ class NoopFSOpModel(AbstractFSOpModel):
     ) -> None:
         pass
 
+    @override
     async def delete_tree(
         self,
         path: Path,
     ) -> None:
         pass
 
+    @override
     def scan_tree(
         self,
         path: Path,
@@ -106,12 +116,14 @@ class NoopFSOpModel(AbstractFSOpModel):
     ) -> AsyncIterator[DirEntry]:
         return _return_empty_dir_entry()
 
+    @override
     async def scan_tree_usage(
         self,
         path: Path,
     ) -> TreeUsage:
         return TreeUsage(0, 0)
 
+    @override
     async def scan_tree_size(
         self,
         path: Path,
@@ -131,17 +143,21 @@ class NoopVolume(AbstractVolume):
             options=None,
         )
 
+    @override
     async def create_quota_model(self) -> AbstractQuotaModel:
         return NoopQuotaModel()
 
+    @override
     async def create_fsop_model(self) -> AbstractFSOpModel:
         return NoopFSOpModel()
 
     # ------ volume operations -------
 
+    @override
     async def get_capabilities(self) -> frozenset[str]:
         return frozenset()
 
+    @override
     async def get_hwinfo(self) -> HardwareMetadata:
         return {
             "status": "healthy",
@@ -149,6 +165,7 @@ class NoopVolume(AbstractVolume):
             "metadata": {},
         }
 
+    @override
     async def create_vfolder(
         self,
         vfid: VFolderID,
@@ -157,9 +174,11 @@ class NoopVolume(AbstractVolume):
     ) -> None:
         return None
 
+    @override
     async def delete_vfolder(self, vfid: VFolderID) -> None:
         return None
 
+    @override
     async def clone_vfolder(
         self,
         src_vfid: VFolderID,
@@ -167,21 +186,27 @@ class NoopVolume(AbstractVolume):
     ) -> None:
         return None
 
+    @override
     async def get_vfolder_mount(self, vfid: VFolderID, subpath: str) -> Path:
         return Path()
 
+    @override
     async def put_metadata(self, vfid: VFolderID, payload: bytes) -> None:
         pass
 
+    @override
     async def get_metadata(self, vfid: VFolderID) -> bytes:
         return b""
 
+    @override
     async def get_performance_metric(self) -> FSPerfMetric:
         return FSPerfMetric(0, 0, 0, 0, 0.0, 0.0)
 
+    @override
     async def get_fs_usage(self) -> CapacityUsage:
         return CapacityUsage(0, 0)
 
+    @override
     async def get_usage(
         self,
         vfid: VFolderID,
@@ -189,11 +214,13 @@ class NoopVolume(AbstractVolume):
     ) -> TreeUsage:
         return TreeUsage(0, 0)
 
+    @override
     async def get_used_bytes(self, vfid: VFolderID) -> BinarySize:
         return BinarySize(0)
 
     # ------ vfolder operations -------
 
+    @override
     def scandir(
         self,
         vfid: VFolderID,
@@ -203,6 +230,7 @@ class NoopVolume(AbstractVolume):
     ) -> AsyncIterator[DirEntry]:
         return _return_empty_dir_entry()
 
+    @override
     async def mkdir(
         self,
         vfid: VFolderID,
@@ -213,6 +241,7 @@ class NoopVolume(AbstractVolume):
     ) -> None:
         pass
 
+    @override
     async def rmdir(
         self,
         vfid: VFolderID,
@@ -222,6 +251,7 @@ class NoopVolume(AbstractVolume):
     ) -> None:
         pass
 
+    @override
     async def move_file(
         self,
         vfid: VFolderID,
@@ -230,6 +260,7 @@ class NoopVolume(AbstractVolume):
     ) -> None:
         pass
 
+    @override
     async def move_tree(
         self,
         vfid: VFolderID,
@@ -238,6 +269,7 @@ class NoopVolume(AbstractVolume):
     ) -> None:
         pass
 
+    @override
     async def copy_file(
         self,
         vfid: VFolderID,
@@ -246,9 +278,11 @@ class NoopVolume(AbstractVolume):
     ) -> None:
         pass
 
+    @override
     async def prepare_upload(self, vfid: VFolderID) -> str:
         return ""
 
+    @override
     async def add_file(
         self,
         vfid: VFolderID,
@@ -257,6 +291,7 @@ class NoopVolume(AbstractVolume):
     ) -> None:
         pass
 
+    @override
     def read_file(
         self,
         vfid: VFolderID,
@@ -269,6 +304,7 @@ class NoopVolume(AbstractVolume):
 
         return _noop()
 
+    @override
     async def delete_files(
         self,
         vfid: VFolderID,

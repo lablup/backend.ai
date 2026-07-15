@@ -16,6 +16,7 @@ to fail there.
 from __future__ import annotations
 
 from decimal import Decimal
+from typing import override
 
 from ai.backend.manager.data.session.spec import SessionSpec
 from ai.backend.manager.errors.api import InvalidAPIParameters
@@ -29,9 +30,11 @@ from ai.backend.manager.sokovan.scheduling_controller.validators.session_spec_ba
 class RequestedSlotTypeRule(SessionSpecValidatorRule):
     """Requested slot keys must be served by an agent in the target RG."""
 
+    @override
     def name(self) -> str:
         return "requested_slot_type"
 
+    @override
     def validate(
         self,
         spec: SessionSpec,
@@ -49,7 +52,7 @@ class RequestedSlotTypeRule(SessionSpecValidatorRule):
         for idx, kernel in enumerate(spec.kernel_specs):
             unknown = sorted({
                 entry.resource_type
-                for entry in kernel.execution_spec.resources
+                for entry in kernel.execution_spec.resource_input.resources
                 if entry.resource_type not in rg_slot_types
                 and parse_quantity(entry.quantity) > Decimal(0)
             })

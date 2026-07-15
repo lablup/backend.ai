@@ -117,6 +117,9 @@ class AdminSearchResourceGroupsPayload(BaseResponseModel):
 class PreemptionConfigInfo(BaseResponseModel):
     """Preemption configuration DTO."""
 
+    enabled: bool = Field(
+        description="Whether preemption is enabled for this resource group (opt-in)."
+    )
     preemptible_priority: int = Field(
         description="Sessions with priority <= this value are eligible for preemption."
     )
@@ -125,6 +128,11 @@ class PreemptionConfigInfo(BaseResponseModel):
     )
     mode: PreemptionModeDTO = Field(
         description="How to preempt a session when preemption is triggered."
+    )
+    preemption_min_runtime: float = Field(
+        description=(
+            "Minimum session runtime in seconds before it becomes preemptible (0 = disabled)."
+        )
     )
 
 

@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.kernel.types import KernelStatus
@@ -28,7 +29,7 @@ from ai.backend.manager.models.resource_policy import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.scaling_group import ScalingGroupRow
+from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow, SessionStatus, SessionTypes
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.repositories.base.purger import BatchPurger, execute_batch_purger
@@ -181,7 +182,21 @@ class TestDomainPurgersIntegration:
     ) -> list[SessionRow]:
         """Create test sessions belonging to the domain."""
         sessions: list[SessionRow] = []
+        sgroup_name = f"default-{uuid.uuid4().hex[:8]}"
+        sgroup_id = ResourceGroupID(uuid.uuid4())
         async with db_with_cleanup.begin_session() as session:
+            sgroup = ScalingGroupRow(
+                name=sgroup_name,
+                id=sgroup_id,
+                description="Test scaling group",
+                is_active=True,
+                driver="static",
+                driver_opts={},
+                scheduler="fifo",
+                scheduler_opts=ScalingGroupOpts(),
+            )
+            session.add(sgroup)
+            await session.flush()
             for i in range(3):
                 sess = SessionRow(
                     name=f"test-session-{i}-{uuid.uuid4().hex[:8]}",
@@ -189,7 +204,10 @@ class TestDomainPurgersIntegration:
                     cluster_mode="single-node",
                     cluster_size=1,
                     domain_name=sample_domain.domain_name,
+                    domain_id=sample_domain.domain_id,
                     group_id=sample_group.id,
+                    scaling_group_name=sgroup_name,
+                    resource_group_id=sgroup_id,
                     user_uuid=sample_user.uuid,
                     occupying_slots=ResourceSlot({}),
                     requested_slots=ResourceSlot({}),
@@ -224,6 +242,8 @@ class TestDomainPurgersIntegration:
                     domain_name=sample_domain.domain_name,
                     group_id=sample_group.id,
                     user_uuid=sample_user.uuid,
+                    scaling_group=sess.scaling_group_name,
+                    resource_group_id=sess.resource_group_id,
                     occupied_slots=ResourceSlot({}),
                     requested_slots=ResourceSlot({}),
                     occupied_shares={},

@@ -13,17 +13,7 @@ from ai.backend.common.clients.http_client.client_pool import ClientPool, tcp_cl
 from ai.backend.web.auth import get_anonymous_session, get_api_session
 from ai.backend.web.clients.endpoint_pool import AcquiredEndpoint
 
-
-class DummyApiConfig:
-    def __init__(self, domain: str, endpoint: list[yarl.URL], ssl_verify: bool) -> None:
-        self.domain = domain
-        self.endpoint = endpoint
-        self.ssl_verify = ssl_verify
-
-
-class DummyConfig:
-    def __init__(self, api_config: DummyApiConfig) -> None:
-        self.api = api_config
+from .conftest import DummyApiConfig, DummyConfig
 
 
 class DummyRequest:

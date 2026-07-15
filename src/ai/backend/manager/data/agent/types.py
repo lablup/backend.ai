@@ -11,7 +11,7 @@ from ai.backend.common.data.agent.types import AgentInfo
 from ai.backend.common.types import AgentId, DeviceName, ResourceSlot, SlotName, SlotTypes
 
 if TYPE_CHECKING:
-    from ai.backend.manager.models.rbac.permission_defs import AgentPermission
+    from ai.backend.manager.data.permission.permission_defs import AgentPermission
 
 
 class AgentStatus(enum.Enum):

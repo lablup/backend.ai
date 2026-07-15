@@ -30,6 +30,7 @@ class TestAppConfigAllowListGQL:
             id=uuid.uuid4(),
             config_name="theme",
             scope_type=AppConfigScopeType.DOMAIN,
+            rank=200,
             created_at=created,
             updated_at=updated,
         )
@@ -38,6 +39,7 @@ class TestAppConfigAllowListGQL:
 
         assert gql.config_name == "theme"
         assert gql.scope_type == AppConfigScopeType.DOMAIN
+        assert gql.rank == 200
         assert gql.created_at == created
         assert gql.updated_at == updated
 

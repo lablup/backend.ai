@@ -7,6 +7,7 @@ from uuid import UUID
 
 from ai.backend.common.exception import ScalingGroupConflict
 from ai.backend.common.types import AccessKey
+from ai.backend.manager.data.scaling_group.types import FairShareScalingGroupSpec
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.models.scaling_group import (
     ScalingGroupForDomainRow,
@@ -15,7 +16,6 @@ from ai.backend.manager.models.scaling_group import (
     ScalingGroupOpts,
     ScalingGroupRow,
 )
-from ai.backend.manager.models.scaling_group.types import FairShareScalingGroupSpec
 from ai.backend.manager.repositories.base.creator import CreatorSpec
 from ai.backend.manager.repositories.base.types import IntegrityErrorCheck
 

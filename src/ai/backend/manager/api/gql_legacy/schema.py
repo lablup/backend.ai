@@ -92,9 +92,9 @@ if TYPE_CHECKING:
         SlotName,
         SlotTypes,
     )
+    from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
     from ai.backend.manager.data.manager_status.types import ManagerStatus
     from ai.backend.manager.idle import IdleCheckerHost
-    from ai.backend.manager.models.storage import StorageSessionManager
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
     from ai.backend.manager.registry import AgentRegistry
     from ai.backend.manager.repositories.agent.repository import AgentRepository
@@ -104,6 +104,16 @@ if TYPE_CHECKING:
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.manager.data.group.types import ProjectType
 from ai.backend.manager.data.image.types import ImageStatus
+from ai.backend.manager.data.permission.permission_defs import (
+    AgentPermission,
+    ComputeSessionPermission,
+    DomainPermission,
+    ImagePermission,
+    ProjectPermission,
+)
+from ai.backend.manager.data.permission.permission_defs import (
+    VFolderPermission as VFolderRBACPermission,
+)
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.errors.api import InvalidAPIParameters
@@ -116,16 +126,6 @@ from ai.backend.manager.models.image.row import (
     PublicImageLoadFilter,
 )
 from ai.backend.manager.models.rbac import ProjectScope, ScopeType, SystemScope
-from ai.backend.manager.models.rbac.permission_defs import (
-    AgentPermission,
-    ComputeSessionPermission,
-    DomainPermission,
-    ImagePermission,
-    ProjectPermission,
-)
-from ai.backend.manager.models.rbac.permission_defs import (
-    VFolderPermission as VFolderRBACPermission,
-)
 from ai.backend.manager.models.scaling_group.row import (
     ScalingGroupRow,
     and_names,
@@ -3456,5 +3456,7 @@ graphene_schema = graphene_federation.build_schema(
     query=Query,
     mutation=Mutation,
     auto_camelcase=False,
-    federation_version=graphene_federation.LATEST_VERSION,
+    # Pin the federation version so the emitted subgraph SDL (and thus the composed
+    # supergraph) stays stable; LATEST_VERSION floats as graphene_federation upgrades.
+    federation_version=graphene_federation.FederationVersion.VERSION_2_7,
 )

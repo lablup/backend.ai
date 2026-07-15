@@ -24,9 +24,9 @@ import yarl
 from pydantic import ConfigDict, Field
 
 from ai.backend.common.exception import BackendAIError
-from ai.backend.common.identifier.domain import DomainName
+from ai.backend.common.identifier.domain import DomainID, DomainName
 from ai.backend.common.identifier.project import ProjectID
-from ai.backend.common.identifier.resource_group import ResourceGroupName
+from ai.backend.common.identifier.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.identifier.session import SessionID
 from ai.backend.common.types import (
     AccessKey,
@@ -35,13 +35,13 @@ from ai.backend.common.types import (
     SessionTypes,
     VFolderMount,
 )
+from ai.backend.manager.data.network.types import NetworkType
 from ai.backend.manager.data.session.options import (
     InternalDataExtras,
     KernelExecutionSpec,
     SessionOptions,
 )
 from ai.backend.manager.errors.kernel import IncompleteSessionSpec
-from ai.backend.manager.models.network import NetworkType
 
 
 class _SpecBaseModel(BackendAISchema):
@@ -69,8 +69,10 @@ class SessionIdentity(_SpecBaseModel):
 class SessionScope(_SpecBaseModel):
     """Ownership / placement scope of the session."""
 
+    domain_id: DomainID
     domain_name: DomainName
     project_id: ProjectID
+    resource_group_id: ResourceGroupID
     resource_group_name: ResourceGroupName
 
 

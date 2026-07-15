@@ -68,6 +68,7 @@ async def _seed(
             entity_id=entity_id,
             request_id=None,
             triggered_by=triggered_by,
+            acted_as=uuid.UUID(triggered_by) if triggered_by else None,
             duration=None,
         )
     )

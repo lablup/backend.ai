@@ -10,6 +10,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
+from ai.backend.common.identifier.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.types import HostPortPair, ResourceSlot
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.api.rest.error_log.handler import ErrorLogHandler
@@ -96,7 +97,8 @@ def server_module_registries(
 @pytest.fixture()
 async def agent_fixture(
     db_engine: SAEngine,
-    scaling_group_fixture: str,
+    scaling_group_name: ResourceGroupName,
+    scaling_group_id: ResourceGroupID,
 ) -> AsyncIterator[str]:
     """Insert a test agent record and yield its ID."""
     agent_id = f"i-test-agent-{secrets.token_hex(4)}"
@@ -105,7 +107,8 @@ async def agent_fixture(
             sa.insert(agents).values(
                 id=agent_id,
                 region="local",
-                scaling_group=scaling_group_fixture,
+                scaling_group=scaling_group_name,
+                resource_group_id=scaling_group_id,
                 available_slots=ResourceSlot(),
                 occupied_slots=ResourceSlot(),
                 addr="127.0.0.1:6001",

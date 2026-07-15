@@ -41,13 +41,16 @@ class ATOMPlugin(AbstractATOMPlugin[ATOMDevice]):
 
         return devices
 
-    async def group_npus(self, devices: list[ATOMDevice]) -> int:
+    async def _group_npus(self, devices: list[ATOMDevice]) -> int:
         non_zero_groups: set[int] = {int(d.rbln_stat_info.group_id) for d in devices} - {0}
         if len(non_zero_groups) > 0:
             await ATOMAPI.destroy_groups(self._rbln_stat_path, list(non_zero_groups))
 
+        assigned_device_ids = {d.device_id for d in devices}
         live_devices = await self._list_devices()
-        device_indexes = [d.rbln_stat_info.npu for d in live_devices]
+        device_indexes = [
+            d.rbln_stat_info.npu for d in live_devices if d.device_id in assigned_device_ids
+        ]
         return await ATOMAPI.create_group(self._rbln_stat_path, device_indexes)
 
     async def list_device_files(

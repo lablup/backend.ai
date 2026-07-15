@@ -4,6 +4,8 @@ Authentication and user-related exceptions.
 
 from __future__ import annotations
 
+from typing import override
+
 from aiohttp import web
 
 from ai.backend.common.exception import (
@@ -21,6 +23,7 @@ class InvalidCredentials(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/invalid-credentials"
     error_title = "Invalid credentials for authentication."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.USER,
@@ -33,6 +36,7 @@ class InsufficientPrivilege(BackendAIError, web.HTTPForbidden):
     error_type = "https://api.backend.ai/probs/insufficient-privilege"
     error_title = "Insufficient privilege."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.USER,
@@ -45,6 +49,7 @@ class InvalidAuthParameters(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/invalid-auth-params"
     error_title = "Missing or invalid authorization parameters."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.USER,
@@ -57,6 +62,7 @@ class AuthorizationFailed(BackendAIError, web.HTTPUnauthorized):
     error_type = "https://api.backend.ai/probs/auth-failed"
     error_title = "Credential/signature mismatch."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.USER,
@@ -69,6 +75,7 @@ class PasswordExpired(BackendAIError, web.HTTPUnauthorized):
     error_type = "https://api.backend.ai/probs/password-expired"
     error_title = "Password has expired."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.USER,
@@ -81,6 +88,7 @@ class EmailAlreadyExistsError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/email-already-exists"
     error_title = "Email already exists."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.USER,
@@ -93,6 +101,7 @@ class UserCreationError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/user-creation-failed"
     error_title = "Failed to create user account."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.USER,
@@ -104,6 +113,7 @@ class UserCreationError(BackendAIError, web.HTTPInternalServerError):
 class UserNotFound(ObjectNotFound):
     object_name = "user"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.USER,
@@ -115,6 +125,7 @@ class UserNotFound(ObjectNotFound):
 class AccessKeyNotFound(ObjectNotFound):
     object_name = "access key"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.USER,
@@ -127,6 +138,7 @@ class GroupMembershipNotFoundError(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/group-membership-not-found"
     error_title = "User is not a member of the specified group."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.GROUP,
@@ -139,6 +151,7 @@ class InvalidClientIPConfig(BackendAIError, web.HTTPForbidden):
     error_type = "https://api.backend.ai/probs/invalid-client-ip-config"
     error_title = "Invalid client IP configuration."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.USER,
@@ -150,6 +163,7 @@ class InvalidClientIPConfig(BackendAIError, web.HTTPForbidden):
 class LoginSessionNotFoundError(ObjectNotFound):
     object_name = "login_session"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AUTH,
@@ -162,6 +176,7 @@ class LoginSessionExpiredError(BackendAIError, web.HTTPUnauthorized):
     error_type = "https://api.backend.ai/probs/login-session-expired"
     error_title = "Login session has expired."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AUTH,
@@ -174,6 +189,7 @@ class LoginBlockedError(BackendAIError, web.HTTPTooManyRequests):
     error_type = "https://api.backend.ai/probs/login-blocked"
     error_title = "Too many failed login attempts."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AUTH,
@@ -185,6 +201,7 @@ class LoginBlockedError(BackendAIError, web.HTTPTooManyRequests):
 class LoginClientTypeNotFound(ObjectNotFound):
     object_name = "login_client_type"
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AUTH,
@@ -197,6 +214,7 @@ class LoginClientTypeConflict(BackendAIError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/login-client-type-conflict"
     error_title = "A login client type with the same name already exists."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AUTH,
@@ -209,6 +227,7 @@ class TooManyConcurrentLoginSessions(BackendAIError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/active-login-session-exists"
     error_title = "Too many concurrent login sessions for this user."
 
+    @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AUTH,

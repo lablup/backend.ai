@@ -49,10 +49,12 @@ class ModelVerifyingEvent(BaseArtifactEvent):
     def event_name(cls) -> str:
         return "model_verifying"
 
+    @override
     def serialize(self) -> tuple[Any, ...]:
         return (self.model_id, self.revision, self.registry_type, self.registry_name)
 
     @classmethod
+    @override
     def deserialize(cls, value: tuple[Any, ...]) -> Self:
         return cls(
             model_id=value[0],
@@ -85,6 +87,7 @@ class ModelImportDoneEvent(BaseArtifactEvent):
     def event_name(cls) -> str:
         return "model_import_done"
 
+    @override
     def serialize(self) -> tuple[Any, ...]:
         verification_result = None
         if self.verification_result is not None:
@@ -101,6 +104,7 @@ class ModelImportDoneEvent(BaseArtifactEvent):
         )
 
     @classmethod
+    @override
     def deserialize(cls, value: tuple[Any, ...]) -> Self:
         verification_result = None
         if value[6] is not None:
@@ -134,6 +138,7 @@ class ModelMetadataFetchDoneEvent(BaseArtifactEvent):
     def event_name(cls) -> str:
         return "models_metadata_fetch_done"
 
+    @override
     def serialize(self) -> tuple[Any, ...]:
         return (
             self.model.model_id,
@@ -145,6 +150,7 @@ class ModelMetadataFetchDoneEvent(BaseArtifactEvent):
         )
 
     @classmethod
+    @override
     def deserialize(cls, value: tuple[Any, ...]) -> Self:
         return cls(
             model=ModelMetadataInfo(

@@ -5,7 +5,7 @@ import hmac
 import logging
 import re
 from collections.abc import Mapping, Sequence
-from typing import Any
+from typing import Any, override
 
 import sqlalchemy as sa
 import trafaret as t
@@ -36,17 +36,21 @@ class KeypairAuthHookPlugin(HookPlugin):
         super().__init__(plugin_config, local_config)
         self.plugin_config = plugin_config_checker.check(self.plugin_config)
 
+    @override
     def get_handlers(self) -> Sequence[tuple[str, HookHandler]]:
         return [
             ("AUTHORIZE", self.authorize),
         ]
 
+    @override
     async def update_plugin_config(self, plugin_config: Mapping[str, Any]) -> None:
         self.plugin_config = plugin_config
 
+    @override
     async def init(self, context: Any = None) -> None:
         pass
 
+    @override
     async def cleanup(self) -> None:
         pass
 

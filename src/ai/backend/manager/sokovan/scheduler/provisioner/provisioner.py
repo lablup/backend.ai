@@ -8,10 +8,10 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import (
     AgentId,
     AgentSelectionStrategy,
-    ResourceSlot,
     SessionId,
     SlotQuantity,
 )
@@ -20,7 +20,6 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.sokovan import (
     AgentAllocation,
     AgentInfo,
-    AgentOccupancy,
     AllocationBatch,
     KernelAllocation,
     KeypairOccupancy,
@@ -42,7 +41,6 @@ from ai.backend.manager.repositories.scheduler import (
     SchedulerRepository,
     SchedulingData,
 )
-from ai.backend.manager.repositories.scheduler.types.agent import AgentMeta
 from ai.backend.manager.sokovan.recorder import (
     ExecutionRecord,
     RecorderContext,
@@ -158,7 +156,6 @@ class SessionProvisioner:
 
     async def schedule_scaling_group(
         self,
-        scaling_group: str,
         scheduling_data: SchedulingData,
         provision_time: datetime,
     ) -> ScheduleResult:
@@ -172,7 +169,6 @@ class SessionProvisioner:
         4. Allocation: Persist allocations to database
 
         Args:
-            scaling_group: The scaling group to schedule for.
             scheduling_data: Pre-fetched scheduling data from Handler.
 
         Returns:
@@ -184,9 +180,10 @@ class SessionProvisioner:
             session.to_session_workload() for session in scheduling_data.pending_sessions.sessions
         ]
         sg_info = scheduling_data.scaling_group
+        resource_group_id = sg_info.id
 
         if not scheduling_data.snapshot_data:
-            log.warning("Missing snapshot data for scaling group {}", scaling_group)
+            log.warning("Missing snapshot data for resource group {}", resource_group_id)
             return ScheduleResult(scheduled_session_ids=[], scheduling_failures=[])
 
         # Load per-session failed agents from Valkey for retry deprioritization.
@@ -216,7 +213,7 @@ class SessionProvisioner:
         sequencer = self._get_sequencer(sg_info.scheduler)
         with (
             self._phase_metrics.measure_phase(
-                "scheduler", scaling_group, f"sequencing_{sg_info.scheduler}"
+                "scheduler", resource_group_id, f"sequencing_{sg_info.scheduler}"
             ),
             RecorderContext[SessionId].shared_phase(
                 "sequencing", success_detail=sequencer.success_message()
@@ -225,9 +222,7 @@ class SessionProvisioner:
                 sequencer.name, success_detail=sequencer.success_message()
             ),
         ):
-            sequenced_workloads = await sequencer.sequence(
-                scaling_group, system_snapshot, workloads
-            )
+            sequenced_workloads = await sequencer.sequence(sg_info.name, system_snapshot, workloads)
 
         # Build mutable agents with occupancy data from snapshot
         agent_occupancy = (
@@ -235,9 +230,7 @@ class SessionProvisioner:
             if scheduling_data.snapshot_data
             else {}
         )
-        mutable_agents = [
-            self._build_agent_info(agent, agent_occupancy) for agent in scheduling_data.agents
-        ]
+        mutable_agents = [agent.to_agent_info(agent_occupancy) for agent in scheduling_data.agents]
         session_allocations: list[SessionAllocation] = []
         scheduling_failures: list[SchedulingFailure] = []
         # Get agent selection strategy from scheduler opts config
@@ -251,7 +244,7 @@ class SessionProvisioner:
             try:
                 # Sequencing phase is automatically included via shared phases
                 session_allocation = await self._schedule_workload(
-                    scaling_group,
+                    resource_group_id,
                     system_snapshot,
                     mutable_agents,
                     selection_config,
@@ -290,18 +283,18 @@ class SessionProvisioner:
             "Processing {} allocations and {} failures in scaling group {}",
             len(session_allocations),
             len(scheduling_failures),
-            scaling_group,
+            resource_group_id,
         )
         # Create batch with allocations and failures
         batch = AllocationBatch(
             allocations=session_allocations,
             failures=scheduling_failures,
         )
-        with self._phase_metrics.measure_phase("scheduler", scaling_group, "allocation"):
+        with self._phase_metrics.measure_phase("scheduler", resource_group_id, "allocation"):
             scheduled_session_ids = await self._allocator.allocate(batch)
 
         failure_ids = [f.session_id for f in scheduling_failures]
-        await self._valkey_schedule.set_pending_queue(scaling_group, failure_ids)
+        await self._valkey_schedule.set_pending_queue(sg_info.name, failure_ids)
         return ScheduleResult(
             scheduled_session_ids=scheduled_session_ids,
             scheduling_failures=scheduling_failures,
@@ -309,7 +302,7 @@ class SessionProvisioner:
 
     async def _schedule_workload(
         self,
-        scaling_group: str,
+        resource_group_id: ResourceGroupID,
         mutable_snapshot: SystemSnapshot,
         mutable_agents: Sequence[AgentInfo],
         selection_config: AgentSelectionConfig,
@@ -320,12 +313,12 @@ class SessionProvisioner:
         recorder = pool.recorder(session_workload.session_id)
 
         # Phase 1: Validation
-        with self._phase_metrics.measure_phase("scheduler", scaling_group, "validation"):
+        with self._phase_metrics.measure_phase("scheduler", resource_group_id, "validation"):
             with recorder.phase("validation"):
                 self._validator.validate(mutable_snapshot, session_workload)
 
         # Phase 2: Agent Selection
-        with self._phase_metrics.measure_phase("scheduler", scaling_group, "agent_selection"):
+        with self._phase_metrics.measure_phase("scheduler", resource_group_id, "agent_selection"):
             with recorder.phase(
                 "agent_selection", success_detail=agent_selector.strategy_success_message()
             ):
@@ -337,7 +330,6 @@ class SessionProvisioner:
                         session_workload,
                         mutable_agents,
                         selection_config,
-                        scaling_group,
                         agent_selector,
                     )
 
@@ -431,7 +423,6 @@ class SessionProvisioner:
         session_workload: SessionWorkload,
         agents_info: Sequence[AgentInfo],
         selection_config: AgentSelectionConfig,
-        scaling_group: str,
         agent_selector: AgentSelector,
     ) -> SessionAllocation:
         """
@@ -440,7 +431,6 @@ class SessionProvisioner:
         :param session_workload: The workload to allocate
         :param agents_info: Available agents (will be modified with updated states)
         :param selection_config: Agent selection configuration
-        :param scaling_group: The scaling group name
         :return: SessionAllocation
         :raises AgentSelectionError: If agent selection fails
         """
@@ -477,38 +467,12 @@ class SessionProvisioner:
         )
 
         # Build session allocation from selections
-        return self._build_session_allocation(
-            session_workload,
-            selections,
-            scaling_group,
-        )
-
-    @staticmethod
-    def _build_agent_info(
-        meta: AgentMeta,
-        occupancy_map: Mapping[AgentId, AgentOccupancy],
-    ) -> AgentInfo:
-        """Create an AgentInfo from agent metadata and occupancy mapping."""
-        occupancy = occupancy_map.get(meta.id)
-        if occupancy:
-            occupied = ResourceSlot({sq.slot_name: sq.quantity for sq in occupancy.occupied_slots})
-        else:
-            occupied = ResourceSlot()
-        return AgentInfo(
-            agent_id=meta.id,
-            agent_addr=meta.addr,
-            architecture=meta.architecture,
-            scaling_group=meta.scaling_group,
-            available_slots=meta.available_slots,
-            occupied_slots=occupied,
-            container_count=occupancy.container_count if occupancy else 0,
-        )
+        return self._build_session_allocation(session_workload, selections)
 
     @staticmethod
     def _build_session_allocation(
         session_workload: SessionWorkload,
         selections: list[AgentSelection],
-        scaling_group: str,
     ) -> SessionAllocation:
         """Build a SessionAllocation from agent selection results."""
         kernel_allocations: list[KernelAllocation] = []
@@ -536,6 +500,7 @@ class SessionProvisioner:
                         agent_id=selected_agent.agent_id,
                         agent_addr=selected_agent.agent_addr,
                         scaling_group=selected_agent.scaling_group,
+                        resource_group_id=session_workload.resource_group_id,
                     )
                 )
 
@@ -545,7 +510,8 @@ class SessionProvisioner:
             session_id=session_workload.session_id,
             session_type=session_workload.session_type,
             cluster_mode=session_workload.cluster_mode,
-            scaling_group=scaling_group,
+            scaling_group=session_workload.scaling_group,
+            resource_group_id=session_workload.resource_group_id,
             kernel_allocations=kernel_allocations,
             agent_allocations=agent_allocations,
             access_key=session_workload.access_key,

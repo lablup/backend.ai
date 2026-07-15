@@ -30,6 +30,7 @@ from ai.backend.manager.data.fair_share import (
     UserFairShareSearchResult,
     UserProjectKey,
 )
+from ai.backend.manager.data.scaling_group.types import FairShareScalingGroupSpec
 from ai.backend.manager.errors.resource import DomainNotFound, ProjectNotFound, ScalingGroupNotFound
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.agent import AgentRow, AgentStatus
@@ -48,7 +49,6 @@ from ai.backend.manager.models.resource_usage_history import (
     UserUsageBucketRow,
 )
 from ai.backend.manager.models.scaling_group import ScalingGroupRow
-from ai.backend.manager.models.scaling_group.types import FairShareScalingGroupSpec
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.repositories.base import (
     BatchQuerier,

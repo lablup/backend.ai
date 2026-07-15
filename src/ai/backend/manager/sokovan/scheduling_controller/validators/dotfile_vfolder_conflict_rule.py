@@ -10,6 +10,7 @@ mount against each dotfile target.
 from __future__ import annotations
 
 from pathlib import PurePosixPath
+from typing import override
 
 from ai.backend.manager.data.session.spec import SessionSpec
 from ai.backend.manager.errors.storage import DotfileVFolderPathConflict
@@ -22,9 +23,11 @@ from ai.backend.manager.sokovan.scheduling_controller.validators.session_spec_ba
 class DotfileVFolderConflictRule(SessionSpecValidatorRule):
     """Dotfile paths must not collide with any kernel's resolved mount path."""
 
+    @override
     def name(self) -> str:
         return "dotfile_vfolder_conflict"
 
+    @override
     def validate(
         self,
         spec: SessionSpec,

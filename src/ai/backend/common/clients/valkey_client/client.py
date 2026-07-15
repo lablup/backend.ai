@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator, Iterable
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from dataclasses import dataclass
-from typing import Any, Final, Self
+from typing import Any, Final, Self, override
 
 from aiotools import cancel_and_wait
 from glide import (
@@ -192,12 +192,14 @@ class ValkeyStandaloneClient(AbstractValkeyClient):
         self._human_readable_name = human_readable_name
         self._pubsub_channels = pubsub_channels
 
+    @override
     async def connect(self) -> None:
         if self._valkey_client is not None:
             return
 
         await self._create_valkey_client()
 
+    @override
     async def disconnect(self) -> None:
         if self._valkey_client:
             await self._valkey_client.close(err_message="ValkeyStandaloneClient is closed.")
@@ -243,6 +245,7 @@ class ValkeyStandaloneClient(AbstractValkeyClient):
             self._human_readable_name,
         )
 
+    @override
     async def ping(self) -> None:
         """
         Ping the server to check if the connection is alive.
@@ -255,9 +258,11 @@ class ValkeyStandaloneClient(AbstractValkeyClient):
             raise ClientNotConnectedError("ValkeyStandaloneClient is not connected")
         await self._valkey_client.ping()
 
+    @override
     async def need_reconnect(self) -> bool:
         return self._valkey_client is None
 
+    @override
     async def check_health(self) -> None:
         """
         Verify that the standalone connection is alive by pinging the server.
@@ -271,6 +276,7 @@ class ValkeyStandaloneClient(AbstractValkeyClient):
         await self._valkey_client.ping()
 
     @asynccontextmanager
+    @override
     async def client(self) -> AsyncIterator[GlideClient]:
         if self._valkey_client is None:
             raise ClientNotConnectedError("ValkeyStandaloneClient is not connected")
@@ -319,12 +325,14 @@ class ValkeySentinelClient(AbstractValkeyClient):
         self._valkey_client = None
         self._master_address = None
 
+    @override
     async def connect(self) -> None:
         if self._valkey_client is not None:
             return
 
         await self._create_valkey_client()
 
+    @override
     async def disconnect(self) -> None:
         if self._valkey_client:
             await self._valkey_client.close(err_message="ValkeySentinelClient is closed.")
@@ -386,6 +394,7 @@ class ValkeySentinelClient(AbstractValkeyClient):
             )
             return None
 
+    @override
     async def ping(self) -> None:
         """
         Ping the current master to check if the connection is alive.
@@ -398,6 +407,7 @@ class ValkeySentinelClient(AbstractValkeyClient):
             raise ClientNotConnectedError("ValkeySentinelClient is not connected")
         await self._valkey_client.ping()
 
+    @override
     async def need_reconnect(self) -> bool:
         """Check if reconnection is needed (client disconnected or master changed)."""
         if self._valkey_client is None:
@@ -412,6 +422,7 @@ class ValkeySentinelClient(AbstractValkeyClient):
 
         return current_master != self._master_address
 
+    @override
     async def check_health(self) -> None:
         """
         Verify that the connected node is still a master via the ROLE command.
@@ -439,6 +450,7 @@ class ValkeySentinelClient(AbstractValkeyClient):
             )
 
     @asynccontextmanager
+    @override
     async def client(self) -> AsyncIterator[GlideClient]:
         if self._valkey_client is None:
             raise ClientNotConnectedError("ValkeySentinelClient is not connected")
@@ -559,11 +571,13 @@ class MonitoringValkeyClient(AbstractValkeyClient):
         self._operation_failure_count = 0
         self._closed = False
 
+    @override
     async def connect(self) -> None:
         await self._operation_client.connect()
         await self._monitor_client.connect()
         self._monitor_task = asyncio.create_task(self._monitor_connection())
 
+    @override
     async def disconnect(self) -> None:
         self._closed = True
         if self._monitor_task:
@@ -573,6 +587,7 @@ class MonitoringValkeyClient(AbstractValkeyClient):
         await self._monitor_client.disconnect()
         await self._operation_client.disconnect()
 
+    @override
     async def ping(self) -> None:
         """
         Ping the server to check if the connection is alive.
@@ -584,9 +599,11 @@ class MonitoringValkeyClient(AbstractValkeyClient):
         """
         await self._monitor_client.ping()
 
+    @override
     async def need_reconnect(self) -> bool:
         return await self._monitor_client.need_reconnect()
 
+    @override
     async def check_health(self) -> None:
         """
         Run the unified health check via the monitor client.
@@ -599,6 +616,7 @@ class MonitoringValkeyClient(AbstractValkeyClient):
         await self._monitor_client.check_health()
 
     @asynccontextmanager
+    @override
     async def client(self) -> AsyncIterator[GlideClient]:
         """
         Acquire the operation client for use, tracking consecutive failures.

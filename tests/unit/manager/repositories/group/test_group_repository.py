@@ -13,7 +13,9 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.permission.types import EntityType, ScopeType
 from ai.backend.common.exception import InvalidAPIParameters
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.project import ProjectID
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import (
     QuotaScopeID,
     QuotaScopeType,
@@ -22,6 +24,7 @@ from ai.backend.common.types import (
     VFolderHostPermissionMap,
     VFolderUsageMode,
 )
+from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.group.types import GroupData, ProjectMemberRoleSpec, ProjectType
@@ -66,7 +69,6 @@ from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
-from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
@@ -281,15 +283,21 @@ class TestGroupRepository:
             yield database_connection
 
     @pytest.fixture
+    def test_domain_id(self) -> DomainID:
+        return DomainID(uuid.uuid4())
+
+    @pytest.fixture
     async def test_domain(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_id: DomainID,
     ) -> str:
         """Create test domain"""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as session:
             domain = DomainRow(
+                id=test_domain_id,
                 name=domain_name,
                 description="Test domain",
                 is_active=True,
@@ -524,15 +532,21 @@ class TestGroupRepository:
         return repo
 
     @pytest.fixture
+    def test_scaling_group_id(self) -> ResourceGroupID:
+        return ResourceGroupID(uuid.uuid4())
+
+    @pytest.fixture
     async def test_scaling_group(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        test_scaling_group_id: ResourceGroupID,
     ) -> str:
         """Create test scaling group"""
         sgroup_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
 
         async with db_with_cleanup.begin_session() as session:
             sgroup = ScalingGroupRow(
+                id=test_scaling_group_id,
                 name=sgroup_name,
                 description="Test scaling group",
                 is_active=True,
@@ -551,9 +565,11 @@ class TestGroupRepository:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain: str,
+        test_domain_id: DomainID,
         test_user: uuid.UUID,
         default_project_resource_policy: str,
         test_scaling_group: str,
+        test_scaling_group_id: ResourceGroupID,
     ) -> uuid.UUID:
         """Create a group with an active kernel"""
         group_id = uuid.uuid4()
@@ -583,6 +599,7 @@ class TestGroupRepository:
                 status=AgentStatus.ALIVE,
                 region="local",
                 scaling_group=test_scaling_group,
+                resource_group_id=test_scaling_group_id,
                 schedulable=True,
                 available_slots=ResourceSlot({}),
                 occupied_slots=ResourceSlot({}),
@@ -597,7 +614,10 @@ class TestGroupRepository:
                 id=session_id,
                 creation_id=f"test-session-{uuid.uuid4().hex[:8]}",
                 domain_name=test_domain,
+                domain_id=test_domain_id,
                 group_id=group_id,
+                scaling_group_name=test_scaling_group,
+                resource_group_id=test_scaling_group_id,
                 user_uuid=test_user,
                 access_key="test-access-key",
                 cluster_mode="single-node",
@@ -622,6 +642,8 @@ class TestGroupRepository:
                 access_key="test-access-key",
                 agent=agent_id,
                 agent_addr="tcp://127.0.0.1:5001",
+                scaling_group=test_scaling_group,
+                resource_group_id=test_scaling_group_id,
                 cluster_role="main",
                 cluster_idx=0,
                 cluster_hostname=f"kernel-{kernel_id.hex[:8]}",
@@ -693,9 +715,11 @@ class TestGroupRepository:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain: str,
+        test_domain_id: DomainID,
         test_user: uuid.UUID,
         default_project_resource_policy: str,
         test_scaling_group: str,
+        test_scaling_group_id: ResourceGroupID,
     ) -> uuid.UUID:
         """Create a group with vfolders mounted to active kernels"""
         group_id = uuid.uuid4()
@@ -743,6 +767,7 @@ class TestGroupRepository:
                 status=AgentStatus.ALIVE,
                 region="local",
                 scaling_group=test_scaling_group,
+                resource_group_id=test_scaling_group_id,
                 schedulable=True,
                 available_slots=ResourceSlot({}),
                 occupied_slots=ResourceSlot({}),
@@ -757,7 +782,10 @@ class TestGroupRepository:
                 id=session_id,
                 creation_id=f"test-session-{uuid.uuid4().hex[:8]}",
                 domain_name=test_domain,
+                domain_id=test_domain_id,
                 group_id=group_id,
+                scaling_group_name=test_scaling_group,
+                resource_group_id=test_scaling_group_id,
                 user_uuid=test_user,
                 access_key="test-access-key",
                 cluster_mode="single-node",
@@ -783,6 +811,8 @@ class TestGroupRepository:
                 access_key="test-access-key",
                 agent=agent_id,
                 agent_addr="tcp://127.0.0.1:5001",
+                scaling_group=test_scaling_group,
+                resource_group_id=test_scaling_group_id,
                 cluster_role="main",
                 cluster_idx=0,
                 cluster_hostname=f"kernel-{kernel_id.hex[:8]}",

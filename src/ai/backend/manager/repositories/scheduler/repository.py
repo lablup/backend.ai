@@ -15,9 +15,10 @@ if TYPE_CHECKING:
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.exception import BackendAIError
+from ai.backend.common.identifier.domain import DomainID, DomainName
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.project import ProjectID
-from ai.backend.common.identifier.resource_group import ResourceGroupName
+from ai.backend.common.identifier.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
@@ -108,7 +109,9 @@ class SchedulerRepository:
         self._config_provider = config_provider
 
     @scheduler_repository_resilience.apply()
-    async def get_scheduling_data(self, scaling_group: str) -> SchedulingData | None:
+    async def get_scheduling_data(
+        self, resource_group_id: ResourceGroupID
+    ) -> SchedulingData | None:
         """
         Get scheduling data from database.
         Returns None if no pending sessions exist.
@@ -121,7 +124,7 @@ class SchedulerRepository:
             max_container_count=max_container_count,
         )
 
-        scheduling_data = await self._db_source.get_scheduling_data(scaling_group, spec)
+        scheduling_data = await self._db_source.get_scheduling_data(resource_group_id, spec)
         if not scheduling_data.pending_sessions.sessions:
             return None
 
@@ -163,16 +166,8 @@ class SchedulerRepository:
         return await self._db_source.mark_sessions_terminating(session_ids, reason, forced=forced)
 
     @scheduler_repository_resilience.apply()
-    async def get_schedulable_scaling_groups(self) -> list[str]:
-        """
-        Get list of scaling groups that have schedulable agents.
-        For sokovan scheduler compatibility.
-        """
-        return await self._db_source.get_schedulable_scaling_groups()
-
-    @scheduler_repository_resilience.apply()
-    async def get_all_scaling_groups(self) -> list[str]:
-        """Get all defined scaling groups."""
+    async def get_all_scaling_groups(self) -> list[ResourceGroupID]:
+        """Get ids of all defined scaling groups."""
         return await self._db_source.get_all_scaling_groups()
 
     @scheduler_repository_resilience.apply()
@@ -237,9 +232,6 @@ class SchedulerRepository:
     async def fetch_session_spec_contexts(
         self,
         draft: SessionSpecDraft,
-        *,
-        storage_manager: StorageSessionManager,
-        allowed_vfolder_types: list[str],
     ) -> SessionSpecContextFetch:
         """Batch-fetch raw data needed to assemble the draft-path
         preparation / validation contexts.
@@ -250,7 +242,22 @@ class SchedulerRepository:
         ``SessionSpecValidationContext`` pair — this split keeps the
         repository layer free of sokovan internals.
         """
-        return await self._db_source.fetch_session_spec_contexts(
+        return await self._db_source.fetch_session_spec_contexts(draft)
+
+    @scheduler_repository_resilience.apply()
+    async def resolve_vfolder_mounts_by_role(
+        self,
+        draft: SessionSpecDraft,
+        *,
+        storage_manager: StorageSessionManager,
+        allowed_vfolder_types: list[str],
+    ) -> dict[str, tuple[VFolderMount, ...]]:
+        """Resolve each kernel group's vfolder mounts, keyed by ``role``.
+
+        Separated from :meth:`fetch_session_spec_contexts` so callers that only
+        need kernel resource resolution can skip the storage-manager RPC.
+        """
+        return await self._db_source.resolve_vfolder_mounts_by_role(
             draft,
             storage_manager=storage_manager,
             allowed_vfolder_types=allowed_vfolder_types,
@@ -263,13 +270,47 @@ class SchedulerRepository:
         access_key: AccessKey,
         domain_name: str,
         project_id: ProjectID,
-    ) -> ResourceGroupName:
+    ) -> ResourceGroupID:
         """Return the first resource group from the owner's allowlist."""
         return await self._db_source.pick_default_resource_group(
             access_key=access_key,
             domain_name=domain_name,
             project_id=project_id,
         )
+
+    @scheduler_repository_resilience.apply()
+    async def query_accessible_resource_group_ids(
+        self,
+        *,
+        domain_name: str,
+        project_id: ProjectID,
+        access_key: AccessKey,
+    ) -> frozenset[ResourceGroupID]:
+        """Return the resource-group ids accessible to the given single-project scope.
+
+        Thin passthrough to
+        :meth:`ScheduleDBSource.query_accessible_resource_group_ids`; the caller
+        performs the accessibility rejection.
+        """
+        return await self._db_source.query_accessible_resource_group_ids(
+            domain_name=domain_name,
+            project_id=project_id,
+            access_key=access_key,
+        )
+
+    @scheduler_repository_resilience.apply()
+    async def get_resource_group_id_by_name(self, name: ResourceGroupName) -> ResourceGroupID:
+        return await self._db_source.get_resource_group_id_by_name(name)
+
+    @scheduler_repository_resilience.apply()
+    async def get_resource_group_name_by_id(
+        self, resource_group_id: ResourceGroupID
+    ) -> ResourceGroupName:
+        return await self._db_source.get_resource_group_name_by_id(resource_group_id)
+
+    @scheduler_repository_resilience.apply()
+    async def get_domain_id_by_name(self, name: DomainName) -> DomainID:
+        return await self._db_source.get_domain_id_by_name(name)
 
     @scheduler_repository_resilience.apply()
     async def prepare_vfolder_mounts(
@@ -646,7 +687,7 @@ class SchedulerRepository:
     @scheduler_repository_resilience.apply()
     async def get_sessions_for_handler(
         self,
-        scaling_group: str,
+        resource_group_id: ResourceGroupID,
         session_statuses: list[SessionStatus],
         kernel_statuses: list[KernelStatus] | None,
     ) -> list[SessionWithKernels]:
@@ -661,7 +702,7 @@ class SchedulerRepository:
         Uses SessionInfo and KernelInfo types for unified data representation.
 
         Args:
-            scaling_group: The scaling group to filter by (first parameter for consistency)
+            resource_group_id: The scaling group id to filter by (first parameter for consistency)
             session_statuses: Session statuses to include
             kernel_statuses: Kernel statuses to filter by. If non-None, includes sessions
                            that have at least one kernel in these statuses (simple filtering).
@@ -671,7 +712,7 @@ class SchedulerRepository:
             List of SessionWithKernels containing SessionInfo and KernelInfo objects.
         """
         return await self._db_source.fetch_sessions_for_handler(
-            scaling_group, session_statuses, kernel_statuses
+            resource_group_id, session_statuses, kernel_statuses
         )
 
     @scheduler_repository_resilience.apply()

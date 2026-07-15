@@ -92,24 +92,6 @@ async def execute_querier[TRow: Base](
 
 
 # =============================================================================
-# Existence Querier (by conditions)
-# =============================================================================
-
-
-@dataclass
-class ExistsQuerier[TRow: Base]:
-    """Existence check over a table by a set of conditions (combined with AND).
-
-    Attributes:
-        row_class: ORM class for table access.
-        conditions: Query conditions; an empty list checks whether the table has any row.
-    """
-
-    row_class: type[TRow]
-    conditions: list[QueryCondition] = field(default_factory=list)
-
-
-# =============================================================================
 # Batch Querier (with pagination)
 # =============================================================================
 
@@ -252,20 +234,15 @@ async def execute_batch_querier(
         await _validate_scope(db_sess, aggregated_checks)
 
     query_pair = _apply_batch_querier(query, querier, or_conditions)
-    data_query = query_pair.query
     count_query = query_pair.count_query
 
-    if querier.pagination.uses_window_function:
-        data_query = data_query.add_columns(sa.func.count().over().label("total_count"))
+    data_query = querier.pagination.attach_count(query_pair.query)
     result = await db_sess.execute(data_query)
     rows = list(result.all())
 
-    total_count: int
-    if querier.pagination.uses_window_function and rows:
-        # Offset pagination with results: use window function from rows
-        total_count = rows[0].total_count
-    else:
-        # Cursor pagination or offset fallback (rows empty): separate count query
+    total_count = querier.pagination.count_from_rows(rows)
+    if total_count is None:
+        # Strategy could not derive the count from rows: run a separate count query.
         count_result = await db_sess.execute(count_query)
         total_count = count_result.scalar() or 0
 

@@ -10,13 +10,13 @@ from ai.backend.common.dto.manager.rbac.request import (
     SearchEntitiesRequest,
 )
 from ai.backend.common.dto.manager.rbac.response import EntityDTO
-from ai.backend.manager.data.filter.adapter import BaseFilterAdapter
 from ai.backend.manager.data.permission.entity import EntityData
 from ai.backend.manager.models.rbac_models.conditions import EntityScopeConditions
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     OffsetPagination,
 )
+from ai.backend.manager.repositories.base.filter_adapter import BaseFilterAdapter
 
 __all__ = ("EntityAdapter",)
 

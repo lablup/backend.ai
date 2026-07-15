@@ -4,6 +4,7 @@ import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
+from typing import override
 
 from ai.backend.common.clients.http_client.client_pool import (
     ClientPool,
@@ -22,6 +23,7 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
 from ai.backend.manager.repositories.fair_share import FairShareRepository
+from ai.backend.manager.repositories.idle_checker.repository import IdleCheckerRepository
 from ai.backend.manager.repositories.prometheus_query_preset.repository import (
     PrometheusQueryPresetRepository,
 )
@@ -45,6 +47,7 @@ from ai.backend.manager.sokovan.scheduler.fair_share import (
     FairShareAggregator,
     FairShareFactorCalculator,
 )
+from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import AgentSelector
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 from ai.backend.manager.sokovan.sokovan import SokovanOrchestrator
 from ai.backend.manager.sokovan.stages.factory import build_reconciler_coordinator
@@ -61,6 +64,7 @@ class SokovanOrchestratorInput:
     scheduler_repository: SchedulerRepository
     deployment_repository: DeploymentRepository
     replica_group_repository: ReplicaGroupRepository
+    idle_checker_repository: IdleCheckerRepository
     fair_share_repository: FairShareRepository
     resource_usage_repository: ResourceUsageHistoryRepository
     config_provider: ManagerConfigProvider
@@ -70,6 +74,7 @@ class SokovanOrchestratorInput:
     event_producer: EventProducer
     valkey_schedule: ValkeyScheduleClient
     valkey_stat: ValkeyStatClient
+    agent_selector: AgentSelector
     # Controller dependencies
     scheduling_controller: SchedulingController
     deployment_controller: DeploymentController
@@ -97,10 +102,12 @@ class SokovanOrchestratorDependency(
     """
 
     @property
+    @override
     def stage_name(self) -> str:
         return "sokovan-orchestrator"
 
     @asynccontextmanager
+    @override
     async def provide(
         self, setup_input: SokovanOrchestratorInput
     ) -> AsyncIterator[SokovanOrchestrator]:
@@ -120,6 +127,7 @@ class SokovanOrchestratorDependency(
             setup_input.agent_client_pool,
             setup_input.network_plugin_ctx,
             setup_input.valkey_schedule,
+            setup_input.agent_selector,
         )
 
         # Create HTTP client pool for deployment operations
@@ -189,6 +197,7 @@ class SokovanOrchestratorDependency(
         # Reconciler coordinator: sokovan owns its stage assembly (DI just passes deps).
         reconciler_coordinator, reconciler_task_specs = build_reconciler_coordinator(
             replica_group_repository=setup_input.replica_group_repository,
+            idle_checker_repository=setup_input.idle_checker_repository,
             valkey_schedule=setup_input.valkey_schedule,
             lock_factory=setup_input.distributed_lock_factory,
             config_provider=setup_input.config_provider,

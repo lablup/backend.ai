@@ -15,6 +15,13 @@ import pytest
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.image.types import ImageStatus, ImageType
+from ai.backend.manager.data.permission.permission_defs import ImagePermission
+
+# ORM cluster registration: configure_mappers() (triggered when this isolated
+# test registers a domain-cluster row) resolves string relationships against the
+# registry. These rows are reachable via relationships but are not otherwise
+# imported/registered by this test; _ORM_CLUSTER keeps them live.
+from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.association_container_registries_groups import (
     AssociationContainerRegistriesGroupsRow,
 )
@@ -28,12 +35,12 @@ from ai.backend.manager.models.image.row import (
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.rbac import ProjectScope
 from ai.backend.manager.models.rbac.context import ClientContext
-from ai.backend.manager.models.rbac.permission_defs import ImagePermission
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
+from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow
 from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.db import with_tables
@@ -43,6 +50,12 @@ REGISTRY_URL = "https://cr.test.io"
 REGISTRY_NAME = "cr.test.io"
 USER_RESOURCE_POLICY_NAME = "test-user-policy"
 PROJECT_RESOURCE_POLICY_NAME = "test-project-policy"
+
+
+_ORM_CLUSTER = (
+    AgentRow,
+    ScalingGroupForDomainRow,
+)
 
 
 class TestImagePermissionContextNonGlobalRegistry:

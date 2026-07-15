@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 from functools import partial
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, override
 
 import aiotools
 import pytest
@@ -75,24 +75,30 @@ def dslice(start: Decimal, stop: Decimal, num: int) -> Iterable[Decimal]:
 class NoopAnycastEvent(AbstractAnycastEvent):
     test_case_ns: str
 
+    @override
     def serialize(self) -> tuple[Any, ...]:
         return (self.test_case_ns,)
 
     @classmethod
+    @override
     def deserialize(cls, value: tuple[Any, ...]) -> NoopAnycastEvent:
         return cls(value[0])
 
     @classmethod
+    @override
     def event_domain(cls) -> EventDomain:
         return EventDomain.AGENT
 
+    @override
     def domain_id(self) -> str | None:
         return None
 
+    @override
     def user_event(self) -> UserEvent | None:
         return None
 
     @classmethod
+    @override
     def event_name(cls) -> str:
         return "noop"
 
@@ -317,6 +323,7 @@ class TimerNode(threading.Thread):
             await event_dispatcher.close()
             await event_producer.close()
 
+    @override
     def run(self) -> None:
         asyncio.run(self.timer_node_async())
 
