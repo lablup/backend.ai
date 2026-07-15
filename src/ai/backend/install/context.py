@@ -260,14 +260,21 @@ class Context(metaclass=ABCMeta):
         if self.install_info.type == InstallType.SOURCE:
             # Develop mode: use ./backend.ai from current directory
             cmd_str = " ".join(cmdargs)
-            await self.run_shell(f"./backend.ai {cmd_str}")
+            exit_code = await self.run_shell(f"./backend.ai {cmd_str}")
 
         elif self.install_info.type == InstallType.PACKAGE:
             # Package mode: use backendai-manager from base_path
             executable = Path(self.install_info.base_path) / "backendai-manager"
-            await self.run_exec(
+            exit_code = await self.run_exec(
                 [str(executable), *cmdargs],
                 cwd=self.install_info.base_path,
+            )
+        else:
+            raise RuntimeError(f"Unsupported install type: {self.install_info.type}")
+
+        if exit_code != 0:
+            raise RuntimeError(
+                f"Manager CLI command failed (exit {exit_code}): {' '.join(cmdargs)}"
             )
 
     @actxmgr
@@ -1013,7 +1020,6 @@ class Context(metaclass=ABCMeta):
 
     async def install_appproxy_db(self) -> None:
         halfstack = self.install_info.halfstack_config
-        service = self.install_info.service_config
 
         self.log_header("Setting up databases... (app-proxy)")
 
@@ -1063,27 +1069,10 @@ class Context(metaclass=ABCMeta):
             [sys.executable, "-m", "alembic", "-c", str(alembic_ini), "upgrade", "head"],
             cwd=self.install_info.base_path,
         )
-
-        # 5. Update scaling_groups in core DB
-        # TODO: Still using wsproxy_* columns for backward compatibility (same with install-dev.sh logic)
-        core_conn = await asyncpg.connect(
-            host=halfstack.postgres_addr.face.host,
-            port=halfstack.postgres_addr.face.port,
-            user=halfstack.postgres_user,
-            password=halfstack.postgres_password,
-            database="backend",
-        )
-        await core_conn.execute(
-            """
-            UPDATE scaling_groups
-            SET wsproxy_api_token = $1,
-                wsproxy_addr = $2
-            WHERE name = 'default'
-            """,
-            service.appproxy_api_secret,
-            f"http://{service.appproxy_coordinator_addr.face.host}:{service.appproxy_coordinator_addr.face.port}",
-        )
-        await core_conn.close()
+        # NOTE: The "default" scaling_group's wsproxy_addr/token are set by
+        # configure_appproxy_fixture(), which runs after load_fixtures() seeds
+        # the row. Do not update scaling_groups here -- the row does not exist
+        # yet at this point in the install flow.
 
     async def configure_appproxy(self) -> None:
         halfstack = self.install_info.halfstack_config
@@ -2306,6 +2295,10 @@ class PackageContext(Context):
         await self.configure_client()
         self.log_header("Loading fixtures...")
         await self.load_fixtures()
+        # load_fixtures() seeds the "default" scaling_group with placeholder
+        # wsproxy_addr/token from the example fixture, so this must run *after*
+        # it to overwrite them with the real coordinator address and secret.
+        await self.configure_appproxy_fixture()
         self.log_header("Preparing vfolder volumes...")
         await self.prepare_local_vfolder_host()
         # TODO: install as systemd services?
