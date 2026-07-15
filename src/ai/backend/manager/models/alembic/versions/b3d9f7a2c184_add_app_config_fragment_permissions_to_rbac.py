@@ -33,30 +33,17 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # Backfill only ``user``/``domain`` scopes (``public`` is superadmin-only, no role) and only
-    # the write path (reads use the allow list, not RBAC). ``permission`` is the NOT NULL bitmask
-    # from c6648c039bd4: bits are inlined as literals so this migration stays frozen against later
-    # Permission enum changes, and grant operations have no bit (0).
+    # Only ``user``/``domain`` scopes (``public`` is superadmin-only, no role) and only the write
+    # path (reads use the allow list, not RBAC). Permission bits and ``domain_admin_page`` are
+    # inlined as literals to stay frozen against later enum changes; grants have no bit (0).
     #
-    # Sibling backfills (f1a2b3c4d5e6, 30c8308738ee, ...) select owner roles negatively, via
-    # ``NOT (role_name LIKE '%member')``. That is unsafe here: role names carry no enforced
-    # convention (``CreateRoleInput.name`` is a free string and the caller picks the scope), so a
-    # custom read-only ``domain``-scoped role matches and would receive fragment ``hard-delete``
-    # and ``grant:all`` over the whole domain. Select admins positively instead — by the
-    # capability each domain admin role provably holds rather than by the shape of its name:
-    #
-    # * ``domain`` — the role must hold ``domain_admin_page`` at that same domain. Every domain
-    #   admin role holds it under both naming schemes by the time this runs: 3b6297b1bd75 covers
-    #   ``role_domain_%_admin``, f2b9a4c7e103/a3c1d8e5b294 cover ``domain-%-admin``, and all three
-    #   are ancestors of this revision. ``domain_admin_page`` is absent from the frozen enum, so
-    #   it is inlined as a literal, as those three migrations do.
-    # * ``user`` — kept broad. A user-scope grant only ever reaches that user's own scope, and
-    #   writing an own-scope fragment is deliberately not admin-only (see
-    #   ``AppConfigScopeType.to_rbac_scope_type``).
-    #
-    # ``role_superadmin`` holds domain-scoped rows but no ``domain_admin_page``, so it drops out.
-    # That is correct and matches 3b6297b1bd75: superadmin authority comes from the
-    # ``user.is_superadmin`` short-circuit in the RBAC validators, never from these rows.
+    # Domain admins are selected positively, by the ``domain_admin_page`` capability at the same
+    # scope, not by the ``NOT (role_name LIKE '%member')`` filter sibling backfills use: role names
+    # carry no enforced convention, so that filter would hand a custom read-only domain role
+    # fragment ``hard-delete`` and ``grant:all``. ``user`` scope needs no such check — a user-scope
+    # grant only ever reaches that user's own scope. ``role_superadmin`` holds no
+    # ``domain_admin_page`` and drops out; its authority comes from the ``user.is_superadmin``
+    # short-circuit in the RBAC validators, not these rows.
     db_conn = op.get_bind()
     db_conn.execute(
         sa.text("""
