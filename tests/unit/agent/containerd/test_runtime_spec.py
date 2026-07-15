@@ -1,7 +1,10 @@
+import resource
 from pathlib import Path
+from unittest import mock
 
 import yaml
 
+import ai.backend.agent.containerd.runtime.spec as spec_mod
 from ai.backend.agent.containerd.runtime.spec import (
     _DEFAULT_CAPS,
     OCI_VERSION,
@@ -182,6 +185,47 @@ class TestFidelity:
         spec = build_oci_runtime_spec(_oci(), command=["x"], rootfs_path="/r")
         types = {r["type"] for r in spec["process"]["rlimits"]}
         assert {"RLIMIT_NOFILE", "RLIMIT_MEMLOCK"} <= types
+
+    def test_nofile_is_clamped_to_a_lower_host_ceiling(self) -> None:
+        # On a host whose fs.nr_open has been lowered below the 1048576 default, an unclamped
+        # NOFILE would make runc's setrlimit() fail with EINVAL and the container never start.
+        # Docker clamps; this backend must too. Emit values no higher than the host ceiling.
+        def fake_getrlimit(res: int) -> tuple[int, int]:
+            if res == resource.RLIMIT_NOFILE:
+                return (65536, 262144)  # host ceiling well below 1048576
+            return (resource.RLIM_INFINITY, resource.RLIM_INFINITY)
+
+        with mock.patch.object(spec_mod.resource, "getrlimit", fake_getrlimit):
+            spec = build_oci_runtime_spec(_oci(), command=["x"], rootfs_path="/r")
+        nofile = [r for r in spec["process"]["rlimits"] if r["type"] == "RLIMIT_NOFILE"][0]
+        assert nofile["hard"] == 262144, "hard NOFILE not clamped to the host ceiling"
+        assert nofile["soft"] == 65536, "soft NOFILE not clamped to the host ceiling"
+
+    def test_memlock_unlimited_is_clamped_to_a_finite_host_limit(self) -> None:
+        # MEMLOCK is requested unlimited; when the host itself caps memlock, grant only that
+        # (parity with the Docker backend's get_safe_ulimit("memlock", -1, -1)).
+        def fake_getrlimit(res: int) -> tuple[int, int]:
+            if res == resource.RLIMIT_MEMLOCK:
+                return (8 * 1024 * 1024, 8 * 1024 * 1024)  # finite 8 MiB host memlock
+            return (resource.RLIM_INFINITY, resource.RLIM_INFINITY)
+
+        with mock.patch.object(spec_mod.resource, "getrlimit", fake_getrlimit):
+            spec = build_oci_runtime_spec(_oci(), command=["x"], rootfs_path="/r")
+        memlock = [r for r in spec["process"]["rlimits"] if r["type"] == "RLIMIT_MEMLOCK"][0]
+        assert memlock["hard"] == 8 * 1024 * 1024, "unlimited memlock not clamped to host"
+        assert memlock["soft"] == 8 * 1024 * 1024
+
+    def test_unlimited_host_keeps_the_requested_defaults(self) -> None:
+        # When the host imposes no ceiling, the requested defaults pass through unchanged:
+        # NOFILE stays 1048576 and MEMLOCK stays OCI-unlimited.
+        def fake_getrlimit(res: int) -> tuple[int, int]:
+            return (resource.RLIM_INFINITY, resource.RLIM_INFINITY)
+
+        with mock.patch.object(spec_mod.resource, "getrlimit", fake_getrlimit):
+            spec = build_oci_runtime_spec(_oci(), command=["x"], rootfs_path="/r")
+        rlimits = {r["type"]: r for r in spec["process"]["rlimits"]}
+        assert rlimits["RLIMIT_NOFILE"]["hard"] == 1048576
+        assert rlimits["RLIMIT_MEMLOCK"]["hard"] == 0xFFFFFFFFFFFFFFFF
 
     def test_shm_size_defaults(self) -> None:
         spec = build_oci_runtime_spec(_oci(), command=["x"], rootfs_path="/r")

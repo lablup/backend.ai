@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import logging
 import os
+import resource
 import stat
 from collections.abc import Mapping, Sequence
 from pathlib import Path
@@ -77,11 +78,52 @@ _DEFAULT_CAPS = [
     "CAP_SYS_NICE",  # NFS-based GPUDirect Storage
 ]
 
-# rlimits matching the Docker backend's Ulimits (nofile bumped high; memlock unlimited).
-_DEFAULT_RLIMITS: list[dict[str, Any]] = [
-    {"type": "RLIMIT_NOFILE", "hard": 1048576, "soft": 1048576},
-    {"type": "RLIMIT_MEMLOCK", "hard": 0xFFFFFFFFFFFFFFFF, "soft": 0xFFFFFFFFFFFFFFFF},
-]
+# OCI rlimit values are unsigned 64-bit; "unlimited" is the max uint64, not the host's
+# signed RLIM_INFINITY (-1 on Linux).
+_OCI_RLIM_INFINITY = 0xFFFFFFFFFFFFFFFF
+
+
+def _clamp_rlimit(res: int, desired_soft: int, desired_hard: int) -> tuple[int, int]:
+    """Clamp a desired (soft, hard) rlimit to the agent process's own limits, mirroring
+    the Docker backend's ``get_safe_ulimit``. A desired value of ``-1`` means "unlimited".
+
+    Docker clamps its Ulimits down to the host ceiling so the runtime's ``setrlimit`` cannot
+    fail. runc does the same ``setrlimit`` from the OCI spec, so an unclamped 1048576 NOFILE
+    fails with ``EINVAL`` — and the container fails to start — on a host whose ``fs.nr_open``
+    has been lowered below it. Clamp so containerd matches Docker instead of refusing.
+    """
+    try:
+        cur_soft, cur_hard = resource.getrlimit(res)
+    except (OSError, ValueError, OverflowError) as e:
+        log.warning("could not read host rlimit {}: {}; using desired values", res, e)
+        cur_soft, cur_hard = resource.RLIM_INFINITY, resource.RLIM_INFINITY
+    inf = resource.RLIM_INFINITY
+
+    def clamp(desired: int, current: int) -> int:
+        if current == inf:
+            # host imposes no ceiling: honor the request as-is (unlimited stays unlimited).
+            return _OCI_RLIM_INFINITY if desired == -1 else desired
+        if desired == -1:
+            # unlimited requested but the host has a finite ceiling: grant only that.
+            return current
+        return min(desired, current)
+
+    return clamp(desired_soft, cur_soft), clamp(desired_hard, cur_hard)
+
+
+def _default_rlimits() -> list[dict[str, Any]]:
+    """Defaults matching the Docker backend's Ulimits: NOFILE bumped high, MEMLOCK unlimited —
+    both clamped to the agent's own host limits (see :func:`_clamp_rlimit`)."""
+    entries: list[dict[str, Any]] = []
+    for rtype, res, desired in (
+        ("RLIMIT_NOFILE", resource.RLIMIT_NOFILE, (1048576, 1048576)),
+        ("RLIMIT_MEMLOCK", resource.RLIMIT_MEMLOCK, (-1, -1)),
+    ):
+        soft, hard = _clamp_rlimit(res, *desired)
+        entries.append({"type": rtype, "soft": soft, "hard": hard})
+    return entries
+
+
 _DEFAULT_SHM_SIZE = 64 * 1024 * 1024  # 64 MiB, containerd/runc default
 
 # Mounts every Linux container needs (runc does not add these implicitly).
@@ -276,7 +318,7 @@ def build_oci_runtime_spec(
     # Plugin rlimits override the defaults of the same type (e.g. an NPU raising memlock).
     plugin_rlimits = oci_spec.get("rlimits") or []
     overridden = {r["type"] for r in plugin_rlimits}
-    rlimits = [*(r for r in _DEFAULT_RLIMITS if r["type"] not in overridden), *plugin_rlimits]
+    rlimits = [*(r for r in _default_rlimits() if r["type"] not in overridden), *plugin_rlimits]
 
     spec: dict[str, Any] = {
         "ociVersion": OCI_VERSION,
