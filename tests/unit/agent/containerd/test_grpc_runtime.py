@@ -288,6 +288,7 @@ class _CommitHarness:
         self.prepared: list[tuple[str, str]] = []
         self.committed_snapshots: list[tuple[str, str]] = []
         self.applied: list[str] = []
+        self.fail_unpack = False
 
     def runtime(self) -> Any:
         rt = cast(Any, ContainerdGrpcRuntime.__new__(ContainerdGrpcRuntime))
@@ -333,6 +334,8 @@ class _CommitHarness:
 
         class _Diff:
             async def Apply(self, req: Any, metadata: Any = None) -> Any:
+                if harness.fail_unpack:
+                    raise grpc.aio.AioRpcError(grpc.StatusCode.INTERNAL, None, None, "apply boom")
                 harness.applied.append(req.diff.digest)
                 return SimpleNamespace()
 
@@ -482,6 +485,21 @@ class TestCommitContainer:
         # ...and committed at the new chain id (base_diff_ids + new_diff_id)
         new_chain = _chain_id([harness.BASE_DIFF_ID, harness.NEW_DIFF_ID])
         assert harness.committed_snapshots == [(new_chain, harness.prepared[0][0])]
+
+    async def test_a_failed_unpack_does_not_undo_the_created_image(self) -> None:
+        # The unpack is best-effort: the image is already created (valid for push/pull), so a failed
+        # unpack must NOT bubble into commit_container's rollback, which would delete the blobs of
+        # that live image. Only same-node immediate reuse is degraded.
+        harness = _CommitHarness()
+        harness.fail_unpack = True
+        rt = harness.runtime()
+
+        await rt.commit_container(  # must not raise, must not roll back
+            "kern-1", base_image_ref="base:1", target_ref="committed:1", labels={}
+        )
+
+        assert harness.created_images, "the image was rolled back on a best-effort unpack failure"
+        assert harness.deleted_content == [], "blobs of a successfully-created image were deleted"
 
     async def test_the_config_records_the_uncompressed_digest_as_the_diff_id(self) -> None:
         # The blob's own digest is the COMPRESSED one. Recording it produces an image containerd
