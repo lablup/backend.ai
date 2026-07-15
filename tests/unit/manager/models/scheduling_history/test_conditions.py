@@ -14,7 +14,6 @@ from ai.backend.common.data.filter_specs import (
     UUIDEqualMatchSpec,
 )
 from ai.backend.common.types import KernelId, SessionId
-from ai.backend.manager.data.kernel.types import KernelSchedulingPhase
 from ai.backend.manager.data.session.types import SchedulingResult
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.scheduling_history.conditions import (
@@ -43,20 +42,6 @@ class TestKernelSchedulingHistoryConditions:
     @pytest.mark.parametrize(
         "case",
         [
-            _ConditionCase(
-                label="by_from_status",
-                condition=KernelSchedulingHistoryConditions.by_from_status(
-                    KernelSchedulingPhase.PULLING
-                ),
-                expected_sql="kernel_scheduling_history.from_status = 'PULLING'",
-            ),
-            _ConditionCase(
-                label="by_to_status",
-                condition=KernelSchedulingHistoryConditions.by_to_status(
-                    KernelSchedulingPhase.RUNNING
-                ),
-                expected_sql="kernel_scheduling_history.to_status = 'RUNNING'",
-            ),
             _ConditionCase(
                 label="by_phase_contains",
                 condition=KernelSchedulingHistoryConditions.by_phase_contains(
@@ -226,8 +211,10 @@ class TestKernelSchedulingHistoryConditions:
                 expected_sql="kernel_scheduling_history.result = 'SUCCESS'",
             ),
             _ConditionCase(
-                label="by_error_code",
-                condition=KernelSchedulingHistoryConditions.by_error_code("ERR"),
+                label="by_error_code_equals",
+                condition=KernelSchedulingHistoryConditions.by_error_code_equals(
+                    StringMatchSpec(value="ERR", case_insensitive=False, negated=False)
+                ),
                 expected_sql="kernel_scheduling_history.error_code = 'ERR'",
             ),
             _ConditionCase(

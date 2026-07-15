@@ -13,7 +13,6 @@ from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchS
 from ai.backend.common.identifier.kernel_scheduling_history import KernelSchedulingHistoryID
 from ai.backend.common.types import KernelId, SessionId
 from ai.backend.manager.data.deployment.types import RouteStatus
-from ai.backend.manager.data.kernel.types import KernelSchedulingPhase
 from ai.backend.manager.data.session.types import SchedulingResult, SessionStatus
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.condition_utils import make_string_in_factory
@@ -470,13 +469,6 @@ class KernelSchedulingHistoryConditions:
         return inner
 
     @staticmethod
-    def by_from_status(phase: KernelSchedulingPhase) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return KernelSchedulingHistoryRow.from_status == str(phase)
-
-        return inner
-
-    @staticmethod
     def by_from_statuses(statuses: list[str]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return KernelSchedulingHistoryRow.from_status.in_(statuses)
@@ -484,23 +476,9 @@ class KernelSchedulingHistoryConditions:
         return inner
 
     @staticmethod
-    def by_to_status(phase: KernelSchedulingPhase) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return KernelSchedulingHistoryRow.to_status == str(phase)
-
-        return inner
-
-    @staticmethod
     def by_to_statuses(statuses: list[str]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return KernelSchedulingHistoryRow.to_status.in_(statuses)
-
-        return inner
-
-    @staticmethod
-    def by_error_code(error_code: str) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return KernelSchedulingHistoryRow.error_code == error_code
 
         return inner
 
