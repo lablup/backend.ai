@@ -18,6 +18,7 @@ from ai.backend.agent.containerd.orchestrator import LaunchResult
 from ai.backend.agent.containerd.runtime.interface import ExecResult, TaskHandle
 from ai.backend.agent.errors import UnsupportedResource
 from ai.backend.agent.errors.agent import ContainerCreationError
+from ai.backend.agent.errors.resources import PortPoolExhaustedError
 from ai.backend.agent.network.local_subnet import DEFAULT_LAYOUT
 from ai.backend.agent.port_pool import PortPool
 from ai.backend.agent.resources import Mount
@@ -1044,6 +1045,22 @@ class TestReserveHostPortsBinding:
         ctx._reserve_host_ports(service_ports)
         # container_port -> host_ip, so a test can assert per service without depending on ordering
         return {container_port: host_ip for _hp, container_port, host_ip in ctx._host_port_map}
+
+    def test_a_mid_reserve_failure_gives_back_what_it_took(self) -> None:
+        # The count check passes (2 ports free) but the second acquire trips the cooldown, so the
+        # first port was taken and the reservation then failed. It must be given back, or it leaks
+        # from the pool — _reserve_host_ports runs before prepare_container's own rollback.
+        ctx = self._ctx(rg=ResourceGroupType.COMPUTE, bind_host="")
+        ctx._port_pool = PortPool((30000, 30001), 3600)  # 2 ports, long cooldown
+        ctx._port_pool.acquire()  # take one
+        ctx._port_pool.release(30000)  # release it -> now in cooldown, so a re-acquire will raise
+        before = len(ctx._port_pool)
+
+        with pytest.raises(PortPoolExhaustedError):
+            ctx._reserve_host_ports([{"name": "svc", "container_ports": (8080, 8081)}])
+
+        assert len(ctx._port_pool) == before  # nothing leaked
+        assert ctx._host_port_map == []
 
     def test_protected_service_binds_loopback_on_storage(self) -> None:
         ctx = self._ctx(rg=ResourceGroupType.STORAGE, bind_host="10.0.0.5")

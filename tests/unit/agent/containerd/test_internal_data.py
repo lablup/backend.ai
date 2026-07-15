@@ -196,6 +196,16 @@ class TestDotfiles:
 
         assert not escape_target.exists()  # the write outside the scratch never happened
 
+    async def test_a_path_that_names_a_directory_is_refused(self, tmp_path: Path) -> None:
+        # `/home/work` maps to the scratch's work dir; write_text on it would raise
+        # IsADirectoryError and fail kernel creation. It is skipped instead.
+        scratch = _scratch(tmp_path / "scratch")
+        ctx = _context(
+            scratch,
+            internal_data={"dotfiles": [{"path": "/home/work", "data": "x", "perm": "600"}]},
+        )
+        await ctx._provision_internal_data(_spec())  # must not raise
+
     async def test_an_absolute_home_dotdot_path_is_refused(self, tmp_path: Path) -> None:
         # /home/work/../../evil also escapes once the /home prefix is stripped and joined.
         scratch = _scratch(tmp_path / "scratch")

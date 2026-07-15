@@ -1095,6 +1095,11 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
                         "ignoring dotfile at {}: it escapes the kernel's scratch directory", path
                     )
                     continue
+                if resolved == scratch_dir.resolve() or resolved.is_dir():
+                    # A path like "/home/" or "/home/work" maps to the scratch itself or an existing
+                    # dir; write_text would then raise IsADirectoryError and fail the kernel.
+                    log.warning("ignoring dotfile at {}: it names a directory, not a file", path)
+                    continue
                 file_path.parent.mkdir(parents=True, exist_ok=True)
                 content = dotfile["data"]
                 if not content.endswith("\n"):
@@ -1140,14 +1145,24 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         bind_host = self.local_config.container.bind_host or None
         # No sshd special case: the manager only builds a cluster SSH port mapping for HOST-network
         # sessions, and those never reach this backend.
-        for sport in service_ports:
-            host_ip = "127.0.0.1" if sport["name"] in protected else bind_host
-            host_ports: list[int] = []
-            for container_port in sport["container_ports"]:
-                host_port = self._port_pool.acquire()
-                host_ports.append(host_port)
-                self._host_port_map.append((host_port, container_port, host_ip))
-            sport["host_ports"] = tuple(host_ports)
+        #
+        # The count check above is necessary but not sufficient: acquire() can still raise while the
+        # pool is nominally large enough (a port in its cooldown window). Roll back what this call
+        # took on any such mid-loop failure — it runs before prepare_container's try, so nothing
+        # else would.
+        try:
+            for sport in service_ports:
+                host_ip = "127.0.0.1" if sport["name"] in protected else bind_host
+                host_ports: list[int] = []
+                for container_port in sport["container_ports"]:
+                    host_port = self._port_pool.acquire()
+                    host_ports.append(host_port)
+                    self._host_port_map.append((host_port, container_port, host_ip))
+                sport["host_ports"] = tuple(host_ports)
+        except Exception:
+            self._port_pool.release_many([hp for hp, _, _ in self._host_port_map])
+            self._host_port_map = []
+            raise
 
     @override
     async def prepare_container(
