@@ -2,7 +2,9 @@ import asyncio
 import json
 from collections.abc import AsyncIterator
 from typing import Any, cast, override
+from unittest import mock
 
+import ai.backend.agent.network.coordinator as coordinator_mod
 from ai.backend.agent.network.coordinator import SessionNetworkCoordinator
 from ai.backend.common.etcd import AbstractKVStore
 from ai.backend.common.network.keys import endpoints_prefix, member_key, members_prefix
@@ -74,6 +76,35 @@ class _BlockingWatchEtcd(FakeEtcd):
     @override
     async def watch_prefix(self, prefix: str, **kwargs: Any) -> AsyncIterator[None]:
         await asyncio.Event().wait()  # blocks forever (until cancelled)
+        yield  # pragma: no cover  (makes this an async generator)
+
+
+class _ScriptedWatchEtcd(FakeEtcd):
+    """Drives ``_watch`` through a fixed script of per-subscription outcomes so the retry/backoff
+    loop can be exercised deterministically. Each entry is one ``watch_prefix`` call:
+
+    - ``"end"``   — the stream ends immediately (an exhausted/closed watch),
+    - ``"raise"`` — the subscription errors,
+    - ``int n``   — yield ``n`` events, then end.
+    """
+
+    def __init__(self, behaviors: list[object]) -> None:
+        super().__init__()
+        self._behaviors = behaviors
+        self.watch_calls = 0
+
+    @override
+    async def watch_prefix(self, prefix: str, **kwargs: Any) -> AsyncIterator[None]:
+        i = self.watch_calls
+        self.watch_calls += 1
+        behavior = self._behaviors[i] if i < len(self._behaviors) else "end"
+        if behavior == "raise":
+            raise RuntimeError("etcd hiccup")
+        if isinstance(behavior, int):
+            for _ in range(behavior):
+                yield None
+            return
+        return  # "end": exhausted stream
         yield  # pragma: no cover  (makes this an async generator)
 
 
@@ -231,6 +262,76 @@ class TestReconcileEndpoints:
         await etcd.delete(f"{endpoints_prefix('s1')}c-remote")
         await coord.reconcile_endpoints("s1")
         assert backend.endpoints_removed == [("10.128.5.20", "10.0.0.2")]
+
+
+class _CancelAfter:
+    """A drop-in for ``asyncio.sleep`` that records each backoff delay and then, once it has been
+    called ``limit`` times, raises ``CancelledError`` to break ``_watch``'s infinite loop — the
+    same way ``stop()`` would in production."""
+
+    def __init__(self, limit: int) -> None:
+        self.delays: list[float] = []
+        self._limit = limit
+
+    async def __call__(self, delay: float, *args: Any, **kwargs: Any) -> None:
+        self.delays.append(delay)
+        if len(self.delays) >= self._limit:
+            raise asyncio.CancelledError()
+
+
+class TestWatchRetryBackoff:
+    """The watch loop must survive a failing/exhausted subscription and re-establish it, never
+    ending for good and never hot-spinning — the multi-node worker-joins-late regression."""
+
+    async def test_exhausted_stream_re_subscribes_after_a_backoff(self) -> None:
+        # A watch that hands back an already-exhausted stream must NOT be re-subscribed in a tight
+        # loop: each re-subscribe waits a backoff first (this is what stops the 100%-CPU spin).
+        etcd = _ScriptedWatchEtcd(["end", "end", "end"])
+        etcd.seed_member(_PEER2)  # visible only via the catch-up read, not a live event
+        backend = RecordingBackend()
+        coord = _coordinator(etcd, backend)
+        sleep = _CancelAfter(limit=3)
+        with mock.patch("asyncio.sleep", sleep):
+            try:
+                await coord._watch("s1")
+            except asyncio.CancelledError:
+                pass
+        # slept before every re-subscribe (no hot-spin) and re-subscribed each time.
+        assert len(sleep.delays) == 3
+        assert etcd.watch_calls >= 3
+        # the catch-up reconcile on re-subscribe applied the peer that the dead stream never
+        # delivered as an event.
+        assert "a2" in backend.added
+
+    async def test_a_failing_subscription_is_retried_not_fatal(self) -> None:
+        # A single etcd/device error used to end the loop for good, silently dropping the node from
+        # the mesh for the rest of the session. It must be caught and retried instead.
+        etcd = _ScriptedWatchEtcd(["raise", "raise", "raise"])
+        backend = RecordingBackend()
+        coord = _coordinator(etcd, backend)
+        sleep = _CancelAfter(limit=3)
+        with mock.patch("asyncio.sleep", sleep):
+            try:
+                await coord._watch("s1")
+            except asyncio.CancelledError:
+                pass
+        assert etcd.watch_calls >= 3  # kept retrying past the first failure
+
+    async def test_backoff_doubles_and_resets_when_events_flow(self) -> None:
+        # Backoff grows exponentially across consecutive failures and snaps back to the base the
+        # moment a live event arrives (the watch is healthy again).
+        etcd = _ScriptedWatchEtcd(["end", "end", 1, "end"])  # 3rd subscription delivers one event
+        backend = RecordingBackend()
+        coord = _coordinator(etcd, backend)
+        sleep = _CancelAfter(limit=3)
+        with mock.patch("asyncio.sleep", sleep):
+            try:
+                await coord._watch("s1")
+            except asyncio.CancelledError:
+                pass
+        base = coordinator_mod._WATCH_RETRY_BACKOFF
+        # end -> base, end -> 2*base, then an event resets it -> base again.
+        assert sleep.delays == [base, 2 * base, base]
 
 
 class TestKeys:
