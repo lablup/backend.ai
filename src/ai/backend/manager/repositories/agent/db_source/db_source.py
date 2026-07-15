@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 from typing import TYPE_CHECKING
 
@@ -6,7 +8,6 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import selectinload
 
 from ai.backend.common.exception import AgentNotFound
-from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import AgentId, ImageID
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.agent.types import (
@@ -18,7 +19,7 @@ from ai.backend.manager.data.agent.types import (
     UpsertResult,
 )
 from ai.backend.manager.data.image.types import ImageDataWithDetails, ImageIdentifier
-from ai.backend.manager.errors.resource import ScalingGroupNotFound
+from ai.backend.manager.errors.resource import UnresolvableResourceGroup
 from ai.backend.manager.models.agent import ADMIN_PERMISSIONS as ADMIN_AGENT_PERMISSIONS
 from ai.backend.manager.models.agent import AgentRow, agents
 from ai.backend.manager.models.image import ImageRow
@@ -92,23 +93,8 @@ class AgentDBSource:
                 raise AgentNotFound(f"Agent with id {agent_id} not found")
             return agent_row.to_data()
 
-    async def _resolve_scaling_group_id(
-        self, session: "AsyncSession", scaling_group_name: str
-    ) -> ResourceGroupID:
-        scaling_group_id = await session.scalar(
-            sa.select(ScalingGroupRow.id).where(ScalingGroupRow.name == scaling_group_name)
-        )
-        if scaling_group_id is None:
-            log.error("Scaling group named [{}] does not exist.", scaling_group_name)
-            raise ScalingGroupNotFound(scaling_group_name)
-        return ResourceGroupID(scaling_group_id)
-
     async def upsert_agent_with_state(self, upsert_data: AgentHeartbeatUpsert) -> UpsertResult:
         async with self._db.begin_session_read_committed() as session:
-            resource_group_id = await self._resolve_scaling_group_id(
-                session, upsert_data.metadata.scaling_group
-            )
-
             query = (
                 sa.select(AgentRow).where(AgentRow.id == upsert_data.metadata.id).with_for_update()
             )
@@ -116,21 +102,59 @@ class AgentDBSource:
             agent_data = row.to_heartbeat_update_data() if row is not None else None
             upsert_result = UpsertResult.from_state_comparison(agent_data, upsert_data)
 
-            stmt = pg_insert(agents).values({
-                **upsert_data.insert_fields,
-                "resource_group_id": resource_group_id,
-            })
-            final_query = stmt.on_conflict_do_update(
-                index_elements=["id"],
-                set_={
-                    **upsert_data.update_fields,
-                    "resource_group_id": resource_group_id,
-                },
-            )
-
-            await session.execute(final_query)
+            if row is None:
+                await self._insert_new_agent(session, upsert_data)
+            else:
+                await session.execute(
+                    sa.update(agents)
+                    .where(agents.c.id == upsert_data.metadata.id)
+                    .values(upsert_data.update_fields)
+                )
 
             return upsert_result
+
+    async def _insert_new_agent(
+        self, session: AsyncSession, upsert_data: AgentHeartbeatUpsert
+    ) -> None:
+        resource_group_name = upsert_data.metadata.scaling_group
+        group_select = (
+            sa.select(
+                *[
+                    sa.literal(value, type_=agents.c[key].type).label(key)
+                    for key, value in upsert_data.insert_fields.items()
+                ],
+                ScalingGroupRow.name.label("scaling_group"),
+                ScalingGroupRow.id.label("resource_group_id"),
+            )
+            .select_from(ScalingGroupRow)
+            .where(
+                sa.or_(
+                    ScalingGroupRow.name == resource_group_name,
+                    ScalingGroupRow.is_default,
+                )
+            )
+            .order_by(sa.case((ScalingGroupRow.name == resource_group_name, 0), else_=1))
+            .limit(1)
+        )
+        stmt = (
+            pg_insert(agents)
+            .from_select(
+                [*upsert_data.insert_fields.keys(), "scaling_group", "resource_group_id"],
+                group_select,
+            )
+            # Guard a rare race where a concurrent registration inserted first
+            .on_conflict_do_update(
+                index_elements=["id"],
+                set_={**upsert_data.update_fields},
+            )
+            .returning(agents.c.id)
+        )
+        affected = (await session.execute(stmt)).scalar_one_or_none()
+        if affected is None:
+            raise UnresolvableResourceGroup(
+                f"Scaling group '{resource_group_name}' not found "
+                "and no default scaling group is set."
+            )
 
     async def update_agent_status_exit(self, updater: Updater[AgentRow]) -> None:
         async with self._db.begin_session() as session:
