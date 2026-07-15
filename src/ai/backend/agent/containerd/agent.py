@@ -882,6 +882,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         self._accel_spec = AcceleratorSpec(
             devices=[*prev.devices, *spec.devices],
             gpu_device_ids=[*prev.gpu_device_ids, *spec.gpu_device_ids],
+            mounts=[*prev.mounts, *spec.mounts],
             env={**prev.env, **spec.env},
             # Each of cpu/mem limits comes from exactly one plugin; keep the first non-None.
             cpuset_cpus=prev.cpuset_cpus or spec.cpuset_cpus,

@@ -435,6 +435,20 @@ class TestAcceleratorAllocation:
         assert ctx._accel_spec.gpu_device_ids == ["0"]
         assert [d.source for d in ctx._accel_spec.devices] == ["/dev/rbln0"]
 
+    async def test_a_plugins_bind_mount_survives_the_merge(self) -> None:
+        # the merge rebuilds the AcceleratorSpec from scratch; a field it forgets to carry (here,
+        # mounts) is silently reset to [] and the accelerator loses its bind (n300's hugepages).
+        ctx = _context(FakeFacade())
+        n300 = _FakeComputer({
+            "HostConfig": {
+                "Mounts": [
+                    {"Type": "bind", "Source": "/dev/hugepages-1G", "Target": "/dev/hugepages-1G"}
+                ]
+            }
+        })
+        await ctx.apply_accelerator_allocation(cast(Any, n300), cast(Any, {}))
+        assert [str(m.source) for m in ctx._accel_spec.mounts] == ["/dev/hugepages-1G"]
+
 
 class TestProtectedServices:
     def _ctx_with_rg(self, rg: Any) -> Any:
