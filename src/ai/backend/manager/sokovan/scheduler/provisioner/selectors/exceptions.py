@@ -77,11 +77,11 @@ class NoAgentsInResourceGroupError(AgentSelectionError):
     error_type = "https://api.backend.ai/probs/no-agents-in-resource-group"
     error_title = "Unavailable : Resource group has no candidate agents."
 
-    _resource_group: ResourceGroupID
+    _resource_group_id: ResourceGroupID
 
-    def __init__(self, resource_group: ResourceGroupID) -> None:
-        self._resource_group = resource_group
-        super().__init__(f"No agents available in resource group '{resource_group}'")
+    def __init__(self, resource_group_id: ResourceGroupID) -> None:
+        self._resource_group_id = resource_group_id
+        super().__init__(f"No agents available in resource group '{resource_group_id}'")
 
     @override
     def error_code(self) -> ErrorCode:
