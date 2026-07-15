@@ -229,6 +229,16 @@ Removing recursion is this BEP's goal, so domain→project→user inheritance is
 - ref (read-only reference / invitation) → invitee VS membership + `permission_cap` (3.(e)).
 - The `association_scopes_entities.relation_type` column and its branching are dropped after migration.
 
+### (i) Scope itself as an entity
+
+- A scope (project/domain/...) is **also registered as an `entity_membership`** in its owner's VS. So "access to the scope object itself" (e.g. can I see projectA?) resolves through the **same one path** as any other entity — there is no separate scope-permission concept.
+- The ownership rule applies uniformly: projectA is a member of `VS_domain`, and the domain's self scope_binding resolves access to it.
+
+### (j) No client-facing API
+
+- Virtual scope is **not exposed to the client — there is no CRUD API** for `virtual_scopes` / `scope_bindings` / `entity_memberships`.
+- It is an internal derived structure managed only as a side effect of owner-entity lifecycle (Scope Creator, 3.(c)) and the RBAC ops provider's grant method.
+
 ## 4. Migration / Compatibility
 
 **Direction: replace the recursive scope-walk with the non-recursive virtual scope resolution.** All virtual scope
@@ -260,6 +270,8 @@ remove the recursive walk path and this config together. Other transition target
 | Decision | Content |
 |----------|---------|
 | Ownership model | `scope → virtual_scope → entity`, two hops. One hub VS per owner |
+| Scope as entity | A scope is also an `entity_membership`, so access to the scope object itself resolves through the same one path — no separate scope-permission concept |
+| Client exposure | Virtual scope is internal only — **no CRUD API**; managed as a side effect of owner-entity lifecycle |
 | Resolution | **No recursion**, one path. Same join for self/hierarchy/association/invitation. Forward/reverse symmetric |
 | Scope Creator | Create VS + **self scope_binding** at owner creation, FK CASCADE on delete. VS writes owned by the RBAC ops provider; domain operations use it |
 | Hierarchy bindings | Bound at relation-creation time (domain→project, domain→user, project→user) |
