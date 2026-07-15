@@ -76,14 +76,14 @@ class TestKernelSchedulingHistoryConditions:
                 condition=KernelSchedulingHistoryConditions.by_phase_contains(
                     StringMatchSpec(value="PULLING", case_insensitive=True, negated=False)
                 ),
-                expected_sql="lower(kernel_scheduling_history.phase) LIKE '%pulling%'",
+                expected_sql="lower(kernel_scheduling_history.phase) LIKE lower('%PULLING%')",
             ),
             _ConditionCase(
                 label="by_phase_contains-case_insensitive-negated",
                 condition=KernelSchedulingHistoryConditions.by_phase_contains(
                     StringMatchSpec(value="PULLING", case_insensitive=True, negated=True)
                 ),
-                expected_sql="lower(kernel_scheduling_history.phase) NOT LIKE '%pulling%'",
+                expected_sql="lower(kernel_scheduling_history.phase) NOT LIKE lower('%PULLING%')",
             ),
             _ConditionCase(
                 label="by_phase_equals",
@@ -132,14 +132,14 @@ class TestKernelSchedulingHistoryConditions:
                 condition=KernelSchedulingHistoryConditions.by_phase_starts_with(
                     StringMatchSpec(value="PULLING", case_insensitive=True, negated=False)
                 ),
-                expected_sql="lower(kernel_scheduling_history.phase) LIKE 'pulling%'",
+                expected_sql="lower(kernel_scheduling_history.phase) LIKE lower('PULLING%')",
             ),
             _ConditionCase(
                 label="by_phase_starts_with-case_insensitive-negated",
                 condition=KernelSchedulingHistoryConditions.by_phase_starts_with(
                     StringMatchSpec(value="PULLING", case_insensitive=True, negated=True)
                 ),
-                expected_sql="lower(kernel_scheduling_history.phase) NOT LIKE 'pulling%'",
+                expected_sql="lower(kernel_scheduling_history.phase) NOT LIKE lower('PULLING%')",
             ),
             _ConditionCase(
                 label="by_phase_ends_with",
@@ -160,14 +160,14 @@ class TestKernelSchedulingHistoryConditions:
                 condition=KernelSchedulingHistoryConditions.by_phase_ends_with(
                     StringMatchSpec(value="PULLING", case_insensitive=True, negated=False)
                 ),
-                expected_sql="lower(kernel_scheduling_history.phase) LIKE '%pulling'",
+                expected_sql="lower(kernel_scheduling_history.phase) LIKE lower('%PULLING')",
             ),
             _ConditionCase(
                 label="by_phase_ends_with-case_insensitive-negated",
                 condition=KernelSchedulingHistoryConditions.by_phase_ends_with(
                     StringMatchSpec(value="PULLING", case_insensitive=True, negated=True)
                 ),
-                expected_sql="lower(kernel_scheduling_history.phase) NOT LIKE '%pulling'",
+                expected_sql="lower(kernel_scheduling_history.phase) NOT LIKE lower('%PULLING')",
             ),
             _ConditionCase(
                 label="by_phase_in",
