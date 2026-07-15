@@ -285,7 +285,7 @@ class SchedulingController:
         ):
             resource_spec = await self._spec_preparer.prepare(draft.resource_spec, prep_ctx)
             scope = SessionScope.model_validate(draft.scope.model_dump(exclude_none=True))
-            spec = SessionSpec.from_resource_spec(scope, resource_spec)
+            spec = SessionSpec(resource_spec=resource_spec, scope=scope)
 
         hook_result = await self._hook_plugin_ctx.dispatch(
             "PRE_ENQUEUE_SESSION",

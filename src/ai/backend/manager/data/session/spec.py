@@ -177,10 +177,3 @@ class SessionSpec(_SpecBaseModel):
 
     resource_spec: SessionResourceSpec
     scope: SessionScope
-
-    @classmethod
-    def from_resource_spec(
-        cls, scope: SessionScope, resource_spec: SessionResourceSpec
-    ) -> SessionSpec:
-        """Attach an ownership ``scope`` to a prepared, scope-free spec."""
-        return cls(resource_spec=resource_spec, scope=scope)
