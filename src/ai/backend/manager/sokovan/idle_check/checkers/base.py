@@ -14,6 +14,13 @@ from ai.backend.manager.repositories.idle_checker.types import IdleCheckerDefini
 
 
 @dataclass(frozen=True)
+class IdleCheckerContext:
+    """Shared execution context for every checker in one reconcile tick."""
+
+    current_time: datetime
+
+
+@dataclass(frozen=True)
 class CheckerAssignment:
     """One checker definition and the sessions it must judge this tick."""
 
@@ -39,7 +46,7 @@ class IdleChecker(ABC):
         self,
         assignments: Sequence[CheckerAssignment],
         *,
-        current_time: datetime,
+        context: IdleCheckerContext,
     ) -> Sequence[IdleJudgment]:
         """Evaluate every assignment of this type in one batched call.
 

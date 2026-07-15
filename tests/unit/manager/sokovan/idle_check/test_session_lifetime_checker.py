@@ -18,7 +18,10 @@ from ai.backend.common.identifier.idle_checker import IdleCheckerID
 from ai.backend.common.types import SessionId, SessionTypes
 from ai.backend.manager.data.idle_checker.types import IdleCheckSession
 from ai.backend.manager.repositories.idle_checker.types import IdleCheckerDefinitionData
-from ai.backend.manager.sokovan.idle_check.checkers.base import CheckerAssignment
+from ai.backend.manager.sokovan.idle_check.checkers.base import (
+    CheckerAssignment,
+    IdleCheckerContext,
+)
 from ai.backend.manager.sokovan.idle_check.checkers.session_lifetime import (
     SessionLifetimeChecker,
 )
@@ -109,7 +112,10 @@ class TestSessionLifetimeChecker:
         assignment = assignment_factory(max_lifetime_seconds=30, sessions=(session,))
 
         judgments = await checker.judge(
-            (assignment,), current_time=_BASE_TIME + timedelta(seconds=29)
+            (assignment,),
+            context=IdleCheckerContext(
+                current_time=_BASE_TIME + timedelta(seconds=29),
+            ),
         )
 
         assert len(judgments) == 1
@@ -126,7 +132,10 @@ class TestSessionLifetimeChecker:
         assignment = assignment_factory(max_lifetime_seconds=30, sessions=(session,))
 
         judgments = await checker.judge(
-            (assignment,), current_time=_BASE_TIME + timedelta(seconds=30)
+            (assignment,),
+            context=IdleCheckerContext(
+                current_time=_BASE_TIME + timedelta(seconds=30),
+            ),
         )
 
         assert len(judgments) == 1
@@ -146,7 +155,10 @@ class TestSessionLifetimeChecker:
         assignment = assignment_factory(max_lifetime_seconds=30, sessions=(session,))
 
         judgments = await checker.judge(
-            (assignment,), current_time=_BASE_TIME + timedelta(seconds=31.2)
+            (assignment,),
+            context=IdleCheckerContext(
+                current_time=_BASE_TIME + timedelta(seconds=31.2),
+            ),
         )
 
         assert judgments[0].is_idle is True
@@ -165,7 +177,10 @@ class TestSessionLifetimeChecker:
             sessions=(session_factory(),),
         )
 
-        judgments = await checker.judge((assignment,), current_time=_BASE_TIME + timedelta(days=1))
+        judgments = await checker.judge(
+            (assignment,),
+            context=IdleCheckerContext(current_time=_BASE_TIME + timedelta(days=1)),
+        )
 
         assert judgments == []
 
@@ -181,7 +196,9 @@ class TestSessionLifetimeChecker:
         )
         assignment = assignment_factory(max_lifetime_seconds=30, sessions=(session,))
 
-        judgments = await checker.judge((assignment,), current_time=_BASE_TIME)
+        judgments = await checker.judge(
+            (assignment,), context=IdleCheckerContext(current_time=_BASE_TIME)
+        )
 
         assert judgments == []
 
@@ -197,7 +214,9 @@ class TestSessionLifetimeChecker:
 
         judgments = await checker.judge(
             (short_lifetime, long_lifetime),
-            current_time=_BASE_TIME + timedelta(seconds=20),
+            context=IdleCheckerContext(
+                current_time=_BASE_TIME + timedelta(seconds=20),
+            ),
         )
 
         assert [judgment.checker_id for judgment in judgments] == [
@@ -219,7 +238,9 @@ class TestSessionLifetimeChecker:
             sessions=(expired_session, active_session),
         )
 
-        judgments = await checker.judge((assignment,), current_time=_BASE_TIME)
+        judgments = await checker.judge(
+            (assignment,), context=IdleCheckerContext(current_time=_BASE_TIME)
+        )
 
         assert [judgment.session_id for judgment in judgments] == [
             expired_session.session_id,
@@ -252,7 +273,9 @@ class TestSessionLifetimeChecker:
 
         judgments = await checker.judge(
             (mismatched_assignment, valid_assignment),
-            current_time=_BASE_TIME + timedelta(seconds=30),
+            context=IdleCheckerContext(
+                current_time=_BASE_TIME + timedelta(seconds=30),
+            ),
         )
 
         assert [judgment.checker_id for judgment in judgments] == [

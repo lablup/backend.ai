@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Sequence
-from datetime import datetime
 from decimal import Decimal
 from typing import override
 
@@ -10,6 +9,7 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.sokovan.idle_check.checkers.base import (
     CheckerAssignment,
     IdleChecker,
+    IdleCheckerContext,
     IdleJudgment,
 )
 
@@ -24,7 +24,7 @@ class SessionLifetimeChecker(IdleChecker):
         self,
         assignments: Sequence[CheckerAssignment],
         *,
-        current_time: datetime,
+        context: IdleCheckerContext,
     ) -> Sequence[IdleJudgment]:
         judgments: list[IdleJudgment] = []
         for assignment in assignments:
@@ -43,7 +43,7 @@ class SessionLifetimeChecker(IdleChecker):
                 if session.starts_at is None:
                     continue
                 running_seconds = Decimal(
-                    str((current_time - session.starts_at).total_seconds())
+                    str((context.current_time - session.starts_at).total_seconds())
                 ).normalize()
                 judgments.append(
                     IdleJudgment(
