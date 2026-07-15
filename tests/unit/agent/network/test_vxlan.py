@@ -1,6 +1,6 @@
 from collections.abc import Sequence
 from pathlib import Path
-from typing import cast
+from typing import cast, override
 
 import pytest
 
@@ -13,6 +13,9 @@ from ai.backend.agent.network.backends.vxlan import (
     fdb_append_args,
     fdb_del_args,
     fdb_replace_args,
+    forward_accept_add_args,
+    forward_accept_check_args,
+    forward_accept_del_args,
     local_bridge_dev,
     local_cni_config,
     neigh_del_args,
@@ -250,6 +253,67 @@ class TestSetupTeardown:
         plugin = _plugin(rec)
         await plugin.teardown_session_network("nope")
         assert rec.calls == []
+
+
+class TestForwardAccept:
+    """On a host with br_netfilter + a DROP FORWARD policy (Docker/kube-proxy co-hosted, or a
+    hardened host), bridged overlay frames traverse iptables FORWARD and are dropped, silently
+    killing the overlay. setup must install a FORWARD-ACCEPT for the overlay bridge; teardown
+    must remove it."""
+
+    async def test_setup_installs_forward_accept_when_absent(self) -> None:
+        # iptables -C fails when the rule is absent (as the real runner reports it); the plugin
+        # must then add it.
+        class _AbsentRuleRunner(Recorder):
+            @override
+            async def __call__(self, argv: Sequence[str]) -> None:
+                await super().__call__(argv)
+                if list(argv[:2]) == ["iptables", "-C"]:
+                    raise RuntimeError("iptables: Bad rule (does a matching rule exist?)")
+
+        rec = _AbsentRuleRunner()
+        plugin = _plugin(rec)
+        await plugin.setup_session_network(_META, _SELF)
+        assert forward_accept_add_args(4097) in rec.calls
+        # and it is scoped to the overlay bridge's own intra-bridge path
+        assert forward_accept_add_args(4097) == [
+            "iptables",
+            "-I",
+            "FORWARD",
+            "-i",
+            "baibr4097",
+            "-o",
+            "baibr4097",
+            "-j",
+            "ACCEPT",
+        ]
+
+    async def test_setup_does_not_duplicate_when_already_present(self) -> None:
+        # a plain runner reports iptables -C success (rule present) -> no add.
+        rec = Recorder()
+        plugin = _plugin(rec)
+        await plugin.setup_session_network(_META, _SELF)
+        assert forward_accept_check_args(4097) in rec.calls
+        assert forward_accept_add_args(4097) not in rec.calls
+
+    async def test_setup_survives_missing_iptables(self) -> None:
+        class _NoIptablesRunner(Recorder):
+            @override
+            async def __call__(self, argv: Sequence[str]) -> None:
+                if argv and argv[0] == "iptables":
+                    raise FileNotFoundError("iptables not installed")
+                await super().__call__(argv)
+
+        plugin = _plugin(_NoIptablesRunner())
+        await plugin.setup_session_network(_META, _SELF)  # must not raise
+
+    async def test_teardown_removes_forward_accept(self) -> None:
+        rec = Recorder()
+        plugin = _plugin(rec)
+        await plugin.setup_session_network(_META, _SELF)
+        rec.calls.clear()
+        await plugin.teardown_session_network("s1")
+        assert forward_accept_del_args(4097) in rec.calls
 
 
 class TestLocalSubnetAllocation:

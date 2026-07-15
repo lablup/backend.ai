@@ -121,6 +121,34 @@ def neigh_del_args(vni: int, ip: str) -> list[str]:
     return ["ip", "neigh", "del", ip, "dev", bridge_dev(vni)]
 
 
+# --- overlay-bridge FORWARD accept (survive a DROP FORWARD policy) ---
+#
+# With br_netfilter loaded and net.bridge.bridge-nf-call-iptables=1 (a node co-hosting Docker or
+# kube-proxy, or a hardened host), frames bridged WITHIN the overlay bridge -- container veth <->
+# vxlan device -- traverse the iptables FORWARD chain. If its policy is DROP (Docker sets exactly
+# that), the overlay goes silently dead: handshakes and cross-node traffic are dropped with no
+# ICMP. Accept intra-bridge forwarding on the overlay bridge, the same rule Docker installs for its
+# own bridges. ``-i BR -o BR`` is exactly the intra-bridge path and nothing else (the encapsulated
+# UDP leaves via the host's OUTPUT chain, not FORWARD).
+
+
+def _forward_accept_rule(vni: int) -> list[str]:
+    br = bridge_dev(vni)
+    return ["FORWARD", "-i", br, "-o", br, "-j", "ACCEPT"]
+
+
+def forward_accept_check_args(vni: int) -> list[str]:
+    return ["iptables", "-C", *_forward_accept_rule(vni)]
+
+
+def forward_accept_add_args(vni: int) -> list[str]:
+    return ["iptables", "-I", *_forward_accept_rule(vni)]
+
+
+def forward_accept_del_args(vni: int) -> list[str]:
+    return ["iptables", "-D", *_forward_accept_rule(vni)]
+
+
 # --- pure CNI config assembly ---
 
 
@@ -283,6 +311,26 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         except RuntimeError:
             pass
 
+    async def _ensure_forward_accept(self, vni: int) -> None:
+        """Idempotently accept intra-bridge forwarding on the overlay bridge, so a DROP FORWARD
+        policy (br_netfilter + a Docker/hardened host) cannot silently kill the overlay. Best-effort:
+        harmless where FORWARD already accepts, and a host without iptables has no such policy."""
+        try:
+            await self._runner(forward_accept_check_args(vni))
+            return  # already present
+        except (RuntimeError, OSError):
+            pass  # absent, or iptables unavailable -- try to add it
+        try:
+            await self._runner(forward_accept_add_args(vni))
+        except (RuntimeError, OSError) as e:
+            log.warning("could not install overlay FORWARD-ACCEPT for {}: {}", bridge_dev(vni), e)
+
+    async def _del_forward_accept(self, vni: int) -> None:
+        try:
+            await self._runner(forward_accept_del_args(vni))
+        except (RuntimeError, OSError):
+            pass  # never installed, already gone, or no iptables
+
     @override
     async def setup_session_network(self, meta: SessionNetMeta, self_member: Member) -> None:
         if meta.backend is not NetworkBackendKind.VXLAN or meta.vni is None:
@@ -304,6 +352,7 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         await self._runner(set_master_args(vni))
         await self._runner(link_up_args(vxlan_dev(vni)))
         await self._runner(link_up_args(bridge_dev(vni)))
+        await self._ensure_forward_accept(vni)
         self._sessions[meta.session_id] = meta
 
     @override
@@ -321,6 +370,7 @@ class VxlanNetworkPlugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
         await self._local_subnets.release(session_id)
         if meta is None or meta.vni is None:
             return
+        await self._del_forward_accept(meta.vni)
         # delete the overlay bridge/vxlan and the per-session LOCAL bridge; ignore missing
         devs = [bridge_dev(meta.vni), vxlan_dev(meta.vni), local_bridge_dev(meta.vni)]
         for dev in devs:
