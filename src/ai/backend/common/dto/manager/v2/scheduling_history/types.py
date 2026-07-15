@@ -16,6 +16,7 @@ from ai.backend.common.dto.manager.v2.common import OrderDirection
 __all__ = (
     "DeploymentHistoryOrderField",
     "DeploymentHistoryScopeDTO",
+    "KernelHistoryOrderField",
     "OrderDirection",
     "RouteHistoryOrderField",
     "RouteHistoryScopeDTO",
@@ -40,6 +41,13 @@ class SchedulingResultType(StrEnum):
 
 class SessionHistoryOrderField(StrEnum):
     """Fields available for ordering session scheduling history."""
+
+    CREATED_AT = "created_at"
+    UPDATED_AT = "updated_at"
+
+
+class KernelHistoryOrderField(StrEnum):
+    """Fields available for ordering kernel scheduling history."""
 
     CREATED_AT = "created_at"
     UPDATED_AT = "updated_at"
