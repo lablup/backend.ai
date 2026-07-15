@@ -17,7 +17,6 @@ from ai.backend.common.data.idle_checker.types import (
 from ai.backend.common.identifier.idle_checker import IdleCheckerID
 from ai.backend.common.types import SessionId, SessionTypes
 from ai.backend.manager.data.idle_checker.types import IdleCheckSession
-from ai.backend.manager.errors.common import InternalServerError
 from ai.backend.manager.repositories.idle_checker.types import IdleCheckerDefinitionData
 from ai.backend.manager.sokovan.idle_check.checkers.base import CheckerAssignment
 from ai.backend.manager.sokovan.idle_check.checkers.session_lifetime import (
@@ -228,12 +227,13 @@ class TestSessionLifetimeChecker:
         ]
         assert [judgment.is_idle for judgment in judgments] == [True, False]
 
-    async def test_rejects_assignment_with_mismatched_spec(
+    async def test_skips_mismatched_spec_and_evaluates_remaining_assignments(
         self,
         checker: SessionLifetimeChecker,
         session_factory: SessionFactory,
+        assignment_factory: AssignmentFactory,
     ) -> None:
-        assignment = CheckerAssignment(
+        mismatched_assignment = CheckerAssignment(
             definition=IdleCheckerDefinitionData(
                 checker_id=IdleCheckerID(uuid4()),
                 checker_type=CheckerType.SESSION_LIFETIME,
@@ -245,6 +245,16 @@ class TestSessionLifetimeChecker:
             ),
             sessions=(session_factory(),),
         )
+        valid_assignment = assignment_factory(
+            max_lifetime_seconds=30,
+            sessions=(session_factory(),),
+        )
 
-        with pytest.raises(InternalServerError):
-            await checker.judge((assignment,), current_time=_BASE_TIME)
+        judgments = await checker.judge(
+            (mismatched_assignment, valid_assignment),
+            current_time=_BASE_TIME + timedelta(seconds=30),
+        )
+
+        assert [judgment.checker_id for judgment in judgments] == [
+            valid_assignment.definition.checker_id
+        ]

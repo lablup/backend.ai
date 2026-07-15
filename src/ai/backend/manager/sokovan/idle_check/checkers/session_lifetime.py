@@ -1,16 +1,19 @@
 from __future__ import annotations
 
+import logging
 from collections.abc import Sequence
 from datetime import datetime
 from decimal import Decimal
 from typing import override
 
-from ai.backend.manager.errors.common import InternalServerError
+from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.sokovan.idle_check.checkers.base import (
     CheckerAssignment,
     IdleChecker,
     IdleJudgment,
 )
+
+log = BraceStyleAdapter(logging.getLogger(__name__))
 
 
 class SessionLifetimeChecker(IdleChecker):
@@ -27,9 +30,12 @@ class SessionLifetimeChecker(IdleChecker):
         for assignment in assignments:
             lifetime_spec = assignment.definition.spec.session_lifetime
             if lifetime_spec is None:
-                raise InternalServerError(
-                    f"Session lifetime checker(id: {assignment.definition.checker_id}) received an empty spec."
+                log.error(
+                    "Session lifetime checker {} has mismatched spec type: {}",
+                    assignment.definition.checker_id,
+                    assignment.definition.spec.type,
                 )
+                continue
             if lifetime_spec.max_lifetime_seconds == 0:
                 continue
             max_lifetime_seconds = Decimal(lifetime_spec.max_lifetime_seconds)
