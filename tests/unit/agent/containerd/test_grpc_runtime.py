@@ -285,6 +285,9 @@ class _CommitHarness:
         self.created_images: list[Any] = []
         self.deleted_content: list[str] = []
         self.fail_image_create = False
+        self.prepared: list[tuple[str, str]] = []
+        self.committed_snapshots: list[tuple[str, str]] = []
+        self.applied: list[str] = []
 
     def runtime(self) -> Any:
         rt = cast(Any, ContainerdGrpcRuntime.__new__(ContainerdGrpcRuntime))
@@ -314,7 +317,25 @@ class _CommitHarness:
                 harness.removed_snapshots.append(req.key)
                 return SimpleNamespace()
 
+            async def Stat(self, req: Any, metadata: Any = None) -> Any:
+                # the new chain is not yet unpacked -> the commit must unpack it
+                raise grpc.aio.AioRpcError(
+                    grpc.StatusCode.NOT_FOUND, None, None, "no such snapshot"
+                )
+
+            async def Prepare(self, req: Any, metadata: Any = None) -> Any:
+                harness.prepared.append((req.key, req.parent))
+                return SimpleNamespace(mounts=[_ACTIVE_MOUNT])
+
+            async def Commit(self, req: Any, metadata: Any = None) -> Any:
+                harness.committed_snapshots.append((req.name, req.key))
+                return SimpleNamespace()
+
         class _Diff:
+            async def Apply(self, req: Any, metadata: Any = None) -> Any:
+                harness.applied.append(req.diff.digest)
+                return SimpleNamespace()
+
             async def Diff(self, req: Any, metadata: Any = None) -> Any:
                 harness.diff_requests.append(req)
                 # As the real differ does: no annotations on the descriptor...
@@ -448,6 +469,19 @@ class TestCommitContainer:
         assert cleared & set(harness.written)  # the config/manifest it wrote
         # ...and was deleted from the content store
         assert harness.NEW_LAYER_DIGEST in harness.deleted_content
+
+    async def test_the_committed_image_is_unpacked_into_the_snapshotter(self) -> None:
+        # Without this the content store has the image but the snapshotter has no committed snapshot
+        # for its chain, so create_container Prepares against a parent that does not exist and the
+        # very next same-node session for the image fails. The commit applies the new layer onto the
+        # base chain and commits a snapshot at the new chain id.
+        harness = await self._commit()
+        # the new layer was applied (untarred) onto a freshly prepared active snapshot...
+        assert harness.applied == [harness.NEW_LAYER_DIGEST]
+        assert len(harness.prepared) == 1  # one active snapshot, parented at the base chain
+        # ...and committed at the new chain id (base_diff_ids + new_diff_id)
+        new_chain = _chain_id([harness.BASE_DIFF_ID, harness.NEW_DIFF_ID])
+        assert harness.committed_snapshots == [(new_chain, harness.prepared[0][0])]
 
     async def test_the_config_records_the_uncompressed_digest_as_the_diff_id(self) -> None:
         # The blob's own digest is the COMPRESSED one. Recording it produces an image containerd

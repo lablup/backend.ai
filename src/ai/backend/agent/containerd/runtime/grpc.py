@@ -550,12 +550,79 @@ class ContainerdGrpcRuntime(OciRuntime):
                 images_pb2.UpdateImageRequest(image=image), metadata=self._md
             )
 
-        # 5. The image now roots the manifest, and the manifest references the config and the layer,
+        # 5. Unpack the new layer into the snapshotter, so the committed image is runnable on THIS
+        #    node without a pull. The content store now has the image, but the snapshotter has no
+        #    committed snapshot for the new chain — and create_container Prepares against exactly
+        #    that chain. The customized-image flow pushes then pulls (pull unpacks) for OTHER nodes,
+        #    but on the committing node check_image sees the config digest locally and skips the
+        #    pull, so without this the very next session for that image fails at Prepare here.
+        #    dockerd's commit produces an immediately-runnable image; this matches it. Best-effort:
+        #    a failed unpack leaves the image valid for push/pull, only same-node reuse degraded.
+        try:
+            await self._unpack_committed_layer([*base_diff_ids, diff_id], layer)
+        except Exception:
+            log.warning(
+                "committed {} but could not unpack it into the snapshotter; it is valid for"
+                " push/pull but a session for it scheduled to THIS node before a pull will fail",
+                target_ref,
+            )
+
+        # 6. The image now roots the manifest, and the manifest references the config and the layer,
         #    so the temporary roots can go. Leaving them would pin every commit's blobs forever —
         #    a GC root is never collected, even after the image is deleted.
         for digest in (manifest_desc["digest"], config_desc["digest"], layer.digest):
             with contextlib.suppress(grpc.aio.AioRpcError):
                 await self._drop_gc_root(digest)
+
+    async def _unpack_committed_layer(self, diff_ids: list[str], layer: Any) -> None:
+        """Apply the freshly committed layer onto the base chain and commit a snapshot at the new
+        chain id, so create_container can Prepare against it — the single-layer unpack containerd's
+        own pull/transfer path performs."""
+        new_chain = _chain_id(diff_ids)
+        base_chain = _chain_id(diff_ids[:-1])
+        # Already unpacked (a re-commit of the same content)? Then there is nothing to do.
+        with contextlib.suppress(grpc.aio.AioRpcError):
+            await self._snapshots_stub().Stat(
+                snapshots_pb2.StatSnapshotRequest(snapshotter=_SNAPSHOTTER, key=new_chain),
+                metadata=self._md,
+            )
+            return
+        unpack_key = f"commit-unpack-{layer.digest}"
+        prepared = await self._snapshots_stub().Prepare(
+            snapshots_pb2.PrepareSnapshotRequest(
+                snapshotter=_SNAPSHOTTER, key=unpack_key, parent=base_chain
+            ),
+            metadata=self._md,
+        )
+        try:
+            await self._diff_stub().Apply(
+                diff_pb2.ApplyRequest(
+                    diff=descriptor_pb2.Descriptor(
+                        media_type=_OCI_LAYER_GZIP_MEDIA_TYPE,
+                        digest=layer.digest,
+                        size=layer.size,
+                    ),
+                    mounts=list(prepared.mounts),
+                ),
+                metadata=self._md,
+            )
+            await self._snapshots_stub().Commit(
+                snapshots_pb2.CommitSnapshotRequest(
+                    snapshotter=_SNAPSHOTTER, name=new_chain, key=unpack_key
+                ),
+                metadata=self._md,
+            )
+        except grpc.aio.AioRpcError as e:
+            # Another commit unpacked the same chain first — fine, the snapshot exists either way.
+            if e.code() is not grpc.StatusCode.ALREADY_EXISTS:
+                with contextlib.suppress(grpc.aio.AioRpcError):
+                    await self._snapshots_stub().Remove(
+                        snapshots_pb2.RemoveSnapshotRequest(
+                            snapshotter=_SNAPSHOTTER, key=unpack_key
+                        ),
+                        metadata=self._md,
+                    )
+                raise
 
     # --- image content helpers (read the manifest chain to resolve the rootfs) ---
 
