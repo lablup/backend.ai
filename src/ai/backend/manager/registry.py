@@ -116,6 +116,7 @@ from ai.backend.manager.data.session.draft import (
     SessionIdentityDraft,
     SessionNetworkDraft,
     SessionOptionsDraft,
+    SessionResourceSpecDraft,
     SessionScopeDraft,
     SessionSpecDraft,
 )
@@ -1142,12 +1143,35 @@ class AgentRegistry:
             )
 
         draft = SessionSpecDraft(
-            identity=SessionIdentityDraft(
-                session_id=SessionID(uuid.uuid4()),
-                creation_id=session_creation_id,
-                session_name=session_name,
-                access_key=access_key,
-                user_uuid=user_scope.user_uuid,
+            resource_spec=SessionResourceSpecDraft(
+                identity=SessionIdentityDraft(
+                    session_id=SessionID(uuid.uuid4()),
+                    creation_id=session_creation_id,
+                    session_name=session_name,
+                    access_key=access_key,
+                    user_uuid=user_scope.user_uuid,
+                ),
+                classification=SessionClassificationDraft(
+                    session_type=session_type,
+                    tag=session_tag,
+                ),
+                network=SessionNetworkDraft(network_id=network_id),
+                callback_url=callback_url,
+                dependencies=dependencies,
+                options=SessionOptionsDraft(
+                    priority=priority,
+                    is_preemptible=is_preemptible,
+                    cluster_mode=cluster_mode,
+                    cluster_size=cluster_size,
+                    scheduling_target=SchedulingTargetDraft(
+                        designated_agents=tuple(AgentId(a) for a in (agent_list or ())),
+                    ),
+                    kernel_groups=tuple(groups_by_role.values()),
+                    handler_options=None,
+                ),
+                internal_data_extras=InternalDataExtras(
+                    sudo_session_enabled=sudo_session_enabled,
+                ),
             ),
             scope=SessionScopeDraft(
                 domain_id=domain_id,
@@ -1155,27 +1179,6 @@ class AgentRegistry:
                 project_id=ProjectID(user_scope.group_id),
                 resource_group_id=resource_group_id,
                 resource_group_name=resource_group_name,
-            ),
-            classification=SessionClassificationDraft(
-                session_type=session_type,
-                tag=session_tag,
-            ),
-            network=SessionNetworkDraft(network_id=network_id),
-            callback_url=callback_url,
-            dependencies=dependencies,
-            options=SessionOptionsDraft(
-                priority=priority,
-                is_preemptible=is_preemptible,
-                cluster_mode=cluster_mode,
-                cluster_size=cluster_size,
-                scheduling_target=SchedulingTargetDraft(
-                    designated_agents=tuple(AgentId(a) for a in (agent_list or ())),
-                ),
-                kernel_groups=tuple(groups_by_role.values()),
-                handler_options=None,
-            ),
-            internal_data_extras=InternalDataExtras(
-                sudo_session_enabled=sudo_session_enabled,
             ),
         )
 

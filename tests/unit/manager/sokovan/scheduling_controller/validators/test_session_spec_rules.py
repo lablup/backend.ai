@@ -46,6 +46,7 @@ from ai.backend.manager.data.session.spec import (
     SessionClassification,
     SessionIdentity,
     SessionNetwork,
+    SessionResourceSpec,
     SessionScope,
     SessionSpec,
 )
@@ -143,12 +144,26 @@ def _spec(
         kernel.model_copy(update={"vfolder_mounts": vfolder_mounts}) for kernel in kernel_specs
     )
     return SessionSpec(
-        identity=SessionIdentity(
-            session_id=SessionID(uuid.uuid4()),
-            creation_id="c-1",
-            session_name="s",
-            access_key=AccessKey("AK"),
-            user_uuid=uuid.uuid4(),
+        resource_spec=SessionResourceSpec(
+            identity=SessionIdentity(
+                session_id=SessionID(uuid.uuid4()),
+                creation_id="c-1",
+                session_name="s",
+                access_key=AccessKey("AK"),
+                user_uuid=uuid.uuid4(),
+            ),
+            classification=SessionClassification(session_type=session_type),
+            network=SessionNetwork(network_type=NetworkType.VOLATILE),
+            options=SessionOptions(
+                priority=10,
+                is_preemptible=True,
+                cluster_mode=ClusterMode.SINGLE_NODE,
+                cluster_size=len(kernel_specs),
+                scheduling_target=SchedulingTarget(),
+                kernel_groups=[],
+                handler_options=SessionHandlerOptions(),
+            ),
+            kernel_specs=decorated_kernel_specs,
         ),
         scope=SessionScope(
             domain_id=DomainID(uuid.uuid4()),
@@ -157,18 +172,6 @@ def _spec(
             resource_group_id=ResourceGroupID(uuid.uuid4()),
             resource_group_name=ResourceGroupName("default"),
         ),
-        classification=SessionClassification(session_type=session_type),
-        network=SessionNetwork(network_type=NetworkType.VOLATILE),
-        options=SessionOptions(
-            priority=10,
-            is_preemptible=True,
-            cluster_mode=ClusterMode.SINGLE_NODE,
-            cluster_size=len(kernel_specs),
-            scheduling_target=SchedulingTarget(),
-            kernel_groups=[],
-            handler_options=SessionHandlerOptions(),
-        ),
-        kernel_specs=decorated_kernel_specs,
     )
 
 

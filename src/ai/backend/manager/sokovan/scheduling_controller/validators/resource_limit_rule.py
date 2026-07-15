@@ -46,7 +46,7 @@ class ResourceLimitRule(SessionSpecValidatorRule):
         spec: SessionSpec,
         context: SessionSpecValidationContext,
     ) -> None:
-        for idx, kernel in enumerate(spec.kernel_specs):
+        for idx, kernel in enumerate(spec.resource_spec.kernel_specs):
             image_info = context.image_infos.get(kernel.execution_spec.resource_input.image_id)
             if image_info is None:
                 continue

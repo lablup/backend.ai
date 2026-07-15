@@ -175,38 +175,12 @@ class SessionSpec(_SpecBaseModel):
     from the main kernel's resolved mount list at enqueue time.
     """
 
-    identity: SessionIdentity
+    resource_spec: SessionResourceSpec
     scope: SessionScope
-    classification: SessionClassification
-    network: SessionNetwork
-    callback_url: yarl.URL | None = None
-    dependencies: tuple[SessionID, ...] = ()
-    options: SessionOptions
-    kernel_specs: tuple[KernelSpec, ...]
-    internal_data_extras: InternalDataExtras = Field(default_factory=InternalDataExtras)
 
     @classmethod
     def from_resource_spec(
         cls, scope: SessionScope, resource_spec: SessionResourceSpec
     ) -> SessionSpec:
         """Attach an ownership ``scope`` to a prepared, scope-free spec."""
-        return cls(
-            identity=resource_spec.identity,
-            scope=scope,
-            classification=resource_spec.classification,
-            network=resource_spec.network,
-            callback_url=resource_spec.callback_url,
-            dependencies=resource_spec.dependencies,
-            options=resource_spec.options,
-            kernel_specs=resource_spec.kernel_specs,
-            internal_data_extras=resource_spec.internal_data_extras,
-        )
-
-    @override
-    @classmethod
-    def build_validation_error(cls, info: SchemaValidationFailureInfo) -> BackendAIError:
-        missing_paths = [_format_loc(tuple(err["loc"])) for err in info.errors]
-        return IncompleteSessionSpec(
-            extra_msg="SessionSpec fields not resolved: " + ", ".join(missing_paths),
-            extra_data={"missing": missing_paths},
-        )
+        return cls(resource_spec=resource_spec, scope=scope)

@@ -37,7 +37,7 @@ class DotfileVFolderConflictRule(SessionSpecValidatorRule):
         if not dotfiles:
             return
         kernel_paths: set[PurePosixPath] = set()
-        for kernel in spec.kernel_specs:
+        for kernel in spec.resource_spec.kernel_specs:
             for mount in kernel.vfolder_mounts:
                 kernel_paths.add(mount.kernel_path)
         if not kernel_paths:

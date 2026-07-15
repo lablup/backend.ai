@@ -223,32 +223,9 @@ class SessionResourceSpecDraft(_DraftBaseModel):
 class SessionSpecDraft(_DraftBaseModel):
     """Top-level draft mirroring ``SessionSpec``.
 
-    ``internal_data_extras`` carries request-envelope fields (sudo
-    toggle, model-definition overlay) that feed
-    :class:`KernelSpec.internal_data`. DB-sourced pieces like dotfiles
-    are merged in by the preparer chain against its context — they
-    never flow through the draft.
+    Composed of a scope-free :class:`SessionResourceSpecDraft` (consumed by
+    the preparer chain) plus a :class:`SessionScopeDraft`.
     """
 
-    identity: SessionIdentityDraft = Field(default_factory=SessionIdentityDraft)
+    resource_spec: SessionResourceSpecDraft = Field(default_factory=SessionResourceSpecDraft)
     scope: SessionScopeDraft = Field(default_factory=SessionScopeDraft)
-    classification: SessionClassificationDraft = Field(default_factory=SessionClassificationDraft)
-    network: SessionNetworkDraft = Field(default_factory=SessionNetworkDraft)
-    callback_url: yarl.URL | None = None
-    dependencies: tuple[SessionID, ...] = ()
-    options: SessionOptionsDraft = Field(default_factory=SessionOptionsDraft)
-    kernel_specs: tuple[KernelSpecDraft, ...] = ()
-    internal_data_extras: InternalDataExtras = Field(default_factory=InternalDataExtras)
-
-    def to_resource_draft(self) -> SessionResourceSpecDraft:
-        """Project onto the scope-free draft the preparer chain operates on."""
-        return SessionResourceSpecDraft(
-            identity=self.identity,
-            classification=self.classification,
-            network=self.network,
-            callback_url=self.callback_url,
-            dependencies=self.dependencies,
-            options=self.options,
-            kernel_specs=self.kernel_specs,
-            internal_data_extras=self.internal_data_extras,
-        )

@@ -32,7 +32,7 @@ class MountNameValidationRule(SessionSpecValidatorRule):
         spec: SessionSpec,
         _context: SessionSpecValidationContext,
     ) -> None:
-        for kernel_idx, kernel in enumerate(spec.kernel_specs):
+        for kernel_idx, kernel in enumerate(spec.resource_spec.kernel_specs):
             seen_paths: set[str] = set()
             for mount_idx, mount in enumerate(kernel.vfolder_mounts):
                 path = str(mount.kernel_path)

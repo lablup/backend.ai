@@ -199,7 +199,7 @@ class SchedulingController:
             return
         domain_name = str(draft.scope.domain_name) if draft.scope.domain_name else None
         project_id = draft.scope.project_id
-        access_key = draft.identity.access_key
+        access_key = draft.resource_spec.identity.access_key
         if access_key is None or domain_name is None or project_id is None:
             raise InternalServerError(
                 "Unreachable: resource_group_id supplied without identity context",
@@ -221,7 +221,7 @@ class SchedulingController:
 
         Only input is the :class:`SessionSpecDraft` — request-envelope
         extras (sudo, model-definition overlay) ride on
-        ``draft.internal_data_extras``. Validation-adjacent DB reads (image
+        ``draft.resource_spec.internal_data_extras``. Validation-adjacent DB reads (image
         metadata, keypair policy, resource-group network, container uid/gid,
         dotfiles, active session count) flow through
         :meth:`SchedulerRepository.fetch_session_spec_contexts`; vfolder mounts
@@ -283,16 +283,16 @@ class SchedulingController:
         with self._metric_observer.measure_phase(
             "scheduling_controller", rg_id, "spec_preparation"
         ):
-            resource_spec = await self._spec_preparer.prepare(draft.to_resource_draft(), prep_ctx)
+            resource_spec = await self._spec_preparer.prepare(draft.resource_spec, prep_ctx)
             scope = SessionScope.model_validate(draft.scope.model_dump(exclude_none=True))
             spec = SessionSpec.from_resource_spec(scope, resource_spec)
 
         hook_result = await self._hook_plugin_ctx.dispatch(
             "PRE_ENQUEUE_SESSION",
             (
-                spec.identity.session_id,
-                spec.identity.session_name,
-                spec.identity.access_key,
+                spec.resource_spec.identity.session_id,
+                spec.resource_spec.identity.session_name,
+                spec.resource_spec.identity.access_key,
             ),
             return_when=ALL_COMPLETED,
         )
@@ -307,14 +307,14 @@ class SchedulingController:
 
         log.info(
             "Session {} ({}) enqueued successfully via draft path",
-            spec.identity.session_name,
+            spec.resource_spec.identity.session_name,
             session_id,
         )
 
         await self._event_producer.broadcast_events_batch([
             SchedulingBroadcastEvent(
                 session_id=session_id,
-                creation_id=spec.identity.creation_id,
+                creation_id=spec.resource_spec.identity.creation_id,
                 status_transition=str(SessionStatus.PENDING),
                 reason="Session enqueued",
             )
@@ -330,7 +330,11 @@ class SchedulingController:
             )
         await self._hook_plugin_ctx.notify(
             "POST_ENQUEUE_SESSION",
-            (session_id, spec.identity.session_name, spec.identity.access_key),
+            (
+                session_id,
+                spec.resource_spec.identity.session_name,
+                spec.resource_spec.identity.access_key,
+            ),
         )
         return session_id
 
@@ -477,7 +481,7 @@ class SchedulingController:
 
         Reuses the enqueue prep chain (vfolder resolution skipped), then drives
         the real agent selector against a live snapshot of the group's agents.
-        Results correspond positionally to ``draft.options.kernel_groups``.
+        Results correspond positionally to ``draft.resource_spec.options.kernel_groups``.
         """
         rg_id = draft.scope.resource_group_id
         if rg_id is None:
@@ -494,7 +498,7 @@ class SchedulingController:
             # storage-RPC resolution by leaving the per-role mount map empty.
             vfolder_mounts_by_role={},
         )
-        resource_spec = await self._spec_preparer.prepare(draft.to_resource_draft(), prep_ctx)
+        resource_spec = await self._spec_preparer.prepare(draft.resource_spec, prep_ctx)
         compute_schedule_kernel_data = self._prepare_kernel_data(resource_spec, fetched)
         return await self._compute_schedule(resource_spec, rg_id, compute_schedule_kernel_data)
 
