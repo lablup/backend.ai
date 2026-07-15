@@ -5,11 +5,19 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from dataclasses import dataclass
+from datetime import datetime
 
 from ai.backend.common.identifier.idle_checker import IdleCheckerID
 from ai.backend.common.types import SessionId
 from ai.backend.manager.data.idle_checker.types import IdleCheckSession
 from ai.backend.manager.repositories.idle_checker.types import IdleCheckerDefinitionData
+
+
+@dataclass(frozen=True)
+class IdleCheckerContext:
+    """Shared execution context for every checker in one reconcile tick."""
+
+    current_time: datetime
 
 
 @dataclass(frozen=True)
@@ -37,6 +45,8 @@ class IdleChecker(ABC):
     async def judge(
         self,
         assignments: Sequence[CheckerAssignment],
+        *,
+        context: IdleCheckerContext,
     ) -> Sequence[IdleJudgment]:
         """Evaluate every assignment of this type in one batched call.
 

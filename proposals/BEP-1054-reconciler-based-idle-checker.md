@@ -32,7 +32,7 @@ This proposal re-homes idle checking onto a sokovan reconciler stage and promote
 ### Non-Goals
 
 - The concrete judgment rules of each checker (timeout math, threshold comparison, metric names) are implementation concerns and are out of scope.
-- Backfilling legacy keypair `idle_timeout` / `max_session_lifetime` into checker specs is left as an open question.
+- Backfilling or falling back to legacy keypair resource-policy idle settings is out of scope. Reconciler-based idle checkers use only their own specs.
 
 ## Current Design
 
@@ -170,7 +170,7 @@ The idle stage lives on the **generic reconciler** — one fetch per tick, not p
 
 **Per resource group, the Source:**
 
-1. reads the idle-eligible running sessions in the group;
+1. reads the idle-eligible running sessions with a recorded start time in the group;
 2. collects the distinct scopes those sessions belong to — the resource group, their projects, their domains;
 3. loads only the enabled `idle_checker_bindings` (with their checker specs) attached to those scopes;
 4. composes each session's effective checker set from the bindings on its own scopes.
@@ -218,11 +218,13 @@ The Source does not branch centrally on checker type to read Valkey or Prometheu
 
 | `checker_type` | Terminates when… | Runtime signal |
 |---|---|---|
-| `session_lifetime` | a session has run longer than its maximum lifetime | none (session creation time) |
+| `session_lifetime` | a started session has run longer than its maximum lifetime; zero disables the definition | none (session start time) |
 | `network_timeout` | an interactive session has had no access and no active connections beyond a timeout | last-access / active-connection signals |
 | `utilization` | a session's resource utilization stays below thresholds across a window, after a grace period | windowed utilization metrics |
 
-The exact judgment rules for each checker are an implementation concern and are intentionally not specified here. A single scope can bind multiple checkers of the same `checker_type`
+The exact judgment rules for each checker are an implementation concern and are intentionally not specified here. A single scope can bind multiple checkers of the same `checker_type`.
+
+Checker specs are the sole configuration source for reconciler-based idle decisions. The Source and checker implementations do not read `keypair_resource_policies.idle_timeout` or `keypair_resource_policies.max_session_lifetime`, and those legacy values are neither fallback values nor implicit defaults. Whether a checker applies is controlled only by its scope bindings; its threshold or lifetime is controlled only by its spec.
 
 ### Utilization via Prometheus
 
@@ -263,7 +265,6 @@ flowchart TB
 
 ## Open Questions
 
-- Should the legacy keypair `idle_timeout` / `max_session_lifetime` values be backfilled into checker specs, or only honored as a fallback during rollout?
 - Should utilization `and` / `or` threshold semantics match the legacy behavior or be redefined?
 
 ## References
