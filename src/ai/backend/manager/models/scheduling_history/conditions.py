@@ -422,22 +422,16 @@ class KernelSchedulingHistoryConditions:
         return inner
 
     @staticmethod
-    def by_from_phase(phase: KernelSchedulingPhase) -> QueryCondition:
+    def by_from_status(phase: KernelSchedulingPhase) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return cast(
-                sa.sql.expression.ColumnElement[bool],
-                KernelSchedulingHistoryRow.from_phase == str(phase),
-            )
+            return KernelSchedulingHistoryRow.from_status == str(phase)
 
         return inner
 
     @staticmethod
-    def by_to_phase(phase: KernelSchedulingPhase) -> QueryCondition:
+    def by_to_status(phase: KernelSchedulingPhase) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return cast(
-                sa.sql.expression.ColumnElement[bool],
-                KernelSchedulingHistoryRow.to_phase == str(phase),
-            )
+            return KernelSchedulingHistoryRow.to_status == str(phase)
 
         return inner
 
