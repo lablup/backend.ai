@@ -2,19 +2,22 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import override
+from uuid import UUID
 
 from ai.backend.common.data.permission.types import EntityType
 from ai.backend.common.identifier.resource_group import ResourceGroupID
-from ai.backend.common.types import ClusterMode
+from ai.backend.common.types import AccessKey, ClusterMode
 from ai.backend.manager.actions.action import BaseAction, BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.data.session.compute_schedule import (
+    ComputeScheduleResult,
+)
 from ai.backend.manager.data.session.draft import KernelResourceInput
-from ai.backend.manager.data.session.dry_run import KernelDryRunResult
 
 
 @dataclass(frozen=True)
-class DryRunScheduleAction(BaseAction):
-    """Dry-run a session's scheduling against a resource group without provisioning.
+class ComputeScheduleAction(BaseAction):
+    """Compute a session's scheduling against a resource group without provisioning.
 
     The fields mirror the scheduler's selection criteria so the real selector can
     be driven directly: ``cluster_mode`` decides whether kernel slots are summed
@@ -22,11 +25,16 @@ class DryRunScheduleAction(BaseAction):
 
     Each kernel is an unresolved ``KernelResourceInput``; the result list
     corresponds positionally, so callers match results to kernels by index.
+
+    ``user_uuid`` and ``access_key`` identify the requesting user and are
+    resolved by the caller.
     """
 
     kernels: list[KernelResourceInput]
     cluster_mode: ClusterMode
     resource_group_id: ResourceGroupID
+    user_uuid: UUID
+    access_key: AccessKey
 
     @override
     @classmethod
@@ -44,8 +52,8 @@ class DryRunScheduleAction(BaseAction):
 
 
 @dataclass(frozen=True)
-class DryRunScheduleActionResult(BaseActionResult):
-    kernel_results: list[KernelDryRunResult]
+class ComputeScheduleActionResult(BaseActionResult):
+    result: ComputeScheduleResult
 
     @override
     def entity_id(self) -> str | None:

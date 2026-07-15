@@ -30,6 +30,7 @@ import pytest
 
 from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.user.types import UserData, UserRole
+from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.identifier.domain import DomainID, DomainName
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.project import ProjectID
@@ -263,6 +264,7 @@ def _build_controller(
             valkey_schedule=valkey_schedule,
             network_plugin_ctx=network_plugin_ctx,
             hook_plugin_ctx=hook_plugin_ctx,
+            agent_selector=MagicMock(),
         )
     )
     return controller, event_producer, hook_plugin_ctx
@@ -278,6 +280,9 @@ class TestEnqueueSessionFromDraft:
 
         repository = AsyncMock()
         repository.fetch_session_spec_contexts.return_value = _fetch_bundle(image_id)
+        repository.query_accessible_resource_group_ids.return_value = frozenset({
+            draft.scope.resource_group_id
+        })
         repository.resolve_vfolder_mounts_by_role.return_value = {"main": (_vfolder_mount(),)}
         repository.enqueue_session_from_spec.return_value = expected_session_id
         repository.mark_scheduling_needed = AsyncMock()
@@ -333,6 +338,9 @@ class TestEnqueueSessionFromDraft:
     ) -> None:
         repository = AsyncMock()
         repository.fetch_session_spec_contexts.return_value = _fetch_bundle(image_id)
+        repository.query_accessible_resource_group_ids.return_value = frozenset({
+            draft.scope.resource_group_id
+        })
         repository.resolve_vfolder_mounts_by_role.return_value = {"main": (_vfolder_mount(),)}
         repository.enqueue_session_from_spec = AsyncMock()
 
@@ -355,6 +363,9 @@ class TestEnqueueSessionFromDraft:
     ) -> None:
         repository = AsyncMock()
         repository.fetch_session_spec_contexts.return_value = _fetch_bundle(image_id)
+        repository.query_accessible_resource_group_ids.return_value = frozenset({
+            draft.scope.resource_group_id
+        })
         repository.resolve_vfolder_mounts_by_role.return_value = {"main": (_vfolder_mount(),)}
         repository.enqueue_session_from_spec.return_value = SessionID(uuid.uuid4())
         repository.mark_scheduling_needed = AsyncMock()
@@ -367,3 +378,50 @@ class TestEnqueueSessionFromDraft:
 
         enqueued_spec = repository.enqueue_session_from_spec.await_args.args[0]
         assert enqueued_spec.network.network_type == NetworkType.VOLATILE
+
+
+class TestResourceGroupAccessibility:
+    async def test_inaccessible_resource_group_rejected_before_fetch(
+        self,
+        draft: SessionSpecDraft,
+        image_id: ImageID,
+    ) -> None:
+        repository = AsyncMock()
+        repository.query_accessible_resource_group_ids.return_value = frozenset()
+        repository.fetch_session_spec_contexts.return_value = _fetch_bundle(image_id)
+        repository.resolve_vfolder_mounts_by_role.return_value = {"main": (_vfolder_mount(),)}
+
+        controller, _event_producer, _hook_plugin_ctx = _build_controller(repository)
+
+        user = _make_user()
+        with with_user(user), pytest.raises(InvalidAPIParameters):
+            await controller.enqueue_session_from_draft(draft)
+
+        repository.fetch_session_spec_contexts.assert_not_called()
+        repository.enqueue_session_from_spec.assert_not_called()
+
+    async def test_access_check_uses_spec_identity_access_key(
+        self,
+        draft: SessionSpecDraft,
+        image_id: ImageID,
+    ) -> None:
+        repository = AsyncMock()
+        repository.query_accessible_resource_group_ids.return_value = frozenset({
+            draft.scope.resource_group_id
+        })
+        repository.fetch_session_spec_contexts.return_value = _fetch_bundle(image_id)
+        repository.resolve_vfolder_mounts_by_role.return_value = {"main": (_vfolder_mount(),)}
+        repository.enqueue_session_from_spec.return_value = SessionID(uuid.uuid4())
+        repository.mark_scheduling_needed = AsyncMock()
+
+        controller, _event_producer, _hook_plugin_ctx = _build_controller(repository)
+
+        user = _make_user()
+        with with_user(user):
+            await controller.enqueue_session_from_draft(draft)
+
+        repository.query_accessible_resource_group_ids.assert_awaited_once()
+        assert (
+            repository.query_accessible_resource_group_ids.await_args.kwargs["access_key"]
+            == draft.identity.access_key
+        )

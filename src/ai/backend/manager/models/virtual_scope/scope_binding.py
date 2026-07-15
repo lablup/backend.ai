@@ -19,7 +19,14 @@ from ai.backend.manager.models.base import (
 
 class ScopeBindingRow(Base):  # type: ignore[misc]
     __tablename__ = "scope_bindings"
-    __table_args__ = (sa.Index("ix_scope_bindings_scope", "scope_type", "scope_id"),)
+    __table_args__ = (
+        sa.Index("ix_scope_bindings_scope", "scope_type", "scope_id"),
+        sa.Index(
+            "ix_scope_bindings_virtual_scope",
+            "virtual_scope_id",
+            postgresql_include=["scope_type", "scope_id", "permission_cap"],
+        ),
+    )
 
     virtual_scope_id: Mapped[VirtualScopeID] = mapped_column(
         "virtual_scope_id",

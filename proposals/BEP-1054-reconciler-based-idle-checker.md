@@ -16,7 +16,7 @@ Backend.AI Manager's idle checker currently lives in `manager/idle.py`, driven b
 1. **Detached from the sokovan lifecycle.** Idle checking runs on its own timer and `DoIdleCheckEvent` wiring instead of the generic reconciler flow the rest of the lifecycle is converging on.
 2. **The idle checker is not a first-class object.** A checker today is a Python class plus config keys. There is no way to define one checker spec (e.g. "GPU under-utilized for 30 minutes") and reuse it across multiple domains, projects, or resource groups.
 3. **Configuration is scattered.** Global config lives in `config.idle`, per-keypair values in the keypair resource policy, and runtime/report state in Valkey. Which setting applies to which session is hard to trace.
-4. **Judgment, I/O, and reporting are entangled.** Checkers read Valkey, accumulate state, and write reports inline, which makes them hard to test and extend.
+4. **Judgment, I/O, and reporting are entangled.** Checkers read Valkey, accumulate cross-tick state, and write reports inline, which makes them hard to test and extend.
 5. **Utilization is tied to the legacy live-stat shape.** Utilization idle should be derivable from agent-emitted Prometheus metrics aggregated over a window.
 
 This proposal re-homes idle checking onto a sokovan reconciler stage and promotes the idle checker to a reusable DB object. Each scope applies a checker through a separate association row.
@@ -27,7 +27,7 @@ This proposal re-homes idle checking onto a sokovan reconciler stage and promote
 - Model the idle checker as a first-class, reusable DB object that is independent of any scope.
 - Express scope application (domain / project / resource group) through a dedicated association table.
 - Drive utilization decisions from agent-emitted Prometheus metrics.
-- Keep judgment free of inline I/O and reporting; the stage only hands idle sessions to the existing termination lifecycle.
+- Keep checker I/O and judgment behind one batched per-type contract and keep reporting outside the checker; the stage only hands idle sessions to the existing termination lifecycle.
 
 ### Non-Goals
 
@@ -57,7 +57,7 @@ Two properties matter for this proposal:
 
 The redesign rests on two ideas:
 
-1. **Idle checking becomes a sokovan reconciler stage.** A `Source` gathers what to evaluate, a `Handler` evaluates it with no external I/O, and an `Applier` marks idle sessions for termination — the same shape as other reconciler stages.
+1. **Idle checking becomes a sokovan reconciler stage.** A `Source` gathers what to evaluate, a `Handler` drives each checker's batched I/O and judgment contract, and an `Applier` marks idle sessions for termination — the same shape as other reconciler stages.
 2. **The idle checker becomes a first-class DB object.** A checker is a reusable, scope-agnostic spec. Whether and where it applies is expressed by separate association rows that bind it to a domain, project, or resource group.
 
 ### Data Model
@@ -134,7 +134,7 @@ erDiagram
 The `spec` column is **not free-form JSON** — it holds a typed, polymorphic payload whose shape is fixed by the row's `checker_type`. Two layers express this:
 
 - **`ABCColumn` — a generic, reusable polymorphic JSONB column.** It is not idle-specific: it persists any value that satisfies a load/write contract (JSONB dict ↔ typed object) and rehydrates the typed object on read. Idle checking is its first user, but the column type is meant to back any table that stores polymorphic, validated config.
-- **`IdleCheckerABC` — the idle-specific payload the column carries.** On load it dispatches by the `checker_type` discriminator to the concrete spec (`session_lifetime` / `network_timeout` / `utilization`), and it declares the behavior contract every checker implements: how it **prepares** the runtime state it needs, and how it **renders an idle verdict**.
+- **`IdleCheckerABC` — the idle-specific payload the column carries.** On load it dispatches by the `checker_type` discriminator to the concrete spec (`session_lifetime` / `network_timeout` / `utilization`), and it declares the behavior contract every checker implements: how it batch-loads runtime signals and renders judgments for its assignments.
 
 Conceptually (the contract only — bodies are an implementation concern):
 
@@ -145,8 +145,7 @@ ABCColumnPayload                  # storage contract ABCColumn speaks to
 
 IdleCheckerABC(ABCColumnPayload)  # the value stored in idle_checkers.spec
   load(raw)  -> concrete spec     # dispatch by checker_type discriminator
-  prepare(context, targets)       # batch-read this checker's runtime state
-  check_idle(target, state) -> verdict   # decide from prepared state + session facts
+  judge(assignments) -> judgments  # batched I/O + decision
 ```
 
 This buys three things:
@@ -155,14 +154,14 @@ This buys three things:
 - **Config lives with its checker.** Each `checker_type` owns its own spec fields instead of a shared column shape every checker must understand.
 - **Extensible without schema change.** A new `checker_type` adds a new `IdleCheckerABC` subtype; the table and column are untouched.
 
-`prepare` and `check_idle` are the behavioral half of this contract; the orchestration that drives them is described under *Checker-Owned Runtime State* below.
+`judge` is the behavioral half of this contract; the orchestration that drives it is described under *Checker-Owned Runtime State* below.
 
 ### Reconciler Stage
 
 The stage follows the generic reconciler contract:
 
-- **Source** — gathers the sessions to evaluate and the checkers that apply to them, and prepares any runtime state the checkers need. This is the only part that performs external reads.
-- **Handler** — evaluates each prepared check into an idle verdict. It performs no external I/O.
+- **Source** — gathers the sessions to evaluate and the checkers that apply to them.
+- **Handler** — pivots the batch by checker type and invokes each checker's single batched `judge` contract. Checker-owned external reads occur behind this contract.
 - **Applier** — collects idle sessions and marks them for termination through the existing scheduler lifecycle.
 
 ### Source Fetch Direction
@@ -199,21 +198,21 @@ domain:         the session's domain
 
 RBAC scope-chain traversal is not used: a resource group can be linked to many domains/projects, so following parent relationships could attach checkers unrelated to the session.
 
-A session's **effective checkers** are the union of enabled bindings attached to its resource group, its project, and its domain. When a session has more than one effective checker, they apply in a deterministic order — by scope specificity (`resource_group` > `project` > `domain`), then a stable tiebreak. The first checker to report idle marks the session for termination; one session yields at most one termination.
+A session's **effective checkers** are the union of enabled bindings attached to its resource group, its project, and its domain. The handler evaluates every implemented checker and merges all idle judgments into one per-session report; one session still yields at most one termination.
 
 #### Matching across scopes
 
-Because a session belongs to three scopes at once and each scope may carry several bindings, three matching cases arise. All three reduce to one rule: **take the union, de-duplicate by checker, order deterministically, and let the first idle verdict win.**
+Because a session belongs to three scopes at once and each scope may carry several bindings, three matching cases arise. All three reduce to one rule: **take the union, de-duplicate by checker, evaluate every checker, and merge their idle reasons.**
 
-- **Different checkers across scopes.** A `network_timeout` bound at the domain, a `utilization` at the project, and another checker at the resource group all apply; the effective set is their union, evaluated in order until one reports idle.
-- **The same checker reachable from multiple scopes.** One `idle_checker_id` may be bound at both the session's domain and its project. It resolves to a **single** effective checker — de-duplicated by checker id and evaluated once — taking the position of its highest-precedence binding. A checker is never evaluated twice for the same session.
-- **Multiple checkers bound to one scope.** A single scope (e.g. one resource group) may carry many bindings, each its own row with its own `enabled` flag; all enabled ones participate and are ordered as above. Whether two bindings of the **same** `checker_type` may coexist at one scope (e.g. two `network_timeout`s with different timeouts) is left open — see Open Questions.
+- **Different checkers across scopes.** A `network_timeout` bound at the domain, a `utilization` at the project, and another checker at the resource group all apply; the effective set is their union and every checker contributes its idle reason.
+- **The same checker reachable from multiple scopes.** One `idle_checker_id` may be bound at both the session's domain and its project. It resolves to a **single** effective checker, de-duplicated by checker id and evaluated once for that session.
+- **Multiple checkers bound to one scope.** A single scope (e.g. one resource group) may carry many bindings, each its own row with its own `enabled` flag; all enabled checkers participate. Multiple definitions of the same `checker_type` are batched into one implementation call.
 
 A binding with `enabled = false` is dropped from the union before any of this, so a disabled binding never contributes a checker.
 
 ### Checker-Owned Runtime State
 
-The Source does not branch centrally on checker type to read Valkey or Prometheus. Each checker owns the preparation of the runtime state it needs, and the Source is only an orchestrator that hands the checker its targets. This keeps query shapes (which store to read, which metric to query) inside the checker that understands them and keeps the Source agnostic to checker internals.
+The Source does not branch centrally on checker type to read Valkey or Prometheus. The Handler groups assignments by checker type and calls each implementation once per tick. Each checker owns its batched external reads and internal judgment material; the public contract exposes only assignments and judgments. This keeps query shapes inside the checker without exposing preparer state to the orchestration layer.
 
 ### Checker Types
 
@@ -249,7 +248,6 @@ flowchart TB
         ReadSessions[read RG sessions]
         ResolveScopes[resolve rg/project/domain scopes]
         LoadCheckers[load bound checkers]
-        Prepare[checker-owned state prep]
     end
 
     Handler[IdleCheck Handler<br/>evaluate verdicts]
@@ -258,13 +256,13 @@ flowchart TB
     Sessions --> ReadSessions --> ResolveScopes --> LoadCheckers
     Checkers --> LoadCheckers
     Bindings --> LoadCheckers
-    LoadCheckers --> Prepare --> Handler --> Applier
+    LoadCheckers --> Handler
+    Handler --> Applier
 ```
 
 
 ## Open Questions
 
-- Is scope specificity (`resource_group` > `project` > `domain`) plus a stable tiebreak enough to order a session's effective checkers, or is an explicit per-binding `priority` needed?
 - Should the legacy keypair `idle_timeout` / `max_session_lifetime` values be backfilled into checker specs, or only honored as a fallback during rollout?
 - Should utilization `and` / `or` threshold semantics match the legacy behavior or be redefined?
 

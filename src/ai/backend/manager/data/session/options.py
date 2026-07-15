@@ -263,7 +263,7 @@ class KernelResourceConfig(_OptionsBaseModel):
     """Resolved per-kernel resource inputs (image + slots).
 
     The resolved counterpart of the draft's ``KernelResourceInput``; grouped as
-    a single field so the same shape is shared with the scheduler dry-run.
+    a single field so the same shape is shared with the compute-schedule flow.
     """
 
     image_id: ImageID = Field(

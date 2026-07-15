@@ -117,6 +117,10 @@ from ai.backend.manager.services.session.actions.complete import (
     CompleteAction,
     CompleteActionResult,
 )
+from ai.backend.manager.services.session.actions.compute_schedule import (
+    ComputeScheduleAction,
+    ComputeScheduleActionResult,
+)
 from ai.backend.manager.services.session.actions.convert_session_to_image import (
     ConvertSessionToImageAction,
     ConvertSessionToImageActionResult,
@@ -315,6 +319,47 @@ class SessionService:
             action.user_id,
         )
         return ResolveSessionActionResult(session_id=session_id)
+
+    async def compute_schedule(self, action: ComputeScheduleAction) -> ComputeScheduleActionResult:
+        """Build a slim ``SessionSpecDraft`` (one kernel group per requested
+        kernel, unique role for positional correlation) and delegate the
+        node-fitting decision to the scheduling controller.
+        """
+        resource_group_name = await self._scheduler_repository.get_resource_group_name_by_id(
+            action.resource_group_id
+        )
+
+        kernel_groups = tuple(
+            KernelGroupDraft(
+                role=DEFAULT_ROLE if idx == 0 else f"sub{idx}",
+                replica_count=1,
+                execution_spec=KernelExecutionSpecDraft(resource_input=kernel),
+            )
+            for idx, kernel in enumerate(action.kernels)
+        )
+
+        draft = SessionSpecDraft(
+            identity=SessionIdentityDraft(
+                session_id=SessionID(uuid.uuid4()),
+                creation_id=uuid.uuid4().hex,
+                session_name="compute-schedule",
+                access_key=action.access_key,
+                user_uuid=action.user_uuid,
+            ),
+            scope=SessionScopeDraft(
+                resource_group_id=action.resource_group_id,
+                resource_group_name=resource_group_name,
+            ),
+            classification=SessionClassificationDraft(session_type=SessionTypes.INTERACTIVE),
+            options=SessionOptionsDraft(
+                cluster_mode=action.cluster_mode,
+                cluster_size=len(action.kernels),
+                kernel_groups=kernel_groups,
+            ),
+        )
+
+        result = await self._scheduling_controller.compute_schedule(draft)
+        return ComputeScheduleActionResult(result=result)
 
     async def resolve_session_name(
         self, action: ResolveSessionNameAction

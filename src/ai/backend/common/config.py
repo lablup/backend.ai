@@ -603,7 +603,9 @@ def _merge_health_check_draft(
     override: ModelHealthCheckDraft,
 ) -> ModelHealthCheckDraft:
     s = override.model_fields_set
+    # model_construct marks every kwarg as set; pass the real union so unset stays unset.
     return ModelHealthCheckDraft.model_construct(
+        _fields_set=base.model_fields_set | override.model_fields_set,
         enable=_pick_non_null_override(base.enable, override.enable, "enable" in s),
         interval=_pick_non_null_override(base.interval, override.interval, "interval" in s),
         path=_pick_non_null_override(base.path, override.path, "path" in s),
@@ -635,13 +637,15 @@ def _merge_service_config_draft(
             base.health_check, override.health_check, "health_check" in s
         )
     return ModelServiceConfigDraft.model_construct(
+        _fields_set=base.model_fields_set | override.model_fields_set,
         pre_start_actions=_pick_non_null_override(
             base.pre_start_actions, override.pre_start_actions, "pre_start_actions" in s
         ),
         start_command=_pick_non_null_override(
             base.start_command, override.start_command, "start_command" in s
         ),
-        shell=_pick_non_null_override(base.shell, override.shell, "shell" in s),
+        # shell requires explicit none to disable shell wrapping; otherwise the baseline's default is preserved.
+        shell=_pick(base.shell, override.shell, "shell" in s),
         port=_pick_non_null_override(base.port, override.port, "port" in s),
         health_check=health_check,
     )
@@ -663,6 +667,7 @@ def _merge_config_draft(
     else:
         metadata = _pick_non_null_override(base.metadata, override.metadata, "metadata" in s)
     return ModelConfigDraft.model_construct(
+        _fields_set=base.model_fields_set | override.model_fields_set,
         name=_pick_non_null_override(base.name, override.name, "name" in s),
         model_path=override.model_path if override.model_path is not None else base.model_path,
         service=service,

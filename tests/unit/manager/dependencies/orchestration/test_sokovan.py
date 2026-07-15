@@ -60,6 +60,7 @@ class TestSokovanOrchestratorDependency:
             event_producer=MagicMock(),
             valkey_schedule=MagicMock(),
             valkey_stat=MagicMock(),
+            agent_selector=MagicMock(),
             scheduling_controller=MagicMock(),
             deployment_controller=MagicMock(),
             route_controller=MagicMock(),
@@ -110,6 +111,7 @@ class TestSokovanOrchestratorDependency:
         event_producer = MagicMock()
         valkey_schedule = MagicMock()
         route_controller = MagicMock()
+        agent_selector = MagicMock()
 
         dependency = SokovanOrchestratorDependency()
         sokovan_input = SokovanOrchestratorInput(
@@ -126,6 +128,7 @@ class TestSokovanOrchestratorDependency:
             event_producer=event_producer,
             valkey_schedule=valkey_schedule,
             valkey_stat=MagicMock(),
+            agent_selector=agent_selector,
             scheduling_controller=MagicMock(),
             deployment_controller=MagicMock(),
             route_controller=route_controller,
@@ -144,4 +147,5 @@ class TestSokovanOrchestratorDependency:
                 agent_client_pool,
                 network_plugin_ctx,
                 valkey_schedule,
+                agent_selector,
             )

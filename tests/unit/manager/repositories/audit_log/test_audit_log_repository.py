@@ -267,7 +267,7 @@ class TestAuditLogRepository:
                     entity_id=None,
                     request_id=None,
                     triggered_by="super-admin",
-                    acted_as=str(acted_as),
+                    acted_as=acted_as,
                     duration=None,
                 )
             )
@@ -297,7 +297,7 @@ class TestAuditLogRepository:
         result_ids = [log.id for log in result.items]
         assert sample_audit_logs_by_acted_as[target_acted_as] in result_ids
         assert sample_audit_logs_by_acted_as[other_acted_as] not in result_ids
-        assert all(log.acted_as == str(target_acted_as) for log in result.items)
+        assert all(log.acted_as == target_acted_as for log in result.items)
 
     # =========================================================================
     # Tests - Search with ordering

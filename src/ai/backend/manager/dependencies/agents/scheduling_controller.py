@@ -13,6 +13,7 @@ from ai.backend.manager.clients.storage_proxy.session_manager import StorageSess
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
+from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import AgentSelector
 from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
     SchedulingController,
     SchedulingControllerArgs,
@@ -30,6 +31,7 @@ class SchedulingControllerInput:
     valkey_schedule: ValkeyScheduleClient
     network_plugin_ctx: NetworkPluginContext
     hook_plugin_ctx: HookPluginContext
+    agent_selector: AgentSelector
 
 
 class SchedulingControllerDependency(
@@ -64,6 +66,7 @@ class SchedulingControllerDependency(
                 valkey_schedule=setup_input.valkey_schedule,
                 network_plugin_ctx=setup_input.network_plugin_ctx,
                 hook_plugin_ctx=setup_input.hook_plugin_ctx,
+                agent_selector=setup_input.agent_selector,
             )
         )
         yield controller

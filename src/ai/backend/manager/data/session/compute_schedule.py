@@ -15,16 +15,18 @@ class UnschedulableReasonHint:
     - ``required_reduction`` — subtract these slots to fit the best-fitting node.
     - ``required_container_reduction`` — free this many containers.
     - ``available_archs`` — architectures that actually exist.
+    - ``image_not_found`` — True if the requested image was not found.
     """
 
     required_reduction: tuple[ResourceSlotEntry, ...] | None = None
     required_container_reduction: int | None = None
     available_archs: list[str] | None = None
+    image_not_found: bool = False
 
 
 @dataclass(frozen=True)
-class KernelDryRunResult:
-    """Dry-run outcome for a single kernel.
+class ComputeScheduleKernelResult:
+    """Compute-schedule outcome for a single kernel.
 
     Results correspond positionally to the requested kernels: the caller
     matches each result to its input by list index, so no correlation handle
@@ -36,6 +38,12 @@ class KernelDryRunResult:
     """
 
     requested_slots: tuple[ResourceSlotEntry, ...]
-    requested_architecture: str
+    requested_architecture: str | None
     success: bool
     reason_hint: UnschedulableReasonHint | None = None
+
+
+@dataclass(frozen=True)
+class ComputeScheduleResult:
+    kernel_results: list[ComputeScheduleKernelResult]
+    resource_group_reason: str | None = None

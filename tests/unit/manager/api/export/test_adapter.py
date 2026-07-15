@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Callable
-from typing import cast
+from typing import Any, cast
 
 import pytest
 import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
@@ -664,15 +665,19 @@ class TestBuildSessionQueryUserFilter:
 _ACTED_AS = uuid.UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
 _ACTED_AS_OTHER = uuid.UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
 
+# postgresql.dialect (PGDialect) has an untyped __init__; go through Any to avoid [no-untyped-call].
+_pg_dialect_cls: Any = postgresql.dialect
+_PG_DIALECT = _pg_dialect_cls()
+
 
 class TestBuildAuditLogQueryActedAsFilter:
     """Tests for build_audit_log_query acted_as (UUID) filtering (BA-6840).
 
     The audit-log CSV export must support filtering by the effective actor UUID. The
-    ``audit_logs.acted_as`` column stores stringified UUIDs, so filter values are compiled
-    as their hyphenated ``str`` form; comparing the string column against raw UUID objects
-    would render the un-hyphenated hex and silently match nothing. These conditions are
-    only exercised through the adapter, not the DTO-construction test.
+    ``audit_logs.acted_as`` column is a native ``UUID``; conditions are compiled with the
+    PostgreSQL dialect (the production target) so the ``GUID`` type renders values as
+    hyphenated UUID literals. These conditions are only exercised through the adapter,
+    not the DTO-construction test.
     """
 
     @pytest.fixture
@@ -742,22 +747,28 @@ class TestBuildAuditLogQueryActedAsFilter:
         """No acted_as filter set."""
         return build_query(AuditLogExportFilter())
 
-    def test_equals_compiles_to_stringified_uuid_equality(
+    def test_equals_compiles_to_uuid_equality(
         self,
         query_equals: StreamingExportQuery,
     ) -> None:
         assert len(query_equals.conditions) == 1
         condition = str(
-            query_equals.conditions[0]().compile(compile_kwargs={"literal_binds": True})
+            query_equals.conditions[0]().compile(
+                dialect=_PG_DIALECT, compile_kwargs={"literal_binds": True}
+            )
         )
         assert f"audit_logs.acted_as = '{_ACTED_AS}'" in condition
 
-    def test_in_compiles_to_stringified_uuid_membership(
+    def test_in_compiles_to_uuid_membership(
         self,
         query_in: StreamingExportQuery,
     ) -> None:
         assert len(query_in.conditions) == 1
-        condition = str(query_in.conditions[0]().compile(compile_kwargs={"literal_binds": True}))
+        condition = str(
+            query_in.conditions[0]().compile(
+                dialect=_PG_DIALECT, compile_kwargs={"literal_binds": True}
+            )
+        )
         assert "audit_logs.acted_as IN (" in condition
         assert f"'{_ACTED_AS}'" in condition
         assert f"'{_ACTED_AS_OTHER}'" in condition
@@ -768,7 +779,9 @@ class TestBuildAuditLogQueryActedAsFilter:
     ) -> None:
         assert len(query_not_equals.conditions) == 1
         condition = str(
-            query_not_equals.conditions[0]().compile(compile_kwargs={"literal_binds": True})
+            query_not_equals.conditions[0]().compile(
+                dialect=_PG_DIALECT, compile_kwargs={"literal_binds": True}
+            )
         )
         assert f"audit_logs.acted_as != '{_ACTED_AS}'" in condition
 
@@ -778,7 +791,9 @@ class TestBuildAuditLogQueryActedAsFilter:
     ) -> None:
         assert len(query_not_in.conditions) == 1
         condition = str(
-            query_not_in.conditions[0]().compile(compile_kwargs={"literal_binds": True})
+            query_not_in.conditions[0]().compile(
+                dialect=_PG_DIALECT, compile_kwargs={"literal_binds": True}
+            )
         )
         assert "audit_logs.acted_as NOT IN (" in condition
         assert f"'{_ACTED_AS}'" in condition
