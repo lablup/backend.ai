@@ -28,6 +28,7 @@ from ai.backend.manager.repositories.base import (
 )
 from ai.backend.manager.repositories.scheduling_history.types import (
     DeploymentHistorySearchScope,
+    KernelSchedulingHistorySearchScope,
     RouteHistorySearchScope,
     SessionSchedulingHistorySearchScope,
 )
@@ -94,7 +95,7 @@ class SchedulingHistoryDBSource:
                 has_previous_page=result.has_previous_page,
             )
 
-    # ========== Kernel History ==========
+    # ========== Kernel History (Admin) ==========
 
     async def search_kernel_history(
         self,
@@ -109,6 +110,28 @@ class SchedulingHistoryDBSource:
                 query,
                 querier,
             )
+
+            items = [row.KernelSchedulingHistoryRow.to_data() for row in result.rows]
+
+            return KernelSchedulingHistoryListResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    # ========== Kernel History (Scoped) ==========
+
+    async def search_kernel_scoped_history(
+        self,
+        querier: BatchQuerier,
+        scope: KernelSchedulingHistorySearchScope,
+    ) -> KernelSchedulingHistoryListResult:
+        """Search kernel scheduling history within scope."""
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(KernelSchedulingHistoryRow)
+
+            result = await execute_batch_querier(db_sess, query, querier, scopes=[scope])
 
             items = [row.KernelSchedulingHistoryRow.to_data() for row in result.rows]
 

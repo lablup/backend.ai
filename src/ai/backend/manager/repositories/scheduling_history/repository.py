@@ -26,6 +26,7 @@ from ai.backend.manager.repositories.base import BatchQuerier
 from .db_source import SchedulingHistoryDBSource
 from .types import (
     DeploymentHistorySearchScope,
+    KernelSchedulingHistorySearchScope,
     RouteHistorySearchScope,
     SessionSchedulingHistorySearchScope,
 )
@@ -81,7 +82,7 @@ class SchedulingHistoryRepository:
         """Search session scheduling history within scope."""
         return await self._db_source.search_session_scoped_history(querier, scope)
 
-    # ========== Kernel History ==========
+    # ========== Kernel History (Admin) ==========
 
     @scheduling_history_repository_resilience.apply()
     async def search_kernel_history(
@@ -90,6 +91,17 @@ class SchedulingHistoryRepository:
     ) -> KernelSchedulingHistoryListResult:
         """Search kernel scheduling history with pagination."""
         return await self._db_source.search_kernel_history(querier)
+
+    # ========== Kernel History (Scoped) ==========
+
+    @scheduling_history_repository_resilience.apply()
+    async def search_kernel_scoped_history(
+        self,
+        querier: BatchQuerier,
+        scope: KernelSchedulingHistorySearchScope,
+    ) -> KernelSchedulingHistoryListResult:
+        """Search kernel scheduling history within scope."""
+        return await self._db_source.search_kernel_scoped_history(querier, scope)
 
     # ========== Deployment History (Admin) ==========
 
