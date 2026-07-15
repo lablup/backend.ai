@@ -105,10 +105,20 @@ def _migrate_new_entity_type(db_conn: Connection) -> None:
                 f"('{perm_id}', '{entity_type}', '{operation}')"
                 for perm_id, entity_type, operation in inputs
             )
+            # `permissions` has no unique constraint on these columns at this
+            # revision, so ON CONFLICT has nothing to match on -- skip existing
+            # rows explicitly to keep re-runs idempotent.
             query = sa.text(f"""
                 INSERT INTO permissions (permission_group_id, entity_type, operation)
-                VALUES {values}
-                ON CONFLICT DO NOTHING
+                SELECT DISTINCT v.permission_group_id::uuid, v.entity_type, v.operation
+                FROM (VALUES {values}) AS v(permission_group_id, entity_type, operation)
+                WHERE NOT EXISTS (
+                    SELECT 1
+                    FROM permissions p
+                    WHERE p.permission_group_id = v.permission_group_id::uuid
+                      AND p.entity_type = v.entity_type
+                      AND p.operation = v.operation
+                )
             """)
             db_conn.execute(query)
 
@@ -224,10 +234,20 @@ def _add_permission_groups_for_vfolder_invitations(db_conn: Connection) -> None:
 
         if values_list:
             values = ", ".join(values_list)
+            # `permission_groups` has no unique constraint on these columns at
+            # this revision, so ON CONFLICT has nothing to match on -- skip
+            # existing rows explicitly to keep re-runs idempotent.
             insert_query = sa.text(f"""
                 INSERT INTO permission_groups (role_id, scope_type, scope_id)
-                VALUES {values}
-                ON CONFLICT DO NOTHING
+                SELECT DISTINCT v.role_id::uuid, v.scope_type, v.scope_id
+                FROM (VALUES {values}) AS v(role_id, scope_type, scope_id)
+                WHERE NOT EXISTS (
+                    SELECT 1
+                    FROM permission_groups pg
+                    WHERE pg.role_id = v.role_id::uuid
+                      AND pg.scope_type = v.scope_type
+                      AND pg.scope_id = v.scope_id
+                )
             """)
             db_conn.execute(insert_query)
 
@@ -283,10 +303,21 @@ def _add_object_permissions_for_vfolder_invitations(db_conn: Connection) -> None
 
         if values_list:
             values = ", ".join(values_list)
+            # `object_permissions` has no unique constraint on these columns at
+            # this revision, so ON CONFLICT has nothing to match on -- skip
+            # existing rows explicitly to keep re-runs idempotent.
             insert_query = sa.text(f"""
                 INSERT INTO object_permissions (role_id, entity_type, entity_id, operation)
-                VALUES {values}
-                ON CONFLICT DO NOTHING
+                SELECT DISTINCT v.role_id::uuid, v.entity_type, v.entity_id, v.operation
+                FROM (VALUES {values}) AS v(role_id, entity_type, entity_id, operation)
+                WHERE NOT EXISTS (
+                    SELECT 1
+                    FROM object_permissions o
+                    WHERE o.role_id = v.role_id::uuid
+                      AND o.entity_type = v.entity_type
+                      AND o.entity_id = v.entity_id
+                      AND o.operation = v.operation
+                )
             """)
             db_conn.execute(insert_query)
 
