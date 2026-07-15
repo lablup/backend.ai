@@ -53,7 +53,7 @@ class SeededIdleCheckData:
     project_session_id: SessionId
     domain_session_id: SessionId
     inference_session_id: SessionId
-    unstarted_session_id: SessionId
+    not_started_session_id: SessionId
     resource_group_checker_id: IdleCheckerID
     project_checker_id: IdleCheckerID
     domain_checker_id: IdleCheckerID
@@ -327,7 +327,7 @@ class TestFetchIdleCheckBatch:
         project_session_id = SessionId(uuid.uuid4())
         domain_session_id = SessionId(uuid.uuid4())
         inference_session_id = SessionId(uuid.uuid4())
-        unstarted_session_id = SessionId(uuid.uuid4())
+        not_started_session_id = SessionId(uuid.uuid4())
         session_specs = (
             (
                 resource_group_scope,
@@ -359,7 +359,7 @@ class TestFetchIdleCheckBatch:
             ),
             (
                 domain_scope,
-                unstarted_session_id,
+                not_started_session_id,
                 datetime(2026, 1, 5, tzinfo=UTC),
                 None,
                 SessionTypes.INTERACTIVE,
@@ -503,7 +503,7 @@ class TestFetchIdleCheckBatch:
             project_session_id=project_session_id,
             domain_session_id=domain_session_id,
             inference_session_id=inference_session_id,
-            unstarted_session_id=unstarted_session_id,
+            not_started_session_id=not_started_session_id,
             resource_group_checker_id=resource_group_checker_id,
             project_checker_id=project_checker_id,
             domain_checker_id=domain_checker_id,
@@ -627,7 +627,7 @@ class TestFetchIdleCheckBatch:
             seeded_idle_check_data.project_session_id,
             seeded_idle_check_data.domain_session_id,
         }
-        assert seeded_idle_check_data.unstarted_session_id not in target_session_ids
+        assert seeded_idle_check_data.not_started_session_id not in target_session_ids
 
     @pytest.fixture
     async def per_type_checker_data(

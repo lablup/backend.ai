@@ -46,7 +46,7 @@ class SessionConditions:
         return inner
 
     @staticmethod
-    def started() -> QueryCondition:
+    def by_started_at() -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return SessionRow.starts_at.isnot(None)
 
