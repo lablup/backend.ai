@@ -94,10 +94,20 @@ def _migrate_new_entity_type(db_conn: Connection) -> None:
                 f"('{perm_id}', '{entity_type}', '{operation}')"
                 for perm_id, entity_type, operation in inputs
             )
+            # `permissions` has no unique constraint on these columns at this
+            # revision, so ON CONFLICT has nothing to match on -- skip existing
+            # rows explicitly to keep re-runs idempotent.
             query = sa.text(f"""
                 INSERT INTO permissions (permission_group_id, entity_type, operation)
-                VALUES {values}
-                ON CONFLICT DO NOTHING
+                SELECT DISTINCT v.permission_group_id::uuid, v.entity_type, v.operation
+                FROM (VALUES {values}) AS v(permission_group_id, entity_type, operation)
+                WHERE NOT EXISTS (
+                    SELECT 1
+                    FROM permissions p
+                    WHERE p.permission_group_id = v.permission_group_id::uuid
+                      AND p.entity_type = v.entity_type
+                      AND p.operation = v.operation
+                )
             """)
             db_conn.execute(query)
 
