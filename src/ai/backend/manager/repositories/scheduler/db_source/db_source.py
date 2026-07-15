@@ -282,19 +282,19 @@ class ScheduleDBSource:
             # 1. Get scaling group
             scaling_group_meta = await self._fetch_scaling_group(db_sess, resource_group_id)
 
-            # 2. Get pending sessions
+            # 2. Get agents
+            agents = await self._fetch_agents(db_sess, scaling_group_meta.id)
+
+            # 3. Get pending sessions
             pending_sessions = await self._fetch_pending_sessions(db_sess, scaling_group_meta.id)
             if not pending_sessions.sessions:
                 return SchedulingData(
                     scaling_group=scaling_group_meta,
                     pending_sessions=pending_sessions,
-                    agents=[],
+                    agents=agents,
                     snapshot_data=None,
                     spec=spec,
                 )
-
-            # 3. Get agents
-            agents = await self._fetch_agents(db_sess, scaling_group_meta.id)
 
             # 4. Get snapshot data
             snapshot_data = await self._fetch_snapshot_data(

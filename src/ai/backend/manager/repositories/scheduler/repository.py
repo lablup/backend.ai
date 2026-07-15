@@ -109,12 +109,9 @@ class SchedulerRepository:
         self._config_provider = config_provider
 
     @scheduler_repository_resilience.apply()
-    async def get_scheduling_data(
-        self, resource_group_id: ResourceGroupID
-    ) -> SchedulingData | None:
+    async def get_scheduling_data(self, resource_group_id: ResourceGroupID) -> SchedulingData:
         """
         Get scheduling data from database.
-        Returns None if no pending sessions exist.
         Raises ScalingGroupNotFound if scaling group doesn't exist.
         """
         known_slot_types = await self._get_known_slot_types()
@@ -124,11 +121,7 @@ class SchedulerRepository:
             max_container_count=max_container_count,
         )
 
-        scheduling_data = await self._db_source.get_scheduling_data(resource_group_id, spec)
-        if not scheduling_data.pending_sessions.sessions:
-            return None
-
-        return scheduling_data
+        return await self._db_source.get_scheduling_data(resource_group_id, spec)
 
     @scheduler_repository_resilience.apply()
     async def allocate_sessions(self, allocation_batch: AllocationBatch) -> list[SessionId]:
