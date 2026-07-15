@@ -335,6 +335,7 @@ class NativeBridgeAttachRunner:
 
         if config.get("ipMasq") and subnet:
             await self._ensure_masq(subnet)
+            await self._ensure_forward_accept(bridge)
         return {"ips": [{"address": f"{ip}/{prefix}"}]}
 
     async def _is_wired(self, host_veth: str, netns: str, ifname: str) -> bool:
@@ -360,6 +361,7 @@ class NativeBridgeAttachRunner:
             remaining = await self._ipam.release(subnet, container_id, ifname)
             if remaining == 0 and config.get("ipMasq"):
                 await self._del_masq(subnet)
+                await self._del_forward_accept(str(config["bridge"]))
 
     async def _ensure_bridge(self, bridge: str, mtu: str, gw_cidr: str | None) -> None:
         rc, _, _ = await _run(["ip", "link", "show", bridge], check=False)
@@ -382,3 +384,24 @@ class NativeBridgeAttachRunner:
 
     async def _del_masq(self, subnet: str) -> None:
         await _run(["iptables", "-t", "nat", "-D", *self._masq_rule(subnet)], check=False)
+
+    def _forward_accept_rules(self, bridge: str) -> list[list[str]]:
+        # br_netfilter + a DROP FORWARD policy (a node co-hosting Docker or kube-proxy, or a
+        # hardened host) routes bridged frames through iptables FORWARD, so egress leaving the
+        # LOCAL bridge -- and same-node container<->container over it -- is dropped and the bridge
+        # goes silently dead. Accept traffic in and out of this bridge, as Docker does for its own.
+        # Paired with the NAT MASQUERADE above and torn down on the same last-owner path.
+        return [
+            ["FORWARD", "-i", bridge, "-j", "ACCEPT"],
+            ["FORWARD", "-o", bridge, "-j", "ACCEPT"],
+        ]
+
+    async def _ensure_forward_accept(self, bridge: str) -> None:
+        for rule in self._forward_accept_rules(bridge):
+            rc, _, _ = await _run(["iptables", "-C", *rule], check=False)
+            if rc != 0:
+                await _run(["iptables", "-I", *rule], check=False)
+
+    async def _del_forward_accept(self, bridge: str) -> None:
+        for rule in self._forward_accept_rules(bridge):
+            await _run(["iptables", "-D", *rule], check=False)

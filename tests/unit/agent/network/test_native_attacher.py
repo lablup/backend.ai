@@ -246,8 +246,8 @@ class _RunRecorder:
         # emulate `ip link show <dev>` / `iptables -C`: rc 0 if present, else 1
         if argv[:3] == ["ip", "link", "show"]:
             return (0 if argv[3] in self._existing else 1), b"", b""
-        if argv[:4] == ["iptables", "-t", "nat", "-C"]:
-            return 1, b"", b""  # rule absent -> triggers -A
+        if argv[0] == "iptables" and "-C" in argv:
+            return 1, b"", b""  # any rule-check reports absent -> triggers the add
         return 0, b"", b""
 
     def flat(self) -> str:
@@ -273,6 +273,9 @@ class TestNativeAttachStatic:
         # static IPAM: no bridge gateway address, no MASQUERADE
         assert "addr replace" not in flat
         assert "MASQUERADE" not in flat
+        # the overlay bridge's FORWARD-accept is the vxlan plugin's to own (at setup), not the
+        # attacher's: an ipMasq=False attach must not touch FORWARD here.
+        assert "-I FORWARD" not in flat
         # no mac in config -> the NIC keeps its kernel-assigned (random) address
         assert "link set baimulti0 address" not in flat
 
@@ -322,6 +325,10 @@ class TestNativeAttachLocal:
             "iptables -t nat -A POSTROUTING -s 172.30.1.0/24 ! -d 172.30.1.0/24 -j MASQUERADE"
             in flat
         )
+        # survive a DROP FORWARD policy (br_netfilter on a Docker/kube-proxy/hardened host):
+        # accept traffic in and out of the LOCAL bridge, or egress + same-node ICC go silently dead.
+        assert "iptables -I FORWARD -i bailo4097 -j ACCEPT" in flat
+        assert "iptables -I FORWARD -o bailo4097 -j ACCEPT" in flat
 
     async def test_an_already_attached_container_is_a_noop(
         self, tmp_path: Path, monkeypatch: Any
@@ -391,6 +398,22 @@ class TestNativeAttachLocal:
             "172.30.1.0/24", "other", "eth0", reserve=["172.30.1.1"]
         )
         assert reused == "172.30.1.2"
+
+    async def test_del_last_owner_removes_forward_accept_with_masq(
+        self, tmp_path: Path, monkeypatch: Any
+    ) -> None:
+        # The LOCAL bridge's FORWARD-accept shares the MASQUERADE lifecycle: torn down when the
+        # last container on the subnet leaves, so a reused bridge name never inherits a stale rule.
+        rec = _RunRecorder(existing=set())
+        monkeypatch.setattr(na, "_run", rec)
+        runner = NativeBridgeAttachRunner(ipam_state_dir=tmp_path)
+        await runner("ADD", ifname="eth0", netns=_NETNS, container_id="cid", config=_LOCAL_CFG)
+        rec.calls.clear()
+        await runner("DEL", ifname="eth0", netns=_NETNS, container_id="cid", config=_LOCAL_CFG)
+        flat = rec.flat()
+        assert "iptables -D FORWARD -i bailo4097 -j ACCEPT" in flat
+        assert "iptables -D FORWARD -o bailo4097 -j ACCEPT" in flat
+        assert "MASQUERADE" in flat  # removed alongside
 
 
 class TestUnsupported:
