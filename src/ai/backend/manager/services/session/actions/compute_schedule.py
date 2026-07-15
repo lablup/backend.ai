@@ -6,7 +6,7 @@ from uuid import UUID
 
 from ai.backend.common.data.permission.types import EntityType
 from ai.backend.common.identifier.resource_group import ResourceGroupID
-from ai.backend.common.types import AccessKey, ClusterMode
+from ai.backend.common.types import ClusterMode
 from ai.backend.manager.actions.action import BaseAction, BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.session.compute_schedule import (
@@ -25,16 +25,12 @@ class ComputeScheduleAction(BaseAction):
 
     Each kernel is an unresolved ``KernelResourceInput``; the result list
     corresponds positionally, so callers match results to kernels by index.
-
-    ``user_uuid`` and ``access_key`` identify the requesting user and are
-    resolved by the caller.
     """
 
     kernels: list[KernelResourceInput]
     cluster_mode: ClusterMode
     resource_group_id: ResourceGroupID
     user_uuid: UUID
-    access_key: AccessKey
 
     @override
     @classmethod

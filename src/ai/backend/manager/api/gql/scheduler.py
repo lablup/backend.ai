@@ -30,6 +30,7 @@ from ai.backend.manager.api.gql.common_types import (
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
+    gql_added_field,
     gql_enum,
     gql_field,
     gql_pydantic_input,
@@ -39,7 +40,6 @@ from ai.backend.manager.api.gql.decorators import (
 )
 from ai.backend.manager.api.gql.session.types import SessionClusterModeGQL
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
-from ai.backend.manager.errors.common import ServiceUnavailable
 from ai.backend.manager.errors.kernel import InvalidSessionId
 
 from .session_federation import Session
@@ -200,6 +200,15 @@ class ComputeScheduleInputGQL(PydanticInputMixin[ComputeScheduleInput]):
 class UnschedulableReasonHintGQL:
     required_reduction: list[ResourceSlotEntryGQL] | None
     available_archs: list[str] | None
+    image_not_found: bool = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "The requested image could not be found. When true, adjusting resource "
+                "slots cannot make the kernel schedulable."
+            ),
+        )
+    )
 
 
 @gql_pydantic_type(
@@ -230,6 +239,15 @@ class ComputeScheduleKernelResultGQL:
 )
 class ComputeSchedulePayloadGQL:
     results: list[ComputeScheduleKernelResultGQL]
+    resource_group_reason: str | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Reason the resource group as a whole cannot admit the session "
+                "(e.g. it has no agents). Null when per-kernel results apply."
+            ),
+        )
+    )
 
 
 @gql_root_field(
@@ -247,5 +265,6 @@ async def compute_schedule(
     input: ComputeScheduleInputGQL,
     info: Info[StrawberryGQLContext],
 ) -> ComputeSchedulePayloadGQL | None:
-    # Schema-only surface: the adapter wiring lands in a follow-up.
-    raise ServiceUnavailable("Compute schedule is not yet available.")
+    payload = await info.context.adapters.session.compute_schedule(input.to_pydantic())
+    result: ComputeSchedulePayloadGQL = ComputeSchedulePayloadGQL.from_pydantic(payload)  # type: ignore[attr-defined]
+    return result

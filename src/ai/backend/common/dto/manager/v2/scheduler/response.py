@@ -60,6 +60,13 @@ class UnschedulableReasonHintInfo(BaseResponseModel):
         default=None,
         description="Architectures that actually exist among the scheduling targets.",
     )
+    image_not_found: bool = Field(
+        default=False,
+        description=(
+            "The requested image could not be found. When True, adjusting resource "
+            "slots cannot make the kernel schedulable."
+        ),
+    )
 
 
 class ComputeScheduleKernelResultInfo(BaseResponseModel):
@@ -90,4 +97,11 @@ class ComputeSchedulePayload(BaseResponseModel):
 
     results: list[ComputeScheduleKernelResultInfo] = Field(
         description="Per-kernel compute-schedule outcomes, correlated to the request by list index.",
+    )
+    resource_group_reason: str | None = Field(
+        default=None,
+        description=(
+            "Reason the resource group as a whole cannot admit the session "
+            "(e.g. it has no agents). Null when per-kernel results apply."
+        ),
     )

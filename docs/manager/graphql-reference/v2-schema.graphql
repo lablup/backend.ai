@@ -2184,6 +2184,11 @@ type ComputeSchedulePayload {
   Per-kernel compute-schedule outcomes, correlated to the request by list index.
   """
   results: [ComputeScheduleKernelResult!]!
+
+  """
+  Reason the resource group as a whole cannot admit the session (e.g. it has no agents). Null when per-kernel results apply.
+  """
+  resourceGroupReason: String
 }
 
 extend type ComputeSessionNode implements Node @key(fields: "id") {
@@ -13486,6 +13491,11 @@ type UnschedulableReasonHint {
 
   """Architectures that actually exist among the scheduling targets."""
   availableArchs: [String!]
+
+  """
+  The requested image could not be found. When True, adjusting resource slots cannot make the kernel schedulable.
+  """
+  imageNotFound: Boolean!
 }
 
 """
