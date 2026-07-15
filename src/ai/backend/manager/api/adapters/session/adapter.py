@@ -44,6 +44,7 @@ from ai.backend.common.dto.manager.v2.scheduler.request import ComputeScheduleIn
 from ai.backend.common.dto.manager.v2.scheduler.response import (
     ComputeScheduleKernelResultInfo,
     ComputeSchedulePayload,
+    ResourceGroupUnschedulableReasonDTO,
     UnschedulableReasonHintInfo,
 )
 from ai.backend.common.dto.manager.v2.session.request import (
@@ -366,12 +367,17 @@ class SessionAdapter(BaseAdapter):
             user_uuid=self._require_user_id(),
         )
         result = await self._processors.session.compute_schedule.wait_for_complete(action)
+        resource_group_reason = result.result.resource_group_reason
         return ComputeSchedulePayload(
             results=[
                 self._compute_schedule_kernel_result_to_info(kernel_result)
                 for kernel_result in result.result.kernel_results
             ],
-            resource_group_reason=result.result.resource_group_reason,
+            resource_group_reason=(
+                ResourceGroupUnschedulableReasonDTO(resource_group_reason.value)
+                if resource_group_reason is not None
+                else None
+            ),
         )
 
     @staticmethod
@@ -406,7 +412,7 @@ class SessionAdapter(BaseAdapter):
                 )
                 for entry in result.requested_slots
             ],
-            requested_architecture=result.requested_architecture or "",
+            requested_architecture=result.requested_architecture,
             success=result.success,
             reason_hint=reason_hint,
         )

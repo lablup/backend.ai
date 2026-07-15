@@ -14,9 +14,17 @@ from ai.backend.common.dto.manager.v2.common import ResourceSlotEntryInfo
 __all__ = (
     "ComputeScheduleKernelResultInfo",
     "ComputeSchedulePayload",
+    "ResourceGroupUnschedulableReasonDTO",
     "SchedulingBroadcastEventPayloadNode",
     "UnschedulableReasonHintInfo",
 )
+
+
+class ResourceGroupUnschedulableReasonDTO(StrEnum):
+    """Reason the resource group as a whole cannot admit the session."""
+
+    RESOURCE_GROUP_NOT_FOUND = "RESOURCE_GROUP_NOT_FOUND"
+    NO_SCHEDULABLE_AGENTS = "NO_SCHEDULABLE_AGENTS"
 
 
 class SchedulingStatusDTO(StrEnum):
@@ -80,7 +88,7 @@ class ComputeScheduleKernelResultInfo(BaseResponseModel):
     requested_slots: list[ResourceSlotEntryInfo] = Field(
         description="Resource slots resolved for this kernel after applying defaults.",
     )
-    requested_architecture: str = Field(
+    requested_architecture: str | None = Field(
         description="Architecture resolved for this kernel.",
     )
     success: bool = Field(
@@ -98,7 +106,7 @@ class ComputeSchedulePayload(BaseResponseModel):
     results: list[ComputeScheduleKernelResultInfo] = Field(
         description="Per-kernel compute-schedule outcomes, correlated to the request by list index.",
     )
-    resource_group_reason: str | None = Field(
+    resource_group_reason: ResourceGroupUnschedulableReasonDTO | None = Field(
         default=None,
         description=(
             "Reason the resource group as a whole cannot admit the session "

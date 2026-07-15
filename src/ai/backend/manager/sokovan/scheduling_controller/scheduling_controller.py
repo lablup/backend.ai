@@ -22,6 +22,7 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.session.compute_schedule import (
     ComputeScheduleKernelResult,
     ComputeScheduleResult,
+    ResourceGroupUnschedulableReason,
     UnschedulableReasonHint,
 )
 from ai.backend.manager.data.session.draft import (
@@ -392,7 +393,7 @@ class SchedulingController:
             for kernel_id, data in kernel_data.items()
             if data.resource_spec is not None
         }
-        resource_group_reason: str | None = None
+        resource_group_reason: ResourceGroupUnschedulableReason | None = None
 
         if kernel_requirements:
             criteria = AgentSelectionCriteria(
@@ -415,7 +416,7 @@ class SchedulingController:
             try:
                 scheduling_data = await self._repository.get_scheduling_data(resource_group_id)
             except ScalingGroupNotFound:
-                resource_group_reason = "Resource group does not exist"
+                resource_group_reason = ResourceGroupUnschedulableReason.RESOURCE_GROUP_NOT_FOUND
                 return ComputeScheduleResult(
                     [
                         ComputeScheduleKernelResult(
@@ -443,7 +444,7 @@ class SchedulingController:
                     mutable_agents, criteria, config, None
                 )
             except NoAgentsInResourceGroupError:
-                resource_group_reason = "No schedulable agents exist in the resource group"
+                resource_group_reason = ResourceGroupUnschedulableReason.NO_SCHEDULABLE_AGENTS
                 for result in kernel_data.values():
                     result.success = False
             except BatchAgentSelectionFailedError as e:

@@ -229,6 +229,19 @@ class ComputeScheduleKernelResultGQL:
     reason_hint: UnschedulableReasonHintGQL | None
 
 
+@gql_enum(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Reason the resource group as a whole cannot admit the session.",
+    )
+)
+class ResourceGroupUnschedulableReason(StrEnum):
+    """Reason the resource group as a whole cannot admit the session."""
+
+    RESOURCE_GROUP_NOT_FOUND = "RESOURCE_GROUP_NOT_FOUND"
+    NO_SCHEDULABLE_AGENTS = "NO_SCHEDULABLE_AGENTS"
+
+
 @gql_pydantic_type(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
@@ -239,7 +252,7 @@ class ComputeScheduleKernelResultGQL:
 )
 class ComputeSchedulePayloadGQL:
     results: list[ComputeScheduleKernelResultGQL]
-    resource_group_reason: str | None = gql_added_field(
+    resource_group_reason: ResourceGroupUnschedulableReason | None = gql_added_field(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
             description=(

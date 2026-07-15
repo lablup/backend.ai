@@ -1,8 +1,20 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import StrEnum
 
 from ai.backend.common.types import ResourceSlotEntry
+
+
+class ResourceGroupUnschedulableReason(StrEnum):
+    """Reason the resource group as a whole cannot admit the session.
+
+    Set only when no per-kernel result applies (the check could not even reach
+    per-kernel node fitting).
+    """
+
+    RESOURCE_GROUP_NOT_FOUND = "RESOURCE_GROUP_NOT_FOUND"
+    NO_SCHEDULABLE_AGENTS = "NO_SCHEDULABLE_AGENTS"
 
 
 @dataclass(frozen=True)
@@ -46,4 +58,4 @@ class ComputeScheduleKernelResult:
 @dataclass(frozen=True)
 class ComputeScheduleResult:
     kernel_results: list[ComputeScheduleKernelResult]
-    resource_group_reason: str | None = None
+    resource_group_reason: ResourceGroupUnschedulableReason | None = None
