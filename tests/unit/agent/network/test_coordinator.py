@@ -104,8 +104,8 @@ class _ScriptedWatchEtcd(FakeEtcd):
             for _ in range(behavior):
                 yield None
             return
-        return  # "end": exhausted stream
-        yield  # pragma: no cover  (makes this an async generator)
+        # "end": exhausted stream — the yield above still makes this an async generator.
+        return
 
 
 class RecordingBackend:
@@ -134,6 +134,31 @@ class RecordingBackend:
 
     async def del_endpoint(self, session_id: str, *, ip: str, mac: str, vtep_ip: str) -> None:
         self.endpoints_removed.append((ip, vtep_ip))
+
+
+class _FailingBackend(RecordingBackend):
+    """RecordingBackend that can be told to fail specific device ops, to exercise the per-op
+    failure isolation in reconcile_peers. ``add_peer`` raises for any agent_id in ``fail_add``;
+    ``del_peer`` raises the first ``fail_del_times`` times it is called. Both still record the
+    attempt so tests can assert it was tried."""
+
+    def __init__(self, *, fail_add: set[str] | None = None, fail_del_times: int = 0) -> None:
+        super().__init__()
+        self.fail_add: set[str] = fail_add or set()
+        self._fail_del_times = fail_del_times
+
+    @override
+    async def add_peer(self, session_id: str, peer: Member) -> None:
+        if peer.agent_id in self.fail_add:
+            raise RuntimeError(f"unroutable peer {peer.agent_id}")
+        await super().add_peer(session_id, peer)
+
+    @override
+    async def del_peer(self, session_id: str, peer: Member) -> None:
+        await super().del_peer(session_id, peer)  # record the attempt
+        if self._fail_del_times > 0:
+            self._fail_del_times -= 1
+            raise RuntimeError(f"withdrawal failed for {peer.agent_id}")
 
 
 def _coordinator(etcd: FakeEtcd, backend: RecordingBackend) -> SessionNetworkCoordinator:
@@ -178,6 +203,42 @@ class TestReconcilePeers:
 
         assert backend.added == ["a2", "a3"]
         assert backend.removed == ["a2"]
+
+    async def test_a_failing_add_peer_is_isolated_and_retried(self) -> None:
+        # One unroutable member used to abort the whole pass, leaving this node with no FDB/ARP for
+        # anybody. A failing add_peer must be isolated: the other peers still apply, and the failed
+        # one is left unapplied so the next reconcile retries exactly it.
+        etcd = FakeEtcd()
+        etcd.seed_member(_SELF)
+        etcd.seed_member(_PEER2)
+        etcd.seed_member(_PEER3)
+        backend = _FailingBackend(fail_add={"a2"})
+        coord = _coordinator(etcd, backend)
+
+        await coord.reconcile_peers("s1")
+        # a2 raised, but a3 was still applied (not aborted by a2's failure).
+        assert "a3" in backend.added
+
+        backend.fail_add.clear()  # a2 becomes routable
+        await coord.reconcile_peers("s1")
+        # a2 was left unapplied, so this second pass retries and lands it; a3 is not re-added.
+        assert backend.added == ["a3", "a2"]
+
+    async def test_a_failing_del_peer_keeps_the_record_for_retry(self) -> None:
+        # A departed peer whose withdrawal fails must NOT be forgotten — a dropped record would
+        # leave a stale FDB entry unicasting to a dead VTEP forever. Keep it and retry.
+        etcd = FakeEtcd()
+        etcd.seed_member(_SELF)
+        etcd.seed_member(_PEER2)
+        backend = _FailingBackend(fail_del_times=1)
+        coord = _coordinator(etcd, backend)
+        await coord.reconcile_peers("s1")
+
+        await etcd.delete(member_key("s1", "a2"))  # a2 leaves
+        await coord.reconcile_peers("s1")  # withdrawal fails once
+        assert backend.removed == ["a2"]  # attempted
+        await coord.reconcile_peers("s1")  # record kept -> retried and now succeeds
+        assert backend.removed == ["a2", "a2"]
 
 
 class TestStartStop:
