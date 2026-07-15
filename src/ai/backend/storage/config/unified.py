@@ -16,6 +16,7 @@ from pydantic import (
 from ai.backend.common.config import BaseConfigSchema
 from ai.backend.common.configs import (
     EtcdConfig,
+    MemrayConfig,
     OTELConfig,
     PyroscopeConfig,
     ServiceDiscoveryConfig,
@@ -23,7 +24,12 @@ from ai.backend.common.configs import (
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.data.storage.types import ArtifactStorageType
 from ai.backend.common.exception import GenericNotImplementedError, InvalidConfigError
-from ai.backend.common.meta import BackendAIConfigMeta, CompositeType, ConfigExample
+from ai.backend.common.meta import (
+    NEXT_RELEASE_VERSION,
+    BackendAIConfigMeta,
+    CompositeType,
+    ConfigExample,
+)
 from ai.backend.common.typed_validators import (
     AutoDirectoryPath,
     GroupID,
@@ -1640,6 +1646,19 @@ class StorageProxyUnifiedConfig(BaseConfigSchema):
                 "profiling data and send to a Pyroscope server for analysis."
             ),
             added_version="25.12.0",
+            composite=CompositeType.FIELD,
+        ),
+    ]
+    memray: Annotated[
+        MemrayConfig,
+        Field(default_factory=MemrayConfig),
+        BackendAIConfigMeta(
+            description=(
+                "Memray allocation-tracking configuration for the storage proxy. "
+                "Enable it only while diagnosing storage-proxy memory growth: the capture file "
+                "keeps growing for as long as the process runs."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
             composite=CompositeType.FIELD,
         ),
     ]
