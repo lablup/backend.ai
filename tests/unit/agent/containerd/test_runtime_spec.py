@@ -4,7 +4,6 @@ from unittest import mock
 
 import yaml
 
-import ai.backend.agent.containerd.runtime.spec as spec_mod
 from ai.backend.agent.containerd.runtime.spec import (
     _DEFAULT_CAPS,
     OCI_VERSION,
@@ -195,7 +194,7 @@ class TestFidelity:
                 return (65536, 262144)  # host ceiling well below 1048576
             return (resource.RLIM_INFINITY, resource.RLIM_INFINITY)
 
-        with mock.patch.object(spec_mod.resource, "getrlimit", fake_getrlimit):
+        with mock.patch.object(resource, "getrlimit", fake_getrlimit):
             spec = build_oci_runtime_spec(_oci(), command=["x"], rootfs_path="/r")
         nofile = [r for r in spec["process"]["rlimits"] if r["type"] == "RLIMIT_NOFILE"][0]
         assert nofile["hard"] == 262144, "hard NOFILE not clamped to the host ceiling"
@@ -209,7 +208,7 @@ class TestFidelity:
                 return (8 * 1024 * 1024, 8 * 1024 * 1024)  # finite 8 MiB host memlock
             return (resource.RLIM_INFINITY, resource.RLIM_INFINITY)
 
-        with mock.patch.object(spec_mod.resource, "getrlimit", fake_getrlimit):
+        with mock.patch.object(resource, "getrlimit", fake_getrlimit):
             spec = build_oci_runtime_spec(_oci(), command=["x"], rootfs_path="/r")
         memlock = [r for r in spec["process"]["rlimits"] if r["type"] == "RLIMIT_MEMLOCK"][0]
         assert memlock["hard"] == 8 * 1024 * 1024, "unlimited memlock not clamped to host"
@@ -221,7 +220,7 @@ class TestFidelity:
         def fake_getrlimit(res: int) -> tuple[int, int]:
             return (resource.RLIM_INFINITY, resource.RLIM_INFINITY)
 
-        with mock.patch.object(spec_mod.resource, "getrlimit", fake_getrlimit):
+        with mock.patch.object(resource, "getrlimit", fake_getrlimit):
             spec = build_oci_runtime_spec(_oci(), command=["x"], rootfs_path="/r")
         rlimits = {r["type"]: r for r in spec["process"]["rlimits"]}
         assert rlimits["RLIMIT_NOFILE"]["hard"] == 1048576
