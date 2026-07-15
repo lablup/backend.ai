@@ -10,6 +10,14 @@ from .actions.search_deployment_scoped_history import (
     SearchDeploymentScopedHistoryAction,
     SearchDeploymentScopedHistoryActionResult,
 )
+from .actions.search_kernel_history import (
+    SearchKernelHistoryAction,
+    SearchKernelHistoryActionResult,
+)
+from .actions.search_kernel_scoped_history import (
+    SearchKernelScopedHistoryAction,
+    SearchKernelScopedHistoryActionResult,
+)
 from .actions.search_route_history import (
     SearchRouteHistoryAction,
     SearchRouteHistoryActionResult,
@@ -48,6 +56,22 @@ class SchedulingHistoryService:
         )
 
         return SearchSessionHistoryActionResult(
+            histories=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
+
+    async def search_kernel_history(
+        self,
+        action: SearchKernelHistoryAction,
+    ) -> SearchKernelHistoryActionResult:
+        """Searches kernel scheduling history (admin API)."""
+        result = await self._repository.search_kernel_history(
+            querier=action.querier,
+        )
+
+        return SearchKernelHistoryActionResult(
             histories=result.items,
             total_count=result.total_count,
             has_next_page=result.has_next_page,
@@ -99,6 +123,23 @@ class SchedulingHistoryService:
         )
 
         return SearchSessionScopedHistoryActionResult(
+            histories=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
+
+    async def search_kernel_scoped_history(
+        self,
+        action: SearchKernelScopedHistoryAction,
+    ) -> SearchKernelScopedHistoryActionResult:
+        """Searches kernel scheduling history within scope."""
+        result = await self._repository.search_kernel_scoped_history(
+            querier=action.querier,
+            scope=action.scope,
+        )
+
+        return SearchKernelScopedHistoryActionResult(
             histories=result.items,
             total_count=result.total_count,
             has_next_page=result.has_next_page,

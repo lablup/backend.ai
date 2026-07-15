@@ -173,6 +173,9 @@ class EntityType(enum.StrEnum):
     SESSION_DIRECT_ACCESS = "session:direct_access"
     SESSION_HISTORY = "session:history"
     SESSION_SCOPED_HISTORY = "session:scoped_history"
+    # Kernel sub
+    KERNEL_HISTORY = "kernel:history"
+    KERNEL_SCOPED_HISTORY = "kernel:scoped_history"
     # Deployment sub
     DEPLOYMENT_REPLICA = "deployment:replica"
     DEPLOYMENT_ROUTE = "deployment:route"

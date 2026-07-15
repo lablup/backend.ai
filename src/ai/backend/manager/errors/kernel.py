@@ -51,6 +51,19 @@ class InvalidSessionId(BackendAIError, web.HTTPBadRequest):
         )
 
 
+class EmptyKernelSchedulingHistoryScope(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/empty-kernel-scheduling-history-scope"
+    error_title = "Kernel scheduling history scope requires session_id or kernel_id."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.KERNEL,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
+
+
 class SessionNotFound(ObjectNotFound):
     object_name = "session"
 

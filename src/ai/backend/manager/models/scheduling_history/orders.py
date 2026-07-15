@@ -9,6 +9,7 @@ from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.dto.manager.v2.scheduling_history.types import (
     DeploymentHistoryOrderField,
+    KernelHistoryOrderField,
     OrderDirection,
     RouteHistoryOrderField,
     SessionHistoryOrderField,
@@ -63,6 +64,15 @@ def resolve_session_order(field: SessionHistoryOrderField, direction: OrderDirec
 
 # ========== Kernel Scheduling History ==========
 
+KERNEL_ORDER_FIELD_MAP: dict[KernelHistoryOrderField, _OrderColumn] = {
+    KernelHistoryOrderField.CREATED_AT: KernelSchedulingHistoryRow.created_at,
+    KernelHistoryOrderField.UPDATED_AT: KernelSchedulingHistoryRow.updated_at,
+}
+
+KERNEL_DEFAULT_FORWARD_ORDER: QueryOrder = KernelSchedulingHistoryRow.created_at.desc()
+KERNEL_DEFAULT_BACKWARD_ORDER: QueryOrder = KernelSchedulingHistoryRow.created_at.asc()
+KERNEL_TIEBREAKER_ORDER: QueryOrder = KernelSchedulingHistoryRow.id.asc()
+
 
 class KernelSchedulingHistoryOrders:
     """Order factories used by GQL KernelSchedulingHistoryOrderBy.to_query_order()."""
@@ -78,6 +88,14 @@ class KernelSchedulingHistoryOrders:
         if ascending:
             return KernelSchedulingHistoryRow.updated_at.asc()
         return KernelSchedulingHistoryRow.updated_at.desc()
+
+
+def resolve_kernel_order(field: KernelHistoryOrderField, direction: OrderDirection) -> QueryOrder:
+    """Resolve a DTO order field + direction to a SQLAlchemy order expression."""
+    col = KERNEL_ORDER_FIELD_MAP[field]
+    if direction == OrderDirection.DESC:
+        return col.desc()
+    return col.asc()
 
 
 # ========== Deployment History ==========

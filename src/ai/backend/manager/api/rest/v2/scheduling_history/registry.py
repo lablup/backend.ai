@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from ai.backend.manager.api.rest.middleware.auth import superadmin_required
+from ai.backend.manager.api.rest.middleware.auth import auth_required, superadmin_required
 from ai.backend.manager.api.rest.routing import RouteRegistry
 
 from .handler import V2SchedulingHistoryHandler
@@ -32,6 +32,21 @@ def register_v2_scheduling_history_routes(
         "/sessions/{session_id}/search",
         handler.admin_session_scoped_search,
         middlewares=[superadmin_required],
+    )
+
+    # Kernel history
+    registry.add(
+        "POST",
+        "/kernels/search",
+        handler.admin_search_kernel_history,
+        middlewares=[superadmin_required],
+    )
+    # The scope is a body field, so the path is fixed rather than carrying a scope id.
+    registry.add(
+        "POST",
+        "/kernels/scoped/search",
+        handler.scoped_search_kernel_history,
+        middlewares=[auth_required],
     )
 
     # Deployment history

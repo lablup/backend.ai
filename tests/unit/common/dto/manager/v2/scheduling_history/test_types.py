@@ -3,16 +3,26 @@
 from __future__ import annotations
 
 import json
+import uuid
+from dataclasses import dataclass
 from datetime import UTC, datetime
+
+import pytest
+from pydantic import ValidationError
 
 from ai.backend.common.dto.manager.v2.scheduling_history.types import (
     DeploymentHistoryOrderField,
+    KernelHistoryOrderField,
+    KernelHistoryScopeDTO,
     OrderDirection,
     RouteHistoryOrderField,
     SchedulingResultType,
     SessionHistoryOrderField,
     SubStepResultInfo,
 )
+
+_SESSION_ID = uuid.UUID("11111111-1111-1111-1111-111111111111")
+_KERNEL_ID = uuid.UUID("22222222-2222-2222-2222-222222222222")
 
 
 class TestOrderDirection:
@@ -109,6 +119,56 @@ class TestRouteHistoryOrderField:
 
     def test_enum_members_count(self) -> None:
         assert len(list(RouteHistoryOrderField)) == 2
+
+
+class TestKernelHistoryOrderField:
+    """Tests for KernelHistoryOrderField enum."""
+
+    def test_created_at_value(self) -> None:
+        assert KernelHistoryOrderField.CREATED_AT.value == "created_at"
+
+    def test_updated_at_value(self) -> None:
+        assert KernelHistoryOrderField.UPDATED_AT.value == "updated_at"
+
+    def test_enum_members_count(self) -> None:
+        assert len(list(KernelHistoryOrderField)) == 2
+
+
+@dataclass(frozen=True)
+class _KernelScopeCase:
+    session_id: uuid.UUID | None
+    kernel_id: uuid.UUID | None
+
+
+class TestKernelHistoryScopeDTO:
+    """Tests for KernelHistoryScopeDTO, whose axes are optional but not both-empty."""
+
+    def test_empty_scope_is_rejected(self) -> None:
+        with pytest.raises(ValidationError):
+            KernelHistoryScopeDTO()
+
+    @pytest.mark.parametrize(
+        "case",
+        [
+            _KernelScopeCase(session_id=_SESSION_ID, kernel_id=None),
+            _KernelScopeCase(session_id=None, kernel_id=_KERNEL_ID),
+            _KernelScopeCase(session_id=_SESSION_ID, kernel_id=_KERNEL_ID),
+        ],
+        ids=lambda case: f"session={case.session_id is not None}-kernel={case.kernel_id is not None}",
+    )
+    def test_any_non_empty_axis_combination_is_accepted(self, case: _KernelScopeCase) -> None:
+        scope = KernelHistoryScopeDTO(session_id=case.session_id, kernel_id=case.kernel_id)
+
+        assert scope.session_id == case.session_id
+        assert scope.kernel_id == case.kernel_id
+
+    def test_serialization_round_trip(self) -> None:
+        scope = KernelHistoryScopeDTO(session_id=_SESSION_ID, kernel_id=_KERNEL_ID)
+
+        restored = KernelHistoryScopeDTO.model_validate_json(scope.model_dump_json())
+
+        assert restored.session_id == _SESSION_ID
+        assert restored.kernel_id == _KERNEL_ID
 
 
 class TestSubStepResultInfo:

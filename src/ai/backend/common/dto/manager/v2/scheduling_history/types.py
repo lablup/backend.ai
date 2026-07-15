@@ -8,7 +8,7 @@ from datetime import datetime
 from enum import StrEnum
 from uuid import UUID
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel, BaseResponseModel
 from ai.backend.common.dto.manager.v2.common import OrderDirection
@@ -16,6 +16,8 @@ from ai.backend.common.dto.manager.v2.common import OrderDirection
 __all__ = (
     "DeploymentHistoryOrderField",
     "DeploymentHistoryScopeDTO",
+    "KernelHistoryOrderField",
+    "KernelHistoryScopeDTO",
     "OrderDirection",
     "RouteHistoryOrderField",
     "RouteHistoryScopeDTO",
@@ -40,6 +42,13 @@ class SchedulingResultType(StrEnum):
 
 class SessionHistoryOrderField(StrEnum):
     """Fields available for ordering session scheduling history."""
+
+    CREATED_AT = "created_at"
+    UPDATED_AT = "updated_at"
+
+
+class KernelHistoryOrderField(StrEnum):
+    """Fields available for ordering kernel scheduling history."""
 
     CREATED_AT = "created_at"
     UPDATED_AT = "updated_at"
@@ -74,6 +83,25 @@ class SessionHistoryScopeDTO(BaseRequestModel):
     """Scope for session scheduling history queries."""
 
     session_id: UUID = Field(description="Session ID to get history for.")
+
+
+class KernelHistoryScopeDTO(BaseRequestModel):
+    """Scope for kernel scheduling history queries.
+
+    Unlike the single-entity scopes above, a kernel query may be scoped either by the
+    owning session (all of its kernels) or by one kernel. At least one must be given.
+    """
+
+    session_id: UUID | None = Field(
+        default=None, description="Restrict to the kernels of this session."
+    )
+    kernel_id: UUID | None = Field(default=None, description="Restrict to this kernel.")
+
+    @model_validator(mode="after")
+    def _check_non_empty(self) -> KernelHistoryScopeDTO:
+        if self.session_id is None and self.kernel_id is None:
+            raise ValueError("At least one of session_id or kernel_id must be given.")
+        return self
 
 
 class DeploymentHistoryScopeDTO(BaseRequestModel):
