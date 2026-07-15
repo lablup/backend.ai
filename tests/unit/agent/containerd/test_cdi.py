@@ -58,6 +58,24 @@ class TestLoad:
     def test_empty_when_no_specs(self, tmp_path: Path) -> None:
         assert load_device_edits([str(tmp_path)]) == {}
 
+    def test_a_non_mapping_container_edits_is_skipped_not_raised(self, tmp_path: Path) -> None:
+        # containerEdits as a list (spec-level and per-device) would make _merge_edits' .get() raise.
+        (tmp_path / "s.yaml").write_text(
+            yaml.safe_dump({
+                "kind": "nvidia.com/gpu",
+                "containerEdits": ["not-a-dict"],  # spec-level, non-mapping
+                "devices": [{"name": "0", "containerEdits": ["also-bad"]}],  # per-device
+            })
+        )
+        edits = load_device_edits([str(tmp_path)])
+        # the device still loads (it has a name); its edits are just empty, not a crash
+        assert edits["nvidia.com/gpu=0"] == {
+            "deviceNodes": [],
+            "mounts": [],
+            "hooks": [],
+            "env": [],
+        }
+
     def test_a_structurally_odd_spec_is_skipped_not_raised(self, tmp_path: Path) -> None:
         # "devices" as a dict rather than a list, and a device that is a scalar: iterating and
         # calling .get() on those would raise, failing the kernel instead of falling back to the
@@ -116,6 +134,28 @@ class TestInject:
         assert inject_cdi_devices(spec, ["nvidia.com/gpu=0"], dirs=[str(tmp_path)]) is True
         dests = [m["destination"] for m in spec["mounts"]]
         assert dests == ["/b"]  # the good mount survived, the bad one was skipped
+
+    def test_scalar_list_elements_are_skipped_not_raised(self, tmp_path: Path) -> None:
+        # A deviceNode / mount / hook that is a scalar (not a mapping) would make its helper raise;
+        # apply must skip it and inject the well-formed siblings around it.
+        spec_def = {
+            "kind": "nvidia.com/gpu",
+            "devices": [
+                {
+                    "name": "0",
+                    "containerEdits": {
+                        "deviceNodes": ["bad", {"path": "/dev/nvidia0", "major": 195, "minor": 0}],
+                        "mounts": ["bad", {"containerPath": "/c", "hostPath": "/h"}],
+                        "hooks": ["bad"],
+                    },
+                }
+            ],
+        }
+        (tmp_path / "x.yaml").write_text(yaml.safe_dump(spec_def))
+        spec = self._blank_spec()
+        assert inject_cdi_devices(spec, ["nvidia.com/gpu=0"], dirs=[str(tmp_path)]) is True
+        assert [d["path"] for d in spec["linux"]["devices"]] == ["/dev/nvidia0"]
+        assert [m["destination"] for m in spec["mounts"]] == ["/c"]
 
     def test_no_specs_returns_false(self, tmp_path: Path) -> None:
         spec = self._blank_spec()

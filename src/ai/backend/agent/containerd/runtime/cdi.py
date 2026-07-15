@@ -39,9 +39,19 @@ _OCI_HOOK_NAMES = frozenset({
 _EDIT_KEYS = ("deviceNodes", "mounts", "hooks", "env")
 
 
-def _merge_edits(spec_level: Mapping[str, Any], device: Mapping[str, Any]) -> dict[str, list[Any]]:
+def _edit_list(edits: Any, key: str) -> list[Any]:
+    """One edit list (deviceNodes / mounts / hooks / env) out of a containerEdits block, tolerating
+    a malformed one: a containerEdits that is not a mapping, or a list value that is not a list, is
+    treated as absent so a bad host CDI spec degrades to the nvidia hook rather than aborting."""
+    if not isinstance(edits, Mapping):
+        return []
+    value = edits.get(key)
+    return value if isinstance(value, list) else []
+
+
+def _merge_edits(spec_level: Any, device: Any) -> dict[str, list[Any]]:
     """A device's effective edits are the spec-level containerEdits followed by the device's own."""
-    return {key: [*(spec_level.get(key) or []), *(device.get(key) or [])] for key in _EDIT_KEYS}
+    return {key: [*_edit_list(spec_level, key), *_edit_list(device, key)] for key in _EDIT_KEYS}
 
 
 def load_device_edits(dirs: Sequence[str] = CDI_DEFAULT_DIRS) -> dict[str, dict[str, list[Any]]]:
@@ -144,9 +154,14 @@ def apply_device_edits(spec: dict[str, Any], edits_list: Sequence[Mapping[str, A
     env: list[str] = spec.setdefault("process", {}).setdefault("env", [])
     hooks: dict[str, list[dict[str, Any]]] = spec.setdefault("hooks", {})
 
+    # Every list here came through _merge_edits, so it is a list — but its ELEMENTS are whatever the
+    # host CDI spec held. A scalar deviceNode/mount/hook would make its helper's .get() raise, which
+    # aborts container creation instead of degrading to the nvidia hook. Skip a non-mapping element.
     seen_dev = {d["path"] for d in devices}
     for edits in edits_list:
         for dn in edits.get("deviceNodes") or []:
+            if not isinstance(dn, Mapping):
+                continue
             oci_dev, rule = _device_node_to_oci(dn)
             if oci_dev is None or oci_dev["path"] in seen_dev:
                 continue
@@ -154,14 +169,17 @@ def apply_device_edits(spec: dict[str, Any], edits_list: Sequence[Mapping[str, A
             devices.append(oci_dev)
             dev_rules.append(rule)
         mounts.extend(
-            oci for m in edits.get("mounts") or [] if (oci := _mount_to_oci(m)) is not None
+            oci
+            for m in edits.get("mounts") or []
+            if isinstance(m, Mapping) and (oci := _mount_to_oci(m)) is not None
         )
         for raw in edits.get("env") or []:
             key = str(raw).split("=", 1)[0]
             env[:] = [e for e in env if e.split("=", 1)[0] != key]
             env.append(str(raw))
         for h in edits.get("hooks") or []:
-            _add_hook(hooks, h)
+            if isinstance(h, Mapping):
+                _add_hook(hooks, h)
 
 
 def inject_cdi_devices(
