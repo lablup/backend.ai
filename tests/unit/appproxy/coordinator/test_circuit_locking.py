@@ -1,66 +1,16 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from types import SimpleNamespace
 from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 import pytest
 
 from ai.backend.appproxy.coordinator.models import Circuit
 from ai.backend.appproxy.coordinator.types import CircuitManager, CircuitRouteUpdateItem
-
-
-class _ReadonlySessionContext:
-    def __init__(self, order: list[str]) -> None:
-        self._order = order
-
-    async def __aenter__(self) -> object:
-        self._order.append("db_enter")
-        return object()
-
-    async def __aexit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc: BaseException | None,
-        tb: Any,
-    ) -> None:
-        self._order.append("db_exit")
-
-
-class _FakeDB:
-    def __init__(self, order: list[str]) -> None:
-        self._order = order
-
-    def begin_readonly_session(self) -> _ReadonlySessionContext:
-        return _ReadonlySessionContext(self._order)
-
-
-class _FakeCircuitManager:
-    def __init__(self, order: list[str]) -> None:
-        self._order = order
-
-    @asynccontextmanager
-    async def circuit_lock(self, _circuit_id: UUID) -> AsyncIterator[None]:
-        self._order.append("lock_enter")
-        try:
-            yield
-        finally:
-            self._order.append("lock_exit")
-
-    def release_circuit_lock(self, _circuit_id: UUID) -> None:
-        self._order.append("release_lock")
-
-    async def _update_circuit_routes_unlocked(
-        self,
-        _circuit: object,
-        _old_routes: list[object],
-    ) -> None:
-        self._order.append("update")
 
 
 @dataclass
@@ -187,27 +137,44 @@ class TestCircuitManagerLocking:
         # Lock entry is cleaned up after unload
         assert circuit.id not in circuit_manager._circuit_locks
 
-    @pytest.fixture
-    def patch_unload(
-        self,
-        circuit_manager: CircuitManager,
-        monkeypatch: pytest.MonkeyPatch,
-    ) -> None:
-        monkeypatch.setattr(circuit_manager, "unload_traefik_circuit", AsyncMock(return_value=None))
-
-    async def test_unload_removes_circuit_lock(
+    async def test_circuit_lock_entry_lives_only_while_used(
         self,
         circuit_manager: CircuitManager,
         circuit: Circuit,
-        patch_unload: None,
     ) -> None:
-        # Populate the lock entry
         async with circuit_manager.circuit_lock(circuit.id):
-            pass
-        assert circuit.id in circuit_manager._circuit_locks
+            assert circuit.id in circuit_manager._circuit_locks
+        assert circuit.id not in circuit_manager._circuit_locks
 
-        # Act
-        await circuit_manager.unload_circuits([circuit])
+    async def test_waiters_keep_lock_entry_alive(
+        self,
+        circuit_manager: CircuitManager,
+        circuit: Circuit,
+    ) -> None:
+        entered = asyncio.Event()
+        release = asyncio.Event()
 
-        # Assert - lock entry should be cleaned up
+        async def _holder() -> None:
+            async with circuit_manager.circuit_lock(circuit.id):
+                entered.set()
+                await release.wait()
+
+        async def _waiter() -> None:
+            async with circuit_manager.circuit_lock(circuit.id):
+                pass
+
+        holder_task = asyncio.create_task(_holder())
+        await entered.wait()
+        held_lock = circuit_manager._circuit_locks.get(circuit.id)
+        assert held_lock is not None
+
+        waiter_task = asyncio.create_task(_waiter())
+        await asyncio.sleep(0)
+
+        assert circuit_manager._circuit_locks.get(circuit.id) is held_lock
+
+        release.set()
+        await asyncio.gather(holder_task, waiter_task)
+        # Drop the test's own strong ref so the entry can be collected.
+        del held_lock
         assert circuit.id not in circuit_manager._circuit_locks

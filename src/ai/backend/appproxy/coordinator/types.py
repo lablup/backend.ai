@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import itertools
 import logging
+import weakref
 from collections import defaultdict
 from collections.abc import AsyncIterator, Callable, Sequence
 from contextlib import AbstractAsyncContextManager, AsyncExitStack
@@ -105,19 +106,19 @@ class CircuitManager:
     event_producer: EventProducer
     traefik_etcd: TraefikEtcd | None
     local_config: ServerConfig
-    _circuit_locks: dict[UUID, asyncio.Lock] = field(default_factory=dict)
-
-    def _get_lock(self, circuit_id: UUID) -> asyncio.Lock:
-        if circuit_id not in self._circuit_locks:
-            self._circuit_locks[circuit_id] = asyncio.Lock()
-        return self._circuit_locks[circuit_id]
-
-    def _release_circuit_lock(self, circuit_id: UUID) -> None:
-        self._circuit_locks.pop(circuit_id, None)
+    # Weak values: an entry vanishes with its last user, so no explicit release.
+    _circuit_locks: weakref.WeakValueDictionary[UUID, asyncio.Lock] = field(
+        default_factory=weakref.WeakValueDictionary
+    )
 
     @actxmgr
     async def circuit_lock(self, circuit_id: UUID) -> AsyncIterator[None]:
-        async with self._get_lock(circuit_id):
+        # No await between lookup and store — callers converge on one lock.
+        lock = self._circuit_locks.get(circuit_id)
+        if lock is None:
+            lock = asyncio.Lock()
+            self._circuit_locks[circuit_id] = lock
+        async with lock:
             yield
 
     async def initialize_circuits(self, circuits: Sequence[Circuit]) -> None:
@@ -264,8 +265,6 @@ class CircuitManager:
                         await self.unload_legacy_circuit(circuit)
             except Exception:
                 log.exception("Failed to unload circuit {}", circuit.id)
-            finally:
-                self._release_circuit_lock(circuit.id)
 
     async def unload_traefik_circuit(self, circuit: Circuit) -> None:
         log.debug("unload_traefik_circuit(): start")
