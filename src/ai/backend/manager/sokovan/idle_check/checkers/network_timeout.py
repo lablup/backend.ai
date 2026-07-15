@@ -96,9 +96,7 @@ class NetworkTimeoutChecker(IdleChecker):
             self._valkey_live.get_multiple_live_data([
                 f"session.{session_id}.last_access" for session_id in session_ids
             ]),
-            self._valkey_live.count_active_connections_batch([
-                str(session_id) for session_id in session_ids
-            ]),
+            self._valkey_live.count_active_connections_batch(session_ids),
         )
         states: dict[SessionId, _NetworkIdleState] = {}
         for session_id, raw_last_access in zip(
@@ -112,6 +110,6 @@ class NetworkTimeoutChecker(IdleChecker):
                 last_access = Decimal(raw_last_access.decode("utf-8"))
             states[session_id] = _NetworkIdleState(
                 last_access=last_access,
-                active_connections=active_connection_counts[str(session_id)],
+                active_connections=active_connection_counts[session_id],
             )
         return states

@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import random
+from uuid import uuid4
 
 import pytest
 
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
+from ai.backend.common.types import SessionId
 
 
 async def test_valkey_live_hset_operations(test_valkey_live: ValkeyLiveClient) -> None:
@@ -51,18 +53,17 @@ class TestCountActiveConnectionsBatch:
     async def session_ids_with_active_connections(
         self,
         test_valkey_live: ValkeyLiveClient,
-    ) -> list[str]:
-        test_prefix = f"test-connections-{random.randint(1000, 9999)}"
-        session_ids = [f"{test_prefix}-session-{i}" for i in range(3)]
-        await test_valkey_live.update_connection_tracker(session_ids[0], "ssh", "stream-1")
-        await test_valkey_live.update_connection_tracker(session_ids[0], "ssh", "stream-2")
-        await test_valkey_live.update_connection_tracker(session_ids[1], "jupyter", "stream-1")
+    ) -> list[SessionId]:
+        session_ids = [SessionId(uuid4()) for _ in range(3)]
+        await test_valkey_live.update_connection_tracker(str(session_ids[0]), "ssh", "stream-1")
+        await test_valkey_live.update_connection_tracker(str(session_ids[0]), "ssh", "stream-2")
+        await test_valkey_live.update_connection_tracker(str(session_ids[1]), "jupyter", "stream-1")
         return session_ids
 
     async def test_returns_connection_counts_by_session(
         self,
         test_valkey_live: ValkeyLiveClient,
-        session_ids_with_active_connections: list[str],
+        session_ids_with_active_connections: list[SessionId],
     ) -> None:
         result = await test_valkey_live.count_active_connections_batch(
             session_ids_with_active_connections

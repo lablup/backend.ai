@@ -54,7 +54,7 @@ class TestNetworkTimeoutSpec:
 class TestNetworkTimeoutChecker:
     @pytest.fixture()
     def valkey_live(self) -> AsyncMock:
-        def count_active_connections(session_ids: Sequence[str]) -> dict[str, int]:
+        def count_active_connections(session_ids: Sequence[SessionId]) -> dict[SessionId, int]:
             return dict.fromkeys(session_ids, 0)
 
         client = AsyncMock(spec=ValkeyLiveClient)
@@ -113,7 +113,7 @@ class TestNetworkTimeoutChecker:
         session: IdleCheckSession,
     ) -> AsyncMock:
         valkey_live.count_active_connections_batch.side_effect = lambda _session_ids: {
-            str(session.session_id): 1
+            session.session_id: 1
         }
         return valkey_live
 

@@ -30,7 +30,7 @@ from ai.backend.common.resilience import (
     RetryArgs,
     RetryPolicy,
 )
-from ai.backend.common.types import ValkeyTarget
+from ai.backend.common.types import SessionId, ValkeyTarget
 from ai.backend.logging.utils import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -252,15 +252,15 @@ class ValkeyLiveClient:
     @valkey_live_resilience.apply()
     async def count_active_connections_batch(
         self,
-        session_ids: Sequence[str],
-    ) -> dict[str, int]:
+        session_ids: Sequence[SessionId],
+    ) -> dict[SessionId, int]:
         """Count active connections for multiple sessions in one batch."""
         if not session_ids:
             return {}
         batch = self._create_batch()
         for session_id in session_ids:
             batch.zcount(
-                self._active_app_connection_key(session_id),
+                self._active_app_connection_key(str(session_id)),
                 InfBound.NEG_INF,
                 InfBound.POS_INF,
             )
