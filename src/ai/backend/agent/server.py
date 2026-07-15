@@ -55,7 +55,6 @@ from ai.backend.agent.errors import (
     InvalidAgentConfigError,
     ResourceError,
 )
-from ai.backend.agent.health.docker import DockerHealthChecker
 from ai.backend.agent.metrics.metric import RPCMetricObserver
 from ai.backend.agent.monitor import AgentErrorPluginContext, AgentStatsPluginContext
 from ai.backend.agent.resources import scan_gpu_alloc_map
@@ -65,7 +64,6 @@ from ai.backend.agent.rpc.kernel.registry import register_kernel_domain
 from ai.backend.agent.rpc.middlewares.metric import build_metric_middleware
 from ai.backend.agent.rpc.routing import AgentRPCRegistry
 from ai.backend.agent.runtime import AgentRuntime
-from ai.backend.agent.types import AgentBackend
 from ai.backend.common import config, identity, msgpack, utils
 from ai.backend.common.asyncio import current_loop
 from ai.backend.common.auth import AgentAuthHandler, PublicKey, SecretKey
@@ -427,13 +425,10 @@ class AgentRPCServer(aobject):
         # Get default agent for health checking
         default_agent = self.runtime.get_agent(None)
 
-        if self.local_config.agent_common.backend == AgentBackend.DOCKER:
-            from ai.backend.agent.docker.agent import DockerAgent
-
-            docker_agent = cast(DockerAgent, default_agent)
-            await self.health_probe.register_liveness(
-                DockerHealthChecker(docker=docker_agent.docker)
-            )
+        # Each backend contributes its own liveness probes (e.g. the container-runtime daemon),
+        # so the server never branches on the backend here.
+        for checker in default_agent.get_liveness_health_checkers():
+            await self.health_probe.register_liveness(checker)
 
         await self.health_probe.register_liveness(
             ValkeyHealthChecker(

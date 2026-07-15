@@ -127,6 +127,7 @@ from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.kernel import KernelLifecycleEventReason
 from ai.backend.common.exception import ImageNotAvailable, InvalidImageName, InvalidImageTag
 from ai.backend.common.files import AsyncFileWriter
+from ai.backend.common.health_checker.abc import ServiceHealthChecker
 from ai.backend.common.json import (
     dump_json,
     load_json,
@@ -1496,6 +1497,12 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             pickle_loader,
             [KernelRecoveryDataAdapterTarget(container_loader, container_writer)],
         )
+
+    @override
+    def get_liveness_health_checkers(self) -> list[ServiceHealthChecker]:
+        from ai.backend.agent.health.docker import DockerHealthChecker
+
+        return [DockerHealthChecker(self.docker)]
 
     @override
     async def __ainit__(self) -> None:

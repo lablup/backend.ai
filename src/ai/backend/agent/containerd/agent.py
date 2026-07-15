@@ -119,6 +119,7 @@ from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.kernel import KernelLifecycleEventReason
 from ai.backend.common.exception import ImageNotAvailable, InvalidImageName, InvalidImageTag
+from ai.backend.common.health_checker.abc import ServiceHealthChecker
 from ai.backend.common.json import dump_json_str
 from ai.backend.common.network.types import NetworkBackendKind, SessionNetMeta
 from ai.backend.common.types import (
@@ -1582,6 +1583,12 @@ class ContainerdAgent(
             pickle_creator.create_loader(),
             [KernelRecoveryDataAdapterTarget(container_loader, container_writer)],
         )
+
+    @override
+    def get_liveness_health_checkers(self) -> list[ServiceHealthChecker]:
+        from ai.backend.agent.health.containerd import ContainerdHealthChecker
+
+        return [ContainerdHealthChecker(self._runtime)]
 
     @override
     async def __ainit__(self) -> None:

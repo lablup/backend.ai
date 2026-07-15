@@ -175,6 +175,7 @@ from ai.backend.common.exception import (
     ConfigurationError,
     VolumeMountFailed,
 )
+from ai.backend.common.health_checker.abc import ServiceHealthChecker
 from ai.backend.common.json import (
     dump_json,
     dump_json_str,
@@ -964,6 +965,12 @@ class AbstractAgent[
         a Docker daemon override this so they never fall into the daemon path (which would 404)."""
         stats_type = local_config.container.stats_type
         return StatModes(stats_type.value) if stats_type else None
+
+    def get_liveness_health_checkers(self) -> list[ServiceHealthChecker]:
+        """Backend-specific liveness probes (e.g. the container runtime daemon) to register with
+        the agent's health probe. Each backend that has a daemon to reach overrides this; the
+        default is none, so the server never needs to branch on the backend."""
+        return []
 
     @override
     async def __ainit__(self) -> None:
