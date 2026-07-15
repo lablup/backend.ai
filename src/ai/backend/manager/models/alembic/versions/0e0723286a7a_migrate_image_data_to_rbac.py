@@ -148,50 +148,6 @@ def _associate_image_to_scope(db_conn: Connection) -> None:
             db_conn.execute(insert_query, values_list)
 
 
-def _remove_image_edges(db_conn: Connection) -> None:
-    """Remove all IMAGE AUTO edges from association_scopes_entities."""
-    entity_type = EntityType.IMAGE.value
-    relation_type = "auto"
-
-    while True:
-        delete_query = sa.text("""
-            DELETE FROM association_scopes_entities
-            WHERE id IN (
-                SELECT id FROM association_scopes_entities
-                WHERE entity_type = :entity_type
-                  AND relation_type = :relation_type
-                LIMIT :limit
-            )
-        """)
-        result = db_conn.execute(
-            delete_query,
-            {"entity_type": entity_type, "relation_type": relation_type, "limit": BATCH_SIZE},
-        )
-        if result.rowcount == 0:
-            break
-
-
-def _remove_image_permissions(db_conn: Connection) -> None:
-    """Remove all IMAGE entity-type permissions."""
-    entity_type = EntityType.IMAGE.value
-
-    while True:
-        delete_query = sa.text("""
-            DELETE FROM permissions
-            WHERE id IN (
-                SELECT id FROM permissions
-                WHERE entity_type = :entity_type
-                LIMIT :limit
-            )
-        """)
-        result = db_conn.execute(
-            delete_query,
-            {"entity_type": entity_type, "limit": BATCH_SIZE},
-        )
-        if result.rowcount == 0:
-            break
-
-
 def upgrade() -> None:
     conn = op.get_bind()
     _add_entity_type_permissions(conn)
@@ -199,6 +155,6 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    conn = op.get_bind()
-    _remove_image_edges(conn)
-    _remove_image_permissions(conn)
+    # Forward-only: the seeded rows are indistinguishable from ones granted
+    # afterwards, so deleting by entity_type would erase operator-managed grants.
+    pass

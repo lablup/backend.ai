@@ -197,45 +197,6 @@ def _associate_agent_to_project_scope(db_conn: Connection) -> None:
             db_conn.execute(insert_query, values_list)
 
 
-def _remove_agent_edges(db_conn: Connection) -> None:
-    """Remove all AGENT AUTO edges from association_scopes_entities."""
-    while True:
-        delete_query = sa.text("""
-            DELETE FROM association_scopes_entities
-            WHERE id IN (
-                SELECT id FROM association_scopes_entities
-                WHERE entity_type = :entity_type
-                  AND relation_type = :relation_type
-                LIMIT :limit
-            )
-        """)
-        result = db_conn.execute(
-            delete_query,
-            {"entity_type": ENTITY_TYPE_AGENT, "relation_type": "auto", "limit": BATCH_SIZE},
-        )
-        if result.rowcount == 0:
-            break
-
-
-def _remove_agent_permissions(db_conn: Connection) -> None:
-    """Remove all AGENT entity-type permissions."""
-    while True:
-        delete_query = sa.text("""
-            DELETE FROM permissions
-            WHERE id IN (
-                SELECT id FROM permissions
-                WHERE entity_type = :entity_type
-                LIMIT :limit
-            )
-        """)
-        result = db_conn.execute(
-            delete_query,
-            {"entity_type": ENTITY_TYPE_AGENT, "limit": BATCH_SIZE},
-        )
-        if result.rowcount == 0:
-            break
-
-
 def upgrade() -> None:
     conn = op.get_bind()
     _add_entity_type_permissions(conn)
@@ -244,6 +205,6 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    conn = op.get_bind()
-    _remove_agent_edges(conn)
-    _remove_agent_permissions(conn)
+    # Forward-only: the seeded rows are indistinguishable from ones granted
+    # afterwards, so deleting by entity_type would erase operator-managed grants.
+    pass
