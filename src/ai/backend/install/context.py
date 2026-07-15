@@ -10,7 +10,6 @@ import random
 import re
 import secrets
 import shutil
-import sys
 import tempfile
 import uuid
 from abc import ABCMeta, abstractmethod
@@ -383,6 +382,27 @@ class Context(metaclass=ABCMeta):
         if exit_code != 0:
             raise RuntimeError(
                 f"Manager CLI command failed (exit {exit_code}): {' '.join(cmdargs)}"
+            )
+
+    async def run_appproxy_coordinator_cli(self, cmdargs: Sequence[str]) -> None:
+        if self.install_info.type == InstallType.SOURCE:
+            # Develop mode: use ./backend.ai from current directory
+            cmd_str = " ".join(cmdargs)
+            exit_code = await self.run_shell(f"./backend.ai app-proxy-coordinator {cmd_str}")
+
+        elif self.install_info.type == InstallType.PACKAGE:
+            # Package mode: use backendai-appproxy-coordinator from base_path
+            executable = Path(self.install_info.base_path) / "backendai-appproxy-coordinator"
+            exit_code = await self.run_exec(
+                [str(executable), "app-proxy-coordinator", *cmdargs],
+                cwd=self.install_info.base_path,
+            )
+        else:
+            raise RuntimeError(f"Unsupported install type: {self.install_info.type}")
+
+        if exit_code != 0:
+            raise RuntimeError(
+                f"App-proxy coordinator CLI command failed (exit {exit_code}): {' '.join(cmdargs)}"
             )
 
     @actxmgr
@@ -1174,12 +1194,12 @@ class Context(metaclass=ABCMeta):
         await app_conn.execute("GRANT ALL ON SCHEMA public TO appproxy;")
         await app_conn.close()
 
-        # 4. Run Alembic migration for app-proxy
+        # 4. Run the schema migration for app-proxy. The alembic scripts live
+        # inside the ai.backend.appproxy package (script_location is a package
+        # resource path), so this must run through the coordinator CLI -- the
+        # installer's own interpreter cannot import them in PACKAGE mode.
         alembic_ini = self.copy_config("alembic-appproxy.ini")
-        await self.run_exec(
-            [sys.executable, "-m", "alembic", "-c", str(alembic_ini), "upgrade", "head"],
-            cwd=self.install_info.base_path,
-        )
+        await self.run_appproxy_coordinator_cli(["schema", "oneshot", "-f", str(alembic_ini)])
         # NOTE: The "default" scaling_group's wsproxy_addr/token are set by
         # configure_appproxy_fixture(), which runs after load_fixtures() seeds
         # the row. Do not update scaling_groups here -- the row does not exist
