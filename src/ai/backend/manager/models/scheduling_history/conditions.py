@@ -10,6 +10,7 @@ from typing import cast
 import sqlalchemy as sa
 
 from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec, UUIDInMatchSpec
+from ai.backend.common.identifier.kernel_scheduling_history import KernelSchedulingHistoryID
 from ai.backend.common.types import KernelId, SessionId
 from ai.backend.manager.data.deployment.types import RouteStatus
 from ai.backend.manager.data.kernel.types import KernelSchedulingPhase
@@ -420,7 +421,7 @@ class KernelSchedulingHistoryConditions:
         return inner
 
     @staticmethod
-    def by_ids(ids: Collection[uuid.UUID]) -> QueryCondition:
+    def by_ids(ids: Collection[KernelSchedulingHistoryID]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return KernelSchedulingHistoryRow.id.in_(ids)
 
