@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import random
 
+import pytest
+
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 
 
@@ -42,6 +44,43 @@ async def test_valkey_live_multiple_data_operations(test_valkey_live: ValkeyLive
     results = await test_valkey_live.get_multiple_live_data(keys)
     assert len(results) == 3
     assert all(result is not None for result in results)
+
+
+class TestCountActiveConnectionsBatch:
+    @pytest.fixture()
+    async def session_ids_with_active_connections(
+        self,
+        test_valkey_live: ValkeyLiveClient,
+    ) -> list[str]:
+        test_prefix = f"test-connections-{random.randint(1000, 9999)}"
+        session_ids = [f"{test_prefix}-session-{i}" for i in range(3)]
+        await test_valkey_live.update_connection_tracker(session_ids[0], "ssh", "stream-1")
+        await test_valkey_live.update_connection_tracker(session_ids[0], "ssh", "stream-2")
+        await test_valkey_live.update_connection_tracker(session_ids[1], "jupyter", "stream-1")
+        return session_ids
+
+    async def test_returns_connection_counts_by_session(
+        self,
+        test_valkey_live: ValkeyLiveClient,
+        session_ids_with_active_connections: list[str],
+    ) -> None:
+        result = await test_valkey_live.count_active_connections_batch(
+            session_ids_with_active_connections
+        )
+
+        assert result == {
+            session_ids_with_active_connections[0]: 2,
+            session_ids_with_active_connections[1]: 1,
+            session_ids_with_active_connections[2]: 0,
+        }
+
+    async def test_returns_empty_mapping_for_empty_input(
+        self,
+        test_valkey_live: ValkeyLiveClient,
+    ) -> None:
+        result = await test_valkey_live.count_active_connections_batch([])
+
+        assert result == {}
 
 
 async def test_valkey_live_client_lifecycle(test_valkey_live: ValkeyLiveClient) -> None:

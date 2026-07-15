@@ -384,7 +384,7 @@ class TestFetchIdleCheckBatch:
                 CheckerType.NETWORK_TIMEOUT,
                 IdleCheckerSpec(
                     type=CheckerType.NETWORK_TIMEOUT,
-                    network=NetworkTimeoutSpec(),
+                    network=NetworkTimeoutSpec(idle_timeout_seconds=3600),
                 ),
                 ScopeType.PROJECT,
                 project_scope.project_id,

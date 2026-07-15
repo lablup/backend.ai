@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import override
 
+from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.dependencies import DependencyComposer, DependencyStack
@@ -58,6 +59,7 @@ class OrchestrationInput:
     distributed_lock_factory: DistributedLockFactory
     valkey_profile_target: ValkeyProfileTarget
     valkey_schedule: ValkeyScheduleClient
+    valkey_live: ValkeyLiveClient
     valkey_stat: ValkeyStatClient
     pidx: int
     # Sokovan-specific
@@ -153,6 +155,7 @@ class OrchestrationComposer(DependencyComposer[OrchestrationInput, Orchestration
             network_plugin_ctx=setup_input.network_plugin_ctx,
             event_producer=setup_input.event_producer,
             valkey_schedule=setup_input.valkey_schedule,
+            valkey_live=setup_input.valkey_live,
             valkey_stat=setup_input.valkey_stat,
             agent_selector=setup_input.agent_selector,
             scheduling_controller=setup_input.scheduling_controller,

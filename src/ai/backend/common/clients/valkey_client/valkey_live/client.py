@@ -250,6 +250,24 @@ class ValkeyLiveClient:
             )
 
     @valkey_live_resilience.apply()
+    async def count_active_connections_batch(
+        self,
+        session_ids: Sequence[str],
+    ) -> dict[str, int]:
+        """Count active connections for multiple sessions in one batch."""
+        if not session_ids:
+            return {}
+        batch = self._create_batch()
+        for session_id in session_ids:
+            batch.zcount(
+                self._active_app_connection_key(session_id),
+                InfBound.NEG_INF,
+                InfBound.POS_INF,
+            )
+        results = cast(list[int], await self._execute_batch(batch))
+        return dict(zip(session_ids, results, strict=True))
+
+    @valkey_live_resilience.apply()
     async def add_scheduler_metadata(
         self,
         key: str,
