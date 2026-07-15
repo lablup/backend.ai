@@ -421,6 +421,64 @@ class KernelSchedulingHistoryConditions:
 
         return inner
 
+    # String filter conditions for phase
+    @staticmethod
+    def by_phase_contains(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            col = cast(sa.ColumnElement[str], KernelSchedulingHistoryRow.phase)
+            if spec.case_insensitive:
+                col = sa.func.lower(col)
+                pattern = f"%{spec.value.lower()}%"
+            else:
+                pattern = f"%{spec.value}%"
+            expr = col.like(pattern)
+            return ~expr if spec.negated else expr
+
+        return inner
+
+    @staticmethod
+    def by_phase_equals(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            col = cast(sa.ColumnElement[str], KernelSchedulingHistoryRow.phase)
+            if spec.case_insensitive:
+                col = sa.func.lower(col)
+                val = spec.value.lower()
+            else:
+                val = spec.value
+            if spec.negated:
+                return col != val
+            return col == val
+
+        return inner
+
+    @staticmethod
+    def by_phase_starts_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            col = cast(sa.ColumnElement[str], KernelSchedulingHistoryRow.phase)
+            if spec.case_insensitive:
+                col = sa.func.lower(col)
+                pattern = f"{spec.value.lower()}%"
+            else:
+                pattern = f"{spec.value}%"
+            expr = col.like(pattern)
+            return ~expr if spec.negated else expr
+
+        return inner
+
+    @staticmethod
+    def by_phase_ends_with(spec: StringMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            col = cast(sa.ColumnElement[str], KernelSchedulingHistoryRow.phase)
+            if spec.case_insensitive:
+                col = sa.func.lower(col)
+                pattern = f"%{spec.value.lower()}"
+            else:
+                pattern = f"%{spec.value}"
+            expr = col.like(pattern)
+            return ~expr if spec.negated else expr
+
+        return inner
+
     @staticmethod
     def by_from_status(phase: KernelSchedulingPhase) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
@@ -441,6 +499,8 @@ class KernelSchedulingHistoryConditions:
             return KernelSchedulingHistoryRow.error_code == error_code
 
         return inner
+
+    by_phase_in = staticmethod(make_string_in_factory(KernelSchedulingHistoryRow.phase))
 
     @staticmethod
     def by_cursor_forward(cursor_id: str) -> QueryCondition:
