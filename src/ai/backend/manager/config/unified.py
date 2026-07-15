@@ -1965,9 +1965,9 @@ class InterContainerNetworkConfig(BaseConfigSchema):
         BackendAIConfigMeta(
             description=(
                 "Pins the cluster-network data-plane backend when default_driver='cni'. "
-                "One of 'vxlan', 'host-gw', or 'wireguard'. "
-                "When unset (null), the backend is selected per session from agent capabilities "
-                "('host-gw' if all members support native routing, otherwise 'vxlan'). "
+                "One of 'vxlan' or 'bridge'. "
+                "When unset (null), multi-node cluster sessions use the portable 'vxlan' overlay "
+                "(single-node sessions use 'bridge', chosen by the agent). "
                 "See BEP-1062."
             ),
             added_version="25.14.0",

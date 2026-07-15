@@ -222,7 +222,7 @@ class TestSetupTeardown:
         bad = SessionNetMeta(
             session_id="s1",
             subnet="10.128.5.0/24",
-            backend=NetworkBackendKind.HOST_GW,
+            backend=NetworkBackendKind.BRIDGE,
             mtu=1500,
         )
         with pytest.raises(ValueError):

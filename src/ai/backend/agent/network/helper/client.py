@@ -135,7 +135,7 @@ class HelperBackendProxy(AbstractNetworkAgentPluginV2["AbstractKernel"]):
     @override
     async def add_peer(self, session_id: str, peer: Member) -> None:
         if peer.vtep_ip is None:
-            return  # non-overlay peer (bridge/host-gw): nothing to program on the overlay
+            return  # non-overlay peer (bridge): nothing to program on the overlay
         await self._client.call(
             HelperRequest(op=HelperOp.ADD_PEER, session_id=session_id, vtep_ip=peer.vtep_ip)
         )

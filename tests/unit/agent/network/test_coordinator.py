@@ -50,7 +50,6 @@ class FakeEtcd:
         self.store[member_key(session_id, member.agent_id)] = json.dumps({
             "host_ip": member.host_ip,
             "vtep_ip": member.vtep_ip,
-            "ip_range": member.ip_range,
         })
 
     def seed_endpoint(

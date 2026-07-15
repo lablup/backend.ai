@@ -2,9 +2,9 @@
 
 Replaces the Swarm-based `OverlayNetworkPlugin` for containerd and other host-native
 runtimes. This plugin owns the *control plane*: it allocates a per-session subnet
-(and a VNI for the vxlan backend), selects the data-plane backend from agent
-capabilities, and writes the session network descriptor to etcd. The data plane
-itself is realized by the agent-side v2 plugins (see BEP-1062/agent-plugin-v2.md).
+(and a VNI for the vxlan backend), selects the data-plane backend (the portable vxlan
+overlay unless the operator pins one), and writes the session network descriptor to etcd.
+The data plane itself is realized by the agent-side v2 plugins (see BEP-1062/agent-plugin-v2.md).
 """
 
 from __future__ import annotations
@@ -18,21 +18,16 @@ from typing import Any, override
 from ai.backend.common.configs.etcd import EtcdConfig
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.network.keys import (
-    agent_caps_key,
     agent_vtep_key,
     member_key,
     session_meta_key,
     session_prefix,
 )
 from ai.backend.common.network.types import (
-    IMPLEMENTED_NETWORK_BACKENDS,
     Member,
     NetworkBackendKind,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.errors.network import (
-    UnsupportedNetworkBackend,
-)
 from ai.backend.manager.network.ipam import (
     DEFAULT_BLOCK_PREFIXLEN,
     DEFAULT_IPAM_POOL,
@@ -119,7 +114,7 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         endpoints = list(options.get("endpoints", []))
 
         await self._require_members_cni_capable(member_agents)
-        backend = await self._select_backend(member_agents, forced_backend)
+        backend = self._select_backend(forced_backend)
         # Size the session subnet to hold every endpoint (removes the fixed-/24 254 cap).
         # A failure to acquire the subnet claims nothing, so it needs no rollback; every
         # subsequent claim (VNI, endpoint IPs, meta/member keys) is undone on any failure so a
@@ -130,8 +125,8 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
             if backend is NetworkBackendKind.VXLAN:
                 vni = await self._vni_allocator.acquire(session_id)
             # `mtu` in plugin_config is the UNDERLAY MTU; the overlay MTU (what the kernel's NIC
-            # gets) is that minus the tunnel overhead. Only meaningful for the VXLAN backend; host-gw
-            # and wireguard would carry their own overhead, but VXLAN is the only one implemented.
+            # gets) is that minus the tunnel overhead. Only the VXLAN backend encapsulates, so only
+            # it pays the overhead; a non-encapsulating backend would keep the underlay MTU.
             underlay_mtu = int(self.plugin_config.get("mtu") or _DEFAULT_UNDERLAY_MTU)
             mtu = (
                 underlay_mtu - _VXLAN_OVERHEAD
@@ -228,51 +223,8 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         """
         await require_members_can_serve_driver(self._require_etcd(), "cni", member_agents)
 
-    async def _select_backend(
-        self, member_agents: list[str], forced_backend: NetworkBackendKind | None
-    ) -> NetworkBackendKind:
-        """Operator override wins; otherwise host-gw only if every member advertises
-        native-routing capability, else the portable vxlan default.
-
-        The chosen backend is validated against the set that actually has an agent-side
-        implementation. What happens to an unimplemented one depends on who chose it:
-
-        - the **operator** (forced_backend) asked for something that does not exist — refuse, so a
-          typo or a premature config does not silently run on a backend they did not ask for;
-        - the **selector** resolved to one from the agents' advertised capabilities — fall back to
-          vxlan and say so. Auto-selection exists to pick the best *working* data plane; failing
-          every session on the cluster because the capability it detected has no implementation yet
-          is not a service the selector should be offering.
-        """
-        backend = await self._resolve_backend(member_agents, forced_backend)
-        if backend in IMPLEMENTED_NETWORK_BACKENDS:
-            return backend
-        if forced_backend is not None:
-            raise UnsupportedNetworkBackend(
-                f"cluster-network backend '{backend}' is declared but not implemented "
-                f"(implemented: {sorted(b.value for b in IMPLEMENTED_NETWORK_BACKENDS)})"
-            )
-        log.warning(
-            "the agents' capabilities select the '{}' backend, which has no agent-side "
-            "implementation yet; falling back to '{}'",
-            backend.value,
-            NetworkBackendKind.VXLAN.value,
-        )
-        return NetworkBackendKind.VXLAN
-
-    async def _resolve_backend(
-        self, member_agents: list[str], forced_backend: NetworkBackendKind | None
-    ) -> NetworkBackendKind:
-        if forced_backend is not None:
-            return forced_backend
-        if not member_agents:
-            return NetworkBackendKind.VXLAN
-        etcd = self._require_etcd()
-        for agent_id in member_agents:
-            raw = await etcd.get(agent_caps_key(agent_id), scope=ConfigScopes.GLOBAL)
-            if raw is None:
-                return NetworkBackendKind.VXLAN
-            caps = json.loads(raw)
-            if not caps.get("native_routing_ok", False):
-                return NetworkBackendKind.VXLAN
-        return NetworkBackendKind.HOST_GW
+    def _select_backend(self, forced_backend: NetworkBackendKind | None) -> NetworkBackendKind:
+        """The operator's forced backend wins; otherwise every multi-node cluster session uses
+        the portable vxlan overlay. (Single-node sessions use the bridge backend, which the agent
+        selects, not this manager plugin.)"""
+        return forced_backend if forced_backend is not None else NetworkBackendKind.VXLAN

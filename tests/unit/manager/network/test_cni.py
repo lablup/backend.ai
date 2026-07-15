@@ -16,7 +16,6 @@ from ai.backend.common.network.types import NetworkBackendKind, mac_for_ip
 from ai.backend.manager.errors.network import (
     NetworkBackendMismatch,
     NetworkPoolExhausted,
-    UnsupportedNetworkBackend,
     VNIPoolExhausted,
 )
 from ai.backend.manager.network.cni import CNINetworkPlugin
@@ -199,56 +198,15 @@ def _plugin_with(etcd: FakeEtcd) -> CNINetworkPlugin:
 
 
 class TestSelectBackend:
-    async def test_forced_backend_wins(self) -> None:
+    def test_no_forced_backend_defaults_to_vxlan(self) -> None:
+        # Multi-node cluster sessions use the portable vxlan overlay unless the operator pins one.
         plugin = _plugin_with(FakeEtcd())
-        result = await plugin._select_backend(["a1"], NetworkBackendKind.VXLAN)
-        assert result is NetworkBackendKind.VXLAN
+        assert plugin._select_backend(None) is NetworkBackendKind.VXLAN
 
-    async def test_no_members_defaults_to_vxlan(self) -> None:
-        plugin = _plugin_with(FakeEtcd())
-        assert await plugin._select_backend([], None) is NetworkBackendKind.VXLAN
-
-    async def test_auto_select_falls_back_when_it_resolves_an_unimplemented_backend(self) -> None:
-        # The capability auto-select still resolves host-gw internally, but host-gw has no
-        # agent-side implementation. Auto-selection must not fail every session of the cluster over
-        # a capability nobody asked for: it picks the working data plane and says so.
-        etcd = FakeEtcd()
-        for agent_id in ("a1", "a2"):
-            etcd.store[f"network/agent/{agent_id}/caps"] = json.dumps({"native_routing_ok": True})
-        plugin = _plugin_with(etcd)
-        assert await plugin._resolve_backend(["a1", "a2"], None) is NetworkBackendKind.HOST_GW
-        assert await plugin._select_backend(["a1", "a2"], None) is NetworkBackendKind.VXLAN
-
-    async def test_an_operator_asking_for_an_unimplemented_backend_is_refused(self) -> None:
-        # The operator named it explicitly: running something else instead would be worse than
-        # failing, since they would never know they did not get what they configured.
-        plugin = _plugin_with(FakeEtcd())
-        with pytest.raises(UnsupportedNetworkBackend):
-            await plugin._select_backend(["a1"], NetworkBackendKind.HOST_GW)
-
-    async def test_one_non_native_falls_back_to_vxlan(self) -> None:
-        etcd = FakeEtcd()
-        etcd.store["network/agent/a1/caps"] = json.dumps({"native_routing_ok": True})
-        etcd.store["network/agent/a2/caps"] = json.dumps({"native_routing_ok": False})
-        plugin = _plugin_with(etcd)
-        assert await plugin._select_backend(["a1", "a2"], None) is NetworkBackendKind.VXLAN
-
-    async def test_forced_unimplemented_backend_is_refused(self) -> None:
-        # an operator pinning host-gw or wireguard (both declared but not implemented) must get a
-        # clear create-time error, not a late UnknownNetworkBackend crash on the agent
-        plugin = _plugin_with(FakeEtcd())
-        for backend in (NetworkBackendKind.HOST_GW, NetworkBackendKind.WIREGUARD):
-            with pytest.raises(UnsupportedNetworkBackend):
-                await plugin._select_backend(["a1"], backend)
-
-    async def test_forced_implemented_backend_is_accepted(self) -> None:
+    def test_forced_backend_wins(self) -> None:
         plugin = _plugin_with(FakeEtcd())
         for backend in (NetworkBackendKind.VXLAN, NetworkBackendKind.BRIDGE):
-            assert await plugin._select_backend(["a1"], backend) is backend
-
-    async def test_missing_caps_falls_back_to_vxlan(self) -> None:
-        plugin = _plugin_with(FakeEtcd())  # no caps published
-        assert await plugin._select_backend(["a1"], None) is NetworkBackendKind.VXLAN
+            assert plugin._select_backend(backend) is backend
 
 
 class TestCreateNetwork:
@@ -279,8 +237,7 @@ class TestCreateNetwork:
         assert json.loads(etcd.store["network/session/s1/meta"])["mtu"] == 1450
 
     async def test_non_vxlan_backend_has_no_vni(self) -> None:
-        # a VNI is a vxlan concept; any other (implemented) backend gets none. bridge stands in for
-        # "not vxlan" here — host-gw would be the natural example but is not implemented (refused).
+        # a VNI is a vxlan concept; the bridge backend gets none.
         etcd = FakeEtcd()
         plugin = _plugin_with(etcd)
         info = await plugin.create_network(identifier="s2", options={"forced_backend": "bridge"})
@@ -330,7 +287,7 @@ class TestCreateNetwork:
         # each agent's member is written up-front so reconcile-at-start finds every peer
         m1 = json.loads(etcd.store["network/session/s1/members/a1"])
         m2 = json.loads(etcd.store["network/session/s1/members/a2"])
-        assert m1 == {"host_ip": "192.168.105.7", "vtep_ip": "192.168.105.7", "ip_range": None}
+        assert m1 == {"host_ip": "192.168.105.7", "vtep_ip": "192.168.105.7"}
         assert m2["vtep_ip"] == "192.168.105.8"
 
     async def test_preseed_skips_agents_without_published_vtep(self) -> None:

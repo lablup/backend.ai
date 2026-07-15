@@ -53,13 +53,13 @@ class TestParseTunnelOffload:
 
 
 class TestComputeCaps:
-    def test_native_routing_offers_host_gw(self) -> None:
-        caps = compute_caps(tunnel_offload=True, native_routing_ok=True)
-        assert caps.backends == ["vxlan", "host-gw"]
-        assert caps.native_routing_ok is True
+    def test_advertises_vxlan(self) -> None:
+        caps = compute_caps(tunnel_offload=True)
+        assert caps.backends == ["vxlan"]
+        assert caps.tunnel_offload is True
 
-    def test_no_native_routing_only_vxlan(self) -> None:
-        caps = compute_caps(tunnel_offload=False, native_routing_ok=False)
+    def test_carries_the_tunnel_offload_flag(self) -> None:
+        caps = compute_caps(tunnel_offload=False)
         assert caps.backends == ["vxlan"]
         assert caps.tunnel_offload is False
 
@@ -89,12 +89,9 @@ class _CapturingEtcd:
 class TestPublishCaps:
     async def test_writes_json_caps_to_expected_key(self) -> None:
         etcd = _CapturingEtcd()
-        caps = AgentNetworkCaps(
-            tunnel_offload=False, native_routing_ok=True, backends=["vxlan", "host-gw"]
-        )
+        caps = AgentNetworkCaps(tunnel_offload=False, backends=["vxlan"])
         await publish_caps(cast(AbstractKVStore, etcd), "i-abc123", caps)
         raw = etcd.puts["network/agent/i-abc123/caps"]
         payload = json.loads(raw)
-        assert payload["native_routing_ok"] is True
-        assert payload["backends"] == ["vxlan", "host-gw"]
+        assert payload["backends"] == ["vxlan"]
         assert payload["tunnel_offload"] is False

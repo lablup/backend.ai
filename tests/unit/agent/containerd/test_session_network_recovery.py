@@ -110,7 +110,7 @@ class RecordingBackend:
     async def del_endpoint(self, session_id: str, **kwargs: Any) -> None: ...
 
     async def probe_caps(self) -> AgentNetworkCaps:
-        return AgentNetworkCaps(tunnel_offload=False, native_routing_ok=False)
+        return AgentNetworkCaps(tunnel_offload=False)
 
     async def attach_endpoint(
         self, kernel_config: Any, cluster_info: Any, *, meta: SessionNetMeta

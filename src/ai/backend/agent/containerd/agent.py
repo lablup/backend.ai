@@ -1629,12 +1629,9 @@ class ContainerdAgent(
         await asyncio.to_thread(self._agent_sock_path.parent.mkdir, parents=True, exist_ok=True)
         self._event_monitor_task = asyncio.create_task(self._monitor_task_events())
         self._agent_sock_task = asyncio.create_task(self._handle_agent_socket())
-        # Advertise what this node's fabric can do, so the manager selects a data plane from facts
-        # rather than from a default. Without this the capability key never exists and the whole
-        # selector is inert — it silently answers "vxlan" for every session whatever the host is.
-        # native_routing_ok stays conservative (False): a single-node boot probe cannot confirm the
-        # fabric forwards container-IP frames, and asserting it would select a backend the agent
-        # does not implement.
+        # Publish this node's networking capabilities (e.g. VXLAN tunnel offload) under the
+        # agent caps key, as a diagnostic signal for operators. Best-effort: a failure here must
+        # not block agent startup.
         try:
             await publish_caps(
                 self.etcd,

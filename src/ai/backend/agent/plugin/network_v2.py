@@ -29,7 +29,7 @@ from ai.backend.common.types import ClusterInfo, KernelCreationConfig
 class AbstractNetworkAgentPluginV2[TKernel: AbstractKernel](AbstractPlugin, metaclass=ABCMeta):
     """Runtime-neutral cluster-network backend attached on the agent side.
 
-    A concrete backend (vxlan / host-gw / wireguard) implements this once and works
+    A concrete backend (vxlan / bridge) implements this once and works
     under any runtime; runtime specifics live in the provisioner that consumes
     `NetworkAttachSpec`.
 
@@ -74,7 +74,7 @@ class AbstractNetworkAgentPluginV2[TKernel: AbstractKernel](AbstractPlugin, meta
 
     @abstractmethod
     async def add_peer(self, session_id: str, peer: Member) -> None:
-        """Reflect a newly joined peer (vxlan: FDB append / host-gw: route add)."""
+        """Reflect a newly joined peer (vxlan: FDB append)."""
         raise NotImplementedError
 
     @abstractmethod
@@ -86,8 +86,8 @@ class AbstractNetworkAgentPluginV2[TKernel: AbstractKernel](AbstractPlugin, meta
         """Proactively program forwarding + ARP for a known remote container endpoint,
         from the manager-assigned ``endpoints/`` table (no BUM flood).
 
-        Overlay-specific (vxlan programs unicast FDB + neighbor). Backends whose peers are
-        node-granular (host-gw routes) do not need per-endpoint programming; default no-op.
+        Overlay-specific (vxlan programs unicast FDB + neighbor). Backends with no cross-node
+        overlay (bridge) do not need per-endpoint programming; default no-op.
         Must be idempotent."""
         pass
 

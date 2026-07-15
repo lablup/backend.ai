@@ -370,7 +370,6 @@ class NetworkHelperServer:
             agent_id=self._agent_id,
             host_ip=self._host_ip,
             vtep_ip=self._vtep_ip if backend is NetworkBackendKind.VXLAN else None,
-            ip_range=None,
         )
 
     def _require_vtep(self, backend: NetworkBackendKind) -> None:
@@ -620,7 +619,7 @@ class NetworkHelperServer:
         Member carries only the validated VTEP; the backend uses nothing else here."""
         entry = self._require_session(session_id)
         vtep_ip = policy.validate_ipv4(req.vtep_ip, what="vtep_ip")
-        peer = Member(agent_id="", host_ip=vtep_ip, vtep_ip=vtep_ip, ip_range=None)
+        peer = Member(agent_id="", host_ip=vtep_ip, vtep_ip=vtep_ip)
         if req.op is HelperOp.ADD_PEER:
             await entry.backend.add_peer(session_id, peer)
         else:

@@ -3,7 +3,7 @@
 `ContainerdAgent` holds one of these. It bridges the data the manager sends
 (``cluster_info["network_config"]`` = the CNINetworkPlugin's ``{backend, subnet, vni,
 mtu}``) into the network subsystem, resolves the **per-session** data-plane backend
-(vxlan / host-gw / wireguard) by name, and composes:
+(vxlan / bridge) by name, and composes:
 
 - per-session setup/teardown via `SessionNetworkCoordinator` (bridge + peers), and
 - per-container launch/terminate via `ContainerdKernelOrchestrator`
@@ -401,7 +401,6 @@ class ContainerdSessionNetwork:
             agent_id=self._agent_id,
             host_ip=self._host_ip,
             vtep_ip=self._vtep_ip if meta.backend is NetworkBackendKind.VXLAN else None,
-            ip_range=None,
         )
 
     @contextlib.asynccontextmanager
@@ -836,7 +835,6 @@ def build_containerd_session_network(
     runner (host-native iproute2/iptables — no ``/opt/cni/bin`` dependency), and both the
     vxlan (multi-node overlay) and bridge (single-node local) backends on ``uplink``. Any
     collaborator can be overridden (used by ContainerdAgent, and injectable in tests).
-    Additional backends (host-gw / wireguard) are registered here as they land.
     """
     # Lazy imports: keep this facade module decoupled from the concrete runtime/backend.
     from ai.backend.agent.containerd.runtime.grpc import ContainerdGrpcRuntime

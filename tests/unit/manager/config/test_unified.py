@@ -23,6 +23,6 @@ class TestInterContainerNetworkConfig:
 
     def test_forced_backend_accepts_field_name(self) -> None:
         config = InterContainerNetworkConfig.model_validate(
-            {"forced_backend": "host-gw"}, by_name=True
+            {"forced_backend": "bridge"}, by_name=True
         )
-        assert config.forced_backend == "host-gw"
+        assert config.forced_backend == "bridge"

@@ -37,22 +37,6 @@ class NetworkBackendKind(StrEnum):
     """Node-local per-session bridge with no cross-node overlay. Used for single-node
     sessions: a plain CNI bridge (host-local IPAM) gives the container a host-reachable IP,
     replacing the former nerdctl-managed bridge."""
-    HOST_GW = "host-gw"
-    """Native L3 routing without encapsulation; requires a cooperative fabric. NOT IMPLEMENTED —
-    declared for the selection interface; no agent-side data-plane backend exists yet."""
-    WIREGUARD = "wireguard"
-    """Encrypted host-to-host tunnels; use when confidentiality is required. NOT IMPLEMENTED —
-    a placeholder for a future backend; nothing selects or registers it."""
-
-
-# The backends that actually have an agent-side data-plane implementation and are registered by
-# build_containerd_session_network. Keep in sync with that registration: the manager guards its
-# backend selection against this set so an unimplemented backend (host-gw / wireguard) is refused
-# with a clear error at create_network time, instead of crashing the agent with UnknownNetworkBackend.
-IMPLEMENTED_NETWORK_BACKENDS: frozenset[NetworkBackendKind] = frozenset({
-    NetworkBackendKind.VXLAN,
-    NetworkBackendKind.BRIDGE,
-})
 
 
 class AttachKind(StrEnum):
@@ -107,15 +91,13 @@ class Member:
     host_ip: str
     vtep_ip: str | None = None
     """VXLAN tunnel endpoint address; used by the vxlan backend for FDB entries."""
-    ip_range: str | None = None
-    """Sub-range of the session subnet owned by this node; used by the host-gw backend."""
 
     def to_etcd_payload(self) -> dict[str, str | None]:
         """The member's etcd value (``agent_id`` is the key, not part of the value).
 
         Single source of the on-wire member schema — used by both the agent (self-publish)
         and the manager (pre-seed) so the two never drift."""
-        return {"host_ip": self.host_ip, "vtep_ip": self.vtep_ip, "ip_range": self.ip_range}
+        return {"host_ip": self.host_ip, "vtep_ip": self.vtep_ip}
 
     @classmethod
     def from_etcd_payload(cls, agent_id: str, payload: Mapping[str, Any]) -> Member:
@@ -123,7 +105,6 @@ class Member:
             agent_id=agent_id,
             host_ip=payload["host_ip"],
             vtep_ip=payload.get("vtep_ip"),
-            ip_range=payload.get("ip_range"),
         )
 
 
@@ -196,5 +177,4 @@ class AgentNetworkCaps:
     """
 
     tunnel_offload: bool
-    native_routing_ok: bool
     backends: list[str] = field(default_factory=list)

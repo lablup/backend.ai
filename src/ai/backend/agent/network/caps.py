@@ -1,13 +1,11 @@
 """Agent networking capability probe (BEP-1062).
 
-The manager selects a cluster-network data-plane backend per session from each
-participating agent's capabilities, published under ``network/agent/{id}/caps``.
-This module detects those capabilities and publishes them.
+Each participating agent publishes its networking capabilities under
+``network/agent/{id}/caps``. This module detects those capabilities and publishes them.
 
 Key capability: VXLAN tunnel offload. When the NIC/driver reports
-``tx-udp_tnl-segmentation: off [fixed]``, VXLAN can never be hardware-accelerated
-on that host, so the manager should prefer a non-encapsulating backend where the
-fabric allows it.
+``tx-udp_tnl-segmentation: off [fixed]``, VXLAN cannot be hardware-accelerated on
+that host — a diagnostic signal for operators sizing the fabric.
 """
 
 from __future__ import annotations
@@ -70,33 +68,20 @@ async def _run_ethtool(iface: str) -> str | None:
     return stdout.decode(errors="replace")
 
 
-def compute_caps(*, tunnel_offload: bool, native_routing_ok: bool) -> AgentNetworkCaps:
-    """Assemble AgentNetworkCaps from probed facts.
-
-    ``vxlan`` is always available (the portable default); ``host-gw`` is offered only
-    when native routing is known to work on this host's fabric.
-    """
-    backends = ["vxlan"]
-    if native_routing_ok:
-        backends.append("host-gw")
+def compute_caps(*, tunnel_offload: bool) -> AgentNetworkCaps:
+    """Assemble AgentNetworkCaps from probed facts. ``vxlan`` is the data-plane backend
+    every agent supports."""
     return AgentNetworkCaps(
         tunnel_offload=tunnel_offload,
-        native_routing_ok=native_routing_ok,
-        backends=backends,
+        backends=["vxlan"],
     )
 
 
-async def probe_caps(iface: str, *, native_routing_ok: bool = False) -> AgentNetworkCaps:
-    """Probe this host's networking capabilities.
-
-    ``native_routing_ok`` defaults to False (conservative): a boot-time single-node
-    probe cannot confirm that the fabric forwards container-IP frames, so the manager
-    falls back to the portable vxlan backend unless native routing is asserted (by
-    configuration or a future active two-node probe).
-    """
+async def probe_caps(iface: str) -> AgentNetworkCaps:
+    """Probe this host's networking capabilities."""
     output = await _run_ethtool(iface)
     tunnel_offload = parse_tunnel_offload(output) if output is not None else False
-    return compute_caps(tunnel_offload=tunnel_offload, native_routing_ok=native_routing_ok)
+    return compute_caps(tunnel_offload=tunnel_offload)
 
 
 async def publish_caps(etcd: AbstractKVStore, agent_id: str, caps: AgentNetworkCaps) -> None:

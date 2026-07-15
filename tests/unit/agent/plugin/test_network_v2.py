@@ -46,7 +46,7 @@ class _CompleteV2Plugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
 
     @override
     async def probe_caps(self) -> AgentNetworkCaps:
-        return AgentNetworkCaps(tunnel_offload=False, native_routing_ok=True, backends=["vxlan"])
+        return AgentNetworkCaps(tunnel_offload=False, backends=["vxlan"])
 
     @override
     async def setup_session_network(self, meta: SessionNetMeta, self_member: Member) -> None:
@@ -105,7 +105,7 @@ class _IncompleteV2Plugin(AbstractNetworkAgentPluginV2[AbstractKernel]):
 
     @override
     async def probe_caps(self) -> AgentNetworkCaps:
-        return AgentNetworkCaps(tunnel_offload=False, native_routing_ok=False)
+        return AgentNetworkCaps(tunnel_offload=False)
 
 
 def _make(plugin_cls: type) -> AbstractNetworkAgentPluginV2[AbstractKernel]:

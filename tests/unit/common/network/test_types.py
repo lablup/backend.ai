@@ -19,12 +19,12 @@ class TestSessionNetMeta:
         meta = SessionNetMeta(
             session_id="s1",
             subnet="10.128.1.0/24",
-            backend=NetworkBackendKind.HOST_GW,
+            backend=NetworkBackendKind.BRIDGE,
             mtu=1500,
         )
         assert meta.vni is None
         assert meta.subnet == "10.128.1.0/24"
-        assert meta.backend is NetworkBackendKind.HOST_GW
+        assert meta.backend is NetworkBackendKind.BRIDGE
 
     def test_is_frozen(self) -> None:
         meta = SessionNetMeta(
@@ -42,23 +42,20 @@ class TestMember:
     def test_optional_fields_default_to_none(self) -> None:
         member = Member(agent_id="a1", host_ip="192.168.0.10")
         assert member.vtep_ip is None
-        assert member.ip_range is None
 
-    def test_carries_backend_specific_fields(self) -> None:
+    def test_carries_the_vtep_address(self) -> None:
         member = Member(
             agent_id="a1",
             host_ip="192.168.0.10",
             vtep_ip="192.168.0.10",
-            ip_range="10.128.1.0/26",
         )
         assert member.vtep_ip == "192.168.0.10"
-        assert member.ip_range == "10.128.1.0/26"
 
     def test_etcd_payload_roundtrip_excludes_agent_id(self) -> None:
         # single-sourced on-wire schema shared by agent self-publish and manager pre-seed
         member = Member(agent_id="a1", host_ip="1.2.3.4", vtep_ip="1.2.3.4")
         payload = member.to_etcd_payload()
-        assert payload == {"host_ip": "1.2.3.4", "vtep_ip": "1.2.3.4", "ip_range": None}
+        assert payload == {"host_ip": "1.2.3.4", "vtep_ip": "1.2.3.4"}
         assert "agent_id" not in payload  # agent_id is the key, not the value
         assert Member.from_etcd_payload("a1", payload) == member
 
@@ -66,8 +63,7 @@ class TestMember:
 class TestEnums:
     def test_backend_kind_values(self) -> None:
         assert NetworkBackendKind.VXLAN.value == "vxlan"
-        assert NetworkBackendKind.HOST_GW.value == "host-gw"
-        assert NetworkBackendKind.WIREGUARD.value == "wireguard"
+        assert NetworkBackendKind.BRIDGE.value == "bridge"
 
     def test_attach_kind_values(self) -> None:
         assert AttachKind.CNI.value == "cni"
@@ -146,8 +142,8 @@ class TestEndpointPlan:
 
 class TestAgentNetworkCaps:
     def test_backends_default_is_independent_empty_list(self) -> None:
-        a = AgentNetworkCaps(tunnel_offload=False, native_routing_ok=True)
-        b = AgentNetworkCaps(tunnel_offload=True, native_routing_ok=False)
+        a = AgentNetworkCaps(tunnel_offload=False)
+        b = AgentNetworkCaps(tunnel_offload=True)
         assert a.backends == []
         # default_factory must not share a single list instance across instances
         a.backends.append("vxlan")
