@@ -20,7 +20,7 @@ from contextvars import ContextVar
 from datetime import datetime
 from functools import partial
 from pathlib import Path
-from typing import Any, Final, override
+from typing import Any, override
 
 import aiofiles
 import aiotools
