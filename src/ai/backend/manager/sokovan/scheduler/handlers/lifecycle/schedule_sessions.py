@@ -120,7 +120,7 @@ class ScheduleSessionsLifecycleHandler(SessionLifecycleHandler):
 
         # Fetch scheduling data required by Provisioner
         scheduling_data = await self._repository.get_scheduling_data(resource_group_id)
-        if scheduling_data is None:
+        if not scheduling_data.pending_sessions.sessions:
             log.debug(
                 "No scheduling data for scaling group {}. Skipping all sessions.",
                 resource_group_id,

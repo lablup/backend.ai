@@ -32,6 +32,7 @@ from ai.backend.manager.data.session.spec import (
 )
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.common import InternalServerError, RejectedByHook
+from ai.backend.manager.errors.resource import ScalingGroupNotFound
 from ai.backend.manager.metrics.scheduler import (
     SchedulerOperationMetricObserver,
     SchedulerPhaseMetricObserver,
@@ -407,8 +408,9 @@ class SchedulingController:
             )
             # The selector mutates the agents list on full success; feed clones so
             # the live snapshot is never altered.
-            scheduling_data = await self._repository.get_scheduling_data(resource_group_id)
-            if scheduling_data is None:
+            try:
+                scheduling_data = await self._repository.get_scheduling_data(resource_group_id)
+            except ScalingGroupNotFound:
                 resource_group_reason = "Resource group does not exist"
                 return ComputeScheduleResult(
                     [
