@@ -284,7 +284,7 @@ class TestTrackConnection(TestStreamService):
         mock_valkey_live.update_connection_tracker.assert_awaited_once_with(
             str(FAKE_KERNEL_ID), "jupyter", "stream-001"
         )
-        mock_valkey_live.mark_session_active.assert_awaited_once_with(str(FAKE_SESSION_ID))
+        mock_valkey_live.mark_session_active.assert_awaited_once_with(FAKE_SESSION_ID)
 
     async def test_re_registration_calls_same_methods(
         self,
@@ -326,7 +326,7 @@ class TestUntrackConnection(TestStreamService):
         mock_valkey_live.remove_connection_tracker.assert_awaited_once_with(
             str(FAKE_KERNEL_ID), "jupyter", "stream-001"
         )
-        mock_valkey_live.update_session_last_access.assert_awaited_once_with(str(FAKE_SESSION_ID))
+        mock_valkey_live.update_session_last_access.assert_awaited_once_with(FAKE_SESSION_ID)
 
     async def test_remaining_connections_does_not_refresh_marker(
         self,
@@ -368,7 +368,7 @@ class TestGCStaleConnections(TestStreamService):
 
         assert isinstance(result, GCStaleConnectionsActionResult)
         assert sid in result.removed_sessions
-        mock_valkey_live.update_session_last_access.assert_awaited_once_with(sid)
+        mock_valkey_live.update_session_last_access.assert_awaited_once_with(FAKE_SESSION_ID)
 
     async def test_empty_session_ids_returns_empty(
         self,

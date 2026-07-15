@@ -30,7 +30,7 @@ from ai.backend.common.resilience import (
     RetryArgs,
     RetryPolicy,
 )
-from ai.backend.common.types import ValkeyTarget
+from ai.backend.common.types import SessionId, ValkeyTarget
 from ai.backend.logging.utils import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -194,10 +194,10 @@ class ValkeyLiveClient:
         async with self._client.client() as conn:
             return await conn.delete([key])
 
-    def _session_last_access_key(self, session_id: str) -> str:
+    def _session_last_access_key(self, session_id: SessionId) -> str:
         return f"session.{session_id}.last_access"
 
-    async def update_session_last_access(self, session_id: str) -> None:
+    async def update_session_last_access(self, session_id: SessionId) -> None:
         """Refresh the session's last network access marker with the server time."""
         timestamp = await self.get_server_time()
         await self.store_live_data(
@@ -206,7 +206,7 @@ class ValkeyLiveClient:
             ex=_SESSION_LAST_ACCESS_EXPIRATION,
         )
 
-    async def mark_session_active(self, session_id: str) -> None:
+    async def mark_session_active(self, session_id: SessionId) -> None:
         """Write the "0" sentinel meaning the session has ongoing activity (never idle).
 
         Only updates an existing marker (XX) so that markers of already-terminated
@@ -219,7 +219,7 @@ class ValkeyLiveClient:
             xx=True,
         )
 
-    async def delete_session_last_access(self, session_id: str) -> None:
+    async def delete_session_last_access(self, session_id: SessionId) -> None:
         """Remove the session's last network access marker."""
         await self.delete_live_data(self._session_last_access_key(session_id))
 

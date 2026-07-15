@@ -95,7 +95,7 @@ class SessionEventHandler:
         published by the manager.
         """
         log.info("handle_session_started: ev:{} s:{}", event.event_name(), event.session_id)
-        await self._valkey_live.update_session_last_access(str(event.session_id))
+        await self._valkey_live.update_session_last_access(event.session_id)
         await self._handle_started_or_cancelled(None, source, event)
         await self._event_dispatcher_plugin_ctx.handle_event(context, source, event)
 
@@ -130,7 +130,7 @@ class SessionEventHandler:
         source: AgentId,
         event: SessionTerminatedAnycastEvent,
     ) -> None:
-        await self._valkey_live.delete_session_last_access(str(event.session_id))
+        await self._valkey_live.delete_session_last_access(event.session_id)
         await self._registry.clean_session(event.session_id)
         await self.invoke_session_callback(None, source, event)
 
@@ -153,7 +153,7 @@ class SessionEventHandler:
         _source: AgentId,
         event: ExecutionStartedAnycastEvent,
     ) -> None:
-        await self._valkey_live.mark_session_active(str(event.session_id))
+        await self._valkey_live.mark_session_active(event.session_id)
 
     async def handle_execution_ended(
         self,
@@ -165,7 +165,7 @@ class SessionEventHandler:
             | ExecutionCancelledAnycastEvent
         ),
     ) -> None:
-        await self._valkey_live.update_session_last_access(str(event.session_id))
+        await self._valkey_live.update_session_last_access(event.session_id)
 
     async def handle_batch_result(
         self,

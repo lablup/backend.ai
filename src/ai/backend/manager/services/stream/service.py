@@ -8,7 +8,7 @@ from typing import Final
 from ai.backend.common import validators as tx
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.etcd import AsyncEtcd
-from ai.backend.common.types import AgentId, KernelId
+from ai.backend.common.types import AgentId, KernelId, SessionId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.errors.api import NotImplementedAPI
 from ai.backend.manager.errors.resource import AgentNotAllocated
@@ -148,7 +148,7 @@ class StreamService:
         await self._valkey_live.update_connection_tracker(
             str(action.kernel_id), action.service, action.stream_id
         )
-        await self._valkey_live.mark_session_active(str(action.session_id))
+        await self._valkey_live.mark_session_active(action.session_id)
         return TrackConnectionActionResult(kernel_id=str(action.kernel_id))
 
     async def untrack_connection(
@@ -159,7 +159,7 @@ class StreamService:
         )
         remaining_count = await self._valkey_live.count_active_connections(str(action.kernel_id))
         if remaining_count == 0:
-            await self._valkey_live.update_session_last_access(str(action.session_id))
+            await self._valkey_live.update_session_last_access(action.session_id)
         return UntrackConnectionActionResult(
             kernel_id=str(action.kernel_id),
             remaining_count=remaining_count,
@@ -187,6 +187,6 @@ class StreamService:
                 remaining,
             )
             if prev_remaining > 0 and remaining == 0:
-                await self._valkey_live.update_session_last_access(str(session_id))
+                await self._valkey_live.update_session_last_access(SessionId(session_id))
                 removed_sessions.append(str(session_id))
         return GCStaleConnectionsActionResult(removed_sessions=removed_sessions)

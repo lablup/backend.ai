@@ -6,6 +6,7 @@ from uuid import uuid4
 import pytest
 
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
+from ai.backend.common.types import SessionId
 
 
 async def test_valkey_live_hset_operations(test_valkey_live: ValkeyLiveClient) -> None:
@@ -49,17 +50,17 @@ async def test_valkey_live_multiple_data_operations(test_valkey_live: ValkeyLive
 
 class TestSessionLastAccessMarker:
     @pytest.fixture()
-    def session_id(self) -> str:
-        return str(uuid4())
+    def session_id(self) -> SessionId:
+        return SessionId(uuid4())
 
     @pytest.fixture()
-    def marker_key(self, session_id: str) -> str:
+    def marker_key(self, session_id: SessionId) -> str:
         return f"session.{session_id}.last_access"
 
     async def test_update_writes_server_timestamp(
         self,
         test_valkey_live: ValkeyLiveClient,
-        session_id: str,
+        session_id: SessionId,
         marker_key: str,
     ) -> None:
         await test_valkey_live.update_session_last_access(session_id)
@@ -71,7 +72,7 @@ class TestSessionLastAccessMarker:
     async def test_mark_active_requires_existing_marker(
         self,
         test_valkey_live: ValkeyLiveClient,
-        session_id: str,
+        session_id: SessionId,
         marker_key: str,
     ) -> None:
         await test_valkey_live.mark_session_active(session_id)
@@ -81,7 +82,7 @@ class TestSessionLastAccessMarker:
     async def test_mark_active_overwrites_existing_marker(
         self,
         test_valkey_live: ValkeyLiveClient,
-        session_id: str,
+        session_id: SessionId,
         marker_key: str,
     ) -> None:
         await test_valkey_live.update_session_last_access(session_id)
@@ -93,7 +94,7 @@ class TestSessionLastAccessMarker:
     async def test_delete_removes_marker(
         self,
         test_valkey_live: ValkeyLiveClient,
-        session_id: str,
+        session_id: SessionId,
         marker_key: str,
     ) -> None:
         await test_valkey_live.update_session_last_access(session_id)

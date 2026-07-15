@@ -257,7 +257,7 @@ class TestSessionActivityMarkers:
 
         await handler.handle_session_started(None, AgentId("i-test"), event)
 
-        mock_valkey_live.update_session_last_access.assert_awaited_once_with(str(session_id))
+        mock_valkey_live.update_session_last_access.assert_awaited_once_with(session_id)
 
     async def test_session_terminated_deletes_marker(self, session_id: SessionId) -> None:
         handler, _mock_registry, mock_valkey_live = _make_handler(_make_mock_db(AsyncMock()))
@@ -266,7 +266,7 @@ class TestSessionActivityMarkers:
         with patch.object(handler, "invoke_session_callback", new=AsyncMock()):
             await handler.handle_session_terminated(None, AgentId("i-test"), event)
 
-        mock_valkey_live.delete_session_last_access.assert_awaited_once_with(str(session_id))
+        mock_valkey_live.delete_session_last_access.assert_awaited_once_with(session_id)
 
     async def test_execution_started_marks_session_active(self, session_id: SessionId) -> None:
         handler, _mock_registry, mock_valkey_live = _make_handler(_make_mock_db(AsyncMock()))
@@ -274,7 +274,7 @@ class TestSessionActivityMarkers:
 
         await handler.handle_execution_started(None, AgentId("i-test"), event)
 
-        mock_valkey_live.mark_session_active.assert_awaited_once_with(str(session_id))
+        mock_valkey_live.mark_session_active.assert_awaited_once_with(session_id)
 
     @pytest.mark.parametrize(
         "event_cls",
@@ -298,4 +298,4 @@ class TestSessionActivityMarkers:
 
         await handler.handle_execution_ended(None, AgentId("i-test"), event)
 
-        mock_valkey_live.update_session_last_access.assert_awaited_once_with(str(session_id))
+        mock_valkey_live.update_session_last_access.assert_awaited_once_with(session_id)
