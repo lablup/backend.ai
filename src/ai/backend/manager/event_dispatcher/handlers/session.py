@@ -9,6 +9,7 @@ import sqlalchemy as sa
 import yarl
 from sqlalchemy.exc import NoResultFound
 
+from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.events.event_types.session.anycast import (
     DoTerminateSessionEvent,
     ExecutionCancelledAnycastEvent,
@@ -33,9 +34,7 @@ from ai.backend.common.types import (
     SessionTypes,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.kernel import SessionNotFound
-from ai.backend.manager.idle import IdleCheckerHost
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.routing import RouteHealthStatus, RouteStatus, RoutingRow
 from ai.backend.manager.models.session import KernelLoadingStrategy, SessionRow
@@ -53,22 +52,22 @@ class SessionEventHandler:
     _registry: AgentRegistry
     _db: ExtendedAsyncSAEngine
     _event_dispatcher_plugin_ctx: EventDispatcherPluginContext
-    _idle_checker_host: IdleCheckerHost
     _scheduling_controller: SchedulingController
+    _valkey_live: ValkeyLiveClient
 
     def __init__(
         self,
         registry: AgentRegistry,
         db: ExtendedAsyncSAEngine,
         event_dispatcher_plugin_ctx: EventDispatcherPluginContext,
-        idle_checker_host: IdleCheckerHost,
         scheduling_controller: SchedulingController,
+        valkey_live: ValkeyLiveClient,
     ) -> None:
         self._registry = registry
         self._db = db
         self._event_dispatcher_plugin_ctx = event_dispatcher_plugin_ctx
-        self._idle_checker_host = idle_checker_host
         self._scheduling_controller = scheduling_controller
+        self._valkey_live = valkey_live
 
     async def _handle_started_or_cancelled(
         self,
@@ -96,10 +95,8 @@ class SessionEventHandler:
         published by the manager.
         """
         log.info("handle_session_started: ev:{} s:{}", event.event_name(), event.session_id)
+        await self._valkey_live.update_session_last_access(str(event.session_id))
         await self._handle_started_or_cancelled(None, source, event)
-        await self._idle_checker_host.dispatch_session_status_event(
-            event.session_id, SessionStatus.RUNNING
-        )
         await self._event_dispatcher_plugin_ctx.handle_event(context, source, event)
 
     async def handle_session_cancelled(
@@ -133,6 +130,7 @@ class SessionEventHandler:
         source: AgentId,
         event: SessionTerminatedAnycastEvent,
     ) -> None:
+        await self._valkey_live.delete_session_last_access(str(event.session_id))
         await self._registry.clean_session(event.session_id)
         await self.invoke_session_callback(None, source, event)
 
@@ -148,6 +146,26 @@ class SessionEventHandler:
             reason=reason.value,
             forced=False,
         )
+
+    async def handle_execution_started(
+        self,
+        _context: None,
+        _source: AgentId,
+        event: ExecutionStartedAnycastEvent,
+    ) -> None:
+        await self._valkey_live.mark_session_active(str(event.session_id))
+
+    async def handle_execution_ended(
+        self,
+        _context: None,
+        _source: AgentId,
+        event: (
+            ExecutionFinishedAnycastEvent
+            | ExecutionTimeoutAnycastEvent
+            | ExecutionCancelledAnycastEvent
+        ),
+    ) -> None:
+        await self._valkey_live.update_session_last_access(str(event.session_id))
 
     async def handle_batch_result(
         self,
@@ -297,46 +315,6 @@ class SessionEventHandler:
 
         self._registry.webhook_ptask_group.create_task(
             _make_session_callback(data, callback_url),
-        )
-
-    async def handle_execution_started(
-        self,
-        _context: None,
-        _source: AgentId,
-        event: ExecutionStartedAnycastEvent,
-    ) -> None:
-        await self._idle_checker_host.dispatch_session_execution_status_event(
-            event.session_id, event.execution_status()
-        )
-
-    async def handle_execution_finished(
-        self,
-        _context: None,
-        _source: AgentId,
-        event: ExecutionFinishedAnycastEvent,
-    ) -> None:
-        await self._idle_checker_host.dispatch_session_execution_status_event(
-            event.session_id, event.execution_status()
-        )
-
-    async def handle_execution_timeout(
-        self,
-        _context: None,
-        _source: AgentId,
-        event: ExecutionTimeoutAnycastEvent,
-    ) -> None:
-        await self._idle_checker_host.dispatch_session_execution_status_event(
-            event.session_id, event.execution_status()
-        )
-
-    async def handle_execution_cancelled(
-        self,
-        _context: None,
-        _source: AgentId,
-        event: ExecutionCancelledAnycastEvent,
-    ) -> None:
-        await self._idle_checker_host.dispatch_session_execution_status_event(
-            event.session_id, event.execution_status()
         )
 
 

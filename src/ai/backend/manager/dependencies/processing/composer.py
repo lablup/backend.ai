@@ -293,6 +293,7 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
         dispatchers = Dispatchers(
             DispatcherArgs(
                 valkey_container_log=setup_input.valkey_container_log,
+                valkey_live=setup_input.valkey_live,
                 valkey_stat=setup_input.valkey_stat,
                 valkey_stream=setup_input.valkey_stream,
                 schedule_coordinator=setup_input.schedule_coordinator,

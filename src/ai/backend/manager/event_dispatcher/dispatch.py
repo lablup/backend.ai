@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from ai.backend.common.clients.valkey_client.valkey_container_log.client import (
     ValkeyContainerLogClient,
 )
+from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
 from ai.backend.common.etcd import AsyncEtcd
@@ -148,6 +149,7 @@ from .reporters import EventLogger
 @dataclass
 class DispatcherArgs:
     valkey_container_log: ValkeyContainerLogClient
+    valkey_live: ValkeyLiveClient
     valkey_stat: ValkeyStatClient
     valkey_stream: ValkeyStreamClient
     schedule_coordinator: ScheduleCoordinator
@@ -221,8 +223,8 @@ class Dispatchers:
             args.agent_registry,
             args.db,
             args.event_dispatcher_plugin_ctx,
-            args.idle_checker_host,
             args.scheduling_controller,
+            args.valkey_live,
         )
         self._vfolder_event_handler = VFolderEventHandler(args.db)
         self._idle_check_event_handler = IdleCheckEventHandler(args.idle_checker_host)
@@ -536,19 +538,19 @@ class Dispatchers:
         evd.consume(
             ExecutionFinishedAnycastEvent,
             None,
-            self._session_event_handler.handle_execution_finished,
+            self._session_event_handler.handle_execution_ended,
             name="session_execution.finished",
         )
         evd.consume(
             ExecutionTimeoutAnycastEvent,
             None,
-            self._session_event_handler.handle_execution_timeout,
+            self._session_event_handler.handle_execution_ended,
             name="session_execution.timeout",
         )
         evd.consume(
             ExecutionCancelledAnycastEvent,
             None,
-            self._session_event_handler.handle_execution_cancelled,
+            self._session_event_handler.handle_execution_ended,
             name="session_execution.cancelled",
         )
 

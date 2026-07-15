@@ -12,6 +12,11 @@ import pytest
 import yarl
 
 from ai.backend.common.events.event_types.session.anycast import (
+    ExecutionCancelledAnycastEvent,
+    ExecutionFinishedAnycastEvent,
+    ExecutionStartedAnycastEvent,
+    ExecutionTimeoutAnycastEvent,
+    SessionStartedAnycastEvent,
     SessionTerminatedAnycastEvent,
 )
 from ai.backend.common.types import (
@@ -63,25 +68,28 @@ def _make_mock_session_row(
     return row
 
 
-def _make_handler(mock_db: MagicMock) -> tuple[SessionEventHandler, MagicMock]:
+def _make_handler(mock_db: MagicMock) -> tuple[SessionEventHandler, MagicMock, AsyncMock]:
     """Create a SessionEventHandler with mocked dependencies.
 
-    Returns the handler and the mock registry so callers can inspect create_task calls.
+    Returns the handler with the mock registry and mock valkey-live client so
+    callers can inspect create_task and last-access marker calls.
     """
     mock_registry = MagicMock()
     mock_registry.webhook_ptask_group = MagicMock()
+    mock_registry.clean_session = AsyncMock()
     mock_event_dispatcher_plugin_ctx = MagicMock()
-    mock_idle_checker_host = MagicMock()
+    mock_event_dispatcher_plugin_ctx.handle_event = AsyncMock()
     mock_scheduling_controller = MagicMock()
     mock_scheduling_controller.mark_sessions_for_termination = AsyncMock()
+    mock_valkey_live = AsyncMock()
     handler = SessionEventHandler(
         registry=mock_registry,
         db=mock_db,
         event_dispatcher_plugin_ctx=mock_event_dispatcher_plugin_ctx,
-        idle_checker_host=mock_idle_checker_host,
         scheduling_controller=mock_scheduling_controller,
+        valkey_live=mock_valkey_live,
     )
-    return handler, mock_registry
+    return handler, mock_registry, mock_valkey_live
 
 
 async def _invoke_and_capture(
@@ -91,7 +99,7 @@ async def _invoke_and_capture(
     """Run invoke_session_callback and return the captured webhook payload data."""
     mock_db_session = AsyncMock()
     mock_db = _make_mock_db(mock_db_session)
-    handler, mock_registry = _make_handler(mock_db)
+    handler, mock_registry, _mock_valkey_live = _make_handler(mock_db)
 
     captured_data: dict[str, Any] = {}
 
@@ -219,7 +227,7 @@ class TestInvokeSessionCallbackPayload:
 
         mock_db_session = AsyncMock()
         mock_db = _make_mock_db(mock_db_session)
-        handler, mock_registry = _make_handler(mock_db)
+        handler, mock_registry, _mock_valkey_live = _make_handler(mock_db)
 
         with (
             patch(
@@ -234,3 +242,60 @@ class TestInvokeSessionCallbackPayload:
             await handler.invoke_session_callback(None, AgentId("i-test"), event)
 
         mock_callback.assert_not_called()
+
+
+class TestSessionActivityMarkers:
+    """Tests for the session last-access marker upkeep on session/execution events."""
+
+    @pytest.fixture
+    def session_id(self) -> SessionId:
+        return SessionId(uuid.uuid4())
+
+    async def test_session_started_initializes_marker(self, session_id: SessionId) -> None:
+        handler, _mock_registry, mock_valkey_live = _make_handler(_make_mock_db(AsyncMock()))
+        event = SessionStartedAnycastEvent(session_id, "creation-id")
+
+        await handler.handle_session_started(None, AgentId("i-test"), event)
+
+        mock_valkey_live.update_session_last_access.assert_awaited_once_with(str(session_id))
+
+    async def test_session_terminated_deletes_marker(self, session_id: SessionId) -> None:
+        handler, _mock_registry, mock_valkey_live = _make_handler(_make_mock_db(AsyncMock()))
+        event = SessionTerminatedAnycastEvent(session_id, "user-requested")
+
+        with patch.object(handler, "invoke_session_callback", new=AsyncMock()):
+            await handler.handle_session_terminated(None, AgentId("i-test"), event)
+
+        mock_valkey_live.delete_session_last_access.assert_awaited_once_with(str(session_id))
+
+    async def test_execution_started_marks_session_active(self, session_id: SessionId) -> None:
+        handler, _mock_registry, mock_valkey_live = _make_handler(_make_mock_db(AsyncMock()))
+        event = ExecutionStartedAnycastEvent(session_id)
+
+        await handler.handle_execution_started(None, AgentId("i-test"), event)
+
+        mock_valkey_live.mark_session_active.assert_awaited_once_with(str(session_id))
+
+    @pytest.mark.parametrize(
+        "event_cls",
+        [
+            ExecutionFinishedAnycastEvent,
+            ExecutionTimeoutAnycastEvent,
+            ExecutionCancelledAnycastEvent,
+        ],
+    )
+    async def test_execution_ended_refreshes_marker(
+        self,
+        session_id: SessionId,
+        event_cls: type[
+            ExecutionFinishedAnycastEvent
+            | ExecutionTimeoutAnycastEvent
+            | ExecutionCancelledAnycastEvent
+        ],
+    ) -> None:
+        handler, _mock_registry, mock_valkey_live = _make_handler(_make_mock_db(AsyncMock()))
+        event = event_cls(session_id)
+
+        await handler.handle_execution_ended(None, AgentId("i-test"), event)
+
+        mock_valkey_live.update_session_last_access.assert_awaited_once_with(str(session_id))
