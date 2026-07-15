@@ -561,6 +561,8 @@ class ModeMenu(Static):
             public_facing_address=args.public_facing_address,
             accelerator=Accelerator(args.accelerator) if args.accelerator is not None else None,
             fqdn_prefix=args.fqdn_prefix,
+            app_base_domain=args.app_base_domain,
+            storage_base_domain=args.storage_base_domain,
             tls_advertised=args.tls_advertised,
             advertised_port=args.advertised_port,
             endpoint_protocol=args.endpoint_protocol,

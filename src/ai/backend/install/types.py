@@ -65,6 +65,8 @@ class CliArgs:
     public_facing_address: str
     accelerator: str | None = None
     fqdn_prefix: str | None = None
+    app_base_domain: str | None = None
+    storage_base_domain: str | None = None
     tls_advertised: bool = False
     advertised_port: int = 443
     endpoint_protocol: EndpointProtocol | None = None
@@ -245,6 +247,8 @@ class InstallVariable:
     public_facing_address: str = "127.0.0.1"
     accelerator: Accelerator | None = None
     fqdn_prefix: str | None = None
+    app_base_domain: str | None = None
+    storage_base_domain: str | None = None
     tls_advertised: bool = False
     advertised_port: int = 443
     endpoint_protocol: EndpointProtocol | None = None
@@ -268,24 +272,24 @@ class InstallVariable:
 
     @property
     def apphub_address(self) -> str:
-        if self.fqdn_prefix:
-            return f"{self.fqdn_prefix}.apphub.backend.ai"
+        if self.fqdn_prefix and self.app_base_domain:
+            return f"{self.fqdn_prefix}.apphub.{self.app_base_domain}"
         return self.public_facing_address
 
     @property
     def app_address(self) -> str:
-        if self.fqdn_prefix:
-            return f"{self.fqdn_prefix}.app.backend.ai"
+        if self.fqdn_prefix and self.app_base_domain:
+            return f"{self.fqdn_prefix}.app.{self.app_base_domain}"
         return self.public_facing_address
 
     @property
     def wildcard_domain(self) -> str | None:
-        if self.fqdn_prefix:
-            return f".{self.fqdn_prefix}.app.backend.ai"
+        if self.fqdn_prefix and self.app_base_domain:
+            return f".{self.fqdn_prefix}.app.{self.app_base_domain}"
         return None
 
     @property
     def storage_public_address(self) -> str:
-        if self.fqdn_prefix:
-            return f"{self.fqdn_prefix}.public.isla-sorna.backend.ai"
+        if self.fqdn_prefix and self.storage_base_domain:
+            return f"{self.fqdn_prefix}.public.{self.storage_base_domain}"
         return self.public_facing_address

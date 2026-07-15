@@ -6,7 +6,6 @@ import hashlib
 import importlib.resources
 import json
 import os
-import random
 import re
 import secrets
 import shutil
@@ -20,7 +19,7 @@ from contextvars import ContextVar
 from datetime import datetime
 from functools import partial
 from pathlib import Path
-from typing import Any, Final, override
+from typing import Any, override
 
 import aiofiles
 import aiotools
@@ -73,12 +72,6 @@ from .types import (
 from .widgets import ProgressItem, SetupLog
 
 current_log: ContextVar[SetupLog] = ContextVar("current_log")
-PASSPHRASE_CHARACTER_POOL: Final[list[str]] = (
-    [chr(x) for x in range(ord("a"), ord("z") + 1)]
-    + [chr(x) for x in range(ord("A"), ord("Z") + 1)]
-    + [chr(x) for x in range(ord("0"), ord("9") + 1)]
-    + ["*$./"]
-)
 
 
 class PostGuide(enum.Enum):
@@ -227,9 +220,6 @@ class Context(metaclass=ABCMeta):
 
     def mangle_pkgname(self, name: str, fat: bool = False) -> str:
         return f"backendai-{name}-{self.os_info.platform}"
-
-    def generate_passphrase(self, len: int = 16) -> str:
-        return "".join(random.sample(PASSPHRASE_CHARACTER_POOL, len))
 
     @staticmethod
     @contextmanager
@@ -667,7 +657,7 @@ class Context(metaclass=ABCMeta):
     async def check_prerequisites(self) -> None:
         self.os_info = await detect_os()
         text = Text()
-        text.append("Detetced OS info: ")
+        text.append("Detected OS info: ")
         text.append(self.os_info.__rich__())  # type: ignore
         self.log.write(text)
         if "LiveCD" in self.os_info.distro_variants:
@@ -1482,7 +1472,6 @@ class Context(metaclass=ABCMeta):
         with self.resource_path(
             "ai.backend.install.fixtures", "example-keypairs.json"
         ) as keypair_path:
-            current_shell = os.environ.get("SHELL", "sh")
             keypair_data = json.loads(Path(keypair_path).read_bytes())
         for keypair in keypair_data["keypairs"]:
             email = keypair["user_id"]
