@@ -13,8 +13,8 @@ from dataclasses import dataclass, field
 
 import pytest
 
+from ai.backend.common.data.entity.types import EntityRef, EntityType, ScopeType
 from ai.backend.common.data.permission.types import Permission
-from ai.backend.common.entity.types import EntityRef, EntityType, ScopeType
 from ai.backend.common.identifier.entity import EntityID
 from ai.backend.common.identifier.user import UserID
 from ai.backend.common.identifier.virtual_scope import VirtualScopeID

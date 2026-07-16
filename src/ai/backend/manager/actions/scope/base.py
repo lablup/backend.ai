@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
 
+from ai.backend.common.data.entity.types import EntityType, ScopeRef
 from ai.backend.common.data.permission.types import Permission
-from ai.backend.common.entity.types import EntityType, ScopeRef
 
 
 class BaseScopeAction(ABC):

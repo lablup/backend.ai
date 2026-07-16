@@ -12,8 +12,8 @@ import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
+from ai.backend.common.data.entity.types import EntityRef, ScopeRef
 from ai.backend.common.data.permission.types import Permission, RelationType
-from ai.backend.common.entity.types import EntityRef, ScopeRef
 from ai.backend.common.identifier.user import UserID
 from ai.backend.common.identifier.virtual_scope import VirtualScopeID
 from ai.backend.manager.data.permission.id import ScopeId

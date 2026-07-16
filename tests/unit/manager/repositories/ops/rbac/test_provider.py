@@ -22,14 +22,14 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
-from ai.backend.common.data.permission.types import EntityType, RBACElementType, RelationType
-from ai.backend.common.entity.types import (
+from ai.backend.common.data.entity.types import (
     EntityType as VirtualScopeEntityType,
 )
-from ai.backend.common.entity.types import (
+from ai.backend.common.data.entity.types import (
     ScopeRef,
     ScopeType,
 )
+from ai.backend.common.data.permission.types import EntityType, RBACElementType, RelationType
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.base import GUID, Base

@@ -3,7 +3,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
-from ai.backend.common.entity.types import ScopeRef
+from ai.backend.common.data.entity.types import ScopeRef
 from ai.backend.common.exception import ErrorCode
 from ai.backend.manager.actions.types import OperationStatus
 
