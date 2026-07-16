@@ -8,7 +8,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common.data.idle_checker.types import CheckerType, IdleCheckerSpec
 from ai.backend.common.identifier.idle_checker import IdleCheckerID
-from ai.backend.common.types import SessionTypes
+from ai.backend.common.types import SessionId, SessionTypes
 from ai.backend.manager.models.base import GUID, Base, PydanticColumn, StrEnumType
 
 
@@ -75,6 +75,51 @@ class IdleCheckerBindingRow(Base):  # type: ignore[misc]
     created_at: Mapped[datetime] = mapped_column(
         "created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
     )
+    updated_at: Mapped[datetime] = mapped_column(
+        "updated_at",
+        sa.DateTime(timezone=True),
+        nullable=False,
+        server_default=sa.func.now(),
+        onupdate=sa.func.now(),
+    )
+
+
+class SessionIdleCheckRow(Base):  # type: ignore[misc]
+    __tablename__ = "session_idle_checks"
+    __table_args__ = (
+        sa.ForeignKeyConstraint(
+            ["session_id"],
+            ["sessions.id"],
+            name="fk_session_idle_checks_session_id",
+            ondelete="CASCADE",
+        ),
+        sa.ForeignKeyConstraint(
+            ["idle_checker_id"],
+            ["idle_checkers.id"],
+            name="fk_session_idle_checks_idle_checker_id",
+            ondelete="CASCADE",
+        ),
+        sa.PrimaryKeyConstraint(
+            "session_id",
+            "idle_checker_id",
+            name="pk_session_idle_checks",
+        ),
+        sa.Index(
+            "ix_session_idle_checks_expire_at_not_null",
+            "expire_at",
+            postgresql_where=sa.text("expire_at IS NOT NULL"),
+        ),
+    )
+
+    session_id: Mapped[SessionId] = mapped_column("session_id", GUID(SessionId), nullable=False)
+    idle_checker_id: Mapped[IdleCheckerID] = mapped_column(
+        "idle_checker_id", GUID(IdleCheckerID), nullable=False
+    )
+    expire_at: Mapped[datetime | None] = mapped_column(
+        "expire_at", sa.DateTime(timezone=True), nullable=True
+    )
+    last_status: Mapped[str] = mapped_column("last_status", sa.String(length=64), nullable=False)
+    last_message: Mapped[str] = mapped_column("last_message", sa.Text, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         "updated_at",
         sa.DateTime(timezone=True),
