@@ -38,5 +38,6 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_index(op.f("ix_vfolders_creator_id"), table_name="vfolders")
+    # drop_column takes the column's index with it; dropping it by name first
+    # only breaks on installs that never had it.
     op.drop_column("vfolders", "creator_id")

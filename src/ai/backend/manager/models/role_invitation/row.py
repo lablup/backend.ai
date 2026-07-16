@@ -39,6 +39,10 @@ class RoleInvitationRow(Base):  # type: ignore[misc]
         GUID,
         sa.ForeignKey("users.uuid", onupdate="CASCADE", ondelete="CASCADE"),
         nullable=False,
+        # The ON DELETE CASCADE above has to find every row for a user, including
+        # accepted ones, so uq_role_invitations_active cannot serve it -- that
+        # index is partial (state != 'accepted').
+        index=True,
     )
     role_id: Mapped[uuid.UUID] = mapped_column(
         "role_id",

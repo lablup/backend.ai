@@ -46,6 +46,7 @@ class PrometheusQueryPresetRow(LifecycleTimestampsMixin, Base):  # type: ignore[
         GUID,
         sa.ForeignKey("prometheus_query_preset_categories.id", ondelete="SET NULL"),
         nullable=True,
+        index=True,
     )
     options: Mapped[PresetOptions] = mapped_column(
         "options",
