@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
-from ai.backend.common.data.permission.types import EntityType
+from ai.backend.common.entity.types import EntityType
 from ai.backend.manager.actions.types import ActionOperationType, OperationStatus
 
 
