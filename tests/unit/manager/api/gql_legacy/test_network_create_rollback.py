@@ -4,6 +4,7 @@ RequestedSubnetUnavailable. gql_mutation_wrapper reports most failures as an ok=
 (re-raising only Timeout/Cancelled), so both surfaces are exercised here.
 """
 
+import asyncio
 from unittest.mock import AsyncMock
 
 import pytest
@@ -40,14 +41,27 @@ class TestCreateNetworkRollback:
         plugin.destroy_network.assert_awaited_once_with("net-1")
 
     async def test_raised_exception_rolls_back_and_propagates(self) -> None:
-        # Timeout/Cancelled are re-raised by gql_mutation_wrapper; the resources must be released
-        # before the exception propagates to the caller.
+        # gql_mutation_wrapper re-raises TimeoutError; the resources must be released before it
+        # propagates to the caller.
         plugin = AsyncMock()
 
         async def run_mutation() -> CreateNetwork:
             raise TimeoutError("db timeout")
 
         with pytest.raises(TimeoutError):
+            await _run_create_network_with_rollback(plugin, "net-1", run_mutation)
+
+        plugin.destroy_network.assert_awaited_once_with("net-1")
+
+    async def test_cancellation_rolls_back_and_propagates(self) -> None:
+        # asyncio.CancelledError is a BaseException, not an Exception — it must still trigger the
+        # rollback (or a cancelled create leaks the subnet/VNI) and then re-propagate unchanged.
+        plugin = AsyncMock()
+
+        async def run_mutation() -> CreateNetwork:
+            raise asyncio.CancelledError()
+
+        with pytest.raises(asyncio.CancelledError):
             await _run_create_network_with_rollback(plugin, "net-1", run_mutation)
 
         plugin.destroy_network.assert_awaited_once_with("net-1")

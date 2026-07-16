@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 import uuid
 from collections.abc import Awaitable, Callable, Mapping
@@ -245,7 +246,11 @@ async def _run_create_network_with_rollback(
 
     try:
         result = await run_mutation()
-    except Exception:
+    except (Exception, asyncio.CancelledError):
+        # asyncio.CancelledError is a BaseException (not an Exception) in current Python, so it must
+        # be named explicitly or a cancelled create would slip past and leak the subnet/VNI. The
+        # cancellation has already been delivered and caught, so the best-effort destroy_network here
+        # runs to completion before we re-raise to propagate the cancellation.
         await _rollback()
         raise
     if not result.ok:
