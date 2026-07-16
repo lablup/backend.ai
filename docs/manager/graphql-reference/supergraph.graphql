@@ -19281,9 +19281,6 @@ type UnschedulableReasonHint
 {
   """Subtract these slots to fit the best-fitting node."""
   requiredReduction: [ResourceSlotEntry!]
-
-  """Architectures that actually exist among the scheduling targets."""
-  availableArchs: [String!]
 }
 
 type UnsetQuotaScope

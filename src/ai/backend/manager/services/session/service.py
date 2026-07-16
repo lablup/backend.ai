@@ -326,9 +326,10 @@ class SessionService:
         kernel, unique role for positional correlation) and delegate the
         node-fitting decision to the scheduling controller.
         """
-        resource_group_name = await self._scheduler_repository.get_resource_group_name_by_id(
-            action.resource_group_id
-        )
+        user = await self._user_repository.get_user_by_uuid(action.user_uuid)
+        if user.main_access_key is None:
+            raise InternalServerError(f"User {action.user_uuid} has no main access key configured")
+        access_key = AccessKey(user.main_access_key)
 
         kernel_groups = tuple(
             KernelGroupDraft(
@@ -338,30 +339,25 @@ class SessionService:
             )
             for idx, kernel in enumerate(action.kernels)
         )
-
-        draft = SessionSpecDraft(
-            resource_spec=SessionResourceSpecDraft(
-                identity=SessionIdentityDraft(
-                    session_id=SessionID(uuid.uuid4()),
-                    creation_id=uuid.uuid4().hex,
-                    session_name="compute-schedule",
-                    access_key=action.access_key,
-                    user_uuid=action.user_uuid,
-                ),
-                classification=SessionClassificationDraft(session_type=SessionTypes.INTERACTIVE),
-                options=SessionOptionsDraft(
-                    cluster_mode=action.cluster_mode,
-                    cluster_size=len(action.kernels),
-                    kernel_groups=kernel_groups,
-                ),
+        resource_spec = SessionResourceSpecDraft(
+            identity=SessionIdentityDraft(
+                session_id=SessionID(uuid.uuid4()),
+                creation_id=uuid.uuid4().hex,
+                session_name="compute-schedule",
+                access_key=access_key,
+                user_uuid=action.user_uuid,
             ),
-            scope=SessionScopeDraft(
-                resource_group_id=action.resource_group_id,
-                resource_group_name=resource_group_name,
+            classification=SessionClassificationDraft(session_type=SessionTypes.INTERACTIVE),
+            options=SessionOptionsDraft(
+                cluster_mode=action.cluster_mode,
+                cluster_size=len(action.kernels),
+                kernel_groups=kernel_groups,
             ),
         )
 
-        result = await self._scheduling_controller.compute_schedule(draft)
+        result = await self._scheduling_controller.compute_schedule(
+            action.resource_group_id, resource_spec
+        )
         return ComputeScheduleActionResult(result=result)
 
     async def resolve_session_name(

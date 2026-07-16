@@ -13483,9 +13483,6 @@ Added in 26.8.0. What the caller could change so an unschedulable kernel would f
 type UnschedulableReasonHint {
   """Subtract these slots to fit the best-fitting node."""
   requiredReduction: [ResourceSlotEntry!]
-
-  """Architectures that actually exist among the scheduling targets."""
-  availableArchs: [String!]
 }
 
 """
