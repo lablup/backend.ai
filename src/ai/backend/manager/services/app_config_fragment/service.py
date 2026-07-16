@@ -1,23 +1,13 @@
 from __future__ import annotations
 
-from ai.backend.common.data.permission.types import RBACElementType
-from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
-from ai.backend.manager.repositories.app_config_fragment.creators import (
-    AppConfigFragmentCreatorSpec,
-)
 from ai.backend.manager.repositories.app_config_fragment.repository import (
     AppConfigFragmentRepository,
 )
-from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.base.rbac.entity_purger import RBACEntityPurger
 from ai.backend.manager.services.app_config_fragment.actions.admin_search import (
     AdminSearchAppConfigFragmentAction,
     AdminSearchAppConfigFragmentActionResult,
-)
-from ai.backend.manager.services.app_config_fragment.actions.bulk_create import (
-    BulkCreateAppConfigFragmentAction,
-    BulkCreateAppConfigFragmentActionResult,
 )
 from ai.backend.manager.services.app_config_fragment.actions.bulk_purge import (
     BulkPurgeAppConfigFragmentAction,
@@ -112,34 +102,6 @@ class AppConfigFragmentService:
     ) -> PurgeAppConfigFragmentActionResult:
         data = await self._repository.purge(action.purger_spec)
         return PurgeAppConfigFragmentActionResult(fragment=data)
-
-    async def bulk_create(
-        self, action: BulkCreateAppConfigFragmentAction
-    ) -> BulkCreateAppConfigFragmentActionResult:
-        # Every item shares the action's scope. A public fragment is GLOBAL — outside the RBAC
-        # scope hierarchy — so it has no scope element and binds to no scope.
-        scope = action.scope
-        element_type = scope.scope_type.to_rbac_element_type()
-        scope_ref = (
-            RBACElementRef(element_type, scope.scope_id) if element_type is not None else None
-        )
-        creators = [
-            RBACEntityCreator(
-                spec=AppConfigFragmentCreatorSpec(
-                    config_name=item.config_name,
-                    scope_type=scope.scope_type,
-                    scope_id=scope.scope_id,
-                    config=item.config,
-                ),
-                element_type=RBACElementType.APP_CONFIG_FRAGMENT,
-                scope_ref=scope_ref,
-            )
-            for item in action.items
-        ]
-        result = await self._repository.bulk_create(creators)
-        return BulkCreateAppConfigFragmentActionResult(
-            scope=scope, succeeded=result.succeeded, failed=result.failed
-        )
 
     async def bulk_update(
         self, action: BulkUpdateAppConfigFragmentAction

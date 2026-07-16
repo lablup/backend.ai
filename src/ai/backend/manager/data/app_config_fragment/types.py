@@ -9,17 +9,6 @@ from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
 
 
 @dataclass(frozen=True)
-class AppConfigFragmentScope:
-    """The scope a fragment is written at: its type and the id of the scoped entity.
-
-    ``scope_id`` is not meaningful for ``public``, which is system-wide.
-    """
-
-    scope_type: AppConfigScopeType
-    scope_id: str
-
-
-@dataclass(frozen=True)
 class AppConfigFragmentData:
     """Domain data for one app config fragment — a single scoped JSON document."""
 

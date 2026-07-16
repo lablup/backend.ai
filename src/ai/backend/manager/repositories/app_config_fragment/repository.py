@@ -31,7 +31,6 @@ from ai.backend.manager.repositories.base import (
     BatchQuerier,
     Updater,
 )
-from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.base.rbac.entity_purger import RBACEntityPurger
 from ai.backend.manager.repositories.ops.rbac.provider import RBACOpsProvider
 
@@ -90,13 +89,6 @@ class AppConfigFragmentRepository:
         self, querier: BatchQuerier, scopes: Sequence[SearchScope]
     ) -> AppConfigFragmentSearchResult:
         return await self._db_source.scoped_search(querier, scopes)
-
-    @app_config_fragment_repository_resilience.apply()
-    async def bulk_create(
-        self,
-        creators: Sequence[RBACEntityCreator[AppConfigFragmentRow]],
-    ) -> AppConfigFragmentBulkResult:
-        return await self._db_source.bulk_create(creators)
 
     @app_config_fragment_repository_resilience.apply()
     async def bulk_update(

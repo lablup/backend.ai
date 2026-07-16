@@ -123,22 +123,6 @@ class AppConfigFragmentDBSource:
             return result.row.to_data()
 
     @app_config_fragment_db_source_resilience.apply()
-    async def bulk_create(
-        self,
-        creators: Sequence[RBACEntityCreator[AppConfigFragmentRow]],
-    ) -> AppConfigFragmentBulkResult:
-        """Create many fragments with per-item partial success."""
-        async with self._rbac_ops_provider.write_ops() as w:
-            result = await w.bulk_create_scoped_partial(creators)
-            return AppConfigFragmentBulkResult(
-                succeeded=[row.to_data() for row in result.successes],
-                failed=[
-                    AppConfigFragmentBulkItemError(index=error.index, message=str(error.exception))
-                    for error in result.errors
-                ],
-            )
-
-    @app_config_fragment_db_source_resilience.apply()
     async def bulk_update(
         self,
         updaters: Sequence[Updater[AppConfigFragmentRow]],
