@@ -39,10 +39,10 @@ from ai.backend.manager.repositories.app_config_fragment.updaters import (
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     OffsetPagination,
-    Purger,
     Updater,
 )
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
+from ai.backend.manager.repositories.base.rbac.entity_purger import RBACEntityPurger
 from ai.backend.manager.services.app_config_fragment.actions.admin_search import (
     AdminSearchAppConfigFragmentAction,
 )
@@ -332,16 +332,26 @@ class TestAppConfigFragmentService:
         mock_repository.bulk_purge = AsyncMock(
             return_value=AppConfigFragmentBulkResult(succeeded=fragments, failed=[])
         )
-        purgers = [
-            Purger(row_class=AppConfigFragmentRow, pk_value=fragments[0].id),
-            Purger(row_class=AppConfigFragmentRow, pk_value=fragments[1].id),
+        purger_specs = [
+            AppConfigFragmentPurgerSpec(fragment_id=fragments[0].id),
+            AppConfigFragmentPurgerSpec(fragment_id=fragments[1].id),
         ]
 
-        result = await service.bulk_purge(BulkPurgeAppConfigFragmentAction(purgers=purgers))
+        result = await service.bulk_purge(
+            BulkPurgeAppConfigFragmentAction(purger_specs=purger_specs)
+        )
 
         assert result.succeeded == fragments
         assert result.failed == []
-        mock_repository.bulk_purge.assert_called_once_with(purgers)
+        # each fragment is purged through its RBAC purger, so its scope binding goes with it
+        mock_repository.bulk_purge.assert_called_once_with([
+            RBACEntityPurger(
+                row_class=AppConfigFragmentRow,
+                pk_value=spec.fragment_id,
+                spec=spec,
+            )
+            for spec in purger_specs
+        ])
 
     async def test_bulk_create_propagates_partial_failures(
         self, service: AppConfigFragmentService, mock_repository: MagicMock

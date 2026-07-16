@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.manager.data.permission.types import RBACElementRef
+from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
 from ai.backend.manager.repositories.app_config_fragment.creators import (
     AppConfigFragmentCreatorSpec,
 )
@@ -9,6 +10,7 @@ from ai.backend.manager.repositories.app_config_fragment.repository import (
     AppConfigFragmentRepository,
 )
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
+from ai.backend.manager.repositories.base.rbac.entity_purger import RBACEntityPurger
 from ai.backend.manager.services.app_config_fragment.actions.admin_search import (
     AdminSearchAppConfigFragmentAction,
     AdminSearchAppConfigFragmentActionResult,
@@ -150,7 +152,16 @@ class AppConfigFragmentService:
     async def bulk_purge(
         self, action: BulkPurgeAppConfigFragmentAction
     ) -> BulkPurgeAppConfigFragmentActionResult:
-        result = await self._repository.bulk_purge(action.purgers)
+        # Each fragment is unbound from its scope as it is deleted, mirroring the single purge.
+        purgers = [
+            RBACEntityPurger(
+                row_class=AppConfigFragmentRow,
+                pk_value=spec.fragment_id,
+                spec=spec,
+            )
+            for spec in action.purger_specs
+        ]
+        result = await self._repository.bulk_purge(purgers)
         return BulkPurgeAppConfigFragmentActionResult(
             succeeded=result.succeeded, failed=result.failed
         )

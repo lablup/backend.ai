@@ -29,10 +29,10 @@ from ai.backend.manager.repositories.app_config_fragment.types import (
 )
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
-    Purger,
     Updater,
 )
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
+from ai.backend.manager.repositories.base.rbac.entity_purger import RBACEntityPurger
 from ai.backend.manager.repositories.ops.rbac.provider import RBACOpsProvider
 
 __all__ = ("AppConfigFragmentRepository",)
@@ -108,7 +108,7 @@ class AppConfigFragmentRepository:
     @app_config_fragment_repository_resilience.apply()
     async def bulk_purge(
         self,
-        purgers: Sequence[Purger[AppConfigFragmentRow]],
+        purgers: Sequence[RBACEntityPurger[AppConfigFragmentRow]],
     ) -> AppConfigFragmentBulkResult:
         return await self._db_source.bulk_purge(purgers)
 

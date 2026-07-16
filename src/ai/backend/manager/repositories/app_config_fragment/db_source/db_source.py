@@ -39,7 +39,6 @@ from ai.backend.manager.repositories.app_config_fragment.types import (
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     NoPagination,
-    Purger,
     Querier,
     Updater,
 )
@@ -166,11 +165,11 @@ class AppConfigFragmentDBSource:
     @app_config_fragment_db_source_resilience.apply()
     async def bulk_purge(
         self,
-        purgers: Sequence[Purger[AppConfigFragmentRow]],
+        purgers: Sequence[RBACEntityPurger[AppConfigFragmentRow]],
     ) -> AppConfigFragmentBulkResult:
-        """Purge many fragments with per-item partial success."""
+        """Purge many fragments with per-item partial success, unbinding each from its scope."""
         async with self._rbac_ops_provider.write_ops() as w:
-            result = await w.bulk_purge_partial(list(purgers))
+            result = await w.bulk_purge_scoped_partial(purgers)
             succeeded = [row.to_data() for row in result.successes]
             succeeded_ids = {data.id for data in succeeded}
             errors_by_index = {e.index: str(e.exception) for e in result.errors}
