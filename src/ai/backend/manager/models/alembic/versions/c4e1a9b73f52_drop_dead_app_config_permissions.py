@@ -21,8 +21,6 @@ Create Date: 2026-07-14 00:00:00.000000
 import sqlalchemy as sa
 from alembic import op
 
-from ai.backend.manager.models.rbac_models.migration.enums import EntityType
-
 # revision identifiers, used by Alembic.
 revision = "c4e1a9b73f52"
 down_revision = "aa27f1d5cd35"
@@ -35,7 +33,9 @@ def upgrade() -> None:
     db_conn = op.get_bind()
     db_conn.execute(
         sa.text("DELETE FROM permissions WHERE entity_type = :entity_type"),
-        {"entity_type": EntityType.APP_CONFIG.value},
+        # Literal string, not an enum member: this removes the app_config entity type of the
+        # removed legacy AppConfig service, which no longer exists in the codebase.
+        {"entity_type": "app_config"},
     )
 
 
