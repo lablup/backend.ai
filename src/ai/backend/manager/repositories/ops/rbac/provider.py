@@ -36,10 +36,24 @@ from ai.backend.manager.repositories.base import (
     Purger,
     PurgerResult,
 )
+from ai.backend.manager.repositories.base.creator import BulkCreatorError
+from ai.backend.manager.repositories.base.integrity import parse_integrity_error
+from ai.backend.manager.repositories.base.purger import (
+    BulkPurgerError,
+    BulkPurgerResultWithFailures,
+)
 from ai.backend.manager.repositories.base.rbac.entity_creator import (
     RBACBulkEntityCreatorResult,
+    RBACBulkEntityCreatorResultWithFailures,
     RBACEntityCreator,
+    RBACEntityCreatorResult,
+    execute_rbac_entity_creator,
     execute_rbac_entity_creators,
+)
+from ai.backend.manager.repositories.base.rbac.entity_purger import (
+    RBACEntityPurger,
+    RBACEntityPurgerResult,
+    execute_rbac_entity_purger,
 )
 from ai.backend.manager.repositories.ops.base.provider import DBOpsProvider, WriteOps
 from ai.backend.manager.repositories.permission_controller.role_manager import RoleManager
@@ -148,12 +162,77 @@ class RBACWriteOps(WriteOps):
         )
         await self._sess.execute(stmt)
 
+    async def create_scoped[TRow: Base](
+        self,
+        creator: RBACEntityCreator[TRow],
+    ) -> RBACEntityCreatorResult[TRow]:
+        """Insert one row with its RBAC scope association (the creator carries its scope)."""
+        return await execute_rbac_entity_creator(self._sess, creator)
+
     async def bulk_create_scoped[TRow: Base](
         self,
         creators: Sequence[RBACEntityCreator[TRow]],
     ) -> RBACBulkEntityCreatorResult[TRow]:
         """Insert rows with their RBAC scope associations (each creator carries its scope)."""
         return await execute_rbac_entity_creators(self._sess, creators)
+
+    async def bulk_create_scoped_partial[TRow: Base](
+        self,
+        creators: Sequence[RBACEntityCreator[TRow]],
+    ) -> RBACBulkEntityCreatorResultWithFailures[TRow]:
+        """Insert rows with their scope associations, isolating each row for partial success.
+
+        The scoped counterpart of :meth:`bulk_create_partial`: a row and its association share
+        one savepoint, so a rejected row rolls back both and leaves the rest created.
+        :meth:`bulk_create_scoped` flushes the batch at once instead and is all-or-nothing.
+        """
+        successes: list[TRow] = []
+        errors: list[BulkCreatorError[TRow]] = []
+        for index, creator in enumerate(creators):
+            async with self.savepoint():
+                try:
+                    result = await execute_rbac_entity_creator(self._sess, creator)
+                    successes.append(result.row)
+                except sa.exc.IntegrityError as e:
+                    errors.append(
+                        BulkCreatorError(
+                            spec=creator.spec, exception=parse_integrity_error(e), index=index
+                        )
+                    )
+                except Exception as e:
+                    # execute_rbac_entity_creator maps the integrity errors its spec declares
+                    # onto domain errors; whatever arrives here fails just this row.
+                    errors.append(BulkCreatorError(spec=creator.spec, exception=e, index=index))
+        return RBACBulkEntityCreatorResultWithFailures(successes=successes, errors=errors)
+
+    async def purge_scoped[TRow: Base](
+        self,
+        purger: RBACEntityPurger[TRow],
+    ) -> RBACEntityPurgerResult[TRow] | None:
+        """Delete one row and its RBAC entries; ``None`` if the row is already gone."""
+        return await execute_rbac_entity_purger(self._sess, purger)
+
+    async def bulk_purge_scoped_partial[TRow: Base](
+        self,
+        purgers: Sequence[RBACEntityPurger[TRow]],
+    ) -> BulkPurgerResultWithFailures[TRow]:
+        """Delete rows with their RBAC entries, isolating each row for partial success.
+
+        The scoped counterpart of :meth:`bulk_purge_partial`: a row and its RBAC entries share
+        one savepoint, so a failed row rolls back both and leaves the rest deleted. A purger
+        targeting a row that is already gone is skipped — no success, no error.
+        """
+        successes: list[TRow] = []
+        errors: list[BulkPurgerError[TRow]] = []
+        for index, purger in enumerate(purgers):
+            async with self.savepoint():
+                try:
+                    result = await execute_rbac_entity_purger(self._sess, purger)
+                    if result is not None:
+                        successes.append(result.row)
+                except Exception as e:
+                    errors.append(BulkPurgerError(purger=purger, exception=e, index=index))
+        return BulkPurgerResultWithFailures(successes=successes, errors=errors)
 
     async def add_users_to_scope(
         self,
