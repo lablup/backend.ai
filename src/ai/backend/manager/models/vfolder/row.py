@@ -331,9 +331,7 @@ class VFolderRow(Base):  # type: ignore[misc]
     )
     # creator is always set to the user who created vfolder (regardless user/project types)
     creator: Mapped[str | None] = mapped_column("creator", sa.String(length=128), nullable=True)
-    creator_id: Mapped[uuid.UUID | None] = mapped_column(
-        "creator_id", GUID, nullable=True, index=True
-    )
+    creator_id: Mapped[uuid.UUID | None] = mapped_column("creator_id", GUID, nullable=True)
     # unmanaged vfolder represents the host-side absolute path instead of storage-based path.
     unmanaged_path: Mapped[str | None] = mapped_column(
         "unmanaged_path", sa.String(length=512), nullable=True
