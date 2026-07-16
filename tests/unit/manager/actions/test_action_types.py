@@ -74,12 +74,6 @@ class TestEntityType:
         assert resource_types == expected
         assert len(resource_types) == 9
 
-    def test_app_config_is_not_a_resource_type(self) -> None:
-        # The legacy app_configs table, model and service are gone (84d5c6daf8cc / BA-5822),
-        # and the BEP-1052 replacement is not RBAC-guarded, so granting APP_CONFIG would
-        # authorize nothing.
-        assert EntityType.APP_CONFIG not in EntityType._resource_types()
-
     def test_scope_and_resource_types_no_overlap(self) -> None:
         scope_types = EntityType._scope_types()
         resource_types = EntityType._resource_types()
