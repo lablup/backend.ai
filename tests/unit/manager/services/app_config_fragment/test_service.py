@@ -18,6 +18,7 @@ from ai.backend.manager.data.app_config_fragment.types import (
     AppConfigFragmentBulkItemError,
     AppConfigFragmentBulkResult,
     AppConfigFragmentData,
+    AppConfigFragmentScope,
     AppConfigFragmentSearchResult,
 )
 from ai.backend.manager.data.permission.types import RBACElementRef
@@ -284,8 +285,7 @@ class TestAppConfigFragmentService:
 
         result = await service.bulk_create(
             BulkCreateAppConfigFragmentAction(
-                scope_type=case.scope_type,
-                scope_id=case.scope_id,
+                scope=AppConfigFragmentScope(scope_type=case.scope_type, scope_id=case.scope_id),
                 items=[AppConfigFragmentBulkCreateItem(config_name="theme", config={"k": "v"})],
             )
         )
@@ -354,8 +354,7 @@ class TestAppConfigFragmentService:
 
         result = await service.bulk_create(
             BulkCreateAppConfigFragmentAction(
-                scope_type=AppConfigScopeType.USER,
-                scope_id=_USER_ID,
+                scope=AppConfigFragmentScope(scope_type=AppConfigScopeType.USER, scope_id=_USER_ID),
                 items=[
                     AppConfigFragmentBulkCreateItem(config_name="theme", config={"k": "v"}),
                     AppConfigFragmentBulkCreateItem(config_name="menu", config={"k": "v"}),

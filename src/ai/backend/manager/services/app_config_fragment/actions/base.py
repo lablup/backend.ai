@@ -53,8 +53,8 @@ class AppConfigFragmentSingleEntityActionResult(BaseSingleEntityActionResult):
 class AppConfigFragmentBulkTarget(ActionTarget):
     """One existing fragment touched by a bulk update / purge, exposed for per-entity RBAC.
 
-    Bulk create targets scopes instead (the fragments do not exist yet) — see
-    ``AppConfigFragmentScopeTarget`` in ``bulk_create``.
+    Bulk create has no targets — its fragments do not exist yet, so it is a scope action
+    (:class:`BulkCreateAppConfigFragmentAction`) authorized at the one scope it writes to.
     """
 
     fragment_id: AppConfigFragmentID

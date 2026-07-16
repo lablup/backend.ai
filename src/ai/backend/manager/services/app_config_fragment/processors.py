@@ -63,7 +63,7 @@ class AppConfigFragmentProcessors(AbstractProcessorPackage):
     purge: SingleEntityActionProcessor[
         PurgeAppConfigFragmentAction, PurgeAppConfigFragmentActionResult
     ]
-    bulk_create: BulkActionProcessor[
+    bulk_create: ScopeActionProcessor[
         BulkCreateAppConfigFragmentAction, BulkCreateAppConfigFragmentActionResult
     ]
     bulk_update: BulkActionProcessor[
@@ -84,7 +84,7 @@ class AppConfigFragmentProcessors(AbstractProcessorPackage):
         self.scoped_search = BulkActionProcessor(service.scoped_search, monitors=action_monitors)
         self.update = SingleEntityActionProcessor(service.update, action_monitors)
         self.purge = SingleEntityActionProcessor(service.purge, action_monitors)
-        self.bulk_create = BulkActionProcessor(service.bulk_create, monitors=action_monitors)
+        self.bulk_create = ScopeActionProcessor(service.bulk_create, action_monitors)
         self.bulk_update = BulkActionProcessor(service.bulk_update, monitors=action_monitors)
         self.bulk_purge = BulkActionProcessor(service.bulk_purge, monitors=action_monitors)
 

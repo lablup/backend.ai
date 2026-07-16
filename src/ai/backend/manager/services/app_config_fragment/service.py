@@ -116,16 +116,17 @@ class AppConfigFragmentService:
     ) -> BulkCreateAppConfigFragmentActionResult:
         # Every item shares the action's scope. A public fragment is GLOBAL — outside the RBAC
         # scope hierarchy — so it has no scope element and binds to no scope.
-        element_type = action.scope_type.to_rbac_element_type()
+        scope = action.scope
+        element_type = scope.scope_type.to_rbac_element_type()
         scope_ref = (
-            RBACElementRef(element_type, action.scope_id) if element_type is not None else None
+            RBACElementRef(element_type, scope.scope_id) if element_type is not None else None
         )
         creators = [
             RBACEntityCreator(
                 spec=AppConfigFragmentCreatorSpec(
                     config_name=item.config_name,
-                    scope_type=action.scope_type,
-                    scope_id=action.scope_id,
+                    scope_type=scope.scope_type,
+                    scope_id=scope.scope_id,
                     config=item.config,
                 ),
                 element_type=RBACElementType.APP_CONFIG_FRAGMENT,
@@ -135,7 +136,7 @@ class AppConfigFragmentService:
         ]
         result = await self._repository.bulk_create(creators)
         return BulkCreateAppConfigFragmentActionResult(
-            succeeded=result.succeeded, failed=result.failed
+            scope=scope, succeeded=result.succeeded, failed=result.failed
         )
 
     async def bulk_update(
