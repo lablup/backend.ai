@@ -1,4 +1,4 @@
-"""Race-free container network-namespace handles for the helper (BEP-1062).
+"""Race-free container network-namespace handles for the privnet (BEP-1062).
 
 The dangerous operation is entering a container's network namespace by PID: a PID is
 reused the moment its process dies, so *validate PID -> then use PID* is a classic
@@ -14,7 +14,7 @@ This module closes that window with two kernel primitives instead of re-reading
    object, never a path that could be re-resolved to a different namespace.
 
 Validation then happens on the pinned fd itself: reject the host netns (identified by
-the helper's own netns, since the helper runs in the host netns). The caller resolves
+the privnet's own netns, since the privnet runs in the host netns). The caller resolves
 the PID from containerd (authoritative) and re-checks it against the pidfd, so the only
 way to be redirected is to lose several races at once *and* land on another managed
 container — and even then the host netns can never be selected.
@@ -40,7 +40,7 @@ class _NsIdent:
 
 @cache
 def _host_netns_ident() -> _NsIdent:
-    """Identity of the netns the helper itself runs in. The helper always runs in the
+    """Identity of the netns the privnet itself runs in. The privnet always runs in the
     host netns, so this is exactly the namespace an attach must never target."""
     st = Path("/proc/self/ns/net").stat()
     return _NsIdent(st.st_dev, st.st_ino)
@@ -100,7 +100,7 @@ def open_container_netns(pid: int) -> PinnedNetns:
 
 
 class NetnsPinner:
-    """The seam the helper pins namespaces through.
+    """The seam the privnet pins namespaces through.
 
     Production always uses this one — it is a thin pass-through to the functions above. It exists so
     the attach path can be driven in a test without a real container: pinning needs a live process

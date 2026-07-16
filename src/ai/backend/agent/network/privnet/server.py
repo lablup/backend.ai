@@ -1,16 +1,16 @@
-"""Privileged network helper daemon (BEP-1062).
+"""Privileged network privnet daemon (BEP-1062).
 
 This is the ONLY component that holds CAP_NET_ADMIN + CAP_SYS_ADMIN. The unprivileged
-agent connects over a unix socket and sends semantic verbs (``protocol.py``); the helper
+agent connects over a unix socket and sends semantic verbs (``protocol.py``); the privnet
 derives every side-effecting value itself and performs the native veth/bridge/netns work
 that would otherwise force the whole agent to run privileged.
 
 Trust model (why a compromised agent stays contained):
 
 - **Peer auth**: the socket is 0600 and every connection is checked with SO_PEERCRED;
-  only the configured agent uid may drive the helper.
+  only the configured agent uid may drive the privnet.
 - **No caller-supplied targets**: the agent sends only ``session_id`` / ``container_id``.
-  The helper derives device names/subnets from the session it set up and re-resolves the
+  The privnet derives device names/subnets from the session it set up and re-resolves the
   container PID from containerd (authoritative) — never trusting a PID/netns/argv/config
   from the agent (closes the argv-injection and PID-TOCTOU classes; see ``netns.py``).
 - **Per-session serialization**: one asyncio.Lock per session serializes
@@ -18,7 +18,7 @@ Trust model (why a compromised agent stays contained):
 
 Only setup/teardown/attach/detach are exposed; there is no generic "run command" verb.
 
-The helper is a daemon that outlives the agent, but it is not immortal: it can be restarted or
+The privnet is a daemon that outlives the agent, but it is not immortal: it can be restarted or
 crash while the node's kernels keep running. Its session registry is in memory, so on boot it
 rebuilds that registry from its own journal (``journal.py``) reconciled against containerd — see
 `recover`. Nothing is taken back from the agent, which is the process this separation exists to
@@ -38,17 +38,17 @@ from typing import TYPE_CHECKING, Any, cast
 from ai.backend.agent.containerd.oci import SESSION_ID_LABEL
 from ai.backend.agent.errors.network import UnusableVtep
 from ai.backend.agent.network.cni import CniAttacher, plan_to_invocations
-from ai.backend.agent.network.helper import netns as netns_mod
-from ai.backend.agent.network.helper import policy
-from ai.backend.agent.network.helper.journal import AttachRecord, HelperJournal
-from ai.backend.agent.network.helper.protocol import (
-    HelperOp,
-    HelperRequest,
-    HelperResponse,
-    ProtocolError,
-)
 from ai.backend.agent.network.native_attacher import HostLocalIpam, get_host_local_ipam
 from ai.backend.agent.network.port_forward import PortForwarder, forwards_for
+from ai.backend.agent.network.privnet import netns as netns_mod
+from ai.backend.agent.network.privnet import policy
+from ai.backend.agent.network.privnet.journal import AttachRecord, PrivNetJournal
+from ai.backend.agent.network.privnet.protocol import (
+    PrivNetOp,
+    PrivNetRequest,
+    PrivNetResponse,
+    ProtocolError,
+)
 from ai.backend.common.network.types import (
     Member,
     NetworkBackendKind,
@@ -71,7 +71,7 @@ _CAP_NAMES = {12: "CAP_NET_ADMIN", 21: "CAP_SYS_ADMIN", 0: "CAP_CHOWN", 1: "CAP_
 
 def _self_effective_caps() -> str:
     """Decode this process's effective capability set for a startup log line, so the
-    operator can confirm the helper holds only the intended (network) capabilities."""
+    operator can confirm the privnet holds only the intended (network) capabilities."""
     try:
         with Path("/proc/self/status").open() as f:
             for line in f:
@@ -86,16 +86,16 @@ def _self_effective_caps() -> str:
     return "CapEff=?"
 
 
-class HelperError(RuntimeError):
+class PrivNetError(RuntimeError):
     """A request could not be served. The message returned to the agent is generic;
-    the privileged detail is logged helper-side only."""
+    the privileged detail is logged privnet-side only."""
 
 
 class _SessionEntry:
     meta: SessionNetMeta
     backend: AbstractNetworkAgentPluginV2[Any]
     attached: dict[str, Any]  # container_id -> EndpointPlan (kept for detach)
-    # container_id -> the LOCAL address the helper itself assigned. The only address a published
+    # container_id -> the LOCAL address the privnet itself assigned. The only address a published
     # host port may be DNAT'd to; never taken from the agent.
     local_ips: dict[str, str]
 
@@ -106,12 +106,12 @@ class _SessionEntry:
         self.local_ips = {}
 
 
-class NetworkHelperServer:
+class PrivNetServer:
     _socket_path: str
     _allowed_uid: int
     _agent_id: str
     _host_ip: str
-    # The validated VTEP. The helper, not the agent, owns the host's networking when it runs, so it
+    # The validated VTEP. The privnet, not the agent, owns the host's networking when it runs, so it
     # is the one that publishes this node's membership — and an unusable address published there is
     # what strands a whole overlay session (see network.vtep). None disables vxlan sessions here.
     _vtep_ip: str | None
@@ -121,7 +121,7 @@ class NetworkHelperServer:
     _backends: dict[str, AbstractNetworkAgentPluginV2[Any]]
     _sessions: dict[str, _SessionEntry]
     _locks: dict[str, asyncio.Lock]
-    _journal: HelperJournal
+    _journal: PrivNetJournal
     _netns: netns_mod.NetnsPinner
     # The store the attach path allocates LOCAL addresses from. Read on recovery to find the
     # address a pre-restart attach assigned, which is the address its published ports DNAT to.
@@ -139,7 +139,7 @@ class NetworkHelperServer:
         backends: dict[str, AbstractNetworkAgentPluginV2[Any]],
         vtep_ip: str | None = None,
         forwarder: PortForwarder | None = None,
-        journal: HelperJournal | None = None,
+        journal: PrivNetJournal | None = None,
         ipam: HostLocalIpam | None = None,
         netns_pinner: netns_mod.NetnsPinner | None = None,
     ) -> None:
@@ -157,7 +157,7 @@ class NetworkHelperServer:
         self._backends = backends
         self._sessions = {}
         self._locks = {}
-        self._journal = journal or HelperJournal()
+        self._journal = journal or PrivNetJournal()
         self._ipam = ipam or get_host_local_ipam()
         self._netns = netns_pinner or netns_mod.NetnsPinner()
 
@@ -171,7 +171,7 @@ class NetworkHelperServer:
     async def serve_forever(self) -> None:
         await self._runtime.open()
         # Before the socket exists, so no request can race the rebuild and be refused for a session
-        # this helper is about to remember.
+        # this privnet is about to remember.
         await self.recover()
         sock_path = Path(self._socket_path)
         if sock_path.exists():
@@ -179,23 +179,23 @@ class NetworkHelperServer:
         server = await asyncio.start_unix_server(self._handle_conn, path=self._socket_path)
         sock_path.chmod(0o600)
         log.info(
-            "network helper listening on {} (agent uid={})", self._socket_path, self._allowed_uid
+            "network privnet listening on {} (agent uid={})", self._socket_path, self._allowed_uid
         )
         log.info("running as uid={} with {}", os.getuid(), _self_effective_caps())
         async with server:
             await server.serve_forever()
 
     async def recover(self) -> None:
-        """Rebuild the session registry after a helper restart, and give back what died while we
+        """Rebuild the session registry after a privnet restart, and give back what died while we
         were down.
 
-        The registry is memory; the devices are not. A restarted helper that skipped this would
+        The registry is memory; the devices are not. A restarted privnet that skipped this would
         hold a node whose bridges, vxlan devices and DNAT rules are all up and carrying traffic,
         while refusing every verb about them — a new kernel could not join a running session, and a
         teardown would report success while leaking the session's devices *and* its node-local
         subnet block, which the pool never gets back.
 
-        Ground truth is this helper's own journal (what it set up and attached) reconciled against
+        Ground truth is this privnet's own journal (what it set up and attached) reconciled against
         containerd (what is actually still running). The agent is not consulted: it is the process
         this separation exists to contain, and a session's subnet is exactly the thing it must not
         be able to re-declare.
@@ -205,7 +205,7 @@ class NetworkHelperServer:
             journalled_sessions = await self._journal.sessions()
             journalled_attachments = await self._journal.attachments()
         except Exception:
-            log.exception("could not read the helper journal; starting with an empty registry")
+            log.exception("could not read the privnet journal; starting with an empty registry")
             return
         if not journalled_sessions and not journalled_attachments:
             return
@@ -239,7 +239,7 @@ class NetworkHelperServer:
                 else:
                     await self._reclaim_dead_session(session_id, raw_config)
             except Exception:
-                # One unrecoverable session must not cost us the others: a helper that gave up here
+                # One unrecoverable session must not cost us the others: a privnet that gave up here
                 # would refuse every verb for every session on the node.
                 log.exception("failed to recover session {}", session_id)
 
@@ -350,7 +350,7 @@ class NetworkHelperServer:
 
     async def _local_ip_of(self, plan: Any, container_id: str) -> str | None:
         """The LOCAL address this container holds, read back from the store the attach allocated it
-        from. It is what its published ports DNAT to, so a restarted helper must know it before it
+        from. It is what its published ports DNAT to, so a restarted privnet must know it before it
         can serve PUBLISH_PORTS for a pre-restart container."""
         for spec in plan.attachments:
             if spec.role is not NetworkRole.LOCAL:
@@ -377,9 +377,9 @@ class NetworkHelperServer:
         peers would program an unusable address and the session hangs at rendezvous with no error."""
         if backend is NetworkBackendKind.VXLAN and self._vtep_ip is None:
             raise UnusableVtep(
-                f"network helper on agent {self._agent_id} cannot join a multi-node overlay session:"
+                f"network privnet on agent {self._agent_id} cannot join a multi-node overlay session:"
                 f" its host address ({self._host_ip!r}) is not a routable unicast IPv4 held by an"
-                " interface of this host that is up. Set BACKENDAI_NETHELPER_HOST_IP (and the"
+                " interface of this host that is up. Set BACKENDAI_PRIVNET_HOST_IP (and the"
                 " agent's container.advertised-host) to the address peers reach this node on."
             )
 
@@ -396,7 +396,7 @@ class NetworkHelperServer:
             uid = self._peer_uid(writer)
             if uid != self._allowed_uid:
                 log.warning("rejecting connection from uid {} (allowed {})", uid, self._allowed_uid)
-                writer.write(HelperResponse(ok=False, error="unauthorized").encode())
+                writer.write(PrivNetResponse(ok=False, error="unauthorized").encode())
                 await writer.drain()
                 return
             line = await reader.readline()
@@ -406,60 +406,60 @@ class NetworkHelperServer:
             writer.write(resp.encode())
             await writer.drain()
         except Exception:
-            log.exception("helper connection handler failed")
+            log.exception("privnet connection handler failed")
             try:
-                writer.write(HelperResponse(ok=False, error="internal error").encode())
+                writer.write(PrivNetResponse(ok=False, error="internal error").encode())
                 await writer.drain()
             except Exception:
                 pass
         finally:
             writer.close()
 
-    async def _dispatch(self, line: bytes) -> HelperResponse:
+    async def _dispatch(self, line: bytes) -> PrivNetResponse:
         try:
-            req = HelperRequest.decode(line)
+            req = PrivNetRequest.decode(line)
             session_id = policy.validate_session_id(req.session_id)
         except (ProtocolError, policy.PolicyViolation) as e:
-            return HelperResponse(ok=False, error=str(e))
+            return PrivNetResponse(ok=False, error=str(e))
         async with self._lock(session_id):
             try:
                 match req.op:
-                    case HelperOp.SETUP_SESSION:
+                    case PrivNetOp.SETUP_SESSION:
                         await self._setup(session_id, req.network_config or {})
-                        return HelperResponse(ok=True)
-                    case HelperOp.TEARDOWN_SESSION:
+                        return PrivNetResponse(ok=True)
+                    case PrivNetOp.TEARDOWN_SESSION:
                         await self._teardown(session_id)
-                        return HelperResponse(ok=True)
-                    case HelperOp.ATTACH_CONTAINER:
+                        return PrivNetResponse(ok=True)
+                    case PrivNetOp.ATTACH_CONTAINER:
                         assigned = await self._attach(session_id, req.container_id, req.ip)
-                        return HelperResponse(ok=True, assigned=assigned)
-                    case HelperOp.DETACH_CONTAINER:
+                        return PrivNetResponse(ok=True, assigned=assigned)
+                    case PrivNetOp.DETACH_CONTAINER:
                         await self._detach(session_id, req.container_id)
-                        return HelperResponse(ok=True)
-                    case HelperOp.ADD_PEER | HelperOp.DEL_PEER:
+                        return PrivNetResponse(ok=True)
+                    case PrivNetOp.ADD_PEER | PrivNetOp.DEL_PEER:
                         await self._peer(session_id, req)
-                        return HelperResponse(ok=True)
-                    case HelperOp.ADD_ENDPOINT | HelperOp.DEL_ENDPOINT:
+                        return PrivNetResponse(ok=True)
+                    case PrivNetOp.ADD_ENDPOINT | PrivNetOp.DEL_ENDPOINT:
                         await self._endpoint(session_id, req)
-                        return HelperResponse(ok=True)
-                    case HelperOp.PUBLISH_PORTS:
+                        return PrivNetResponse(ok=True)
+                    case PrivNetOp.PUBLISH_PORTS:
                         await self._publish_ports(session_id, req)
-                        return HelperResponse(ok=True)
-                    case HelperOp.UNPUBLISH_PORTS:
-                        return HelperResponse(ok=True, host_ports=await self._unpublish_ports(req))
-                    case HelperOp.LIST_PORTS:
-                        return HelperResponse(ok=True, forwards=await self._list_ports())
-            except (policy.PolicyViolation, netns_mod.NetnsError, HelperError) as e:
-                return HelperResponse(ok=False, error=str(e))
+                        return PrivNetResponse(ok=True)
+                    case PrivNetOp.UNPUBLISH_PORTS:
+                        return PrivNetResponse(ok=True, host_ports=await self._unpublish_ports(req))
+                    case PrivNetOp.LIST_PORTS:
+                        return PrivNetResponse(ok=True, forwards=await self._list_ports())
+            except (policy.PolicyViolation, netns_mod.NetnsError, PrivNetError) as e:
+                return PrivNetResponse(ok=False, error=str(e))
             except Exception:
-                log.exception("helper op {} failed for session {}", req.op, session_id)
-                return HelperResponse(ok=False, error="operation failed")
+                log.exception("privnet op {} failed for session {}", req.op, session_id)
+                return PrivNetResponse(ok=False, error="operation failed")
 
     def _resolve_backend(self, backend: NetworkBackendKind) -> AbstractNetworkAgentPluginV2[Any]:
         try:
             return self._backends[str(backend)]
         except KeyError:
-            raise HelperError("unsupported backend") from None
+            raise PrivNetError("unsupported backend") from None
 
     async def _setup(self, session_id: str, raw_config: dict[str, Any]) -> None:
         cfg = policy.validate_network_config(raw_config)
@@ -500,7 +500,7 @@ class NetworkHelperServer:
         container_id = policy.validate_container_id(container_id)
         entry = self._sessions.get(session_id)
         if entry is None:
-            raise HelperError("attach before setup")
+            raise PrivNetError("attach before setup")
         # The manager-assigned overlay IP (multi-node vxlan) is agent-supplied, so validate it is
         # confined to THIS session's subnet before trusting it; None (single node) keeps the
         # host-local fallback. attach_endpoint reads it from kernel_config["cluster_network_ip"];
@@ -513,7 +513,7 @@ class NetworkHelperServer:
         # Authoritative PID resolution from containerd — the agent's view is never trusted.
         pid = await self._runtime.container_pid(container_id)
         if pid is None:
-            raise HelperError("no running task for container")
+            raise PrivNetError("no running task for container")
         pinned = self._netns.open(pid)
         try:
             # Re-confirm the PID<->container binding still holds after pinning, so a
@@ -521,7 +521,7 @@ class NetworkHelperServer:
             pid2 = await self._runtime.container_pid(container_id)
             if pid2 != pid or not self._netns.alive(pinned):
                 raise netns_mod.NetnsError("container task changed during attach")
-            # The plan (bridge/subnet CNI config) is derived helper-side from the session meta;
+            # The plan (bridge/subnet CNI config) is derived privnet-side from the session meta;
             # the overlay's static IP (+ derived MAC) comes from the validated kernel_config.
             plan = await entry.backend.attach_endpoint(
                 cast(Any, kernel_config), cast(Any, {}), meta=entry.meta
@@ -530,7 +530,7 @@ class NetworkHelperServer:
             # so it needs the ``/proc/<pid>/ns/net`` form, not the pinned-fd path. The pin
             # above already validated this is a live, non-host container netns; we keep the
             # pidfd open across the attach so a vanished process is still detectable.
-            # Journalled before the attach, so a helper that dies mid-attach still knows on its next
+            # Journalled before the attach, so a privnet that dies mid-attach still knows on its next
             # boot that this container may hold a veth and an address to give back.
             await self._journal.record_attachment(
                 container_id, session_id, kernel_config.get("cluster_network_ip")
@@ -545,10 +545,10 @@ class NetworkHelperServer:
         finally:
             pinned.close()
 
-    async def _publish_ports(self, session_id: str, req: HelperRequest) -> None:
+    async def _publish_ports(self, session_id: str, req: PrivNetRequest) -> None:
         """DNAT the agent-chosen host ports to this container's LOCAL address.
 
-        The address is the helper's own record from attach, not something the agent sent: that is
+        The address is the privnet's own record from attach, not something the agent sent: that is
         what keeps a compromised agent from pointing one of the node's ports at an arbitrary host.
         """
         if req.container_id is None:
@@ -557,16 +557,16 @@ class NetworkHelperServer:
         ports = policy.validate_port_pairs(req.ports)
         entry = self._sessions.get(session_id)
         if entry is None:
-            raise HelperError("publish before setup")
+            raise PrivNetError("publish before setup")
         local_ip = entry.local_ips.get(container_id)
         if local_ip is None:
-            raise HelperError("publish before attach")
+            raise PrivNetError("publish before attach")
         await self._forwarder.install(forwards_for(container_id, local_ip, ports))
 
-    async def _unpublish_ports(self, req: HelperRequest) -> tuple[int, ...]:
+    async def _unpublish_ports(self, req: PrivNetRequest) -> tuple[int, ...]:
         """Withdraw every rule tagged with this container, returning the host ports it held.
 
-        Needs no session entry: the rules name their own container, so this works after a helper
+        Needs no session entry: the rules name their own container, so this works after a privnet
         restart too, when nothing in memory remembers the attach.
         """
         if req.container_id is None:
@@ -587,7 +587,7 @@ class NetworkHelperServer:
         container_id = policy.validate_container_id(container_id)
         # Withdraw first, and unconditionally: a DNAT rule outliving its container would send the
         # next holder of that host port at an address that is about to disappear. Keyed by the
-        # container's own tag, so it holds even if this helper never saw the attach.
+        # container's own tag, so it holds even if this privnet never saw the attach.
         await self._forwarder.remove_container(container_id)
         entry = self._sessions.get(session_id)
         if entry is None:
@@ -611,28 +611,28 @@ class NetworkHelperServer:
     def _require_session(self, session_id: str) -> _SessionEntry:
         entry = self._sessions.get(session_id)
         if entry is None:
-            raise HelperError("peer/endpoint programming before session setup")
+            raise PrivNetError("peer/endpoint programming before session setup")
         return entry
 
-    async def _peer(self, session_id: str, req: HelperRequest) -> None:
+    async def _peer(self, session_id: str, req: PrivNetRequest) -> None:
         """Program (ADD_PEER) or remove (DEL_PEER) a peer VTEP's overlay forwarding. The
         Member carries only the validated VTEP; the backend uses nothing else here."""
         entry = self._require_session(session_id)
         vtep_ip = policy.validate_ipv4(req.vtep_ip, what="vtep_ip")
         peer = Member(agent_id="", host_ip=vtep_ip, vtep_ip=vtep_ip)
-        if req.op is HelperOp.ADD_PEER:
+        if req.op is PrivNetOp.ADD_PEER:
             await entry.backend.add_peer(session_id, peer)
         else:
             await entry.backend.del_peer(session_id, peer)
 
-    async def _endpoint(self, session_id: str, req: HelperRequest) -> None:
+    async def _endpoint(self, session_id: str, req: PrivNetRequest) -> None:
         """Program (ADD_ENDPOINT) or remove (DEL_ENDPOINT) a remote container endpoint's
         unicast FDB + ARP entry."""
         entry = self._require_session(session_id)
         ip = policy.validate_ipv4(req.ip, what="endpoint ip")
         mac = policy.validate_mac(req.mac)
         vtep_ip = policy.validate_ipv4(req.vtep_ip, what="vtep_ip")
-        if req.op is HelperOp.ADD_ENDPOINT:
+        if req.op is PrivNetOp.ADD_ENDPOINT:
             await entry.backend.add_endpoint(session_id, ip=ip, mac=mac, vtep_ip=vtep_ip)
         else:
             await entry.backend.del_endpoint(session_id, ip=ip, mac=mac, vtep_ip=vtep_ip)

@@ -785,25 +785,25 @@ class CommonAgentConfig(BaseConfigSchema):
             example=ConfigExample(local="./var/lib/backend.ai", prod="/var/lib/backend.ai"),
         ),
     ]
-    network_helper_socket: Annotated[
+    network_privnet_socket: Annotated[
         str | None,
         Field(
             default=None,
-            validation_alias=AliasChoices("network-helper-socket", "network_helper_socket"),
-            serialization_alias="network-helper-socket",
+            validation_alias=AliasChoices("network-privnet-socket", "network_privnet_socket"),
+            serialization_alias="network-privnet-socket",
         ),
         BackendAIConfigMeta(
             description=(
-                "Unix socket path of the privileged network helper (BEP-1062). When set, the "
+                "Unix socket path of the privnet daemon (BEP-1062). When set, the "
                 "containerd agent delegates all CAP_NET_ADMIN/CAP_SYS_ADMIN container networking "
-                "to the helper over this socket and needs no network privilege itself. When unset "
+                "to the privnet over this socket and needs no network privilege itself. When unset "
                 "(the default), the agent performs container networking in-process, which requires "
                 "the agent process to hold those capabilities. Only used by the containerd backend."
             ),
             added_version="25.12.0",
             example=ConfigExample(
-                local="/tmp/backend.ai/net-helper.sock",
-                prod="/run/backend.ai/net-helper.sock",
+                local="/tmp/backend.ai/net-privnet.sock",
+                prod="/run/backend.ai/net-privnet.sock",
             ),
         ),
     ]

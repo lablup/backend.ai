@@ -1,10 +1,10 @@
-"""Wire protocol for the privileged network helper (BEP-1062).
+"""Wire protocol for the privnet daemon (BEP-1062).
 
-The unprivileged agent and the privileged (CAP_NET_ADMIN) helper speak a small,
+The unprivileged agent and the privileged (CAP_NET_ADMIN) privnet speak a small,
 **semantic** RPC over a unix socket: newline-delimited JSON, one request and one
 response per line. The vocabulary is deliberately tiny and carries only opaque
 identifiers (``session_id`` / ``container_id``) plus the manager-provided network
-parameters — never argv, device names, netns paths, or CNI config. The helper
+parameters — never argv, device names, netns paths, or CNI config. The privnet
 derives every side-effecting value itself (see ``server.py``), so a compromised
 agent cannot inject commands, target an arbitrary namespace, or name an arbitrary
 device: the attack surface is the enum of verbs below, nothing more.
@@ -21,7 +21,7 @@ from dataclasses import dataclass
 from typing import Any
 
 
-class HelperOp(enum.StrEnum):
+class PrivNetOp(enum.StrEnum):
     SETUP_SESSION = "setup_session"
     TEARDOWN_SESSION = "teardown_session"
     ATTACH_CONTAINER = "attach_container"
@@ -35,7 +35,7 @@ class HelperOp(enum.StrEnum):
     DEL_ENDPOINT = "del_endpoint"
     # Host-port ingress: publish a container's service ports on host ports (DNAT), and withdraw
     # them. The agent sends only the port pairing; the DNAT destination is the LOCAL address the
-    # helper itself assigned at attach, so a lying agent cannot redirect a host port anywhere else.
+    # privnet itself assigned at attach, so a lying agent cannot redirect a host port anywhere else.
     PUBLISH_PORTS = "publish_ports"
     UNPUBLISH_PORTS = "unpublish_ports"
     # Node-wide: every published port, so a restarted agent can take them back out of its port
@@ -99,24 +99,24 @@ def _decode_forwards(raw: Any) -> tuple[tuple[str, int, str, int], ...] | None:
 
 
 @dataclass(frozen=True)
-class HelperRequest:
+class PrivNetRequest:
     """A single semantic request. ``network_config`` is only present for
-    SETUP_SESSION and is the manager's ``{backend, subnet, vni, mtu}`` — the helper
+    SETUP_SESSION and is the manager's ``{backend, subnet, vni, mtu}`` — the privnet
     still validates it (untrusted: it arrives via the agent)."""
 
-    op: HelperOp
+    op: PrivNetOp
     session_id: str
     container_id: str | None = None
     network_config: dict[str, Any] | None = None
     # Overlay peer/endpoint programming (ADD_PEER/DEL_PEER carry vtep_ip; ADD_ENDPOINT/
-    # DEL_ENDPOINT carry ip + mac + vtep_ip). Opaque values the helper still validates.
+    # DEL_ENDPOINT carry ip + mac + vtep_ip). Opaque values the privnet still validates.
     vtep_ip: str | None = None
     ip: str | None = None
     mac: str | None = None
     # PUBLISH_PORTS only: the (host_port, container_port, host_ip) pairing the agent's port pool
     # produced. host_ip is the interface the service is published on (None = every local address);
-    # the DNAT *destination* is never sent — the helper uses its own assigned LOCAL address (see
-    # HelperOp.PUBLISH_PORTS), so a compromised agent can pick the publish interface but not the
+    # the DNAT *destination* is never sent — the privnet uses its own assigned LOCAL address (see
+    # PrivNetOp.PUBLISH_PORTS), so a compromised agent can pick the publish interface but not the
     # redirect target.
     ports: tuple[tuple[int, int, str | None], ...] | None = None
 
@@ -135,7 +135,7 @@ class HelperRequest:
         return json.dumps(payload, separators=(",", ":")).encode() + b"\n"
 
     @classmethod
-    def decode(cls, line: bytes) -> HelperRequest:
+    def decode(cls, line: bytes) -> PrivNetRequest:
         try:
             data = json.loads(line)
         except (ValueError, TypeError) as e:
@@ -143,7 +143,7 @@ class HelperRequest:
         if not isinstance(data, dict):
             raise ProtocolError("frame is not an object")
         try:
-            op = HelperOp(data["op"])
+            op = PrivNetOp(data["op"])
         except (KeyError, ValueError) as e:
             raise ProtocolError("missing or unknown op") from e
         session_id = data.get("session_id")
@@ -172,7 +172,7 @@ class HelperRequest:
 
 
 @dataclass(frozen=True)
-class HelperResponse:
+class PrivNetResponse:
     """Result of one request. ``assigned`` maps a NetworkRole name to the assigned
     IP (only for ATTACH). ``host_ports`` are the ports UNPUBLISH_PORTS withdrew, so the agent can
     return them to its pool. ``error`` is a short, non-privileged reason string."""
@@ -197,7 +197,7 @@ class HelperResponse:
         return json.dumps(payload, separators=(",", ":")).encode() + b"\n"
 
     @classmethod
-    def decode(cls, line: bytes) -> HelperResponse:
+    def decode(cls, line: bytes) -> PrivNetResponse:
         try:
             data = json.loads(line)
         except (ValueError, TypeError) as e:

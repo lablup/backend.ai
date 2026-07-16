@@ -1,7 +1,7 @@
-"""Input policy for the privileged network helper (BEP-1062).
+"""Input policy for the privnet daemon (BEP-1062).
 
 Pure, side-effect-free validation of everything the (untrusted) agent sends before
-the helper acts on it. Two design rules keep this small and race-free:
+the privnet acts on it. Two design rules keep this small and race-free:
 
 - The agent sends only opaque identifiers and the manager's network parameters.
   It never sends device names, argv, netns paths, or CNI config, so there is no
@@ -28,7 +28,7 @@ _SESSION_ID_RE = re.compile(r"\A[A-Za-z0-9][A-Za-z0-9._-]{0,127}\Z")
 _CONTAINER_ID_RE = re.compile(r"\A[A-Za-z0-9][A-Za-z0-9._-]{0,127}\Z")
 _MAC_RE = re.compile(r"\A[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}\Z")
 
-# The helper only ever operates on RFC1918 space; a manager-provided subnet outside
+# The privnet only ever operates on RFC1918 space; a manager-provided subnet outside
 # it is rejected outright (defence in depth — the bridge backend derives its own
 # node-local subnet, but the overlay path trusts the manager's value).
 _PRIVATE_POOLS = (
@@ -40,7 +40,7 @@ _PRIVATE_POOLS = (
 _VNI_MIN, _VNI_MAX = 1, (1 << 24) - 1  # VXLAN VNI is 24-bit
 _MTU_MIN, _MTU_MAX = 576, 9000
 
-# A published host port must be unprivileged: the helper runs as root, so a lying agent asking to
+# A published host port must be unprivileged: the privnet runs as root, so a lying agent asking to
 # publish on 22 or 443 would hijack the node's own SSH or TLS listener. Container ports are the
 # far side of the DNAT and can be anything the image listens on.
 _MIN_HOST_PORT = 1024
@@ -80,7 +80,7 @@ def validate_port_pairs(
     """Bound the agent-supplied (host_port, container_port, host_ip) pairing.
 
     This is the trust boundary for host-port ingress. The DNAT *destination* is never taken from the
-    agent (the helper uses the LOCAL address it assigned at attach), so the agent can influence only
+    agent (the privnet uses the LOCAL address it assigned at attach), so the agent can influence only
     *which* host port is redirected and *which local interface* it is published on — hence the
     unprivileged-port floor, the duplicate check, and validating host_ip as a real IPv4 (or None for
     every local address). The worst a lying agent achieves is publishing its own container on some
@@ -162,7 +162,7 @@ def _validate_subnet(subnet: str) -> str:
 
 def validate_network_config(raw: dict[str, Any]) -> ValidatedNetworkConfig:
     """Validate the manager-provided ``{backend, subnet, vni, mtu}``. Every field is
-    treated as untrusted (it reaches the helper via the agent)."""
+    treated as untrusted (it reaches the privnet via the agent)."""
     try:
         backend = NetworkBackendKind(raw["backend"])
     except (KeyError, ValueError) as e:

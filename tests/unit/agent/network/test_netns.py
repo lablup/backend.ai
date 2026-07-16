@@ -1,4 +1,4 @@
-"""The helper's container-netns pinning, against real namespaces (BEP-1062).
+"""The privnet's container-netns pinning, against real namespaces (BEP-1062).
 
 This is the module that stands between a privileged operation and the wrong namespace. Entering a
 container's netns by PID is a TOCTOU: a PID is reused the moment its process dies, so a *validate
@@ -22,7 +22,7 @@ from pathlib import Path
 
 import pytest
 
-from ai.backend.agent.network.helper.netns import (
+from ai.backend.agent.network.privnet.netns import (
     NetnsError,
     NetnsPinner,
     open_container_netns,
@@ -133,7 +133,7 @@ class TestPinning:
     def test_close_is_safe_to_call_twice(self, container_pid: int) -> None:
         pinned = open_container_netns(container_pid)
         pinned.close()
-        pinned.close()  # a double close must not take the helper down mid-attach
+        pinned.close()  # a double close must not take the privnet down mid-attach
 
 
 class TestWhatItRefuses:
@@ -144,7 +144,7 @@ class TestWhatItRefuses:
             open_container_netns(host_pid)
 
     def test_our_own_process(self) -> None:
-        # The helper runs in the host netns, so it is its own counter-example.
+        # The privnet runs in the host netns, so it is its own counter-example.
         with pytest.raises(NetnsError, match="host netns"):
             open_container_netns(os.getpid())
 
@@ -182,7 +182,7 @@ class TestLiveness:
 
 
 class TestThePinnerSeam:
-    """What the helper actually holds. It exists so the attach path can be driven in a test, so it
+    """What the privnet actually holds. It exists so the attach path can be driven in a test, so it
     had better be the real thing in production."""
 
     def test_it_pins_for_real(self, container_pid: int) -> None:

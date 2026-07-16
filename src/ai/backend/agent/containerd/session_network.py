@@ -84,7 +84,7 @@ class ContainerdSessionNetwork:
     _backends: Mapping[str, AbstractNetworkAgentPluginV2[Any]]
     # Builds the per-session container-attach provisioner (one per session, so it can name its
     # own session without having witnessed the attach). Overridable so the privileged network
-    # helper can supply a proxy that RPCs attach/detach instead of running them here.
+    # privnet can supply a proxy that RPCs attach/detach instead of running them here.
     _make_provisioner: Callable[[AbstractNetworkAgentPluginV2[Any], str], Any]
     _coordinators: dict[str, SessionNetworkCoordinator]
     _orchestrators: dict[str, ContainerdKernelOrchestrator]
@@ -98,7 +98,7 @@ class ContainerdSessionNetwork:
     # ground truth by `recover` after a restart.
     _attachments: dict[str, tuple[str, EndpointPlan, int]]
     # The durable journals this process owns, and so may reconcile on restart. Both are None when
-    # a privileged helper owns the host state (it keeps its own records and outlives the agent).
+    # a privileged privnet owns the host state (it keeps its own records and outlives the agent).
     _local_subnets: LocalSubnetAllocator | None
     _ipam: HostLocalIpam | None
     # One lock per session, so the per-node data-plane setup runs once even when several kernels of
@@ -313,7 +313,7 @@ class ContainerdSessionNetwork:
         its /24 would free a block whose bridge is up, and the next session to take it would delete
         that live bridge. A block is reclaimed only when no live container names its session.
 
-        Both journals are None under a privileged helper: it owns the host state and its own
+        Both journals are None under a privileged privnet: it owns the host state and its own
         records, and it outlives the agent, so there is nothing here to reclaim.
         """
         if self._ipam is not None:
@@ -576,7 +576,7 @@ class ContainerdSessionNetwork:
 
     def session_of(self, container_id: str) -> str | None:
         """The session a live container belongs to, from the attach record (rebuilt by `recover`
-        after a restart). The helper's port verbs need it to reach the right session lock."""
+        after a restart). The privnet's port verbs need it to reach the right session lock."""
         attachment = self._attachments.get(container_id)
         return attachment[0] if attachment is not None else None
 
@@ -591,8 +591,8 @@ class ContainerdSessionNetwork:
         mint a fresh block for a dead session — one no teardown will ever release, since the
         session's coordinator is gone, so it would leak from the node's pool until a restart.
 
-        None under a privileged helper, which owns the pool and assigns the addresses itself — the
-        agent cannot compute them, so peer resolution there is the helper's to add.
+        None under a privileged privnet, which owns the pool and assigns the addresses itself — the
+        agent cannot compute them, so peer resolution there is the privnet's to add.
         """
         if self._local_subnets is None:
             return None
@@ -629,7 +629,7 @@ class ContainerdSessionNetwork:
     async def _purge_local_addresses(self, session_id: str) -> None:
         """Drop the IPAM claims in this session's LOCAL block, whose containers are all gone."""
         if self._ipam is None or self._local_subnets is None:
-            return  # a privileged helper owns both journals, and reclaims them itself
+            return  # a privileged privnet owns both journals, and reclaims them itself
         if (subnet := await self._local_subnets.subnet_of(session_id)) is not None:
             await self._ipam.purge_subnet(subnet)
 
@@ -825,7 +825,7 @@ def build_containerd_session_network(
     runtime: OciRuntime | None = None,
     cni_runner: CniRunner | None = None,
     backends: Mapping[str, AbstractNetworkAgentPluginV2[Any]] | None = None,
-    helper_socket: str | None = None,
+    privnet_socket: str | None = None,
     local_subnet_layout: LocalSubnetLayout | None = None,
     vtep_ip: str | None = None,
 ) -> ContainerdSessionNetwork:
@@ -849,35 +849,35 @@ def build_containerd_session_network(
     runtime = runtime or ContainerdGrpcRuntime(namespace="backend-ai")
     cni_runner = cni_runner or NativeBridgeAttachRunner()
 
-    # With a helper socket, every privileged host op (bridge setup/teardown + veth/netns
-    # attach) is delegated to the CAP_NET_ADMIN/CAP_SYS_ADMIN helper, so this (agent) process
+    # With a privnet socket, every privileged host op (bridge setup/teardown + veth/netns
+    # attach) is delegated to the CAP_NET_ADMIN/CAP_SYS_ADMIN privnet, so this (agent) process
     # needs no network privilege: the backend becomes a proxy and the per-container
-    # provisioner RPCs the helper. See ai.backend.agent.network.helper.
+    # provisioner RPCs the privnet. See ai.backend.agent.network.privnet.
     make_provisioner: Callable[[AbstractNetworkAgentPluginV2[Any], str], Any] | None = None
-    # Journals this process may reconcile on restart; left None under a helper, which owns the
+    # Journals this process may reconcile on restart; left None under a privnet, which owns the
     # host state, keeps its own records, and outlives the agent.
     owned_local_subnets: LocalSubnetAllocator | None = None
     owned_ipam: HostLocalIpam | None = None
-    if helper_socket is not None:
-        from ai.backend.agent.network.helper.client import (
-            HelperBackendProxy,
-            HelperClient,
-            HelperProvisioner,
+    if privnet_socket is not None:
+        from ai.backend.agent.network.privnet.client import (
+            PrivNetBackendProxy,
+            PrivNetClient,
+            PrivNetProvisioner,
         )
 
-        client = HelperClient(helper_socket)
-        proxy = HelperBackendProxy({}, {}, client=client, uplink=uplink)
+        client = PrivNetClient(privnet_socket)
+        proxy = PrivNetBackendProxy({}, {}, client=client, uplink=uplink)
         backends = {
             str(NetworkBackendKind.VXLAN): proxy,
             str(NetworkBackendKind.BRIDGE): proxy,
         }
 
-        def _helper_provisioner_factory(
+        def _privnet_provisioner_factory(
             _backend: AbstractNetworkAgentPluginV2[Any], session_id: str
         ) -> Any:
-            return HelperProvisioner(client, session_id)
+            return PrivNetProvisioner(client, session_id)
 
-        make_provisioner = _helper_provisioner_factory
+        make_provisioner = _privnet_provisioner_factory
     else:
         # The process-wide owner of the node-local pool: shared by both backends here (they carve
         # their LOCAL block out of the same pool) and by every other agent this runtime hosts.

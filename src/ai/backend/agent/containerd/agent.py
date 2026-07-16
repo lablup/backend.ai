@@ -79,9 +79,9 @@ from ai.backend.agent.kernel_registry.pickle.creator import (
 from ai.backend.agent.kernel_registry.recovery.base_recovery import BaseKernelRegistryRecovery
 from ai.backend.agent.kernel_registry.writer.types import KernelRegistrySaveMetadata
 from ai.backend.agent.network.caps import probe_caps, publish_caps, publish_vtep, withdraw_vtep
-from ai.backend.agent.network.helper.client import HelperClient, HelperPortForwarder
 from ai.backend.agent.network.local_subnet import cluster_host_ips
 from ai.backend.agent.network.port_forward import PortForwarder, PortPublisher, forwards_for
+from ai.backend.agent.network.privnet.client import PrivNetClient, PrivNetPortForwarder
 from ai.backend.agent.network.vtep import uplink_for_ip, usable_vtep
 from ai.backend.agent.port_pool import PortPool
 from ai.backend.agent.proxy import DomainSocketProxy, proxy_connection
@@ -755,7 +755,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
             return {}, None  # not a cluster (or the lone kernel): only the baseline is needed
         subnet = await self._session_network.local_subnet_of(self._session_id)
         if subnet is None:
-            return {}, None  # helper mode owns the addresses; peer resolution is its to add
+            return {}, None  # privnet mode owns the addresses; peer resolution is its to add
         mapping = cluster_host_ips(subnet, peers)
         own = environ.get("BACKENDAI_CLUSTER_HOST")
         if own not in mapping:
@@ -1464,8 +1464,8 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
     async def _publish_ports(self, container_ip: str) -> None:
         """DNAT the reserved host ports at the container.
 
-        Under a privileged helper the publisher is a proxy: it sends only the port pairing, and the
-        helper DNATs to the LOCAL address it assigned itself — `container_ip` never leaves here.
+        Under a privileged privnet the publisher is a proxy: it sends only the port pairing, and the
+        privnet DNATs to the LOCAL address it assigned itself — `container_ip` never leaves here.
         """
         if self._port_forwarder is None:
             raise RuntimeError("no port publisher; the kernel's services would be unreachable")
@@ -1530,7 +1530,7 @@ class ContainerdAgent(
         # multi-node overlay on this node (ensure_session then refuses a vxlan session outright);
         # single-node sessions never touch it.
         self._vtep_ip = usable_vtep(self._host_ip)
-        # When a privileged network helper is configured, delegate all CAP_NET_ADMIN/
+        # When a privnet daemon is configured, delegate all CAP_NET_ADMIN/
         # CAP_SYS_ADMIN host networking to it so this agent process needs no such privilege.
         self._session_network = build_containerd_session_network(
             self.etcd,
@@ -1538,18 +1538,20 @@ class ContainerdAgent(
             host_ip=self._host_ip,
             uplink=uplink_for_ip(self._vtep_ip or self._host_ip),
             runtime=self._runtime,
-            helper_socket=self.local_config.agent.network_helper_socket,
+            privnet_socket=self.local_config.agent.network_privnet_socket,
             local_subnet_layout=container_cfg.local_subnet_layout(),
             vtep_ip=self._vtep_ip,
         )
         # Host-port ingress is an iptables (CAP_NET_ADMIN) op, so only the process that owns the
-        # host's networking may install it: this agent when it runs privileged, the helper when
+        # host's networking may install it: this agent when it runs privileged, the privnet when
         # privilege is separated. Either way the kernel's services get published.
-        helper_socket = self.local_config.agent.network_helper_socket
+        privnet_socket = self.local_config.agent.network_privnet_socket
         self._port_forwarder = (
             PortForwarder()
-            if helper_socket is None
-            else HelperPortForwarder(HelperClient(helper_socket), self._session_network.session_of)
+            if privnet_socket is None
+            else PrivNetPortForwarder(
+                PrivNetClient(privnet_socket), self._session_network.session_of
+            )
         )
         # Restart recovery (parity with DockerAgent): the container-based loader/writer keep each
         # kernel's recovery.json in its scratch (resource.txt / environ.txt are already written at
@@ -1694,7 +1696,7 @@ class ContainerdAgent(
         await super().shutdown(stop_signal)
 
     async def _handle_agent_socket(self) -> None:
-        """Serve the in-container helper socket (host<->container PID translation, jail
+        """Serve the in-container privnet socket (host<->container PID translation, jail
         status) as a ZMQ REP over an ipc:// UNIX socket. Re-binds on error."""
         zmq_ctx = zmq.asyncio.Context()
         endpoint = f"ipc://{self._agent_sock_path}"
@@ -2242,7 +2244,7 @@ class ContainerdAgent(
         # next holder of that host port's traffic at an address that no longer exists. The rules
         # are tagged with the container id, so this needs no bookkeeping of our own — and it works
         # just as well after a restart, when nothing in memory remembers the kernel. Must precede
-        # remove_container, which drops the attach record the helper's session lock is keyed by.
+        # remove_container, which drops the attach record the privnet's session lock is keyed by.
         try:
             released = await self._port_forwarder.remove_container(str(kernel_id))
         except Exception:
