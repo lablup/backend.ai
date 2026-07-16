@@ -197,3 +197,115 @@ class TestProcessingComposer:
                     "dispatcher.start",
                     "BgtaskRegistry",
                 ]
+
+    @patch(
+        "ai.backend.manager.dependencies.processing.bgtask_registry.BackgroundTaskHandlerRegistry"
+    )
+    @patch("ai.backend.manager.dependencies.processing.bgtask_registry.CommitSessionHandler")
+    @patch("ai.backend.manager.dependencies.processing.bgtask_registry.RescanGPUAllocMapsHandler")
+    @patch("ai.backend.manager.dependencies.processing.bgtask_registry.PurgeImagesHandler")
+    @patch("ai.backend.manager.dependencies.processing.bgtask_registry.RescanImagesHandler")
+    @patch("ai.backend.manager.dependencies.processing.composer.Dispatchers")
+    @patch("ai.backend.manager.dependencies.processing.processors.create_processors")
+    @patch("ai.backend.manager.dependencies.processing.event_dispatcher.EventDispatcher")
+    async def test_event_dispatcher_plugins_reinitialized_before_start(
+        self,
+        mock_dispatcher_class: MagicMock,
+        mock_create_processors: MagicMock,
+        mock_dispatchers_class: MagicMock,
+        mock_rescan_images: MagicMock,
+        mock_purge_images: MagicMock,
+        mock_rescan_gpu: MagicMock,
+        mock_commit_session: MagicMock,
+        mock_registry_class: MagicMock,
+    ) -> None:
+        """Event-dispatcher plugins must receive the standard manager context
+        before the event dispatcher starts delivering events."""
+        call_order: list[str] = []
+
+        mock_event_dispatcher = MagicMock()
+        mock_event_dispatcher.start = AsyncMock(side_effect=lambda: call_order.append("start"))
+        mock_event_dispatcher.close = AsyncMock()
+        mock_dispatcher_class.return_value = mock_event_dispatcher
+
+        mock_processors = MagicMock()
+        mock_create_processors.return_value = mock_processors
+        mock_dispatchers_class.return_value = MagicMock()
+        mock_registry_class.return_value = MagicMock()
+
+        stub_plugin = MagicMock()
+        stub_plugin.init = AsyncMock(side_effect=lambda context: call_order.append("plugin_init"))
+        setup_input = _make_processing_input()
+        setup_input.event_dispatcher_plugin_ctx.plugins = {"stub": stub_plugin}
+
+        composer = ProcessingComposer()
+        stack = DependencyBuilderStack()
+
+        async with stack:
+            async with composer.compose(stack, setup_input):
+                pass
+
+        stub_plugin.init.assert_awaited_once()
+        context = stub_plugin.init.await_args.kwargs["context"]
+        expected_keys = {
+            "etcd",
+            "config_provider",
+            "repositories",
+            "processors",
+            "error_log_repository",
+        }
+        assert expected_keys <= set(context.keys())
+        assert context["processors"] is mock_processors
+        assert call_order == ["plugin_init", "start"]
+
+    @patch(
+        "ai.backend.manager.dependencies.processing.bgtask_registry.BackgroundTaskHandlerRegistry"
+    )
+    @patch("ai.backend.manager.dependencies.processing.bgtask_registry.CommitSessionHandler")
+    @patch("ai.backend.manager.dependencies.processing.bgtask_registry.RescanGPUAllocMapsHandler")
+    @patch("ai.backend.manager.dependencies.processing.bgtask_registry.PurgeImagesHandler")
+    @patch("ai.backend.manager.dependencies.processing.bgtask_registry.RescanImagesHandler")
+    @patch("ai.backend.manager.dependencies.processing.composer.Dispatchers")
+    @patch("ai.backend.manager.dependencies.processing.processors.create_processors")
+    @patch("ai.backend.manager.dependencies.processing.event_dispatcher.EventDispatcher")
+    async def test_plugin_init_failure_does_not_abort_composition(
+        self,
+        mock_dispatcher_class: MagicMock,
+        mock_create_processors: MagicMock,
+        mock_dispatchers_class: MagicMock,
+        mock_rescan_images: MagicMock,
+        mock_purge_images: MagicMock,
+        mock_rescan_gpu: MagicMock,
+        mock_commit_session: MagicMock,
+        mock_registry_class: MagicMock,
+    ) -> None:
+        """A plugin whose re-init raises must be skipped, not abort startup."""
+        mock_event_dispatcher = MagicMock()
+        mock_event_dispatcher.start = AsyncMock()
+        mock_event_dispatcher.close = AsyncMock()
+        mock_dispatcher_class.return_value = mock_event_dispatcher
+
+        mock_create_processors.return_value = MagicMock()
+        mock_dispatchers_class.return_value = MagicMock()
+        mock_registry_class.return_value = MagicMock()
+
+        broken_plugin = MagicMock()
+        broken_plugin.init = AsyncMock(side_effect=RuntimeError("broken plugin config"))
+        healthy_plugin = MagicMock()
+        healthy_plugin.init = AsyncMock()
+        setup_input = _make_processing_input()
+        setup_input.event_dispatcher_plugin_ctx.plugins = {
+            "broken": broken_plugin,
+            "healthy": healthy_plugin,
+        }
+
+        composer = ProcessingComposer()
+        stack = DependencyBuilderStack()
+
+        async with stack:
+            async with composer.compose(stack, setup_input) as resources:
+                assert isinstance(resources, ProcessingResources)
+
+        broken_plugin.init.assert_awaited_once()
+        healthy_plugin.init.assert_awaited_once()
+        mock_event_dispatcher.start.assert_awaited_once()

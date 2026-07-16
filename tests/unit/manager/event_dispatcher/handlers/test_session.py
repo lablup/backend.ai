@@ -11,8 +11,13 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 import yarl
 
+from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.events.event_types.session.anycast import (
+    SessionCancelledAnycastEvent,
+    SessionFailureAnycastEvent,
+    SessionSuccessAnycastEvent,
     SessionTerminatedAnycastEvent,
+    SessionTerminatingAnycastEvent,
 )
 from ai.backend.common.types import (
     AgentId,
@@ -20,6 +25,7 @@ from ai.backend.common.types import (
     SessionResult,
     SessionTypes,
 )
+from ai.backend.manager.errors.kernel import SessionNotFound
 from ai.backend.manager.event_dispatcher.handlers.session import SessionEventHandler
 
 
@@ -234,3 +240,127 @@ class TestInvokeSessionCallbackPayload:
             await handler.invoke_session_callback(None, AgentId("i-test"), event)
 
         mock_callback.assert_not_called()
+
+
+class TestEventDispatcherPluginForwarding:
+    """Session result/termination events must be forwarded to event-dispatcher plugins."""
+
+    @pytest.fixture
+    def plugin_ctx(self) -> MagicMock:
+        ctx = MagicMock()
+        ctx.handle_event = AsyncMock()
+        return ctx
+
+    @pytest.fixture
+    def handler(self, plugin_ctx: MagicMock) -> SessionEventHandler:
+        registry = MagicMock()
+        registry.clean_session = AsyncMock()
+        scheduling_controller = MagicMock()
+        scheduling_controller.mark_sessions_for_termination = AsyncMock()
+        return SessionEventHandler(
+            registry=registry,
+            db=_make_mock_db(AsyncMock()),
+            event_dispatcher_plugin_ctx=plugin_ctx,
+            idle_checker_host=MagicMock(),
+            scheduling_controller=scheduling_controller,
+        )
+
+    @pytest.fixture
+    def session_id(self) -> SessionId:
+        return SessionId(uuid.uuid4())
+
+    async def test_batch_failure_is_forwarded_to_plugins(
+        self,
+        handler: SessionEventHandler,
+        plugin_ctx: MagicMock,
+        session_id: SessionId,
+    ) -> None:
+        event = SessionFailureAnycastEvent(
+            session_id,
+            reason=KernelLifecycleEventReason.TASK_FAILED,
+            exit_code=1,
+        )
+        with (
+            patch(
+                "ai.backend.manager.event_dispatcher.handlers.session"
+                ".SessionRow.set_session_result",
+                new_callable=AsyncMock,
+            ),
+            patch(
+                "ai.backend.manager.event_dispatcher.handlers.session.SessionRow.get_session",
+                new_callable=AsyncMock,
+                side_effect=SessionNotFound("gone"),
+            ),
+        ):
+            await handler.handle_batch_result(None, AgentId("i-test"), event)
+        plugin_ctx.handle_event.assert_awaited_once_with(None, AgentId("i-test"), event)
+
+    async def test_batch_success_is_forwarded_to_plugins(
+        self,
+        handler: SessionEventHandler,
+        plugin_ctx: MagicMock,
+        session_id: SessionId,
+    ) -> None:
+        event = SessionSuccessAnycastEvent(
+            session_id,
+            reason=KernelLifecycleEventReason.TASK_FINISHED,
+            exit_code=0,
+        )
+        with (
+            patch(
+                "ai.backend.manager.event_dispatcher.handlers.session"
+                ".SessionRow.set_session_result",
+                new_callable=AsyncMock,
+            ),
+            patch(
+                "ai.backend.manager.event_dispatcher.handlers.session.SessionRow.get_session",
+                new_callable=AsyncMock,
+                side_effect=SessionNotFound("gone"),
+            ),
+        ):
+            await handler.handle_batch_result(None, AgentId("i-test"), event)
+        plugin_ctx.handle_event.assert_awaited_once_with(None, AgentId("i-test"), event)
+
+    async def test_session_terminated_is_forwarded_to_plugins(
+        self,
+        handler: SessionEventHandler,
+        plugin_ctx: MagicMock,
+        session_id: SessionId,
+    ) -> None:
+        event = SessionTerminatedAnycastEvent(session_id, "task-failed")
+        with patch(
+            "ai.backend.manager.event_dispatcher.handlers.session.SessionRow.get_session",
+            new_callable=AsyncMock,
+            side_effect=SessionNotFound("gone"),
+        ):
+            await handler.handle_session_terminated(None, AgentId("i-test"), event)
+        plugin_ctx.handle_event.assert_awaited_once_with(None, AgentId("i-test"), event)
+
+    async def test_session_cancelled_is_forwarded_to_plugins(
+        self,
+        handler: SessionEventHandler,
+        plugin_ctx: MagicMock,
+        session_id: SessionId,
+    ) -> None:
+        event = SessionCancelledAnycastEvent(
+            session_id,
+            "test-creation-id",
+            reason=KernelLifecycleEventReason.FAILED_TO_START,
+        )
+        await handler.handle_session_cancelled(None, AgentId("i-test"), event)
+        plugin_ctx.handle_event.assert_awaited_once_with(None, AgentId("i-test"), event)
+
+    async def test_session_terminating_is_forwarded_to_plugins(
+        self,
+        handler: SessionEventHandler,
+        plugin_ctx: MagicMock,
+        session_id: SessionId,
+    ) -> None:
+        event = SessionTerminatingAnycastEvent(session_id, "user-requested")
+        with patch(
+            "ai.backend.manager.event_dispatcher.handlers.session.SessionRow.get_session",
+            new_callable=AsyncMock,
+            side_effect=SessionNotFound("gone"),
+        ):
+            await handler.handle_session_terminating(None, AgentId("i-test"), event)
+        plugin_ctx.handle_event.assert_awaited_once_with(None, AgentId("i-test"), event)
