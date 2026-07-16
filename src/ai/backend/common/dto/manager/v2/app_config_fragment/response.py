@@ -19,6 +19,7 @@ __all__ = (
     "BulkUpdateAppConfigFragmentPayload",
     "CreateAppConfigFragmentPayload",
     "PurgeAppConfigFragmentPayload",
+    "SearchAppConfigFragmentPayload",
     "UpdateAppConfigFragmentPayload",
 )
 
@@ -78,3 +79,12 @@ class BulkPurgeAppConfigFragmentPayload(BaseResponseModel):
     failed: list[AppConfigFragmentBulkErrorInfo] = Field(
         description="Per-item failures, each naming the fragment it targeted."
     )
+
+
+class SearchAppConfigFragmentPayload(BaseResponseModel):
+    """Payload for paginated app config fragment search results."""
+
+    items: list[AppConfigFragmentNode] = Field(description="App config fragment nodes.")
+    total_count: int = Field(description="Total count matching the query.")
+    has_next_page: bool = Field(description="Whether there is a next page.")
+    has_previous_page: bool = Field(description="Whether there is a previous page.")
