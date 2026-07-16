@@ -9,6 +9,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import ResourceSlot, SlotQuantity
 from ai.backend.manager.data.fair_share import (
     DomainFairShareData,
@@ -52,6 +53,8 @@ from ai.backend.manager.services.fair_share.actions import (
     UpsertProjectFairShareWeightAction,
     UpsertUserFairShareWeightAction,
 )
+
+RESOURCE_GROUP_ID = ResourceGroupID(uuid.UUID("00000000-0000-0000-0000-000000000001"))
 
 
 @pytest.fixture
@@ -1122,6 +1125,7 @@ class TestUpsertFairShareWeightWithoutResourceGroup:
 
         action = UpsertDomainFairShareWeightAction(
             resource_group="non-existent-sg",
+            resource_group_id=RESOURCE_GROUP_ID,
             domain_name="test-domain",
             weight=Decimal("2.5"),
         )
@@ -1169,6 +1173,7 @@ class TestUpsertFairShareWeightWithoutResourceGroup:
 
         action = UpsertProjectFairShareWeightAction(
             resource_group="non-existent-sg",
+            resource_group_id=RESOURCE_GROUP_ID,
             project_id=project_id,
             domain_name="test-domain",
             weight=Decimal("3.0"),
@@ -1220,6 +1225,7 @@ class TestUpsertFairShareWeightWithoutResourceGroup:
 
         action = UpsertUserFairShareWeightAction(
             resource_group="non-existent-sg",
+            resource_group_id=RESOURCE_GROUP_ID,
             project_id=project_id,
             user_uuid=user_uuid,
             domain_name="test-domain",

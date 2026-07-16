@@ -7,6 +7,7 @@ from decimal import Decimal
 
 import pytest
 
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import BinarySize, ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.models.agent import AgentRow
@@ -73,14 +74,21 @@ async def domain_name(
 
 
 @pytest.fixture
+def resource_group_id() -> ResourceGroupID:
+    return ResourceGroupID(uuid.uuid4())
+
+
+@pytest.fixture
 async def scaling_group(
     database_with_usage_tables: ExtendedAsyncSAEngine,
+    resource_group_id: ResourceGroupID,
 ) -> AsyncGenerator[str, None]:
     """Create ScalingGroupRow and return its name."""
     name = "default"
     async with database_with_usage_tables.begin_session() as db_sess:
         db_sess.add(
             ScalingGroupRow(
+                id=resource_group_id,
                 name=name,
                 description="Test scaling group",
                 is_active=True,
@@ -185,11 +193,13 @@ async def domain_usage_bucket_id(
     database_with_usage_tables: ExtendedAsyncSAEngine,
     domain_name: str,
     scaling_group: str,
+    resource_group_id: ResourceGroupID,
 ) -> AsyncGenerator[uuid.UUID, None]:
     """Create DomainUsageBucketRow and return its ID."""
     row = DomainUsageBucketRow(
         domain_name=domain_name,
         resource_group=scaling_group,
+        resource_group_id=resource_group_id,
         period_start=date(2024, 1, 1),
         period_end=date(2024, 1, 1),
         decay_unit_days=1,
@@ -208,11 +218,13 @@ async def domain_usage_bucket_with_capacity_id(
     database_with_usage_tables: ExtendedAsyncSAEngine,
     domain_name: str,
     scaling_group: str,
+    resource_group_id: ResourceGroupID,
 ) -> AsyncGenerator[uuid.UUID, None]:
     """Create DomainUsageBucketRow with capacity snapshot and return its ID."""
     row = DomainUsageBucketRow(
         domain_name=domain_name,
         resource_group=scaling_group,
+        resource_group_id=resource_group_id,
         period_start=date(2024, 1, 1),
         period_end=date(2024, 1, 1),
         decay_unit_days=1,
@@ -239,12 +251,14 @@ async def project_usage_bucket_id(
     project_id: uuid.UUID,
     domain_name: str,
     scaling_group: str,
+    resource_group_id: ResourceGroupID,
 ) -> AsyncGenerator[uuid.UUID, None]:
     """Create ProjectUsageBucketRow and return its ID."""
     row = ProjectUsageBucketRow(
         project_id=project_id,
         domain_name=domain_name,
         resource_group=scaling_group,
+        resource_group_id=resource_group_id,
         period_start=date(2024, 1, 1),
         period_end=date(2024, 1, 1),
         decay_unit_days=1,
@@ -265,6 +279,7 @@ async def user_usage_bucket_id(
     project_id: uuid.UUID,
     domain_name: str,
     scaling_group: str,
+    resource_group_id: ResourceGroupID,
 ) -> AsyncGenerator[uuid.UUID, None]:
     """Create UserUsageBucketRow and return its ID."""
     row = UserUsageBucketRow(
@@ -272,6 +287,7 @@ async def user_usage_bucket_id(
         project_id=project_id,
         domain_name=domain_name,
         resource_group=scaling_group,
+        resource_group_id=resource_group_id,
         period_start=date(2024, 1, 1),
         period_end=date(2024, 1, 1),
         decay_unit_days=1,
@@ -292,6 +308,7 @@ async def kernel_usage_record_id(
     project_id: uuid.UUID,
     domain_name: str,
     scaling_group: str,
+    resource_group_id: ResourceGroupID,
 ) -> AsyncGenerator[tuple[uuid.UUID, uuid.UUID, uuid.UUID], None]:
     """Create KernelUsageRecordRow and return (record_id, kernel_id, session_id)."""
     kernel_id = uuid.uuid4()
@@ -305,6 +322,7 @@ async def kernel_usage_record_id(
         project_id=project_id,
         domain_name=domain_name,
         resource_group=scaling_group,
+        resource_group_id=resource_group_id,
         period_start=now,
         period_end=now,
         resource_usage=ResourceSlot(),
@@ -323,6 +341,7 @@ async def kernel_usage_record_with_usage_id(
     project_id: uuid.UUID,
     domain_name: str,
     scaling_group: str,
+    resource_group_id: ResourceGroupID,
 ) -> AsyncGenerator[uuid.UUID, None]:
     """Create KernelUsageRecordRow with resource usage and return its ID."""
     row = KernelUsageRecordRow(
@@ -332,6 +351,7 @@ async def kernel_usage_record_with_usage_id(
         project_id=project_id,
         domain_name=domain_name,
         resource_group=scaling_group,
+        resource_group_id=resource_group_id,
         period_start=datetime(2024, 1, 1, 12, 0, 0, tzinfo=UTC),
         period_end=datetime(2024, 1, 1, 12, 5, 0, tzinfo=UTC),
         resource_usage=ResourceSlot({

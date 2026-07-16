@@ -8,6 +8,7 @@ from decimal import Decimal
 from typing import override
 
 from ai.backend.common.data.permission.types import EntityType
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.manager.actions.action import BaseAction, BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.fair_share import (
@@ -344,6 +345,7 @@ class UpsertDomainFairShareWeightAction(DomainFairShareAction):
     """Action to upsert a domain fair share weight."""
 
     resource_group: str
+    resource_group_id: ResourceGroupID
     domain_name: str
     weight: Decimal | None
 
@@ -373,6 +375,7 @@ class UpsertProjectFairShareWeightAction(ProjectFairShareAction):
     """Action to upsert a project fair share weight."""
 
     resource_group: str
+    resource_group_id: ResourceGroupID
     project_id: uuid.UUID
     domain_name: str
     weight: Decimal | None
@@ -403,6 +406,7 @@ class UpsertUserFairShareWeightAction(UserFairShareAction):
     """Action to upsert a user fair share weight."""
 
     resource_group: str
+    resource_group_id: ResourceGroupID
     project_id: uuid.UUID
     user_uuid: uuid.UUID
     domain_name: str
@@ -445,6 +449,7 @@ class BulkUpsertDomainFairShareWeightAction(DomainFairShareAction):
     """Action to bulk upsert domain fair share weights."""
 
     resource_group: str
+    resource_group_id: ResourceGroupID
     inputs: list[DomainWeightInput]
 
     @override
@@ -482,6 +487,7 @@ class BulkUpsertProjectFairShareWeightAction(ProjectFairShareAction):
     """Action to bulk upsert project fair share weights."""
 
     resource_group: str
+    resource_group_id: ResourceGroupID
     inputs: list[ProjectWeightInput]
 
     @override
@@ -520,6 +526,7 @@ class BulkUpsertUserFairShareWeightAction(UserFairShareAction):
     """Action to bulk upsert user fair share weights."""
 
     resource_group: str
+    resource_group_id: ResourceGroupID
     inputs: list[UserWeightInput]
 
     @override
