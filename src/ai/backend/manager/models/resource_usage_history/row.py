@@ -106,10 +106,10 @@ class KernelUsageRecordRow(Base):  # type: ignore[misc]
     resource_group: Mapped[str] = mapped_column(
         "resource_group", sa.String(length=64), nullable=False, index=True
     )
-    resource_group_id: Mapped[ResourceGroupID | None] = mapped_column(
+    resource_group_id: Mapped[ResourceGroupID] = mapped_column(
         "resource_group_id",
         GUID,
-        nullable=True,
+        nullable=False,
     )
 
     # Period slice information
@@ -192,10 +192,10 @@ class DomainUsageBucketRow(Base):  # type: ignore[misc]
     resource_group: Mapped[str] = mapped_column(
         "resource_group", sa.String(length=64), nullable=False
     )
-    resource_group_id: Mapped[ResourceGroupID | None] = mapped_column(
+    resource_group_id: Mapped[ResourceGroupID] = mapped_column(
         "resource_group_id",
         GUID,
-        nullable=True,
+        nullable=False,
     )
 
     # Bucket period information
@@ -286,10 +286,10 @@ class ProjectUsageBucketRow(Base):  # type: ignore[misc]
     resource_group: Mapped[str] = mapped_column(
         "resource_group", sa.String(length=64), nullable=False
     )
-    resource_group_id: Mapped[ResourceGroupID | None] = mapped_column(
+    resource_group_id: Mapped[ResourceGroupID] = mapped_column(
         "resource_group_id",
         GUID,
-        nullable=True,
+        nullable=False,
     )
 
     # Bucket period information
@@ -399,10 +399,10 @@ class UserUsageBucketRow(Base):  # type: ignore[misc]
     resource_group: Mapped[str] = mapped_column(
         "resource_group", sa.String(length=64), nullable=False
     )
-    resource_group_id: Mapped[ResourceGroupID | None] = mapped_column(
+    resource_group_id: Mapped[ResourceGroupID] = mapped_column(
         "resource_group_id",
         GUID,
-        nullable=True,
+        nullable=False,
     )
 
     # Bucket period information

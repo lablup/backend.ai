@@ -1,8 +1,9 @@
-"""add nullable kernel usage record resource_group_id column
+"""add kernel usage record resource_group_id column
 
-Add a nullable ``resource_group_id`` column alongside the existing
-``resource_group`` name column and backfill rows whose names still resolve.
-The name-based lookup behavior remains unchanged during this expand phase.
+Add a non-null ``resource_group_id`` column alongside the existing
+``resource_group`` name column, backfill rows whose names still resolve,
+and remove orphan rows that cannot be resolved. The name-based lookup
+behavior remains unchanged during this expand phase.
 
 Revision ID: 710460cca1ed
 Revises: 097389c0853b
@@ -33,6 +34,8 @@ def upgrade() -> None:
           AND kernel_usage_records.resource_group_id IS NULL
         """
     )
+    op.execute("DELETE FROM kernel_usage_records WHERE resource_group_id IS NULL")
+    op.alter_column("kernel_usage_records", "resource_group_id", nullable=False)
 
 
 def downgrade() -> None:

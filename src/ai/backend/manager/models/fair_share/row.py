@@ -110,10 +110,10 @@ class DomainFairShareRow(Base):  # type: ignore[misc]
     resource_group: Mapped[str] = mapped_column(
         "resource_group", sa.String(length=64), nullable=False, index=True
     )
-    resource_group_id: Mapped[ResourceGroupID | None] = mapped_column(
+    resource_group_id: Mapped[ResourceGroupID] = mapped_column(
         "resource_group_id",
         GUID,
-        nullable=True,
+        nullable=False,
     )
     domain_name: Mapped[str] = mapped_column(
         "domain_name", sa.String(length=64), nullable=False, index=True
@@ -338,10 +338,10 @@ class ProjectFairShareRow(Base):  # type: ignore[misc]
     resource_group: Mapped[str] = mapped_column(
         "resource_group", sa.String(length=64), nullable=False, index=True
     )
-    resource_group_id: Mapped[ResourceGroupID | None] = mapped_column(
+    resource_group_id: Mapped[ResourceGroupID] = mapped_column(
         "resource_group_id",
         GUID,
-        nullable=True,
+        nullable=False,
     )
     project_id: Mapped[uuid.UUID] = mapped_column("project_id", GUID, nullable=False, index=True)
     domain_name: Mapped[str] = mapped_column(
@@ -569,10 +569,10 @@ class UserFairShareRow(Base):  # type: ignore[misc]
     resource_group: Mapped[str] = mapped_column(
         "resource_group", sa.String(length=64), nullable=False, index=True
     )
-    resource_group_id: Mapped[ResourceGroupID | None] = mapped_column(
+    resource_group_id: Mapped[ResourceGroupID] = mapped_column(
         "resource_group_id",
         GUID,
-        nullable=True,
+        nullable=False,
     )
     user_uuid: Mapped[uuid.UUID] = mapped_column("user_uuid", GUID, nullable=False, index=True)
     project_id: Mapped[uuid.UUID] = mapped_column("project_id", GUID, nullable=False, index=True)

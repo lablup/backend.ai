@@ -1,9 +1,9 @@
-"""add nullable fair-share resource_group_id columns
+"""add fair-share resource_group_id columns
 
-Add nullable ``resource_group_id`` columns alongside the existing
-``resource_group`` name columns and backfill rows whose names still resolve.
-Name-based constraints and lookup behavior remain unchanged during this
-expand phase.
+Add non-null ``resource_group_id`` columns alongside the existing
+``resource_group`` name columns, backfill rows whose names still resolve,
+and remove orphan rows that cannot be resolved. Name-based constraints and
+lookup behavior remain unchanged during this expand phase.
 
 Revision ID: 097389c0853b
 Revises: c4e1a9b73f52
@@ -37,6 +37,9 @@ def upgrade() -> None:
           AND domain_fair_shares.resource_group_id IS NULL
         """
     )
+    op.execute("DELETE FROM domain_fair_shares WHERE resource_group_id IS NULL")
+    op.alter_column("domain_fair_shares", "resource_group_id", nullable=False)
+
     op.add_column(
         "project_fair_shares",
         sa.Column("resource_group_id", GUID(), nullable=True),
@@ -50,6 +53,9 @@ def upgrade() -> None:
           AND project_fair_shares.resource_group_id IS NULL
         """
     )
+    op.execute("DELETE FROM project_fair_shares WHERE resource_group_id IS NULL")
+    op.alter_column("project_fair_shares", "resource_group_id", nullable=False)
+
     op.add_column(
         "user_fair_shares",
         sa.Column("resource_group_id", GUID(), nullable=True),
@@ -63,6 +69,8 @@ def upgrade() -> None:
           AND user_fair_shares.resource_group_id IS NULL
         """
     )
+    op.execute("DELETE FROM user_fair_shares WHERE resource_group_id IS NULL")
+    op.alter_column("user_fair_shares", "resource_group_id", nullable=False)
 
 
 def downgrade() -> None:
