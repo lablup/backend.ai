@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import enum
 
-from ai.backend.common.data.permission.types import ScopeType
+from ai.backend.common.data.permission.types import RBACElementType, ScopeType
 
 __all__ = ("AppConfigScopeType",)
 
@@ -33,6 +33,21 @@ class AppConfigScopeType(enum.StrEnum):
                 return ScopeType.DOMAIN
             case AppConfigScopeType.USER:
                 return ScopeType.USER
+
+    def to_rbac_element_type(self) -> RBACElementType | None:
+        """The RBAC scope element a fragment at this scope belongs to.
+
+        ``public`` maps to the global scope, which has no RBAC scope element — a public
+        fragment is *global-scoped* (no scope association; superadmin-only writes), so it
+        returns ``None``.
+        """
+        match self:
+            case AppConfigScopeType.PUBLIC:
+                return None
+            case AppConfigScopeType.DOMAIN:
+                return RBACElementType.DOMAIN
+            case AppConfigScopeType.USER:
+                return RBACElementType.USER
 
     def to_rbac_scope_id(self, scope_id: str) -> str:
         """The RBAC scope id for a write at this fragment scope.

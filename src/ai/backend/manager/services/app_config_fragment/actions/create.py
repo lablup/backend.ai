@@ -44,7 +44,10 @@ class CreateAppConfigFragmentAction(AppConfigFragmentScopeAction):
 
     @override
     def target_element(self) -> RBACElementRef:
-        return RBACElementRef(RBACElementType.APP_CONFIG_FRAGMENT, "")
+        element = self.creator_spec.scope_type.to_rbac_element_type()
+        if element is None:
+            return RBACElementRef(RBACElementType.APP_CONFIG_FRAGMENT, "")
+        return RBACElementRef(element, self.creator_spec.scope_id)
 
 
 @dataclass

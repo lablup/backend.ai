@@ -4,10 +4,13 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncGenerator
+from dataclasses import dataclass, field
 
 import pytest
+import sqlalchemy as sa
 
 from ai.backend.common.data.app_config.types import AppConfigScopeType
+from ai.backend.common.data.permission.types import EntityType, ScopeType
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
 from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.user import UserID
@@ -23,9 +26,17 @@ from ai.backend.manager.models.app_config_allow_list.row import AppConfigAllowLi
 from ai.backend.manager.models.app_config_definition.row import AppConfigDefinitionRow
 from ai.backend.manager.models.app_config_fragment.conditions import AppConfigFragmentConditions
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
+from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+    AssociationScopesEntitiesRow,
+)
+from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
+from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.app_config_fragment.creators import (
     AppConfigFragmentCreatorSpec,
+)
+from ai.backend.manager.repositories.app_config_fragment.purgers import (
+    AppConfigFragmentPurgerSpec,
 )
 from ai.backend.manager.repositories.app_config_fragment.repository import (
     AppConfigFragmentRepository,
@@ -40,13 +51,10 @@ from ai.backend.manager.repositories.app_config_fragment.updaters import (
 )
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
-    BulkCreator,
-    Creator,
     OffsetPagination,
-    Purger,
     Updater,
 )
-from ai.backend.manager.repositories.ops import DBOpsProvider
+from ai.backend.manager.repositories.ops.rbac.provider import RBACOpsProvider
 from ai.backend.manager.types import OptionalState
 from ai.backend.testutils.db import with_tables
 
@@ -61,17 +69,23 @@ _OTHER_USER_ID = str(uuid.uuid4())
 async def database(
     database_connection: ExtendedAsyncSAEngine,
 ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
-    # FK order: app_config_definitions (parent) before the allow-list and fragments (children).
     async with with_tables(
         database_connection,
-        [AppConfigDefinitionRow, AppConfigAllowListRow, AppConfigFragmentRow],
+        [
+            AppConfigDefinitionRow,
+            AppConfigAllowListRow,
+            AppConfigFragmentRow,
+            AssociationScopesEntitiesRow,
+            RoleRow,
+            PermissionRow,
+        ],
     ):
         yield database_connection
 
 
 @pytest.fixture
 def repository(database: ExtendedAsyncSAEngine) -> AppConfigFragmentRepository:
-    return AppConfigFragmentRepository(DBOpsProvider(database))
+    return AppConfigFragmentRepository(RBACOpsProvider(database))
 
 
 def _allow_list_row(config_name: str, scope_type: AppConfigScopeType) -> AppConfigAllowListRow:
@@ -190,14 +204,12 @@ class TestCreateAndGet:
         self, repository: AppConfigFragmentRepository, theme_registered: None
     ) -> None:
         created = await repository.create(
-            Creator(
-                spec=AppConfigFragmentCreatorSpec(
-                    config_name="theme",
-                    scope_type=AppConfigScopeType.PUBLIC,
-                    scope_id="public",
-                    config={"theme": "dark"},
-                )
-            ),
+            AppConfigFragmentCreatorSpec(
+                config_name="theme",
+                scope_type=AppConfigScopeType.PUBLIC,
+                scope_id="public",
+                config={"theme": "dark"},
+            )
         )
         fetched = await repository.get_by_id(created.id)
         assert fetched.id == created.id
@@ -214,14 +226,12 @@ class TestCreateAndGet:
     ) -> None:
         with pytest.raises(AppConfigFragmentWriteNotAllowed):
             await repository.create(
-                Creator(
-                    spec=AppConfigFragmentCreatorSpec(
-                        config_name="theme",
-                        scope_type=AppConfigScopeType.PUBLIC,
-                        scope_id="public",
-                        config={"theme": "dark"},
-                    )
-                ),
+                AppConfigFragmentCreatorSpec(
+                    config_name="theme",
+                    scope_type=AppConfigScopeType.PUBLIC,
+                    scope_id="public",
+                    config={"theme": "dark"},
+                )
             )
 
     async def test_unique_constraint_violation(
@@ -231,14 +241,12 @@ class TestCreateAndGet:
     ) -> None:
         with pytest.raises(UniqueConstraintViolationError):
             await repository.create(
-                Creator(
-                    spec=AppConfigFragmentCreatorSpec(
-                        config_name=domain_scoped_fragment.config_name,
-                        scope_type=domain_scoped_fragment.scope_type,
-                        scope_id=domain_scoped_fragment.scope_id,
-                        config={"k": "v"},
-                    )
-                ),
+                AppConfigFragmentCreatorSpec(
+                    config_name=domain_scoped_fragment.config_name,
+                    scope_type=domain_scoped_fragment.scope_type,
+                    scope_id=domain_scoped_fragment.scope_id,
+                    config={"k": "v"},
+                )
             )
 
 
@@ -275,7 +283,7 @@ class TestPurge:
         domain_scoped_fragment: AppConfigFragmentData,
     ) -> None:
         purged = await repository.purge(
-            Purger(row_class=AppConfigFragmentRow, pk_value=domain_scoped_fragment.id),
+            AppConfigFragmentPurgerSpec(fragment_id=domain_scoped_fragment.id),
         )
         assert purged.id == domain_scoped_fragment.id
         with pytest.raises(AppConfigFragmentNotFound):
@@ -285,7 +293,7 @@ class TestPurge:
         missing_id = AppConfigFragmentID(uuid.uuid4())
         with pytest.raises(AppConfigFragmentNotFound):
             await repository.purge(
-                Purger(row_class=AppConfigFragmentRow, pk_value=missing_id),
+                AppConfigFragmentPurgerSpec(fragment_id=missing_id),
             )
 
 
@@ -439,64 +447,6 @@ async def two_fragments(database: ExtendedAsyncSAEngine) -> list[AppConfigFragme
         return [row.to_data() for row in rows]
 
 
-class TestBulkCreate:
-    async def test_all_created(
-        self, repository: AppConfigFragmentRepository, theme_registered: None
-    ) -> None:
-        result = await repository.bulk_create(
-            BulkCreator(
-                specs=[
-                    AppConfigFragmentCreatorSpec(
-                        config_name="theme",
-                        scope_type=AppConfigScopeType.PUBLIC,
-                        scope_id="public",
-                        config={"a": 1},
-                    ),
-                    AppConfigFragmentCreatorSpec(
-                        config_name="theme",
-                        scope_type=AppConfigScopeType.DOMAIN,
-                        scope_id=_DOMAIN_ID,
-                        config={"b": 2},
-                    ),
-                ]
-            )
-        )
-        assert len(result.succeeded) == 2
-        assert result.failed == []
-        for fragment in result.succeeded:
-            assert (await repository.get_by_id(fragment.id)).id == fragment.id
-
-    async def test_partial_when_one_not_allow_listed(
-        self, repository: AppConfigFragmentRepository, menu_defined: None
-    ) -> None:
-        result = await repository.bulk_create(
-            BulkCreator(
-                specs=[
-                    AppConfigFragmentCreatorSpec(
-                        config_name="theme",  # allow-listed
-                        scope_type=AppConfigScopeType.DOMAIN,
-                        scope_id=_DOMAIN_ID,
-                        config={"a": 1},
-                    ),
-                    AppConfigFragmentCreatorSpec(
-                        config_name="menu",  # defined but NOT allow-listed -> FK rejects the insert
-                        scope_type=AppConfigScopeType.PUBLIC,
-                        scope_id="public",
-                        config={"b": 2},
-                    ),
-                ]
-            )
-        )
-        # partial: the allow-listed theme fragment is created; the menu item (index 1) is rejected
-        assert [f.config_name for f in result.succeeded] == ["theme"]
-        assert [f.index for f in result.failed] == [1]
-        # the created theme fragment persists (not rolled back with the rejected one)
-        search = await repository.admin_search(
-            BatchQuerier(pagination=OffsetPagination(limit=10, offset=0))
-        )
-        assert {item.config_name for item in search.items} == {"theme"}
-
-
 class TestBulkUpdate:
     async def test_all_updated(
         self,
@@ -546,8 +496,7 @@ class TestBulkPurge:
         two_fragments: list[AppConfigFragmentData],
     ) -> None:
         result = await repository.bulk_purge([
-            Purger(row_class=AppConfigFragmentRow, pk_value=fragment.id)
-            for fragment in two_fragments
+            AppConfigFragmentPurgerSpec(fragment_id=fragment.id) for fragment in two_fragments
         ])
         assert {p.id for p in result.succeeded} == {f.id for f in two_fragments}
         assert result.failed == []
@@ -562,8 +511,8 @@ class TestBulkPurge:
     ) -> None:
         missing_id = AppConfigFragmentID(uuid.uuid4())
         result = await repository.bulk_purge([
-            Purger(row_class=AppConfigFragmentRow, pk_value=two_fragments[0].id),
-            Purger(row_class=AppConfigFragmentRow, pk_value=missing_id),  # missing -> reported
+            AppConfigFragmentPurgerSpec(fragment_id=two_fragments[0].id),
+            AppConfigFragmentPurgerSpec(fragment_id=missing_id),  # missing -> reported
         ])
         # partial: the existing fragment is purged; the missing one (index 1) is reported
         assert [p.id for p in result.succeeded] == [two_fragments[0].id]
@@ -704,3 +653,142 @@ class TestApplicableFragments:
             AppConfigScopeArguments(domain_id=DomainID(_DOMAIN_UUID), user_id=UserID(_USER_UUID)),
         )
         assert applicable == []
+
+
+@dataclass(frozen=True)
+class _ScopeBinding:
+    """One RBAC scope a fragment is bound to (a row of ``association_scopes_entities``)."""
+
+    scope_type: ScopeType
+    scope_id: str
+
+
+@dataclass(frozen=True)
+class _FragmentScopeCase:
+    """A fragment scope to write at, with the bindings a create at that scope must produce.
+
+    ``expected_bindings`` is empty for ``public``: it is GLOBAL-scoped and has no RBAC scope
+    element to bind to.
+    """
+
+    scope_type: AppConfigScopeType
+    scope_id: str
+    expected_bindings: list[_ScopeBinding] = field(default_factory=list)
+
+
+class TestRBACScopeAssociation:
+    """Create binds a ``user`` / ``domain`` fragment to its RBAC scope so the RBAC validator can
+    resolve ownership on a later update/purge; ``public`` (GLOBAL, no RBAC scope) gets none."""
+
+    @staticmethod
+    async def _scope_bindings(
+        database: ExtendedAsyncSAEngine, entity_id: str
+    ) -> list[_ScopeBinding]:
+        """The RBAC scopes the fragment is currently bound to."""
+        async with database.begin_readonly_session() as db_sess:
+            rows = await db_sess.scalars(
+                sa.select(AssociationScopesEntitiesRow).where(
+                    AssociationScopesEntitiesRow.entity_type == EntityType.APP_CONFIG_FRAGMENT,
+                    AssociationScopesEntitiesRow.entity_id == entity_id,
+                )
+            )
+            return [_ScopeBinding(scope_type=row.scope_type, scope_id=row.scope_id) for row in rows]
+
+    @pytest.mark.parametrize(
+        "case",
+        [
+            _FragmentScopeCase(
+                scope_type=AppConfigScopeType.USER,
+                scope_id=_USER_ID,
+                expected_bindings=[_ScopeBinding(scope_type=ScopeType.USER, scope_id=_USER_ID)],
+            ),
+            _FragmentScopeCase(
+                scope_type=AppConfigScopeType.DOMAIN,
+                scope_id=_DOMAIN_ID,
+                expected_bindings=[_ScopeBinding(scope_type=ScopeType.DOMAIN, scope_id=_DOMAIN_ID)],
+            ),
+            _FragmentScopeCase(scope_type=AppConfigScopeType.PUBLIC, scope_id="public"),
+        ],
+        ids=lambda case: case.scope_type.value,
+    )
+    async def test_create_binds_to_its_rbac_scope(
+        self,
+        repository: AppConfigFragmentRepository,
+        database: ExtendedAsyncSAEngine,
+        theme_registered: None,
+        case: _FragmentScopeCase,
+    ) -> None:
+        created = await repository.create(
+            AppConfigFragmentCreatorSpec(
+                config_name="theme",
+                scope_type=case.scope_type,
+                scope_id=case.scope_id,
+                config={"k": "v"},
+            )
+        )
+        assert await self._scope_bindings(database, str(created.id)) == case.expected_bindings
+
+    @pytest.mark.parametrize(
+        "case",
+        [
+            _FragmentScopeCase(
+                scope_type=AppConfigScopeType.USER,
+                scope_id=_USER_ID,
+                expected_bindings=[_ScopeBinding(scope_type=ScopeType.USER, scope_id=_USER_ID)],
+            ),
+            _FragmentScopeCase(
+                scope_type=AppConfigScopeType.DOMAIN,
+                scope_id=_DOMAIN_ID,
+                expected_bindings=[_ScopeBinding(scope_type=ScopeType.DOMAIN, scope_id=_DOMAIN_ID)],
+            ),
+            _FragmentScopeCase(scope_type=AppConfigScopeType.PUBLIC, scope_id="public"),
+        ],
+        ids=lambda case: case.scope_type.value,
+    )
+    async def test_purge_removes_the_row_and_its_scope_binding(
+        self,
+        repository: AppConfigFragmentRepository,
+        database: ExtendedAsyncSAEngine,
+        theme_registered: None,
+        case: _FragmentScopeCase,
+    ) -> None:
+        created = await repository.create(
+            AppConfigFragmentCreatorSpec(
+                config_name="theme",
+                scope_type=case.scope_type,
+                scope_id=case.scope_id,
+                config={"k": "v"},
+            )
+        )
+        assert await self._scope_bindings(database, str(created.id)) == case.expected_bindings
+        purged = await repository.purge(AppConfigFragmentPurgerSpec(fragment_id=created.id))
+        assert purged.id == created.id
+        assert await self._scope_bindings(database, str(created.id)) == []
+
+    async def test_bulk_purge_removes_the_scope_binding(
+        self,
+        repository: AppConfigFragmentRepository,
+        database: ExtendedAsyncSAEngine,
+        theme_registered: None,
+    ) -> None:
+        """A bulk purge unbinds each fragment, like the single purge.
+
+        Deleting the rows alone would leave their scope associations behind, pointing at
+        fragments that no longer exist.
+        """
+        created = await repository.create(
+            AppConfigFragmentCreatorSpec(
+                config_name="theme",
+                scope_type=AppConfigScopeType.USER,
+                scope_id=_USER_ID,
+                config={"k": "v"},
+            )
+        )
+        assert await self._scope_bindings(database, str(created.id)) == [
+            _ScopeBinding(scope_type=ScopeType.USER, scope_id=_USER_ID)
+        ]
+        result = await repository.bulk_purge([AppConfigFragmentPurgerSpec(fragment_id=created.id)])
+        assert [p.id for p in result.succeeded] == [created.id]
+        assert await self._scope_bindings(database, str(created.id)) == []
+        with pytest.raises(AppConfigFragmentNotFound):
+            await repository.get_by_id(created.id)

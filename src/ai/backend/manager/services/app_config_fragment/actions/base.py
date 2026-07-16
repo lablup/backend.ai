@@ -51,12 +51,7 @@ class AppConfigFragmentSingleEntityActionResult(BaseSingleEntityActionResult):
 
 @dataclass(frozen=True)
 class AppConfigFragmentBulkTarget(ActionTarget):
-    """One existing fragment touched by a bulk update / purge, exposed for per-entity RBAC.
-
-    Bulk create has no targets — the fragments do not exist yet, so its action returns an
-    empty sequence. The target lets a future ``BulkActionValidator`` iterate the batch;
-    richer per-item data stays on the action's ``bulk_*`` payload.
-    """
+    """One existing fragment touched by a bulk update / purge, exposed for per-entity RBAC."""
 
     fragment_id: AppConfigFragmentID
 
@@ -68,12 +63,11 @@ class AppConfigFragmentBulkTarget(ActionTarget):
 
 
 class AppConfigFragmentBulkAction(BaseBulkAction[AppConfigFragmentBulkTarget]):
-    """Base for bulk app config fragment mutations (bulk create / update / purge).
+    """Base for bulk app config fragment mutations over existing fragments (update / purge).
 
     Bulk operations span many fragments (potentially across scopes), so there is no single
     entity id to report. Each concrete action exposes its per-item targets via ``targets()``
-    so a ``BulkActionValidator`` can authorize the batch per entity. No validator is wired
-    yet — authorization currently lives in the repository's allow-list write-gate.
+    so the bulk RBAC validator can authorize the batch per fragment.
     """
 
     @override
