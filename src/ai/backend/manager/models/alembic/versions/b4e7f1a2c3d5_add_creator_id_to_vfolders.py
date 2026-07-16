@@ -23,12 +23,6 @@ def upgrade() -> None:
         "vfolders",
         sa.Column("creator_id", GUID, nullable=True),
     )
-    op.create_index(
-        op.f("ix_vfolders_creator_id"),
-        "vfolders",
-        ["creator_id"],
-        unique=False,
-    )
     # Backfill creator_id from users table by matching creator (email) → users.email
     op.execute(
         sa.text(
