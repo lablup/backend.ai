@@ -92,12 +92,12 @@ class TestBuildIdleCheckStage:
             return_value=checker,
         )
         return SessionLifetimeStageSetup(
-            registration=build_idle_check_stage(idle_checker_repository),
+            registration=build_idle_check_stage(idle_checker_repository, MagicMock()),
             checker=checker,
         )
 
     def test_registration_metadata(self) -> None:
-        registration = build_idle_check_stage(MagicMock())
+        registration = build_idle_check_stage(MagicMock(), MagicMock())
         assert registration.reconcile_type == "idle_check"
         assert registration.stage.lock_id == LockID.LOCKID_IDLE_CHECK_RECONCILE
         assert registration.task_spec.reconcile_type == "idle_check"
@@ -117,6 +117,7 @@ class TestFactoryRegistration:
         _, task_specs = build_reconciler_coordinator(
             replica_group_repository=MagicMock(),
             idle_checker_repository=MagicMock(),
+            valkey_live=MagicMock(),
             valkey_schedule=MagicMock(),
             lock_factory=MagicMock(),
             config_provider=MagicMock(),

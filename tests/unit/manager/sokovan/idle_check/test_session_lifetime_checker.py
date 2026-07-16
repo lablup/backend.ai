@@ -261,7 +261,7 @@ class TestSessionLifetimeChecker:
                 target_session_types=frozenset({SessionTypes.INTERACTIVE}),
                 spec=IdleCheckerSpec(
                     type=CheckerType.NETWORK_TIMEOUT,
-                    network=NetworkTimeoutSpec(),
+                    network=NetworkTimeoutSpec(idle_timeout_seconds=30),
                 ),
             ),
             sessions=(session_factory(),),

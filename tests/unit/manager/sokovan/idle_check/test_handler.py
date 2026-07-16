@@ -47,7 +47,8 @@ _SPECS: Final[dict[CheckerType, IdleCheckerSpec]] = {
         session_lifetime=SessionLifetimeSpec(max_lifetime_seconds=3600),
     ),
     CheckerType.NETWORK_TIMEOUT: IdleCheckerSpec(
-        type=CheckerType.NETWORK_TIMEOUT, network=NetworkTimeoutSpec()
+        type=CheckerType.NETWORK_TIMEOUT,
+        network=NetworkTimeoutSpec(idle_timeout_seconds=3600),
     ),
 }
 
