@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import uuid
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from ai.backend.common.data.app_config.types import AppConfigScopeType
-from ai.backend.common.data.permission.types import ScopeType
+from ai.backend.common.data.permission.types import RBACElementType, ScopeType
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
 from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.user import UserID
@@ -19,6 +20,7 @@ from ai.backend.manager.data.app_config_fragment.types import (
     AppConfigFragmentData,
     AppConfigFragmentSearchResult,
 )
+from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.app_config import AppConfigFragmentNotFound
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
 from ai.backend.manager.repositories.app_config_fragment.creators import (
@@ -35,11 +37,11 @@ from ai.backend.manager.repositories.app_config_fragment.updaters import (
 )
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
-    BulkCreator,
     OffsetPagination,
     Purger,
     Updater,
 )
+from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.services.app_config_fragment.actions.admin_search import (
     AdminSearchAppConfigFragmentAction,
 )
@@ -75,6 +77,20 @@ from ai.backend.manager.types import OptionalState
 
 _USER_UUID = uuid.uuid4()
 _USER_ID = str(_USER_UUID)
+_DOMAIN_ID = str(uuid.uuid4())
+
+
+@dataclass(frozen=True)
+class _BulkCreateScopeCase:
+    """A scope to bulk-create at, with the scope ref every item's creator must carry.
+
+    ``expected_scope_ref`` is ``None`` for ``public``: it is GLOBAL — outside the RBAC scope
+    hierarchy — so it binds to no scope.
+    """
+
+    scope_type: AppConfigScopeType
+    scope_id: str
+    expected_scope_ref: RBACElementRef | None
 
 
 def _fragment(
@@ -234,8 +250,32 @@ class TestAppConfigFragmentService:
 
     # --- bulk ---
 
+    @pytest.mark.parametrize(
+        "case",
+        [
+            _BulkCreateScopeCase(
+                scope_type=AppConfigScopeType.USER,
+                scope_id=_USER_ID,
+                expected_scope_ref=RBACElementRef(RBACElementType.USER, _USER_ID),
+            ),
+            _BulkCreateScopeCase(
+                scope_type=AppConfigScopeType.DOMAIN,
+                scope_id=_DOMAIN_ID,
+                expected_scope_ref=RBACElementRef(RBACElementType.DOMAIN, _DOMAIN_ID),
+            ),
+            _BulkCreateScopeCase(
+                scope_type=AppConfigScopeType.PUBLIC,
+                scope_id="public",
+                expected_scope_ref=None,
+            ),
+        ],
+        ids=lambda case: case.scope_type.value,
+    )
     async def test_bulk_create_delegates_to_repository(
-        self, service: AppConfigFragmentService, mock_repository: MagicMock
+        self,
+        service: AppConfigFragmentService,
+        mock_repository: MagicMock,
+        case: _BulkCreateScopeCase,
     ) -> None:
         fragments = [_fragment(), _fragment()]
         mock_repository.bulk_create = AsyncMock(
@@ -244,26 +284,26 @@ class TestAppConfigFragmentService:
 
         result = await service.bulk_create(
             BulkCreateAppConfigFragmentAction(
-                scope_type=AppConfigScopeType.USER,
-                scope_id=_USER_ID,
+                scope_type=case.scope_type,
+                scope_id=case.scope_id,
                 items=[AppConfigFragmentBulkCreateItem(config_name="theme", config={"k": "v"})],
             )
         )
 
         assert result.succeeded == fragments
         assert result.failed == []
-        mock_repository.bulk_create.assert_called_once_with(
-            BulkCreator(
-                specs=[
-                    AppConfigFragmentCreatorSpec(
-                        config_name="theme",
-                        scope_type=AppConfigScopeType.USER,
-                        scope_id=_USER_ID,
-                        config={"k": "v"},
-                    )
-                ]
+        mock_repository.bulk_create.assert_called_once_with([
+            RBACEntityCreator(
+                spec=AppConfigFragmentCreatorSpec(
+                    config_name="theme",
+                    scope_type=case.scope_type,
+                    scope_id=case.scope_id,
+                    config={"k": "v"},
+                ),
+                element_type=RBACElementType.APP_CONFIG_FRAGMENT,
+                scope_ref=case.expected_scope_ref,
             )
-        )
+        ])
 
     async def test_bulk_update_delegates_to_repository(
         self, service: AppConfigFragmentService, mock_repository: MagicMock

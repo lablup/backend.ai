@@ -1,12 +1,14 @@
 from __future__ import annotations
 
+from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.repositories.app_config_fragment.creators import (
     AppConfigFragmentCreatorSpec,
 )
 from ai.backend.manager.repositories.app_config_fragment.repository import (
     AppConfigFragmentRepository,
 )
-from ai.backend.manager.repositories.base import BulkCreator
+from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.services.app_config_fragment.actions.admin_search import (
     AdminSearchAppConfigFragmentAction,
     AdminSearchAppConfigFragmentActionResult,
@@ -112,16 +114,26 @@ class AppConfigFragmentService:
     async def bulk_create(
         self, action: BulkCreateAppConfigFragmentAction
     ) -> BulkCreateAppConfigFragmentActionResult:
-        specs = [
-            AppConfigFragmentCreatorSpec(
-                config_name=item.config_name,
-                scope_type=action.scope_type,
-                scope_id=action.scope_id,
-                config=item.config,
+        # Every item shares the action's scope. A public fragment is GLOBAL — outside the RBAC
+        # scope hierarchy — so it has no scope element and binds to no scope.
+        element_type = action.scope_type.to_rbac_element_type()
+        scope_ref = (
+            RBACElementRef(element_type, action.scope_id) if element_type is not None else None
+        )
+        creators = [
+            RBACEntityCreator(
+                spec=AppConfigFragmentCreatorSpec(
+                    config_name=item.config_name,
+                    scope_type=action.scope_type,
+                    scope_id=action.scope_id,
+                    config=item.config,
+                ),
+                element_type=RBACElementType.APP_CONFIG_FRAGMENT,
+                scope_ref=scope_ref,
             )
             for item in action.items
         ]
-        result = await self._repository.bulk_create(BulkCreator(specs=specs))
+        result = await self._repository.bulk_create(creators)
         return BulkCreateAppConfigFragmentActionResult(
             succeeded=result.succeeded, failed=result.failed
         )

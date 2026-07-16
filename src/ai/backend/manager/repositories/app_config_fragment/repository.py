@@ -29,10 +29,10 @@ from ai.backend.manager.repositories.app_config_fragment.types import (
 )
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
-    BulkCreator,
     Purger,
     Updater,
 )
+from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.ops.rbac.provider import RBACOpsProvider
 
 __all__ = ("AppConfigFragmentRepository",)
@@ -94,9 +94,9 @@ class AppConfigFragmentRepository:
     @app_config_fragment_repository_resilience.apply()
     async def bulk_create(
         self,
-        bulk_creator: BulkCreator[AppConfigFragmentRow],
+        creators: Sequence[RBACEntityCreator[AppConfigFragmentRow]],
     ) -> AppConfigFragmentBulkResult:
-        return await self._db_source.bulk_create(bulk_creator)
+        return await self._db_source.bulk_create(creators)
 
     @app_config_fragment_repository_resilience.apply()
     async def bulk_update(

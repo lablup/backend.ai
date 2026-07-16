@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import cast
 
 import sqlalchemy as sa
 
@@ -39,8 +38,6 @@ from ai.backend.manager.repositories.app_config_fragment.types import (
 )
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
-    BulkCreator,
-    Creator,
     NoPagination,
     Purger,
     Querier,
@@ -82,15 +79,17 @@ class AppConfigFragmentDBSource:
 
     @app_config_fragment_db_source_resilience.apply()
     async def create(self, spec: AppConfigFragmentCreatorSpec) -> AppConfigFragmentData:
-        scope_element = spec.scope_type.to_rbac_element_type()
+        # A public fragment is GLOBAL — outside the RBAC scope hierarchy — so it has no scope
+        # element and binds to no scope, making its create a plain insert.
+        element_type = spec.scope_type.to_rbac_element_type()
+        rbac_creator = RBACEntityCreator(
+            spec=spec,
+            element_type=RBACElementType.APP_CONFIG_FRAGMENT,
+            scope_ref=(
+                RBACElementRef(element_type, spec.scope_id) if element_type is not None else None
+            ),
+        )
         async with self._rbac_ops_provider.write_ops() as w:
-            if scope_element is None:
-                return (await w.create(Creator(spec=spec))).row.to_data()
-            rbac_creator = RBACEntityCreator(
-                spec=spec,
-                element_type=RBACElementType.APP_CONFIG_FRAGMENT,
-                scope_ref=RBACElementRef(scope_element, spec.scope_id),
-            )
             return (await w.create_scoped(rbac_creator)).row.to_data()
 
     @app_config_fragment_db_source_resilience.apply()
@@ -127,34 +126,18 @@ class AppConfigFragmentDBSource:
     @app_config_fragment_db_source_resilience.apply()
     async def bulk_create(
         self,
-        bulk_creator: BulkCreator[AppConfigFragmentRow],
+        creators: Sequence[RBACEntityCreator[AppConfigFragmentRow]],
     ) -> AppConfigFragmentBulkResult:
         """Create many fragments with per-item partial success."""
-        succeeded: list[AppConfigFragmentData] = []
-        failed: list[AppConfigFragmentBulkItemError] = []
         async with self._rbac_ops_provider.write_ops() as w:
-            for index, base_spec in enumerate(bulk_creator.specs):
-                spec = cast(AppConfigFragmentCreatorSpec, base_spec)
-                scope_element = spec.scope_type.to_rbac_element_type()
-                try:
-                    async with w.savepoint():
-                        if scope_element is None:
-                            data = (await w.create(Creator(spec=spec))).row.to_data()
-                        else:
-                            data = (
-                                await w.create_scoped(
-                                    RBACEntityCreator(
-                                        spec=spec,
-                                        element_type=RBACElementType.APP_CONFIG_FRAGMENT,
-                                        scope_ref=RBACElementRef(scope_element, spec.scope_id),
-                                    )
-                                )
-                            ).row.to_data()
-                except BackendAIError as e:
-                    failed.append(AppConfigFragmentBulkItemError(index=index, message=str(e)))
-                    continue
-                succeeded.append(data)
-        return AppConfigFragmentBulkResult(succeeded=succeeded, failed=failed)
+            result = await w.bulk_create_scoped_partial(creators)
+            return AppConfigFragmentBulkResult(
+                succeeded=[row.to_data() for row in result.successes],
+                failed=[
+                    AppConfigFragmentBulkItemError(index=error.index, message=str(error.exception))
+                    for error in result.errors
+                ],
+            )
 
     @app_config_fragment_db_source_resilience.apply()
     async def bulk_update(

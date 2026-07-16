@@ -10,13 +10,14 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.data.app_config.types import AppConfigScopeType
-from ai.backend.common.data.permission.types import EntityType, ScopeType
+from ai.backend.common.data.permission.types import EntityType, RBACElementType, ScopeType
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
 from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.user import UserID
 from ai.backend.manager.data.app_config_fragment.types import (
     AppConfigFragmentData,
 )
+from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.app_config import (
     AppConfigFragmentNotFound,
     AppConfigFragmentWriteNotAllowed,
@@ -51,11 +52,11 @@ from ai.backend.manager.repositories.app_config_fragment.updaters import (
 )
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
-    BulkCreator,
     OffsetPagination,
     Purger,
     Updater,
 )
+from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.ops.rbac.provider import RBACOpsProvider
 from ai.backend.manager.types import OptionalState
 from ai.backend.testutils.db import with_tables
@@ -453,24 +454,28 @@ class TestBulkCreate:
     async def test_all_created(
         self, repository: AppConfigFragmentRepository, theme_registered: None
     ) -> None:
-        result = await repository.bulk_create(
-            BulkCreator(
-                specs=[
-                    AppConfigFragmentCreatorSpec(
-                        config_name="theme",
-                        scope_type=AppConfigScopeType.PUBLIC,
-                        scope_id="public",
-                        config={"a": 1},
-                    ),
-                    AppConfigFragmentCreatorSpec(
-                        config_name="theme",
-                        scope_type=AppConfigScopeType.DOMAIN,
-                        scope_id=_DOMAIN_ID,
-                        config={"b": 2},
-                    ),
-                ]
-            )
-        )
+        result = await repository.bulk_create([
+            RBACEntityCreator(
+                spec=AppConfigFragmentCreatorSpec(
+                    config_name="theme",
+                    scope_type=AppConfigScopeType.PUBLIC,
+                    scope_id="public",
+                    config={"a": 1},
+                ),
+                element_type=RBACElementType.APP_CONFIG_FRAGMENT,
+                scope_ref=None,
+            ),
+            RBACEntityCreator(
+                spec=AppConfigFragmentCreatorSpec(
+                    config_name="theme",
+                    scope_type=AppConfigScopeType.DOMAIN,
+                    scope_id=_DOMAIN_ID,
+                    config={"b": 2},
+                ),
+                element_type=RBACElementType.APP_CONFIG_FRAGMENT,
+                scope_ref=RBACElementRef(RBACElementType.DOMAIN, _DOMAIN_ID),
+            ),
+        ])
         assert len(result.succeeded) == 2
         assert result.failed == []
         for fragment in result.succeeded:
@@ -479,24 +484,28 @@ class TestBulkCreate:
     async def test_partial_when_one_not_allow_listed(
         self, repository: AppConfigFragmentRepository, menu_defined: None
     ) -> None:
-        result = await repository.bulk_create(
-            BulkCreator(
-                specs=[
-                    AppConfigFragmentCreatorSpec(
-                        config_name="theme",  # allow-listed
-                        scope_type=AppConfigScopeType.DOMAIN,
-                        scope_id=_DOMAIN_ID,
-                        config={"a": 1},
-                    ),
-                    AppConfigFragmentCreatorSpec(
-                        config_name="menu",  # defined but NOT allow-listed -> FK rejects the insert
-                        scope_type=AppConfigScopeType.PUBLIC,
-                        scope_id="public",
-                        config={"b": 2},
-                    ),
-                ]
-            )
-        )
+        result = await repository.bulk_create([
+            RBACEntityCreator(
+                spec=AppConfigFragmentCreatorSpec(
+                    config_name="theme",  # allow-listed
+                    scope_type=AppConfigScopeType.DOMAIN,
+                    scope_id=_DOMAIN_ID,
+                    config={"a": 1},
+                ),
+                element_type=RBACElementType.APP_CONFIG_FRAGMENT,
+                scope_ref=RBACElementRef(RBACElementType.DOMAIN, _DOMAIN_ID),
+            ),
+            RBACEntityCreator(
+                spec=AppConfigFragmentCreatorSpec(
+                    config_name="menu",  # defined but NOT allow-listed -> FK rejects the insert
+                    scope_type=AppConfigScopeType.PUBLIC,
+                    scope_id="public",
+                    config={"b": 2},
+                ),
+                element_type=RBACElementType.APP_CONFIG_FRAGMENT,
+                scope_ref=None,
+            ),
+        ])
         # partial: the allow-listed theme fragment is created; the menu item (index 1) is rejected
         assert [f.config_name for f in result.succeeded] == ["theme"]
         assert [f.index for f in result.failed] == [1]
@@ -737,6 +746,21 @@ class _FragmentScopeCase:
     expected_bindings: list[_ScopeBinding] = field(default_factory=list)
 
 
+@dataclass(frozen=True)
+class _BulkFragmentScopeCase:
+    """One item of a bulk create: the scope to write at, the scope ref its creator carries, and
+    the bindings that item must end up with.
+
+    ``scope_ref`` is ``None`` for ``public``, which is GLOBAL and binds to no scope, leaving
+    ``expected_bindings`` empty.
+    """
+
+    scope_type: AppConfigScopeType
+    scope_id: str
+    scope_ref: RBACElementRef | None
+    expected_bindings: list[_ScopeBinding] = field(default_factory=list)
+
+
 class TestRBACScopeAssociation:
     """Create binds a ``user`` / ``domain`` fragment to its RBAC scope so the RBAC validator can
     resolve ownership on a later update/purge; ``public`` (GLOBAL, no RBAC scope) gets none."""
@@ -788,6 +812,53 @@ class TestRBACScopeAssociation:
             )
         )
         assert await self._scope_bindings(database, str(created.id)) == case.expected_bindings
+
+    async def test_bulk_create_binds_each_item_to_its_own_rbac_scope(
+        self,
+        repository: AppConfigFragmentRepository,
+        database: ExtendedAsyncSAEngine,
+        theme_registered: None,
+    ) -> None:
+        """A batch mixing scoped and global items binds each item to its own scope.
+
+        The scope refs differ per item within the one batch, so this pins that an item with no
+        scope ref stays unbound without suppressing the bindings of the scoped items beside it.
+        """
+        cases = [
+            _BulkFragmentScopeCase(
+                scope_type=AppConfigScopeType.USER,
+                scope_id=_USER_ID,
+                scope_ref=RBACElementRef(RBACElementType.USER, _USER_ID),
+                expected_bindings=[_ScopeBinding(scope_type=ScopeType.USER, scope_id=_USER_ID)],
+            ),
+            _BulkFragmentScopeCase(
+                scope_type=AppConfigScopeType.DOMAIN,
+                scope_id=_DOMAIN_ID,
+                scope_ref=RBACElementRef(RBACElementType.DOMAIN, _DOMAIN_ID),
+                expected_bindings=[_ScopeBinding(scope_type=ScopeType.DOMAIN, scope_id=_DOMAIN_ID)],
+            ),
+            _BulkFragmentScopeCase(
+                scope_type=AppConfigScopeType.PUBLIC,
+                scope_id="public",
+                scope_ref=None,
+            ),
+        ]
+        result = await repository.bulk_create([
+            RBACEntityCreator(
+                spec=AppConfigFragmentCreatorSpec(
+                    config_name="theme",
+                    scope_type=case.scope_type,
+                    scope_id=case.scope_id,
+                    config={"k": "v"},
+                ),
+                element_type=RBACElementType.APP_CONFIG_FRAGMENT,
+                scope_ref=case.scope_ref,
+            )
+            for case in cases
+        ])
+        assert result.failed == []
+        for case, fragment in zip(cases, result.succeeded, strict=True):
+            assert await self._scope_bindings(database, str(fragment.id)) == case.expected_bindings
 
     @pytest.mark.parametrize(
         "case",
