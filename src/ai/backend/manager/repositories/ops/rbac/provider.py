@@ -102,7 +102,12 @@ class RBACWriteOps(WriteOps):
         return virtual_scope_id
 
     async def _insert_virtual_scopes(self, scopes: Sequence[ScopeRef]) -> None:
-        """Get-or-create the virtual scope nodes for ``scopes`` (idempotent)."""
+        """Create the virtual scope nodes for ``scopes`` and register each scope
+        as an entity member of its own virtual scope (idempotent).
+
+        Access to the scope object itself then resolves as an ordinary entity through the
+        single-path permission resolution. ``permission_cap`` is NULL (ownership, no ceiling).
+        """
         if not scopes:
             return
         values = [{"scope_type": s.scope_type, "scope_id": s.scope_id} for s in scopes]
@@ -112,6 +117,25 @@ class RBACWriteOps(WriteOps):
             .on_conflict_do_nothing(index_elements=["scope_type", "scope_id"])
         )
         await self._sess.execute(stmt)
+        membership_source = sa.select(
+            VirtualScopeRow.id,
+            VirtualScopeRow.scope_type,
+            VirtualScopeRow.scope_id,
+            sa.null(),
+        ).where(
+            sa.tuple_(VirtualScopeRow.scope_type, VirtualScopeRow.scope_id).in_([
+                (s.scope_type, s.scope_id) for s in scopes
+            ])
+        )
+        membership_stmt = (
+            pg_insert(EntityMembershipRow)
+            .from_select(
+                ["virtual_scope_id", "entity_type", "entity_id", "permission_cap"],
+                membership_source,
+            )
+            .on_conflict_do_nothing()
+        )
+        await self._sess.execute(membership_stmt)
 
     async def _delete_virtual_scopes(self, scopes: Sequence[ScopeRef]) -> None:
         """Delete the virtual scope nodes for ``scopes`` (FK CASCADE removes their edges)."""
