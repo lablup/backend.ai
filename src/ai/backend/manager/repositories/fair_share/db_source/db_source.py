@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, cast
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import ResourceSlot, SlotQuantity
 from ai.backend.manager.data.fair_share import (
     DomainFairShareData,
@@ -910,6 +911,7 @@ class FairShareDBSource:
     async def bulk_update_fair_share_factors(
         self,
         resource_group: str,
+        resource_group_id: ResourceGroupID,
         calculation_result: FairShareFactorCalculationResult,
         lookback_start: date,
         lookback_end: date,
@@ -938,6 +940,7 @@ class FairShareDBSource:
             for domain_name, domain_result in calculation_result.domain_results.items():
                 insert_stmt = pg_insert(DomainFairShareRow).values(
                     resource_group=resource_group,
+                    resource_group_id=resource_group_id,
                     domain_name=domain_name,
                     fair_share_factor=domain_result.fair_share_factor,
                     total_decayed_usage=domain_result.total_decayed_usage,
@@ -963,6 +966,7 @@ class FairShareDBSource:
             for project_id, project_result in calculation_result.project_results.items():
                 insert_stmt = pg_insert(ProjectFairShareRow).values(
                     resource_group=resource_group,
+                    resource_group_id=resource_group_id,
                     project_id=project_id,
                     domain_name=project_result.domain_name,
                     fair_share_factor=project_result.fair_share_factor,
@@ -991,6 +995,7 @@ class FairShareDBSource:
                 scheduling_rank = rank_by_user.get(user_key)
                 insert_stmt = pg_insert(UserFairShareRow).values(
                     resource_group=resource_group,
+                    resource_group_id=resource_group_id,
                     user_uuid=user_key.user_uuid,
                     project_id=user_key.project_id,
                     domain_name=user_result.domain_name,

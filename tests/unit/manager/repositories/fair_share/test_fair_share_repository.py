@@ -11,6 +11,7 @@ from decimal import Decimal
 
 import pytest
 
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.errors.resource import DomainNotFound
 from ai.backend.manager.models.agent import AgentRow
@@ -63,6 +64,8 @@ from ai.backend.manager.repositories.fair_share import (
 )
 from ai.backend.manager.types import OptionalState, TriState
 from ai.backend.testutils.db import with_tables
+
+RESOURCE_GROUP_ID = ResourceGroupID(uuid.UUID("00000000-0000-0000-0000-000000000001"))
 
 
 class TestFairShareRepository:
@@ -272,6 +275,7 @@ class TestFairShareRepository:
         creator = Creator(
             spec=DomainFairShareCreatorSpec(
                 resource_group=test_scaling_group,
+                resource_group_id=RESOURCE_GROUP_ID,
                 domain_name=test_domain_name,
                 weight=Decimal("2.0"),
             )
@@ -297,6 +301,7 @@ class TestFairShareRepository:
         upserter = Upserter(
             spec=DomainFairShareUpserterSpec(
                 resource_group=test_scaling_group,
+                resource_group_id=RESOURCE_GROUP_ID,
                 domain_name=test_domain_name,
                 weight=TriState.update(Decimal("1.5")),
                 # Must provide at least one update value for ON CONFLICT UPDATE
@@ -322,6 +327,7 @@ class TestFairShareRepository:
         upserter1 = Upserter(
             spec=DomainFairShareUpserterSpec(
                 resource_group=test_scaling_group,
+                resource_group_id=RESOURCE_GROUP_ID,
                 domain_name=test_domain_name,
                 weight=TriState.update(Decimal("1.0")),
                 # Must provide at least one update value for ON CONFLICT UPDATE
@@ -334,6 +340,7 @@ class TestFairShareRepository:
         upserter2 = Upserter(
             spec=DomainFairShareUpserterSpec(
                 resource_group=test_scaling_group,
+                resource_group_id=RESOURCE_GROUP_ID,
                 domain_name=test_domain_name,
                 fair_share_factor=OptionalState.update(Decimal("0.75")),
                 normalized_usage=OptionalState.update(Decimal("0.5")),
@@ -358,6 +365,7 @@ class TestFairShareRepository:
         creator = Creator(
             spec=DomainFairShareCreatorSpec(
                 resource_group=test_scaling_group,
+                resource_group_id=RESOURCE_GROUP_ID,
                 domain_name=test_domain_name,
                 weight=Decimal("1.5"),
             )
@@ -412,6 +420,7 @@ class TestFairShareRepository:
             creator = Creator(
                 spec=DomainFairShareCreatorSpec(
                     resource_group=test_scaling_group,
+                    resource_group_id=RESOURCE_GROUP_ID,
                     domain_name=name,
                 )
             )
@@ -443,6 +452,7 @@ class TestFairShareRepository:
         creator = Creator(
             spec=ProjectFairShareCreatorSpec(
                 resource_group=test_scaling_group,
+                resource_group_id=RESOURCE_GROUP_ID,
                 project_id=test_project_id,
                 domain_name=test_domain_name,
                 weight=Decimal("1.5"),
@@ -467,6 +477,7 @@ class TestFairShareRepository:
         upserter = Upserter(
             spec=ProjectFairShareUpserterSpec(
                 resource_group=test_scaling_group,
+                resource_group_id=RESOURCE_GROUP_ID,
                 project_id=test_project_id,
                 domain_name=test_domain_name,
                 weight=TriState.update(Decimal("2.0")),
@@ -491,6 +502,7 @@ class TestFairShareRepository:
         creator = Creator(
             spec=ProjectFairShareCreatorSpec(
                 resource_group=test_scaling_group,
+                resource_group_id=RESOURCE_GROUP_ID,
                 project_id=test_project_id,
                 domain_name=test_domain_name,
             )
@@ -518,6 +530,7 @@ class TestFairShareRepository:
         creator = Creator(
             spec=UserFairShareCreatorSpec(
                 resource_group=test_scaling_group,
+                resource_group_id=RESOURCE_GROUP_ID,
                 user_uuid=test_user_uuid,
                 project_id=test_project_id,
                 domain_name=test_domain_name,
@@ -544,6 +557,7 @@ class TestFairShareRepository:
         upserter = Upserter(
             spec=UserFairShareUpserterSpec(
                 resource_group=test_scaling_group,
+                resource_group_id=RESOURCE_GROUP_ID,
                 user_uuid=test_user_uuid,
                 project_id=test_project_id,
                 domain_name=test_domain_name,
@@ -570,6 +584,7 @@ class TestFairShareRepository:
         creator = Creator(
             spec=UserFairShareCreatorSpec(
                 resource_group=test_scaling_group,
+                resource_group_id=RESOURCE_GROUP_ID,
                 user_uuid=test_user_uuid,
                 project_id=test_project_id,
                 domain_name=test_domain_name,
@@ -617,6 +632,7 @@ class TestFairShareRepository:
         upserter = Upserter(
             spec=DomainFairShareUpserterSpec(
                 resource_group=non_existent_sg,
+                resource_group_id=RESOURCE_GROUP_ID,
                 domain_name=domain_name,
                 weight=TriState.update(Decimal("2.5")),
                 fair_share_factor=OptionalState.update(Decimal("1.0")),
@@ -667,6 +683,7 @@ class TestFairShareRepository:
         upserter = Upserter(
             spec=ProjectFairShareUpserterSpec(
                 resource_group=non_existent_sg,
+                resource_group_id=RESOURCE_GROUP_ID,
                 project_id=project_id,
                 domain_name=test_domain_name,
                 weight=TriState.update(Decimal("3.0")),
@@ -697,6 +714,7 @@ class TestFairShareRepository:
         upserter = Upserter(
             spec=UserFairShareUpserterSpec(
                 resource_group=non_existent_sg,
+                resource_group_id=RESOURCE_GROUP_ID,
                 user_uuid=test_user_uuid,
                 project_id=test_project_id,
                 domain_name=test_domain_name,

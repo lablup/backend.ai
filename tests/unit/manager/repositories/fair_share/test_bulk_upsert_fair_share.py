@@ -10,6 +10,7 @@ from decimal import Decimal
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.fair_share import (
@@ -49,6 +50,7 @@ class DomainFairShareTestContext:
     """Context for domain fair share tests."""
 
     scaling_group: str
+    resource_group_id: ResourceGroupID
     domain_names: list[str]
     existing_weights: dict[str, Decimal]  # domain_name -> existing weight (empty if none)
 
@@ -58,6 +60,7 @@ class ProjectFairShareTestContext:
     """Context for project fair share tests."""
 
     scaling_group: str
+    resource_group_id: ResourceGroupID
     domain_name: str
     project_ids: list[uuid.UUID]
     existing_weights: dict[uuid.UUID, Decimal]
@@ -68,6 +71,7 @@ class UserFairShareTestContext:
     """Context for user fair share tests."""
 
     scaling_group: str
+    resource_group_id: ResourceGroupID
     domain_name: str
     project_id: uuid.UUID
     user_uuids: list[uuid.UUID]
@@ -117,10 +121,12 @@ class TestBulkUpsertDomainFairShare:
     ) -> DomainFairShareTestContext:
         """Scenario: All domains are new (no existing fair share records)."""
         sg_name = f"test-sg-{uuid.uuid4().hex[:8]}"
+        rg_id = ResourceGroupID(uuid.uuid4())
         domain_names = [f"test-domain-{i}-{uuid.uuid4().hex[:8]}" for i in range(3)]
 
         async with db_with_cleanup.begin_session() as db_sess:
             sg = ScalingGroupRow(
+                id=rg_id,
                 name=sg_name,
                 description="Test scaling group",
                 is_active=True,
@@ -145,6 +151,7 @@ class TestBulkUpsertDomainFairShare:
 
         return DomainFairShareTestContext(
             scaling_group=sg_name,
+            resource_group_id=rg_id,
             domain_names=domain_names,
             existing_weights={},  # No existing records
         )
@@ -156,11 +163,13 @@ class TestBulkUpsertDomainFairShare:
     ) -> DomainFairShareTestContext:
         """Scenario: All domains already have fair share records."""
         sg_name = f"test-sg-{uuid.uuid4().hex[:8]}"
+        rg_id = ResourceGroupID(uuid.uuid4())
         domain_names = [f"test-domain-{i}-{uuid.uuid4().hex[:8]}" for i in range(3)]
         existing_weights = {name: Decimal("1.0") for name in domain_names}
 
         async with db_with_cleanup.begin_session() as db_sess:
             sg = ScalingGroupRow(
+                id=rg_id,
                 name=sg_name,
                 description="Test scaling group",
                 is_active=True,
@@ -187,6 +196,7 @@ class TestBulkUpsertDomainFairShare:
             for name, weight in existing_weights.items():
                 row = DomainFairShareRow(
                     resource_group=sg_name,
+                    resource_group_id=rg_id,
                     domain_name=name,
                     weight=weight,
                 )
@@ -195,6 +205,7 @@ class TestBulkUpsertDomainFairShare:
 
         return DomainFairShareTestContext(
             scaling_group=sg_name,
+            resource_group_id=rg_id,
             domain_names=domain_names,
             existing_weights=existing_weights,
         )
@@ -206,12 +217,14 @@ class TestBulkUpsertDomainFairShare:
     ) -> DomainFairShareTestContext:
         """Scenario: Mix of new and existing domains."""
         sg_name = f"test-sg-{uuid.uuid4().hex[:8]}"
+        rg_id = ResourceGroupID(uuid.uuid4())
         domain_names = [f"test-domain-{i}-{uuid.uuid4().hex[:8]}" for i in range(3)]
         # Only first domain has existing record
         existing_weights = {domain_names[0]: Decimal("1.0")}
 
         async with db_with_cleanup.begin_session() as db_sess:
             sg = ScalingGroupRow(
+                id=rg_id,
                 name=sg_name,
                 description="Test scaling group",
                 is_active=True,
@@ -237,6 +250,7 @@ class TestBulkUpsertDomainFairShare:
             # Pre-create only first domain's fair share record
             row = DomainFairShareRow(
                 resource_group=sg_name,
+                resource_group_id=rg_id,
                 domain_name=domain_names[0],
                 weight=Decimal("1.0"),
             )
@@ -245,6 +259,7 @@ class TestBulkUpsertDomainFairShare:
 
         return DomainFairShareTestContext(
             scaling_group=sg_name,
+            resource_group_id=rg_id,
             domain_names=domain_names,
             existing_weights=existing_weights,
         )
@@ -260,6 +275,7 @@ class TestBulkUpsertDomainFairShare:
         specs = [
             DomainFairShareBulkWeightUpserterSpec(
                 resource_group=ctx.scaling_group,
+                resource_group_id=ctx.resource_group_id,
                 domain_name=domain,
                 weight=Decimal(f"{i + 1}.0"),
             )
@@ -293,6 +309,7 @@ class TestBulkUpsertDomainFairShare:
         specs = [
             DomainFairShareBulkWeightUpserterSpec(
                 resource_group=ctx.scaling_group,
+                resource_group_id=ctx.resource_group_id,
                 domain_name=domain,
                 weight=Decimal(f"{i + 10}.0"),
             )
@@ -326,6 +343,7 @@ class TestBulkUpsertDomainFairShare:
         specs = [
             DomainFairShareBulkWeightUpserterSpec(
                 resource_group=ctx.scaling_group,
+                resource_group_id=ctx.resource_group_id,
                 domain_name=domain,
                 weight=Decimal("5.0"),
             )
@@ -405,11 +423,13 @@ class TestBulkUpsertProjectFairShare:
     ) -> ProjectFairShareTestContext:
         """Scenario: All projects are new (no existing fair share records)."""
         sg_name = f"test-sg-{uuid.uuid4().hex[:8]}"
+        rg_id = ResourceGroupID(uuid.uuid4())
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
         project_ids = [uuid.uuid4() for _ in range(3)]
 
         async with db_with_cleanup.begin_session() as db_sess:
             sg = ScalingGroupRow(
+                id=rg_id,
                 name=sg_name,
                 description="Test scaling group",
                 is_active=True,
@@ -454,6 +474,7 @@ class TestBulkUpsertProjectFairShare:
 
         return ProjectFairShareTestContext(
             scaling_group=sg_name,
+            resource_group_id=rg_id,
             domain_name=domain_name,
             project_ids=project_ids,
             existing_weights={},
@@ -466,12 +487,14 @@ class TestBulkUpsertProjectFairShare:
     ) -> ProjectFairShareTestContext:
         """Scenario: All projects already have fair share records."""
         sg_name = f"test-sg-{uuid.uuid4().hex[:8]}"
+        rg_id = ResourceGroupID(uuid.uuid4())
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
         project_ids = [uuid.uuid4() for _ in range(3)]
         existing_weights = {pid: Decimal("1.0") for pid in project_ids}
 
         async with db_with_cleanup.begin_session() as db_sess:
             sg = ScalingGroupRow(
+                id=rg_id,
                 name=sg_name,
                 description="Test scaling group",
                 is_active=True,
@@ -518,6 +541,7 @@ class TestBulkUpsertProjectFairShare:
             for pid, weight in existing_weights.items():
                 row = ProjectFairShareRow(
                     resource_group=sg_name,
+                    resource_group_id=rg_id,
                     project_id=pid,
                     domain_name=domain_name,
                     weight=weight,
@@ -527,6 +551,7 @@ class TestBulkUpsertProjectFairShare:
 
         return ProjectFairShareTestContext(
             scaling_group=sg_name,
+            resource_group_id=rg_id,
             domain_name=domain_name,
             project_ids=project_ids,
             existing_weights=existing_weights,
@@ -543,6 +568,7 @@ class TestBulkUpsertProjectFairShare:
         specs = [
             ProjectFairShareBulkWeightUpserterSpec(
                 resource_group=ctx.scaling_group,
+                resource_group_id=ctx.resource_group_id,
                 project_id=pid,
                 domain_name=ctx.domain_name,
                 weight=Decimal(f"{i + 1}.5"),
@@ -577,6 +603,7 @@ class TestBulkUpsertProjectFairShare:
         specs = [
             ProjectFairShareBulkWeightUpserterSpec(
                 resource_group=ctx.scaling_group,
+                resource_group_id=ctx.resource_group_id,
                 project_id=pid,
                 domain_name=ctx.domain_name,
                 weight=Decimal(f"{i + 20}.0"),
@@ -644,12 +671,14 @@ class TestBulkUpsertUserFairShare:
     ) -> UserFairShareTestContext:
         """Scenario: All users are new (no existing fair share records)."""
         sg_name = f"test-sg-{uuid.uuid4().hex[:8]}"
+        rg_id = ResourceGroupID(uuid.uuid4())
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
         project_id = uuid.uuid4()
         user_uuids = [uuid.uuid4() for _ in range(3)]
 
         async with db_with_cleanup.begin_session() as db_sess:
             sg = ScalingGroupRow(
+                id=rg_id,
                 name=sg_name,
                 description="Test scaling group",
                 is_active=True,
@@ -724,6 +753,7 @@ class TestBulkUpsertUserFairShare:
 
         return UserFairShareTestContext(
             scaling_group=sg_name,
+            resource_group_id=rg_id,
             domain_name=domain_name,
             project_id=project_id,
             user_uuids=user_uuids,
@@ -737,6 +767,7 @@ class TestBulkUpsertUserFairShare:
     ) -> UserFairShareTestContext:
         """Scenario: All users already have fair share records."""
         sg_name = f"test-sg-{uuid.uuid4().hex[:8]}"
+        rg_id = ResourceGroupID(uuid.uuid4())
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
         project_id = uuid.uuid4()
         user_uuids = [uuid.uuid4() for _ in range(3)]
@@ -744,6 +775,7 @@ class TestBulkUpsertUserFairShare:
 
         async with db_with_cleanup.begin_session() as db_sess:
             sg = ScalingGroupRow(
+                id=rg_id,
                 name=sg_name,
                 description="Test scaling group",
                 is_active=True,
@@ -820,6 +852,7 @@ class TestBulkUpsertUserFairShare:
             for uid, weight in existing_weights.items():
                 row = UserFairShareRow(
                     resource_group=sg_name,
+                    resource_group_id=rg_id,
                     user_uuid=uid,
                     project_id=project_id,
                     domain_name=domain_name,
@@ -830,6 +863,7 @@ class TestBulkUpsertUserFairShare:
 
         return UserFairShareTestContext(
             scaling_group=sg_name,
+            resource_group_id=rg_id,
             domain_name=domain_name,
             project_id=project_id,
             user_uuids=user_uuids,
@@ -843,12 +877,14 @@ class TestBulkUpsertUserFairShare:
     ) -> UserFairShareTestContext:
         """Scenario: Users to be set with null weight (use default)."""
         sg_name = f"test-sg-{uuid.uuid4().hex[:8]}"
+        rg_id = ResourceGroupID(uuid.uuid4())
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
         project_id = uuid.uuid4()
         user_uuids = [uuid.uuid4() for _ in range(3)]
 
         async with db_with_cleanup.begin_session() as db_sess:
             sg = ScalingGroupRow(
+                id=rg_id,
                 name=sg_name,
                 description="Test scaling group",
                 is_active=True,
@@ -923,6 +959,7 @@ class TestBulkUpsertUserFairShare:
 
         return UserFairShareTestContext(
             scaling_group=sg_name,
+            resource_group_id=rg_id,
             domain_name=domain_name,
             project_id=project_id,
             user_uuids=user_uuids,
@@ -940,6 +977,7 @@ class TestBulkUpsertUserFairShare:
         specs = [
             UserFairShareBulkWeightUpserterSpec(
                 resource_group=ctx.scaling_group,
+                resource_group_id=ctx.resource_group_id,
                 user_uuid=uid,
                 project_id=ctx.project_id,
                 domain_name=ctx.domain_name,
@@ -975,6 +1013,7 @@ class TestBulkUpsertUserFairShare:
         specs = [
             UserFairShareBulkWeightUpserterSpec(
                 resource_group=ctx.scaling_group,
+                resource_group_id=ctx.resource_group_id,
                 user_uuid=uid,
                 project_id=ctx.project_id,
                 domain_name=ctx.domain_name,
@@ -1010,6 +1049,7 @@ class TestBulkUpsertUserFairShare:
         specs = [
             UserFairShareBulkWeightUpserterSpec(
                 resource_group=ctx.scaling_group,
+                resource_group_id=ctx.resource_group_id,
                 user_uuid=uid,
                 project_id=ctx.project_id,
                 domain_name=ctx.domain_name,

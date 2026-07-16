@@ -601,6 +601,7 @@ class ResourceUsageHistoryDBSource:
                     project_id=key.project_id,
                     domain_name=key.domain_name,
                     resource_group=key.resource_group,
+                    resource_group_id=key.resource_group_id,
                     period_start=key.period_date,
                     period_end=key.period_date,
                     decay_unit_days=decay_unit_days,
@@ -608,7 +609,10 @@ class ResourceUsageHistoryDBSource:
                 )
                 .on_conflict_do_update(
                     index_elements=["user_uuid", "project_id", "resource_group", "period_start"],
-                    set_={"resource_usage": new_usage, "updated_at": sa.func.now()},
+                    set_={
+                        "resource_usage": new_usage,
+                        "updated_at": sa.func.now(),
+                    },
                 )
                 .returning(UserUsageBucketRow.__table__.c.id)
             )
@@ -691,6 +695,7 @@ class ResourceUsageHistoryDBSource:
                     project_id=key.project_id,
                     domain_name=key.domain_name,
                     resource_group=key.resource_group,
+                    resource_group_id=key.resource_group_id,
                     period_start=key.period_date,
                     period_end=key.period_date,
                     decay_unit_days=decay_unit_days,
@@ -698,7 +703,10 @@ class ResourceUsageHistoryDBSource:
                 )
                 .on_conflict_do_update(
                     index_elements=["project_id", "resource_group", "period_start"],
-                    set_={"resource_usage": new_usage, "updated_at": sa.func.now()},
+                    set_={
+                        "resource_usage": new_usage,
+                        "updated_at": sa.func.now(),
+                    },
                 )
                 .returning(ProjectUsageBucketRow.__table__.c.id)
             )
@@ -772,6 +780,7 @@ class ResourceUsageHistoryDBSource:
                 .values(
                     domain_name=key.domain_name,
                     resource_group=key.resource_group,
+                    resource_group_id=key.resource_group_id,
                     period_start=key.period_date,
                     period_end=key.period_date,
                     decay_unit_days=decay_unit_days,
@@ -779,7 +788,10 @@ class ResourceUsageHistoryDBSource:
                 )
                 .on_conflict_do_update(
                     index_elements=["domain_name", "resource_group", "period_start"],
-                    set_={"resource_usage": new_usage, "updated_at": sa.func.now()},
+                    set_={
+                        "resource_usage": new_usage,
+                        "updated_at": sa.func.now(),
+                    },
                 )
                 .returning(DomainUsageBucketRow.__table__.c.id)
             )

@@ -14,6 +14,7 @@ from uuid import UUID, uuid4
 
 import pytest
 
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.fair_share import (
     DomainUsageBucketKey,
@@ -26,6 +27,8 @@ from ai.backend.manager.repositories.resource_usage_history import (
 from ai.backend.manager.sokovan.scheduler.fair_share.aggregator import (
     FairShareAggregator,
 )
+
+RESOURCE_GROUP_ID = ResourceGroupID(uuid4())
 
 
 def make_datetime(
@@ -53,6 +56,7 @@ def make_spec(
         project_id=project_id or uuid4(),
         domain_name=domain_name,
         resource_group=resource_group,
+        resource_group_id=RESOURCE_GROUP_ID,
         period_start=period_start,
         period_end=period_end,
         resource_usage=resource_usage,
@@ -191,6 +195,7 @@ class TestAggregateKernelUsageToBuckets:
             project_id=project_id,
             domain_name="test-domain",
             resource_group="test-rg",
+            resource_group_id=specs[0].resource_group_id,
             period_date=date(2024, 1, 15),
         )
         assert user_key in result.user_usage_deltas
@@ -204,6 +209,7 @@ class TestAggregateKernelUsageToBuckets:
             project_id=project_id,
             domain_name="test-domain",
             resource_group="test-rg",
+            resource_group_id=specs[0].resource_group_id,
             period_date=date(2024, 1, 15),
         )
         assert project_key in result.project_usage_deltas
@@ -214,6 +220,7 @@ class TestAggregateKernelUsageToBuckets:
         domain_key = DomainUsageBucketKey(
             domain_name="test-domain",
             resource_group="test-rg",
+            resource_group_id=specs[0].resource_group_id,
             period_date=date(2024, 1, 15),
         )
         assert domain_key in result.domain_usage_deltas
@@ -287,6 +294,7 @@ class TestAggregateKernelUsageToBuckets:
             project_id=project_id,
             domain_name="default",
             resource_group="default",
+            resource_group_id=specs[0].resource_group_id,
             period_date=date(2024, 1, 15),
         )
         day2_key = UserUsageBucketKey(
@@ -294,6 +302,7 @@ class TestAggregateKernelUsageToBuckets:
             project_id=project_id,
             domain_name="default",
             resource_group="default",
+            resource_group_id=specs[0].resource_group_id,
             period_date=date(2024, 1, 16),
         )
 
@@ -415,6 +424,7 @@ class TestBackloggedUsageScenario:
             project_id=project_id,
             domain_name="default",
             resource_group="default",
+            resource_group_id=specs[0].resource_group_id,
             period_date=date(2024, 1, 15),
         )
         day2_key = UserUsageBucketKey(
@@ -422,6 +432,7 @@ class TestBackloggedUsageScenario:
             project_id=project_id,
             domain_name="default",
             resource_group="default",
+            resource_group_id=specs[0].resource_group_id,
             period_date=date(2024, 1, 16),
         )
 
@@ -517,6 +528,7 @@ class TestBackloggedUsageScenario:
             project_id=project_id,
             domain_name="default",
             resource_group="default",
+            resource_group_id=specs[0].resource_group_id,
             period_date=date(2024, 1, 15),
         )
         day2_key = UserUsageBucketKey(
@@ -524,6 +536,7 @@ class TestBackloggedUsageScenario:
             project_id=project_id,
             domain_name="default",
             resource_group="default",
+            resource_group_id=specs[0].resource_group_id,
             period_date=date(2024, 1, 16),
         )
 
@@ -581,6 +594,7 @@ class TestBackloggedUsageScenario:
             project_id=project_id,
             domain_name="default",
             resource_group="default",
+            resource_group_id=specs[0].resource_group_id,
             period_date=date(2024, 1, 15),
         )
         # User1: raw=2 for 300s, User2: raw=2 for 300s (day1 part)
@@ -593,6 +607,7 @@ class TestBackloggedUsageScenario:
             project_id=project_id,
             domain_name="default",
             resource_group="default",
+            resource_group_id=specs[0].resource_group_id,
             period_date=date(2024, 1, 16),
         )
         # User2 only: raw=2 for 300s (day2 part)

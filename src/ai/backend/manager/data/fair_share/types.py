@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import ResourceSlot, SlotQuantity
 
 
@@ -383,6 +384,7 @@ class UserUsageBucketKey:
     project_id: uuid.UUID
     domain_name: str
     resource_group: str
+    resource_group_id: ResourceGroupID
     period_date: date
 
 
@@ -396,6 +398,7 @@ class ProjectUsageBucketKey:
     project_id: uuid.UUID
     domain_name: str
     resource_group: str
+    resource_group_id: ResourceGroupID
     period_date: date
 
 
@@ -408,6 +411,7 @@ class DomainUsageBucketKey:
 
     domain_name: str
     resource_group: str
+    resource_group_id: ResourceGroupID
     period_date: date
 
 

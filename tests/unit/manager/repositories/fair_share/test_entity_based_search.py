@@ -20,6 +20,7 @@ from decimal import Decimal
 import pytest
 
 from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.errors.resource import ScalingGroupNotFound
 from ai.backend.manager.models.agent import AgentRow
@@ -71,6 +72,8 @@ from ai.backend.manager.repositories.fair_share.types import (
     UserFairShareSearchScope,
 )
 from ai.backend.testutils.db import with_tables
+
+RESOURCE_GROUP_ID = ResourceGroupID(uuid.UUID("00000000-0000-0000-0000-000000000001"))
 
 
 class TestSearchDomainFairSharesEntityBased:
@@ -164,6 +167,7 @@ class TestSearchDomainFairSharesEntityBased:
             Creator(
                 spec=DomainFairShareCreatorSpec(
                     resource_group=scaling_group,
+                    resource_group_id=RESOURCE_GROUP_ID,
                     domain_name=domain_name,
                     weight=Decimal("2.0"),  # Explicit weight for use_default=False
                 )
@@ -301,6 +305,7 @@ class TestSearchDomainFairSharesEntityBased:
                 Creator(
                     spec=DomainFairShareCreatorSpec(
                         resource_group=scaling_group,
+                        resource_group_id=RESOURCE_GROUP_ID,
                         domain_name=name,
                         weight=Decimal("2.0"),  # Explicit weight for use_default=False
                     )
@@ -731,6 +736,7 @@ class TestSearchProjectFairSharesEntityBased:
             Creator(
                 spec=ProjectFairShareCreatorSpec(
                     resource_group=scaling_group,
+                    resource_group_id=RESOURCE_GROUP_ID,
                     project_id=project_id,
                     domain_name=domain_name,
                     weight=Decimal("2.0"),  # Explicit weight for use_default=False
@@ -1193,6 +1199,7 @@ class TestSearchUserFairSharesEntityBased:
             Creator(
                 spec=UserFairShareCreatorSpec(
                     resource_group=scaling_group,
+                    resource_group_id=RESOURCE_GROUP_ID,
                     user_uuid=user_uuid,
                     project_id=project_id,
                     domain_name=domain_name,

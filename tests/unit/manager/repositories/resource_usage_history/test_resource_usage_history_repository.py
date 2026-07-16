@@ -12,6 +12,7 @@ from decimal import Decimal
 
 import pytest
 
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
@@ -60,6 +61,8 @@ from ai.backend.manager.repositories.resource_usage_history import (
     UserUsageBucketUpserterSpec,
 )
 from ai.backend.testutils.db import with_tables
+
+RESOURCE_GROUP_ID = ResourceGroupID(uuid.UUID("00000000-0000-0000-0000-000000000001"))
 
 
 class TestResourceUsageHistoryRepository:
@@ -255,6 +258,7 @@ class TestResourceUsageHistoryRepository:
                 project_id=test_project_id,
                 domain_name=test_domain_name,
                 resource_group=test_scaling_group,
+                resource_group_id=RESOURCE_GROUP_ID,
                 period_start=now - timedelta(minutes=5),
                 period_end=now,
                 resource_usage=ResourceSlot({"cpu": Decimal("300"), "mem": Decimal("1073741824")}),
@@ -295,6 +299,7 @@ class TestResourceUsageHistoryRepository:
                     project_id=test_project_id,
                     domain_name=test_domain_name,
                     resource_group=test_scaling_group,
+                    resource_group_id=RESOURCE_GROUP_ID,
                     period_start=period_start,
                     period_end=period_end,
                     resource_usage=ResourceSlot({"cpu": Decimal("300")}),
@@ -337,6 +342,7 @@ class TestResourceUsageHistoryRepository:
                     project_id=test_project_id,
                     domain_name=test_domain_name,
                     resource_group=test_scaling_group,
+                    resource_group_id=RESOURCE_GROUP_ID,
                     period_start=period_start,
                     period_end=period_end,
                     resource_usage=ResourceSlot({"cpu": Decimal("300")}),
@@ -374,6 +380,7 @@ class TestResourceUsageHistoryRepository:
             spec=DomainUsageBucketCreatorSpec(
                 domain_name=test_domain_name,
                 resource_group=test_scaling_group,
+                resource_group_id=RESOURCE_GROUP_ID,
                 period_start=today,
                 period_end=today + timedelta(days=1),
                 decay_unit_days=1,
@@ -408,6 +415,7 @@ class TestResourceUsageHistoryRepository:
             spec=DomainUsageBucketUpserterSpec(
                 domain_name=test_domain_name,
                 resource_group=test_scaling_group,
+                resource_group_id=RESOURCE_GROUP_ID,
                 period_start=today,
                 period_end=today + timedelta(days=1),
                 decay_unit_days=1,
@@ -435,6 +443,7 @@ class TestResourceUsageHistoryRepository:
             spec=DomainUsageBucketUpserterSpec(
                 domain_name=test_domain_name,
                 resource_group=test_scaling_group,
+                resource_group_id=RESOURCE_GROUP_ID,
                 period_start=today,
                 period_end=today + timedelta(days=1),
                 decay_unit_days=1,
@@ -449,6 +458,7 @@ class TestResourceUsageHistoryRepository:
             spec=DomainUsageBucketUpserterSpec(
                 domain_name=test_domain_name,
                 resource_group=test_scaling_group,
+                resource_group_id=RESOURCE_GROUP_ID,
                 period_start=today,
                 period_end=today + timedelta(days=1),
                 decay_unit_days=1,
@@ -476,6 +486,7 @@ class TestResourceUsageHistoryRepository:
                 spec=DomainUsageBucketCreatorSpec(
                     domain_name=test_domain_name,
                     resource_group=test_scaling_group,
+                    resource_group_id=RESOURCE_GROUP_ID,
                     period_start=bucket_date,
                     period_end=bucket_date + timedelta(days=1),
                     decay_unit_days=1,
@@ -520,6 +531,7 @@ class TestResourceUsageHistoryRepository:
                 project_id=test_project_id,
                 domain_name=test_domain_name,
                 resource_group=test_scaling_group,
+                resource_group_id=RESOURCE_GROUP_ID,
                 period_start=today,
                 period_end=today + timedelta(days=1),
                 decay_unit_days=1,
@@ -551,6 +563,7 @@ class TestResourceUsageHistoryRepository:
                 project_id=test_project_id,
                 domain_name=test_domain_name,
                 resource_group=test_scaling_group,
+                resource_group_id=RESOURCE_GROUP_ID,
                 period_start=today,
                 period_end=today + timedelta(days=1),
                 decay_unit_days=1,
@@ -581,6 +594,7 @@ class TestResourceUsageHistoryRepository:
                 project_id=test_project_id,
                 domain_name=test_domain_name,
                 resource_group=test_scaling_group,
+                resource_group_id=RESOURCE_GROUP_ID,
                 period_start=today,
                 period_end=today + timedelta(days=1),
                 decay_unit_days=1,
@@ -617,6 +631,7 @@ class TestResourceUsageHistoryRepository:
                     project_id=test_project_id,
                     domain_name=test_domain_name,
                     resource_group=test_scaling_group,
+                    resource_group_id=RESOURCE_GROUP_ID,
                     period_start=bucket_date,
                     period_end=bucket_date + timedelta(days=1),
                     decay_unit_days=1,
@@ -688,6 +703,7 @@ class TestResourceUsageHistoryRepository:
                     project_id=test_project_id,
                     domain_name=test_domain_name,
                     resource_group=test_scaling_group,
+                    resource_group_id=RESOURCE_GROUP_ID,
                     period_start=bucket_date,
                     period_end=bucket_date + timedelta(days=1),
                     decay_unit_days=1,
@@ -738,6 +754,7 @@ class TestResourceUsageHistoryRepository:
                 spec=DomainUsageBucketCreatorSpec(
                     domain_name=test_domain_name,
                     resource_group=test_scaling_group,
+                    resource_group_id=RESOURCE_GROUP_ID,
                     period_start=bucket_date,
                     period_end=bucket_date + timedelta(days=1),
                     decay_unit_days=1,

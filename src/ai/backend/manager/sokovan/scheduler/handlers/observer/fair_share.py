@@ -145,7 +145,7 @@ class FairShareObserver(KernelObserver):
 
         # ===== Phase 1: Record usage =====
         preparation_result = self._aggregator.prepare_kernel_usage_records(
-            kernels, resource_group_name, now
+            kernels, resource_group_id, resource_group_name, now
         )
 
         log.debug(
@@ -181,7 +181,9 @@ class FairShareObserver(KernelObserver):
         log.debug("[FairShareObserver] DB write completed")
 
         # ===== Phase 2: Calculate and update factors + ranks =====
-        await self._calculate_and_update_factors_and_ranks(resource_group_name, now.date())
+        await self._calculate_and_update_factors_and_ranks(
+            resource_group_name, resource_group_id, now.date()
+        )
 
         log.debug(
             "[FairShareObserver] Observation complete: observed_count={}",
@@ -192,6 +194,7 @@ class FairShareObserver(KernelObserver):
     async def _calculate_and_update_factors_and_ranks(
         self,
         scaling_group: str,
+        resource_group_id: ResourceGroupID,
         today: date,
     ) -> None:
         """Calculate fair share factors and scheduling ranks, then update tables.
@@ -261,6 +264,7 @@ class FairShareObserver(KernelObserver):
             # ===== Batched DB write: factors + ranks =====
             await self._fair_share_repository.bulk_update_fair_share_factors(
                 scaling_group,
+                resource_group_id,
                 calculation_result,
                 lookback_start,
                 today,

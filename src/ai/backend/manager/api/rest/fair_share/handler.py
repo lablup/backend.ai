@@ -68,6 +68,7 @@ from ai.backend.common.dto.manager.fair_share import (
     UserUsageBucketFilter,
 )
 from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
+from ai.backend.common.identifier.resource_group import ResourceGroupName
 from ai.backend.manager.models.scaling_group.conditions import ScalingGroupConditions
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
@@ -105,6 +106,9 @@ from ai.backend.manager.services.resource_usage.actions import (
 )
 from ai.backend.manager.services.scaling_group.actions.list_scaling_groups import (
     SearchScalingGroupsAction,
+)
+from ai.backend.manager.services.scaling_group.actions.resolve_resource_group_id_by_name import (
+    ResolveResourceGroupIDByNameAction,
 )
 from ai.backend.manager.services.scaling_group.actions.update_fair_share_spec import (
     ResourceWeightInput,
@@ -685,9 +689,13 @@ class FairShareAPIHandler:
         body: BodyParam[UpsertDomainFairShareWeightRequest],
     ) -> APIResponse:
         """Upsert domain fair share weight."""
+        result = await self._scaling_group.resolve_resource_group_id_by_name.wait_for_complete(
+            ResolveResourceGroupIDByNameAction(name=ResourceGroupName(path.parsed.resource_group))
+        )
         action_result = await self._fair_share.upsert_domain_fair_share_weight.wait_for_complete(
             UpsertDomainFairShareWeightAction(
                 resource_group=path.parsed.resource_group,
+                resource_group_id=result.resource_group_id,
                 domain_name=path.parsed.domain_name,
                 weight=body.parsed.weight,
             )
@@ -705,9 +713,13 @@ class FairShareAPIHandler:
         body: BodyParam[UpsertProjectFairShareWeightRequest],
     ) -> APIResponse:
         """Upsert project fair share weight."""
+        result = await self._scaling_group.resolve_resource_group_id_by_name.wait_for_complete(
+            ResolveResourceGroupIDByNameAction(name=ResourceGroupName(path.parsed.resource_group))
+        )
         action_result = await self._fair_share.upsert_project_fair_share_weight.wait_for_complete(
             UpsertProjectFairShareWeightAction(
                 resource_group=path.parsed.resource_group,
+                resource_group_id=result.resource_group_id,
                 project_id=path.parsed.project_id,
                 domain_name=body.parsed.domain_name,
                 weight=body.parsed.weight,
@@ -726,9 +738,13 @@ class FairShareAPIHandler:
         body: BodyParam[UpsertUserFairShareWeightRequest],
     ) -> APIResponse:
         """Upsert user fair share weight."""
+        result = await self._scaling_group.resolve_resource_group_id_by_name.wait_for_complete(
+            ResolveResourceGroupIDByNameAction(name=ResourceGroupName(path.parsed.resource_group))
+        )
         action_result = await self._fair_share.upsert_user_fair_share_weight.wait_for_complete(
             UpsertUserFairShareWeightAction(
                 resource_group=path.parsed.resource_group,
+                resource_group_id=result.resource_group_id,
                 project_id=path.parsed.project_id,
                 user_uuid=path.parsed.user_uuid,
                 domain_name=body.parsed.domain_name,
@@ -756,10 +772,14 @@ class FairShareAPIHandler:
             for entry in body.parsed.inputs
         ]
 
+        result = await self._scaling_group.resolve_resource_group_id_by_name.wait_for_complete(
+            ResolveResourceGroupIDByNameAction(name=ResourceGroupName(body.parsed.resource_group))
+        )
         action_result = (
             await self._fair_share.bulk_upsert_domain_fair_share_weight.wait_for_complete(
                 BulkUpsertDomainFairShareWeightAction(
                     resource_group=body.parsed.resource_group,
+                    resource_group_id=result.resource_group_id,
                     inputs=inputs,
                 )
             )
@@ -785,10 +805,14 @@ class FairShareAPIHandler:
             for entry in body.parsed.inputs
         ]
 
+        result = await self._scaling_group.resolve_resource_group_id_by_name.wait_for_complete(
+            ResolveResourceGroupIDByNameAction(name=ResourceGroupName(body.parsed.resource_group))
+        )
         action_result = (
             await self._fair_share.bulk_upsert_project_fair_share_weight.wait_for_complete(
                 BulkUpsertProjectFairShareWeightAction(
                     resource_group=body.parsed.resource_group,
+                    resource_group_id=result.resource_group_id,
                     inputs=inputs,
                 )
             )
@@ -815,9 +839,13 @@ class FairShareAPIHandler:
             for entry in body.parsed.inputs
         ]
 
+        result = await self._scaling_group.resolve_resource_group_id_by_name.wait_for_complete(
+            ResolveResourceGroupIDByNameAction(name=ResourceGroupName(body.parsed.resource_group))
+        )
         action_result = await self._fair_share.bulk_upsert_user_fair_share_weight.wait_for_complete(
             BulkUpsertUserFairShareWeightAction(
                 resource_group=body.parsed.resource_group,
+                resource_group_id=result.resource_group_id,
                 inputs=inputs,
             )
         )

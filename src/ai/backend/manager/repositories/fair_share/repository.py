@@ -7,6 +7,7 @@ from collections.abc import Sequence
 from datetime import date
 from typing import TYPE_CHECKING
 
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience import (
     MetricArgs,
@@ -371,6 +372,7 @@ class FairShareRepository:
     async def bulk_update_fair_share_factors(
         self,
         resource_group: str,
+        resource_group_id: ResourceGroupID,
         calculation_result: FairShareFactorCalculationResult,
         lookback_start: date,
         lookback_end: date,
@@ -387,7 +389,11 @@ class FairShareRepository:
             lookback_end: End of lookback period used in calculation
         """
         return await self._db_source.bulk_update_fair_share_factors(
-            resource_group, calculation_result, lookback_start, lookback_end
+            resource_group,
+            resource_group_id,
+            calculation_result,
+            lookback_start,
+            lookback_end,
         )
 
     # ==================== Batched Reads ====================

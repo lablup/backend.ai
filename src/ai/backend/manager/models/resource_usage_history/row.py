@@ -24,6 +24,7 @@ from typing import TYPE_CHECKING
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
 
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.models.base import (
     GUID,
@@ -105,6 +106,11 @@ class KernelUsageRecordRow(Base):  # type: ignore[misc]
     resource_group: Mapped[str] = mapped_column(
         "resource_group", sa.String(length=64), nullable=False, index=True
     )
+    resource_group_id: Mapped[ResourceGroupID | None] = mapped_column(
+        "resource_group_id",
+        GUID,
+        nullable=True,
+    )
 
     # Period slice information
     period_start: Mapped[datetime] = mapped_column(
@@ -185,6 +191,11 @@ class DomainUsageBucketRow(Base):  # type: ignore[misc]
     )
     resource_group: Mapped[str] = mapped_column(
         "resource_group", sa.String(length=64), nullable=False
+    )
+    resource_group_id: Mapped[ResourceGroupID | None] = mapped_column(
+        "resource_group_id",
+        GUID,
+        nullable=True,
     )
 
     # Bucket period information
@@ -274,6 +285,11 @@ class ProjectUsageBucketRow(Base):  # type: ignore[misc]
     )
     resource_group: Mapped[str] = mapped_column(
         "resource_group", sa.String(length=64), nullable=False
+    )
+    resource_group_id: Mapped[ResourceGroupID | None] = mapped_column(
+        "resource_group_id",
+        GUID,
+        nullable=True,
     )
 
     # Bucket period information
@@ -382,6 +398,11 @@ class UserUsageBucketRow(Base):  # type: ignore[misc]
     )
     resource_group: Mapped[str] = mapped_column(
         "resource_group", sa.String(length=64), nullable=False
+    )
+    resource_group_id: Mapped[ResourceGroupID | None] = mapped_column(
+        "resource_group_id",
+        GUID,
+        nullable=True,
     )
 
     # Bucket period information

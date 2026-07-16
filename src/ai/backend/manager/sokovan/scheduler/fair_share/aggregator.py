@@ -20,6 +20,7 @@ from decimal import Decimal
 from typing import TYPE_CHECKING
 from uuid import UUID
 
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.fair_share import (
@@ -78,7 +79,8 @@ class FairShareAggregator:
     def prepare_kernel_usage_records(
         self,
         kernels: Sequence[KernelInfo],
-        scaling_group: str,
+        resource_group_id: ResourceGroupID,
+        resource_group: str,
         now: datetime,
     ) -> KernelUsagePreparationResult:
         """Prepare kernel usage records for bulk creation.
@@ -102,7 +104,7 @@ class FairShareAggregator:
 
         for kernel in kernels:
             kernel_specs, observation_end = self._prepare_kernel_usage_specs(
-                kernel, scaling_group, now
+                kernel, resource_group_id, resource_group, now
             )
             if kernel_specs:
                 result.specs.extend(kernel_specs)
@@ -241,6 +243,7 @@ class FairShareAggregator:
             project_id=spec.project_id,
             domain_name=spec.domain_name,
             resource_group=spec.resource_group,
+            resource_group_id=spec.resource_group_id,
             period_date=period_date,
         )
         ud = user_deltas[user_key]
@@ -254,6 +257,7 @@ class FairShareAggregator:
             project_id=spec.project_id,
             domain_name=spec.domain_name,
             resource_group=spec.resource_group,
+            resource_group_id=spec.resource_group_id,
             period_date=period_date,
         )
         pd = project_deltas[project_key]
@@ -266,6 +270,7 @@ class FairShareAggregator:
         domain_key = DomainUsageBucketKey(
             domain_name=spec.domain_name,
             resource_group=spec.resource_group,
+            resource_group_id=spec.resource_group_id,
             period_date=period_date,
         )
         dd = domain_deltas[domain_key]
@@ -277,6 +282,7 @@ class FairShareAggregator:
     def _prepare_kernel_usage_specs(
         self,
         kernel: KernelInfo,
+        resource_group_id: ResourceGroupID,
         scaling_group: str,
         now: datetime,
     ) -> tuple[list[KernelUsageRecordCreatorSpec], datetime]:
@@ -349,6 +355,7 @@ class FairShareAggregator:
         # Generate 5-minute slices
         specs = self._generate_slice_specs(
             kernel=kernel,
+            resource_group_id=resource_group_id,
             scaling_group=scaling_group,
             start_time=start_time,
             end_time=end_time,
@@ -368,6 +375,7 @@ class FairShareAggregator:
     def _generate_slice_specs(
         self,
         kernel: KernelInfo,
+        resource_group_id: ResourceGroupID,
         scaling_group: str,
         start_time: datetime,
         end_time: datetime,
@@ -418,6 +426,7 @@ class FairShareAggregator:
                 project_id=kernel.user_permission.group_id,
                 domain_name=kernel.user_permission.domain_name,
                 resource_group=scaling_group,
+                resource_group_id=resource_group_id,
                 period_start=current_start,
                 period_end=current_end,
                 resource_usage=resource_seconds,
