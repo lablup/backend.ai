@@ -56,6 +56,8 @@ _SESSION_LAST_RESPONSE_SUFFIX: Final[str] = "last_response_time"
 _AGENT_LAST_SEEN_HASH: Final[str] = "agent.last_seen"
 # Matches the legacy marker retention (1 day); safety net over the TERMINATED-event deletion.
 _SESSION_LAST_ACCESS_EXPIRATION: Final[int] = 86400
+# Sentinel meaning the session has ongoing activity; the idle checker skips judgment for it.
+_SESSION_ACTIVE_SENTINEL: Final[str] = "0"
 
 
 class ValkeyLiveClient:
@@ -214,7 +216,7 @@ class ValkeyLiveClient:
         """
         await self.store_live_data(
             self._session_last_access_key(session_id),
-            "0",
+            _SESSION_ACTIVE_SENTINEL,
             ex=_SESSION_LAST_ACCESS_EXPIRATION,
             xx=True,
         )
