@@ -32,6 +32,8 @@ def build_v2_routes(
     from .app_config_allow_list.registry import register_v2_app_config_allow_list_routes
     from .app_config_definition.handler import V2AppConfigDefinitionHandler
     from .app_config_definition.registry import register_v2_app_config_definition_routes
+    from .app_config_fragment.handler import V2AppConfigFragmentHandler
+    from .app_config_fragment.registry import register_v2_app_config_fragment_routes
     from .artifact.handler import V2ArtifactHandler
     from .artifact.registry import register_v2_artifact_routes
     from .artifact_registry.handler import V2ArtifactRegistryHandler
@@ -123,6 +125,7 @@ def build_v2_routes(
 
     # Build all handlers (each takes its individual adapter)
     agent_handler = V2AgentHandler(adapter=adapters.agent)
+    app_config_fragment_handler = V2AppConfigFragmentHandler(adapter=adapters.app_config_fragment)
     app_config_allow_list_handler = V2AppConfigAllowListHandler(
         adapter=adapters.app_config_allow_list
     )
@@ -187,6 +190,9 @@ def build_v2_routes(
 
     # Add all domain sub-registries
     v2_reg.add_subregistry(register_v2_agent_routes(agent_handler, route_deps))
+    v2_reg.add_subregistry(
+        register_v2_app_config_fragment_routes(app_config_fragment_handler, route_deps)
+    )
     v2_reg.add_subregistry(
         register_v2_app_config_allow_list_routes(app_config_allow_list_handler, route_deps)
     )

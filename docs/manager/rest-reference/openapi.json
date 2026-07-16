@@ -557,6 +557,110 @@
         "title": "AppConfigScopeType",
         "type": "string"
       },
+      "CreateAppConfigFragmentInput": {
+        "description": "Input for creating a new app config fragment at a given scope.",
+        "properties": {
+          "config_name": {
+            "description": "Registered config name (FK to app_config_definitions).",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Config Name",
+            "type": "string"
+          },
+          "scope_type": {
+            "$ref": "#/components/schemas/AppConfigScopeType",
+            "description": "Scope the fragment is written at (public | domain | user)."
+          },
+          "scope_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Scope identifier: the domain id (domain scope) or the user id (user scope). Null for public scope, which has no owner.",
+            "title": "Scope Id"
+          },
+          "config": {
+            "additionalProperties": true,
+            "description": "The fragment's JSON config document.",
+            "title": "Config",
+            "type": "object"
+          }
+        },
+        "required": [
+          "config_name",
+          "scope_type",
+          "config"
+        ],
+        "title": "CreateAppConfigFragmentInput",
+        "type": "object"
+      },
+      "UpdateAppConfigFragmentInput": {
+        "description": "Input for updating an app config fragment's config document.",
+        "properties": {
+          "id": {
+            "description": "App config fragment id to update.",
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "config": {
+            "additionalProperties": true,
+            "description": "The replacement JSON config document.",
+            "title": "Config",
+            "type": "object"
+          }
+        },
+        "required": [
+          "id",
+          "config"
+        ],
+        "title": "UpdateAppConfigFragmentInput",
+        "type": "object"
+      },
+      "BulkUpdateAppConfigFragmentInput": {
+        "description": "Input for updating many fragments' config documents (per-item partial success).",
+        "properties": {
+          "items": {
+            "description": "Fragments to update, each identified by its id.",
+            "items": {
+              "$ref": "#/components/schemas/UpdateAppConfigFragmentInput"
+            },
+            "minItems": 1,
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "BulkUpdateAppConfigFragmentInput",
+        "type": "object"
+      },
+      "BulkPurgeAppConfigFragmentInput": {
+        "description": "Input for purging many fragments (per-item partial success).",
+        "properties": {
+          "ids": {
+            "description": "Fragment ids to purge.",
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "ids"
+        ],
+        "title": "BulkPurgeAppConfigFragmentInput",
+        "type": "object"
+      },
       "CreateAppConfigAllowListInput": {
         "description": "Input for registering a new app config allow-list entry.",
         "properties": {
@@ -39581,6 +39685,185 @@
         ],
         "parameters": [],
         "description": "Retrieve aggregate resource capacity/usage across all agents (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/app-config-fragments/": {
+      "post": {
+        "operationId": "v2/app-config-fragments.create",
+        "tags": [
+          "v2/app-config-fragments"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAppConfigFragmentInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Create a fragment at the caller's authorized scope (auth required, RBAC-gated).\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/app-config-fragments/bulk-update": {
+      "post": {
+        "operationId": "v2/app-config-fragments.bulk_update",
+        "tags": [
+          "v2/app-config-fragments"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkUpdateAppConfigFragmentInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Update many fragments' configs by id, with per-item partial success (auth, RBAC).\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/app-config-fragments/bulk-delete": {
+      "post": {
+        "operationId": "v2/app-config-fragments.bulk_purge",
+        "tags": [
+          "v2/app-config-fragments"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkPurgeAppConfigFragmentInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Purge many fragments by id, with per-item partial success (auth, RBAC).\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/app-config-fragments/{fragment_id}": {
+      "get": {
+        "operationId": "v2/app-config-fragments.get",
+        "tags": [
+          "v2/app-config-fragments"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "fragment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Get a fragment by id (auth required, RBAC-gated).\n\n**Preconditions:**\n* User privilege required.\n"
+      },
+      "patch": {
+        "operationId": "v2/app-config-fragments.update",
+        "tags": [
+          "v2/app-config-fragments"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAppConfigFragmentInput"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "fragment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Update a fragment's config document by id (auth required, RBAC-gated).\n\n**Preconditions:**\n* User privilege required.\n"
+      },
+      "delete": {
+        "operationId": "v2/app-config-fragments.purge",
+        "tags": [
+          "v2/app-config-fragments"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "fragment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Purge a fragment by id (auth required, RBAC-gated).\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/app-config-allow-list/": {
