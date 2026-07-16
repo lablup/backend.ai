@@ -57,7 +57,7 @@ from ai.backend.manager.reporters.hub import ReporterHub, ReporterHubArgs
 from ai.backend.manager.reporters.smtp import SMTPReporter, SMTPSenderArgs
 from ai.backend.manager.repositories.repositories import Repositories
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
-from ai.backend.manager.service.container_registry.harbor import (
+from ai.backend.manager.services.container_registry.harbor import (
     AbstractPerProjectContainerRegistryQuotaService,
 )
 from ai.backend.manager.services.processors import Processors, ServiceArgs

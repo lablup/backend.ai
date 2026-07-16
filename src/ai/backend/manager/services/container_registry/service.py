@@ -76,7 +76,7 @@ from ai.backend.manager.services.container_registry.actions.update_registry_quot
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.container_registry import ContainerRegistryRow
-    from ai.backend.manager.service.container_registry.harbor import (
+    from ai.backend.manager.services.container_registry.harbor import (
         AbstractPerProjectContainerRegistryQuotaService,
     )
 

@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, override
 from ai.backend.common.dependencies import DependencyComposer, DependencyStack
 from ai.backend.manager.notification.notification_center import NotificationCenter
 from ai.backend.manager.repositories.repositories import Repositories
-from ai.backend.manager.service.base import ServicesContext
+from ai.backend.manager.services.base import ServicesContext
 from ai.backend.manager.types import DistributedLockFactory
 
 from .distributed_lock import DistributedLockFactoryDependency, DistributedLockInput

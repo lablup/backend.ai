@@ -8,8 +8,8 @@ from typing import TYPE_CHECKING, override
 from ai.backend.manager.repositories.container_registry_quota.repository import (
     PerProjectRegistryQuotaRepository,
 )
-from ai.backend.manager.service.base import ServicesContext
-from ai.backend.manager.service.container_registry.harbor import (
+from ai.backend.manager.services.base import ServicesContext
+from ai.backend.manager.services.container_registry.harbor import (
     PerProjectContainerRegistryQuotaClientPool,
     PerProjectContainerRegistryQuotaService,
 )

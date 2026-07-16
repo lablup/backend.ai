@@ -29,7 +29,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.repositories.agent.repository import AgentRepository
     from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
     from ai.backend.manager.repositories.user.repository import UserRepository
-    from ai.backend.manager.service.base import ServicesContext
+    from ai.backend.manager.services.base import ServicesContext
     from ai.backend.manager.services.processors import Processors
 
 type WebRequestHandler = Callable[

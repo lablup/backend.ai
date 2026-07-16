@@ -33,7 +33,7 @@ from ai.backend.common.metrics.metric import GraphQLMetricObserver
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.plugin.network import NetworkPluginContext
-from ai.backend.manager.service.base import ServicesContext
+from ai.backend.manager.services.base import ServicesContext
 from ai.backend.manager.services.processors import Processors
 
 from .audit_log import (

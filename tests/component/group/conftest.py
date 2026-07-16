@@ -26,7 +26,7 @@ from ai.backend.manager.repositories.container_registry.repository import (
 )
 from ai.backend.manager.repositories.group.repositories import GroupRepositories
 from ai.backend.manager.repositories.group.repository import GroupRepository
-from ai.backend.manager.service.container_registry.harbor import (
+from ai.backend.manager.services.container_registry.harbor import (
     AbstractPerProjectContainerRegistryQuotaService,
 )
 from ai.backend.manager.services.container_registry.processors import ContainerRegistryProcessors

@@ -1,4 +1,4 @@
-from .container_registry.harbor import (
+from ai.backend.manager.services.container_registry.harbor import (
     AbstractPerProjectContainerRegistryQuotaService,
 )
 
