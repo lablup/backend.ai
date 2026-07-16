@@ -30,21 +30,11 @@ from ai.backend.manager.data.agent.types import (
     AgentHeartbeatUpsert,
     UpsertResult,
 )
-from ai.backend.manager.data.kernel.types import KernelStatus
-from ai.backend.manager.errors.agent import (
-    AgentHasConflictingSessions,
-    ConflictingSessionRescheduleNotSupported,
-)
-from ai.backend.manager.models.kernel.conditions import KernelConditions
+from ai.backend.manager.errors.agent import ConflictingSessionRescheduleNotSupported
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.agent.repository import AgentRepository
 from ai.backend.manager.repositories.agent.updaters import AgentStatusUpdaterSpec
-from ai.backend.manager.repositories.base import BatchQuerier, NoPagination
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
-from ai.backend.manager.services.agent.actions.cleanup_conflicting_sessions import (
-    CleanupConflictingSessionsAction,
-    CleanupConflictingSessionsActionResult,
-)
 from ai.backend.manager.services.agent.actions.get_total_resources import (
     GetTotalResourcesAction,
     GetTotalResourcesActionResult,
@@ -88,6 +78,10 @@ from ai.backend.manager.services.agent.actions.search_agents import (
 from ai.backend.manager.services.agent.actions.sync_agent_registry import (
     SyncAgentRegistryAction,
     SyncAgentRegistryActionResult,
+)
+from ai.backend.manager.services.agent.actions.update_resource_group import (
+    UpdateAgentResourceGroupAction,
+    UpdateAgentResourceGroupActionResult,
 )
 from ai.backend.manager.services.agent.actions.watcher_agent_restart import (
     WatcherAgentRestartAction,
@@ -173,60 +167,47 @@ class AgentService:
 
         return SyncAgentRegistryActionResult(result=None, agent_data=agent_data)
 
-    async def cleanup_conflicting_sessions(
-        self, action: CleanupConflictingSessionsAction
-    ) -> CleanupConflictingSessionsActionResult:
+    async def update_resource_group(
+        self, action: UpdateAgentResourceGroupAction
+    ) -> UpdateAgentResourceGroupActionResult:
         """
-        Clean up the sessions running on an agent whose resource group is changing.
+        Change an agent's resource group, handling the sessions running on it.
 
-        When an agent moves to a different resource group, every session with an
-        active kernel on it was scheduled under the old group and must be handled.
-        With ``force`` unset, the presence of any such session is an error (the
-        admin drains first). With ``force`` set, the sessions are transitioned per
-        ``policy``; the actual cleanup then proceeds asynchronously.
+        The repository atomically gates on the agent's active sessions (raising
+        AgentHasConflictingSessions when they exist and ``force`` is unset),
+        commits the group change, and returns those sessions. The returned
+        sessions are then transitioned per ``policy``; their cleanup proceeds
+        asynchronously. ``RESCHEDULE`` is not implemented yet.
         """
         agent_id = action.agent_id
-        conflicting_statuses = (
-            KernelStatus.resource_occupied_statuses() | KernelStatus.resource_requested_statuses()
+        if action.policy is ConflictingSessionCleanupPolicy.RESCHEDULE:
+            # Rejected up front so no group change or termination happens.
+            raise ConflictingSessionRescheduleNotSupported()
+
+        kernels = await self._agent_repository.update_resource_group(
+            agent_id, action.resource_group_id, force=action.force
         )
-        querier = BatchQuerier(
-            pagination=NoPagination(),
-            conditions=[
-                KernelConditions.by_agent_id(agent_id),
-                KernelConditions.by_statuses(conflicting_statuses),
-            ],
-        )
-        kernels = await self._scheduler_repository.search_kernels(querier)
         conflicting_session_ids = list({
-            SessionId(UUID(kernel.session.session_id)) for kernel in kernels.items
+            SessionId(UUID(kernel.session.session_id)) for kernel in kernels
         })
 
-        if not conflicting_session_ids:
-            return CleanupConflictingSessionsActionResult(
-                agent_id=agent_id,
-                conflicting_session_ids=[],
-                terminating_session_ids=[],
+        terminating_session_ids: list[SessionId] = []
+        if conflicting_session_ids:
+            # Graceful termination: sessions transition to TERMINATING and the
+            # container cleanup proceeds asynchronously in the next schedule cycle.
+            mark_result = await self._scheduling_controller.mark_sessions_for_termination(
+                conflicting_session_ids,
+                reason=_RESOURCE_GROUP_CHANGED_REASON,
+                forced=False,
             )
+            terminating_session_ids = mark_result.terminating_sessions
 
-        if not action.force:
-            raise AgentHasConflictingSessions(agent_id, len(conflicting_session_ids))
-
-        match action.policy:
-            case ConflictingSessionCleanupPolicy.TERMINATE:
-                # Graceful termination: sessions transition to TERMINATING and the
-                # container cleanup proceeds asynchronously in the next schedule cycle.
-                mark_result = await self._scheduling_controller.mark_sessions_for_termination(
-                    conflicting_session_ids,
-                    reason=_RESOURCE_GROUP_CHANGED_REASON,
-                    forced=False,
-                )
-                return CleanupConflictingSessionsActionResult(
-                    agent_id=agent_id,
-                    conflicting_session_ids=conflicting_session_ids,
-                    terminating_session_ids=mark_result.terminating_sessions,
-                )
-            case ConflictingSessionCleanupPolicy.RESCHEDULE:
-                raise ConflictingSessionRescheduleNotSupported()
+        return UpdateAgentResourceGroupActionResult(
+            agent_id=agent_id,
+            resource_group_id=action.resource_group_id,
+            conflicting_session_ids=conflicting_session_ids,
+            terminating_session_ids=terminating_session_ids,
+        )
 
     async def _request_watcher(
         self,

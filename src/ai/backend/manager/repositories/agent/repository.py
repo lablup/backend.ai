@@ -9,6 +9,7 @@ from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiv
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.data.image.types import ScannedImage
 from ai.backend.common.exception import BackendAIError
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
@@ -23,6 +24,7 @@ from ai.backend.manager.data.agent.types import (
     UpsertResult,
 )
 from ai.backend.manager.data.image.types import ImageDataWithDetails, ImageIdentifier
+from ai.backend.manager.data.kernel.types import KernelInfo
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.resource_slot import AgentResourceRow
@@ -158,6 +160,21 @@ class AgentRepository:
     async def update_agent_status(self, agent_id: AgentId, spec: AgentStatusUpdaterSpec) -> None:
         updater = Updater[AgentRow](spec=spec, pk_value=agent_id)
         await self._db_source.update_agent_status(updater)
+
+    @agent_repository_resilience.apply()
+    async def update_resource_group(
+        self,
+        agent_id: AgentId,
+        resource_group_id: ResourceGroupID,
+        *,
+        force: bool,
+    ) -> list[KernelInfo]:
+        """Change the agent's resource group, returning the kernels still on it.
+
+        Raises AgentHasConflictingSessions if the agent has active kernels and
+        ``force`` is not set; otherwise updates the group and returns those kernels.
+        """
+        return await self._db_source.update_resource_group(agent_id, resource_group_id, force=force)
 
     # For compatibility with redis key made with image canonical strings
     # Use remove_agent_from_images instead of this if possible

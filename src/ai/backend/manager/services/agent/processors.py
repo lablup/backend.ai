@@ -5,10 +5,6 @@ from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.actions.validators import ActionValidators
-from ai.backend.manager.services.agent.actions.cleanup_conflicting_sessions import (
-    CleanupConflictingSessionsAction,
-    CleanupConflictingSessionsActionResult,
-)
 from ai.backend.manager.services.agent.actions.get_total_resources import (
     GetTotalResourcesAction,
     GetTotalResourcesActionResult,
@@ -53,6 +49,10 @@ from ai.backend.manager.services.agent.actions.sync_agent_registry import (
     SyncAgentRegistryAction,
     SyncAgentRegistryActionResult,
 )
+from ai.backend.manager.services.agent.actions.update_resource_group import (
+    UpdateAgentResourceGroupAction,
+    UpdateAgentResourceGroupActionResult,
+)
 from ai.backend.manager.services.agent.actions.watcher_agent_restart import (
     WatcherAgentRestartAction,
     WatcherAgentRestartActionResult,
@@ -91,8 +91,8 @@ class AgentProcessors(AbstractProcessorPackage):
     load_container_counts: ActionProcessor[
         LoadContainerCountsAction, LoadContainerCountsActionResult
     ]
-    cleanup_conflicting_sessions: ActionProcessor[
-        CleanupConflictingSessionsAction, CleanupConflictingSessionsActionResult
+    update_resource_group: ActionProcessor[
+        UpdateAgentResourceGroupAction, UpdateAgentResourceGroupActionResult
     ]
 
     def __init__(
@@ -125,9 +125,7 @@ class AgentProcessors(AbstractProcessorPackage):
         )
         self.search_agents = ActionProcessor(service.search_agents, action_monitors)
         self.load_container_counts = ActionProcessor(service.load_container_counts, action_monitors)
-        self.cleanup_conflicting_sessions = ActionProcessor(
-            service.cleanup_conflicting_sessions, action_monitors
-        )
+        self.update_resource_group = ActionProcessor(service.update_resource_group, action_monitors)
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -144,5 +142,5 @@ class AgentProcessors(AbstractProcessorPackage):
             RemoveAgentFromImagesByCanonicalsAction.spec(),
             SearchAgentsAction.spec(),
             LoadContainerCountsAction.spec(),
-            CleanupConflictingSessionsAction.spec(),
+            UpdateAgentResourceGroupAction.spec(),
         ]

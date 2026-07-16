@@ -15,6 +15,7 @@ from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.event_types.agent.anycast import AgentStartedEvent
 from ai.backend.common.exception import AgentWatcherResponseError
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.types import (
     AgentId,
@@ -35,15 +36,15 @@ from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.agent.repository import AgentRepository
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.repositories.scheduler.types.session import MarkTerminatingResult
-from ai.backend.manager.services.agent.actions.cleanup_conflicting_sessions import (
-    CleanupConflictingSessionsAction,
-)
 from ai.backend.manager.services.agent.actions.get_watcher_status import (
     GetWatcherStatusAction,
 )
 from ai.backend.manager.services.agent.actions.handle_heartbeat import (
     HandleHeartbeatAction,
     HandleHeartbeatActionResult,
+)
+from ai.backend.manager.services.agent.actions.update_resource_group import (
+    UpdateAgentResourceGroupAction,
 )
 from ai.backend.manager.services.agent.actions.watcher_agent_restart import (
     WatcherAgentRestartAction,
@@ -588,10 +589,14 @@ class TestWatcher:
         assert "Agent watcher error" in str(exc_info.value)
 
 
-class TestCleanupConflictingSessions:
+class TestUpdateResourceGroup:
     @pytest.fixture
     def agent_id(self) -> AgentId:
         return AgentId("agent-cleanup")
+
+    @pytest.fixture
+    def target_group_id(self) -> ResourceGroupID:
+        return ResourceGroupID(uuid4())
 
     @staticmethod
     def _mark_result(terminating: list[SessionId]) -> MarkTerminatingResult:
@@ -603,110 +608,122 @@ class TestCleanupConflictingSessions:
         )
 
     @staticmethod
-    def _search_result(session_ids: list[SessionId]) -> MagicMock:
-        """Mimic a KernelListResult: one kernel per session id, exposing session.session_id."""
-        result = MagicMock()
-        result.items = [
+    def _kernels(session_ids: list[SessionId]) -> list[MagicMock]:
+        """Mimic KernelInfo objects: one kernel per session, exposing session.session_id."""
+        return [
             MagicMock(session=MagicMock(session_id=str(session_id))) for session_id in session_ids
         ]
-        return result
 
-    async def test_no_conflicts_without_force_succeeds(
-        self,
-        agent_service: AgentService,
-        mock_scheduler_repository: AsyncMock,
-        mock_scheduling_controller: AsyncMock,
+    @staticmethod
+    def _action(
         agent_id: AgentId,
-    ) -> None:
-        # Given no conflicting kernels
-        mock_scheduler_repository.search_kernels.return_value = self._search_result([])
-        action = CleanupConflictingSessionsAction(
+        target_group_id: ResourceGroupID,
+        *,
+        policy: ConflictingSessionCleanupPolicy = ConflictingSessionCleanupPolicy.TERMINATE,
+        force: bool = False,
+    ) -> UpdateAgentResourceGroupAction:
+        return UpdateAgentResourceGroupAction(
             agent_id=agent_id,
-            policy=ConflictingSessionCleanupPolicy.TERMINATE,
-            force=False,
+            resource_group_id=target_group_id,
+            policy=policy,
+            force=force,
         )
 
-        # When
-        result = await agent_service.cleanup_conflicting_sessions(action)
+    async def test_no_conflicts_commits_group_change(
+        self,
+        agent_service: AgentService,
+        mock_agent_repository: AsyncMock,
+        mock_scheduling_controller: AsyncMock,
+        agent_id: AgentId,
+        target_group_id: ResourceGroupID,
+    ) -> None:
+        # Given the repository reports no active sessions and commits the change
+        mock_agent_repository.update_resource_group.return_value = []
 
-        # Then it succeeds as a no-op without touching the scheduling controller
+        # When
+        result = await agent_service.update_resource_group(
+            self._action(agent_id, target_group_id, force=False)
+        )
+
+        # Then the group is committed without terminating anything
+        assert result.resource_group_id == target_group_id
         assert result.conflicting_session_ids == []
         assert result.terminating_session_ids == []
         mock_scheduling_controller.mark_sessions_for_termination.assert_not_called()
-
-    async def test_conflicts_without_force_raises_and_leaves_sessions_intact(
-        self,
-        agent_service: AgentService,
-        mock_scheduler_repository: AsyncMock,
-        mock_scheduling_controller: AsyncMock,
-        agent_id: AgentId,
-    ) -> None:
-        # Given conflicting kernels exist
-        mock_scheduler_repository.search_kernels.return_value = self._search_result([
-            SessionId(uuid4()),
-        ])
-        action = CleanupConflictingSessionsAction(
-            agent_id=agent_id,
-            policy=ConflictingSessionCleanupPolicy.TERMINATE,
-            force=False,
+        mock_agent_repository.update_resource_group.assert_awaited_once_with(
+            agent_id, target_group_id, force=False
         )
 
-        # When / Then
-        with pytest.raises(AgentHasConflictingSessions):
-            await agent_service.cleanup_conflicting_sessions(action)
+    async def test_conflicts_without_force_raises(
+        self,
+        agent_service: AgentService,
+        mock_agent_repository: AsyncMock,
+        mock_scheduling_controller: AsyncMock,
+        agent_id: AgentId,
+        target_group_id: ResourceGroupID,
+    ) -> None:
+        # Given the repository rejects the change because active sessions remain
+        mock_agent_repository.update_resource_group.side_effect = AgentHasConflictingSessions(
+            agent_id, 1
+        )
 
-        # Sessions are left unchanged
+        # When / Then the error propagates and nothing is terminated
+        with pytest.raises(AgentHasConflictingSessions):
+            await agent_service.update_resource_group(
+                self._action(agent_id, target_group_id, force=False)
+            )
+
         mock_scheduling_controller.mark_sessions_for_termination.assert_not_called()
 
-    async def test_terminate_with_force_marks_sessions_terminating(
+    async def test_force_marks_returned_sessions_terminating(
         self,
         agent_service: AgentService,
-        mock_scheduler_repository: AsyncMock,
+        mock_agent_repository: AsyncMock,
         mock_scheduling_controller: AsyncMock,
         agent_id: AgentId,
+        target_group_id: ResourceGroupID,
     ) -> None:
-        # Given conflicting kernels exist (two distinct sessions)
-        conflicting = [SessionId(uuid4()), SessionId(uuid4())]
-        mock_scheduler_repository.search_kernels.return_value = self._search_result(conflicting)
+        # Given the repository commits the change and returns the remaining kernels
+        remaining = [SessionId(uuid4()), SessionId(uuid4())]
+        mock_agent_repository.update_resource_group.return_value = self._kernels(remaining)
         mock_scheduling_controller.mark_sessions_for_termination.return_value = self._mark_result(
-            conflicting
-        )
-        action = CleanupConflictingSessionsAction(
-            agent_id=agent_id,
-            policy=ConflictingSessionCleanupPolicy.TERMINATE,
-            force=True,
+            remaining
         )
 
         # When
-        result = await agent_service.cleanup_conflicting_sessions(action)
-
-        # Then sessions transition to TERMINATING (graceful, forced=False)
-        mock_scheduling_controller.mark_sessions_for_termination.assert_awaited_once()
-        call = mock_scheduling_controller.mark_sessions_for_termination.call_args
-        assert set(call.args[0]) == set(conflicting)
-        assert call.kwargs["forced"] is False
-        assert set(result.conflicting_session_ids) == set(conflicting)
-        assert result.terminating_session_ids == conflicting
-
-    async def test_reschedule_with_force_is_not_supported(
-        self,
-        agent_service: AgentService,
-        mock_scheduler_repository: AsyncMock,
-        mock_scheduling_controller: AsyncMock,
-        agent_id: AgentId,
-    ) -> None:
-        # Given conflicting kernels exist
-        mock_scheduler_repository.search_kernels.return_value = self._search_result([
-            SessionId(uuid4()),
-        ])
-        action = CleanupConflictingSessionsAction(
-            agent_id=agent_id,
-            policy=ConflictingSessionCleanupPolicy.RESCHEDULE,
-            force=True,
+        result = await agent_service.update_resource_group(
+            self._action(agent_id, target_group_id, force=True)
         )
 
-        # When / Then RESCHEDULE is design-only for now
-        with pytest.raises(ConflictingSessionRescheduleNotSupported):
-            await agent_service.cleanup_conflicting_sessions(action)
+        # Then the returned kernels' sessions transition to TERMINATING (graceful)
+        mock_agent_repository.update_resource_group.assert_awaited_once_with(
+            agent_id, target_group_id, force=True
+        )
+        call = mock_scheduling_controller.mark_sessions_for_termination.call_args
+        assert set(call.args[0]) == set(remaining)
+        assert call.kwargs["forced"] is False
+        assert set(result.conflicting_session_ids) == set(remaining)
+        assert result.terminating_session_ids == remaining
+        assert result.resource_group_id == target_group_id
 
+    async def test_reschedule_is_rejected_before_any_change(
+        self,
+        agent_service: AgentService,
+        mock_agent_repository: AsyncMock,
+        mock_scheduling_controller: AsyncMock,
+        agent_id: AgentId,
+        target_group_id: ResourceGroupID,
+    ) -> None:
+        # When / Then RESCHEDULE is design-only; nothing is changed or terminated
+        with pytest.raises(ConflictingSessionRescheduleNotSupported):
+            await agent_service.update_resource_group(
+                self._action(
+                    agent_id,
+                    target_group_id,
+                    policy=ConflictingSessionCleanupPolicy.RESCHEDULE,
+                    force=True,
+                )
+            )
+
+        mock_agent_repository.update_resource_group.assert_not_called()
         mock_scheduling_controller.mark_sessions_for_termination.assert_not_called()
