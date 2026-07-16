@@ -169,7 +169,6 @@ class AgentRow(Base):  # type: ignore[misc]
         return AgentDataForHeartbeatUpdate(
             status=self.status,
             status_changed=self.status_changed,
-            scaling_group=self.scaling_group,
             available_slots=self.available_slots,
             addr=self.addr,
             public_host=self.public_host,

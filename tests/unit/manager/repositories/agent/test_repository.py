@@ -41,7 +41,7 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.agent.types import AgentHeartbeatUpsert, AgentStatus
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.errors.resource import ScalingGroupNotFound
+from ai.backend.manager.errors.resource import UnresolvableResourceGroup
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
@@ -423,14 +423,16 @@ class TestAgentRepositoryDB:
         agent = await agent_repository.get_by_id(lost_agent.agent_id)
         assert agent.status == AgentStatus.ALIVE
 
-    async def test_sync_agent_heartbeat_scaling_group_change_updates_resource_group_id(
+    async def test_sync_agent_heartbeat_scaling_group_change_is_ignored(
         self,
         agent_repository: AgentRepository,
         alive_agent: AgentFixtureData,
+        scaling_group: ScalingGroupFixtureData,
         sample_agent_info: AgentInfo,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> None:
-        """A heartbeat reporting a different scaling group updates both name and id columns"""
+        """The DB is authoritative: a heartbeat reporting a different scaling group must not
+        change the agent's group columns."""
         new_sgroup_name = str(uuid4())
         new_sgroup_id = ResourceGroupID(uuid4())
         async with db_with_cleanup.begin_session() as db_sess:
@@ -465,14 +467,15 @@ class TestAgentRepositoryDB:
                     )
                 )
             ).one()
-        assert row.scaling_group == new_sgroup_name
-        assert row.resource_group_id == new_sgroup_id
+        assert row.scaling_group == scaling_group.name
+        assert row.resource_group_id == scaling_group.id
 
-    async def test_sync_agent_heartbeat_scaling_group_not_found(
+    async def test_sync_agent_heartbeat_unresolvable_group_no_default(
         self,
         agent_repository: AgentRepository,
     ) -> None:
-        """Test sync_agent_heartbeat raises ScalingGroupNotFound for non-existent scaling group"""
+        """A new agent whose reported group does not exist and with no default group configured
+        fails registration with UnresolvableResourceGroup."""
         agent_id = AgentId("agent-no-sgroup")
         agent_info_with_nonexistent_sg = AgentInfo(
             ip="192.168.1.100",
@@ -501,7 +504,7 @@ class TestAgentRepositoryDB:
             heartbeat_received=datetime.now(tzutc()),
         )
 
-        with pytest.raises(ScalingGroupNotFound):
+        with pytest.raises(UnresolvableResourceGroup):
             await agent_repository.sync_agent_heartbeat(agent_id, upsert_data)
 
     async def test_sync_agent_heartbeat_with_new_resource_slots(
@@ -522,6 +525,323 @@ class TestAgentRepositoryDB:
 
         assert result.need_resource_slot_update is True
         mock_config_provider.legacy_etcd_config_loader.update_resource_slots.assert_called_once()
+
+    # ==================== upsert_agent_with_state tests ====================
+
+    @pytest.fixture
+    def agent_db_source(self, db_with_cleanup: ExtendedAsyncSAEngine) -> AgentDBSource:
+        """AgentDBSource backed by the real test database."""
+        return AgentDBSource(db_with_cleanup)
+
+    @pytest.fixture
+    async def default_scaling_group(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[ScalingGroupFixtureData, None]:
+        """Create a scaling group marked as the default (is_default=True)."""
+        name = str(uuid4())
+        scaling_group_id = ResourceGroupID(uuid4())
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                ScalingGroupRow(
+                    id=scaling_group_id,
+                    name=name,
+                    description="Default scaling group",
+                    is_active=True,
+                    is_public=True,
+                    is_default=True,
+                    driver="static",
+                    driver_opts={},
+                    scheduler="fifo",
+                    scheduler_opts=ScalingGroupOpts(),
+                    use_host_network=False,
+                )
+            )
+        yield ScalingGroupFixtureData(name=name, id=scaling_group_id)
+
+    async def test_upsert_new_agent_inserts_with_resolved_group(
+        self,
+        agent_db_source: AgentDBSource,
+        scaling_group: ScalingGroupFixtureData,
+        sample_agent_info: AgentInfo,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> None:
+        """A new agent (no existing row) is inserted with the resolved resource group."""
+        agent_id = AgentId("upsert-new-resolvable")
+        upsert_data = AgentHeartbeatUpsert.from_agent_info(
+            agent_id=agent_id,
+            agent_info=sample_agent_info,
+            heartbeat_received=datetime.now(tzutc()),
+        )
+
+        result = await agent_db_source.upsert_agent_with_state(upsert_data)
+
+        assert result.was_revived is False
+        assert result.need_resource_slot_update is True
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            row = (
+                await db_sess.execute(
+                    sa.select(
+                        AgentRow.status, AgentRow.scaling_group, AgentRow.resource_group_id
+                    ).where(AgentRow.id == agent_id)
+                )
+            ).one()
+        assert row.status == AgentStatus.ALIVE
+        assert row.scaling_group == scaling_group.name
+        assert row.resource_group_id == scaling_group.id
+
+    async def test_upsert_new_agent_prefers_named_group_over_default(
+        self,
+        agent_db_source: AgentDBSource,
+        scaling_group: ScalingGroupFixtureData,
+        default_scaling_group: ScalingGroupFixtureData,
+        sample_agent_info: AgentInfo,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> None:
+        """With a default group present, a resolvable reported name still wins over the default."""
+        agent_id = AgentId("upsert-new-named-over-default")
+        # sample_agent_info reports scaling_group.name, which exists and is not the default.
+        upsert_data = AgentHeartbeatUpsert.from_agent_info(
+            agent_id=agent_id,
+            agent_info=sample_agent_info,
+            heartbeat_received=datetime.now(tzutc()),
+        )
+
+        await agent_db_source.upsert_agent_with_state(upsert_data)
+
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            row = (
+                await db_sess.execute(
+                    sa.select(AgentRow.scaling_group, AgentRow.resource_group_id).where(
+                        AgentRow.id == agent_id
+                    )
+                )
+            ).one()
+        assert row.scaling_group == scaling_group.name
+        assert row.resource_group_id == scaling_group.id
+        assert row.resource_group_id != default_scaling_group.id
+
+    async def test_upsert_new_agent_unresolvable_name_falls_back_to_default(
+        self,
+        agent_db_source: AgentDBSource,
+        default_scaling_group: ScalingGroupFixtureData,
+        sample_agent_info: AgentInfo,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> None:
+        """A new agent reporting an unknown group is registered into the default group."""
+        agent_id = AgentId("upsert-new-fallback")
+        info = sample_agent_info.model_copy(update={"scaling_group": f"ghost-{uuid4()}"})
+        upsert_data = AgentHeartbeatUpsert.from_agent_info(
+            agent_id=agent_id,
+            agent_info=info,
+            heartbeat_received=datetime.now(tzutc()),
+        )
+
+        await agent_db_source.upsert_agent_with_state(upsert_data)
+
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            row = (
+                await db_sess.execute(
+                    sa.select(AgentRow.scaling_group, AgentRow.resource_group_id).where(
+                        AgentRow.id == agent_id
+                    )
+                )
+            ).one()
+        assert row.scaling_group == default_scaling_group.name
+        assert row.resource_group_id == default_scaling_group.id
+
+    async def test_upsert_new_agent_empty_name_uses_default(
+        self,
+        agent_db_source: AgentDBSource,
+        default_scaling_group: ScalingGroupFixtureData,
+        sample_agent_info: AgentInfo,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> None:
+        """A new agent reporting no group name (empty) is registered into the default group."""
+        agent_id = AgentId("upsert-new-empty")
+        info = sample_agent_info.model_copy(update={"scaling_group": ""})
+        upsert_data = AgentHeartbeatUpsert.from_agent_info(
+            agent_id=agent_id,
+            agent_info=info,
+            heartbeat_received=datetime.now(tzutc()),
+        )
+
+        await agent_db_source.upsert_agent_with_state(upsert_data)
+
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            resource_group_id = await db_sess.scalar(
+                sa.select(AgentRow.resource_group_id).where(AgentRow.id == agent_id)
+            )
+        assert resource_group_id == default_scaling_group.id
+
+    async def test_upsert_new_agent_unresolvable_name_no_default_raises(
+        self,
+        agent_db_source: AgentDBSource,
+        scaling_group: ScalingGroupFixtureData,
+        sample_agent_info: AgentInfo,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> None:
+        """Registration fails when the reported group is unknown and no default group exists."""
+        agent_id = AgentId("upsert-new-noresolve")
+        info = sample_agent_info.model_copy(update={"scaling_group": f"ghost-{uuid4()}"})
+        upsert_data = AgentHeartbeatUpsert.from_agent_info(
+            agent_id=agent_id,
+            agent_info=info,
+            heartbeat_received=datetime.now(tzutc()),
+        )
+
+        with pytest.raises(UnresolvableResourceGroup):
+            await agent_db_source.upsert_agent_with_state(upsert_data)
+
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            exists = await db_sess.scalar(sa.select(AgentRow.id).where(AgentRow.id == agent_id))
+        assert exists is None
+
+    async def test_upsert_existing_agent_keeps_group_on_different_report(
+        self,
+        agent_db_source: AgentDBSource,
+        alive_agent: AgentFixtureData,
+        scaling_group: ScalingGroupFixtureData,
+        sample_agent_info: AgentInfo,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> None:
+        """An existing agent reporting a different (resolvable) group keeps its DB group."""
+        other_name = str(uuid4())
+        other_id = ResourceGroupID(uuid4())
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                ScalingGroupRow(
+                    id=other_id,
+                    name=other_name,
+                    description="Another scaling group",
+                    is_active=True,
+                    is_public=True,
+                    driver="static",
+                    driver_opts={},
+                    scheduler="fifo",
+                    scheduler_opts=ScalingGroupOpts(),
+                    use_host_network=False,
+                )
+            )
+        info = sample_agent_info.model_copy(update={"scaling_group": other_name})
+        upsert_data = AgentHeartbeatUpsert.from_agent_info(
+            agent_id=alive_agent.agent_id,
+            agent_info=info,
+            heartbeat_received=datetime.now(tzutc()),
+        )
+
+        result = await agent_db_source.upsert_agent_with_state(upsert_data)
+
+        assert result.was_revived is False
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            row = (
+                await db_sess.execute(
+                    sa.select(AgentRow.scaling_group, AgentRow.resource_group_id).where(
+                        AgentRow.id == alive_agent.agent_id
+                    )
+                )
+            ).one()
+        assert row.scaling_group == scaling_group.name
+        assert row.resource_group_id == scaling_group.id
+
+    async def test_upsert_revived_agent_keeps_group(
+        self,
+        agent_db_source: AgentDBSource,
+        lost_agent: AgentFixtureData,
+        scaling_group: ScalingGroupFixtureData,
+        sample_agent_info: AgentInfo,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> None:
+        """A redeploy hits the UPDATE path: the lost agent is revived and its group is unchanged."""
+        upsert_data = AgentHeartbeatUpsert.from_agent_info(
+            agent_id=lost_agent.agent_id,
+            agent_info=sample_agent_info,
+            heartbeat_received=datetime.now(tzutc()),
+        )
+
+        result = await agent_db_source.upsert_agent_with_state(upsert_data)
+
+        assert result.was_revived is True
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            row = (
+                await db_sess.execute(
+                    sa.select(
+                        AgentRow.status, AgentRow.scaling_group, AgentRow.resource_group_id
+                    ).where(AgentRow.id == lost_agent.agent_id)
+                )
+            ).one()
+        assert row.status == AgentStatus.ALIVE
+        assert row.scaling_group == scaling_group.name
+        assert row.resource_group_id == scaling_group.id
+
+    async def test_upsert_existing_agent_unresolvable_report_keeps_group(
+        self,
+        agent_db_source: AgentDBSource,
+        alive_agent: AgentFixtureData,
+        scaling_group: ScalingGroupFixtureData,
+        default_scaling_group: ScalingGroupFixtureData,
+        sample_agent_info: AgentInfo,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> None:
+        """An existing agent reporting an unknown group is not moved to the default group."""
+        info = sample_agent_info.model_copy(update={"scaling_group": f"ghost-{uuid4()}"})
+        upsert_data = AgentHeartbeatUpsert.from_agent_info(
+            agent_id=alive_agent.agent_id,
+            agent_info=info,
+            heartbeat_received=datetime.now(tzutc()),
+        )
+
+        await agent_db_source.upsert_agent_with_state(upsert_data)
+
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            row = (
+                await db_sess.execute(
+                    sa.select(AgentRow.scaling_group, AgentRow.resource_group_id).where(
+                        AgentRow.id == alive_agent.agent_id
+                    )
+                )
+            ).one()
+        assert row.scaling_group == scaling_group.name
+        assert row.resource_group_id == scaling_group.id
+
+    async def test_upsert_existing_agent_unresolvable_report_no_default_still_updates(
+        self,
+        agent_db_source: AgentDBSource,
+        alive_agent: AgentFixtureData,
+        scaling_group: ScalingGroupFixtureData,
+        sample_agent_info: AgentInfo,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> None:
+        """An existing agent reporting an unknown group with no default group must not fail its
+        heartbeat: status/resources still update and the group is left unchanged."""
+        new_addr = "tcp://10.0.0.9:6001"
+        info = sample_agent_info.model_copy(
+            update={"scaling_group": f"ghost-{uuid4()}", "addr": new_addr}
+        )
+        upsert_data = AgentHeartbeatUpsert.from_agent_info(
+            agent_id=alive_agent.agent_id,
+            agent_info=info,
+            heartbeat_received=datetime.now(tzutc()),
+        )
+
+        result = await agent_db_source.upsert_agent_with_state(upsert_data)
+
+        assert result.was_revived is False
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            row = (
+                await db_sess.execute(
+                    sa.select(
+                        AgentRow.status,
+                        AgentRow.addr,
+                        AgentRow.scaling_group,
+                        AgentRow.resource_group_id,
+                    ).where(AgentRow.id == alive_agent.agent_id)
+                )
+            ).one()
+        assert row.status == AgentStatus.ALIVE
+        assert row.addr == new_addr  # the heartbeat update actually ran
+        assert row.scaling_group == scaling_group.name  # group unchanged
+        assert row.resource_group_id == scaling_group.id
 
 
 class TestAgentRepositoryCache:
