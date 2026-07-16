@@ -3675,14 +3675,15 @@ class ScheduleDBSource:
 
             return handler_sessions
 
-    async def search_kernels_for_handler(
+    async def search_kernels(
         self,
         querier: BatchQuerier,
     ) -> KernelListResult:
-        """Search kernels for kernel handler execution.
+        """Search kernels matching the given querier conditions.
 
-        This method is for KernelLifecycleHandler. It queries kernels
-        directly using BatchQuerier conditions.
+        Generic single-table kernel search. Cross-entity criteria (e.g. an
+        agent-group comparison) are expressed as correlated subquery conditions
+        via ``KernelConditions``, so the base query stays single-table.
 
         Args:
             querier: BatchQuerier containing conditions, orders, and pagination.
@@ -3700,6 +3701,24 @@ class ScheduleDBSource:
                 has_next_page=result.has_next_page,
                 has_previous_page=result.has_previous_page,
             )
+
+    async def search_kernels_for_handler(
+        self,
+        querier: BatchQuerier,
+    ) -> KernelListResult:
+        """Search kernels for kernel handler execution.
+
+        This method is for KernelLifecycleHandler. It queries kernels
+        directly using BatchQuerier conditions.
+
+        Args:
+            querier: BatchQuerier containing conditions, orders, and pagination.
+                     Use KernelConditions for filtering.
+
+        Returns:
+            KernelListResult containing KernelInfo objects.
+        """
+        return await self.search_kernels(querier)
 
     async def search_sessions_for_handler(
         self,

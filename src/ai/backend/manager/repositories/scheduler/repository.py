@@ -458,6 +458,11 @@ class SchedulerRepository:
         return await self._db_source.update_kernel_status_terminated(kernel_id, reason, exit_code)
 
     @scheduler_repository_resilience.apply()
+    async def search_kernels(self, querier: BatchQuerier) -> KernelListResult:
+        """Search kernels matching the given querier conditions."""
+        return await self._db_source.search_kernels(querier)
+
+    @scheduler_repository_resilience.apply()
     async def get_agent_ids_for_sessions(
         self, session_ids: list[SessionId]
     ) -> dict[SessionId, list[AgentId]]:

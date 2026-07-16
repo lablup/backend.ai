@@ -170,6 +170,7 @@ def create_services(args: ServiceArgs) -> Services:
             args.config_provider,
             repositories.agent.repository,
             repositories.scheduler.repository,
+            args.scheduling_controller,
             args.hook_plugin_ctx,
             args.event_producer,
             args.agent_cache,

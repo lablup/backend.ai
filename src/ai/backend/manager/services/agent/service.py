@@ -1,6 +1,7 @@
 import logging
 from datetime import datetime
 from typing import Any, Literal, cast
+from uuid import UUID
 
 import aiohttp
 import yarl
@@ -20,6 +21,7 @@ from ai.backend.common.exception import (
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.types import (
     AgentId,
+    SessionId,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.agent_cache import AgentRPCCache
@@ -28,10 +30,21 @@ from ai.backend.manager.data.agent.types import (
     AgentHeartbeatUpsert,
     UpsertResult,
 )
+from ai.backend.manager.data.kernel.types import KernelStatus
+from ai.backend.manager.errors.agent import (
+    AgentHasConflictingSessions,
+    ConflictingSessionRescheduleNotSupported,
+)
+from ai.backend.manager.models.kernel.conditions import KernelConditions
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.agent.repository import AgentRepository
 from ai.backend.manager.repositories.agent.updaters import AgentStatusUpdaterSpec
+from ai.backend.manager.repositories.base import BatchQuerier, NoPagination
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
+from ai.backend.manager.services.agent.actions.cleanup_conflicting_sessions import (
+    CleanupConflictingSessionsAction,
+    CleanupConflictingSessionsActionResult,
+)
 from ai.backend.manager.services.agent.actions.get_total_resources import (
     GetTotalResourcesAction,
     GetTotalResourcesActionResult,
@@ -88,9 +101,13 @@ from ai.backend.manager.services.agent.actions.watcher_agent_stop import (
     WatcherAgentStopAction,
     WatcherAgentStopActionResult,
 )
+from ai.backend.manager.services.agent.types import ConflictingSessionCleanupPolicy
+from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 from ai.backend.manager.types import OptionalState
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+_RESOURCE_GROUP_CHANGED_REASON = "AGENT_RESOURCE_GROUP_CHANGED"
 
 
 class AgentService:
@@ -99,6 +116,7 @@ class AgentService:
     _agent_registry: AgentRegistry
     _agent_repository: AgentRepository
     _scheduler_repository: SchedulerRepository
+    _scheduling_controller: SchedulingController
     _hook_plugin_ctx: HookPluginContext
     _event_producer: EventProducer
     _agent_cache: AgentRPCCache
@@ -110,6 +128,7 @@ class AgentService:
         config_provider: ManagerConfigProvider,
         agent_repository: AgentRepository,
         scheduler_repository: SchedulerRepository,
+        scheduling_controller: SchedulingController,
         hook_plugin_ctx: HookPluginContext,
         event_producer: EventProducer,
         agent_cache: AgentRPCCache,
@@ -119,6 +138,7 @@ class AgentService:
         self._config_provider = config_provider
         self._agent_repository = agent_repository
         self._scheduler_repository = scheduler_repository
+        self._scheduling_controller = scheduling_controller
         self._hook_plugin_ctx = hook_plugin_ctx
         self._event_producer = event_producer
         self._agent_cache = agent_cache
@@ -152,6 +172,61 @@ class AgentService:
         agent_data = await self._agent_repository.get_by_id(agent_id)
 
         return SyncAgentRegistryActionResult(result=None, agent_data=agent_data)
+
+    async def cleanup_conflicting_sessions(
+        self, action: CleanupConflictingSessionsAction
+    ) -> CleanupConflictingSessionsActionResult:
+        """
+        Clean up the sessions running on an agent whose resource group is changing.
+
+        When an agent moves to a different resource group, every session with an
+        active kernel on it was scheduled under the old group and must be handled.
+        With ``force`` unset, the presence of any such session is an error (the
+        admin drains first). With ``force`` set, the sessions are transitioned per
+        ``policy``; the actual cleanup then proceeds asynchronously.
+        """
+        agent_id = action.agent_id
+        conflicting_statuses = (
+            KernelStatus.resource_occupied_statuses() | KernelStatus.resource_requested_statuses()
+        )
+        querier = BatchQuerier(
+            pagination=NoPagination(),
+            conditions=[
+                KernelConditions.by_agent_id(agent_id),
+                KernelConditions.by_statuses(conflicting_statuses),
+            ],
+        )
+        kernels = await self._scheduler_repository.search_kernels(querier)
+        conflicting_session_ids = list({
+            SessionId(UUID(kernel.session.session_id)) for kernel in kernels.items
+        })
+
+        if not conflicting_session_ids:
+            return CleanupConflictingSessionsActionResult(
+                agent_id=agent_id,
+                conflicting_session_ids=[],
+                terminating_session_ids=[],
+            )
+
+        if not action.force:
+            raise AgentHasConflictingSessions(agent_id, len(conflicting_session_ids))
+
+        match action.policy:
+            case ConflictingSessionCleanupPolicy.TERMINATE:
+                # Graceful termination: sessions transition to TERMINATING and the
+                # container cleanup proceeds asynchronously in the next schedule cycle.
+                mark_result = await self._scheduling_controller.mark_sessions_for_termination(
+                    conflicting_session_ids,
+                    reason=_RESOURCE_GROUP_CHANGED_REASON,
+                    forced=False,
+                )
+                return CleanupConflictingSessionsActionResult(
+                    agent_id=agent_id,
+                    conflicting_session_ids=conflicting_session_ids,
+                    terminating_session_ids=mark_result.terminating_sessions,
+                )
+            case ConflictingSessionCleanupPolicy.RESCHEDULE:
+                raise ConflictingSessionRescheduleNotSupported()
 
     async def _request_watcher(
         self,
