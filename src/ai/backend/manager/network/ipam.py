@@ -14,7 +14,12 @@ from urllib.parse import quote
 
 from ai.backend.common.network.keys import endpoint_key, session_ipam_key
 from ai.backend.common.network.types import mac_for_ip
-from ai.backend.manager.errors.network import NetworkPoolExhausted, VNIPoolExhausted
+from ai.backend.manager.errors.network import (
+    NetworkPoolExhausted,
+    RequestedSubnetInvalid,
+    RequestedSubnetUnavailable,
+    VNIPoolExhausted,
+)
 
 if TYPE_CHECKING:
     from ai.backend.common.etcd import AsyncEtcd
@@ -40,6 +45,27 @@ def _prefix_for_hosts(host_count: int, *, default_prefixlen: int, floor_prefixle
     return prefixlen
 
 
+def _allocated_key(cidr: str) -> str:
+    return f"{_ALLOCATED_PREFIX}/{quote(cidr, safe='')}"
+
+
+def _unit_blocks(
+    subnet: ipaddress.IPv4Network | ipaddress.IPv6Network, unit_prefixlen: int
+) -> list[str]:
+    """The fixed-size unit blocks a session subnet is composed of.
+
+    A session block is never narrower than ``unit_prefixlen`` (widening only lowers the prefix),
+    so it tiles into ``2**(unit_prefixlen - subnet.prefixlen)`` contiguous unit blocks. Claiming
+    the allocation at this fixed granularity — the way Docker's IPAM carves its pool into
+    fixed-size subnets — is what lets a wider block collide (via CAS on a shared unit) with a
+    narrower one it contains, instead of both succeeding on distinct exact-CIDR keys and
+    overlapping. ``unit_prefixlen`` clamps up to ``subnet.prefixlen`` for a subnet that is already
+    at (or below) unit size, which yields the subnet itself as its sole unit.
+    """
+    new_prefix = max(unit_prefixlen, subnet.prefixlen)
+    return [str(unit) for unit in subnet.subnets(new_prefix=new_prefix)]
+
+
 class SubnetAllocator:
     """Allocates per-session subnets from a pool using etcd CAS."""
 
@@ -58,34 +84,95 @@ class SubnetAllocator:
         self._pool = pool
         self._block_prefixlen = block_prefixlen
 
-    async def acquire(self, session_id: str, *, host_count: int = 1) -> str:
-        """Claim the first free block sized for ``host_count`` endpoints, via CAS.
+    async def acquire(
+        self, session_id: str, *, host_count: int = 1, subnet: str | None = None
+    ) -> str:
+        """Claim a session subnet via CAS and return its CIDR.
 
-        The block prefix is chosen so the session subnet can hold every endpoint of the
-        cluster (``host_count`` = total containers), removing the fixed-``/24`` 254-endpoint
-        ceiling. ``host_count=1`` yields the default ``/24``.
+        Two modes, mirroring ``docker network create``:
+
+        - **Auto** (``subnet is None``): claim the first free block sized for ``host_count``
+          endpoints (``host_count`` = total containers), removing the fixed-``/24`` 254-endpoint
+          ceiling. ``host_count=1`` yields the default ``/24``. An overlapping/taken block is
+          skipped for the next candidate.
+        - **Explicit** (``subnet`` given, like ``--subnet``): claim exactly that block. An overlap
+          is a hard failure, not a relocation, and ``host_count`` is ignored (the request already
+          fixed the size).
+
+        Either way the block is registered as its fixed-size *unit* blocks (``block_prefixlen``),
+        not as a single variable-width key: a wider block and a narrower one that overlaps it share
+        a unit, so the CAS on that unit rejects the overlap. A block only partially claimed (a later
+        unit was already taken) is fully released before the mode's failure/skip, so it is never
+        split between two sessions.
 
         Raises:
-            NetworkPoolExhausted: no free block of the required size remains.
+            NetworkPoolExhausted: auto mode, no free block of the required size remains.
+            RequestedSubnetInvalid: explicit mode, the subnet is malformed, unaligned, outside the
+                pool, or narrower than one unit block.
+            RequestedSubnetUnavailable: explicit mode, the subnet overlaps an allocated block.
         """
         pool = ipaddress.ip_network(self._pool)
+        payload = json.dumps({"session_id": session_id})
+        if subnet is not None:
+            return await self._acquire_requested(subnet, pool, payload)
         prefixlen = _prefix_for_hosts(
             host_count,
             default_prefixlen=self._block_prefixlen,
             floor_prefixlen=pool.prefixlen,
         )
         for candidate in pool.subnets(new_prefix=prefixlen):
-            cidr = str(candidate)
-            claimed = await self._etcd.put_if_absent(
-                f"{_ALLOCATED_PREFIX}/{quote(cidr, safe='')}",
-                json.dumps({"session_id": session_id}),
-            )
-            if claimed:
-                return cidr
+            if await self._try_claim_units(candidate, payload):
+                return str(candidate)
         raise NetworkPoolExhausted()
 
+    async def _acquire_requested(
+        self,
+        subnet: str,
+        pool: ipaddress.IPv4Network | ipaddress.IPv6Network,
+        payload: str,
+    ) -> str:
+        """Claim an explicitly requested block, validating it against the pool first."""
+        try:
+            # strict=True rejects a subnet whose host bits are set, i.e. one not aligned to its
+            # own prefix (e.g. 10.128.1.0/23) — the same misalignment Docker's IPAM rejects.
+            requested = ipaddress.ip_network(subnet, strict=True)
+        except ValueError as e:
+            raise RequestedSubnetInvalid(
+                f"'{subnet}' is not a valid, prefix-aligned subnet: {e}"
+            ) from e
+        if requested.version != pool.version or not requested.subnet_of(pool):  # type: ignore[arg-type]
+            raise RequestedSubnetInvalid(f"'{requested}' is not contained in the IPAM pool {pool}.")
+        if requested.prefixlen > self._block_prefixlen:
+            raise RequestedSubnetInvalid(
+                f"'{requested}' is narrower than one unit block (/{self._block_prefixlen}); the pool"
+                " is accounted at that granularity. Lower ipam-block-size to request a smaller block."
+            )
+        if not await self._try_claim_units(requested, payload):
+            raise RequestedSubnetUnavailable(
+                f"'{requested}' overlaps a subnet already allocated to another session."
+            )
+        return str(requested)
+
+    async def _try_claim_units(
+        self,
+        candidate: ipaddress.IPv4Network | ipaddress.IPv6Network,
+        payload: str,
+    ) -> bool:
+        """CAS-claim every unit block of ``candidate``; return False (and give back any partial
+        claim) if any unit is already owned, so the block is never split between two sessions."""
+        claimed: list[str] = []
+        for unit in _unit_blocks(candidate, self._block_prefixlen):
+            if await self._etcd.put_if_absent(_allocated_key(unit), payload):
+                claimed.append(unit)
+                continue
+            for taken in claimed:
+                await self._etcd.delete(_allocated_key(taken))
+            return False
+        return True
+
     async def release(self, subnet: str) -> None:
-        await self._etcd.delete(f"{_ALLOCATED_PREFIX}/{quote(subnet, safe='')}")
+        for unit in _unit_blocks(ipaddress.ip_network(subnet), self._block_prefixlen):
+            await self._etcd.delete(_allocated_key(unit))
 
 
 class EndpointAllocator:

@@ -6,6 +6,7 @@ delegated to etcd and verified separately against a live cluster. CNINetworkPlug
 create/destroy remain contract guards until P2 fills them in.
 """
 
+import ipaddress
 import json
 from typing import Any, cast
 
@@ -14,8 +15,11 @@ import pytest
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.network.types import NetworkBackendKind, mac_for_ip
 from ai.backend.manager.errors.network import (
+    ForcedBackendUnsupported,
     NetworkBackendMismatch,
     NetworkPoolExhausted,
+    RequestedSubnetInvalid,
+    RequestedSubnetUnavailable,
     VNIPoolExhausted,
 )
 from ai.backend.manager.network.cni import CNINetworkPlugin
@@ -141,6 +145,74 @@ class TestVariableSubnetSizing:
         allocator = _subnet_allocator(FakeEtcd())
         assert await allocator.acquire("s1") == "10.128.0.0/24"
 
+    async def test_wide_block_skips_subnet_that_overlaps_a_narrow_one(self) -> None:
+        # A /24 is taken; a later 300-endpoint session needs a /23. The /23 at the pool's
+        # start (10.128.0.0/23) contains the taken /24, so it must be skipped rather than
+        # allocated on top of it.
+        etcd = FakeEtcd()
+        allocator = _subnet_allocator(etcd)
+        assert await allocator.acquire("s1") == "10.128.0.0/24"
+        wide = await allocator.acquire("s2", host_count=300)
+        assert wide == "10.128.2.0/23"
+        assert not ipaddress.ip_network(wide).overlaps(ipaddress.ip_network("10.128.0.0/24"))
+
+    async def test_narrow_block_skips_unit_owned_by_a_wide_one(self) -> None:
+        # The reverse order: a /23 is taken first, then default /24 requests must land past it.
+        etcd = FakeEtcd()
+        allocator = _subnet_allocator(etcd)
+        assert await allocator.acquire("s1", host_count=300) == "10.128.0.0/23"
+        # both /24 units of the /23 are owned, so the next /24 is 10.128.2.0/24
+        assert await allocator.acquire("s2") == "10.128.2.0/24"
+
+    async def test_release_of_wide_block_frees_every_unit(self) -> None:
+        etcd = FakeEtcd()
+        allocator = _subnet_allocator(etcd)
+        wide = await allocator.acquire("s1", host_count=300)
+        await allocator.release(wide)
+        # every /24 unit is free again, so a /24 request reuses the block's start
+        assert await allocator.acquire("s2") == "10.128.0.0/24"
+        assert await allocator.acquire("s3") == "10.128.1.0/24"
+
+
+class TestExplicitSubnet:
+    async def test_requested_subnet_is_claimed_verbatim(self) -> None:
+        allocator = _subnet_allocator(FakeEtcd())
+        # like `docker network create --subnet`: the exact block is honored, not auto-picked
+        assert await allocator.acquire("s1", subnet="10.128.5.0/24") == "10.128.5.0/24"
+
+    async def test_requested_wide_subnet_claims_all_units(self) -> None:
+        etcd = FakeEtcd()
+        allocator = _subnet_allocator(etcd)
+        assert await allocator.acquire("s1", subnet="10.128.4.0/23") == "10.128.4.0/23"
+        # both /24 units are now owned, so an auto /24 lands past them
+        assert await allocator.acquire("s2") == "10.128.0.0/24"
+
+    async def test_overlap_with_existing_is_a_hard_failure(self) -> None:
+        # unlike auto mode (which skips), an explicit request overlapping a taken block errors
+        etcd = FakeEtcd()
+        allocator = _subnet_allocator(etcd)
+        await allocator.acquire("s1")  # 10.128.0.0/24
+        with pytest.raises(RequestedSubnetUnavailable):
+            await allocator.acquire("s2", subnet="10.128.0.0/23")  # contains the taken /24
+        # the failed request left nothing behind: the free /24 unit is still claimable
+        assert await allocator.acquire("s3", subnet="10.128.1.0/24") == "10.128.1.0/24"
+
+    async def test_subnet_outside_pool_is_rejected(self) -> None:
+        allocator = _subnet_allocator(FakeEtcd())
+        with pytest.raises(RequestedSubnetInvalid):
+            await allocator.acquire("s1", subnet="192.168.0.0/24")
+
+    async def test_misaligned_subnet_is_rejected(self) -> None:
+        allocator = _subnet_allocator(FakeEtcd())
+        with pytest.raises(RequestedSubnetInvalid):
+            # host bits set for a /23 (10.128.1.0 is not a /23 boundary)
+            await allocator.acquire("s1", subnet="10.128.1.0/23")
+
+    async def test_subnet_narrower_than_unit_is_rejected(self) -> None:
+        allocator = _subnet_allocator(FakeEtcd())  # unit block is /24
+        with pytest.raises(RequestedSubnetInvalid):
+            await allocator.acquire("s1", subnet="10.128.0.0/26")
+
 
 class TestMacForIp:
     def test_stable_and_ip_encoded(self) -> None:
@@ -203,10 +275,17 @@ class TestSelectBackend:
         plugin = _plugin_with(FakeEtcd())
         assert plugin._select_backend(None) is NetworkBackendKind.VXLAN
 
-    def test_forced_backend_wins(self) -> None:
+    def test_forced_vxlan_wins(self) -> None:
         plugin = _plugin_with(FakeEtcd())
-        for backend in (NetworkBackendKind.VXLAN, NetworkBackendKind.BRIDGE):
-            assert plugin._select_backend(backend) is backend
+        assert plugin._select_backend(NetworkBackendKind.VXLAN) is NetworkBackendKind.VXLAN
+
+    def test_forced_bridge_is_rejected(self) -> None:
+        # bridge is node-local (single-node); this control plane only serves multi-node sessions,
+        # whose IPs are centrally assigned over an overlay. Pinning bridge would produce an
+        # /etc/hosts naming overlay IPs no container holds, so it is refused up-front.
+        plugin = _plugin_with(FakeEtcd())
+        with pytest.raises(ForcedBackendUnsupported):
+            plugin._select_backend(NetworkBackendKind.BRIDGE)
 
 
 class TestCreateNetwork:
@@ -236,13 +315,14 @@ class TestCreateNetwork:
         assert info.options["mtu"] == 1450  # 1500 underlay - 50 VXLAN overhead
         assert json.loads(etcd.store["network/session/s1/meta"])["mtu"] == 1450
 
-    async def test_non_vxlan_backend_has_no_vni(self) -> None:
-        # a VNI is a vxlan concept; the bridge backend gets none.
+    async def test_forced_bridge_backend_is_rejected_before_any_allocation(self) -> None:
+        # bridge cannot serve a multi-node session (this control plane's only caller); the
+        # request is refused up-front, so no subnet/VNI/meta is claimed and nothing leaks.
         etcd = FakeEtcd()
         plugin = _plugin_with(etcd)
-        info = await plugin.create_network(identifier="s2", options={"forced_backend": "bridge"})
-        assert info.options["backend"] == "bridge"
-        assert info.options["vni"] is None
+        with pytest.raises(ForcedBackendUnsupported):
+            await plugin.create_network(identifier="s2", options={"forced_backend": "bridge"})
+        assert etcd.store == {}
 
     async def test_assigns_disjoint_endpoint_ips_and_records_them(self) -> None:
         etcd = FakeEtcd()
@@ -335,17 +415,6 @@ class TestCreateNetwork:
         assert info.options["vni"] == 4096  # first VNI, reused
         # a2 falls back to self-publish + watch convergence (no seed written)
         assert "network/session/s1/members/a2" not in etcd.store
-
-    async def test_non_vxlan_backend_does_not_preseed_members(self) -> None:
-        etcd = FakeEtcd()
-        etcd.store["network/agent/a1/vtep"] = "192.168.105.7"
-        plugin = _plugin_with(etcd)
-        await plugin.create_network(
-            identifier="s2",
-            options={"forced_backend": "bridge", "member_agents": ["a1"]},
-        )
-        # VTEP-based pre-seed applies to vxlan only
-        assert "network/session/s2/members/a1" not in etcd.store
 
 
 class TestMemberBackendCompat:

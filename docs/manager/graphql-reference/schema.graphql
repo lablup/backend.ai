@@ -2588,7 +2588,16 @@ type Mutation {
   check_and_transit_session_status(input: CheckAndTransitStatusInput!): CheckAndTransitStatus
 
   """Added in 24.12.0."""
-  create_network(driver: String, name: String!, project_id: UUID!): CreateNetwork
+  create_network(
+    driver: String
+    name: String!
+    project_id: UUID!
+
+    """
+    Explicit CIDR for this network's address block, like `docker network create --subnet` (added in 26.7.0). Must be aligned to its own prefix, contained in the manager's IPAM pool, and no narrower than one IPAM block. Omit to auto-allocate. Honored by the 'cni' driver; ignored by the 'overlay' (Swarm) driver.
+    """
+    subnet: String
+  ): CreateNetwork
 
   """Added in 24.12.0."""
   modify_network(network: String!, props: ModifyNetworkInput!): ModifyNetwork

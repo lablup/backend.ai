@@ -28,6 +28,7 @@ from ai.backend.common.network.types import (
     NetworkBackendKind,
 )
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.errors.network import ForcedBackendUnsupported
 from ai.backend.manager.network.ipam import (
     DEFAULT_BLOCK_PREFIXLEN,
     DEFAULT_IPAM_POOL,
@@ -112,6 +113,9 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         # Each endpoint = one container: {"container_id", "agent_id"}. The manager assigns
         # its overlay IP centrally (BEP-1062) so per-node IPs are disjoint.
         endpoints = list(options.get("endpoints", []))
+        # Optional explicit subnet (like `docker network create --subnet`): when set, the
+        # allocator claims exactly this block and fails on overlap instead of auto-sizing.
+        requested_subnet = options.get("subnet")
 
         await self._require_members_cni_capable(member_agents)
         backend = self._select_backend(forced_backend)
@@ -119,7 +123,11 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
         # A failure to acquire the subnet claims nothing, so it needs no rollback; every
         # subsequent claim (VNI, endpoint IPs, meta/member keys) is undone on any failure so a
         # partial create never leaks a block/VNI or lets a retry consume fresh ones.
-        subnet = await self._subnet_allocator.acquire(session_id, host_count=max(len(endpoints), 1))
+        subnet = await self._subnet_allocator.acquire(
+            session_id,
+            host_count=max(len(endpoints), 1),
+            subnet=str(requested_subnet) if requested_subnet else None,
+        )
         vni: int | None = None
         try:
             if backend is NetworkBackendKind.VXLAN:
@@ -225,6 +233,17 @@ class CNINetworkPlugin(AbstractNetworkManagerPlugin):
 
     def _select_backend(self, forced_backend: NetworkBackendKind | None) -> NetworkBackendKind:
         """The operator's forced backend wins; otherwise every multi-node cluster session uses
-        the portable vxlan overlay. (Single-node sessions use the bridge backend, which the agent
-        selects, not this manager plugin.)"""
+        the portable vxlan overlay.
+
+        This control plane only ever provisions multi-node sessions — single-node sessions never
+        reach it (the agent selects their node-local bridge backend directly). The bridge backend
+        is node-local and ignores the manager's central IPAM, so pinning it here would provision a
+        session whose /etc/hosts names overlay IPs no container holds. Reject it rather than hand
+        back unusable networking; 'vxlan' (or an unset override) is the only valid choice here.
+        """
+        if forced_backend is NetworkBackendKind.BRIDGE:
+            raise ForcedBackendUnsupported(
+                "the 'bridge' data-plane backend is node-local (single-node) and cannot serve a"
+                " multi-node cluster session; use 'vxlan' (the default) or leave forced-backend unset."
+            )
         return forced_backend if forced_backend is not None else NetworkBackendKind.VXLAN

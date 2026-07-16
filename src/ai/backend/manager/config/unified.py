@@ -211,6 +211,7 @@ from ai.backend.common.meta import (
     CompositeType,
     ConfigExample,
 )
+from ai.backend.common.network.types import NetworkBackendKind
 from ai.backend.common.typed_validators import (
     AutoDirectoryPath,
     CommaSeparatedStrList,
@@ -1965,15 +1966,49 @@ class InterContainerNetworkConfig(BaseConfigSchema):
         BackendAIConfigMeta(
             description=(
                 "Pins the cluster-network data-plane backend when default_driver='cni'. "
-                "One of 'vxlan' or 'bridge'. "
+                "Only 'vxlan' may be pinned; 'bridge' is rejected at startup because it is "
+                "node-local (single-node) and cannot serve a multi-node cluster session. "
                 "When unset (null), multi-node cluster sessions use the portable 'vxlan' overlay "
-                "(single-node sessions use 'bridge', chosen by the agent). "
+                "(single-node sessions use 'bridge', chosen by the agent, never pinned here). "
                 "See BEP-1062."
             ),
             added_version="25.14.0",
             example=ConfigExample(local="vxlan", prod="null"),
         ),
     ]
+
+    @model_validator(mode="after")
+    def _validate_forced_backend(self) -> Self:
+        # forced-backend only takes effect under the 'cni' driver (BEP-1062); the 'overlay' (Swarm)
+        # driver — the default — ignores it. Validate it only when it is actually consumed, so a
+        # stale/legacy value left on an overlay deployment (e.g. a 'wireguard'/'host-gw' pin from
+        # when those backends existed) does not fail manager startup for a field with no effect
+        # there.
+        #
+        # Under 'cni': 'bridge' is a node-local (single-node) backend with no cross-node overlay
+        # that ignores the manager's central IPAM, so pinning it would make every multi-node
+        # session's /etc/hosts name overlay IPs no container actually holds. Single-node sessions
+        # get 'bridge' from the agent, never from this pin, so 'bridge' (and any unknown value) is
+        # meaningless here. Only 'vxlan' is a valid pin; reject anything else at startup rather than
+        # at the first cluster session. The CNI plugin's _select_backend enforces the same rule at
+        # its own call boundary — kept here too so a misconfiguration fails fast at config load.
+        if self.default_driver != "cni":
+            return self
+        if (
+            self.forced_backend is not None
+            and self.forced_backend != NetworkBackendKind.VXLAN.value
+        ):
+            if self.forced_backend == NetworkBackendKind.BRIDGE.value:
+                raise ValueError(
+                    "forced-backend 'bridge' is not allowed: it is a node-local single-node backend"
+                    " that cannot serve a multi-node cluster session. Use 'vxlan' or leave"
+                    " forced-backend unset."
+                )
+            raise ValueError(
+                f"forced-backend '{self.forced_backend}' is not a valid cluster-network backend;"
+                " only 'vxlan' may be pinned (or leave forced-backend unset)."
+            )
+        return self
 
     @model_validator(mode="after")
     def _validate_ipam_pool(self) -> Self:

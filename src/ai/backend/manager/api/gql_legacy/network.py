@@ -226,6 +226,15 @@ class CreateNetwork(graphene.Mutation):  # type: ignore[misc]
         name = graphene.String(required=True)
         project_id = graphene.UUID(required=True)
         driver = graphene.String()
+        subnet = graphene.String(
+            required=False,
+            description=(
+                "Explicit CIDR for this network's address block, like `docker network create "
+                "--subnet` (added in 26.7.0). Must be aligned to its own prefix, contained in the "
+                "manager's IPAM pool, and no narrower than one IPAM block. Omit to auto-allocate. "
+                "Honored by the 'cni' driver; ignored by the 'overlay' (Swarm) driver."
+            ),
+        )
 
     ok = graphene.Boolean()
     msg = graphene.String()
@@ -238,6 +247,7 @@ class CreateNetwork(graphene.Mutation):  # type: ignore[misc]
         name: str,
         project_id: uuid.UUID,
         driver: str | None,
+        subnet: str | None = None,
     ) -> CreateNetwork:
         graph_ctx: GraphQueryContext = info.context
         network_config = graph_ctx.config_provider.config.network.inter_container
@@ -275,8 +285,11 @@ class CreateNetwork(graphene.Mutation):  # type: ignore[misc]
                 )
 
         network_plugin = graph_ctx.network_plugin_ctx.plugins[_driver]
+        # An explicit subnet is validated and claimed inside create_network (RequestedSubnet* is
+        # raised on a bad/overlapping request); auto-allocation runs when it is omitted.
+        create_options = {"subnet": subnet} if subnet else None
         try:
-            network_info = await network_plugin.create_network()
+            network_info = await network_plugin.create_network(options=create_options)
             network_name = network_info.network_id
         except Exception:
             log.exception("Failed to create the inter-container network (plugin: {})", _driver)

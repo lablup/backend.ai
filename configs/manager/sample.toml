@@ -766,10 +766,11 @@
     # sessions into the pool.
     # Added in 26.7.0
     ipam-block-size = 24
-    # Pins the cluster-network data-plane backend when default_driver='cni'. One
-    # of 'vxlan', 'host-gw', or 'wireguard'. When unset (null), the backend is
-    # selected per session from agent capabilities ('host-gw' if all members
-    # support native routing, otherwise 'vxlan'). See BEP-1062.
+    # Pins the cluster-network data-plane backend when default_driver='cni'. Only
+    # 'vxlan' is valid for a multi-node cluster session; the node-local 'bridge'
+    # backend serves single-node sessions and is selected by the agent, not pinned
+    # here (pinning it is rejected at session creation). When unset (null),
+    # multi-node sessions use the vxlan overlay. See BEP-1062.
     # Added in 25.14.0
     ## forced-backend = "null"
 
