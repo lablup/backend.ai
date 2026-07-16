@@ -19,7 +19,6 @@ from ai.backend.manager.data.app_config_fragment.types import (
     AppConfigFragmentSearchResult,
 )
 from ai.backend.manager.errors.app_config import AppConfigFragmentNotFound
-from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
 from ai.backend.manager.repositories.app_config_fragment.creators import (
     AppConfigFragmentCreatorSpec,
 )
@@ -37,7 +36,6 @@ from ai.backend.manager.repositories.base import (
     OffsetPagination,
     Updater,
 )
-from ai.backend.manager.repositories.base.rbac.entity_purger import RBACEntityPurger
 from ai.backend.manager.services.app_config_fragment.actions.admin_search import (
     AdminSearchAppConfigFragmentAction,
 )
@@ -319,15 +317,7 @@ class TestAppConfigFragmentService:
 
         assert result.succeeded == fragments
         assert result.failed == []
-        # each fragment is purged through its RBAC purger, so its scope binding goes with it
-        mock_repository.bulk_purge.assert_called_once_with([
-            RBACEntityPurger(
-                row_class=AppConfigFragmentRow,
-                pk_value=spec.fragment_id,
-                spec=spec,
-            )
-            for spec in purger_specs
-        ])
+        mock_repository.bulk_purge.assert_called_once_with(purger_specs)
 
 
 class TestCreateActionScope:

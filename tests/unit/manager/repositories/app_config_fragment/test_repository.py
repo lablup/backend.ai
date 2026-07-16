@@ -54,7 +54,6 @@ from ai.backend.manager.repositories.base import (
     OffsetPagination,
     Updater,
 )
-from ai.backend.manager.repositories.base.rbac.entity_purger import RBACEntityPurger
 from ai.backend.manager.repositories.ops.rbac.provider import RBACOpsProvider
 from ai.backend.manager.types import OptionalState
 from ai.backend.testutils.db import with_tables
@@ -497,12 +496,7 @@ class TestBulkPurge:
         two_fragments: list[AppConfigFragmentData],
     ) -> None:
         result = await repository.bulk_purge([
-            RBACEntityPurger(
-                row_class=AppConfigFragmentRow,
-                pk_value=fragment.id,
-                spec=AppConfigFragmentPurgerSpec(fragment_id=fragment.id),
-            )
-            for fragment in two_fragments
+            AppConfigFragmentPurgerSpec(fragment_id=fragment.id) for fragment in two_fragments
         ])
         assert {p.id for p in result.succeeded} == {f.id for f in two_fragments}
         assert result.failed == []
@@ -517,16 +511,8 @@ class TestBulkPurge:
     ) -> None:
         missing_id = AppConfigFragmentID(uuid.uuid4())
         result = await repository.bulk_purge([
-            RBACEntityPurger(
-                row_class=AppConfigFragmentRow,
-                pk_value=two_fragments[0].id,
-                spec=AppConfigFragmentPurgerSpec(fragment_id=two_fragments[0].id),
-            ),
-            RBACEntityPurger(  # missing -> reported
-                row_class=AppConfigFragmentRow,
-                pk_value=missing_id,
-                spec=AppConfigFragmentPurgerSpec(fragment_id=missing_id),
-            ),
+            AppConfigFragmentPurgerSpec(fragment_id=two_fragments[0].id),
+            AppConfigFragmentPurgerSpec(fragment_id=missing_id),  # missing -> reported
         ])
         # partial: the existing fragment is purged; the missing one (index 1) is reported
         assert [p.id for p in result.succeeded] == [two_fragments[0].id]
@@ -801,13 +787,7 @@ class TestRBACScopeAssociation:
         assert await self._scope_bindings(database, str(created.id)) == [
             _ScopeBinding(scope_type=ScopeType.USER, scope_id=_USER_ID)
         ]
-        result = await repository.bulk_purge([
-            RBACEntityPurger(
-                row_class=AppConfigFragmentRow,
-                pk_value=created.id,
-                spec=AppConfigFragmentPurgerSpec(fragment_id=created.id),
-            )
-        ])
+        result = await repository.bulk_purge([AppConfigFragmentPurgerSpec(fragment_id=created.id)])
         assert [p.id for p in result.succeeded] == [created.id]
         assert await self._scope_bindings(database, str(created.id)) == []
         with pytest.raises(AppConfigFragmentNotFound):
