@@ -30,7 +30,7 @@ from ai.backend.common.resilience import (
     RetryArgs,
     RetryPolicy,
 )
-from ai.backend.common.types import ValkeyTarget
+from ai.backend.common.types import SessionId, ValkeyTarget
 from ai.backend.logging.utils import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -54,6 +54,10 @@ _DEFAULT_EXPIRATION = 3600  # 1 hour default expiration
 _SESSION_REQUESTS_SUFFIX: Final[str] = "requests"
 _SESSION_LAST_RESPONSE_SUFFIX: Final[str] = "last_response_time"
 _AGENT_LAST_SEEN_HASH: Final[str] = "agent.last_seen"
+# Matches the legacy marker retention (1 day); safety net over the TERMINATED-event deletion.
+_SESSION_LAST_ACCESS_EXPIRATION: Final[int] = 86400
+# Sentinel meaning the session has ongoing activity; the idle checker skips judgment for it.
+_SESSION_ACTIVE_SENTINEL: Final[str] = "0"
 
 
 class ValkeyLiveClient:
@@ -191,6 +195,35 @@ class ValkeyLiveClient:
         """Delete live data keys."""
         async with self._client.client() as conn:
             return await conn.delete([key])
+
+    def _session_last_access_key(self, session_id: SessionId) -> str:
+        return f"session.{session_id}.last_access"
+
+    async def update_session_last_access(self, session_id: SessionId) -> None:
+        """Refresh the session's last network access marker with the server time."""
+        timestamp = await self.get_server_time()
+        await self.store_live_data(
+            self._session_last_access_key(session_id),
+            f"{timestamp:.06f}",
+            ex=_SESSION_LAST_ACCESS_EXPIRATION,
+        )
+
+    async def mark_session_active(self, session_id: SessionId) -> None:
+        """Write the "0" sentinel meaning the session has ongoing activity (never idle).
+
+        Only updates an existing marker (XX) so that markers of already-terminated
+        sessions are not resurrected.
+        """
+        await self.store_live_data(
+            self._session_last_access_key(session_id),
+            _SESSION_ACTIVE_SENTINEL,
+            ex=_SESSION_LAST_ACCESS_EXPIRATION,
+            xx=True,
+        )
+
+    async def delete_session_last_access(self, session_id: SessionId) -> None:
+        """Remove the session's last network access marker."""
+        await self.delete_live_data(self._session_last_access_key(session_id))
 
     @valkey_live_resilience.apply()
     async def incr_live_data(

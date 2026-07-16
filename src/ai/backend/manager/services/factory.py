@@ -424,7 +424,6 @@ def create_services(args: ServiceArgs) -> Services:
             repository=repositories.stream.repository,
             registry=args.agent_registry,
             valkey_live=args.valkey_live,
-            idle_checker_host=args.idle_checker_host,
             etcd=args.etcd,
         ),
         events=EventsService(
