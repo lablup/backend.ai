@@ -189,20 +189,23 @@ class RBACWriteOps(WriteOps):
         successes: list[TRow] = []
         errors: list[BulkCreatorError[TRow]] = []
         for index, creator in enumerate(creators):
-            async with self.savepoint():
-                try:
+            # The handlers stay outside the savepoint: a failure has to reach the context
+            # manager for it to roll back. Catching inside would leave it releasing a
+            # savepoint the failed statement already aborted, which kills the whole batch.
+            try:
+                async with self.savepoint():
                     result = await execute_rbac_entity_creator(self._sess, creator)
-                    successes.append(result.row)
-                except sa.exc.IntegrityError as e:
-                    errors.append(
-                        BulkCreatorError(
-                            spec=creator.spec, exception=parse_integrity_error(e), index=index
-                        )
+                successes.append(result.row)
+            except sa.exc.IntegrityError as e:
+                errors.append(
+                    BulkCreatorError(
+                        spec=creator.spec, exception=parse_integrity_error(e), index=index
                     )
-                except Exception as e:
-                    # execute_rbac_entity_creator maps the integrity errors its spec declares
-                    # onto domain errors; whatever arrives here fails just this row.
-                    errors.append(BulkCreatorError(spec=creator.spec, exception=e, index=index))
+                )
+            except Exception as e:
+                # execute_rbac_entity_creator maps the integrity errors its spec declares
+                # onto domain errors; whatever arrives here fails just this row.
+                errors.append(BulkCreatorError(spec=creator.spec, exception=e, index=index))
         return RBACBulkEntityCreatorResultWithFailures(successes=successes, errors=errors)
 
     async def purge_scoped[TRow: Base](
@@ -225,13 +228,14 @@ class RBACWriteOps(WriteOps):
         successes: list[TRow] = []
         errors: list[BulkPurgerError[TRow]] = []
         for index, purger in enumerate(purgers):
-            async with self.savepoint():
-                try:
+            # The handler stays outside the savepoint — see bulk_create_scoped_partial.
+            try:
+                async with self.savepoint():
                     result = await execute_rbac_entity_purger(self._sess, purger)
-                    if result is not None:
-                        successes.append(result.row)
-                except Exception as e:
-                    errors.append(BulkPurgerError(purger=purger, exception=e, index=index))
+                if result is not None:
+                    successes.append(result.row)
+            except Exception as e:
+                errors.append(BulkPurgerError(purger=purger, exception=e, index=index))
         return BulkPurgerResultWithFailures(successes=successes, errors=errors)
 
     async def add_users_to_scope(
