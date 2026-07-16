@@ -112,7 +112,7 @@ class DomainFairShareRow(Base):  # type: ignore[misc]
     )
     resource_group_id: Mapped[ResourceGroupID] = mapped_column(
         "resource_group_id",
-        GUID,
+        GUID(ResourceGroupID),
         nullable=False,
     )
     domain_name: Mapped[str] = mapped_column(
@@ -340,7 +340,7 @@ class ProjectFairShareRow(Base):  # type: ignore[misc]
     )
     resource_group_id: Mapped[ResourceGroupID] = mapped_column(
         "resource_group_id",
-        GUID,
+        GUID(ResourceGroupID),
         nullable=False,
     )
     project_id: Mapped[uuid.UUID] = mapped_column("project_id", GUID, nullable=False, index=True)
@@ -571,7 +571,7 @@ class UserFairShareRow(Base):  # type: ignore[misc]
     )
     resource_group_id: Mapped[ResourceGroupID] = mapped_column(
         "resource_group_id",
-        GUID,
+        GUID(ResourceGroupID),
         nullable=False,
     )
     user_uuid: Mapped[uuid.UUID] = mapped_column("user_uuid", GUID, nullable=False, index=True)

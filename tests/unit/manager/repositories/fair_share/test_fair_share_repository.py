@@ -10,6 +10,7 @@ from collections.abc import AsyncGenerator
 from decimal import Decimal
 
 import pytest
+import sqlalchemy as sa
 
 from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import ResourceSlot
@@ -318,6 +319,7 @@ class TestFairShareRepository:
 
     async def test_upsert_domain_fair_share_update(
         self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
         fair_share_repository: FairShareRepository,
         test_scaling_group: str,
         test_domain_name: str,
@@ -336,11 +338,13 @@ class TestFairShareRepository:
         )
         await fair_share_repository.upsert_domain_fair_share(upserter1)
 
-        # Second upsert - should update calculated fields only
+        replacement_resource_group_id = ResourceGroupID(uuid.uuid4())
+
+        # Second upsert - should update calculated fields and synchronize the resource group ID
         upserter2 = Upserter(
             spec=DomainFairShareUpserterSpec(
                 resource_group=test_scaling_group,
-                resource_group_id=RESOURCE_GROUP_ID,
+                resource_group_id=replacement_resource_group_id,
                 domain_name=test_domain_name,
                 fair_share_factor=OptionalState.update(Decimal("0.75")),
                 normalized_usage=OptionalState.update(Decimal("0.5")),
@@ -353,6 +357,14 @@ class TestFairShareRepository:
         # Calculated values should be updated
         assert result.data.calculation_snapshot.fair_share_factor == Decimal("0.75")
         assert result.data.calculation_snapshot.normalized_usage == Decimal("0.5")
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            stored_resource_group_id = await db_sess.scalar(
+                sa.select(DomainFairShareRow.resource_group_id).where(
+                    DomainFairShareRow.resource_group == test_scaling_group,
+                    DomainFairShareRow.domain_name == test_domain_name,
+                )
+            )
+        assert stored_resource_group_id == replacement_resource_group_id
 
     async def test_get_domain_fair_share(
         self,

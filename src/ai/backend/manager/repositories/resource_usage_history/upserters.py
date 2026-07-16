@@ -53,7 +53,10 @@ class DomainUsageBucketUpserterSpec(UpserterSpec[DomainUsageBucketRow]):
 
     @override
     def build_update_values(self) -> dict[str, Any]:
-        values: dict[str, Any] = {"period_end": self.period_end}
+        values: dict[str, Any] = {
+            "resource_group_id": self.resource_group_id,
+            "period_end": self.period_end,
+        }
         if self.resource_usage is not None:
             values["resource_usage"] = self.resource_usage
         if self.capacity_snapshot is not None:
@@ -99,7 +102,10 @@ class ProjectUsageBucketUpserterSpec(UpserterSpec[ProjectUsageBucketRow]):
 
     @override
     def build_update_values(self) -> dict[str, Any]:
-        values: dict[str, Any] = {"period_end": self.period_end}
+        values: dict[str, Any] = {
+            "resource_group_id": self.resource_group_id,
+            "period_end": self.period_end,
+        }
         if self.resource_usage is not None:
             values["resource_usage"] = self.resource_usage
         if self.capacity_snapshot is not None:
@@ -147,7 +153,10 @@ class UserUsageBucketUpserterSpec(UpserterSpec[UserUsageBucketRow]):
 
     @override
     def build_update_values(self) -> dict[str, Any]:
-        values: dict[str, Any] = {"period_end": self.period_end}
+        values: dict[str, Any] = {
+            "resource_group_id": self.resource_group_id,
+            "period_end": self.period_end,
+        }
         if self.resource_usage is not None:
             values["resource_usage"] = self.resource_usage
         if self.capacity_snapshot is not None:

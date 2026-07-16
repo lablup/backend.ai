@@ -952,6 +952,7 @@ class FairShareDBSource:
                 upsert_stmt = insert_stmt.on_conflict_do_update(
                     index_elements=["resource_group", "domain_name"],
                     set_={
+                        "resource_group_id": insert_stmt.excluded.resource_group_id,
                         "fair_share_factor": insert_stmt.excluded.fair_share_factor,
                         "total_decayed_usage": insert_stmt.excluded.total_decayed_usage,
                         "normalized_usage": insert_stmt.excluded.normalized_usage,
@@ -979,6 +980,7 @@ class FairShareDBSource:
                 upsert_stmt = insert_stmt.on_conflict_do_update(
                     index_elements=["resource_group", "project_id"],
                     set_={
+                        "resource_group_id": insert_stmt.excluded.resource_group_id,
                         "domain_name": insert_stmt.excluded.domain_name,
                         "fair_share_factor": insert_stmt.excluded.fair_share_factor,
                         "total_decayed_usage": insert_stmt.excluded.total_decayed_usage,
@@ -1010,6 +1012,7 @@ class FairShareDBSource:
                 upsert_stmt = insert_stmt.on_conflict_do_update(
                     index_elements=["resource_group", "user_uuid", "project_id"],
                     set_={
+                        "resource_group_id": insert_stmt.excluded.resource_group_id,
                         "domain_name": insert_stmt.excluded.domain_name,
                         "fair_share_factor": insert_stmt.excluded.fair_share_factor,
                         "total_decayed_usage": insert_stmt.excluded.total_decayed_usage,

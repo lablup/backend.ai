@@ -78,7 +78,7 @@ class DomainFairShareUpserterSpec(UpserterSpec[DomainFairShareRow]):
 
     @override
     def build_update_values(self) -> dict[str, Any]:
-        values: dict[str, Any] = {}
+        values: dict[str, Any] = {"resource_group_id": self.resource_group_id}
         # Spec fields (weight can be updated via mutation)
         self.weight.update_dict(values, "weight")
         # Calculation fields
@@ -120,7 +120,7 @@ class DomainFairShareBulkWeightUpserterSpec(UpserterSpec[DomainFairShareRow]):
 
     @override
     def build_update_values(self) -> dict[str, Any]:
-        return {"weight": self.weight}
+        return {"resource_group_id": self.resource_group_id, "weight": self.weight}
 
 
 @dataclass
@@ -184,7 +184,7 @@ class ProjectFairShareUpserterSpec(UpserterSpec[ProjectFairShareRow]):
 
     @override
     def build_update_values(self) -> dict[str, Any]:
-        values: dict[str, Any] = {}
+        values: dict[str, Any] = {"resource_group_id": self.resource_group_id}
         # Spec fields (weight can be updated via mutation)
         self.weight.update_dict(values, "weight")
         # Calculation fields
@@ -228,7 +228,7 @@ class ProjectFairShareBulkWeightUpserterSpec(UpserterSpec[ProjectFairShareRow]):
 
     @override
     def build_update_values(self) -> dict[str, Any]:
-        return {"weight": self.weight}
+        return {"resource_group_id": self.resource_group_id, "weight": self.weight}
 
 
 @dataclass
@@ -294,7 +294,7 @@ class UserFairShareUpserterSpec(UpserterSpec[UserFairShareRow]):
 
     @override
     def build_update_values(self) -> dict[str, Any]:
-        values: dict[str, Any] = {}
+        values: dict[str, Any] = {"resource_group_id": self.resource_group_id}
         # Spec fields (weight can be updated via mutation)
         self.weight.update_dict(values, "weight")
         # Calculation fields
@@ -340,4 +340,4 @@ class UserFairShareBulkWeightUpserterSpec(UpserterSpec[UserFairShareRow]):
 
     @override
     def build_update_values(self) -> dict[str, Any]:
-        return {"weight": self.weight}
+        return {"resource_group_id": self.resource_group_id, "weight": self.weight}

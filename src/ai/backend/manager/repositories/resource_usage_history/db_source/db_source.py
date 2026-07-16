@@ -610,6 +610,7 @@ class ResourceUsageHistoryDBSource:
                 .on_conflict_do_update(
                     index_elements=["user_uuid", "project_id", "resource_group", "period_start"],
                     set_={
+                        "resource_group_id": key.resource_group_id,
                         "resource_usage": new_usage,
                         "updated_at": sa.func.now(),
                     },
@@ -704,6 +705,7 @@ class ResourceUsageHistoryDBSource:
                 .on_conflict_do_update(
                     index_elements=["project_id", "resource_group", "period_start"],
                     set_={
+                        "resource_group_id": key.resource_group_id,
                         "resource_usage": new_usage,
                         "updated_at": sa.func.now(),
                     },
@@ -789,6 +791,7 @@ class ResourceUsageHistoryDBSource:
                 .on_conflict_do_update(
                     index_elements=["domain_name", "resource_group", "period_start"],
                     set_={
+                        "resource_group_id": key.resource_group_id,
                         "resource_usage": new_usage,
                         "updated_at": sa.func.now(),
                     },

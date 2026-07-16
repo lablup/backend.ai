@@ -195,11 +195,18 @@ class TestUsageBucketEntries:
         await db_source.increment_usage_buckets(result1)
 
         # Second increment: 3 CPUs for 300 seconds
+        replacement_resource_group_id = ResourceGroupID(uuid.uuid4())
+        replacement_key = DomainUsageBucketKey(
+            domain_name=test_domain_name,
+            resource_group="default",
+            resource_group_id=replacement_resource_group_id,
+            period_date=period,
+        )
         result2 = UsageBucketAggregationResult(
             user_usage_deltas={},
             project_usage_deltas={},
             domain_usage_deltas={
-                key: BucketDelta(
+                replacement_key: BucketDelta(
                     slots=ResourceSlot({"cpu": Decimal("3")}),
                     duration_seconds=300,
                 ),
@@ -225,6 +232,15 @@ class TestUsageBucketEntries:
             assert entry_rows[0].slot_name == "cpu"
             assert entry_rows[0].amount == Decimal("5")
             assert entry_rows[0].duration_seconds == 600
+
+            stored_resource_group_id = await db_sess.scalar(
+                sa.select(DomainUsageBucketRow.resource_group_id).where(
+                    DomainUsageBucketRow.domain_name == test_domain_name,
+                    DomainUsageBucketRow.resource_group == "default",
+                    DomainUsageBucketRow.period_start == period,
+                )
+            )
+            assert stored_resource_group_id == replacement_resource_group_id
 
     async def test_increment_user_buckets_creates_entries(
         self,

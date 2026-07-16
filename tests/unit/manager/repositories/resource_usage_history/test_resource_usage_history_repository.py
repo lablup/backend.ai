@@ -11,6 +11,7 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 import pytest
+import sqlalchemy as sa
 
 from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import ResourceSlot
@@ -431,6 +432,7 @@ class TestResourceUsageHistoryRepository:
 
     async def test_upsert_domain_usage_bucket_update(
         self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
         resource_usage_history_repository: ResourceUsageHistoryRepository,
         test_scaling_group: str,
         test_domain_name: str,
@@ -453,12 +455,14 @@ class TestResourceUsageHistoryRepository:
         )
         await resource_usage_history_repository.upsert_domain_usage_bucket(upserter1)
 
+        replacement_resource_group_id = ResourceGroupID(uuid.uuid4())
+
         # Second upsert (update)
         upserter2 = Upserter(
             spec=DomainUsageBucketUpserterSpec(
                 domain_name=test_domain_name,
                 resource_group=test_scaling_group,
-                resource_group_id=RESOURCE_GROUP_ID,
+                resource_group_id=replacement_resource_group_id,
                 period_start=today,
                 period_end=today + timedelta(days=1),
                 decay_unit_days=1,
@@ -469,6 +473,15 @@ class TestResourceUsageHistoryRepository:
         result = await resource_usage_history_repository.upsert_domain_usage_bucket(upserter2)
 
         assert result.resource_usage["cpu"] == Decimal("7200")
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            stored_resource_group_id = await db_sess.scalar(
+                sa.select(DomainUsageBucketRow.resource_group_id).where(
+                    DomainUsageBucketRow.domain_name == test_domain_name,
+                    DomainUsageBucketRow.resource_group == test_scaling_group,
+                    DomainUsageBucketRow.period_start == today,
+                )
+            )
+        assert stored_resource_group_id == replacement_resource_group_id
 
     async def test_search_domain_usage_buckets(
         self,

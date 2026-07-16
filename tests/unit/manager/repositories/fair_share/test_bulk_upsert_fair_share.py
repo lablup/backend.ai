@@ -196,7 +196,7 @@ class TestBulkUpsertDomainFairShare:
             for name, weight in existing_weights.items():
                 row = DomainFairShareRow(
                     resource_group=sg_name,
-                    resource_group_id=rg_id,
+                    resource_group_id=ResourceGroupID(uuid.uuid4()),
                     domain_name=name,
                     weight=weight,
                 )
@@ -327,10 +327,12 @@ class TestBulkUpsertDomainFairShare:
                     DomainFairShareRow.resource_group == ctx.scaling_group
                 )
             )
-            fair_shares = {row.domain_name: row.weight for row in rows.scalars()}
+            fair_shares = {
+                row.domain_name: (row.weight, row.resource_group_id) for row in rows.scalars()
+            }
 
         for i, domain in enumerate(ctx.domain_names):
-            assert fair_shares[domain] == Decimal(f"{i + 10}.0")
+            assert fair_shares[domain] == (Decimal(f"{i + 10}.0"), ctx.resource_group_id)
 
     async def test_bulk_upsert_mixed(
         self,
@@ -541,7 +543,7 @@ class TestBulkUpsertProjectFairShare:
             for pid, weight in existing_weights.items():
                 row = ProjectFairShareRow(
                     resource_group=sg_name,
-                    resource_group_id=rg_id,
+                    resource_group_id=ResourceGroupID(uuid.uuid4()),
                     project_id=pid,
                     domain_name=domain_name,
                     weight=weight,
@@ -622,10 +624,12 @@ class TestBulkUpsertProjectFairShare:
                     ProjectFairShareRow.resource_group == ctx.scaling_group
                 )
             )
-            fair_shares = {row.project_id: row.weight for row in rows.scalars()}
+            fair_shares = {
+                row.project_id: (row.weight, row.resource_group_id) for row in rows.scalars()
+            }
 
         for i, pid in enumerate(ctx.project_ids):
-            assert fair_shares[pid] == Decimal(f"{i + 20}.0")
+            assert fair_shares[pid] == (Decimal(f"{i + 20}.0"), ctx.resource_group_id)
 
 
 class TestBulkUpsertUserFairShare:
@@ -852,7 +856,7 @@ class TestBulkUpsertUserFairShare:
             for uid, weight in existing_weights.items():
                 row = UserFairShareRow(
                     resource_group=sg_name,
-                    resource_group_id=rg_id,
+                    resource_group_id=ResourceGroupID(uuid.uuid4()),
                     user_uuid=uid,
                     project_id=project_id,
                     domain_name=domain_name,
@@ -1033,10 +1037,12 @@ class TestBulkUpsertUserFairShare:
                     UserFairShareRow.resource_group == ctx.scaling_group
                 )
             )
-            fair_shares = {row.user_uuid: row.weight for row in rows.scalars()}
+            fair_shares = {
+                row.user_uuid: (row.weight, row.resource_group_id) for row in rows.scalars()
+            }
 
         for i, uid in enumerate(ctx.user_uuids):
-            assert fair_shares[uid] == Decimal(f"{i + 30}.0")
+            assert fair_shares[uid] == (Decimal(f"{i + 30}.0"), ctx.resource_group_id)
 
     async def test_bulk_upsert_with_null_weight(
         self,

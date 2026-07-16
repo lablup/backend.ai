@@ -108,7 +108,7 @@ class KernelUsageRecordRow(Base):  # type: ignore[misc]
     )
     resource_group_id: Mapped[ResourceGroupID] = mapped_column(
         "resource_group_id",
-        GUID,
+        GUID(ResourceGroupID),
         nullable=False,
     )
 
@@ -194,7 +194,7 @@ class DomainUsageBucketRow(Base):  # type: ignore[misc]
     )
     resource_group_id: Mapped[ResourceGroupID] = mapped_column(
         "resource_group_id",
-        GUID,
+        GUID(ResourceGroupID),
         nullable=False,
     )
 
@@ -288,7 +288,7 @@ class ProjectUsageBucketRow(Base):  # type: ignore[misc]
     )
     resource_group_id: Mapped[ResourceGroupID] = mapped_column(
         "resource_group_id",
-        GUID,
+        GUID(ResourceGroupID),
         nullable=False,
     )
 
@@ -401,7 +401,7 @@ class UserUsageBucketRow(Base):  # type: ignore[misc]
     )
     resource_group_id: Mapped[ResourceGroupID] = mapped_column(
         "resource_group_id",
-        GUID,
+        GUID(ResourceGroupID),
         nullable=False,
     )
 
