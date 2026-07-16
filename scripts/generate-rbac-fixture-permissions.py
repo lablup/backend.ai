@@ -71,7 +71,6 @@ RESOURCE_ENTITY_TYPES: tuple[str, ...] = (
     "resource_group",
     "artifact",
     "artifact_registry",
-    "app_config",
     "app_config_fragment",
     "notification_channel",
     "notification_rule",
