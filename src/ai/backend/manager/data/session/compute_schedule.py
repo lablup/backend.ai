@@ -1,20 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import StrEnum
 
 from ai.backend.common.types import ResourceSlotEntry
-
-
-class ResourceGroupUnschedulableReason(StrEnum):
-    """Reason the resource group as a whole cannot admit the session.
-
-    Set only when no per-kernel result applies (the check could not even reach
-    per-kernel node fitting).
-    """
-
-    RESOURCE_GROUP_NOT_FOUND = "RESOURCE_GROUP_NOT_FOUND"
-    NO_SCHEDULABLE_AGENTS = "NO_SCHEDULABLE_AGENTS"
 
 
 @dataclass(frozen=True)
@@ -25,15 +13,9 @@ class UnschedulableReasonHint:
     ``RemediationHint``.
 
     - ``required_reduction`` — subtract these slots to fit the best-fitting node.
-    - ``required_container_reduction`` — free this many containers.
-    - ``available_archs`` — architectures that actually exist.
-    - ``image_not_found`` — True if the requested image was not found.
     """
 
     required_reduction: tuple[ResourceSlotEntry, ...] | None = None
-    required_container_reduction: int | None = None
-    available_archs: list[str] | None = None
-    image_not_found: bool = False
 
 
 @dataclass(frozen=True)
@@ -50,7 +32,7 @@ class ComputeScheduleKernelResult:
     """
 
     requested_slots: tuple[ResourceSlotEntry, ...]
-    requested_architecture: str | None
+    requested_architecture: str
     success: bool
     reason_hint: UnschedulableReasonHint | None = None
 
@@ -58,4 +40,3 @@ class ComputeScheduleKernelResult:
 @dataclass(frozen=True)
 class ComputeScheduleResult:
     kernel_results: list[ComputeScheduleKernelResult]
-    resource_group_reason: ResourceGroupUnschedulableReason | None = None

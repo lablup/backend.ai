@@ -14,17 +14,9 @@ from ai.backend.common.dto.manager.v2.common import ResourceSlotEntryInfo
 __all__ = (
     "ComputeScheduleKernelResultInfo",
     "ComputeSchedulePayload",
-    "ResourceGroupUnschedulableReasonDTO",
     "SchedulingBroadcastEventPayloadNode",
     "UnschedulableReasonHintInfo",
 )
-
-
-class ResourceGroupUnschedulableReasonDTO(StrEnum):
-    """Reason the resource group as a whole cannot admit the session."""
-
-    RESOURCE_GROUP_NOT_FOUND = "RESOURCE_GROUP_NOT_FOUND"
-    NO_SCHEDULABLE_AGENTS = "NO_SCHEDULABLE_AGENTS"
 
 
 class SchedulingStatusDTO(StrEnum):
@@ -64,17 +56,6 @@ class UnschedulableReasonHintInfo(BaseResponseModel):
         default=None,
         description="Subtract these slots to fit the best-fitting node.",
     )
-    available_archs: list[str] | None = Field(
-        default=None,
-        description="Architectures that actually exist among the scheduling targets.",
-    )
-    image_not_found: bool = Field(
-        default=False,
-        description=(
-            "The requested image could not be found. When True, adjusting resource "
-            "slots cannot make the kernel schedulable."
-        ),
-    )
 
 
 class ComputeScheduleKernelResultInfo(BaseResponseModel):
@@ -88,7 +69,7 @@ class ComputeScheduleKernelResultInfo(BaseResponseModel):
     requested_slots: list[ResourceSlotEntryInfo] = Field(
         description="Resource slots resolved for this kernel after applying defaults.",
     )
-    requested_architecture: str | None = Field(
+    requested_architecture: str = Field(
         description="Architecture resolved for this kernel.",
     )
     success: bool = Field(
@@ -105,11 +86,4 @@ class ComputeSchedulePayload(BaseResponseModel):
 
     results: list[ComputeScheduleKernelResultInfo] = Field(
         description="Per-kernel compute-schedule outcomes, correlated to the request by list index.",
-    )
-    resource_group_reason: ResourceGroupUnschedulableReasonDTO | None = Field(
-        default=None,
-        description=(
-            "Reason the resource group as a whole cannot admit the session "
-            "(e.g. it has no agents). Null when per-kernel results apply."
-        ),
     )

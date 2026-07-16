@@ -30,7 +30,6 @@ from ai.backend.manager.api.gql.common_types import (
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
-    gql_added_field,
     gql_enum,
     gql_field,
     gql_pydantic_input,
@@ -199,16 +198,6 @@ class ComputeScheduleInputGQL(PydanticInputMixin[ComputeScheduleInput]):
 )
 class UnschedulableReasonHintGQL:
     required_reduction: list[ResourceSlotEntryGQL] | None
-    available_archs: list[str] | None
-    image_not_found: bool = gql_added_field(
-        BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
-            description=(
-                "The requested image could not be found. When true, adjusting resource "
-                "slots cannot make the kernel schedulable."
-            ),
-        )
-    )
 
 
 @gql_pydantic_type(
@@ -229,19 +218,6 @@ class ComputeScheduleKernelResultGQL:
     reason_hint: UnschedulableReasonHintGQL | None
 
 
-@gql_enum(
-    BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
-        description="Reason the resource group as a whole cannot admit the session.",
-    )
-)
-class ResourceGroupUnschedulableReason(StrEnum):
-    """Reason the resource group as a whole cannot admit the session."""
-
-    RESOURCE_GROUP_NOT_FOUND = "RESOURCE_GROUP_NOT_FOUND"
-    NO_SCHEDULABLE_AGENTS = "NO_SCHEDULABLE_AGENTS"
-
-
 @gql_pydantic_type(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
@@ -252,15 +228,6 @@ class ResourceGroupUnschedulableReason(StrEnum):
 )
 class ComputeSchedulePayloadGQL:
     results: list[ComputeScheduleKernelResultGQL]
-    resource_group_reason: ResourceGroupUnschedulableReason | None = gql_added_field(
-        BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
-            description=(
-                "Reason the resource group as a whole cannot admit the session "
-                "(e.g. it has no agents). Null when per-kernel results apply."
-            ),
-        )
-    )
 
 
 @gql_root_field(

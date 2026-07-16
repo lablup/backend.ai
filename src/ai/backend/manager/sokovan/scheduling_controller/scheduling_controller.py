@@ -22,7 +22,6 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.session.compute_schedule import (
     ComputeScheduleKernelResult,
     ComputeScheduleResult,
-    ResourceGroupUnschedulableReason,
     UnschedulableReasonHint,
 )
 from ai.backend.manager.data.session.draft import (
@@ -37,7 +36,7 @@ from ai.backend.manager.data.session.spec import (
 )
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.common import InternalServerError, RejectedByHook
-from ai.backend.manager.errors.resource import ScalingGroupNotFound
+from ai.backend.manager.errors.image import ImageNotFound
 from ai.backend.manager.metrics.scheduler import (
     SchedulerOperationMetricObserver,
     SchedulerPhaseMetricObserver,
@@ -50,7 +49,6 @@ from ai.backend.manager.repositories.scheduler import (
 from ai.backend.manager.repositories.scheduler.types.session_creation import SessionSpecContextFetch
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.exceptions import (
     BatchAgentSelectionFailedError,
-    NoAgentsInResourceGroupError,
 )
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import (
     AgentSelectionConfig,
@@ -121,7 +119,7 @@ class _KernelComputeScheduleResourceSpec:
 
 @dataclass
 class _KernelComputeScheduleData:
-    resource_spec: _KernelComputeScheduleResourceSpec | None
+    resource_spec: _KernelComputeScheduleResourceSpec
 
     requested_slots: tuple[ResourceSlotEntry, ...]
     reason_hint: UnschedulableReasonHint | None
@@ -357,13 +355,7 @@ class SchedulingController:
                 else None
             )
             if image_info is None:
-                prepared_data[kernel_id] = _KernelComputeScheduleData(
-                    resource_spec=None,
-                    requested_slots=tuple(resource_input.resources),
-                    reason_hint=UnschedulableReasonHint(image_not_found=True),
-                    success=False,
-                )
-                continue
+                raise ImageNotFound(f"Image '{resource_input.image_id}' not found")
             prepared_data[kernel_id] = _KernelComputeScheduleData(
                 resource_spec=_KernelComputeScheduleResourceSpec(
                     image=_Image(
@@ -389,11 +381,8 @@ class SchedulingController:
         kernel_data: dict[KernelId, _KernelComputeScheduleData],
     ) -> ComputeScheduleResult:
         kernel_requirements: dict[UUID, KernelResourceSpec] = {
-            kernel_id: data.resource_spec.spec
-            for kernel_id, data in kernel_data.items()
-            if data.resource_spec is not None
+            kernel_id: data.resource_spec.spec for kernel_id, data in kernel_data.items()
         }
-        resource_group_reason: ResourceGroupUnschedulableReason | None = None
 
         if kernel_requirements:
             criteria = AgentSelectionCriteria(
@@ -411,42 +400,25 @@ class SchedulingController:
                 max_container_count=None,
                 enforce_spreading_endpoint_replica=False,
             )
-            # The selector mutates the agents list on full success; feed clones so
-            # the live snapshot is never altered.
-            try:
-                scheduling_data = await self._repository.get_scheduling_data(resource_group_id)
-            except ScalingGroupNotFound:
-                resource_group_reason = ResourceGroupUnschedulableReason.RESOURCE_GROUP_NOT_FOUND
-                return ComputeScheduleResult(
-                    [
-                        ComputeScheduleKernelResult(
-                            requested_slots=data.requested_slots,
-                            requested_architecture=data.resource_spec.image.architecture
-                            if data.resource_spec is not None
-                            else None,
-                            success=False,
-                            reason_hint=data.reason_hint,
-                        )
-                        for data in kernel_data.values()
-                    ],
-                    resource_group_reason=resource_group_reason,
-                )
+            # An unknown resource group (ScalingGroupNotFound) is a request error,
+            # not a per-kernel fitting outcome, so let it propagate to the caller.
+            scheduling_data = await self._repository.get_scheduling_data(resource_group_id)
             agent_occupancy = (
                 scheduling_data.snapshot_data.resource_occupancy.by_agent
                 if scheduling_data.snapshot_data
                 else {}
             )
+            # The selector mutates the agents list on full success; feed clones so
+            # the live snapshot is never altered.
             mutable_agents = [
                 agent.to_agent_info(agent_occupancy) for agent in scheduling_data.agents
             ]
+            # A resource group with no candidate agents (NoAgentsInResourceGroupError)
+            # is likewise a whole-request error, so it propagates too.
             try:
                 await self._agent_selector.select_agents_for_batch_requirements(
                     mutable_agents, criteria, config, None
                 )
-            except NoAgentsInResourceGroupError:
-                resource_group_reason = ResourceGroupUnschedulableReason.NO_SCHEDULABLE_AGENTS
-                for result in kernel_data.values():
-                    result.success = False
             except BatchAgentSelectionFailedError as e:
                 for err in e.errors:
                     hint = err.build_remediation_hint()
@@ -456,7 +428,6 @@ class SchedulingController:
                             if hint.required_reduction is not None
                             else None
                         ),
-                        available_archs=hint.available_archs,
                     )
                     for kernel_id in err.resource_requirement.kernel_ids:
                         failed_draft = kernel_data.get(kernel_id)
@@ -467,17 +438,13 @@ class SchedulingController:
         kernel_result = [
             ComputeScheduleKernelResult(
                 requested_slots=kernel_data.requested_slots,
-                requested_architecture=kernel_data.resource_spec.image.architecture
-                if kernel_data.resource_spec is not None
-                else None,
+                requested_architecture=kernel_data.resource_spec.image.architecture,
                 success=kernel_data.success,
                 reason_hint=kernel_data.reason_hint,
             )
             for kernel_data in kernel_data.values()
         ]
-        return ComputeScheduleResult(
-            kernel_results=kernel_result, resource_group_reason=resource_group_reason
-        )
+        return ComputeScheduleResult(kernel_results=kernel_result)
 
     async def compute_schedule(
         self,
