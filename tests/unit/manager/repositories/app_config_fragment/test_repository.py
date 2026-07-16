@@ -515,6 +515,42 @@ class TestBulkCreate:
         )
         assert {item.config_name for item in search.items} == {"theme"}
 
+    async def test_partial_when_a_scoped_one_is_not_allow_listed(
+        self, repository: AppConfigFragmentRepository, menu_defined: None
+    ) -> None:
+        """A rejected *scoped* item must not take the rest of the batch down with it.
+
+        The sibling case rejects a ``public`` item, which binds to no scope; here the rejected
+        item carries a scope ref, so its row and its association roll back together on their
+        own savepoint, leaving the fragment beside it created.
+        """
+        result = await repository.bulk_create([
+            RBACEntityCreator(
+                spec=AppConfigFragmentCreatorSpec(
+                    config_name="menu",  # defined but NOT allow-listed -> FK rejects it
+                    scope_type=AppConfigScopeType.DOMAIN,
+                    scope_id=_DOMAIN_ID,
+                    config={"a": 1},
+                ),
+                element_type=RBACElementType.APP_CONFIG_FRAGMENT,
+                scope_ref=RBACElementRef(RBACElementType.DOMAIN, _DOMAIN_ID),
+            ),
+            RBACEntityCreator(
+                spec=AppConfigFragmentCreatorSpec(
+                    config_name="theme",  # allow-listed, also scoped
+                    scope_type=AppConfigScopeType.USER,
+                    scope_id=_USER_ID,
+                    config={"b": 2},
+                ),
+                element_type=RBACElementType.APP_CONFIG_FRAGMENT,
+                scope_ref=RBACElementRef(RBACElementType.USER, _USER_ID),
+            ),
+        ])
+        assert [f.config_name for f in result.succeeded] == ["theme"]
+        assert [f.index for f in result.failed] == [0]
+        # the surviving fragment really is committed
+        assert (await repository.get_by_id(result.succeeded[0].id)).config == {"b": 2}
+
 
 class TestBulkUpdate:
     async def test_all_updated(
