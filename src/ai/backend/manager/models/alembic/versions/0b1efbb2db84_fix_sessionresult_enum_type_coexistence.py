@@ -41,6 +41,23 @@ def _is_expected_divergence(exc: BaseException) -> bool:
     return _sqlstate_of(exc) in _EXPECTED_DIVERGENCE_SQLSTATES
 
 
+def _retype_result_column(conn: sa.engine.Connection, table: str, target_type: str) -> None:
+    """Change ``<table>.result`` to ``target_type``, carrying its default across.
+
+    PostgreSQL cannot cast an existing column default between two unrelated enum
+    types, so ALTER COLUMN ... TYPE fails outright while a default is attached.
+    Drop it, retype, then put it back -- the same order dec0deba5893 uses.
+    """
+    conn.exec_driver_sql(f"ALTER TABLE {table} ALTER COLUMN result DROP DEFAULT")
+    conn.exec_driver_sql(
+        f"ALTER TABLE {table} ALTER COLUMN result"
+        f" TYPE {target_type} USING result::text::{target_type}"
+    )
+    conn.exec_driver_sql(
+        f"ALTER TABLE {table} ALTER COLUMN result SET DEFAULT 'UNDEFINED'::{target_type}"
+    )
+
+
 def upgrade() -> None:
     conn = op.get_bind()
 
@@ -62,10 +79,7 @@ def upgrade() -> None:
                 #   - "sessionresults" was created by b6b884fbae1f (2022, sessions.result)
                 #   - ffcf0ed13a26 skipped rename because both existed
                 # Fix: alter sessions.result to use the singular type, then drop plural.
-                conn.exec_driver_sql(
-                    "ALTER TABLE sessions ALTER COLUMN result"
-                    " TYPE sessionresult USING result::text::sessionresult"
-                )
+                _retype_result_column(conn, "sessions", "sessionresult")
                 conn.exec_driver_sql("DROP TYPE sessionresults")
             elif has_plural and not has_singular:
                 # Only plural exists (ffcf0ed13a26 was never applied, or was skipped).
@@ -102,10 +116,7 @@ def downgrade() -> None:
                 conn.exec_driver_sql(
                     "CREATE TYPE sessionresults AS ENUM ('UNDEFINED', 'SUCCESS', 'FAILURE')"
                 )
-                conn.exec_driver_sql(
-                    "ALTER TABLE sessions ALTER COLUMN result"
-                    " TYPE sessionresults USING result::text::sessionresults"
-                )
+                _retype_result_column(conn, "sessions", "sessionresults")
     except sa.exc.DBAPIError as e:
         if not _is_expected_divergence(e):
             raise
