@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from collections.abc import Mapping
+from collections.abc import Awaitable, Callable, Mapping
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, overload
 
@@ -28,6 +28,7 @@ from ai.backend.manager.models.minilang.ordering import QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
 from ai.backend.manager.models.network import NetworkRow
 from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.plugin.network import AbstractNetworkManagerPlugin
 from ai.backend.manager.repositories.base.rbac.entity_creator import (
     RBACEntityCreator,
     execute_rbac_entity_creator,
@@ -217,6 +218,41 @@ class NetworkNode(graphene.ObjectType):  # type: ignore[misc]
         return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
 
 
+async def _run_create_network_with_rollback(
+    network_plugin: AbstractNetworkManagerPlugin,
+    network_name: str,
+    run_mutation: Callable[[], Awaitable[CreateNetwork]],
+) -> CreateNetwork:
+    """Run the DB/RBAC mutation for an already-provisioned network, releasing the plugin's
+    subnet/VNI/etcd meta on any failure.
+
+    ``network_plugin.create_network`` has already claimed those resources by the time this runs.
+    ``gql_mutation_wrapper`` swallows most DB/RBAC failures into an ``ok=False`` result (it re-raises
+    only Timeout/Cancelled), so BOTH surfaces — a raised exception and a returned ``ok=False`` — must
+    trigger a best-effort ``destroy_network``; otherwise the block/VNI leaks and, when an explicit
+    subnet was requested, a same-subnet retry then fails with ``RequestedSubnetUnavailable``.
+    ``destroy_network`` is idempotent.
+    """
+
+    async def _rollback() -> None:
+        try:
+            await network_plugin.destroy_network(network_name)
+        except Exception:
+            log.exception(
+                "Failed to roll back inter-container network {} after a failed create",
+                network_name,
+            )
+
+    try:
+        result = await run_mutation()
+    except Exception:
+        await _rollback()
+        raise
+    if not result.ok:
+        await _rollback()
+    return result
+
+
 class CreateNetwork(graphene.Mutation):  # type: ignore[misc]
     """Added in 24.12.0."""
 
@@ -319,7 +355,11 @@ class CreateNetwork(graphene.Mutation):  # type: ignore[misc]
                     network=NetworkNode.from_row(result.row),
                 )
 
-        return await gql_mutation_wrapper(CreateNetwork, _do_mutate)
+        return await _run_create_network_with_rollback(
+            network_plugin,
+            network_name,
+            lambda: gql_mutation_wrapper(CreateNetwork, _do_mutate),
+        )
 
 
 class ModifyNetworkInput(graphene.InputObjectType):  # type: ignore[misc]
