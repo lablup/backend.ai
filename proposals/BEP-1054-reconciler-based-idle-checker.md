@@ -27,8 +27,9 @@ This proposal re-homes idle checking onto a sokovan reconciler stage and promote
 - Model the idle checker as a first-class, reusable DB object that is independent of any scope.
 - Express scope application (domain / project / resource group) through a dedicated association table.
 - Drive utilization decisions from agent-emitted Prometheus metrics.
-- Keep checker I/O and judgment behind one batched per-type contract and keep reporting outside the checker; persist each check's projected cleanup time to the database (not Valkey) as the single source for both the sweep decision and client-facing reporting.
+- Keep checker I/O and judgment behind one batched per-type contract and keep reporting outside the checker; persist each check's projected cleanup time and latest judgment to the database (not Valkey) as the single source for both the sweep decision and client-facing reporting.
 - Expose when a session is scheduled to be cleaned up — per checker and as a session-level aggregate — replacing the Valkey remaining-time report.
+- Copy the checker status and message associated with an elapsed deadline into session scheduling history so operators can explain why the session was terminated.
 
 ### Non-Goals
 
@@ -93,18 +94,20 @@ A binding is one `(scope_type, scope_id) → idle_checker` edge. **This associat
 
 A dedicated association table (rather than reusing the RBAC `association_scopes_entities`) is chosen because idle application needs its own `enabled` flag and future binding-level metadata (e.g. priority), and because idle application semantics should not be conflated with RBAC permission semantics.
 
-#### `session_idle_checks` — per-session projected cleanup time
+#### `session_idle_checks` — per-session projected cleanup time and latest judgment
 
-The deadline-refresh stage records, for each running session and each checker applied to it, **when that checker would next clean the session up**. This is the value the sweep stage acts on and the value clients read.
+The deadline-refresh stage records, for each running session and each checker applied to it, **when that checker would next clean the session up** and the latest completed judgment. The sweep stage acts on this row, clients read it, and the stored judgment is copied to scheduling history when the session is swept.
 
 | Column | Type | Description |
 |---|---|---|
 | `session_id` | UUID, FK → `sessions.id` (ON DELETE CASCADE) | The evaluated session |
 | `idle_checker_id` | UUID, FK → `idle_checkers.id` (ON DELETE CASCADE) | The checker that produced this deadline |
 | `expire_at` | timestamptz, nullable | When the session is scheduled to be cleaned up by this checker. `NULL` while the checker is in a grace period or cannot yet determine a deadline |
-| `updated_at` | timestamptz | Last refresh |
+| `last_status` | string | Status returned by the latest completed checker execution |
+| `last_message` | text | Human-readable reason returned with the latest judgment |
+| `updated_at` | timestamptz | When the latest judgment was persisted |
 
-Primary key `(session_id, idle_checker_id)` — one row per session × applied checker. `expire_at` is the **projected cleanup time, not a termination timestamp**: it is a future point (or just past, once due) at which the checker's condition elapses; the sweep stage — not this row — performs the actual `TERMINATING` transition. The FK to `idle_checkers` ties each deadline back to the checker that owns it, so a `SessionIdleCheck` node can name its checker and a deleted checker's rows are removed by cascade.
+Primary key `(session_id, idle_checker_id)` — one row per session × applied checker. `expire_at` is the **projected cleanup time, not a termination timestamp**: it is the deadline after which the sweep stage may perform the actual `TERMINATING` transition. The FK to `idle_checkers` ties each result back to the checker that owns it, so a `SessionIdleCheck` node can name its checker and a deleted checker's rows are removed by cascade.
 
 #### Scope-ID convention
 
@@ -137,6 +140,8 @@ erDiagram
         uuid session_id FK
         uuid idle_checker_id FK
         timestamptz expire_at
+        string last_status
+        text last_message
     }
     DOMAINS { string name PK }
     GROUPS { uuid id PK }
@@ -156,7 +161,7 @@ erDiagram
 The `spec` column is **not free-form JSON** — it holds a typed, polymorphic payload whose shape is fixed by the row's `checker_type`. Two layers express this:
 
 - **`ABCColumn` — a generic, reusable polymorphic JSONB column.** It is not idle-specific: it persists any value that satisfies a load/write contract (JSONB dict ↔ typed object) and rehydrates the typed object on read. Idle checking is its first user, but the column type is meant to back any table that stores polymorphic, validated config.
-- **`IdleCheckerABC` — the idle-specific payload the column carries.** On load it dispatches by the `checker_type` discriminator to the concrete spec (`session_lifetime` / `network_timeout` / `utilization`), and it declares the behavior contract every checker implements: how it batch-loads runtime signals and renders judgments for its assignments, each judgment carrying the projected `expire_at` for that session.
+- **`IdleCheckerABC` — the idle-specific payload the column carries.** On load it dispatches by the `checker_type` discriminator to the concrete spec (`session_lifetime` / `network_timeout` / `utilization`), and it declares the behavior contract every checker implements: how it batch-loads runtime signals and renders judgments for its assignments, each judgment carrying the projected `expire_at`, status, and message for that session.
 
 Conceptually (the contract only — bodies are an implementation concern):
 
@@ -167,7 +172,7 @@ ABCColumnPayload                  # storage contract ABCColumn speaks to
 
 IdleCheckerABC(ABCColumnPayload)  # the value stored in idle_checkers.spec
   load(raw)  -> concrete spec     # dispatch by checker_type discriminator
-  judge(assignments) -> judgments  # batched I/O -> projected expire_at per assignment
+  judge(assignments) -> judgments  # batched I/O -> expire_at + status + message
 ```
 
 This buys three things:
@@ -180,25 +185,25 @@ This buys three things:
 
 ### Reconciler Stages
 
-Idle checking is split into **two reconciler stages** so that computing a deadline — which needs the checkers' batched runtime reads — is separated from acting on an elapsed deadline, a pure time comparison:
+Idle checking is split into **two reconciler stages** so that computing and reporting deadlines is separated from acting on elapsed deadlines:
 
 **1. Deadline-refresh stage** — recomputes, per running session, when each applied checker would next terminate it, and persists that time.
 
 - **Source** — gathers the sessions to evaluate and the checkers that apply to them (see *Source Fetch Direction*).
-- **Handler** — pivots the batch by checker type and invokes each checker's single batched `judge` contract, producing a projected `expire_at` per (session, checker). Checker-owned external reads occur behind this contract; the Handler performs no external I/O beyond it.
-- **Applier** — upserts one `session_idle_checks` row per (session, checker) with the computed `expire_at`, and **prunes rows for checkers no longer applicable** to the session (binding removed or disabled). It marks nothing for termination.
+- **Handler** — pivots the batch by checker type and invokes each checker's single batched `judge` contract, producing `expire_at`, `last_status`, and `last_message` per (session, checker). Checker-owned external reads occur behind this contract; the Handler performs no external I/O beyond it.
+- **Applier** — upserts one `session_idle_checks` row per (session, checker) with the completed judgment, and **prunes non-due rows for checkers no longer applicable** to the session (binding removed or disabled). It marks nothing for termination. An existing row whose stored `expire_at` is already at or before the DB-sourced current time is neither updated nor pruned because the sweep stage now owns that row. The guard checks the stored deadline: a newly computed deadline that is already due is still inserted, or replaces a not-yet-due row, so that the sweep can observe it.
 
 **2. Expiry-sweep stage** — terminates sessions whose deadline has already passed.
 
-- **Source** — reads `session_idle_checks` rows with `expire_at <= now`, joined to still-eligible running sessions. No per-resource-group iteration and no checker `judge` call.
-- **Handler** — trivial: the rows already are the verdict.
-- **Applier** — marks those sessions `TERMINATING` through the existing scheduler termination lifecycle.
+- **Source** — reads `session_idle_checks` rows with non-null `expire_at <= now`, joined to `RUNNING` sessions. No per-resource-group iteration is required. Multiple due rows for one session remain available as separate reasons, while the session itself is transitioned at most once.
+- **Handler** — groups the due rows by session without running the checker again. The stored deadlines and latest checker results are the sweep input.
+- **Applier** — conditionally marks each still-`RUNNING` session `TERMINATING` and records the stored checker results in scheduling history in the same transaction. A session whose status changed after the Source read is skipped.
 
-Splitting this way keeps termination correct under change: because the refresh stage rewrites `expire_at` every tick from the *current* effective checker set and deletes rows whose checker no longer applies, the sweep never terminates on a checker that would no longer judge the session idle. The one constraint is cadence — a deadline must be refreshed before it elapses, so the refresh interval bounds worst-case late termination (see Open Questions).
+The refresh stage is the only stage that runs checkers. It may update or remove a future deadline when activity, bindings, or checker definitions change. Once a stored deadline elapses, ownership passes to the sweep stage and refresh no longer changes that row. A change affects the deadline only if refresh persists it before the stored deadline elapses; the sweep does not re-evaluate runtime signals or checker applicability. Refresh cadence therefore determines how quickly such changes are reflected, while sweep cadence determines how long termination may occur after the deadline.
 
 ### Source Fetch Direction
 
-This describes the **deadline-refresh** stage's Source; the sweep stage instead reads due `session_idle_checks` rows directly (see *Reconciler Stages*). The refresh stage lives on the **generic reconciler** — one fetch per tick, not per resource group. Even so, its Source reads sessions **per resource group**, following the pattern the scheduler coordinator already uses (`ScheduleCoordinator` iterates scaling groups and reads each with `get_sessions_for_handler(scaling_group, …)`).
+This describes the **deadline-refresh** stage's Source; the sweep stage instead reads indexed due `session_idle_checks` rows directly (see *Reconciler Stages*). The refresh stage lives on the **generic reconciler** — one fetch per tick, not per resource group. Even so, its Source reads sessions **per resource group**, following the pattern the scheduler coordinator already uses (`ScheduleCoordinator` iterates scaling groups and reads each with `get_sessions_for_handler(scaling_group, …)`).
 
 **Per resource group, the Source:**
 
@@ -264,24 +269,26 @@ Utilization is evaluated from agent-emitted Prometheus metrics aggregated over a
 
 ### Termination Handling
 
-The **sweep** stage's Applier does not kill containers or perform the final `TERMINATED` transition. It marks expired sessions as `TERMINATING` through the existing scheduler termination lifecycle, which is idempotent for sessions already terminating or terminal. The existing session scheduler coordinator then reads `TERMINATING` sessions per resource group and drives agent termination as it does today.
+The **sweep** stage's Applier does not kill containers or perform the final `TERMINATED` transition. It marks sessions with elapsed deadlines as `TERMINATING` through the existing scheduler termination lifecycle, which is idempotent for sessions already terminating or terminal. The existing session scheduler coordinator then reads `TERMINATING` sessions per resource group and drives agent termination as it does today.
 
-The generic reconciler's per-entity retry/history classification (`decisions()`) is intentionally unused in both stages: neither a set of `expire_at` upserts nor a list of expired sessions is a set of retryable per-entity outcomes. Both stages leave the classification path empty.
+The termination operation accepts per-session idle reasons rather than one batch-wide generic message. For every session actually transitioned, the session status update, kernel status updates, and scheduling-history write happen atomically. The history entry records `RUNNING → TERMINATING` and identifies every checker whose deadline elapsed together with its stored `last_status` and `last_message`, in deterministic checker order. This preserves why the session was swept even after the live result row changes or is removed.
+
+The generic reconciler's per-entity retry classification (`decisions()`) is intentionally unused in both stages: neither a set of result upserts nor a list of due sessions is a set of retryable per-entity outcomes. Both stages leave the classification path empty.
 
 ### Deadline Persistence & Reporting
 
-Each check's projected cleanup time is stored in `session_idle_checks.expire_at` as an **absolute timestamp**, not a countdown. Remaining time is derived on read as `expire_at - now` (negative once past due). Storing the absolute time means a value is written only when it actually changes, needs no per-tick rewrite to "tick down", and never drifts between refresh ticks.
+Each check's projected cleanup time is stored in `session_idle_checks.expire_at` as an **absolute timestamp**, not a countdown. Remaining time is derived on read as `expire_at - now` (negative once past due). The latest status and message are persisted with it, and `updated_at` records when that judgment was stored. Absolute timestamps need no writes merely to make a countdown tick and do not drift between refresh ticks.
 
 This DB-backed report **replaces the Valkey remaining-time report** previously published per checker under `session.{session_id}.idle_checker.{checker_id}.remaining`. That Valkey path and `IdleCheckerHost.get_idle_check_report` are retired; `session_idle_checks` is the single source for both the sweep decision and client-facing remaining time.
 
 ### GraphQL Exposure
 
-`session_idle_checks` is exposed so clients can read a session-level aggregate and drill into each checker's contribution:
+`session_idle_checks` is exposed through the Strawberry `SessionV2` API so clients can read a session-level aggregate and drill into each checker's contribution:
 
-- **`SessionIdleCheck` node** — one per `session_idle_checks` row: the bound `idle_checker` (id / name / `checker_type`), `expire_at`, and a derived `remaining_seconds` (`expire_at - now`, computed at read). Reachable from the session.
-- **`Session.idle_expire_at`** — the `min` of the session's non-null `expire_at` values: the earliest time the session is scheduled to be cleaned up. `NULL` when no applied checker has a deadline yet.
+- **`SessionIdleCheck` node** — one per `session_idle_checks` row: the bound `idle_checker` (id / name / `checker_type`), `expire_at`, derived `remaining_seconds` (`expire_at - now`, computed at read), `last_status`, `last_message`, and `updated_at`. Reachable from `SessionV2`.
+- **`SessionV2.idle_expire_at`** — the `min` of the session's non-null `expire_at` values: the earliest time the session is scheduled to be cleaned up. `NULL` when no applied checker has a deadline yet.
 
-These replace the legacy `Session.idle_checks` JSONString, which read the Valkey report.
+These fields are added to `SessionV2GQL` in `api/gql/session/types.py`. The legacy Graphene module is referenced only to remove the old `Session.idle_checks` JSONString that read the Valkey report; no new API surface is added there.
 
 ### Data Flow
 
@@ -297,13 +304,13 @@ flowchart TB
     subgraph Refresh[Deadline-refresh stage]
         ReadSessions[read RG sessions + resolve scopes]
         LoadCheckers[load bound checkers]
-        Judge[judge -> expire_at per checker]
+        Judge[judge -> deadline + status + message]
         Upsert[upsert + prune rows]
     end
 
     subgraph Sweep[Expiry-sweep stage]
-        ReadDue[read rows where expire_at <= now]
-        Mark[mark sessions TERMINATING]
+        ReadDue[read indexed due rows for RUNNING sessions]
+        Mark[mark TERMINATING + write history atomically]
     end
 
     Sessions --> ReadSessions --> LoadCheckers
@@ -317,9 +324,7 @@ flowchart TB
 ## Open Questions
 
 - Should utilization `and` / `or` threshold semantics match the legacy behavior or be redefined?
-- Refresh cadence vs. deadline granularity: the refresh stage must rewrite `expire_at` before it elapses, so the tick interval bounds worst-case late termination. Is one shared interval enough, or should near-due deadlines be refreshed more eagerly?
-- Row lifecycle: rows are removed by `ON DELETE CASCADE` when a session or checker is deleted, and pruned by the refresh stage when a checker stops applying. Is an additional sweep of orphaned rows (e.g. sessions that left the running set out-of-band) needed?
-- Should a checker with no current deadline store a `NULL`-`expire_at` row, or no row at all?
+- Row lifecycle: rows are removed by `ON DELETE CASCADE` when a session or checker is deleted, and non-due rows are pruned by refresh when a checker stops applying. Should sweep delete consumed due rows after writing history, or retain them until the session is deleted?
 
 ## References
 
@@ -327,7 +332,8 @@ flowchart TB
 - `src/ai/backend/manager/sokovan/reconciler/base.py`
 - `src/ai/backend/manager/sokovan/stages/factory.py`
 - `src/ai/backend/manager/models/idle_checker/row.py` (new `session_idle_checks` table)
-- `src/ai/backend/manager/api/gql_legacy/session.py` (session idle-check exposure)
+- `src/ai/backend/manager/api/gql/session/types.py` (new `SessionV2` idle-check exposure)
+- `src/ai/backend/manager/api/gql_legacy/session.py` (legacy `Session.idle_checks` removal only)
 - `docs/superpowers/specs/2026-06-17-first-class-idle-checker-design.md`
 - [BEP-1029: Sokovan Observer Handler](BEP-1029-sokovan-observer-handler.md)
 - [BEP-1050: Prometheus Query Preset System](BEP-1050-prometheus-query-preset-system.md)
