@@ -2,7 +2,7 @@ from typing import override
 
 from ai.backend.common.contexts.request_id import current_request_id
 from ai.backend.common.contexts.user import current_user, triggered_user
-from ai.backend.common.entity.types import EntityType
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.actions.action import BaseAction, BaseActionTriggerMeta, ProcessResult
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.types import BLANK_ID

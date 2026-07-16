@@ -1,6 +1,6 @@
 from typing import override
 
-from ai.backend.common.entity.types import EntityType
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.metrics.metric import ActionMetricObserver
 from ai.backend.manager.actions.action import BaseAction, BaseActionTriggerMeta, ProcessResult
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor

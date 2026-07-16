@@ -8,7 +8,7 @@ from typing import Self
 
 import psutil
 
-from ai.backend.common.entity.types import EntityType
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.exception import BackendAIError, ErrorCode
 from ai.backend.common.metrics.multiprocess import (
     generate_latest_multiprocess,
