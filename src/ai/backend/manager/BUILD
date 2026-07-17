@@ -85,7 +85,7 @@ __dependencies_rules__(
         "//stubs/**",
         "!*",
     ),
-    # repositories: may depend on models/data/dto; must not depend on services or api.
+    # repositories: must not depend on services or api.
     (
         "/repositories/**",
         "!/services/**",
