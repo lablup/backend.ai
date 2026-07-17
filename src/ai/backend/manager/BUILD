@@ -85,6 +85,31 @@ __dependencies_rules__(
         "//stubs/**",
         "!*",
     ),
+    # repositories: may depend on models/data/dto; must not depend on services or api.
+    (
+        "/repositories/**",
+        "!/services/**",
+        "!/api/**",
+        "/**",
+        "//src/ai/backend/common/**",
+        "//src/ai/backend/cli/**",
+        "//src/ai/backend/logging/**",
+        "//reqs#*",
+        "//stubs/**",
+        "!*",
+    ),
+    # services: must not depend on api.
+    (
+        "/services/**",
+        "!/api/**",
+        "/**",
+        "//src/ai/backend/common/**",
+        "//src/ai/backend/cli/**",
+        "//src/ai/backend/logging/**",
+        "//reqs#*",
+        "//stubs/**",
+        "!*",
+    ),
     # default: every other file in the component.
     (
         "*",
