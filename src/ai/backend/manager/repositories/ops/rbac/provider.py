@@ -116,40 +116,52 @@ class RBACWriteOps(WriteOps):
         return virtual_scope_id
 
     async def _insert_virtual_scopes(self, scopes: Sequence[ScopeRef]) -> None:
-        """Create the virtual scope nodes for ``scopes`` and register each scope
-        as an entity member of its own virtual scope (idempotent).
-
-        Access to the scope object itself then resolves as an ordinary entity through the
-        single-path permission resolution. ``permission_cap`` is NULL (ownership, no ceiling).
-        """
+        """Create each scope's virtual scope node with its self entity-membership and self
+        scope_binding (permission_cap NULL). Idempotent: an existing scope is a no-op."""
         if not scopes:
             return
         values = [{"scope_type": s.scope_type, "scope_id": s.scope_id} for s in scopes]
-        stmt = (
+        insert_stmt = (
             pg_insert(VirtualScopeRow)
             .values(values)
             .on_conflict_do_nothing(index_elements=["scope_type", "scope_id"])
+            .returning(
+                VirtualScopeRow.id,
+                VirtualScopeRow.scope_type,
+                VirtualScopeRow.scope_id,
+            )
         )
-        await self._sess.execute(stmt)
-        membership_source = sa.select(
-            VirtualScopeRow.id,
-            VirtualScopeRow.scope_type,
-            VirtualScopeRow.scope_id,
-            sa.null(),
-        ).where(
-            sa.tuple_(VirtualScopeRow.scope_type, VirtualScopeRow.scope_id).in_([
-                (s.scope_type, s.scope_id) for s in scopes
-            ])
-        )
+        inserted = (await self._sess.execute(insert_stmt)).all()
+        if not inserted:
+            return
         membership_stmt = (
             pg_insert(EntityMembershipRow)
-            .from_select(
-                ["virtual_scope_id", "entity_type", "entity_id", "permission_cap"],
-                membership_source,
-            )
+            .values([
+                {
+                    "virtual_scope_id": row.id,
+                    "entity_type": row.scope_type,
+                    "entity_id": row.scope_id,
+                    "permission_cap": None,
+                }
+                for row in inserted
+            ])
             .on_conflict_do_nothing()
         )
         await self._sess.execute(membership_stmt)
+        binding_stmt = (
+            pg_insert(ScopeBindingRow)
+            .values([
+                {
+                    "virtual_scope_id": row.id,
+                    "scope_type": row.scope_type,
+                    "scope_id": row.scope_id,
+                    "permission_cap": None,
+                }
+                for row in inserted
+            ])
+            .on_conflict_do_nothing()
+        )
+        await self._sess.execute(binding_stmt)
 
     async def _delete_virtual_scopes(self, scopes: Sequence[ScopeRef]) -> None:
         """Delete the virtual scope nodes for ``scopes`` (FK CASCADE removes their edges)."""
@@ -273,14 +285,18 @@ class RBACWriteOps(WriteOps):
     async def create_scope[TRow: Base](
         self,
         creation: ScopeCreation[TRow],
+        parent: ScopeRef | None = None,
     ) -> CreatorResult[TRow]:
         """Create the real scope entity via ``creation.creator`` and its virtual scope node.
 
-        The virtual scope insert is idempotent (get-or-create). ``creation.scope.scope_id``
-        must match the id the created row carries.
+        ``creation.scope.scope_id`` must match the id the created row carries. When ``parent``
+        is given, the parent scope is bound to this scope's virtual scope so it can reach this
+        scope's entities.
         """
         result = await self.create(creation.creator)
         await self._insert_virtual_scopes([creation.scope])
+        if parent is not None:
+            await self.bind_scope(parent, creation.scope, permission_cap=None)
         return result
 
     async def bulk_create_scopes[TRow: Base](
@@ -408,6 +424,20 @@ class RBACWriteOps(WriteOps):
             ]),
         )
         await self._sess.execute(stmt)
+
+    # -- Virtual scope: ensure compatibility for externally-created rows ----------
+
+    async def ensure_scope(
+        self,
+        scope: ScopeRef,
+        parent: ScopeRef | None = None,
+    ) -> None:
+        """Ensure the virtual scope node for an already-created ``scope``. When ``parent`` is
+        given, the parent scope is bound to this scope's virtual scope. Idempotent.
+        """
+        await self._insert_virtual_scopes([scope])
+        if parent is not None:
+            await self.bind_scope(parent, scope, permission_cap=None)
 
 
 class RBACOpsProvider(DBOpsProvider):
