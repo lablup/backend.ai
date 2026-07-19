@@ -1,9 +1,8 @@
 from typing import override
 
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
-from ai.backend.manager.actions.processor import ActionProcessor
+from ai.backend.manager.actions.processor.global_action import GlobalActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
-from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.services.retention_policy.actions.create import (
     CreateRetentionPolicyAction,
     CreateRetentionPolicyActionResult,
@@ -28,23 +27,24 @@ from ai.backend.manager.services.retention_policy.service import RetentionPolicy
 
 
 class RetentionPolicyProcessors(AbstractProcessorPackage):
-    create: ActionProcessor[CreateRetentionPolicyAction, CreateRetentionPolicyActionResult]
-    update: ActionProcessor[UpdateRetentionPolicyAction, UpdateRetentionPolicyActionResult]
-    delete: ActionProcessor[DeleteRetentionPolicyAction, DeleteRetentionPolicyActionResult]
-    purge: ActionProcessor[PurgeRetentionPolicyAction, PurgeRetentionPolicyActionResult]
-    search: ActionProcessor[SearchRetentionPoliciesAction, SearchRetentionPoliciesActionResult]
+    create: GlobalActionProcessor[CreateRetentionPolicyAction, CreateRetentionPolicyActionResult]
+    update: GlobalActionProcessor[UpdateRetentionPolicyAction, UpdateRetentionPolicyActionResult]
+    delete: GlobalActionProcessor[DeleteRetentionPolicyAction, DeleteRetentionPolicyActionResult]
+    purge: GlobalActionProcessor[PurgeRetentionPolicyAction, PurgeRetentionPolicyActionResult]
+    search: GlobalActionProcessor[
+        SearchRetentionPoliciesAction, SearchRetentionPoliciesActionResult
+    ]
 
     def __init__(
         self,
         service: RetentionPolicyService,
         action_monitors: list[ActionMonitor],
-        validators: ActionValidators,
     ) -> None:
-        self.create = ActionProcessor(service.create, action_monitors)
-        self.update = ActionProcessor(service.update, action_monitors)
-        self.delete = ActionProcessor(service.delete, action_monitors)
-        self.purge = ActionProcessor(service.purge, action_monitors)
-        self.search = ActionProcessor(service.search, action_monitors)
+        self.create = GlobalActionProcessor(service.create, action_monitors)
+        self.update = GlobalActionProcessor(service.update, action_monitors)
+        self.delete = GlobalActionProcessor(service.delete, action_monitors)
+        self.purge = GlobalActionProcessor(service.purge, action_monitors)
+        self.search = GlobalActionProcessor(service.search, action_monitors)
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
