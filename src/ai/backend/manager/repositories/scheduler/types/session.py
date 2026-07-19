@@ -53,6 +53,7 @@ class PendingSessionData:
     scaling_group_name: str
     resource_group_id: ResourceGroupID
     priority: int
+    job_priority: int
     is_preemptible: bool
     session_type: SessionTypes
     cluster_mode: ClusterMode
@@ -74,6 +75,7 @@ class PendingSessionData:
             scaling_group=self.scaling_group_name,
             resource_group_id=self.resource_group_id,
             priority=self.priority,
+            job_priority=self.job_priority,
             session_type=self.session_type,
             cluster_mode=self.cluster_mode,
             starts_at=self.starts_at,

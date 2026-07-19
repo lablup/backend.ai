@@ -45,7 +45,7 @@ from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyIm
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.config import ModelHealthCheck
-from ai.backend.common.defs.session import SESSION_PRIORITY_DEFAULT
+from ai.backend.common.defs.session import JOB_PRIORITY_DEFAULT, SESSION_PRIORITY_DEFAULT
 from ai.backend.common.docker import ImageRef, LabelName
 from ai.backend.common.dto.agent.response import (
     CodeCompletionResp,
@@ -442,6 +442,7 @@ class AgentRegistry:
         enqueue_only: bool = False,
         max_wait_seconds: int = 0,
         priority: int = SESSION_PRIORITY_DEFAULT,
+        job_priority: int = JOB_PRIORITY_DEFAULT,
         is_preemptible: bool = True,
         bootstrap_script: str | None = None,
         dependencies: list[uuid.UUID] | None = None,
@@ -648,6 +649,7 @@ class AgentRegistry:
                         resource_policy,
                         user_scope=user_scope,
                         priority=priority,
+                        job_priority=job_priority,
                         is_preemptible=is_preemptible,
                         cluster_mode=cluster_mode,
                         cluster_size=cluster_size,
@@ -982,6 +984,7 @@ class AgentRegistry:
         *,
         user_scope: UserScope,
         priority: int,
+        job_priority: int,
         public_sgroup_only: bool,
         cluster_mode: ClusterMode,
         cluster_size: int,
@@ -1160,6 +1163,7 @@ class AgentRegistry:
                 dependencies=dependencies,
                 options=SessionOptionsDraft(
                     priority=priority,
+                    job_priority=job_priority,
                     is_preemptible=is_preemptible,
                     cluster_mode=cluster_mode,
                     cluster_size=cluster_size,
@@ -1196,6 +1200,7 @@ class AgentRegistry:
         *,
         user_scope: UserScope,
         priority: int = SESSION_PRIORITY_DEFAULT,
+        job_priority: int = JOB_PRIORITY_DEFAULT,
         is_preemptible: bool = True,
         public_sgroup_only: bool = True,
         cluster_mode: ClusterMode = ClusterMode.SINGLE_NODE,
@@ -1222,6 +1227,7 @@ class AgentRegistry:
             resource_policy=resource_policy,
             user_scope=user_scope,
             priority=priority,
+            job_priority=job_priority,
             is_preemptible=is_preemptible,
             public_sgroup_only=public_sgroup_only,
             cluster_mode=cluster_mode,

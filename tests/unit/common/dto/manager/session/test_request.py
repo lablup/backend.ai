@@ -7,6 +7,7 @@ from pydantic import ValidationError
 
 from ai.backend.common.data.session.types import CustomizedImageVisibilityScope
 from ai.backend.common.defs.session import (
+    JOB_PRIORITY_DEFAULT,
     SESSION_PRIORITY_DEFAULT,
     SESSION_PRIORITY_MAX,
     SESSION_PRIORITY_MIN,
@@ -46,10 +47,32 @@ class TestCreateFromTemplateRequest:
             "template_id": str(uuid4()),
         })
         assert req.priority == SESSION_PRIORITY_DEFAULT
+        assert req.job_priority == JOB_PRIORITY_DEFAULT
         assert req.cluster_size == 1
         assert req.cluster_mode == ClusterMode.SINGLE_NODE
         assert req.enqueue_only is False
         assert req.reuse is True
+
+    def test_job_priority_is_settable_and_uncapped(self) -> None:
+        """job_priority defaults to 0, is user-settable, and has no range cap
+        (unlike the policy-bounded ``priority``)."""
+        base = {"template_id": str(uuid4())}
+        assert CreateFromTemplateRequest.model_validate(base).job_priority == 0
+        assert (
+            CreateFromTemplateRequest.model_validate({**base, "job_priority": 50}).job_priority
+            == 50
+        )
+        assert (
+            CreateFromTemplateRequest.model_validate({
+                **base,
+                "job_priority": SESSION_PRIORITY_MAX + 1,
+            }).job_priority
+            == SESSION_PRIORITY_MAX + 1
+        )
+        assert (
+            CreateFromTemplateRequest.model_validate({**base, "job_priority": -5}).job_priority
+            == -5
+        )
 
     def test_camel_case_aliases(self) -> None:
         tid = uuid4()

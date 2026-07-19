@@ -94,6 +94,9 @@ class SessionWorkload:
     resource_group_id: ResourceGroupID
     # Priority level (higher value = higher priority)
     priority: int = 0
+    # Scope-local preemption priority among the owner's own sessions
+    # (higher preempts lower; decoupled from the global scheduler ``priority``)
+    job_priority: int = 0
     # Session type (INTERACTIVE, BATCH, INFERENCE)
     session_type: SessionTypes = SessionTypes.INTERACTIVE
     # Cluster mode (SINGLE_NODE or MULTI_NODE)

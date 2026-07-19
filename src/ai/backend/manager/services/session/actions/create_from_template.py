@@ -7,6 +7,7 @@ from typing import Any, override
 import yarl
 
 from ai.backend.common.data.permission.types import RBACElementType, ScopeType
+from ai.backend.common.defs.session import JOB_PRIORITY_DEFAULT
 from ai.backend.common.types import AccessKey, ClusterMode, SessionTypes
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
@@ -43,6 +44,8 @@ class CreateFromTemplateActionParams:
     bootstrap_script: str | None | Undefined
     dependencies: list[uuid.UUID] | None
     callback_url: yarl.URL | None
+    # Scope-local preemption priority (ranks the requester's own sessions).
+    job_priority: int = JOB_PRIORITY_DEFAULT
 
 
 @dataclass

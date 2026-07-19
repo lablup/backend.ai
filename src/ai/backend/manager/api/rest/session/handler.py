@@ -603,6 +603,7 @@ class SessionHandler:
                     ),
                     callback_url=(yarl.URL(params.callback_url) if params.callback_url else None),
                     priority=params.priority,
+                    job_priority=params.job_priority,
                     is_preemptible=params.is_preemptible,
                     starts_at=params.starts_at,
                     batch_timeout=(
@@ -693,6 +694,7 @@ class SessionHandler:
                     ),
                     callback_url=(yarl.URL(params.callback_url) if params.callback_url else None),
                     priority=params.priority,
+                    job_priority=params.job_priority,
                     is_preemptible=params.is_preemptible,
                     starts_at=params.starts_at,
                     batch_timeout=(

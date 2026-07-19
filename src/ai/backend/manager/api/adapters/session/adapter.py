@@ -308,6 +308,7 @@ class SessionAdapter(BaseAdapter):
             execution=execution_spec,
             scheduling=SessionSchedulingSpec(
                 priority=input.priority,
+                job_priority=input.job_priority,
                 is_preemptible=input.is_preemptible,
                 dependencies=input.dependencies,
                 agent_list=input.agent_list,

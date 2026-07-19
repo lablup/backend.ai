@@ -411,6 +411,13 @@ class DefaultSessionOptions(_OptionsBaseModel):
         default=10,
         description="Default scheduling priority for new sessions.",
     )
+    job_priority: int = Field(
+        default=0,
+        description=(
+            "Default scope-local preemption priority for new sessions "
+            "(ranks the owner's own sessions; decoupled from `priority`)."
+        ),
+    )
     is_preemptible: bool = Field(
         default=True,
         description="Default preemption flag for new sessions.",
@@ -500,6 +507,7 @@ class SessionOptions(_OptionsBaseModel):
       | Field                                          | Location                                       |
       | ---------------------------------------------- | ---------------------------------------------- |
       | ``priority``                                   | ``SessionRow.priority`` column                 |
+      | ``job_priority``                               | ``SessionRow.job_priority`` column             |
       | ``is_preemptible``                             | ``SessionRow.is_preemptible`` column           |
       | ``cluster_mode``                               | ``SessionRow.cluster_mode`` column             |
       | ``cluster_size``                               | ``SessionRow.cluster_size`` column             |
@@ -513,6 +521,13 @@ class SessionOptions(_OptionsBaseModel):
     """
 
     priority: int = Field(description="Scheduling priority.")
+    # Defaults to the neutral baseline (0) when unresolved — unlike `priority`,
+    # job_priority has a meaningful "no preference" value, so a missing value
+    # resolves to neutral rather than being an error.
+    job_priority: int = Field(
+        default=0,
+        description="Scope-local preemption priority among the owner's own sessions.",
+    )
     is_preemptible: bool = Field(description="Preemption flag.")
     cluster_mode: ClusterMode = Field(description="Placement constraint.")
     cluster_size: int = Field(

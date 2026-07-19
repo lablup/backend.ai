@@ -652,6 +652,10 @@ class EnqueueSessionInputGQL(PydanticInputMixin[EnqueueSessionInputDTO]):
     bootstrap_script: str | None = gql_field(default=None, description="Bootstrap script.")
 
     priority: int = gql_field(default=10, description="Scheduling priority (0-100).")
+    job_priority: int = gql_field(
+        default=0,
+        description="Scope-local preemption priority among the requester's own sessions.",
+    )
     is_preemptible: bool = gql_field(default=True, description="Whether preemptible.")
     dependencies: list[ID] | None = gql_field(default=None, description="Dependent session IDs.")
     agent_list: list[str] | None = gql_field(default=None, description="Designated agent IDs.")
