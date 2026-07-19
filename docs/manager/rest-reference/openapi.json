@@ -22340,6 +22340,265 @@
         "title": "AdminSearchResourceAllocationsInput",
         "type": "object"
       },
+      "RetentionCategory": {
+        "description": "Identifier linking a ``retention_policies`` row to its code-side cleanup\nprocedure. A pure identifier carrying no table references.\n\nThe single definition shared across the data, DTO, GraphQL, and API layers.",
+        "enum": [
+          "logs",
+          "login",
+          "reconcile_history",
+          "roles_invitations",
+          "deployments",
+          "sessions",
+          "usage_records",
+          "usage_buckets"
+        ],
+        "title": "RetentionCategory",
+        "type": "string"
+      },
+      "CreateRetentionPolicyInput": {
+        "properties": {
+          "category": {
+            "$ref": "#/components/schemas/RetentionCategory",
+            "description": "Retention category, validated against the fixed catalog."
+          },
+          "retention_period_days": {
+            "description": "Retention period in days; records older than now - period are purged.",
+            "minimum": 1,
+            "title": "Retention Period Days",
+            "type": "integer"
+          },
+          "enabled": {
+            "default": true,
+            "description": "Whether this policy is active.",
+            "title": "Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "category",
+          "retention_period_days"
+        ],
+        "title": "CreateRetentionPolicyInput",
+        "type": "object"
+      },
+      "RetentionPolicyFilter": {
+        "properties": {
+          "category": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RetentionCategory"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by category."
+          },
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by enabled flag.",
+            "title": "Enabled"
+          }
+        },
+        "title": "RetentionPolicyFilter",
+        "type": "object"
+      },
+      "RetentionPolicyOrder": {
+        "properties": {
+          "field": {
+            "$ref": "#/components/schemas/RetentionPolicyOrderField"
+          },
+          "direction": {
+            "$ref": "#/components/schemas/OrderDirection",
+            "default": "ASC"
+          }
+        },
+        "required": [
+          "field"
+        ],
+        "title": "RetentionPolicyOrder",
+        "type": "object"
+      },
+      "RetentionPolicyOrderField": {
+        "enum": [
+          "category",
+          "created_at",
+          "last_swept_at"
+        ],
+        "title": "RetentionPolicyOrderField",
+        "type": "string"
+      },
+      "SearchRetentionPoliciesInput": {
+        "properties": {
+          "filter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RetentionPolicyFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "order": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/RetentionPolicyOrder"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Order"
+          },
+          "first": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "First"
+          },
+          "after": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "After"
+          },
+          "last": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Last"
+          },
+          "before": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Before"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Limit"
+          },
+          "offset": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Offset"
+          }
+        },
+        "title": "SearchRetentionPoliciesInput",
+        "type": "object"
+      },
+      "UpdateRetentionPolicyInput": {
+        "properties": {
+          "id": {
+            "description": "Retention policy ID.",
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RetentionCategory"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "New category, validated against the catalog; None = no change."
+          },
+          "retention_period_days": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "New retention period in days; None = no change.",
+            "title": "Retention Period Days"
+          },
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Toggle enabled; None = no change.",
+            "title": "Enabled"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "UpdateRetentionPolicyInput",
+        "type": "object"
+      },
       "RuntimeVariantFilter": {
         "properties": {
           "name": {
@@ -46490,6 +46749,185 @@
         },
         "parameters": [],
         "description": "Search resource allocations with filters, orders, and pagination.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/retention-policies": {
+      "post": {
+        "operationId": "v2/retention-policies.admin_create",
+        "tags": [
+          "v2/retention-policies"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRetentionPolicyInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/retention-policies/search": {
+      "post": {
+        "operationId": "v2/retention-policies.admin_search",
+        "tags": [
+          "v2/retention-policies"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchRetentionPoliciesInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/retention-policies/{policy_id}": {
+      "get": {
+        "operationId": "v2/retention-policies.admin_get",
+        "tags": [
+          "v2/retention-policies"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "policy_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n"
+      },
+      "patch": {
+        "operationId": "v2/retention-policies.admin_update",
+        "tags": [
+          "v2/retention-policies"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateRetentionPolicyInput"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "policy_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n"
+      },
+      "delete": {
+        "operationId": "v2/retention-policies.admin_delete",
+        "tags": [
+          "v2/retention-policies"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "policy_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/retention-policies/{policy_id}/purge": {
+      "post": {
+        "operationId": "v2/retention-policies.admin_purge",
+        "tags": [
+          "v2/retention-policies"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "policy_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/v2/runtime-variants/search": {

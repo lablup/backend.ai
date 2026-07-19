@@ -4385,6 +4385,28 @@ input CreateResourcePresetV2Input
   resourceGroupName: String = null
 }
 
+"""Added in 26.8.0. Create retention policy input."""
+input CreateRetentionPolicyInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Retention category, validated against the fixed catalog."""
+  category: RetentionCategory!
+
+  """Retention period in days."""
+  retentionPeriodDays: Int!
+
+  """Whether this policy is active."""
+  enabled: Boolean! = true
+}
+
+"""Added in 26.8.0. Create retention policy payload."""
+type CreateRetentionPolicyPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The created retention policy."""
+  policy: RetentionPolicy!
+}
+
 """
 Added in 25.19.0. Input for specifying revision configuration within a deployment.
 """
@@ -5490,6 +5512,14 @@ type DeleteResourcePresetPayload
 {
   """UUID of the deleted resource preset."""
   id: String!
+}
+
+"""Added in 26.8.0. Delete retention policy payload."""
+type DeleteRetentionPolicyPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """ID of the deleted retention policy."""
+  id: UUID!
 }
 
 """Added in 26.3.0. Input for soft-deleting a role"""
@@ -12106,6 +12136,20 @@ type Mutation
   """Added in 26.4.2. Delete multiple runtime variants (superadmin only)."""
   adminDeleteRuntimeVariants(input: DeleteRuntimeVariantsInput!): DeleteRuntimeVariantsPayload @join__field(graph: STRAWBERRY)
 
+  """Added in 26.8.0. Create a retention policy (superadmin only)."""
+  adminCreateRetentionPolicy(input: CreateRetentionPolicyInput!): CreateRetentionPolicyPayload @join__field(graph: STRAWBERRY)
+
+  """Added in 26.8.0. Update a retention policy (superadmin only)."""
+  adminUpdateRetentionPolicy(input: UpdateRetentionPolicyInput!): UpdateRetentionPolicyPayload @join__field(graph: STRAWBERRY)
+
+  """Added in 26.8.0. Delete a retention policy (superadmin only)."""
+  adminDeleteRetentionPolicy(id: UUID!): DeleteRetentionPolicyPayload @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.8.0. Purge (permanently remove) a retention policy (superadmin only).
+  """
+  adminPurgeRetentionPolicy(id: UUID!): PurgeRetentionPolicyPayload @join__field(graph: STRAWBERRY)
+
   """Added in 26.4.2. Create a runtime variant preset (superadmin only)."""
   adminCreateRuntimeVariantPreset(input: CreateRuntimeVariantPresetInput!): CreateRuntimeVariantPresetPayload @join__field(graph: STRAWBERRY)
 
@@ -14032,6 +14076,14 @@ type PurgeProjectPayload
   purged: Boolean!
 }
 
+"""Added in 26.8.0. Purge retention policy payload."""
+type PurgeRetentionPolicyPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """ID of the purged retention policy."""
+  id: UUID!
+}
+
 """Added in 26.3.0. Input for purging a role"""
 input PurgeRoleInput
   @join__type(graph: STRAWBERRY)
@@ -15147,6 +15199,14 @@ type Query
 
   """Added in 26.4.2. Get a single runtime variant by ID."""
   runtimeVariant(id: UUID!): RuntimeVariant @join__field(graph: STRAWBERRY)
+
+  """Added in 26.8.0. Search retention policies (superadmin only)."""
+  adminRetentionPolicies(filter: RetentionPolicyFilter = null, orderBy: [RetentionPolicyOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RetentionPolicyConnection @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.8.0. Get a single retention policy by ID (superadmin only).
+  """
+  adminRetentionPolicy(id: UUID!): RetentionPolicy @join__field(graph: STRAWBERRY)
 
   """Added in 26.4.2. Search runtime variant presets."""
   runtimeVariantPresets(filter: RuntimeVariantPresetFilter = null, orderBy: [RuntimeVariantPresetOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RuntimeVariantPresetConnection @join__field(graph: STRAWBERRY)
@@ -16508,6 +16568,105 @@ type RestoreVFolderPayload
 {
   """ID of the restored virtual folder"""
   id: UUID!
+}
+
+"""
+Added in 26.8.0. Retention category identifying a code-side cleanup procedure.
+"""
+enum RetentionCategory
+  @join__type(graph: STRAWBERRY)
+{
+  LOGS @join__enumValue(graph: STRAWBERRY)
+  LOGIN @join__enumValue(graph: STRAWBERRY)
+  RECONCILE_HISTORY @join__enumValue(graph: STRAWBERRY)
+  ROLES_INVITATIONS @join__enumValue(graph: STRAWBERRY)
+  DEPLOYMENTS @join__enumValue(graph: STRAWBERRY)
+  SESSIONS @join__enumValue(graph: STRAWBERRY)
+  USAGE_RECORDS @join__enumValue(graph: STRAWBERRY)
+  USAGE_BUCKETS @join__enumValue(graph: STRAWBERRY)
+}
+
+"""
+Added in 26.8.0. A per-category retention policy: admin-tunable cleanup settings for accumulating DB records.
+"""
+type RetentionPolicy implements Node
+  @join__implements(graph: STRAWBERRY, interface: "Node")
+  @join__type(graph: STRAWBERRY)
+{
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """Retention category."""
+  category: RetentionCategory!
+
+  """Retention period in days; records older than now - period are purged."""
+  retentionPeriodDays: Int!
+
+  """Whether this policy is active."""
+  enabled: Boolean!
+
+  """When this policy was last swept (read-only observability field)."""
+  lastSweptAt: DateTime
+
+  """Timestamp when this policy was created."""
+  createdAt: DateTime!
+
+  """Timestamp of the last modification."""
+  updatedAt: DateTime!
+}
+
+"""Added in 26.8.0. Paginated list of retention policies."""
+type RetentionPolicyConnection
+  @join__type(graph: STRAWBERRY)
+{
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [RetentionPolicyEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type RetentionPolicyEdge
+  @join__type(graph: STRAWBERRY)
+{
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: RetentionPolicy!
+}
+
+"""Added in 26.8.0. Filter for retention policies."""
+input RetentionPolicyFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """Category filter."""
+  category: RetentionCategory = null
+
+  """Enabled filter."""
+  enabled: Boolean = null
+}
+
+"""Added in 26.8.0. Order specification."""
+input RetentionPolicyOrderBy
+  @join__type(graph: STRAWBERRY)
+{
+  """Field to order by."""
+  field: RetentionPolicyOrderField!
+
+  """ASC or DESC."""
+  direction: String! = "ASC"
+}
+
+"""Added in 26.8.0. Order fields for retention policies."""
+enum RetentionPolicyOrderField
+  @join__type(graph: STRAWBERRY)
+{
+  CATEGORY @join__enumValue(graph: STRAWBERRY)
+  CREATED_AT @join__enumValue(graph: STRAWBERRY)
+  LAST_SWEPT_AT @join__enumValue(graph: STRAWBERRY)
 }
 
 """
@@ -20098,6 +20257,31 @@ input UpdateResourcePresetV2Input
 
   """Updated resource group name. Use null to make global."""
   resourceGroupName: String = null
+}
+
+"""Added in 26.8.0. Update retention policy input."""
+input UpdateRetentionPolicyInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Retention policy ID."""
+  id: UUID!
+
+  """New category."""
+  category: RetentionCategory = null
+
+  """New retention period in days."""
+  retentionPeriodDays: Int = null
+
+  """Toggle enabled."""
+  enabled: Boolean = null
+}
+
+"""Added in 26.8.0. Update retention policy payload."""
+type UpdateRetentionPolicyPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The updated retention policy."""
+  policy: RetentionPolicy!
 }
 
 """Added in 26.3.0. Input for updating a role"""

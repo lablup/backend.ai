@@ -2897,6 +2897,24 @@ input CreateResourcePresetV2Input {
   resourceGroupName: String = null
 }
 
+"""Added in 26.8.0. Create retention policy input."""
+input CreateRetentionPolicyInput {
+  """Retention category, validated against the fixed catalog."""
+  category: RetentionCategory!
+
+  """Retention period in days."""
+  retentionPeriodDays: Int!
+
+  """Whether this policy is active."""
+  enabled: Boolean! = true
+}
+
+"""Added in 26.8.0. Create retention policy payload."""
+type CreateRetentionPolicyPayload {
+  """The created retention policy."""
+  policy: RetentionPolicy!
+}
+
 """
 Added in 25.19.0. Input for specifying revision configuration within a deployment.
 """
@@ -3679,6 +3697,12 @@ type DeleteResourceGroupPayload {
 type DeleteResourcePresetPayload {
   """UUID of the deleted resource preset."""
   id: String!
+}
+
+"""Added in 26.8.0. Delete retention policy payload."""
+type DeleteRetentionPolicyPayload {
+  """ID of the deleted retention policy."""
+  id: UUID!
 }
 
 """Added in 26.3.0. Input for soft-deleting a role"""
@@ -7957,6 +7981,20 @@ type Mutation {
   """Added in 26.4.2. Delete multiple runtime variants (superadmin only)."""
   adminDeleteRuntimeVariants(input: DeleteRuntimeVariantsInput!): DeleteRuntimeVariantsPayload
 
+  """Added in 26.8.0. Create a retention policy (superadmin only)."""
+  adminCreateRetentionPolicy(input: CreateRetentionPolicyInput!): CreateRetentionPolicyPayload
+
+  """Added in 26.8.0. Update a retention policy (superadmin only)."""
+  adminUpdateRetentionPolicy(input: UpdateRetentionPolicyInput!): UpdateRetentionPolicyPayload
+
+  """Added in 26.8.0. Delete a retention policy (superadmin only)."""
+  adminDeleteRetentionPolicy(id: UUID!): DeleteRetentionPolicyPayload
+
+  """
+  Added in 26.8.0. Purge (permanently remove) a retention policy (superadmin only).
+  """
+  adminPurgeRetentionPolicy(id: UUID!): PurgeRetentionPolicyPayload
+
   """Added in 26.4.2. Create a runtime variant preset (superadmin only)."""
   adminCreateRuntimeVariantPreset(input: CreateRuntimeVariantPresetInput!): CreateRuntimeVariantPresetPayload
 
@@ -9493,6 +9531,12 @@ type PurgeProjectPayload {
   purged: Boolean!
 }
 
+"""Added in 26.8.0. Purge retention policy payload."""
+type PurgeRetentionPolicyPayload {
+  """ID of the purged retention policy."""
+  id: UUID!
+}
+
 """Added in 26.3.0. Input for purging a role"""
 input PurgeRoleInput {
   id: UUID!
@@ -10194,6 +10238,14 @@ type Query {
 
   """Added in 26.4.2. Get a single runtime variant by ID."""
   runtimeVariant(id: UUID!): RuntimeVariant
+
+  """Added in 26.8.0. Search retention policies (superadmin only)."""
+  adminRetentionPolicies(filter: RetentionPolicyFilter = null, orderBy: [RetentionPolicyOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RetentionPolicyConnection
+
+  """
+  Added in 26.8.0. Get a single retention policy by ID (superadmin only).
+  """
+  adminRetentionPolicy(id: UUID!): RetentionPolicy
 
   """Added in 26.4.2. Search runtime variant presets."""
   runtimeVariantPresets(filter: RuntimeVariantPresetFilter = null, orderBy: [RuntimeVariantPresetOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RuntimeVariantPresetConnection
@@ -11384,6 +11436,90 @@ Added in 26.4.4. Payload returned after restoring a virtual folder from trash.
 type RestoreVFolderPayload {
   """ID of the restored virtual folder"""
   id: UUID!
+}
+
+"""
+Added in 26.8.0. Retention category identifying a code-side cleanup procedure.
+"""
+enum RetentionCategory {
+  LOGS
+  LOGIN
+  RECONCILE_HISTORY
+  ROLES_INVITATIONS
+  DEPLOYMENTS
+  SESSIONS
+  USAGE_RECORDS
+  USAGE_BUCKETS
+}
+
+"""
+Added in 26.8.0. A per-category retention policy: admin-tunable cleanup settings for accumulating DB records.
+"""
+type RetentionPolicy implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """Retention category."""
+  category: RetentionCategory!
+
+  """Retention period in days; records older than now - period are purged."""
+  retentionPeriodDays: Int!
+
+  """Whether this policy is active."""
+  enabled: Boolean!
+
+  """When this policy was last swept (read-only observability field)."""
+  lastSweptAt: DateTime
+
+  """Timestamp when this policy was created."""
+  createdAt: DateTime!
+
+  """Timestamp of the last modification."""
+  updatedAt: DateTime!
+}
+
+"""Added in 26.8.0. Paginated list of retention policies."""
+type RetentionPolicyConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [RetentionPolicyEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type RetentionPolicyEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: RetentionPolicy!
+}
+
+"""Added in 26.8.0. Filter for retention policies."""
+input RetentionPolicyFilter {
+  """Category filter."""
+  category: RetentionCategory = null
+
+  """Enabled filter."""
+  enabled: Boolean = null
+}
+
+"""Added in 26.8.0. Order specification."""
+input RetentionPolicyOrderBy {
+  """Field to order by."""
+  field: RetentionPolicyOrderField!
+
+  """ASC or DESC."""
+  direction: String! = "ASC"
+}
+
+"""Added in 26.8.0. Order fields for retention policies."""
+enum RetentionPolicyOrderField {
+  CATEGORY
+  CREATED_AT
+  LAST_SWEPT_AT
 }
 
 """
@@ -14175,6 +14311,27 @@ input UpdateResourcePresetV2Input {
 
   """Updated resource group name. Use null to make global."""
   resourceGroupName: String = null
+}
+
+"""Added in 26.8.0. Update retention policy input."""
+input UpdateRetentionPolicyInput {
+  """Retention policy ID."""
+  id: UUID!
+
+  """New category."""
+  category: RetentionCategory = null
+
+  """New retention period in days."""
+  retentionPeriodDays: Int = null
+
+  """Toggle enabled."""
+  enabled: Boolean = null
+}
+
+"""Added in 26.8.0. Update retention policy payload."""
+type UpdateRetentionPolicyPayload {
+  """The updated retention policy."""
+  policy: RetentionPolicy!
 }
 
 """Added in 26.3.0. Input for updating a role"""
