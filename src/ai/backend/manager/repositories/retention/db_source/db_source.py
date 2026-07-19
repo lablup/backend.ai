@@ -17,10 +17,15 @@ import sqlalchemy as sa
 from sqlalchemy.sql.elements import ColumnElement
 
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.auth.login_session_types import LoginSessionStatus
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.permission.status import RoleStatus
-from ai.backend.manager.data.retention.types import RetentionCategory, RetentionPurgeResult
+from ai.backend.manager.data.retention.types import (
+    RetentionCategory,
+    RetentionPolicyData,
+    RetentionPurgeResult,
+)
 from ai.backend.manager.data.role_invitation.types import RoleInvitationState
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.vfolder.types import VFolderInvitationState
@@ -34,6 +39,7 @@ from ai.backend.manager.models.login_session.row import LoginHistoryRow, LoginSe
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.replica_group_history.row import ReplicaGroupHistoryRow
 from ai.backend.manager.models.resource_usage_history.row import KernelUsageRecordRow
+from ai.backend.manager.models.retention.row import RetentionPolicyRow
 from ai.backend.manager.models.role_invitation.row import RoleInvitationRow
 from ai.backend.manager.models.routing.row import RoutingRow
 from ai.backend.manager.models.scheduling_history.row import (
@@ -44,9 +50,16 @@ from ai.backend.manager.models.scheduling_history.row import (
 )
 from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.vfolder.row import VFolderInvitationRow
-from ai.backend.manager.repositories.base import BatchPurger, BatchPurgerSpec
-from ai.backend.manager.repositories.ops import DBOpsProvider
+from ai.backend.manager.repositories.base import (
+    BatchPurger,
+    BatchPurgerSpec,
+    BatchQuerier,
+    NoPagination,
+    Updater,
+)
+from ai.backend.manager.repositories.ops import DBOpsProvider, ReadOps, WriteOps
 from ai.backend.manager.repositories.retention.purgers import TimestampBoundaryPurgerSpec
+from ai.backend.manager.repositories.retention.updaters import LastSweptAtUpdaterSpec
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -81,10 +94,16 @@ class _BoundaryTable:
 
 class RetentionDBSource:
     _ops: DBOpsProvider
+    _config_provider: ManagerConfigProvider
     _catalog: Mapping[RetentionCategory, Sequence[_BoundaryTable]]
 
-    def __init__(self, ops_provider: DBOpsProvider) -> None:
+    def __init__(
+        self,
+        ops_provider: DBOpsProvider,
+        config_provider: ManagerConfigProvider,
+    ) -> None:
         self._ops = ops_provider
+        self._config_provider = config_provider
         self._catalog = self._build_catalog()
 
     @staticmethod
@@ -199,30 +218,92 @@ class RetentionDBSource:
             for t in tables
         ]
 
-    async def purge_older_than(
-        self,
-        category: RetentionCategory,
-        threshold: datetime,
-        batch_size: int,
-    ) -> RetentionPurgeResult:
-        """Delete every row of ``category`` older than ``threshold``.
+    async def sweep(self) -> list[RetentionPurgeResult]:
+        """Purge every enabled category once, within a single transaction.
 
-        Each of the category's tables is drained in its own transaction via
-        ``batch_purge``, which deletes in ``batch_size`` chunks (delete-and-
-        advance) so a large backlog never becomes a single huge DELETE.
+        Reads ``batch_size`` / ``per_tick_budget`` from config at call time (so a
+        config change takes effect on the next tick). The whole sweep runs in one
+        ``write_ops`` session, so reading DB ``now``, loading policies, draining
+        each category, and stamping ``last_swept_at`` all share one snapshot and
+        commit atomically at the end — a crash mid-tick rolls the entire tick
+        back, leaving no delete-without-stamp drift.
+
+        Policies are visited least-recently-swept first. A category whose cleanup
+        is not wired yet (``deployments`` / ``usage_buckets``) raises
+        :class:`RetentionCategoryNotSupportedError`; the loop isolates that (a
+        pure lookup, so the transaction stays valid) and skips it without a stamp
+        so it is retried once wired. When ``per_tick_budget`` is set, once the
+        tick's cumulative deletions reach it the remaining categories are deferred
+        to the next tick.
         """
-        specs = self._purger_specs(category, threshold)
-        total_deleted = 0
+        retention_config = self._config_provider.config.retention
+        batch_size = retention_config.batch_size
+        budget_remaining = retention_config.per_tick_budget
+        results: list[RetentionPurgeResult] = []
 
-        for spec in specs:
-            async with self._ops.write_ops() as w:
-                result = await w.batch_purge(BatchPurger(spec=spec, batch_size=batch_size))
-                total_deleted += result.deleted_count
+        async with self._ops.write_ops() as w:
+            now = await w.current_time()
+            policies = await self._load_enabled_policies(w)
 
-        log.debug(
-            "retention purge category={} threshold={} deleted={}",
-            category.value,
-            threshold,
-            total_deleted,
+            for policy in policies:
+                if budget_remaining is not None and budget_remaining <= 0:
+                    log.debug(
+                        "retention sweep per-tick budget exhausted; deferring remaining categories"
+                    )
+                    break
+                threshold = now - policy.retention_period
+                try:
+                    specs = self._purger_specs(policy.category, threshold)
+                except RetentionCategoryNotSupportedError:
+                    log.debug(
+                        "retention category {} has no cleanup wired yet; skipping",
+                        policy.category.value,
+                    )
+                    continue
+                deleted = await self._drain_specs(w, specs, batch_size)
+                await w.update(Updater(spec=LastSweptAtUpdaterSpec(now), pk_value=policy.id))
+                results.append(
+                    RetentionPurgeResult(category=policy.category, deleted_count=deleted)
+                )
+                if budget_remaining is not None:
+                    budget_remaining -= deleted
+
+        total_deleted = sum(r.deleted_count for r in results)
+        if total_deleted:
+            log.info(
+                "retention sweep deleted {} record(s) across {} categor(ies)",
+                total_deleted,
+                len(results),
+            )
+        return results
+
+    async def _load_enabled_policies(self, r: ReadOps) -> list[RetentionPolicyData]:
+        """Load every enabled policy, least-recently-swept first, on ``r``.
+
+        The ordering makes the sweep fair under a per-tick budget: categories
+        that have waited longest are drained before ones swept more recently.
+        """
+        querier = BatchQuerier(
+            pagination=NoPagination(),
+            conditions=[lambda: RetentionPolicyRow.enabled == sa.true()],
+            orders=[RetentionPolicyRow.last_swept_at.asc().nulls_first()],
         )
-        return RetentionPurgeResult(category=category, deleted_count=total_deleted)
+        result = await r.batch_query_in_global(sa.select(RetentionPolicyRow), querier)
+        return [row.RetentionPolicyRow.to_data() for row in result.rows]
+
+    async def _drain_specs(
+        self,
+        w: WriteOps,
+        specs: list[BatchPurgerSpec[Any]],
+        batch_size: int,
+    ) -> int:
+        """Drain each spec's rows on ``w`` in ``batch_size`` chunks; total deleted.
+
+        Runs on the caller's session so the deletes join the caller's transaction
+        (the sweep drains every category and stamps in one commit).
+        """
+        total_deleted = 0
+        for spec in specs:
+            result = await w.batch_purge(BatchPurger(spec=spec, batch_size=batch_size))
+            total_deleted += result.deleted_count
+        return total_deleted

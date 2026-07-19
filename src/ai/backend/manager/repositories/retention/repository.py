@@ -1,35 +1,34 @@
 from __future__ import annotations
 
-import logging
-from datetime import datetime
-
-from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.retention.types import RetentionCategory, RetentionPurgeResult
+from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.retention.types import RetentionPurgeResult
 from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.manager.repositories.retention.db_source.db_source import RetentionDBSource
-
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class RetentionRepository:
     """Deletes accumulated DB records past their category's age boundary.
 
-    A single repository owns the ``category -> tables`` mapping and reuses the
-    ``BatchPurger`` framework for chunk-based (delete-and-advance) deletes. The
-    leader sweep (separate task) computes ``threshold = now - retention_period``
-    per policy and calls :meth:`purge_older_than`.
+    The single caller-facing operation is :meth:`sweep`: it reads every enabled
+    ``retention_policies`` row and, per policy, drains records older than
+    ``now - retention_period`` and stamps ``last_swept_at`` — one cohesive
+    policy-driven action in a single transaction. ``batch_size`` /
+    ``per_tick_budget`` are read from config inside the sweep, so it stays
+    argument-free and picks up config changes on the next tick.
     """
 
     _db_source: RetentionDBSource
 
-    def __init__(self, ops_provider: DBOpsProvider) -> None:
-        self._db_source = RetentionDBSource(ops_provider)
-
-    async def purge_older_than(
+    def __init__(
         self,
-        category: RetentionCategory,
-        threshold: datetime,
-        batch_size: int,
-    ) -> RetentionPurgeResult:
-        """Purge rows of ``category`` older than ``threshold``, chunked per table."""
-        return await self._db_source.purge_older_than(category, threshold, batch_size)
+        ops_provider: DBOpsProvider,
+        config_provider: ManagerConfigProvider,
+    ) -> None:
+        self._db_source = RetentionDBSource(ops_provider, config_provider)
+
+    async def sweep(self) -> list[RetentionPurgeResult]:
+        """Sweep every enabled category once against DB-sourced ``now``.
+
+        Returns the per-category purge results (skipped categories excluded).
+        """
+        return await self._db_source.sweep()

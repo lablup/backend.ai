@@ -29,6 +29,7 @@ from ai.backend.manager.repositories.replica_group.repository import ReplicaGrou
 from ai.backend.manager.repositories.resource_usage_history import (
     ResourceUsageHistoryRepository,
 )
+from ai.backend.manager.repositories.retention.repository import RetentionRepository
 from ai.backend.manager.repositories.runtime_variant.repository import RuntimeVariantRepository
 from ai.backend.manager.repositories.scheduler import SchedulerRepository
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
@@ -67,6 +68,7 @@ class OrchestrationInput:
     idle_checker_repository: IdleCheckerRepository
     fair_share_repository: FairShareRepository
     resource_usage_repository: ResourceUsageHistoryRepository
+    retention_repository: RetentionRepository
     agent_client_pool: AgentClientPool
     appproxy_client_pool: AppProxyClientPool
     network_plugin_ctx: NetworkPluginContext
@@ -177,6 +179,7 @@ class OrchestrationComposer(DependencyComposer[OrchestrationInput, Orchestration
             config_provider=setup_input.config_provider,
             event_producer=setup_input.event_producer,
             sokovan_orchestrator=sokovan_orchestrator,
+            retention_repository=setup_input.retention_repository,
         )
         leader_election = await stack.enter_dependency(
             leader_dep,
