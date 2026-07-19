@@ -384,6 +384,14 @@ from .resource_usage import (
     project_usage_buckets,
     user_usage_buckets,
 )
+from .retention_policy import (
+    admin_create_retention_policy,
+    admin_delete_retention_policy,
+    admin_purge_retention_policy,
+    admin_retention_policies,
+    admin_retention_policy,
+    admin_update_retention_policy,
+)
 from .role_preset import (
     admin_bulk_add_role_preset_permissions,
     admin_bulk_remove_role_preset_permissions,
@@ -681,6 +689,9 @@ class Query:
     # Runtime Variant APIs
     runtime_variants = runtime_variants
     runtime_variant = runtime_variant
+    # Retention Policy APIs
+    admin_retention_policies = admin_retention_policies
+    admin_retention_policy = admin_retention_policy
     # Runtime Variant Preset APIs
     runtime_variant_presets = runtime_variant_presets
     runtime_variant_preset = runtime_variant_preset
@@ -913,6 +924,11 @@ class Mutation:
     admin_update_runtime_variant = admin_update_runtime_variant
     admin_delete_runtime_variant = admin_delete_runtime_variant
     admin_delete_runtime_variants = admin_delete_runtime_variants
+    # Retention Policy mutations
+    admin_create_retention_policy = admin_create_retention_policy
+    admin_update_retention_policy = admin_update_retention_policy
+    admin_delete_retention_policy = admin_delete_retention_policy
+    admin_purge_retention_policy = admin_purge_retention_policy
     # Runtime Variant Preset mutations
     admin_create_runtime_variant_preset = admin_create_runtime_variant_preset
     admin_update_runtime_variant_preset = admin_update_runtime_variant_preset

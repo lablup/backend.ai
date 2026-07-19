@@ -44,6 +44,7 @@ from ai.backend.manager.api.adapters.resource_policy.adapter import ResourcePoli
 from ai.backend.manager.api.adapters.resource_preset.adapter import ResourcePresetAdapter
 from ai.backend.manager.api.adapters.resource_slot.adapter import ResourceSlotAdapter
 from ai.backend.manager.api.adapters.resource_usage.adapter import ResourceUsageAdapter
+from ai.backend.manager.api.adapters.retention_policy.adapter import RetentionPolicyAdapter
 from ai.backend.manager.api.adapters.role_preset.adapter import RolePresetAdapter
 from ai.backend.manager.api.adapters.runtime_variant.adapter import RuntimeVariantAdapter
 from ai.backend.manager.api.adapters.runtime_variant_preset.adapter import (
@@ -104,6 +105,7 @@ class Adapters:
         resource_policy: ResourcePolicyAdapter,
         resource_preset: ResourcePresetAdapter,
         resource_slot: ResourceSlotAdapter,
+        retention_policy: RetentionPolicyAdapter,
         runtime_variant: RuntimeVariantAdapter,
         runtime_variant_preset: RuntimeVariantPresetAdapter,
         deployment_revision_preset: DeploymentRevisionPresetAdapter,
@@ -147,6 +149,7 @@ class Adapters:
         self.resource_policy = resource_policy
         self.resource_preset = resource_preset
         self.resource_slot = resource_slot
+        self.retention_policy = retention_policy
         self.runtime_variant = runtime_variant
         self.runtime_variant_preset = runtime_variant_preset
         self.deployment_revision_preset = deployment_revision_preset
@@ -211,6 +214,7 @@ class Adapters:
             resource_policy=ResourcePolicyAdapter(processors),
             resource_preset=ResourcePresetAdapter(processors),
             resource_slot=ResourceSlotAdapter(processors),
+            retention_policy=RetentionPolicyAdapter(processors),
             runtime_variant=RuntimeVariantAdapter(processors),
             runtime_variant_preset=RuntimeVariantPresetAdapter(processors),
             deployment_revision_preset=DeploymentRevisionPresetAdapter(processors),
