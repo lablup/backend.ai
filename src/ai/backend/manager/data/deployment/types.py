@@ -102,6 +102,12 @@ class RouteStatus(enum.Enum):
     def inactive_route_statuses(cls) -> set[RouteStatus]:
         return {RouteStatus.TERMINATING, RouteStatus.TERMINATED, RouteStatus.FAILED_TO_START}
 
+    @classmethod
+    @lru_cache(maxsize=1)
+    def terminal_statuses(cls) -> set[RouteStatus]:
+        """Routes that will not transition further (TERMINATING is still in-flight)."""
+        return {RouteStatus.TERMINATED, RouteStatus.FAILED_TO_START}
+
     def is_active(self) -> bool:
         return self in self.active_route_statuses()
 
@@ -193,6 +199,12 @@ class ReplicaGroupLifecycle(enum.StrEnum):
     FAILED = "failed"
     DRAINING = "draining"
     DRAINED = "drained"
+
+    @classmethod
+    @lru_cache(maxsize=1)
+    def terminal_statuses(cls) -> set[ReplicaGroupLifecycle]:
+        """Replica-group lifecycles that will not transition further."""
+        return {cls.DRAINED, cls.FAILED}
 
 
 class ReplicaGroupScalingStatus(enum.StrEnum):
