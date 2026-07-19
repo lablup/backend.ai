@@ -4,6 +4,7 @@ import enum
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
+from functools import lru_cache
 from typing import Any, override
 
 from ai.backend.common.data.user.types import UserRole
@@ -89,6 +90,16 @@ class VFolderInvitationState(enum.StrEnum):
     CANCELED = "canceled"  # canceled by inviter
     ACCEPTED = "accepted"
     REJECTED = "rejected"  # rejected by invitee
+
+    @classmethod
+    @lru_cache(maxsize=1)
+    def declined_states(cls) -> frozenset[VFolderInvitationState]:
+        """Terminal states that did not grant access (rejected / canceled).
+
+        ACCEPTED is excluded: acceptance writes a durable ``vfolder_permissions``
+        row, but the invitation record is kept rather than purged as history.
+        """
+        return frozenset((cls.REJECTED, cls.CANCELED))
 
 
 class VFolderOperationStatus(enum.StrEnum):

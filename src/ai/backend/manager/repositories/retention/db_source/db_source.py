@@ -1,24 +1,25 @@
 """Database source for retention cleanup.
 
-Holds the ``category -> tables`` catalog (kept inside the repository, never a
-module global) and drains each table with chunk-based delete-and-advance via
-the shared ``batch_purge``.
+The single caller-facing operation is :meth:`sweep`: it reads every enabled
+policy and drains records past each category's age boundary, stamping
+``last_swept_at`` — all in one transaction. Categories map to purger specs via
+one :meth:`_catalog`, and each spec drains via the shared ``batch_purge``.
 """
 
 from __future__ import annotations
 
 import logging
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
 import sqlalchemy as sa
-from sqlalchemy.sql.elements import ColumnElement
 
+from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.auth.login_session_types import LoginSessionStatus
+from ai.backend.manager.data.deployment.types import ReplicaGroupLifecycle, RouteStatus
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.retention.types import (
@@ -31,14 +32,22 @@ from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.vfolder.types import VFolderInvitationState
 from ai.backend.manager.errors.retention import RetentionCategoryNotSupportedError
 from ai.backend.manager.models.audit_log.row import AuditLogRow
-from ai.backend.manager.models.base import Base
+from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
+from ai.backend.manager.models.endpoint.row import EndpointRow, EndpointTokenRow
 from ai.backend.manager.models.error_logs import ErrorLogRow
 from ai.backend.manager.models.event_log.row import EventLogRow
 from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.login_session.row import LoginHistoryRow, LoginSessionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
 from ai.backend.manager.models.replica_group_history.row import ReplicaGroupHistoryRow
-from ai.backend.manager.models.resource_usage_history.row import KernelUsageRecordRow
+from ai.backend.manager.models.resource_usage_history.row import (
+    DomainUsageBucketRow,
+    KernelUsageRecordRow,
+    ProjectUsageBucketRow,
+    UsageBucketEntryRow,
+    UserUsageBucketRow,
+)
 from ai.backend.manager.models.retention.row import RetentionPolicyRow
 from ai.backend.manager.models.role_invitation.row import RoleInvitationRow
 from ai.backend.manager.models.routing.row import RoutingRow
@@ -52,50 +61,26 @@ from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.vfolder.row import VFolderInvitationRow
 from ai.backend.manager.repositories.base import (
     BatchPurger,
-    BatchPurgerSpec,
     BatchQuerier,
     NoPagination,
     Updater,
 )
 from ai.backend.manager.repositories.ops import DBOpsProvider, ReadOps, WriteOps
-from ai.backend.manager.repositories.retention.purgers import TimestampBoundaryPurgerSpec
+from ai.backend.manager.repositories.retention.purgers import RetentionPurgerSpec
 from ai.backend.manager.repositories.retention.updaters import LastSweptAtUpdaterSpec
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
-# Invitation states that are terminal (no further update expected), so their
-# proxy timestamp is a safe grace boundary. Only PENDING is non-terminal.
-_TERMINAL_ROLE_INVITATION_STATES = (
-    RoleInvitationState.ACCEPTED,
-    RoleInvitationState.REJECTED,
-    RoleInvitationState.CANCELED,
-)
-_TERMINAL_VFOLDER_INVITATION_STATES = (
-    VFolderInvitationState.ACCEPTED,
-    VFolderInvitationState.REJECTED,
-    VFolderInvitationState.CANCELED,
-)
-
-
-@dataclass(frozen=True)
-class _BoundaryTable:
-    """One table's fixed cleanup definition; only ``threshold`` varies per sweep.
-
-    The boundary column is chosen by table nature: append-only logs use
-    ``created_at``, in-place-merged history uses ``updated_at``, and lifecycle
-    records use their terminal timestamp plus a terminal-status
-    ``extra_conditions`` filter.
-    """
-
-    row_class: type[Base]
-    boundary: Any
-    extra_conditions: Sequence[ColumnElement[bool]] = field(default_factory=tuple)
+# usage_bucket_entries.bucket_type discriminators: the three bucket kinds share
+# one FK-less entries table, so each parent purge matches its own entries.
+_DOMAIN_BUCKET_TYPE = "domain"
+_PROJECT_BUCKET_TYPE = "project"
+_USER_BUCKET_TYPE = "user"
 
 
 class RetentionDBSource:
     _ops: DBOpsProvider
     _config_provider: ManagerConfigProvider
-    _catalog: Mapping[RetentionCategory, Sequence[_BoundaryTable]]
 
     def __init__(
         self,
@@ -104,21 +89,22 @@ class RetentionDBSource:
     ) -> None:
         self._ops = ops_provider
         self._config_provider = config_provider
-        self._catalog = self._build_catalog()
 
     @staticmethod
-    def _build_catalog() -> Mapping[RetentionCategory, Sequence[_BoundaryTable]]:
-        """Build the fixed ``category -> tables`` catalog once (column refs are
-        constant; only the threshold is applied per sweep).
+    def _catalog(
+        threshold: datetime,
+    ) -> Mapping[RetentionCategory, Sequence[RetentionPurgerSpec[Any]]]:
+        """Build the ``category -> specs`` catalog with ``threshold`` bound.
 
-        ``deployments`` and ``usage_buckets`` keep a bespoke ordered delete and
-        are intentionally absent until wired.
+        The ordered-delete categories (``sessions``, ``deployments``,
+        ``usage_buckets``) list their specs child-before-parent so the drain
+        removes FK-less or plain-FK children first. FK-CASCADE children are left
+        to the DB unless they also need their own boundary sweep (terminal
+        routings / replica_groups outliving a still-running endpoint).
         """
-        # sessions: kernels are listed before sessions so the ordered per-table
-        # drain removes kernels first (kernels.session_id is a plain FK). A
-        # session is skipped this sweep while any kernel still references it or a
+        # A session is held back while any kernel still references it or a
         # RESTRICT-guarded routing points at it, then purged once the blocker
-        # ages out -- expressed as correlated NOT EXISTS guards below.
+        # ages out -- expressed as correlated NOT EXISTS guards.
         session_has_kernel = (
             sa.select(sa.literal(1))
             .where(KernelRow.session_id == SessionRow.id)
@@ -133,27 +119,35 @@ class RetentionDBSource:
         )
         return {
             RetentionCategory.LOGS: (
-                _BoundaryTable(EventLogRow, EventLogRow.created_at),
-                _BoundaryTable(AuditLogRow, AuditLogRow.created_at),
-                # error_logs purges purely on the boundary — is_read/is_cleared
-                # flags are intentionally ignored (all rows past boundary go).
-                _BoundaryTable(ErrorLogRow, ErrorLogRow.created_at),
+                RetentionPurgerSpec(EventLogRow, EventLogRow.created_at, threshold),
+                RetentionPurgerSpec(AuditLogRow, AuditLogRow.created_at, threshold),
+                # error_logs purges purely on the boundary; is_read/is_cleared are ignored.
+                RetentionPurgerSpec(ErrorLogRow, ErrorLogRow.created_at, threshold),
             ),
-            # updated_at (not created_at): attempts++ merges touch updated_at,
-            # so a recently-retried row keeps an old created_at but survives.
+            # updated_at (not created_at): a retry merge touches updated_at, so a
+            # recently-retried row keeps an old created_at but survives.
             RetentionCategory.RECONCILE_HISTORY: (
-                _BoundaryTable(SessionSchedulingHistoryRow, SessionSchedulingHistoryRow.updated_at),
-                _BoundaryTable(KernelSchedulingHistoryRow, KernelSchedulingHistoryRow.updated_at),
-                _BoundaryTable(DeploymentHistoryRow, DeploymentHistoryRow.updated_at),
-                _BoundaryTable(RouteHistoryRow, RouteHistoryRow.updated_at),
-                _BoundaryTable(ReplicaGroupHistoryRow, ReplicaGroupHistoryRow.updated_at),
+                RetentionPurgerSpec(
+                    SessionSchedulingHistoryRow, SessionSchedulingHistoryRow.updated_at, threshold
+                ),
+                RetentionPurgerSpec(
+                    KernelSchedulingHistoryRow, KernelSchedulingHistoryRow.updated_at, threshold
+                ),
+                RetentionPurgerSpec(
+                    DeploymentHistoryRow, DeploymentHistoryRow.updated_at, threshold
+                ),
+                RetentionPurgerSpec(RouteHistoryRow, RouteHistoryRow.updated_at, threshold),
+                RetentionPurgerSpec(
+                    ReplicaGroupHistoryRow, ReplicaGroupHistoryRow.updated_at, threshold
+                ),
             ),
             RetentionCategory.LOGIN: (
-                _BoundaryTable(LoginHistoryRow, LoginHistoryRow.created_at),
-                _BoundaryTable(
+                RetentionPurgerSpec(LoginHistoryRow, LoginHistoryRow.created_at, threshold),
+                RetentionPurgerSpec(
                     LoginSessionRow,
                     LoginSessionRow.invalidated_at,
-                    (
+                    threshold,
+                    conditions=(
                         LoginSessionRow.status.in_((
                             LoginSessionStatus.INVALIDATED,
                             LoginSessionStatus.REVOKED,
@@ -162,40 +156,121 @@ class RetentionDBSource:
                 ),
             ),
             RetentionCategory.ROLES_INVITATIONS: (
-                _BoundaryTable(
+                RetentionPurgerSpec(
                     RoleRow,
                     RoleRow.deleted_at,
-                    (RoleRow.status == RoleStatus.DELETED,),
+                    threshold,
+                    conditions=(RoleRow.status == RoleStatus.DELETED,),
                 ),
-                _BoundaryTable(
+                RetentionPurgerSpec(
                     RoleInvitationRow,
                     RoleInvitationRow.updated_at,
-                    (RoleInvitationRow.state.in_(_TERMINAL_ROLE_INVITATION_STATES),),
+                    threshold,
+                    conditions=(
+                        RoleInvitationRow.state.in_(RoleInvitationState.declined_states()),
+                    ),
                 ),
-                _BoundaryTable(
+                RetentionPurgerSpec(
                     VFolderInvitationRow,
                     VFolderInvitationRow.modified_at,
-                    (VFolderInvitationRow.state.in_(_TERMINAL_VFOLDER_INVITATION_STATES),),
+                    threshold,
+                    conditions=(
+                        VFolderInvitationRow.state.in_(VFolderInvitationState.declined_states()),
+                    ),
                 ),
             ),
             RetentionCategory.USAGE_RECORDS: (
-                _BoundaryTable(KernelUsageRecordRow, KernelUsageRecordRow.period_end),
+                RetentionPurgerSpec(
+                    KernelUsageRecordRow, KernelUsageRecordRow.period_end, threshold
+                ),
             ),
             RetentionCategory.SESSIONS: (
-                _BoundaryTable(
+                RetentionPurgerSpec(
                     KernelRow,
                     KernelRow.terminated_at,
-                    (KernelRow.status.in_(KernelStatus.terminal_statuses()),),
+                    threshold,
+                    conditions=(KernelRow.status.in_(KernelStatus.terminal_statuses()),),
                 ),
-                _BoundaryTable(
+                RetentionPurgerSpec(
                     SessionRow,
                     SessionRow.terminated_at,
-                    (
+                    threshold,
+                    conditions=(
                         SessionRow.status.in_(SessionStatus.terminal_statuses()),
                         ~session_has_kernel,
                         ~session_has_routing,
                     ),
                 ),
+            ),
+            # deployment_revisions carry no ON DELETE to endpoints, so they are
+            # drained first by endpoint id; policies / auto_scaling_rules cascade.
+            # Terminal routings / replica_groups outlive a still-live endpoint, so
+            # they get their own boundary sweep; endpoint_tokens expire on theirs.
+            RetentionCategory.DEPLOYMENTS: (
+                RetentionPurgerSpec(
+                    DeploymentRevisionRow,
+                    EndpointRow.destroyed_at,
+                    threshold,
+                    match_column=DeploymentRevisionRow.endpoint,
+                    source_key=EndpointRow.id,
+                    source_conditions=(EndpointRow.lifecycle_stage == EndpointLifecycle.DESTROYED,),
+                ),
+                RetentionPurgerSpec(
+                    RoutingRow,
+                    RoutingRow.updated_at,
+                    threshold,
+                    conditions=(RoutingRow.status.in_(RouteStatus.terminal_statuses()),),
+                ),
+                RetentionPurgerSpec(
+                    ReplicaGroupRow,
+                    ReplicaGroupRow.updated_at,
+                    threshold,
+                    conditions=(
+                        ReplicaGroupRow.lifecycle.in_(ReplicaGroupLifecycle.terminal_statuses()),
+                    ),
+                ),
+                RetentionPurgerSpec(
+                    EndpointRow,
+                    EndpointRow.destroyed_at,
+                    threshold,
+                    conditions=(EndpointRow.lifecycle_stage == EndpointLifecycle.DESTROYED,),
+                ),
+                RetentionPurgerSpec(EndpointTokenRow, EndpointTokenRow.expires_at, threshold),
+            ),
+            # Each bucket kind is purged on its own period_end, with its FK-less
+            # usage_bucket_entries (keyed by bucket_id + bucket_type) drained first.
+            RetentionCategory.USAGE_BUCKETS: (
+                RetentionPurgerSpec(
+                    UsageBucketEntryRow,
+                    DomainUsageBucketRow.period_end,
+                    threshold,
+                    conditions=(UsageBucketEntryRow.bucket_type == _DOMAIN_BUCKET_TYPE,),
+                    match_column=UsageBucketEntryRow.bucket_id,
+                    source_key=DomainUsageBucketRow.id,
+                ),
+                RetentionPurgerSpec(
+                    DomainUsageBucketRow, DomainUsageBucketRow.period_end, threshold
+                ),
+                RetentionPurgerSpec(
+                    UsageBucketEntryRow,
+                    ProjectUsageBucketRow.period_end,
+                    threshold,
+                    conditions=(UsageBucketEntryRow.bucket_type == _PROJECT_BUCKET_TYPE,),
+                    match_column=UsageBucketEntryRow.bucket_id,
+                    source_key=ProjectUsageBucketRow.id,
+                ),
+                RetentionPurgerSpec(
+                    ProjectUsageBucketRow, ProjectUsageBucketRow.period_end, threshold
+                ),
+                RetentionPurgerSpec(
+                    UsageBucketEntryRow,
+                    UserUsageBucketRow.period_end,
+                    threshold,
+                    conditions=(UsageBucketEntryRow.bucket_type == _USER_BUCKET_TYPE,),
+                    match_column=UsageBucketEntryRow.bucket_id,
+                    source_key=UserUsageBucketRow.id,
+                ),
+                RetentionPurgerSpec(UserUsageBucketRow, UserUsageBucketRow.period_end, threshold),
             ),
         }
 
@@ -203,20 +278,14 @@ class RetentionDBSource:
         self,
         category: RetentionCategory,
         threshold: datetime,
-    ) -> list[BatchPurgerSpec[Any]]:
-        """Look up the category's tables and bind ``threshold`` into each spec."""
-        tables = self._catalog.get(category)
-        if tables is None:
+    ) -> Sequence[RetentionPurgerSpec[Any]]:
+        """Look up the category's specs (each already bound to ``threshold``)."""
+        specs = self._catalog(threshold).get(category)
+        if specs is None:
             raise RetentionCategoryNotSupportedError(
-                f"Retention category '{category.value}' has no simple/grouped "
-                "cleanup wired in this repository."
+                f"Retention category '{category.value}' has no cleanup wired in this repository."
             )
-        return [
-            TimestampBoundaryPurgerSpec(
-                t.row_class, t.boundary, threshold, extra_conditions=t.extra_conditions
-            )
-            for t in tables
-        ]
+        return specs
 
     async def sweep(self) -> list[RetentionPurgeResult]:
         """Purge every enabled category once, within a single transaction.
@@ -228,13 +297,12 @@ class RetentionDBSource:
         commit atomically at the end — a crash mid-tick rolls the entire tick
         back, leaving no delete-without-stamp drift.
 
-        Policies are visited least-recently-swept first. A category whose cleanup
-        is not wired yet (``deployments`` / ``usage_buckets``) raises
-        :class:`RetentionCategoryNotSupportedError`; the loop isolates that (a
-        pure lookup, so the transaction stays valid) and skips it without a stamp
-        so it is retried once wired. When ``per_tick_budget`` is set, once the
-        tick's cumulative deletions reach it the remaining categories are deferred
-        to the next tick.
+        Policies are visited least-recently-swept first. A category with no wired
+        cleanup raises :class:`RetentionCategoryNotSupportedError`; the loop
+        isolates that (a pure lookup, so the transaction stays valid) and skips it
+        without a stamp so it is retried once wired. When ``per_tick_budget`` is
+        set, once the tick's cumulative deletions reach it the remaining
+        categories are deferred to the next tick.
         """
         retention_config = self._config_provider.config.retention
         batch_size = retention_config.batch_size
@@ -294,7 +362,7 @@ class RetentionDBSource:
     async def _drain_specs(
         self,
         w: WriteOps,
-        specs: list[BatchPurgerSpec[Any]],
+        specs: Sequence[RetentionPurgerSpec[Any]],
         batch_size: int,
     ) -> int:
         """Drain each spec's rows on ``w`` in ``batch_size`` chunks; total deleted.

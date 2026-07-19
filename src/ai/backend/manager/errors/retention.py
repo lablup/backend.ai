@@ -19,11 +19,11 @@ from .common import ObjectNotFound
 
 
 class RetentionCategoryNotSupportedError(RepositoryError):
-    """Raised when a retention category has no code-side cleanup wired yet.
+    """Raised when a retention category has no code-side cleanup wired.
 
-    The ordered-delete categories (``sessions``, ``deployments``,
-    ``usage_buckets``) are implemented separately; requesting one here fails
-    loudly instead of silently deleting nothing.
+    A defensive guard: every :class:`RetentionCategory` is mapped in the
+    repository catalog, so an unmapped category fails loudly instead of
+    silently deleting nothing.
     """
 
     error_type = "https://api.backend.ai/probs/retention-category-not-supported"
