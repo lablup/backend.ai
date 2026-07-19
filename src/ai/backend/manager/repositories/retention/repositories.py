@@ -12,5 +12,5 @@ class RetentionRepositories:
     @classmethod
     def create(cls, args: RepositoryArgs) -> Self:
         return cls(
-            repository=RetentionRepository(args.ops_provider),
+            repository=RetentionRepository(args.ops_provider, args.config_provider),
         )

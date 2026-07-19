@@ -1,15 +1,21 @@
-"""Real-DB tests for the retention repository.
+"""Real-DB tests for the retention DB source.
 
-Covers the simple/grouped categories wired in BA-6929: rows past the age
-boundary are purged while newer rows and non-terminal/recently-touched rows are
-preserved, deletion advances across batches, and ``budget`` caps a call.
+Everything runs through the public ``sweep()`` entry point (there is no other
+caller-facing operation). Per category with self-contained tables, a seeded
+policy drives the sweep and we assert rows past the age boundary are purged
+while newer / non-terminal / recently-touched rows are preserved, deletion
+advances across batches, unwired categories are skipped, and the per-tick budget
+defers the rest.
 
-Categories are exercised through the public ``purge_older_than`` API where the
-tables are self-contained. The terminal-state filter is validated on the
-FK-free ``roles`` table via its ``TimestampBoundaryPurgerSpec``; ``login`` and
-the invitation tables share that exact spec + terminal-status mechanism (their
-FK chains to ``users``/``vfolders`` make full category setup disproportionate),
-so they are not duplicated here.
+``sessions`` exercises the ordered kernels->sessions delete with the
+remaining-kernel / live-routing NOT EXISTS guards. The terminal-state filter is
+validated on the FK-free ``roles`` table via its ``TimestampBoundaryPurgerSpec``
+directly; ``login`` and the invitation tables share that exact spec, so they are
+not duplicated here.
+
+sweep() derives its threshold from DB ``now``, so fixtures use timestamps
+relative to the real current time; every category is seeded with a 30-day policy
+so its threshold lands at ~now-30d.
 """
 
 from __future__ import annotations
@@ -18,6 +24,7 @@ import uuid
 from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
+from unittest.mock import MagicMock
 
 import pytest
 import sqlalchemy as sa
@@ -32,7 +39,6 @@ from ai.backend.manager.data.error_log.types import ErrorLogSeverity
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.retention.types import RetentionCategory, RetentionPurgeResult
-from ai.backend.manager.errors.retention import RetentionCategoryNotSupportedError
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.audit_log.row import AuditLogRow
 from ai.backend.manager.models.base import Base
@@ -55,6 +61,7 @@ from ai.backend.manager.models.resource_policy import (
     UserResourcePolicyRow,
 )
 from ai.backend.manager.models.resource_usage_history.row import KernelUsageRecordRow
+from ai.backend.manager.models.retention.row import RetentionPolicyRow
 from ai.backend.manager.models.routing.row import RouteStatus, RoutingRow
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.scheduling_history.row import (
@@ -74,14 +81,15 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder.row import VFolderRow
 from ai.backend.manager.repositories.base import BatchPurger
 from ai.backend.manager.repositories.ops import DBOpsProvider
+from ai.backend.manager.repositories.retention.db_source.db_source import RetentionDBSource
 from ai.backend.manager.repositories.retention.purgers import TimestampBoundaryPurgerSpec
-from ai.backend.manager.repositories.retention.repository import RetentionRepository
 from ai.backend.testutils.db import with_tables
 
-_NOW = datetime(2026, 1, 1, tzinfo=UTC)
+_NOW = datetime.now(UTC)
 _THRESHOLD = _NOW - timedelta(days=30)
 _OLD = _NOW - timedelta(days=400)  # older than threshold -> eligible for purge
 _NEW = _NOW - timedelta(days=1)  # newer than threshold -> preserved
+_RETENTION_DAYS = 30
 
 
 @dataclass
@@ -98,12 +106,6 @@ class _Scope:
     user_policy_name: str = "retention-user-policy"
 
 
-async def db_purge(engine: ExtendedAsyncSAEngine, threshold: datetime) -> RetentionPurgeResult:
-    """Run the public sessions-category purge against a real engine."""
-    repo = RetentionRepository(DBOpsProvider(engine))
-    return await repo.purge_older_than(RetentionCategory.SESSIONS, threshold, batch_size=100)
-
-
 async def _insert(engine: ExtendedAsyncSAEngine, rows: list[Base]) -> None:
     async with engine.begin_session() as sess:
         sess.add_all(rows)
@@ -115,9 +117,62 @@ async def _count(engine: ExtendedAsyncSAEngine, row_class: type[Base]) -> int:
         return int(result.scalar_one())
 
 
+async def _swept_at(engine: ExtendedAsyncSAEngine, category: RetentionCategory) -> datetime | None:
+    async with engine.begin_readonly_session() as sess:
+        result = await sess.execute(
+            sa.select(RetentionPolicyRow.last_swept_at).where(
+                RetentionPolicyRow.category == category
+            )
+        )
+        return result.scalar_one()
+
+
+def _policy_row(
+    category: RetentionCategory,
+    *,
+    enabled: bool = True,
+    last_swept_at: datetime | None = None,
+) -> RetentionPolicyRow:
+    return RetentionPolicyRow(
+        category=category,
+        retention_period=timedelta(days=_RETENTION_DAYS),
+        enabled=enabled,
+        last_swept_at=last_swept_at,
+    )
+
+
+def _make_db_source(
+    engine: ExtendedAsyncSAEngine,
+    *,
+    batch_size: int = 100,
+    per_tick_budget: int | None = None,
+) -> RetentionDBSource:
+    config_provider = MagicMock()
+    config_provider.config.retention.batch_size = batch_size
+    config_provider.config.retention.per_tick_budget = per_tick_budget
+    return RetentionDBSource(DBOpsProvider(engine), config_provider)
+
+
+async def _sweep_category(
+    engine: ExtendedAsyncSAEngine,
+    category: RetentionCategory,
+    *,
+    batch_size: int = 100,
+) -> RetentionPurgeResult:
+    """Seed an enabled policy for ``category`` and run the sweep; return its result.
+
+    The DB holds only this one policy, so the sweep processes exactly this
+    category and always includes it in the results (wired categories are never
+    skipped, even at zero deletions).
+    """
+    await _insert(engine, [_policy_row(category)])
+    results = await _make_db_source(engine, batch_size=batch_size).sweep()
+    return next(r for r in results if r.category is category)
+
+
 @pytest.fixture
-def repo(database_connection: ExtendedAsyncSAEngine) -> RetentionRepository:
-    return RetentionRepository(DBOpsProvider(database_connection))
+def db_source(database_connection: ExtendedAsyncSAEngine) -> RetentionDBSource:
+    return _make_db_source(database_connection)
 
 
 class TestLogsRetention:
@@ -140,13 +195,12 @@ class TestLogsRetention:
                 EventLogRow,
                 AuditLogRow,
                 ErrorLogRow,
+                RetentionPolicyRow,
             ],
         ):
             yield database_connection
 
-    async def test_purges_old_rows_across_all_log_tables(
-        self, db: ExtendedAsyncSAEngine, repo: RetentionRepository
-    ) -> None:
+    async def test_purges_old_rows_across_all_log_tables(self, db: ExtendedAsyncSAEngine) -> None:
         await _insert(
             db,
             [
@@ -164,7 +218,7 @@ class TestLogsRetention:
             ],
         )
 
-        result = await repo.purge_older_than(RetentionCategory.LOGS, _THRESHOLD, batch_size=100)
+        result = await _sweep_category(db, RetentionCategory.LOGS)
 
         assert result.category is RetentionCategory.LOGS
         assert result.deleted_count == 3  # one old row from each of the three tables
@@ -173,7 +227,7 @@ class TestLogsRetention:
         assert await _count(db, ErrorLogRow) == 0
 
     async def test_error_logs_ignores_read_and_cleared_flags(
-        self, db: ExtendedAsyncSAEngine, repo: RetentionRepository
+        self, db: ExtendedAsyncSAEngine
     ) -> None:
         await _insert(
             db,
@@ -185,7 +239,7 @@ class TestLogsRetention:
             ],
         )
 
-        result = await repo.purge_older_than(RetentionCategory.LOGS, _THRESHOLD, batch_size=100)
+        result = await _sweep_category(db, RetentionCategory.LOGS)
 
         assert result.deleted_count == 1
         assert await _count(db, ErrorLogRow) == 1
@@ -227,13 +281,12 @@ class TestReconcileHistoryRetention:
                 DeploymentHistoryRow,
                 RouteHistoryRow,
                 ReplicaGroupHistoryRow,
+                RetentionPolicyRow,
             ],
         ):
             yield database_connection
 
-    async def test_uses_updated_at_not_created_at(
-        self, db: ExtendedAsyncSAEngine, repo: RetentionRepository
-    ) -> None:
+    async def test_uses_updated_at_not_created_at(self, db: ExtendedAsyncSAEngine) -> None:
         await _insert(
             db,
             [
@@ -245,16 +298,14 @@ class TestReconcileHistoryRetention:
             ],
         )
 
-        result = await repo.purge_older_than(
-            RetentionCategory.RECONCILE_HISTORY, _THRESHOLD, batch_size=100
-        )
+        result = await _sweep_category(db, RetentionCategory.RECONCILE_HISTORY)
 
         assert result.deleted_count == 2
         assert await _count(db, SessionSchedulingHistoryRow) == 1
         assert await _count(db, KernelSchedulingHistoryRow) == 0
 
     async def test_advances_across_batches_smaller_than_backlog(
-        self, db: ExtendedAsyncSAEngine, repo: RetentionRepository
+        self, db: ExtendedAsyncSAEngine
     ) -> None:
         await _insert(
             db,
@@ -264,11 +315,9 @@ class TestReconcileHistoryRetention:
             ],
         )
 
-        result = await repo.purge_older_than(
-            RetentionCategory.RECONCILE_HISTORY, _THRESHOLD, batch_size=2
-        )
+        result = await _sweep_category(db, RetentionCategory.RECONCILE_HISTORY, batch_size=2)
 
-        assert result.deleted_count == 5
+        assert result.deleted_count == 5  # batch_size=2 drains all 5 via advance
         assert await _count(db, SessionSchedulingHistoryRow) == 0
 
     def _session_history(
@@ -304,34 +353,31 @@ class TestUsageRecordsRetention:
     async def db(
         self, database_connection: ExtendedAsyncSAEngine
     ) -> AsyncIterator[ExtendedAsyncSAEngine]:
-        async with with_tables(database_connection, [KernelUsageRecordRow]):
+        async with with_tables(database_connection, [KernelUsageRecordRow, RetentionPolicyRow]):
             yield database_connection
 
-    async def test_purges_by_period_end(
-        self, db: ExtendedAsyncSAEngine, repo: RetentionRepository
-    ) -> None:
-        await _insert(db, [self._record(period_end=_OLD), self._record(period_end=_NEW)])
+    async def test_purges_by_period_end(self, db: ExtendedAsyncSAEngine) -> None:
+        await _insert(db, [_usage_record(period_end=_OLD), _usage_record(period_end=_NEW)])
 
-        result = await repo.purge_older_than(
-            RetentionCategory.USAGE_RECORDS, _THRESHOLD, batch_size=100
-        )
+        result = await _sweep_category(db, RetentionCategory.USAGE_RECORDS)
 
         assert result.deleted_count == 1
         assert await _count(db, KernelUsageRecordRow) == 1
 
-    def _record(self, *, period_end: datetime) -> KernelUsageRecordRow:
-        return KernelUsageRecordRow(
-            kernel_id=uuid.uuid4(),
-            session_id=uuid.uuid4(),
-            user_uuid=uuid.uuid4(),
-            project_id=uuid.uuid4(),
-            domain_name="default",
-            resource_group="default",
-            resource_group_id=ResourceGroupID(uuid.uuid4()),
-            period_start=period_end - timedelta(hours=1),
-            period_end=period_end,
-            resource_usage=ResourceSlot(),
-        )
+
+def _usage_record(*, period_end: datetime) -> KernelUsageRecordRow:
+    return KernelUsageRecordRow(
+        kernel_id=uuid.uuid4(),
+        session_id=uuid.uuid4(),
+        user_uuid=uuid.uuid4(),
+        project_id=uuid.uuid4(),
+        domain_name="default",
+        resource_group="default",
+        resource_group_id=ResourceGroupID(uuid.uuid4()),
+        period_start=period_end - timedelta(hours=1),
+        period_end=period_end,
+        resource_usage=ResourceSlot(),
+    )
 
 
 class TestTerminalStateFilter:
@@ -406,6 +452,7 @@ class TestSessionsRetention:
                 ReplicaGroupRow,
                 RoutingRow,
                 SessionDependencyRow,
+                RetentionPolicyRow,
             ],
         ):
             yield database_connection
@@ -598,7 +645,7 @@ class TestSessionsRetention:
             db, scope, session_id, status=KernelStatus.CANCELLED, terminated_at=_OLD
         )
 
-        result = await db_purge(db, _THRESHOLD)
+        result = await _sweep_category(db, RetentionCategory.SESSIONS)
 
         assert result.deleted_count == 3  # 2 kernels + 1 session
         assert await _count(db, KernelRow) == 0
@@ -612,7 +659,7 @@ class TestSessionsRetention:
         )
         await self._add_routing_for(db, scope, session_id)
 
-        result = await db_purge(db, _THRESHOLD)
+        result = await _sweep_category(db, RetentionCategory.SESSIONS)
 
         assert result.deleted_count == 0
         assert await _count(db, SessionRow) == 1  # RESTRICT-referenced session preserved
@@ -629,7 +676,7 @@ class TestSessionsRetention:
             db, scope, session_id, status=KernelStatus.TERMINATED, terminated_at=_NEW
         )
 
-        result = await db_purge(db, _THRESHOLD)
+        result = await _sweep_category(db, RetentionCategory.SESSIONS)
 
         assert result.deleted_count == 0
         assert await _count(db, KernelRow) == 1
@@ -641,7 +688,7 @@ class TestSessionsRetention:
         await self._add_session(db, scope, status=SessionStatus.TERMINATED, terminated_at=_NEW)
         await self._add_session(db, scope, status=SessionStatus.RUNNING, terminated_at=None)
 
-        result = await db_purge(db, _THRESHOLD)
+        result = await _sweep_category(db, RetentionCategory.SESSIONS)
 
         assert result.deleted_count == 0
         assert await _count(db, SessionRow) == 2
@@ -658,19 +705,98 @@ class TestSessionsRetention:
         async with db.begin_session() as sess:
             sess.add(SessionDependencyRow(session_id=dependant, depends_on=dependency))
 
-        result = await db_purge(db, _THRESHOLD)
+        result = await _sweep_category(db, RetentionCategory.SESSIONS)
 
         assert result.deleted_count == 2
         assert await _count(db, SessionRow) == 0
         assert await _count(db, SessionDependencyRow) == 0  # cascaded with the sessions
 
 
-class TestUnsupportedCategory:
-    async def test_ordered_delete_categories_are_rejected(self, repo: RetentionRepository) -> None:
-        # sessions is wired here (BA-6930); deployments/usage_buckets stay unwired.
-        for category in (
-            RetentionCategory.DEPLOYMENTS,
-            RetentionCategory.USAGE_BUCKETS,
+class TestSweep:
+    """sweep() orchestration across policies: policy-driven purge + last_swept_at
+    stamp, unwired categories skipped without aborting the tick, per-tick budget
+    defers the rest, disabled policies excluded."""
+
+    @pytest.fixture
+    async def db(
+        self, database_connection: ExtendedAsyncSAEngine
+    ) -> AsyncIterator[ExtendedAsyncSAEngine]:
+        async with with_tables(
+            database_connection,
+            [
+                DomainRow,
+                UserResourcePolicyRow,
+                KeyPairResourcePolicyRow,
+                UserRow,
+                KeyPairRow,
+                EventLogRow,
+                AuditLogRow,
+                ErrorLogRow,
+                KernelUsageRecordRow,
+                RetentionPolicyRow,
+            ],
         ):
-            with pytest.raises(RetentionCategoryNotSupportedError):
-                await repo.purge_older_than(category, _THRESHOLD, batch_size=100)
+            yield database_connection
+
+    async def test_purges_wired_stamps_swept_and_skips_unwired(
+        self, db: ExtendedAsyncSAEngine, db_source: RetentionDBSource
+    ) -> None:
+        await _insert(
+            db,
+            [
+                EventLogRow(event_name="old", event_domain=EventDomain.SESSION, created_at=_OLD),
+                EventLogRow(event_name="recent", event_domain=EventDomain.SESSION, created_at=_NEW),
+                _policy_row(RetentionCategory.LOGS),
+                # Seeded enabled but not wired yet -> must be skipped, not abort the tick.
+                _policy_row(RetentionCategory.DEPLOYMENTS),
+            ],
+        )
+
+        results = await db_source.sweep()
+
+        assert [r.category for r in results] == [RetentionCategory.LOGS]
+        assert results[0].deleted_count == 1  # only the old EventLog row
+        assert await _count(db, EventLogRow) == 1
+        assert await _swept_at(db, RetentionCategory.LOGS) is not None
+        # Skipped category keeps its NULL stamp so it retries once wired.
+        assert await _swept_at(db, RetentionCategory.DEPLOYMENTS) is None
+
+    async def test_per_tick_budget_defers_remaining_categories(
+        self, db: ExtendedAsyncSAEngine
+    ) -> None:
+        db_source = _make_db_source(db, per_tick_budget=1)
+        already_swept = _NEW
+        await _insert(
+            db,
+            [
+                EventLogRow(event_name="a", event_domain=EventDomain.SESSION, created_at=_OLD),
+                EventLogRow(event_name="b", event_domain=EventDomain.SESSION, created_at=_OLD),
+                _usage_record(period_end=_OLD),
+                # LOGS never swept -> ordered first; USAGE_RECORDS swept recently -> second.
+                _policy_row(RetentionCategory.LOGS),
+                _policy_row(RetentionCategory.USAGE_RECORDS, last_swept_at=already_swept),
+            ],
+        )
+
+        results = await db_source.sweep()
+
+        # LOGS drains 2 rows, hitting the budget; USAGE_RECORDS is deferred.
+        assert [r.category for r in results] == [RetentionCategory.LOGS]
+        assert await _count(db, KernelUsageRecordRow) == 1
+        assert await _swept_at(db, RetentionCategory.USAGE_RECORDS) == already_swept
+
+    async def test_disabled_policy_is_not_swept(
+        self, db: ExtendedAsyncSAEngine, db_source: RetentionDBSource
+    ) -> None:
+        await _insert(
+            db,
+            [
+                EventLogRow(event_name="old", event_domain=EventDomain.SESSION, created_at=_OLD),
+                _policy_row(RetentionCategory.LOGS, enabled=False),
+            ],
+        )
+
+        results = await db_source.sweep()
+
+        assert results == []
+        assert await _count(db, EventLogRow) == 1  # disabled -> row preserved
