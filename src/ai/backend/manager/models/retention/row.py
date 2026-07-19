@@ -8,9 +8,10 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.manager.data.retention.types import RetentionCategory
 from ai.backend.manager.models.base import GUID, Base, StrEnumType
+from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
 
 
-class RetentionPolicyRow(Base):  # type: ignore[misc]
+class RetentionPolicyRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
     __tablename__ = "retention_policies"
     __table_args__ = (sa.UniqueConstraint("category", name="uq_retention_policies_category"),)
 
@@ -28,14 +29,4 @@ class RetentionPolicyRow(Base):  # type: ignore[misc]
     )
     last_swept_at: Mapped[datetime | None] = mapped_column(
         "last_swept_at", sa.DateTime(timezone=True), nullable=True
-    )
-    created_at: Mapped[datetime] = mapped_column(
-        "created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        "updated_at",
-        sa.DateTime(timezone=True),
-        nullable=False,
-        server_default=sa.func.now(),
-        onupdate=sa.func.now(),
     )

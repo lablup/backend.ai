@@ -61,6 +61,9 @@ class TestRetentionPolicyRow:
         assert row.retention_period == timedelta(days=90)
         assert row.enabled is True
         assert row.last_swept_at is None
+        # created_at / updated_at come from LifecycleTimestampsMixin (server_default).
+        assert row.created_at is not None
+        assert row.updated_at is not None
 
     async def test_duplicate_category_violates_unique(self, db: ExtendedAsyncSAEngine) -> None:
         async with db.begin_session() as sess:
