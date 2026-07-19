@@ -13,30 +13,36 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
+import sqlalchemy as sa
 from sqlalchemy.sql.elements import ColumnElement
 
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.auth.login_session_types import LoginSessionStatus
+from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.retention.types import RetentionCategory, RetentionPurgeResult
 from ai.backend.manager.data.role_invitation.types import RoleInvitationState
+from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.vfolder.types import VFolderInvitationState
 from ai.backend.manager.errors.retention import RetentionCategoryNotSupportedError
 from ai.backend.manager.models.audit_log.row import AuditLogRow
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.error_logs import ErrorLogRow
 from ai.backend.manager.models.event_log.row import EventLogRow
+from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.login_session.row import LoginHistoryRow, LoginSessionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.replica_group_history.row import ReplicaGroupHistoryRow
 from ai.backend.manager.models.resource_usage_history.row import KernelUsageRecordRow
 from ai.backend.manager.models.role_invitation.row import RoleInvitationRow
+from ai.backend.manager.models.routing.row import RoutingRow
 from ai.backend.manager.models.scheduling_history.row import (
     DeploymentHistoryRow,
     KernelSchedulingHistoryRow,
     RouteHistoryRow,
     SessionSchedulingHistoryRow,
 )
+from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.vfolder.row import VFolderInvitationRow
 from ai.backend.manager.repositories.base import BatchPurger, BatchPurgerSpec
 from ai.backend.manager.repositories.ops import DBOpsProvider
@@ -86,9 +92,26 @@ class RetentionDBSource:
         """Build the fixed ``category -> tables`` catalog once (column refs are
         constant; only the threshold is applied per sweep).
 
-        Categories with a bespoke ordered delete (sessions, deployments,
-        usage_buckets) are implemented separately and intentionally absent.
+        ``deployments`` and ``usage_buckets`` keep a bespoke ordered delete and
+        are intentionally absent until wired.
         """
+        # sessions: kernels are listed before sessions so the ordered per-table
+        # drain removes kernels first (kernels.session_id is a plain FK). A
+        # session is skipped this sweep while any kernel still references it or a
+        # RESTRICT-guarded routing points at it, then purged once the blocker
+        # ages out -- expressed as correlated NOT EXISTS guards below.
+        session_has_kernel = (
+            sa.select(sa.literal(1))
+            .where(KernelRow.session_id == SessionRow.id)
+            .correlate(SessionRow)
+            .exists()
+        )
+        session_has_routing = (
+            sa.select(sa.literal(1))
+            .where(RoutingRow.session == SessionRow.id)
+            .correlate(SessionRow)
+            .exists()
+        )
         return {
             RetentionCategory.LOGS: (
                 _BoundaryTable(EventLogRow, EventLogRow.created_at),
@@ -138,6 +161,22 @@ class RetentionDBSource:
             ),
             RetentionCategory.USAGE_RECORDS: (
                 _BoundaryTable(KernelUsageRecordRow, KernelUsageRecordRow.period_end),
+            ),
+            RetentionCategory.SESSIONS: (
+                _BoundaryTable(
+                    KernelRow,
+                    KernelRow.terminated_at,
+                    (KernelRow.status.in_(KernelStatus.terminal_statuses()),),
+                ),
+                _BoundaryTable(
+                    SessionRow,
+                    SessionRow.terminated_at,
+                    (
+                        SessionRow.status.in_(SessionStatus.terminal_statuses()),
+                        ~session_has_kernel,
+                        ~session_has_routing,
+                    ),
+                ),
             ),
         }
 
