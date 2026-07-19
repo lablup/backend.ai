@@ -10,9 +10,10 @@ from ai.backend.common.data.idle_checker.types import CheckerType, IdleCheckerSp
 from ai.backend.common.identifier.idle_checker import IdleCheckerID
 from ai.backend.common.types import SessionId, SessionTypes
 from ai.backend.manager.models.base import GUID, Base, PydanticColumn, StrEnumType
+from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin, UpdatedAtMixin
 
 
-class IdleCheckerRow(Base):  # type: ignore[misc]
+class IdleCheckerRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
     __tablename__ = "idle_checkers"
 
     id: Mapped[IdleCheckerID] = mapped_column(
@@ -31,19 +32,9 @@ class IdleCheckerRow(Base):  # type: ignore[misc]
     spec: Mapped[IdleCheckerSpec] = mapped_column(
         "spec", PydanticColumn(IdleCheckerSpec), nullable=False
     )
-    created_at: Mapped[datetime] = mapped_column(
-        "created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        "updated_at",
-        sa.DateTime(timezone=True),
-        nullable=False,
-        server_default=sa.func.now(),
-        onupdate=sa.func.now(),
-    )
 
 
-class IdleCheckerBindingRow(Base):  # type: ignore[misc]
+class IdleCheckerBindingRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
     __tablename__ = "idle_checker_bindings"
     __table_args__ = (
         sa.ForeignKeyConstraint(
@@ -72,19 +63,9 @@ class IdleCheckerBindingRow(Base):  # type: ignore[misc]
     enabled: Mapped[bool] = mapped_column(
         "enabled", sa.Boolean, nullable=False, server_default=sa.true()
     )
-    created_at: Mapped[datetime] = mapped_column(
-        "created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        "updated_at",
-        sa.DateTime(timezone=True),
-        nullable=False,
-        server_default=sa.func.now(),
-        onupdate=sa.func.now(),
-    )
 
 
-class SessionIdleCheckRow(Base):  # type: ignore[misc]
+class SessionIdleCheckRow(UpdatedAtMixin, Base):  # type: ignore[misc]
     __tablename__ = "session_idle_checks"
     __table_args__ = (
         sa.ForeignKeyConstraint(
@@ -120,10 +101,3 @@ class SessionIdleCheckRow(Base):  # type: ignore[misc]
     )
     last_status: Mapped[str] = mapped_column("last_status", sa.String(length=64), nullable=False)
     last_message: Mapped[str] = mapped_column("last_message", sa.Text, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(
-        "updated_at",
-        sa.DateTime(timezone=True),
-        nullable=False,
-        server_default=sa.func.now(),
-        onupdate=sa.func.now(),
-    )

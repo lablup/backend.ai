@@ -33,6 +33,7 @@ from ai.backend.manager.models.base import (
     SlugType,
     VFolderHostPermissionColumn,
 )
+from ai.backend.manager.models.mixins.timestamp import CreatedAtMixin
 from ai.backend.manager.models.rbac import (
     AbstractPermissionContext,
     AbstractPermissionContextBuilder,
@@ -90,7 +91,7 @@ def _get_network_join_condition() -> sa.ColumnElement[bool]:
     return DomainRow.name == foreign(NetworkRow.domain_name)
 
 
-class DomainRow(Base):  # type: ignore[misc]
+class DomainRow(CreatedAtMixin, Base):  # type: ignore[misc]
     __tablename__ = "domains"
 
     name: Mapped[str] = mapped_column(
@@ -105,9 +106,6 @@ class DomainRow(Base):  # type: ignore[misc]
     )
     description: Mapped[str | None] = mapped_column("description", sa.String(length=512))
     is_active: Mapped[bool] = mapped_column("is_active", sa.Boolean, default=True, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(
-        "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
-    )
     modified_at: Mapped[datetime] = mapped_column(
         "modified_at",
         sa.DateTime(timezone=True),

@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from datetime import datetime
-
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -15,9 +13,10 @@ from ai.backend.manager.models.base import (
     Base,
     IntFlagType,
 )
+from ai.backend.manager.models.mixins.timestamp import CreatedAtMixin
 
 
-class EntityMembershipRow(Base):  # type: ignore[misc]
+class EntityMembershipRow(CreatedAtMixin, Base):  # type: ignore[misc]
     __tablename__ = "entity_memberships"
     __table_args__ = (
         sa.Index(
@@ -40,9 +39,6 @@ class EntityMembershipRow(Base):  # type: ignore[misc]
     entity_id: Mapped[EntityID] = mapped_column("entity_id", GUID(), primary_key=True)
     permission_cap: Mapped[Permission | None] = mapped_column(
         "permission_cap", IntFlagType(Permission), nullable=True
-    )
-    created_at: Mapped[datetime] = mapped_column(
-        "created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
     )
 
     def to_data(self) -> EntityMembershipData:
