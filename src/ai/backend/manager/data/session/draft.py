@@ -159,6 +159,7 @@ class SessionOptionsDraft(_DraftBaseModel):
     """Optional-heavy mirror of ``SessionOptions``."""
 
     priority: int | None = None
+    job_priority: int | None = None
     is_preemptible: bool | None = None
     cluster_mode: ClusterMode | None = None
     cluster_size: int | None = None

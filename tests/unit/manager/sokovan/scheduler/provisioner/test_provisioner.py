@@ -52,6 +52,30 @@ from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import 
 )
 
 
+def test_pending_session_to_workload_carries_job_priority() -> None:
+    """SessionWorkload built for scheduling carries the session's job_priority."""
+    session = PendingSessionData(
+        id=SessionId(uuid.uuid4()),
+        access_key=AccessKey("test-key"),
+        requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("1024")}),
+        user_uuid=uuid.uuid4(),
+        group_id=uuid.uuid4(),
+        domain_name="default",
+        scaling_group_name="test-sg",
+        resource_group_id=ResourceGroupID(uuid.uuid4()),
+        session_type=SessionTypes.INTERACTIVE,
+        cluster_mode=ClusterMode.SINGLE_NODE,
+        priority=0,
+        job_priority=42,
+        is_preemptible=True,
+        starts_at=None,
+        is_private=False,
+        kernels=[],
+        designated_agent_ids=None,
+    )
+    assert session.to_session_workload().job_priority == 42
+
+
 def _create_scheduling_data_with_strategy(
     strategy: AgentSelectionStrategy,
 ) -> SchedulingData:
@@ -78,6 +102,7 @@ def _create_scheduling_data_with_strategy(
         session_type=SessionTypes.INTERACTIVE,
         cluster_mode=ClusterMode.SINGLE_NODE,
         priority=0,
+        job_priority=0,
         is_preemptible=True,
         starts_at=None,
         is_private=False,

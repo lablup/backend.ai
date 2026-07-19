@@ -25642,6 +25642,12 @@
             "title": "Priority",
             "type": "integer"
           },
+          "job_priority": {
+            "default": 0,
+            "description": "Scope-local preemption priority among the requester's own sessions (higher preempts lower; decoupled from `priority`).",
+            "title": "Job Priority",
+            "type": "integer"
+          },
           "is_preemptible": {
             "default": true,
             "description": "Whether this session can be preempted.",
@@ -34602,6 +34608,12 @@
             "title": "Priority",
             "type": "integer"
           },
+          "job_priority": {
+            "default": 0,
+            "description": "Scope-local preemption priority among the requester's own sessions (higher preempts lower; decoupled from `priority`).",
+            "title": "Job Priority",
+            "type": "integer"
+          },
           "is_preemptible": {
             "default": true,
             "title": "Is Preemptible",
@@ -34815,6 +34827,12 @@
             "maximum": 100,
             "minimum": 0,
             "title": "Priority",
+            "type": "integer"
+          },
+          "job_priority": {
+            "default": 0,
+            "description": "Scope-local preemption priority among the requester's own sessions (higher preempts lower; decoupled from `priority`).",
+            "title": "Job Priority",
             "type": "integer"
           },
           "is_preemptible": {

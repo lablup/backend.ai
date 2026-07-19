@@ -7060,6 +7060,9 @@ input EnqueueSessionInput
   """Scheduling priority (0-100)."""
   priority: Int! = 10
 
+  """Scope-local preemption priority among the requester's own sessions."""
+  jobPriority: Int! = 0
+
   """Whether preemptible."""
   isPreemptible: Boolean! = true
 

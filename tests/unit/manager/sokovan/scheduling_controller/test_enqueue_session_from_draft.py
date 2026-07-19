@@ -326,6 +326,8 @@ class TestEnqueueSessionFromDraft:
             == draft.resource_spec.identity.session_name
         )
         assert enqueued_spec.resource_spec.options.cluster_size == 1
+        # Draft left job_priority unset → filled from the resource-group default (0).
+        assert enqueued_spec.resource_spec.options.job_priority == 0
         assert len(enqueued_spec.resource_spec.kernel_specs) == 1
         kernel = enqueued_spec.resource_spec.kernel_specs[0]
         assert kernel.cluster_role == "main"
@@ -343,6 +345,41 @@ class TestEnqueueSessionFromDraft:
         broadcast_batch = event_producer.broadcast_events_batch.await_args.args[0]
         assert len(broadcast_batch) == 1
         assert broadcast_batch[0].session_id == expected_session_id
+
+    async def test_explicit_job_priority_flows_into_spec(
+        self,
+        draft: SessionSpecDraft,
+        image_id: ImageID,
+    ) -> None:
+        """A caller-supplied job_priority survives the preparer chain into the SessionSpec."""
+        draft_jp = draft.model_copy(
+            update={
+                "resource_spec": draft.resource_spec.model_copy(
+                    update={
+                        "options": draft.resource_spec.options.model_copy(
+                            update={"job_priority": 50}
+                        ),
+                    }
+                ),
+            }
+        )
+
+        repository = AsyncMock()
+        repository.fetch_session_spec_contexts.return_value = _fetch_bundle(image_id)
+        repository.query_accessible_resource_group_ids.return_value = frozenset({
+            draft_jp.scope.resource_group_id
+        })
+        repository.resolve_vfolder_mounts_by_role.return_value = {"main": (_vfolder_mount(),)}
+        repository.enqueue_session_from_spec.return_value = SessionID(uuid.uuid4())
+        repository.mark_scheduling_needed = AsyncMock()
+
+        controller, _, _ = _build_controller(repository)
+
+        with with_user(_make_user()):
+            await controller.enqueue_session_from_draft(draft_jp)
+
+        enqueued_spec = repository.enqueue_session_from_spec.await_args.args[0]
+        assert enqueued_spec.resource_spec.options.job_priority == 50
 
     async def test_pre_enqueue_hook_rejection_raises(
         self,

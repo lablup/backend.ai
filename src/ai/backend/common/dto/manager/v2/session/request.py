@@ -335,6 +335,13 @@ class EnqueueSessionInput(BaseRequestModel):
 
     # Scheduling
     priority: int = Field(default=10, ge=0, le=100, description="Scheduling priority (0-100).")
+    job_priority: int = Field(
+        default=0,
+        description=(
+            "Scope-local preemption priority among the requester's own sessions "
+            "(higher preempts lower; decoupled from `priority`)."
+        ),
+    )
     is_preemptible: bool = Field(default=True, description="Whether this session can be preempted.")
     dependencies: list[UUID] | None = Field(
         default=None, description="Session IDs that must complete before this session starts."

@@ -20,7 +20,7 @@ from dateutil.tz import tzutc
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.data.session.types import CustomizedImageVisibilityScope
-from ai.backend.common.defs.session import SESSION_PRIORITY_DEFAULT
+from ai.backend.common.defs.session import JOB_PRIORITY_DEFAULT, SESSION_PRIORITY_DEFAULT
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.events.fetcher import EventFetcher
 from ai.backend.common.events.hub.hub import EventHub
@@ -591,6 +591,7 @@ class SessionService:
         image = action.params.image
         architecture = action.params.architecture
         priority = action.params.priority
+        job_priority = action.params.job_priority
         is_preemptible = action.params.is_preemptible
         bootstrap_script = action.params.bootstrap_script
         dependencies = action.params.dependencies
@@ -637,6 +638,7 @@ class SessionService:
                 cluster_size,
                 reuse=reuse_if_exists,
                 priority=priority,
+                job_priority=job_priority,
                 is_preemptible=is_preemptible,
                 enqueue_only=enqueue_only,
                 max_wait_seconds=max_wait_seconds,
@@ -794,6 +796,7 @@ class SessionService:
         image = params["image"]
         architecture = params["architecture"]
         priority = params["priority"]
+        job_priority = params.get("job_priority", JOB_PRIORITY_DEFAULT)
         is_preemptible = params.get("is_preemptible", True)
         bootstrap_script = params["bootstrap_script"]
         dependencies = params["dependencies"]
@@ -841,6 +844,7 @@ class SessionService:
                 cluster_size,
                 reuse=reuse_if_exists,
                 priority=priority,
+                job_priority=job_priority,
                 is_preemptible=is_preemptible,
                 enqueue_only=enqueue_only,
                 max_wait_seconds=max_wait_seconds,
@@ -1711,6 +1715,7 @@ class SessionService:
                 dependencies=dependencies,
                 options=SessionOptionsDraft(
                     priority=action.scheduling.priority or SESSION_PRIORITY_DEFAULT,
+                    job_priority=action.scheduling.job_priority,
                     is_preemptible=action.scheduling.is_preemptible,
                     cluster_mode=action.resource.cluster_mode,
                     cluster_size=action.resource.cluster_size,

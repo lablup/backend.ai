@@ -201,6 +201,7 @@ class SessionRowFromSpec(CreatorSpec[SessionRow]):
             cluster_mode=cluster_mode_value,
             cluster_size=spec.resource_spec.options.cluster_size,
             priority=spec.resource_spec.options.priority,
+            job_priority=spec.resource_spec.options.job_priority,
             status=SessionStatus.PENDING,
             status_history={
                 SessionStatus.PENDING.name: self.enqueue_time.isoformat(),

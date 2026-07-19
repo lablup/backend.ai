@@ -9,7 +9,7 @@ override it.
 
 Scope:
 
-  * option-level fields: ``priority``, ``is_preemptible``,
+  * option-level fields: ``priority``, ``job_priority``, ``is_preemptible``,
     ``cluster_mode``, ``timeouts``,
     ``scheduling_target.agent_selection_policy``
   * per-group ``execution_spec`` fields: ``image_id``, ``resources``,
@@ -71,6 +71,9 @@ class MergeResourceGroupDefaultsRule(SessionSpecDraftRule):
         new_options = opts.model_copy(
             update={
                 "priority": opts.priority if opts.priority is not None else rg.priority,
+                "job_priority": (
+                    opts.job_priority if opts.job_priority is not None else rg.job_priority
+                ),
                 "is_preemptible": (
                     opts.is_preemptible if opts.is_preemptible is not None else rg.is_preemptible
                 ),
