@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from datetime import datetime
-
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -11,11 +9,12 @@ from ai.backend.manager.data.app_config_allow_list.types import (
     AppConfigAllowListData,
 )
 from ai.backend.manager.models.base import GUID, Base, StrEnumType
+from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
 
 __all__ = ("AppConfigAllowListRow",)
 
 
-class AppConfigAllowListRow(Base):  # type: ignore[misc]
+class AppConfigAllowListRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
     """Permission to write config fragments for one config name at one scope type.
 
     A config fragment may be created only when a matching row exists here.
@@ -55,19 +54,6 @@ class AppConfigAllowListRow(Base):  # type: ignore[misc]
     rank: Mapped[int] = mapped_column(
         "rank",
         sa.Integer,
-        nullable=False,
-    )
-    created_at: Mapped[datetime] = mapped_column(
-        "created_at",
-        sa.DateTime(timezone=True),
-        server_default=sa.func.now(),
-        nullable=False,
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        "updated_at",
-        sa.DateTime(timezone=True),
-        server_default=sa.func.now(),
-        onupdate=sa.func.now(),
         nullable=False,
     )
 

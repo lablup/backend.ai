@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from datetime import datetime
-
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -13,9 +11,10 @@ from ai.backend.manager.models.base import (
     GUID,
     Base,
 )
+from ai.backend.manager.models.mixins.timestamp import CreatedAtMixin
 
 
-class VirtualScopeRow(Base):  # type: ignore[misc]
+class VirtualScopeRow(CreatedAtMixin, Base):  # type: ignore[misc]
     __tablename__ = "virtual_scopes"
     __table_args__ = (
         sa.UniqueConstraint("scope_type", "scope_id", name="uq_virtual_scopes_scope"),
@@ -32,9 +31,6 @@ class VirtualScopeRow(Base):  # type: ignore[misc]
         "scope_type", sa.String(length=32), nullable=False
     )
     scope_id: Mapped[ScopeID] = mapped_column("scope_id", GUID(), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(
-        "created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
-    )
 
     def to_data(self) -> VirtualScopeData:
         return VirtualScopeData(

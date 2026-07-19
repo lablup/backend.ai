@@ -20,6 +20,7 @@ from ai.backend.manager.models.base import (
     Base,
     PydanticColumn,
 )
+from ai.backend.manager.models.mixins.timestamp import CreatedAtMixin, LifecycleTimestampsMixin
 from ai.backend.manager.models.resource_slot.types import NumberFormat
 
 __all__ = (
@@ -32,7 +33,7 @@ __all__ = (
 )
 
 
-class ResourceSlotTypeRow(Base):  # type: ignore[misc]
+class ResourceSlotTypeRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
     """Registry of known resource slot types with display metadata.
 
     Primary key is slot_name (e.g., 'cpu', 'mem', 'cuda.device').
@@ -94,22 +95,9 @@ class ResourceSlotTypeRow(Base):  # type: ignore[misc]
     rank: Mapped[int] = mapped_column(
         "rank", sa.Integer, nullable=False, server_default=sa.text("0")
     )
-    created_at: Mapped[datetime] = mapped_column(
-        "created_at",
-        sa.DateTime(timezone=True),
-        nullable=False,
-        server_default=sa.func.now(),
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        "updated_at",
-        sa.DateTime(timezone=True),
-        nullable=False,
-        server_default=sa.func.now(),
-        onupdate=sa.func.now(),
-    )
 
 
-class AgentResourceRow(Base):  # type: ignore[misc]
+class AgentResourceRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
     """Per-agent, per-slot resource capacity and usage.
 
     Composite primary key: (agent_id, slot_name).
@@ -127,19 +115,6 @@ class AgentResourceRow(Base):  # type: ignore[misc]
     )
     used: Mapped[Decimal] = mapped_column(
         "used", sa.Numeric(precision=24, scale=6), nullable=False, server_default=sa.text("0")
-    )
-    created_at: Mapped[datetime] = mapped_column(
-        "created_at",
-        sa.DateTime(timezone=True),
-        nullable=False,
-        server_default=sa.func.now(),
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        "updated_at",
-        sa.DateTime(timezone=True),
-        nullable=False,
-        server_default=sa.func.now(),
-        onupdate=sa.func.now(),
     )
 
     slot_type_row: Mapped[ResourceSlotTypeRow] = relationship(
@@ -170,7 +145,7 @@ class AgentResourceRow(Base):  # type: ignore[misc]
     )
 
 
-class ResourceAllocationRow(Base):  # type: ignore[misc]
+class ResourceAllocationRow(CreatedAtMixin, Base):  # type: ignore[misc]
     """Per-kernel, per-slot resource allocation.
 
     Composite primary key: (kernel_id, slot_name).
@@ -185,12 +160,6 @@ class ResourceAllocationRow(Base):  # type: ignore[misc]
     )
     used: Mapped[Decimal | None] = mapped_column(
         "used", sa.Numeric(precision=24, scale=6), nullable=True
-    )
-    created_at: Mapped[datetime] = mapped_column(
-        "created_at",
-        sa.DateTime(timezone=True),
-        nullable=False,
-        server_default=sa.func.now(),
     )
     used_at: Mapped[datetime | None] = mapped_column(
         "used_at",
