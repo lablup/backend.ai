@@ -64,6 +64,7 @@ from ai.backend.manager.repositories.resource_slot.repositories import ResourceS
 from ai.backend.manager.repositories.resource_usage_history.repositories import (
     ResourceUsageHistoryRepositories,
 )
+from ai.backend.manager.repositories.retention.repositories import RetentionRepositories
 from ai.backend.manager.repositories.role_preset.repositories import RolePresetRepositories
 from ai.backend.manager.repositories.runtime_variant.repositories import RuntimeVariantRepositories
 from ai.backend.manager.repositories.runtime_variant_preset.repositories import (
@@ -142,6 +143,7 @@ class Repositories:
     events: EventsRepositories
     storage_namespace: StorageNamespaceRepositories
     audit_log: AuditLogRepositories
+    retention: RetentionRepositories
 
     @classmethod
     def create(cls, args: RepositoryArgs) -> Self:
@@ -198,6 +200,7 @@ class Repositories:
         events_repositories = EventsRepositories.create(args)
         storage_namespace_repositories = StorageNamespaceRepositories.create(args)
         audit_log_repositories = AuditLogRepositories.create(args)
+        retention_repositories = RetentionRepositories.create(args)
 
         return cls(
             agent=agent_repositories,
@@ -251,4 +254,5 @@ class Repositories:
             events=events_repositories,
             storage_namespace=storage_namespace_repositories,
             audit_log=audit_log_repositories,
+            retention=retention_repositories,
         )
