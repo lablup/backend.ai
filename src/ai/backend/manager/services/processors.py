@@ -239,6 +239,12 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.resource_usage.service import (
         ResourceUsageService,
     )
+    from ai.backend.manager.services.retention_policy.processors import (
+        RetentionPolicyProcessors,
+    )
+    from ai.backend.manager.services.retention_policy.service import (
+        RetentionPolicyService,
+    )
     from ai.backend.manager.services.role_preset.processors import (
         RolePresetProcessors,
     )
@@ -401,6 +407,7 @@ class Services:
     prometheus_query_preset_category: PrometheusQueryPresetCategoryService
     resource_preset: ResourcePresetService
     resource_slot: ResourceSlotService
+    retention_policy: RetentionPolicyService
     role_preset: RolePresetService
     runtime_variant: RuntimeVariantService
     runtime_variant_preset: RuntimeVariantPresetService
@@ -468,6 +475,7 @@ class Processors(AbstractProcessorPackage):
     prometheus_query_preset_category: PrometheusQueryPresetCategoryProcessors
     resource_preset: ResourcePresetProcessors
     resource_slot: ResourceSlotProcessors
+    retention_policy: RetentionPolicyProcessors
     role_preset: RolePresetProcessors
     runtime_variant: RuntimeVariantProcessors
     runtime_variant_preset: RuntimeVariantPresetProcessors
@@ -528,6 +536,7 @@ class Processors(AbstractProcessorPackage):
             *self.prometheus_query_preset_category.supported_actions(),
             *self.resource_preset.supported_actions(),
             *self.resource_slot.supported_actions(),
+            *self.retention_policy.supported_actions(),
             *self.role_preset.supported_actions(),
             *self.runtime_variant.supported_actions(),
             *self.runtime_variant_preset.supported_actions(),

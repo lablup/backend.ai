@@ -1,23 +1,40 @@
 from __future__ import annotations
 
-import enum
 from dataclasses import dataclass
+from datetime import datetime, timedelta
+
+from ai.backend.common.data.retention.types import RetentionCategory
+from ai.backend.common.identifier.retention_policy import RetentionPolicyID
+
+__all__ = (
+    "RetentionCategory",
+    "RetentionPolicyData",
+    "RetentionPolicySearchResult",
+    "RetentionPurgeResult",
+)
 
 
-class RetentionCategory(enum.StrEnum):
-    """
-    Identifier linking a ``retention_policies`` row to its code-side cleanup
-    procedure. A pure identifier carrying no table references.
-    """
+@dataclass(frozen=True)
+class RetentionPolicyData:
+    """A retention policy row: per-category admin-tunable cleanup settings."""
 
-    LOGS = "logs"
-    LOGIN = "login"
-    RECONCILE_HISTORY = "reconcile_history"
-    ROLES_INVITATIONS = "roles_invitations"
-    DEPLOYMENTS = "deployments"
-    SESSIONS = "sessions"
-    USAGE_RECORDS = "usage_records"
-    USAGE_BUCKETS = "usage_buckets"
+    id: RetentionPolicyID
+    category: RetentionCategory
+    retention_period: timedelta
+    enabled: bool
+    last_swept_at: datetime | None
+    created_at: datetime
+    updated_at: datetime
+
+
+@dataclass(frozen=True)
+class RetentionPolicySearchResult:
+    """Search result with total count for retention policies."""
+
+    items: list[RetentionPolicyData]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool
 
 
 @dataclass(frozen=True)

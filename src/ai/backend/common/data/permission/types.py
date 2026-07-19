@@ -136,6 +136,7 @@ class EntityType(enum.StrEnum):
     PROMETHEUS_QUERY_PRESET = "prometheus_query_preset"
     PROMETHEUS_QUERY_PRESET_CATEGORY = "prometheus_query_preset_category"
     RESOURCE_PRESET = "resource_preset"
+    RETENTION_POLICY = "retention_policy"
     MODEL_CARD = "model_card"
     ROLE = "role"
     RUNTIME_VARIANT = "runtime_variant"
