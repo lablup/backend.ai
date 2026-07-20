@@ -6,14 +6,16 @@ from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor.scope import ScopeActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.services.app_config.actions.resolve import (
-    ResolveAppConfigAction,
-    ResolveAppConfigActionResult,
+    ResolveAppConfigsAction,
+    ResolveAppConfigsActionResult,
 )
 from ai.backend.manager.services.app_config.service import AppConfigService
 
 
 class AppConfigProcessors(AbstractProcessorPackage):
-    resolve_app_config: ScopeActionProcessor[ResolveAppConfigAction, ResolveAppConfigActionResult]
+    resolve_app_configs: ScopeActionProcessor[
+        ResolveAppConfigsAction, ResolveAppConfigsActionResult
+    ]
 
     def __init__(
         self,
@@ -25,10 +27,12 @@ class AppConfigProcessors(AbstractProcessorPackage):
         # service injects it from the session, so a resolve can only ever be for the
         # acting user. (The allow-list could not have done this — it registers which
         # (config_name, scope_type) pairs merge and at what rank, with no user dimension.)
-        self.resolve_app_config = ScopeActionProcessor(service.resolve_app_config, action_monitors)
+        self.resolve_app_configs = ScopeActionProcessor(
+            service.resolve_app_configs, action_monitors
+        )
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
         return [
-            ResolveAppConfigAction.spec(),
+            ResolveAppConfigsAction.spec(),
         ]

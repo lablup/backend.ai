@@ -25,7 +25,7 @@ from ai.backend.manager.repositories.app_config_fragment.purgers import (
     AppConfigFragmentPurgerSpec,
 )
 from ai.backend.manager.repositories.app_config_fragment.types import (
-    AppConfigScopeArguments,
+    ResolvedAppConfigScope,
 )
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
@@ -105,6 +105,6 @@ class AppConfigFragmentRepository:
 
     @app_config_fragment_repository_resilience.apply()
     async def list_visible_fragments_bulk(
-        self, config_names: list[str], scope: AppConfigScopeArguments | None = None
+        self, config_names: list[str], scope: ResolvedAppConfigScope | None = None
     ) -> list[AppConfigFragmentData]:
         return await self._db_source.list_visible_fragments_bulk(config_names, scope)

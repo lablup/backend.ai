@@ -5,11 +5,11 @@ from typing import override
 
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.permission.types import RBACElementType, ScopeType
-from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.user import UserID
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.app_config.types import AppConfigData
 from ai.backend.manager.data.permission.types import RBACElementRef
+from ai.backend.manager.repositories.app_config_fragment.types import AppConfigScopeArguments
 from ai.backend.manager.services.app_config.actions.base import (
     AppConfigScopeAction,
     AppConfigScopeActionResult,
@@ -17,21 +17,22 @@ from ai.backend.manager.services.app_config.actions.base import (
 
 
 @dataclass
-class ResolveAppConfigAction(AppConfigScopeAction):
+class ResolveAppConfigsAction(AppConfigScopeAction):
     """Resolve the merged ``AppConfig`` for each of ``config_names``.
 
     The only read shape: a single name is a one-element ``config_names``. Reads are the hot
     path and a client bootstraps several configs at once, so batching is the default rather
     than an optimization bolted beside a single-name variant.
 
-    ``domain_id`` names the resolving principal's domain. The user half is taken from the
-    session, never from the caller — there is no field to put someone else's id in, so a
-    resolve can only ever be for the acting user. ``domain_id=None`` is the anonymous,
+    ``scope_arguments`` carries what the caller may name — the domain, and any scope
+    dimension added later. Not the user: that half is injected from the session, so there is
+    no field to put someone else's id in and a resolve can only ever be for the acting user.
+    Leaving ``scope_arguments`` unset, or resolving with no session at all, is the anonymous
     pre-login read: only ``public``-scope fragments contribute.
     """
 
     config_names: list[str]
-    domain_id: DomainID | None = None
+    scope_arguments: AppConfigScopeArguments | None = None
 
     @override
     @classmethod
@@ -54,7 +55,7 @@ class ResolveAppConfigAction(AppConfigScopeAction):
 
 
 @dataclass
-class ResolveAppConfigActionResult(AppConfigScopeActionResult):
+class ResolveAppConfigsActionResult(AppConfigScopeActionResult):
     app_configs: list[AppConfigData]
     _user_id: UserID | None
 

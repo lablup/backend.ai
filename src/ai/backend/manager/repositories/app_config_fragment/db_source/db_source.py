@@ -34,7 +34,7 @@ from ai.backend.manager.repositories.app_config_fragment.purgers import (
     AppConfigFragmentPurgerSpec,
 )
 from ai.backend.manager.repositories.app_config_fragment.types import (
-    AppConfigScopeArguments,
+    ResolvedAppConfigScope,
 )
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
@@ -210,7 +210,7 @@ class AppConfigFragmentDBSource:
 
     @app_config_fragment_db_source_resilience.apply()
     async def list_visible_fragments_bulk(
-        self, config_names: list[str], scope: AppConfigScopeArguments | None = None
+        self, config_names: list[str], scope: ResolvedAppConfigScope | None = None
     ) -> list[AppConfigFragmentData]:
         """Visible fragments for several ``config_names`` in one query, ordered by ascending ``rank``.
 

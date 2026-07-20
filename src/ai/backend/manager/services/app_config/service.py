@@ -4,7 +4,6 @@ from collections.abc import Mapping, Sequence
 from typing import Any
 
 from ai.backend.common.contexts.user import current_user
-from ai.backend.common.exception import UnreachableError
 from ai.backend.common.identifier.user import UserID
 from ai.backend.manager.data.app_config.types import AppConfigData
 from ai.backend.manager.data.app_config_fragment.types import AppConfigFragmentData
@@ -12,10 +11,10 @@ from ai.backend.manager.errors.app_config import AppConfigFragmentNotFound
 from ai.backend.manager.repositories.app_config_fragment.repository import (
     AppConfigFragmentRepository,
 )
-from ai.backend.manager.repositories.app_config_fragment.types import AppConfigScopeArguments
+from ai.backend.manager.repositories.app_config_fragment.types import ResolvedAppConfigScope
 from ai.backend.manager.services.app_config.actions.resolve import (
-    ResolveAppConfigAction,
-    ResolveAppConfigActionResult,
+    ResolveAppConfigsAction,
+    ResolveAppConfigsActionResult,
 )
 
 __all__ = ("AppConfigService",)
@@ -61,19 +60,20 @@ class AppConfigService:
     def __init__(self, fragment_repository: AppConfigFragmentRepository) -> None:
         self._fragment_repository = fragment_repository
 
-    async def resolve_app_config(
-        self, action: ResolveAppConfigAction
-    ) -> ResolveAppConfigActionResult:
+    async def resolve_app_configs(
+        self, action: ResolveAppConfigsAction
+    ) -> ResolveAppConfigsActionResult:
         """Resolve the merged ``AppConfig`` for each of ``config_names`` in a single query.
 
         The only read the service offers — one name is a one-element request. One entry per
         requested name, in request order; a name repeated in the input is repeated in the
         output (each position resolves independently, never collapsed).
 
-        With a ``domain_id`` the merge overlays the session user's domain and user fragments
-        on top of ``public``; with ``domain_id=None`` (anonymous, pre-login) only ``public``
-        fragments contribute. The user half of the scope comes from the session, so a caller
-        can only ever resolve their own config.
+        With ``scope_arguments`` **and** a session user, the merge overlays that user's
+        domain and user fragments on top of ``public``. Missing either one is the anonymous,
+        pre-login read: only ``public`` fragments contribute, and no session is not an error.
+        The user half of the scope always comes from the session, so a caller can only ever
+        resolve their own config.
 
         All-or-nothing on ``AppConfigFragmentNotFound``: one requested name nothing
         contributes to fails the whole call. A partial result would have to mark the absent
@@ -81,13 +81,12 @@ class AppConfigService:
         second, quieter kind of failure.
         """
         user = current_user()
-        if action.domain_id is None:
+        if action.scope_arguments is None or user is None:
+            # The caller named no scope: the anonymous, pre-login read.
             scope = None
-        elif user is None:
-            raise UnreachableError("User context is not available")
         else:
-            scope = AppConfigScopeArguments(
-                domain_id=action.domain_id, user_id=UserID(user.user_id)
+            scope = ResolvedAppConfigScope(
+                domain_id=action.scope_arguments.domain_id, user_id=UserID(user.user_id)
             )
         fragments = await self._fragment_repository.list_visible_fragments_bulk(
             action.config_names, scope
@@ -106,6 +105,6 @@ class AppConfigService:
                     merged_config=_merge_configs(visible),
                 )
             )
-        return ResolveAppConfigActionResult(
+        return ResolveAppConfigsActionResult(
             app_configs=app_configs, _user_id=scope.user_id if scope is not None else None
         )

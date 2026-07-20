@@ -21,13 +21,17 @@ from ai.backend.manager.errors.app_config import AppConfigFragmentNotFound
 from ai.backend.manager.repositories.app_config_fragment.repository import (
     AppConfigFragmentRepository,
 )
-from ai.backend.manager.repositories.app_config_fragment.types import AppConfigScopeArguments
-from ai.backend.manager.services.app_config.actions.resolve import ResolveAppConfigAction
+from ai.backend.manager.repositories.app_config_fragment.types import (
+    AppConfigScopeArguments,
+    ResolvedAppConfigScope,
+)
+from ai.backend.manager.services.app_config.actions.resolve import ResolveAppConfigsAction
 from ai.backend.manager.services.app_config.service import AppConfigService
 
 _USER_ID = UserID(uuid.uuid4())
 _DOMAIN_ID = DomainID(uuid.uuid4())
 _NOW = datetime.now(UTC)
+_SCOPE_ARGS = AppConfigScopeArguments(domain_id=_DOMAIN_ID)
 
 FragmentFactory = Callable[[str, dict[str, Any], AppConfigScopeType, str], AppConfigFragmentData]
 
@@ -175,8 +179,8 @@ class TestAppConfigService:
         acting_user: UserData,
         deep_merge_fragments: list[AppConfigFragmentData],
     ) -> None:
-        result = await service.resolve_app_config(
-            ResolveAppConfigAction(config_names=["theme"], domain_id=_DOMAIN_ID)
+        result = await service.resolve_app_configs(
+            ResolveAppConfigsAction(config_names=["theme"], scope_arguments=_SCOPE_ARGS)
         )
 
         assert [c.config_name for c in result.app_configs] == ["theme"]
@@ -192,12 +196,12 @@ class TestAppConfigService:
     ) -> None:
         # The action names only the domain; the user half is injected from the session, so
         # there is no way for a caller to resolve someone else's config.
-        result = await service.resolve_app_config(
-            ResolveAppConfigAction(config_names=["theme"], domain_id=_DOMAIN_ID)
+        result = await service.resolve_app_configs(
+            ResolveAppConfigsAction(config_names=["theme"], scope_arguments=_SCOPE_ARGS)
         )
 
         mock_fragment_repository.list_visible_fragments_bulk.assert_called_once_with(
-            ["theme"], AppConfigScopeArguments(domain_id=_DOMAIN_ID, user_id=_USER_ID)
+            ["theme"], ResolvedAppConfigScope(domain_id=_DOMAIN_ID, user_id=_USER_ID)
         )
         assert result.scope_id() == str(_USER_ID)
 
@@ -207,8 +211,8 @@ class TestAppConfigService:
         acting_user: UserData,
         list_replace_fragments: list[AppConfigFragmentData],
     ) -> None:
-        result = await service.resolve_app_config(
-            ResolveAppConfigAction(config_names=["ui"], domain_id=_DOMAIN_ID)
+        result = await service.resolve_app_configs(
+            ResolveAppConfigsAction(config_names=["ui"], scope_arguments=_SCOPE_ARGS)
         )
 
         # The user's shorter nav list fully replaces public's — no trailing "about"/"contact".
@@ -223,8 +227,8 @@ class TestAppConfigService:
         acting_user: UserData,
         two_name_fragments: list[AppConfigFragmentData],
     ) -> None:
-        result = await service.resolve_app_config(
-            ResolveAppConfigAction(config_names=["theme", "menu"], domain_id=_DOMAIN_ID)
+        result = await service.resolve_app_configs(
+            ResolveAppConfigsAction(config_names=["theme", "menu"], scope_arguments=_SCOPE_ARGS)
         )
 
         # One AppConfigData per requested name, in request order.
@@ -240,8 +244,8 @@ class TestAppConfigService:
     ) -> None:
         # A config_name repeated in the request must be repeated in the output — each
         # position resolves independently, never collapsed into a single entry.
-        result = await service.resolve_app_config(
-            ResolveAppConfigAction(config_names=["theme", "theme"], domain_id=_DOMAIN_ID)
+        result = await service.resolve_app_configs(
+            ResolveAppConfigsAction(config_names=["theme", "theme"], scope_arguments=_SCOPE_ARGS)
         )
 
         assert [c.config_name for c in result.app_configs] == ["theme", "theme"]
@@ -256,8 +260,8 @@ class TestAppConfigService:
     ) -> None:
         # No contributing fragment is a 404 — not an AppConfigData carrying an empty merge.
         with pytest.raises(AppConfigFragmentNotFound):
-            await service.resolve_app_config(
-                ResolveAppConfigAction(config_names=["unknown"], domain_id=_DOMAIN_ID)
+            await service.resolve_app_configs(
+                ResolveAppConfigsAction(config_names=["unknown"], scope_arguments=_SCOPE_ARGS)
             )
 
     async def test_resolve_fails_whole_call_on_one_absent_name(
@@ -269,21 +273,39 @@ class TestAppConfigService:
         # "unknown" contributes nothing, so the call fails as a whole — the names that did
         # resolve are not returned alongside it.
         with pytest.raises(AppConfigFragmentNotFound):
-            await service.resolve_app_config(
-                ResolveAppConfigAction(
-                    config_names=["theme", "menu", "unknown"], domain_id=_DOMAIN_ID
+            await service.resolve_app_configs(
+                ResolveAppConfigsAction(
+                    config_names=["theme", "menu", "unknown"], scope_arguments=_SCOPE_ARGS
                 )
             )
 
-    async def test_resolve_without_domain_merges_public_fragments_only(
+    async def test_resolve_without_a_session_merges_public_fragments_only(
         self,
         service: AppConfigService,
         mock_fragment_repository: MagicMock,
         public_only_fragments: list[AppConfigFragmentData],
     ) -> None:
-        # domain_id=None is the anonymous, pre-login read: no session user is bound, only
-        # public fragments are queried, and the result is attributable to no user.
-        result = await service.resolve_app_config(ResolveAppConfigAction(config_names=["theme"]))
+        # Scope arguments but no session user (no acting_user fixture): the user half cannot
+        # be filled, so this degrades to the anonymous read rather than failing.
+        result = await service.resolve_app_configs(
+            ResolveAppConfigsAction(config_names=["theme"], scope_arguments=_SCOPE_ARGS)
+        )
+
+        assert result.app_configs[0].merged_config == {"theme": "light", "lang": "en"}
+        assert result._user_id is None
+        mock_fragment_repository.list_visible_fragments_bulk.assert_called_once_with(
+            ["theme"], None
+        )
+
+    async def test_resolve_without_scope_arguments_merges_public_fragments_only(
+        self,
+        service: AppConfigService,
+        mock_fragment_repository: MagicMock,
+        public_only_fragments: list[AppConfigFragmentData],
+    ) -> None:
+        # Naming no scope at all is the other half of the anonymous read: only public
+        # fragments are queried, and the result is attributable to no user.
+        result = await service.resolve_app_configs(ResolveAppConfigsAction(config_names=["theme"]))
 
         assert result.app_configs[0].merged_config == {"theme": "light", "lang": "en"}
         assert result._user_id is None
