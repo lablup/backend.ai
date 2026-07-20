@@ -10,6 +10,7 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec
 from ai.backend.common.identifier.replica import ReplicaID
+from ai.backend.common.types import KernelId, SessionId
 from ai.backend.manager.errors.deployment import EndpointNotFound
 from ai.backend.manager.errors.kernel import (
     EmptyKernelSchedulingHistoryScope,
@@ -82,10 +83,10 @@ class KernelSchedulingHistorySearchScope(SearchScope):
     an empty scope would degenerate into an unscoped (admin) search.
     """
 
-    session_id: UUID | None = None
+    session_id: SessionId | None = None
     """Restrict to the kernels of this session."""
 
-    kernel_id: UUID | None = None
+    kernel_id: KernelId | None = None
     """Restrict to this kernel."""
 
     def __post_init__(self) -> None:

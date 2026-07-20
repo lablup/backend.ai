@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 
 import pytest
 
+from ai.backend.common.types import KernelId, SessionId
 from ai.backend.manager.errors.kernel import EmptyKernelSchedulingHistoryScope
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.session import SessionRow
@@ -18,8 +19,8 @@ from ai.backend.manager.repositories.scheduling_history.types import (
     KernelSchedulingHistorySearchScope,
 )
 
-_SESSION_ID = uuid.UUID("11111111-1111-1111-1111-111111111111")
-_KERNEL_ID = uuid.UUID("22222222-2222-2222-2222-222222222222")
+_SESSION_ID = SessionId(uuid.UUID("11111111-1111-1111-1111-111111111111"))
+_KERNEL_ID = KernelId(uuid.UUID("22222222-2222-2222-2222-222222222222"))
 
 
 @dataclass(frozen=True)
@@ -30,8 +31,8 @@ class _ExistenceCheckExpectation:
 
 @dataclass(frozen=True)
 class _ScopeCase:
-    session_id: uuid.UUID | None
-    kernel_id: uuid.UUID | None
+    session_id: SessionId | None
+    kernel_id: KernelId | None
     expected_sql_fragments: list[str] = field(default_factory=list)
     expected_checks: list[_ExistenceCheckExpectation] = field(default_factory=list)
 
