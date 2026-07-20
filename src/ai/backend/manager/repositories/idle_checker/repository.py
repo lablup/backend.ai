@@ -93,11 +93,13 @@ class IdleCheckerRepository:
     async def fetch_expired_idle_checks(
         self, session_statuses: Collection[SessionStatus]
     ) -> ExpiredIdleCheckBatchData:
+        now = await self._db_source.current_time()
         querier = BatchQuerier(
             pagination=NoPagination(),
             conditions=[
-                SessionIdleCheckConditions.expired(),
+                SessionIdleCheckConditions.expired(now),
                 SessionConditions.by_statuses(session_statuses),
             ],
         )
-        return await self._db_source.fetch_expired_idle_checks(querier)
+        checks = await self._db_source.fetch_expired_idle_checks(querier)
+        return ExpiredIdleCheckBatchData(checks=checks, now=now)

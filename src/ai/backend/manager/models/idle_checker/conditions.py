@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime
+
 import sqlalchemy as sa
 
 from ai.backend.manager.models.clauses import QueryCondition
@@ -18,11 +20,11 @@ class IdleCheckerBindingConditions:
 
 class SessionIdleCheckConditions:
     @staticmethod
-    def expired() -> QueryCondition:
+    def expired(now: datetime) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return sa.and_(
                 SessionIdleCheckRow.expire_at.isnot(None),
-                SessionIdleCheckRow.expire_at <= sa.func.now(),
+                SessionIdleCheckRow.expire_at <= now,
             )
 
         return inner

@@ -72,8 +72,8 @@ class ExpiredIdleCheckData:
 
 @dataclass(frozen=True)
 class ExpiredIdleCheckBatchData:
-    """Expired idle checks selected by the repository query.
-    `now` is the DB transaction timestamp used by the reconciler.
+    """Idle checks expired as of the DB timestamp.
+    `now` is the same timestamp passed to the reconciler.
     """
 
     checks: Sequence[ExpiredIdleCheckData]

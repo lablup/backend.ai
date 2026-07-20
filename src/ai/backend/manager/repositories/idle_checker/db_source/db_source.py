@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from datetime import datetime
 from typing import cast
 
 import sqlalchemy as sa
@@ -22,7 +23,6 @@ from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.idle_checker.types import (
     BoundCheckerData,
-    ExpiredIdleCheckBatchData,
     ExpiredIdleCheckData,
     IdleCheckerDefinitionData,
     IdleCheckSessionData,
@@ -35,6 +35,10 @@ class IdleCheckerDBSource:
 
     def __init__(self, ops_provider: DBOpsProvider) -> None:
         self._ops = ops_provider
+
+    async def current_time(self) -> datetime:
+        async with self._ops.read_ops() as r:
+            return await r.current_time()
 
     async def fetch_bound_checkers(
         self,
@@ -110,13 +114,11 @@ class IdleCheckerDBSource:
     async def fetch_expired_idle_checks(
         self,
         querier: BatchQuerier,
-    ) -> ExpiredIdleCheckBatchData:
+    ) -> Sequence[ExpiredIdleCheckData]:
         check_query = sa.select(SessionIdleCheckRow).join(
             SessionRow, SessionIdleCheckRow.session_id == SessionRow.id
         )
         async with self._ops.read_ops() as r:
-            # Same transaction as the fetch, so now >= every returned expire_at.
-            now = await r.current_time()
             result_rows = (await r.batch_query_in_global(check_query, querier)).rows
         checks: list[ExpiredIdleCheckData] = []
         for row in result_rows:
@@ -133,4 +135,4 @@ class IdleCheckerDBSource:
                     last_message=check_row.last_message,
                 )
             )
-        return ExpiredIdleCheckBatchData(checks=tuple(checks), now=now)
+        return tuple(checks)
