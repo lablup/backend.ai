@@ -198,7 +198,7 @@ class _FakeNetns:
     produce; the TOCTOU logic it guards is the module's own (netns.py), not the attach path's."""
 
     def open(self, pid: int) -> PinnedNetns:
-        return PinnedNetns(netns_fd=-1, pidfd=-1)  # close() tolerates a bad fd
+        return PinnedNetns(netns_fd=-1, pidfd=-1, pid=pid)  # close() tolerates a bad fd
 
     def alive(self, pinned: PinnedNetns) -> bool:
         return True
