@@ -30,7 +30,7 @@ from ai.backend.common.resilience import (
     RetryArgs,
     RetryPolicy,
 )
-from ai.backend.common.types import SessionId, ValkeyTarget
+from ai.backend.common.types import KernelId, SessionId, ValkeyTarget
 from ai.backend.logging.utils import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -273,7 +273,7 @@ class ValkeyLiveClient:
         return seconds + (microseconds / 10**6)
 
     @valkey_live_resilience.apply()
-    async def count_active_connections(self, session_id: str) -> int:
+    async def count_active_connections(self, session_id: SessionId) -> int:
         """Count active connections for a session."""
         async with self._client.client() as conn:
             return await conn.zcount(
@@ -314,7 +314,8 @@ class ValkeyLiveClient:
     @valkey_live_resilience.apply()
     async def update_connection_tracker(
         self,
-        session_id: str,
+        session_id: SessionId,
+        kernel_id: KernelId,
         service: str,
         stream_id: str,
     ) -> None:
@@ -322,12 +323,13 @@ class ValkeyLiveClient:
         Update connection tracker with current timestamp.
 
         :param session_id: The session ID to track connections for.
+        :param kernel_id: The kernel ID hosting the connection.
         :param service: The service name.
         :param stream_id: The stream ID.
         """
         current_time = await self.get_server_time()
         connection_id = self._active_app_connection_value(
-            kernel_id=session_id,
+            kernel_id=kernel_id,
             service=service,
             stream_id=stream_id,
         )
@@ -336,33 +338,10 @@ class ValkeyLiveClient:
             await conn.zadd(tracker_key, {connection_id: current_time})
 
     @valkey_live_resilience.apply()
-    async def update_app_connection_tracker(
-        self,
-        kernel_id: str,
-        service: str,
-        stream_id: str,
-    ) -> None:
-        """
-        Update app connection tracker for a specific kernel, service, and stream.
-
-        :param kernel_id: The kernel ID.
-        :param service: The service name.
-        :param stream_id: The stream ID.
-        """
-        tracker_key = self._active_app_connection_key(kernel_id)  # TODO: Check if this is correct
-        tracker_val = self._active_app_connection_value(
-            kernel_id=kernel_id,
-            service=service,
-            stream_id=stream_id,
-        )
-        current_time = await self.get_server_time()
-        async with self._client.client() as conn:
-            await conn.zadd(tracker_key, {tracker_val: current_time})
-
-    @valkey_live_resilience.apply()
     async def remove_connection_tracker(
         self,
-        session_id: str,
+        session_id: SessionId,
+        kernel_id: KernelId,
         service: str,
         stream_id: str,
     ) -> int:
@@ -370,13 +349,14 @@ class ValkeyLiveClient:
         Remove connection from tracker.
 
         :param session_id: The session ID to remove connection from.
+        :param kernel_id: The kernel ID hosting the connection.
         :param service: The service name.
         :param stream_id: The stream ID.
         :return: Number of connections removed.
         """
         tracker_key = self._active_app_connection_key(session_id)
         connection_id = self._active_app_connection_value(
-            kernel_id=session_id,
+            kernel_id=kernel_id,
             service=service,
             stream_id=stream_id,
         )
@@ -386,7 +366,7 @@ class ValkeyLiveClient:
     @valkey_live_resilience.apply()
     async def remove_stale_connections(
         self,
-        session_id: str,
+        session_id: SessionId,
         max_timestamp: float,
     ) -> int:
         """
@@ -586,7 +566,7 @@ class ValkeyLiveClient:
         async with self._client.client() as conn:
             return await conn.delete([key])
 
-    def _active_app_connection_key(self, session_id: str) -> str:
+    def _active_app_connection_key(self, session_id: SessionId) -> str:
         """
         Generate the key for tracking active app connections for a session.
         :param session_id: The session ID.
@@ -596,7 +576,7 @@ class ValkeyLiveClient:
 
     def _active_app_connection_value(
         self,
-        kernel_id: str,
+        kernel_id: KernelId,
         service: str,
         stream_id: str,
     ) -> str:
