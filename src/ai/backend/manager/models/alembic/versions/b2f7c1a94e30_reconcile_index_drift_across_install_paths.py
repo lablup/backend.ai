@@ -20,7 +20,7 @@ The existence checks keep every statement a no-op where the database already
 agrees.
 
 Revision ID: b2f7c1a94e30
-Revises: aa27f1d5cd35
+Revises: 3f9a1c7b2e04
 Create Date: 2026-07-16
 
 """
@@ -29,7 +29,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "b2f7c1a94e30"
-down_revision = "aa27f1d5cd35"
+down_revision = "3f9a1c7b2e04"
 # Part of: NEXT_RELEASE_VERSION
 branch_labels = None
 depends_on = None
