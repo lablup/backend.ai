@@ -63,6 +63,9 @@ def test_vfolder_name_validator() -> None:
     assert verify_vfolder_name("/home/work/boot")
     assert verify_vfolder_name("/home/work/root")
     assert verify_vfolder_name("home/work")
+    # Mounting exactly at /home/work collides with the agent's intrinsic
+    # scratch mount and makes dockerd reject container creation.
+    assert not verify_vfolder_name("/home/work")
 
 
 def test_dotfile_name_validator() -> None:
