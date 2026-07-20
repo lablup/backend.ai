@@ -223,10 +223,8 @@ class FairShareAggregator:
     ) -> None:
         """Add resource usage to bucket deltas for a day.
 
-        Accumulates raw resource amounts and duration separately.
-        Slots are accumulated additively (sum of ``raw_slots`` across all
-        slices within the same bucket key) while ``duration_seconds`` tracks
-        total observation time.
+        The segment is converted to resource-seconds before accumulation; see
+        ``BucketDelta`` for why it cannot be multiplied afterwards.
 
         Args:
             spec: Original spec (for entity identifiers)
@@ -237,6 +235,8 @@ class FairShareAggregator:
             project_deltas: Project deltas to update (mutated)
             domain_deltas: Domain deltas to update (mutated)
         """
+        segment_usage = self._calculate_resource_seconds(raw_slots, segment_seconds)
+
         # User bucket key
         user_key = UserUsageBucketKey(
             user_uuid=spec.user_uuid,
@@ -248,7 +248,7 @@ class FairShareAggregator:
         )
         ud = user_deltas[user_key]
         user_deltas[user_key] = BucketDelta(
-            slots=ud.slots + raw_slots,
+            resource_usage=ud.resource_usage + segment_usage,
             duration_seconds=ud.duration_seconds + segment_seconds,
         )
 
@@ -262,7 +262,7 @@ class FairShareAggregator:
         )
         pd = project_deltas[project_key]
         project_deltas[project_key] = BucketDelta(
-            slots=pd.slots + raw_slots,
+            resource_usage=pd.resource_usage + segment_usage,
             duration_seconds=pd.duration_seconds + segment_seconds,
         )
 
@@ -275,7 +275,7 @@ class FairShareAggregator:
         )
         dd = domain_deltas[domain_key]
         domain_deltas[domain_key] = BucketDelta(
-            slots=dd.slots + raw_slots,
+            resource_usage=dd.resource_usage + segment_usage,
             duration_seconds=dd.duration_seconds + segment_seconds,
         )
 

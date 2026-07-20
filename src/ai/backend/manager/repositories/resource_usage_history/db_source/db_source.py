@@ -398,7 +398,7 @@ class ResourceUsageHistoryDBSource:
                 UserUsageBucketRow.user_uuid,
                 UserUsageBucketRow.project_id,
                 ube.c.slot_name,
-                sa.func.sum(ube.c.amount).label("total_amount"),
+                sa.func.sum(ube.c.amount).label("total_resource_usage"),
             )
             .select_from(
                 sa.join(
@@ -429,7 +429,7 @@ class ResourceUsageHistoryDBSource:
             key = (row.user_uuid, row.project_id)
             if key not in aggregated:
                 aggregated[key] = ResourceSlot()
-            aggregated[key][row.slot_name] = row.total_amount
+            aggregated[key][row.slot_name] = row.total_resource_usage
         return aggregated
 
     async def get_aggregated_usage_by_project(
@@ -448,7 +448,7 @@ class ResourceUsageHistoryDBSource:
                 sa.select(
                     ProjectUsageBucketRow.project_id,
                     ube.c.slot_name,
-                    sa.func.sum(ube.c.amount).label("total_amount"),
+                    sa.func.sum(ube.c.amount).label("total_resource_usage"),
                 )
                 .select_from(
                     sa.join(
@@ -477,7 +477,7 @@ class ResourceUsageHistoryDBSource:
             for row in rows:
                 if row.project_id not in aggregated:
                     aggregated[row.project_id] = ResourceSlot()
-                aggregated[row.project_id][row.slot_name] = row.total_amount
+                aggregated[row.project_id][row.slot_name] = row.total_resource_usage
             return aggregated
 
     async def get_aggregated_usage_by_domain(
@@ -496,7 +496,7 @@ class ResourceUsageHistoryDBSource:
                 sa.select(
                     DomainUsageBucketRow.domain_name,
                     ube.c.slot_name,
-                    sa.func.sum(ube.c.amount).label("total_amount"),
+                    sa.func.sum(ube.c.amount).label("total_resource_usage"),
                 )
                 .select_from(
                     sa.join(
@@ -525,7 +525,7 @@ class ResourceUsageHistoryDBSource:
             for row in rows:
                 if row.domain_name not in aggregated:
                     aggregated[row.domain_name] = ResourceSlot()
-                aggregated[row.domain_name][row.slot_name] = row.total_amount
+                aggregated[row.domain_name][row.slot_name] = row.total_resource_usage
             return aggregated
 
     # ==================== Bucket Delta Updates ====================
@@ -587,11 +587,7 @@ class ResourceUsageHistoryDBSource:
         for key, bucket_delta in deltas.items():
             lookup_key = (key.user_uuid, key.project_id, key.resource_group, key.period_date)
             existing_usage = existing.get(lookup_key, ResourceSlot())
-            # JSONB stores resource-seconds (amount * seconds) for legacy compatibility
-            resource_seconds = self._calculate_resource_seconds(
-                bucket_delta.slots, bucket_delta.duration_seconds
-            )
-            new_usage = existing_usage + resource_seconds
+            new_usage = existing_usage + bucket_delta.resource_usage
 
             # Upsert with merged usage (JSONB)
             stmt = (
@@ -684,10 +680,7 @@ class ResourceUsageHistoryDBSource:
         for key, bucket_delta in deltas.items():
             lookup_key = (key.project_id, key.resource_group, key.period_date)
             existing_usage = existing.get(lookup_key, ResourceSlot())
-            resource_seconds = self._calculate_resource_seconds(
-                bucket_delta.slots, bucket_delta.duration_seconds
-            )
-            new_usage = existing_usage + resource_seconds
+            new_usage = existing_usage + bucket_delta.resource_usage
 
             # Upsert with merged usage (JSONB)
             stmt = (
@@ -771,10 +764,7 @@ class ResourceUsageHistoryDBSource:
         for key, bucket_delta in deltas.items():
             lookup_key = (key.domain_name, key.resource_group, key.period_date)
             existing_usage = existing.get(lookup_key, ResourceSlot())
-            resource_seconds = self._calculate_resource_seconds(
-                bucket_delta.slots, bucket_delta.duration_seconds
-            )
-            new_usage = existing_usage + resource_seconds
+            new_usage = existing_usage + bucket_delta.resource_usage
 
             # Upsert with merged usage (JSONB)
             stmt = (
@@ -851,18 +841,13 @@ class ResourceUsageHistoryDBSource:
     ) -> None:
         """Upsert normalized usage_bucket_entries for a bucket.
 
-        For each slot in the delta, insert or update an entry row.
-        ``amount`` stores the raw resource amount (not pre-multiplied)
-        and ``duration_seconds`` stores the actual observation duration.
-        The product ``amount * duration_seconds`` is computed at SQL query
-        time where PostgreSQL auto-extends NUMERIC precision, eliminating
-        overflow risk for large memory values.
+        Both columns accumulate independently and are never multiplied together.
 
         ``capacity`` is set to 0 here; it is updated separately during
         fair share factor calculation when the cluster capacity is known.
         """
         entry_table = UsageBucketEntryRow.__table__
-        for slot_name, value in bucket_delta.slots.items():
+        for slot_name, value in bucket_delta.resource_usage.items():
             stmt = (
                 pg_insert(entry_table)
                 .values(

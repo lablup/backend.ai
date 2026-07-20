@@ -417,15 +417,18 @@ class DomainUsageBucketKey:
 
 @dataclass
 class BucketDelta:
-    """Separated resource amount and duration for a usage bucket.
+    """Accumulated resource usage and observation duration for a usage bucket.
 
-    Stores raw resource amounts and duration separately instead of
-    pre-multiplied resource-seconds.  The product ``amount * duration_seconds``
-    is computed at SQL query time where PostgreSQL auto-extends NUMERIC precision,
-    eliminating overflow risk for large memory values.
+    ``resource_usage`` is in resource-seconds and must be accumulated as
+    ``sum(amount_k * duration_k)``.  Summing amounts and durations separately
+    and multiplying afterwards gives a cross product inflated by the number of
+    slices in the bucket.
+
+    ``duration_seconds`` is for reporting only; both fields are sums, so they
+    are never multiplied with each other.
     """
 
-    slots: ResourceSlot = field(default_factory=ResourceSlot)
+    resource_usage: ResourceSlot = field(default_factory=ResourceSlot)
     duration_seconds: int = 0
 
 

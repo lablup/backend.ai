@@ -3,12 +3,13 @@
 Verifies that kernel usage specs are correctly split by day boundaries
 and aggregated into user/project/domain buckets.
 
-Phase 3 (BA-4308): BucketDelta stores raw amount and duration separately.
+BucketDelta stores resource-seconds and the observed duration separately.
 """
 
 from __future__ import annotations
 
-from datetime import UTC, date, datetime
+from dataclasses import dataclass
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from uuid import UUID, uuid4
 
@@ -29,6 +30,13 @@ from ai.backend.manager.sokovan.scheduler.fair_share.aggregator import (
 )
 
 RESOURCE_GROUP_ID = ResourceGroupID(uuid4())
+
+_USER_A = UUID("11111111-1111-4111-8111-111111111111")
+_USER_B = UUID("22222222-2222-4222-8222-222222222222")
+_USER_C = UUID("33333333-3333-4333-8333-333333333333")
+_PROJECT_1 = UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+_PROJECT_2 = UUID("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")
+_TICK_DAY = date(2026, 7, 17)
 
 
 def make_datetime(
@@ -164,7 +172,8 @@ class TestSplitSpecByDay:
 class TestAggregateKernelUsageToBuckets:
     """Tests for aggregate_kernel_usage_to_buckets method.
 
-    BucketDelta stores raw slots and duration_seconds separately.
+    BucketDelta stores resource-seconds (amount * duration summed per slice)
+    and the total observed duration separately.
     """
 
     def test_single_spec_single_day(self, aggregator: FairShareAggregator) -> None:
@@ -200,7 +209,8 @@ class TestAggregateKernelUsageToBuckets:
         )
         assert user_key in result.user_usage_deltas
         delta = result.user_usage_deltas[user_key]
-        assert delta.slots["cpu"] == Decimal("2")
+        # 2 CPU for 300s -> 600 CPU-seconds
+        assert delta.resource_usage["cpu"] == Decimal("600")
         assert delta.duration_seconds == 300
 
         # Project bucket
@@ -213,7 +223,7 @@ class TestAggregateKernelUsageToBuckets:
             period_date=date(2024, 1, 15),
         )
         assert project_key in result.project_usage_deltas
-        assert result.project_usage_deltas[project_key].slots["cpu"] == Decimal("2")
+        assert result.project_usage_deltas[project_key].resource_usage["cpu"] == Decimal("600")
 
         # Domain bucket
         assert len(result.domain_usage_deltas) == 1
@@ -224,7 +234,7 @@ class TestAggregateKernelUsageToBuckets:
             period_date=date(2024, 1, 15),
         )
         assert domain_key in result.domain_usage_deltas
-        assert result.domain_usage_deltas[domain_key].slots["cpu"] == Decimal("2")
+        assert result.domain_usage_deltas[domain_key].resource_usage["cpu"] == Decimal("600")
 
     def test_multiple_specs_same_user_same_day_aggregated(
         self, aggregator: FairShareAggregator
@@ -255,12 +265,11 @@ class TestAggregateKernelUsageToBuckets:
 
         result = aggregator.aggregate_kernel_usage_to_buckets(specs)
 
-        # Should have only one user bucket with summed raw slots and duration
         assert len(result.user_usage_deltas) == 1
         user_key = list(result.user_usage_deltas.keys())[0]
         delta = result.user_usage_deltas[user_key]
-        # Raw slots accumulate: 2 + 2 = 4
-        assert delta.slots["cpu"] == Decimal("4")
+        # Per slice: 2*300 + 2*300 = 1200, not (2+2) * (300+300) = 2400
+        assert delta.resource_usage["cpu"] == Decimal("1200")
         # Durations accumulate: 300 + 300 = 600
         assert delta.duration_seconds == 600
 
@@ -308,11 +317,11 @@ class TestAggregateKernelUsageToBuckets:
 
         assert day1_key in result.user_usage_deltas
         assert day2_key in result.user_usage_deltas
-        # Day 1: 3 minutes = 180s, raw slots = 2 CPU
-        assert result.user_usage_deltas[day1_key].slots["cpu"] == Decimal("2")
+        # Day 1: 2 CPU for 180s -> 360 CPU-seconds
+        assert result.user_usage_deltas[day1_key].resource_usage["cpu"] == Decimal("360")
         assert result.user_usage_deltas[day1_key].duration_seconds == 180
-        # Day 2: 3 minutes = 180s, raw slots = 2 CPU
-        assert result.user_usage_deltas[day2_key].slots["cpu"] == Decimal("2")
+        # Day 2: 2 CPU for 180s -> 360 CPU-seconds
+        assert result.user_usage_deltas[day2_key].resource_usage["cpu"] == Decimal("360")
         assert result.user_usage_deltas[day2_key].duration_seconds == 180
 
 
@@ -436,16 +445,14 @@ class TestBackloggedUsageScenario:
             period_date=date(2024, 1, 16),
         )
 
-        # Day 1: 5 specs, raw_slots=2 each, accumulated = 2*5 = 10
-        # duration: 240 + 300 + 300 + 300 + 300 = 1440 seconds
+        # 5 specs at 2 CPU, durations 240 + 300*4 = 1440s
         d1 = result.user_usage_deltas[day1_key]
-        assert d1.slots["cpu"] == Decimal("10")
+        assert d1.resource_usage["cpu"] == Decimal("2880")
         assert d1.duration_seconds == 1440
 
-        # Day 2: 3 specs, raw_slots=2 each, accumulated = 2*3 = 6
-        # duration: 300 + 300 + 180 = 780 seconds
+        # 3 specs at 2 CPU, durations 300 + 300 + 180 = 780s
         d2 = result.user_usage_deltas[day2_key]
-        assert d2.slots["cpu"] == Decimal("6")
+        assert d2.resource_usage["cpu"] == Decimal("1560")
         assert d2.duration_seconds == 780
 
     def test_backlogged_usage_with_midnight_crossing_spec(
@@ -540,17 +547,14 @@ class TestBackloggedUsageScenario:
             period_date=date(2024, 1, 16),
         )
 
-        # Day 1: specs contribute raw_slots=2 each
-        # 4 complete specs + crossing spec day1 part = 5 contributions = 2*5 = 10
-        # duration: 240 + 300 + 300 + 300 + 300(crossing) = 1440s
+        # 4 complete specs + the crossing spec's day1 part, all at 2 CPU: 1440s
         d1 = result.user_usage_deltas[day1_key]
-        assert d1.slots["cpu"] == Decimal("10")
+        assert d1.resource_usage["cpu"] == Decimal("2880")
         assert d1.duration_seconds == 1440
 
-        # Day 2: crossing spec day2 part + 2 specs = 3 contributions = 2*3 = 6
-        # duration: 300(crossing) + 300 + 180 = 780s
+        # The crossing spec's day2 part + 2 specs, all at 2 CPU: 780s
         d2 = result.user_usage_deltas[day2_key]
-        assert d2.slots["cpu"] == Decimal("6")
+        assert d2.resource_usage["cpu"] == Decimal("1560")
         assert d2.duration_seconds == 780
 
     def test_backlogged_multiple_users(self, aggregator: FairShareAggregator) -> None:
@@ -597,10 +601,9 @@ class TestBackloggedUsageScenario:
             resource_group_id=specs[0].resource_group_id,
             period_date=date(2024, 1, 15),
         )
-        # User1: raw=2 for 300s, User2: raw=2 for 300s (day1 part)
-        # Accumulated slots: 2 + 2 = 4
+        # User1 and User2 each 2 CPU for 300s: 2*300 + 2*300 = 1200
         pd1 = result.project_usage_deltas[project_day1_key]
-        assert pd1.slots["cpu"] == Decimal("4")
+        assert pd1.resource_usage["cpu"] == Decimal("1200")
         assert pd1.duration_seconds == 600  # 300 + 300
 
         project_day2_key = ProjectUsageBucketKey(
@@ -610,9 +613,9 @@ class TestBackloggedUsageScenario:
             resource_group_id=specs[0].resource_group_id,
             period_date=date(2024, 1, 16),
         )
-        # User2 only: raw=2 for 300s (day2 part)
+        # User2 only: 2 CPU for 300s (day2 part) -> 600 CPU-seconds
         pd2 = result.project_usage_deltas[project_day2_key]
-        assert pd2.slots["cpu"] == Decimal("2")
+        assert pd2.resource_usage["cpu"] == Decimal("600")
         assert pd2.duration_seconds == 300
 
 
@@ -649,7 +652,7 @@ class TestEdgeCases:
         user_key = list(result.user_usage_deltas.keys())[0]
         assert user_key.period_date == date(2024, 1, 15)
         delta = result.user_usage_deltas[user_key]
-        assert delta.slots["cpu"] == Decimal("2")
+        assert delta.resource_usage["cpu"] == Decimal("600")
         assert delta.duration_seconds == 300
 
     def test_spec_starting_exactly_at_midnight(self, aggregator: FairShareAggregator) -> None:
@@ -696,8 +699,306 @@ class TestEdgeCases:
         assert len(result.user_usage_deltas) == 2
 
         for _key, delta in result.user_usage_deltas.items():
-            # Each day gets raw slots + 120 seconds
-            assert delta.slots["cpu"] == Decimal("2")
-            assert delta.slots["mem"] == Decimal("4096")
-            assert delta.slots["cuda.shares"] == Decimal("1")
+            assert delta.resource_usage["cpu"] == Decimal("240")
+            assert delta.resource_usage["mem"] == Decimal("491520")
+            assert delta.resource_usage["cuda.shares"] == Decimal("120")
             assert delta.duration_seconds == 120
+
+
+@dataclass(frozen=True)
+class _ConcurrentKernelsCase:
+    """One tick observing ``kernel_count`` kernels of the same user."""
+
+    kernel_count: int
+    expected_resource_usage: Decimal
+    expected_duration_seconds: int
+
+
+class TestConcurrentKernelsNotCrossMultiplied:
+    """Regression: a bucket must not scale with the square of the kernel count.
+
+    Summing amounts and durations separately and multiplying afterwards
+    inflates a bucket by exactly the number of kernels folded into it.
+    """
+
+    @pytest.mark.parametrize(
+        "case",
+        [
+            _ConcurrentKernelsCase(
+                kernel_count=1,
+                expected_resource_usage=Decimal("300"),
+                expected_duration_seconds=300,
+            ),
+            _ConcurrentKernelsCase(
+                kernel_count=2,
+                expected_resource_usage=Decimal("600"),
+                expected_duration_seconds=600,
+            ),
+            _ConcurrentKernelsCase(
+                kernel_count=4,
+                expected_resource_usage=Decimal("1200"),
+                expected_duration_seconds=1200,
+            ),
+            _ConcurrentKernelsCase(
+                kernel_count=10,
+                expected_resource_usage=Decimal("3000"),
+                expected_duration_seconds=3000,
+            ),
+        ],
+        ids=lambda case: f"{case.kernel_count}-kernels",
+    )
+    def test_one_tick_of_concurrent_kernels(
+        self,
+        aggregator: FairShareAggregator,
+        case: _ConcurrentKernelsCase,
+    ) -> None:
+        """N kernels at 1 fGPU for one 300s slice total N*300 fGPU-seconds."""
+        user_uuid = uuid4()
+        project_id = uuid4()
+        raw_slots = ResourceSlot({"cuda.shares": Decimal("1")})
+
+        specs = [
+            make_spec(
+                period_start=make_datetime(2026, 7, 17, 10, 0, 0),
+                period_end=make_datetime(2026, 7, 17, 10, 5, 0),
+                resource_usage=ResourceSlot({"cuda.shares": Decimal("300")}),
+                occupied_slots=raw_slots,
+                user_uuid=user_uuid,
+                project_id=project_id,
+            )
+            for _ in range(case.kernel_count)
+        ]
+
+        result = aggregator.aggregate_kernel_usage_to_buckets(specs)
+
+        user_key = UserUsageBucketKey(
+            user_uuid=user_uuid,
+            project_id=project_id,
+            domain_name="default",
+            resource_group="default",
+            resource_group_id=RESOURCE_GROUP_ID,
+            period_date=date(2026, 7, 17),
+        )
+        delta = result.user_usage_deltas[user_key]
+        assert delta.resource_usage["cuda.shares"] == case.expected_resource_usage
+        assert delta.duration_seconds == case.expected_duration_seconds
+
+        domain_key = DomainUsageBucketKey(
+            domain_name="default",
+            resource_group="default",
+            resource_group_id=RESOURCE_GROUP_ID,
+            period_date=date(2026, 7, 17),
+        )
+        domain_delta = result.domain_usage_deltas[domain_key]
+        assert domain_delta.resource_usage["cuda.shares"] == case.expected_resource_usage
+
+    def test_full_day_of_four_kernels(self, aggregator: FairShareAggregator) -> None:
+        """A full day of 4 kernels sums to 4 * 86400, not 4 * 4 * 86400."""
+        user_uuid = uuid4()
+        project_id = uuid4()
+        raw_slots = ResourceSlot({"cuda.shares": Decimal("1")})
+
+        specs = [
+            make_spec(
+                period_start=datetime(2026, 7, 17, tzinfo=UTC).replace(
+                    hour=slice_index // 12, minute=(slice_index % 12) * 5
+                ),
+                period_end=datetime(2026, 7, 17, tzinfo=UTC).replace(
+                    hour=slice_index // 12, minute=(slice_index % 12) * 5
+                )
+                + timedelta(seconds=300),
+                resource_usage=ResourceSlot({"cuda.shares": Decimal("300")}),
+                occupied_slots=raw_slots,
+                user_uuid=user_uuid,
+                project_id=project_id,
+            )
+            for slice_index in range(288)
+            for _ in range(4)
+        ]
+
+        result = aggregator.aggregate_kernel_usage_to_buckets(specs)
+
+        user_key = UserUsageBucketKey(
+            user_uuid=user_uuid,
+            project_id=project_id,
+            domain_name="default",
+            resource_group="default",
+            resource_group_id=RESOURCE_GROUP_ID,
+            period_date=date(2026, 7, 17),
+        )
+        delta = result.user_usage_deltas[user_key]
+        assert delta.resource_usage["cuda.shares"] == Decimal("345600")
+
+
+@dataclass(frozen=True)
+class _Workload:
+    """Identical kernels one user runs inside one project."""
+
+    user_uuid: UUID
+    project_id: UUID
+    shares: Decimal
+    kernel_count: int
+
+
+@dataclass(frozen=True)
+class _UserBucketExpectation:
+    label: str
+    user_uuid: UUID
+    project_id: UUID
+    resource_usage: Decimal
+    duration_seconds: int
+
+
+@dataclass(frozen=True)
+class _ProjectBucketExpectation:
+    label: str
+    project_id: UUID
+    resource_usage: Decimal
+    duration_seconds: int
+
+
+class TestMultiTenantTick:
+    """One observation tick spanning two projects, three users and seven kernels.
+
+    The inflation compounds up the hierarchy, since each level multiplies by
+    the kernel count *it* aggregates: 2x for a user here, 3x for a project,
+    7x for the domain.  User A runs in both projects, so user buckets must
+    stay keyed by (user, project).
+    """
+
+    @pytest.fixture
+    def multi_tenant_specs(self) -> list[KernelUsageRecordCreatorSpec]:
+        """One 5-minute slice per kernel, all on the same day."""
+        workloads = [
+            _Workload(_USER_A, _PROJECT_1, Decimal("1"), 2),
+            _Workload(_USER_B, _PROJECT_1, Decimal("2"), 1),
+            _Workload(_USER_A, _PROJECT_2, Decimal("1"), 3),
+            _Workload(_USER_C, _PROJECT_2, Decimal("4"), 1),
+        ]
+        return [
+            make_spec(
+                period_start=make_datetime(2026, 7, 17, 10, 0, 0),
+                period_end=make_datetime(2026, 7, 17, 10, 5, 0),
+                resource_usage=ResourceSlot({"cuda.shares": workload.shares * 300}),
+                occupied_slots=ResourceSlot({"cuda.shares": workload.shares}),
+                user_uuid=workload.user_uuid,
+                project_id=workload.project_id,
+            )
+            for workload in workloads
+            for _ in range(workload.kernel_count)
+        ]
+
+    @pytest.mark.parametrize(
+        "case",
+        [
+            _UserBucketExpectation(
+                label="user-a-project-1",  # 2 kernels * 1 share * 300s
+                user_uuid=_USER_A,
+                project_id=_PROJECT_1,
+                resource_usage=Decimal("600"),
+                duration_seconds=600,
+            ),
+            _UserBucketExpectation(
+                label="user-b-project-1",  # 1 kernel * 2 shares * 300s
+                user_uuid=_USER_B,
+                project_id=_PROJECT_1,
+                resource_usage=Decimal("600"),
+                duration_seconds=300,
+            ),
+            _UserBucketExpectation(
+                label="user-a-project-2",  # 3 kernels * 1 share * 300s
+                user_uuid=_USER_A,
+                project_id=_PROJECT_2,
+                resource_usage=Decimal("900"),
+                duration_seconds=900,
+            ),
+            _UserBucketExpectation(
+                label="user-c-project-2",  # 1 kernel * 4 shares * 300s
+                user_uuid=_USER_C,
+                project_id=_PROJECT_2,
+                resource_usage=Decimal("1200"),
+                duration_seconds=300,
+            ),
+        ],
+        ids=lambda case: case.label,
+    )
+    def test_user_buckets_are_keyed_by_user_and_project(
+        self,
+        aggregator: FairShareAggregator,
+        multi_tenant_specs: list[KernelUsageRecordCreatorSpec],
+        case: _UserBucketExpectation,
+    ) -> None:
+        result = aggregator.aggregate_kernel_usage_to_buckets(multi_tenant_specs)
+
+        assert len(result.user_usage_deltas) == 4
+        delta = result.user_usage_deltas[
+            UserUsageBucketKey(
+                user_uuid=case.user_uuid,
+                project_id=case.project_id,
+                domain_name="default",
+                resource_group="default",
+                resource_group_id=RESOURCE_GROUP_ID,
+                period_date=_TICK_DAY,
+            )
+        ]
+        assert delta.resource_usage["cuda.shares"] == case.resource_usage
+        assert delta.duration_seconds == case.duration_seconds
+
+    @pytest.mark.parametrize(
+        "case",
+        [
+            _ProjectBucketExpectation(
+                label="project-1",  # user A 600 + user B 600
+                project_id=_PROJECT_1,
+                resource_usage=Decimal("1200"),
+                duration_seconds=900,
+            ),
+            _ProjectBucketExpectation(
+                label="project-2",  # user A 900 + user C 1200
+                project_id=_PROJECT_2,
+                resource_usage=Decimal("2100"),
+                duration_seconds=1200,
+            ),
+        ],
+        ids=lambda case: case.label,
+    )
+    def test_project_buckets_sum_their_users(
+        self,
+        aggregator: FairShareAggregator,
+        multi_tenant_specs: list[KernelUsageRecordCreatorSpec],
+        case: _ProjectBucketExpectation,
+    ) -> None:
+        result = aggregator.aggregate_kernel_usage_to_buckets(multi_tenant_specs)
+
+        assert len(result.project_usage_deltas) == 2
+        delta = result.project_usage_deltas[
+            ProjectUsageBucketKey(
+                project_id=case.project_id,
+                domain_name="default",
+                resource_group="default",
+                resource_group_id=RESOURCE_GROUP_ID,
+                period_date=_TICK_DAY,
+            )
+        ]
+        assert delta.resource_usage["cuda.shares"] == case.resource_usage
+        assert delta.duration_seconds == case.duration_seconds
+
+    def test_domain_bucket_sums_every_project(
+        self,
+        aggregator: FairShareAggregator,
+        multi_tenant_specs: list[KernelUsageRecordCreatorSpec],
+    ) -> None:
+        """Project 1 (1200) + project 2 (2100)."""
+        result = aggregator.aggregate_kernel_usage_to_buckets(multi_tenant_specs)
+
+        assert len(result.domain_usage_deltas) == 1
+        delta = result.domain_usage_deltas[
+            DomainUsageBucketKey(
+                domain_name="default",
+                resource_group="default",
+                resource_group_id=RESOURCE_GROUP_ID,
+                period_date=_TICK_DAY,
+            )
+        ]
+        assert delta.resource_usage["cuda.shares"] == Decimal("3300")
+        assert delta.duration_seconds == 2100
