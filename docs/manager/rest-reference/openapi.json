@@ -15050,6 +15050,7 @@
           "project_resource_policy",
           "role",
           "audit_log",
+          "kernel:history",
           "event_log",
           "project_admin_page",
           "domain_admin_page",

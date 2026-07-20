@@ -15545,6 +15545,7 @@ enum RBACElementType
   PROJECT_RESOURCE_POLICY @join__enumValue(graph: STRAWBERRY)
   ROLE @join__enumValue(graph: STRAWBERRY)
   AUDIT_LOG @join__enumValue(graph: STRAWBERRY)
+  KERNEL_HISTORY @join__enumValue(graph: STRAWBERRY)
   EVENT_LOG @join__enumValue(graph: STRAWBERRY)
   PROJECT_ADMIN_PAGE @join__enumValue(graph: STRAWBERRY)
   DOMAIN_ADMIN_PAGE @join__enumValue(graph: STRAWBERRY)
