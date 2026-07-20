@@ -66,11 +66,6 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.drop_index("ix_prometheus_query_presets_category_id", table_name="prometheus_query_presets")
-    op.drop_constraint(
-        "fk_prometheus_query_presets_category_id",
-        "prometheus_query_presets",
-        type_="foreignkey",
-    )
     op.drop_column("prometheus_query_presets", "category_id")
     op.drop_column("prometheus_query_presets", "rank")
     op.drop_column("prometheus_query_presets", "description")
