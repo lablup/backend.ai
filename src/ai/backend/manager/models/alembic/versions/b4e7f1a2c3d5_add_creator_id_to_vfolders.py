@@ -23,12 +23,6 @@ def upgrade() -> None:
         "vfolders",
         sa.Column("creator_id", GUID, nullable=True),
     )
-    op.create_index(
-        op.f("ix_vfolders_creator_id"),
-        "vfolders",
-        ["creator_id"],
-        unique=False,
-    )
     # Backfill creator_id from users table by matching creator (email) → users.email
     op.execute(
         sa.text(
@@ -38,5 +32,6 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_index(op.f("ix_vfolders_creator_id"), table_name="vfolders")
+    # drop_column takes the column's index with it; dropping it by name first
+    # only breaks on installs that never had it.
     op.drop_column("vfolders", "creator_id")

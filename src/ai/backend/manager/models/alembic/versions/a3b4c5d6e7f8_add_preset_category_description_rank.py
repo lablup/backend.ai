@@ -65,7 +65,9 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_index("ix_prometheus_query_presets_category_id", table_name="prometheus_query_presets")
+    # drop_column below takes the column's index and foreign key with it;
+    # dropping either by name first only breaks on installs that never had
+    # that name.
     op.drop_column("prometheus_query_presets", "category_id")
     op.drop_column("prometheus_query_presets", "rank")
     op.drop_column("prometheus_query_presets", "description")

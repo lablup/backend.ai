@@ -248,6 +248,6 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_index("uq_role_invitations_active", table_name="role_invitations")
-    op.drop_index("ix_role_invitations_invitee_user_id", table_name="role_invitations")
+    # drop_table takes the table's indexes with it; dropping them by name first
+    # only breaks on installs that never had them.
     op.drop_table("role_invitations")
