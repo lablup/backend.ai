@@ -28,7 +28,11 @@ from ai.backend.common.types import (
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import GroupRow
-from ai.backend.manager.models.idle_checker.row import IdleCheckerBindingRow, IdleCheckerRow
+from ai.backend.manager.models.idle_checker.row import (
+    IdleCheckerBindingRow,
+    IdleCheckerRow,
+    SessionIdleCheckRow,
+)
 from ai.backend.manager.models.resource_policy import ProjectResourcePolicyRow
 from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
@@ -65,6 +69,116 @@ class PerTypeCheckerData:
     batch_session_id: SessionId
     interactive_checker_id: IdleCheckerID
     batch_checker_id: IdleCheckerID
+
+
+@dataclass(frozen=True)
+class ExpiredCheckSessionData:
+    session_id: SessionId
+    first_checker_id: IdleCheckerID
+    second_checker_id: IdleCheckerID
+    first_expire_at: datetime
+    second_expire_at: datetime
+
+
+def _expired_check_scope_rows(
+    scope: ScopeFixture,
+) -> tuple[ProjectResourcePolicyRow, DomainRow, GroupRow, ScalingGroupRow]:
+    return (
+        ProjectResourcePolicyRow(
+            name=f"{scope.domain_name}-policy",
+            max_vfolder_count=10,
+            max_quota_scope_size=1024,
+            max_network_count=10,
+        ),
+        DomainRow(
+            id=scope.domain_id,
+            name=scope.domain_name,
+            description=None,
+            is_active=True,
+        ),
+        GroupRow(
+            id=scope.project_id,
+            name=f"{scope.domain_name}-project",
+            description=None,
+            is_active=True,
+            domain_name=scope.domain_name,
+            resource_policy=f"{scope.domain_name}-policy",
+        ),
+        ScalingGroupRow(
+            id=scope.scaling_group_id,
+            name=scope.scaling_group_name,
+            description=None,
+            is_active=True,
+            is_public=True,
+            driver="static",
+            driver_opts={},
+            scheduler="fifo",
+            use_host_network=False,
+        ),
+    )
+
+
+def _expired_check_session_row(
+    scope: ScopeFixture,
+    session_id: SessionId,
+    status: SessionStatus,
+) -> SessionRow:
+    return SessionRow(
+        id=session_id,
+        creation_id=str(session_id)[:32],
+        name=f"session-{session_id}",
+        session_type=SessionTypes.INTERACTIVE,
+        cluster_mode=ClusterMode.SINGLE_NODE,
+        cluster_size=1,
+        domain_name=scope.domain_name,
+        domain_id=scope.domain_id,
+        resource_group_id=scope.scaling_group_id,
+        group_id=scope.project_id,
+        user_uuid=uuid.uuid4(),
+        access_key=None,
+        tag=None,
+        status=status,
+        status_info=None,
+        status_data=None,
+        status_history={},
+        result=SessionResult.UNDEFINED,
+        created_at=datetime(2026, 1, 1, tzinfo=UTC),
+        terminated_at=None,
+        starts_at=datetime(2026, 1, 1, tzinfo=UTC),
+        startup_command=None,
+        callback_url=None,
+        occupying_slots=ResourceSlot({"cpu": "1"}),
+        requested_slots=ResourceSlot({"cpu": "1"}),
+        vfolder_mounts=[],
+        environ=None,
+        bootstrap_script=None,
+        use_host_network=False,
+        scaling_group_name=scope.scaling_group_name,
+    )
+
+
+def _expired_check_checker_row(checker_id: IdleCheckerID) -> IdleCheckerRow:
+    return IdleCheckerRow(
+        id=checker_id,
+        name=f"checker-{checker_id}",
+        description=None,
+        checker_type=CheckerType.SESSION_LIFETIME,
+        target_session_types=[SessionTypes.INTERACTIVE],
+        spec=IdleCheckerSpec(
+            type=CheckerType.SESSION_LIFETIME,
+            session_lifetime=SessionLifetimeSpec(max_lifetime_seconds=3600),
+        ),
+    )
+
+
+def _expired_check_scope_fixture(prefix: str) -> ScopeFixture:
+    return ScopeFixture(
+        domain_name=f"{prefix}-domain",
+        domain_id=DomainID(uuid.uuid4()),
+        project_id=uuid.uuid4(),
+        scaling_group_name=f"{prefix}-sgroup",
+        scaling_group_id=ResourceGroupID(uuid.uuid4()),
+    )
 
 
 class TestFetchIdleCheckBatch:
@@ -776,3 +890,212 @@ class TestFetchIdleCheckBatch:
         batch_target = targets_by_session_id[per_type_checker_data.batch_session_id]
         batch_checker_ids = [bound.checker.checker_id for bound in batch_target.checkers]
         assert batch_checker_ids == [per_type_checker_data.batch_checker_id]
+
+
+class TestFetchExpiredIdleChecks:
+    @pytest.fixture
+    async def database(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+        async with with_tables(
+            database_connection,
+            [
+                ProjectResourcePolicyRow,
+                DomainRow,
+                GroupRow,
+                ScalingGroupRow,
+                SessionRow,
+                IdleCheckerRow,
+                SessionIdleCheckRow,
+            ],
+        ):
+            yield database_connection
+
+    @pytest.fixture
+    def repository(self, database: ExtendedAsyncSAEngine) -> IdleCheckerRepository:
+        return IdleCheckerRepository(DBOpsProvider(database))
+
+    @pytest.fixture
+    async def expired_check_session(
+        self,
+        database: ExtendedAsyncSAEngine,
+    ) -> ExpiredCheckSessionData:
+        scope = _expired_check_scope_fixture("expired-check")
+        session_id = SessionId(uuid.uuid4())
+        first_checker_id = IdleCheckerID(uuid.uuid4())
+        second_checker_id = IdleCheckerID(uuid.uuid4())
+        first_expire_at = datetime(2026, 1, 1, tzinfo=UTC)
+        second_expire_at = datetime(2026, 2, 1, tzinfo=UTC)
+        async with database.begin_session() as db_sess:
+            for scope_row in _expired_check_scope_rows(scope):
+                db_sess.add(scope_row)
+            db_sess.add(_expired_check_session_row(scope, session_id, SessionStatus.RUNNING))
+            db_sess.add(_expired_check_checker_row(first_checker_id))
+            db_sess.add(_expired_check_checker_row(second_checker_id))
+            await db_sess.flush()
+            db_sess.add(
+                SessionIdleCheckRow(
+                    session_id=session_id,
+                    idle_checker_id=first_checker_id,
+                    expire_at=first_expire_at,
+                    last_status="expired",
+                    last_message="Judged expired.",
+                )
+            )
+            db_sess.add(
+                SessionIdleCheckRow(
+                    session_id=session_id,
+                    idle_checker_id=second_checker_id,
+                    expire_at=second_expire_at,
+                    last_status="expired",
+                    last_message="Judged expired.",
+                )
+            )
+        return ExpiredCheckSessionData(
+            session_id=session_id,
+            first_checker_id=first_checker_id,
+            second_checker_id=second_checker_id,
+            first_expire_at=first_expire_at,
+            second_expire_at=second_expire_at,
+        )
+
+    @pytest.fixture
+    async def session_without_deadline(
+        self,
+        database: ExtendedAsyncSAEngine,
+    ) -> SessionId:
+        scope = _expired_check_scope_fixture("no-deadline")
+        session_id = SessionId(uuid.uuid4())
+        checker_id = IdleCheckerID(uuid.uuid4())
+        async with database.begin_session() as db_sess:
+            for scope_row in _expired_check_scope_rows(scope):
+                db_sess.add(scope_row)
+            db_sess.add(_expired_check_session_row(scope, session_id, SessionStatus.RUNNING))
+            db_sess.add(_expired_check_checker_row(checker_id))
+            await db_sess.flush()
+            db_sess.add(
+                SessionIdleCheckRow(
+                    session_id=session_id,
+                    idle_checker_id=checker_id,
+                    expire_at=None,
+                    last_status="grace_period",
+                    last_message="Waiting for the grace period to end.",
+                )
+            )
+        return session_id
+
+    @pytest.fixture
+    async def session_with_future_deadline(
+        self,
+        database: ExtendedAsyncSAEngine,
+    ) -> SessionId:
+        scope = _expired_check_scope_fixture("future-deadline")
+        session_id = SessionId(uuid.uuid4())
+        checker_id = IdleCheckerID(uuid.uuid4())
+        async with database.begin_session() as db_sess:
+            for scope_row in _expired_check_scope_rows(scope):
+                db_sess.add(scope_row)
+            db_sess.add(_expired_check_session_row(scope, session_id, SessionStatus.RUNNING))
+            db_sess.add(_expired_check_checker_row(checker_id))
+            await db_sess.flush()
+            db_sess.add(
+                SessionIdleCheckRow(
+                    session_id=session_id,
+                    idle_checker_id=checker_id,
+                    expire_at=datetime(2100, 1, 1, tzinfo=UTC),
+                    last_status="active",
+                    last_message="The session is active.",
+                )
+            )
+        return session_id
+
+    @pytest.fixture
+    async def terminated_session_with_expired_check(
+        self,
+        database: ExtendedAsyncSAEngine,
+    ) -> SessionId:
+        scope = _expired_check_scope_fixture("terminated")
+        session_id = SessionId(uuid.uuid4())
+        checker_id = IdleCheckerID(uuid.uuid4())
+        async with database.begin_session() as db_sess:
+            for scope_row in _expired_check_scope_rows(scope):
+                db_sess.add(scope_row)
+            db_sess.add(_expired_check_session_row(scope, session_id, SessionStatus.TERMINATED))
+            db_sess.add(_expired_check_checker_row(checker_id))
+            await db_sess.flush()
+            db_sess.add(
+                SessionIdleCheckRow(
+                    session_id=session_id,
+                    idle_checker_id=checker_id,
+                    expire_at=datetime(2026, 1, 1, tzinfo=UTC),
+                    last_status="expired",
+                    last_message="Judged expired.",
+                )
+            )
+        return session_id
+
+    async def test_returns_each_expired_check_of_running_session(
+        self,
+        repository: IdleCheckerRepository,
+        expired_check_session: ExpiredCheckSessionData,
+    ) -> None:
+        batch = await repository.fetch_expired_idle_checks([SessionStatus.RUNNING])
+        checks_by_key = {(check.session_id, check.checker_id): check for check in batch.checks}
+
+        assert set(checks_by_key) == {
+            (expired_check_session.session_id, expired_check_session.first_checker_id),
+            (expired_check_session.session_id, expired_check_session.second_checker_id),
+        }
+        check = checks_by_key[
+            (expired_check_session.session_id, expired_check_session.first_checker_id)
+        ]
+        assert check.expire_at == expired_check_session.first_expire_at
+        assert check.last_status == "expired"
+        assert check.last_message == "Judged expired."
+
+    async def test_excludes_checks_without_deadline(
+        self,
+        repository: IdleCheckerRepository,
+        session_without_deadline: SessionId,
+    ) -> None:
+        batch = await repository.fetch_expired_idle_checks([SessionStatus.RUNNING])
+        check_session_ids = {check.session_id for check in batch.checks}
+
+        assert batch.checks == ()
+        assert session_without_deadline not in check_session_ids
+
+    async def test_excludes_checks_with_future_deadline(
+        self,
+        repository: IdleCheckerRepository,
+        session_with_future_deadline: SessionId,
+    ) -> None:
+        batch = await repository.fetch_expired_idle_checks([SessionStatus.RUNNING])
+        check_session_ids = {check.session_id for check in batch.checks}
+
+        assert batch.checks == ()
+        assert session_with_future_deadline not in check_session_ids
+
+    async def test_excludes_sessions_not_in_target_statuses(
+        self,
+        repository: IdleCheckerRepository,
+        terminated_session_with_expired_check: SessionId,
+    ) -> None:
+        batch = await repository.fetch_expired_idle_checks([SessionStatus.RUNNING])
+        check_session_ids = {check.session_id for check in batch.checks}
+
+        assert batch.checks == ()
+        assert terminated_session_with_expired_check not in check_session_ids
+
+    async def test_now_is_db_sourced_and_covers_every_deadline(
+        self,
+        repository: IdleCheckerRepository,
+        expired_check_session: ExpiredCheckSessionData,
+    ) -> None:
+        batch = await repository.fetch_expired_idle_checks([SessionStatus.RUNNING])
+        check_session_ids = {check.session_id for check in batch.checks}
+
+        assert batch.now.tzinfo is not None
+        assert check_session_ids == {expired_check_session.session_id}
+        for check in batch.checks:
+            assert check.expire_at <= batch.now

@@ -8,7 +8,7 @@ from datetime import datetime
 
 from ai.backend.common.data.idle_checker.types import CheckerType, IdleCheckerSpec
 from ai.backend.common.identifier.idle_checker import IdleCheckerID
-from ai.backend.common.types import SessionTypes
+from ai.backend.common.types import SessionId, SessionTypes
 from ai.backend.manager.data.idle_checker.types import IdleCheckSession
 from ai.backend.manager.data.permission.id import ScopeId
 
@@ -57,3 +57,24 @@ class IdleCheckBatchData:
     """Handler-oriented idle-check input for one reconciler tick."""
 
     targets: Sequence[IdleCheckTargetData]
+
+
+@dataclass(frozen=True)
+class ExpiredIdleCheckData:
+    """One stored judgment whose deadline has passed, kept per checker as its own reason."""
+
+    session_id: SessionId
+    checker_id: IdleCheckerID
+    expire_at: datetime
+    last_status: str
+    last_message: str
+
+
+@dataclass(frozen=True)
+class ExpiredIdleCheckBatchData:
+    """Idle checks expired as of the DB timestamp.
+    `now` is the same timestamp passed to the reconciler.
+    """
+
+    checks: Sequence[ExpiredIdleCheckData]
+    now: datetime
