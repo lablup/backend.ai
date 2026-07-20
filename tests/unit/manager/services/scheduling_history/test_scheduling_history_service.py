@@ -12,8 +12,10 @@ from uuid import uuid4
 import pytest
 from dateutil.tz import tzutc
 
+from ai.backend.common.data.permission.types import EntityType, RBACElementType, ScopeType
+from ai.backend.common.identifier.kernel_scheduling_history import KernelSchedulingHistoryID
 from ai.backend.common.identifier.replica import ReplicaID
-from ai.backend.common.types import SessionId
+from ai.backend.common.types import KernelId, SessionId
 from ai.backend.manager.data.deployment.types import (
     DeploymentHandlerCategory,
     DeploymentHistoryData,
@@ -22,6 +24,12 @@ from ai.backend.manager.data.deployment.types import (
     RouteHistoryData,
     RouteHistoryListResult,
 )
+from ai.backend.manager.data.kernel.types import (
+    KernelSchedulingHistoryData,
+    KernelSchedulingHistoryListResult,
+    KernelSchedulingPhase,
+)
+from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.session.types import (
     SchedulingResult,
     SessionSchedulingHistoryData,
@@ -32,6 +40,7 @@ from ai.backend.manager.repositories.base.pagination import NoPagination
 from ai.backend.manager.repositories.scheduling_history import SchedulingHistoryRepository
 from ai.backend.manager.repositories.scheduling_history.types import (
     DeploymentHistorySearchScope,
+    KernelSchedulingHistorySearchScope,
     RouteHistorySearchScope,
     SessionSchedulingHistorySearchScope,
 )
@@ -40,6 +49,12 @@ from ai.backend.manager.services.scheduling_history.actions.search_deployment_hi
 )
 from ai.backend.manager.services.scheduling_history.actions.search_deployment_scoped_history import (
     SearchDeploymentScopedHistoryAction,
+)
+from ai.backend.manager.services.scheduling_history.actions.search_kernel_history import (
+    SearchKernelHistoryAction,
+)
+from ai.backend.manager.services.scheduling_history.actions.search_kernel_scoped_history import (
+    SearchKernelScopedHistoryAction,
 )
 from ai.backend.manager.services.scheduling_history.actions.search_route_history import (
     SearchRouteHistoryAction,
@@ -72,6 +87,23 @@ def service(mock_repository: MagicMock) -> SchedulingHistoryService:
 @pytest.fixture
 def querier() -> BatchQuerier:
     return BatchQuerier(pagination=NoPagination())
+
+
+def _make_kernel_history() -> KernelSchedulingHistoryData:
+    return KernelSchedulingHistoryData(
+        id=KernelSchedulingHistoryID(uuid4()),
+        kernel_id=KernelId(uuid4()),
+        session_id=SessionId(uuid4()),
+        phase="CREATING",
+        from_status=KernelSchedulingPhase.PREPARED,
+        to_status=KernelSchedulingPhase.CREATING,
+        result=SchedulingResult.SUCCESS,
+        error_code=None,
+        message="",
+        attempts=1,
+        created_at=_NOW,
+        updated_at=_NOW,
+    )
 
 
 def _make_session_history() -> SessionSchedulingHistoryData:
@@ -299,4 +331,62 @@ class TestSearchRouteScopedHistoryAction:
         assert result.histories == [history_item]
         mock_repository.search_route_scoped_history.assert_awaited_once_with(
             querier=querier, scope=scope
+        )
+
+
+class TestSearchKernelHistoryAction:
+    async def test_returns_kernel_histories_with_pagination(
+        self,
+        service: SchedulingHistoryService,
+        mock_repository: MagicMock,
+        querier: BatchQuerier,
+    ) -> None:
+        history_item = _make_kernel_history()
+        mock_repository.search_kernel_history.return_value = KernelSchedulingHistoryListResult(
+            items=[history_item],
+            total_count=1,
+            has_next_page=True,
+            has_previous_page=False,
+        )
+
+        action = SearchKernelHistoryAction(querier=querier)
+        result = await service.search_kernel_history(action)
+
+        assert result.items == [history_item]
+        assert result.total_count == 1
+        assert result.has_next_page is True
+        assert result.has_previous_page is False
+        mock_repository.search_kernel_history.assert_awaited_once_with(querier=querier)
+
+
+class TestSearchKernelScopedHistoryAction:
+    async def test_scopes_to_the_kernel_and_exposes_its_rbac_element(
+        self,
+        service: SchedulingHistoryService,
+        mock_repository: MagicMock,
+        querier: BatchQuerier,
+    ) -> None:
+        history_item = _make_kernel_history()
+        mock_repository.search_kernel_scoped_history.return_value = (
+            KernelSchedulingHistoryListResult(
+                items=[history_item],
+                total_count=1,
+                has_next_page=False,
+                has_previous_page=False,
+            )
+        )
+        kernel_id = KernelId(uuid4())
+
+        action = SearchKernelScopedHistoryAction(kernel_id=kernel_id, querier=querier)
+        result = await service.search_kernel_scoped_history(action)
+
+        assert result.items == [history_item]
+        assert action.target_element() == RBACElementRef(
+            element_type=RBACElementType.KERNEL, element_id=str(kernel_id)
+        )
+        assert action.scope_type() is ScopeType.KERNEL
+        assert action.entity_type() is EntityType.KERNEL_HISTORY
+        mock_repository.search_kernel_scoped_history.assert_awaited_once_with(
+            querier=querier,
+            scope=KernelSchedulingHistorySearchScope(kernel_id=kernel_id),
         )

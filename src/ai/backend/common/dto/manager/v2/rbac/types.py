@@ -109,6 +109,7 @@ class RBACElementTypeDTO(StrEnum):
     PROJECT_RESOURCE_POLICY = "project_resource_policy"
     ROLE = "role"
     AUDIT_LOG = "audit_log"
+    KERNEL_HISTORY = "kernel:history"
     EVENT_LOG = "event_log"
 
     # Admin page access control

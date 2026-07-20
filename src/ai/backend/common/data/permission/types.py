@@ -352,6 +352,7 @@ class ScopeType(enum.StrEnum):
 
     # === Entity-level scopes ===
     SESSION = "session"
+    KERNEL = "kernel"
     DEPLOYMENT = "deployment"
     MODEL_DEPLOYMENT = "model_deployment"
     VFOLDER = "vfolder"
@@ -424,6 +425,7 @@ class RBACElementType(enum.StrEnum):
     PROJECT_RESOURCE_POLICY = "project_resource_policy"
     ROLE = "role"
     AUDIT_LOG = "audit_log"
+    KERNEL_HISTORY = "kernel:history"
     EVENT_LOG = "event_log"
 
     # === Admin page access control ===
