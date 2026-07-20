@@ -163,8 +163,8 @@ class TestUsageBucketEntries:
             slot_map = {e.slot_name: e for e in entry_rows}
             assert "cpu" in slot_map
             assert "mem" in slot_map
-            assert slot_map["cpu"].amount == Decimal("600")
-            assert slot_map["mem"].amount == Decimal("1228800000")
+            assert slot_map["cpu"].resource_usage == Decimal("600")
+            assert slot_map["mem"].resource_usage == Decimal("1228800000")
             assert slot_map["cpu"].duration_seconds == 300
             assert slot_map["mem"].duration_seconds == 300
 
@@ -232,7 +232,7 @@ class TestUsageBucketEntries:
 
             assert len(entry_rows) == 1
             assert entry_rows[0].slot_name == "cpu"
-            assert entry_rows[0].amount == Decimal("1500")
+            assert entry_rows[0].resource_usage == Decimal("1500")
             assert entry_rows[0].duration_seconds == 600
 
             stored_resource_group_id = await db_sess.scalar(
@@ -291,8 +291,8 @@ class TestUsageBucketEntries:
 
             assert len(entry_rows) == 2
             slot_map = {e.slot_name: e for e in entry_rows}
-            assert slot_map["cpu"].amount == Decimal("900")
-            assert slot_map["cuda.device"].amount == Decimal("600")
+            assert slot_map["cpu"].resource_usage == Decimal("900")
+            assert slot_map["cuda.device"].resource_usage == Decimal("600")
             assert slot_map["cpu"].duration_seconds == 300
 
     async def test_aggregated_usage_reads_from_entries(
@@ -332,7 +332,7 @@ class TestUsageBucketEntries:
         )
         await db_source.increment_usage_buckets(result)
 
-        # Query aggregated usage — SUM(amount) across buckets
+        # Query aggregated usage — SUM(resource_usage) across buckets
         aggregated = await db_source.get_aggregated_usage_by_domain(
             resource_group="default",
             lookback_start=date(2024, 1, 14),

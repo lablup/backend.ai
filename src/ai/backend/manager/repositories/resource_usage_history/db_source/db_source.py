@@ -398,7 +398,7 @@ class ResourceUsageHistoryDBSource:
                 UserUsageBucketRow.user_uuid,
                 UserUsageBucketRow.project_id,
                 ube.c.slot_name,
-                sa.func.sum(ube.c.amount).label("total_resource_usage"),
+                sa.func.sum(ube.c.resource_usage).label("total_resource_usage"),
             )
             .select_from(
                 sa.join(
@@ -448,7 +448,7 @@ class ResourceUsageHistoryDBSource:
                 sa.select(
                     ProjectUsageBucketRow.project_id,
                     ube.c.slot_name,
-                    sa.func.sum(ube.c.amount).label("total_resource_usage"),
+                    sa.func.sum(ube.c.resource_usage).label("total_resource_usage"),
                 )
                 .select_from(
                     sa.join(
@@ -496,7 +496,7 @@ class ResourceUsageHistoryDBSource:
                 sa.select(
                     DomainUsageBucketRow.domain_name,
                     ube.c.slot_name,
-                    sa.func.sum(ube.c.amount).label("total_resource_usage"),
+                    sa.func.sum(ube.c.resource_usage).label("total_resource_usage"),
                 )
                 .select_from(
                     sa.join(
@@ -854,14 +854,14 @@ class ResourceUsageHistoryDBSource:
                     bucket_id=bucket_id,
                     bucket_type=bucket_type,
                     slot_name=slot_name,
-                    amount=value,
+                    resource_usage=value,
                     duration_seconds=bucket_delta.duration_seconds,
                     capacity=0,
                 )
                 .on_conflict_do_update(
                     constraint="pk_usage_bucket_entries",
                     set_={
-                        "amount": entry_table.c.amount + value,
+                        "resource_usage": entry_table.c.resource_usage + value,
                         "duration_seconds": (
                             entry_table.c.duration_seconds + bucket_delta.duration_seconds
                         ),

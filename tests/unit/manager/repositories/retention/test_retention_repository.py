@@ -1332,7 +1332,7 @@ class TestUsageBucketsRetention:
                     bucket_id=bucket_id,
                     bucket_type=bucket_type,
                     slot_name=slot,
-                    amount=Decimal("1"),
+                    resource_usage=Decimal("1"),
                     duration_seconds=1,
                     capacity=Decimal("1"),
                 )

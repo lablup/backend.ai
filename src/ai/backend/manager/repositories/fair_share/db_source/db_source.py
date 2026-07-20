@@ -1585,7 +1585,7 @@ class FairShareDBSource:
                 UserUsageBucketRow.project_id,
                 UserUsageBucketRow.period_start,
                 ube.c.slot_name,
-                ube.c.amount,
+                ube.c.resource_usage,
             )
             .select_from(
                 sa.join(
@@ -1612,7 +1612,7 @@ class FairShareDBSource:
                 ProjectUsageBucketRow.project_id,
                 ProjectUsageBucketRow.period_start,
                 ube.c.slot_name,
-                ube.c.amount,
+                ube.c.resource_usage,
             )
             .select_from(
                 sa.join(
@@ -1639,7 +1639,7 @@ class FairShareDBSource:
                 DomainUsageBucketRow.domain_name,
                 DomainUsageBucketRow.period_start,
                 ube.c.slot_name,
-                ube.c.amount,
+                ube.c.resource_usage,
             )
             .select_from(
                 sa.join(
@@ -1668,7 +1668,7 @@ class FairShareDBSource:
                 user_buckets[key] = {}
             if row.period_start not in user_buckets[key]:
                 user_buckets[key][row.period_start] = ResourceSlot()
-            user_buckets[key][row.period_start][row.slot_name] = Decimal(str(row.amount))
+            user_buckets[key][row.period_start][row.slot_name] = Decimal(str(row.resource_usage))
 
         project_buckets: dict[uuid.UUID, dict[date, ResourceSlot]] = {}
         for row in project_rows:
@@ -1677,7 +1677,7 @@ class FairShareDBSource:
             if row.period_start not in project_buckets[row.project_id]:
                 project_buckets[row.project_id][row.period_start] = ResourceSlot()
             project_buckets[row.project_id][row.period_start][row.slot_name] = Decimal(
-                str(row.amount)
+                str(row.resource_usage)
             )
 
         domain_buckets: dict[str, dict[date, ResourceSlot]] = {}
@@ -1687,7 +1687,7 @@ class FairShareDBSource:
             if row.period_start not in domain_buckets[row.domain_name]:
                 domain_buckets[row.domain_name][row.period_start] = ResourceSlot()
             domain_buckets[row.domain_name][row.period_start][row.slot_name] = Decimal(
-                str(row.amount)
+                str(row.resource_usage)
             )
 
         return RawUsageBucketsByLevel(

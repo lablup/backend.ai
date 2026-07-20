@@ -442,9 +442,10 @@ class UserUsageBucketRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
 class UsageBucketEntryRow(Base):  # type: ignore[misc]
     """Per-slot normalized entry for usage bucket aggregation (Phase 3).
 
-    ``amount`` holds ``sum(amount_k * duration_k)`` resource-seconds and is what
-    the read paths sum.  ``duration_seconds`` is for reporting only; both columns
-    are sums, so they are never multiplied together.
+    ``resource_usage`` holds ``sum(amount_k * duration_k)`` resource-seconds and
+    is what the read paths sum, matching the column of the same name on the three
+    parent bucket tables.  ``duration_seconds`` is for reporting only; both
+    columns are sums, so they are never multiplied together.
 
     One entry per (bucket_id, slot_name). ``bucket_type`` is a discriminator
     indicating which parent table (domain/project/user_usage_buckets) owns
@@ -456,8 +457,8 @@ class UsageBucketEntryRow(Base):  # type: ignore[misc]
     bucket_id: Mapped[uuid.UUID] = mapped_column("bucket_id", GUID(), nullable=False)
     bucket_type: Mapped[str] = mapped_column("bucket_type", sa.String(length=16), nullable=False)
     slot_name: Mapped[str] = mapped_column("slot_name", sa.String(length=64), nullable=False)
-    amount: Mapped[Decimal] = mapped_column(
-        "amount", sa.Numeric(precision=32, scale=6), nullable=False
+    resource_usage: Mapped[Decimal] = mapped_column(
+        "resource_usage", sa.Numeric(precision=32, scale=6), nullable=False
     )
     duration_seconds: Mapped[int] = mapped_column("duration_seconds", sa.Integer(), nullable=False)
     capacity: Mapped[Decimal] = mapped_column(
