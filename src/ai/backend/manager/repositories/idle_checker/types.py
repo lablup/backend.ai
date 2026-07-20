@@ -72,10 +72,8 @@ class ExpiredIdleCheckData:
 
 @dataclass(frozen=True)
 class ExpiredIdleCheckBatchData:
-    """Sweep input for one reconciler tick.
-
-    ``now`` is the DB time read in the same transaction as the fetch, so every
-    returned check satisfies ``expire_at <= now``.
+    """Expired idle checks selected by the repository query.
+    `now` is the DB transaction timestamp used by the reconciler.
     """
 
     checks: Sequence[ExpiredIdleCheckData]
