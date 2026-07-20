@@ -419,23 +419,15 @@ class DomainUsageBucketKey:
 
 
 @dataclass
-class BucketDelta:
-    """Separated resource amount and duration for a usage bucket.
+class UsageBucketAggregationResult:
+    """Resource-seconds to add to each bucket, from one observation tick.
 
-    Stores raw resource amounts and duration separately instead of
-    pre-multiplied resource-seconds.  The product ``amount * duration_seconds``
-    is computed at SQL query time where PostgreSQL auto-extends NUMERIC precision,
-    eliminating overflow risk for large memory values.
+    Each value is ``sum(amount_k * duration_k)`` over the slices folded into that
+    bucket.  It must be accumulated as a sum of per-slice products: summing the
+    amounts and the durations separately and multiplying afterwards gives a cross
+    product inflated by the number of slices.
     """
 
-    slots: ResourceSlot = field(default_factory=ResourceSlot)
-    duration_seconds: int = 0
-
-
-@dataclass
-class UsageBucketAggregationResult:
-    """Result of aggregating kernel usage into daily buckets."""
-
-    user_usage_deltas: dict[UserUsageBucketKey, BucketDelta] = field(default_factory=dict)
-    project_usage_deltas: dict[ProjectUsageBucketKey, BucketDelta] = field(default_factory=dict)
-    domain_usage_deltas: dict[DomainUsageBucketKey, BucketDelta] = field(default_factory=dict)
+    user_usage_deltas: dict[UserUsageBucketKey, ResourceSlot] = field(default_factory=dict)
+    project_usage_deltas: dict[ProjectUsageBucketKey, ResourceSlot] = field(default_factory=dict)
+    domain_usage_deltas: dict[DomainUsageBucketKey, ResourceSlot] = field(default_factory=dict)
