@@ -343,8 +343,6 @@ class ManagerDependencyComposer(DependencyComposer[DependencyInput, DependencyRe
                 registry_quota_service=domain.services_ctx.per_project_container_registries_quota,
                 # BgtaskRegistry creation
                 agent_client_pool=agents.agent_client_pool,
-                # Log cleanup timer
-                distributed_lock_factory=domain.distributed_lock_factory,
                 # Lifecycle background tasks
                 stats_monitor=monitoring.stats_monitor,
                 pidx=setup_input.pidx,
