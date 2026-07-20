@@ -27,7 +27,11 @@ class AppConfigProcessors(AbstractProcessorPackage):
         service: AppConfigService,
         action_monitors: list[ActionMonitor],
     ) -> None:
-        # No RBAC validator is injected here on purpose: reads are gated by the allowlist.
+        # No RBAC validator is injected here on purpose. The allow-list registers which
+        # (config_name, scope_type) pairs merge and at what rank — it carries no user
+        # dimension, so it cannot keep one user from naming another's principal. That is
+        # the service's own check (``_authorize_resolve_principal``): the resolving
+        # user_id must be the acting user's own, superadmins excepted.
         self.resolve_app_config = ScopeActionProcessor(service.resolve_app_config, action_monitors)
         self.resolve_app_config_bulk = ScopeActionProcessor(
             service.resolve_app_config_bulk, action_monitors

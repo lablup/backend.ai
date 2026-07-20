@@ -3,18 +3,25 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from ai.backend.common.contexts.user import with_user
 from ai.backend.common.data.app_config.types import AppConfigScopeType
+from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
 from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.user import UserID
 from ai.backend.manager.data.app_config_fragment.types import AppConfigFragmentData
+from ai.backend.manager.errors.app_config import (
+    AppConfigFragmentNotFound,
+    AppConfigResolveNotAllowed,
+)
 from ai.backend.manager.repositories.app_config_fragment.repository import (
     AppConfigFragmentRepository,
 )
@@ -26,11 +33,21 @@ from ai.backend.manager.services.app_config.actions.resolve_bulk import (
 from ai.backend.manager.services.app_config.service import AppConfigService
 
 _USER_ID = UserID(uuid.uuid4())
+_OTHER_USER_ID = UserID(uuid.uuid4())
 _DOMAIN_ID = DomainID(uuid.uuid4())
 _NOW = datetime.now(UTC)
 _SCOPE = AppConfigScopeArguments(domain_id=_DOMAIN_ID, user_id=_USER_ID)
+_OTHER_SCOPE = AppConfigScopeArguments(domain_id=_DOMAIN_ID, user_id=_OTHER_USER_ID)
 
 FragmentFactory = Callable[[str, dict[str, Any], AppConfigScopeType, str], AppConfigFragmentData]
+
+
+@dataclass(frozen=True)
+class _ResolvePrincipalCase:
+    """An acting user paired with the principal it resolves for."""
+
+    acting_user: UserData
+    scope: AppConfigScopeArguments
 
 
 @pytest.fixture
@@ -67,6 +84,22 @@ class TestAppConfigService:
     @pytest.fixture
     def service(self, mock_fragment_repository: MagicMock) -> AppConfigService:
         return AppConfigService(fragment_repository=mock_fragment_repository)
+
+    @pytest.fixture
+    def acting_user(self) -> Iterator[UserData]:
+        """Bind ``_USER_ID`` as the acting principal — the identity an authenticated resolve
+        is authorized against. Ordinary user, so it may resolve only its own config.
+        """
+        user = UserData(
+            user_id=_USER_ID,
+            is_authorized=True,
+            is_admin=False,
+            is_superadmin=False,
+            role=UserRole.USER,
+            domain_name="default",
+        )
+        with with_user(user):
+            yield user
 
     @pytest.fixture
     def deep_merge_fragments(
@@ -157,6 +190,7 @@ class TestAppConfigService:
     async def test_resolve_deep_merges_applicable_fragments(
         self,
         service: AppConfigService,
+        acting_user: UserData,
         mock_fragment_repository: MagicMock,
         deep_merge_fragments: list[AppConfigFragmentData],
     ) -> None:
@@ -175,6 +209,7 @@ class TestAppConfigService:
     async def test_resolve_replaces_lists_wholesale(
         self,
         service: AppConfigService,
+        acting_user: UserData,
         list_replace_fragments: list[AppConfigFragmentData],
     ) -> None:
         result = await service.resolve_app_config(
@@ -187,22 +222,22 @@ class TestAppConfigService:
             "theme": {"light": True, "dark": True},
         }
 
-    async def test_resolve_empty_yields_none_merged_config(
+    async def test_resolve_without_matching_fragments_raises(
         self,
         service: AppConfigService,
+        acting_user: UserData,
         no_fragments: list[AppConfigFragmentData],
     ) -> None:
-        result = await service.resolve_app_config(
-            ResolveAppConfigAction(config_name="unknown", scope_arguments=_SCOPE)
-        )
-
-        # No contributing fragment -> None (unconfigured), not an empty {}.
-        assert result.app_config.fragments == []
-        assert result.app_config.merged_config is None
+        # No contributing fragment is a 404 — not an AppConfigData carrying a None merge.
+        with pytest.raises(AppConfigFragmentNotFound):
+            await service.resolve_app_config(
+                ResolveAppConfigAction(config_name="unknown", scope_arguments=_SCOPE)
+            )
 
     async def test_resolve_bulk_groups_by_name_and_merges_each(
         self,
         service: AppConfigService,
+        acting_user: UserData,
         mock_fragment_repository: MagicMock,
         bulk_fragments: list[AppConfigFragmentData],
     ) -> None:
@@ -214,7 +249,9 @@ class TestAppConfigService:
         assert [c.config_name for c in result.app_configs] == ["theme", "menu", "unknown"]
         assert result.app_configs[0].merged_config == {"theme": "dark", "lang": "en"}
         assert result.app_configs[1].merged_config == {"items": ["a"]}
-        assert result.app_configs[2].merged_config is None  # unregistered -> no fragments
+        # A name nothing contributes to yields None here — the single resolve raises 404 for
+        # the same input, so one absent name cannot fail the whole batch.
+        assert result.app_configs[2].merged_config is None
         assert result.scope_id() == str(_USER_ID)
         mock_fragment_repository.list_visible_fragments_bulk.assert_called_once_with(
             ["theme", "menu", "unknown"], _SCOPE
@@ -223,6 +260,7 @@ class TestAppConfigService:
     async def test_resolve_bulk_repeats_duplicate_config_names_in_output(
         self,
         service: AppConfigService,
+        acting_user: UserData,
         duplicate_name_fragments: list[AppConfigFragmentData],
     ) -> None:
         # A config_name repeated in the request must be repeated in the output — each
@@ -252,3 +290,74 @@ class TestAppConfigService:
         mock_fragment_repository.list_visible_fragments_bulk.assert_called_once_with(
             ["theme"], None
         )
+
+    @pytest.mark.parametrize(
+        "case",
+        [
+            _ResolvePrincipalCase(
+                acting_user=UserData(
+                    user_id=_USER_ID,
+                    is_authorized=True,
+                    is_admin=False,
+                    is_superadmin=False,
+                    role=UserRole.USER,
+                    domain_name="default",
+                ),
+                scope=_SCOPE,
+            ),
+            _ResolvePrincipalCase(
+                acting_user=UserData(
+                    user_id=_USER_ID,
+                    is_authorized=True,
+                    is_admin=True,
+                    is_superadmin=True,
+                    role=UserRole.SUPERADMIN,
+                    domain_name="default",
+                ),
+                scope=_OTHER_SCOPE,
+            ),
+        ],
+        ids=lambda case: (
+            "superadmin-resolves-another-user" if case.acting_user.is_superadmin else "self"
+        ),
+    )
+    async def test_resolve_allows_permitted_principals(
+        self,
+        service: AppConfigService,
+        deep_merge_fragments: list[AppConfigFragmentData],
+        case: _ResolvePrincipalCase,
+    ) -> None:
+        with with_user(case.acting_user):
+            result = await service.resolve_app_config(
+                ResolveAppConfigAction(config_name="theme", scope_arguments=case.scope)
+            )
+
+        assert result.app_config.merged_config == {"theme": "dark", "lang": "en"}
+
+    async def test_resolve_rejects_another_users_principal(
+        self,
+        service: AppConfigService,
+        acting_user: UserData,
+        mock_fragment_repository: MagicMock,
+    ) -> None:
+        # The repository must never be reached — the principal is rejected before the read.
+        with pytest.raises(AppConfigResolveNotAllowed):
+            await service.resolve_app_config(
+                ResolveAppConfigAction(config_name="theme", scope_arguments=_OTHER_SCOPE)
+            )
+
+        mock_fragment_repository.list_visible_fragments_bulk.assert_not_called()
+
+    async def test_resolve_bulk_rejects_another_users_principal(
+        self,
+        service: AppConfigService,
+        acting_user: UserData,
+        mock_fragment_repository: MagicMock,
+    ) -> None:
+        # Same gate on the bulk path — otherwise it would be a way around the single resolve.
+        with pytest.raises(AppConfigResolveNotAllowed):
+            await service.resolve_app_config_bulk(
+                ResolveBulkAppConfigAction(config_names=["theme"], scope=_OTHER_SCOPE)
+            )
+
+        mock_fragment_repository.list_visible_fragments_bulk.assert_not_called()

@@ -3,11 +3,18 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any
 
+from ai.backend.common.contexts.user import current_user
+from ai.backend.common.exception import UnreachableError
 from ai.backend.manager.data.app_config.types import AppConfigData
 from ai.backend.manager.data.app_config_fragment.types import AppConfigFragmentData
+from ai.backend.manager.errors.app_config import (
+    AppConfigFragmentNotFound,
+    AppConfigResolveNotAllowed,
+)
 from ai.backend.manager.repositories.app_config_fragment.repository import (
     AppConfigFragmentRepository,
 )
+from ai.backend.manager.repositories.app_config_fragment.types import AppConfigScopeArguments
 from ai.backend.manager.services.app_config.actions.resolve import (
     ResolveAppConfigAction,
     ResolveAppConfigActionResult,
@@ -35,6 +42,31 @@ def _recursive_override(base: Mapping[str, Any], override: Mapping[str, Any]) ->
         else:
             result[key] = override_value
     return result
+
+
+def _authorize_resolve_principal(scope: AppConfigScopeArguments | None) -> None:
+    """Reject resolving on behalf of a user other than the acting one.
+
+    Only ``user_id`` is checked: it selects which user-scope fragments overlay the merge, so
+    resolving someone else's would hand back their config. ``domain_id`` is deliberately left
+    unchecked — the handler is expected to derive it from the same principal. Superadmins may
+    resolve any principal.
+    """
+    user = current_user()
+    if user is not None and user.is_superadmin:
+        # Superadmins resolve any principal — nothing below applies to them.
+        return
+    if scope is None:
+        # Anonymous, pre-login resolve: only public fragments contribute, so there is no
+        # principal to authorize.
+        return
+    if user is None:
+        raise UnreachableError("User context is not available")
+    if user.user_id == scope.user_id:
+        return
+    raise AppConfigResolveNotAllowed(
+        f"User {user.user_id} may not resolve the app config of user {scope.user_id}."
+    )
 
 
 def _merge_configs(fragments: Sequence[AppConfigFragmentData]) -> dict[str, Any] | None:
@@ -68,11 +100,21 @@ class AppConfigService:
 
         With a principal ``scope`` the merge overlays the caller's domain and user fragments
         on top of ``public``; with ``scope=None`` (anonymous, pre-login) only ``public``
-        fragments contribute.
+        fragments contribute. Naming another user raises ``AppConfigResolveNotAllowed``.
+
+        A ``config_name`` nothing contributes to is an ``AppConfigFragmentNotFound`` — either
+        the name is unregistered or no fragment is visible at this scope. (The bulk path
+        diverges here: it reports such a name as a ``None`` ``merged_config`` entry so one
+        absent name cannot fail the whole batch.)
         """
+        _authorize_resolve_principal(action.scope_arguments)
         fragments = await self._fragment_repository.list_visible_fragments_bulk(
             [action.config_name], action.scope_arguments
         )
+        if not fragments:
+            raise AppConfigFragmentNotFound(
+                f"No visible fragment contributes to app config '{action.config_name}'."
+            )
         app_config = AppConfigData(
             config_name=action.config_name,
             fragments=fragments,
@@ -89,8 +131,13 @@ class AppConfigService:
         One entry per requested ``config_name``, in request order — a name repeated in the
         input is repeated in the output (each position resolves independently, never
         collapsed). With ``scope=None`` (anonymous, pre-login) only ``public`` fragments
-        contribute to every entry.
+        contribute to every entry. Naming another user raises ``AppConfigResolveNotAllowed``.
+
+        A name nothing contributes to yields a ``None`` ``merged_config`` rather than the
+        ``AppConfigFragmentNotFound`` its single-name counterpart raises — one absent name
+        must not fail the whole batch.
         """
+        _authorize_resolve_principal(action.scope)
         fragments = await self._fragment_repository.list_visible_fragments_bulk(
             action.config_names, action.scope
         )
