@@ -4,6 +4,7 @@ from typing import override
 
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
+from ai.backend.manager.actions.processor.global_action import GlobalActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.actions.validators import ActionValidators
 
@@ -35,7 +36,7 @@ class SchedulingHistoryProcessors(AbstractProcessorPackage):
     search_session_history: ActionProcessor[
         SearchSessionHistoryAction, SearchSessionHistoryActionResult
     ]
-    search_kernel_history: ActionProcessor[
+    search_kernel_history: GlobalActionProcessor[
         SearchKernelHistoryAction, SearchKernelHistoryActionResult
     ]
     search_deployment_history: ActionProcessor[
@@ -67,7 +68,9 @@ class SchedulingHistoryProcessors(AbstractProcessorPackage):
         self.search_session_history = ActionProcessor(
             service.search_session_history, action_monitors
         )
-        self.search_kernel_history = ActionProcessor(service.search_kernel_history, action_monitors)
+        self.search_kernel_history = GlobalActionProcessor(
+            service.search_kernel_history, action_monitors
+        )
         self.search_deployment_history = ActionProcessor(
             service.search_deployment_history, action_monitors
         )
