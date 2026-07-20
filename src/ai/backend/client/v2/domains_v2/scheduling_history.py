@@ -7,13 +7,16 @@ from uuid import UUID
 from ai.backend.client.v2.base_domain import BaseDomainClient
 from ai.backend.common.dto.manager.v2.scheduling_history.request import (
     AdminSearchDeploymentHistoriesInput,
+    AdminSearchKernelHistoriesInput,
     AdminSearchRouteHistoriesInput,
     AdminSearchSessionHistoriesInput,
+    ScopedSearchKernelHistoriesInput,
 )
 from ai.backend.common.dto.manager.v2.scheduling_history.response import (
     AdminSearchDeploymentHistoriesPayload,
     AdminSearchRouteHistoriesPayload,
     AdminSearchSessionHistoriesPayload,
+    SearchKernelHistoriesPayload,
 )
 
 _PATH = "/v2/scheduling-history"
@@ -44,6 +47,30 @@ class V2SchedulingHistoryClient(BaseDomainClient):
             f"{_PATH}/sessions/{session_id}/search",
             request=request,
             response_model=AdminSearchSessionHistoriesPayload,
+        )
+
+    # ========== Kernel History ==========
+
+    async def search_kernel_history(
+        self, request: AdminSearchKernelHistoriesInput
+    ) -> SearchKernelHistoriesPayload:
+        """Search kernel scheduling histories with admin scope."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/kernels/admin/search",
+            request=request,
+            response_model=SearchKernelHistoriesPayload,
+        )
+
+    async def kernel_scoped_search(
+        self, request: ScopedSearchKernelHistoriesInput
+    ) -> SearchKernelHistoriesPayload:
+        """Search kernel scheduling histories within a session and/or kernel scope."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/kernels/scoped/search",
+            request=request,
+            response_model=SearchKernelHistoriesPayload,
         )
 
     # ========== Deployment History ==========
