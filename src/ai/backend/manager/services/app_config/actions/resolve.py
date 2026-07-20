@@ -20,8 +20,8 @@ class ResolveAppConfigAction(AppConfigScopeAction):
     """Resolve the merged ``AppConfig`` for one ``config_name``.
 
     ``scope`` carries the resolving principal ``(user, domain)``. When it is ``None`` — the
-    anonymous, pre-login read — only ``public``-scope fragments contribute and the action is
-    a ``GLOBAL`` read attributable to no user.
+    anonymous, pre-login read — only ``public``-scope fragments contribute; the action stays
+    a ``USER``-scope read but carries no ``scope_id``.
     """
 
     config_name: str
@@ -34,7 +34,7 @@ class ResolveAppConfigAction(AppConfigScopeAction):
 
     @override
     def scope_type(self) -> ScopeType:
-        return ScopeType.USER if self.scope_arguments is not None else ScopeType.GLOBAL
+        return ScopeType.USER
 
     @override
     def scope_id(self) -> str:
@@ -52,7 +52,7 @@ class ResolveAppConfigActionResult(AppConfigScopeActionResult):
 
     @override
     def scope_type(self) -> ScopeType:
-        return ScopeType.USER if self._user_id is not None else ScopeType.GLOBAL
+        return ScopeType.USER
 
     @override
     def scope_id(self) -> str:
