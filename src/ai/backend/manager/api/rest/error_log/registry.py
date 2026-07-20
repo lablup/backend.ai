@@ -1,10 +1,8 @@
 """Error log module registrar.
 
-Lifecycle management (GlobalTimer for log cleanup, event dispatcher
-integration) is handled by the DependencyComposer:
-
-* Event consumer: ``event_dispatcher.handlers.log_cleanup``
-* GlobalTimer: ``dependencies.processing.log_cleanup_timer``
+Old ``error_logs`` rows are purged by the DB record retention sweep under the
+``logs`` category (BEP-1063); this module only registers the HTTP routes. A
+manual immediate sweep can be triggered via the ``clear-history`` CLI.
 """
 
 from __future__ import annotations

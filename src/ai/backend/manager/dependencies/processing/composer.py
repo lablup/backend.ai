@@ -68,12 +68,11 @@ from ai.backend.manager.sokovan.deployment.route.route_controller import RouteCo
 from ai.backend.manager.sokovan.reconciler.coordinator import ReconcilerCoordinator
 from ai.backend.manager.sokovan.scheduler.coordinator import ScheduleCoordinator
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
-from ai.backend.manager.types import DistributedLockFactory, SMTPTriggerPolicy
+from ai.backend.manager.types import SMTPTriggerPolicy
 
 from .agent_lost_checker import AgentLostCheckerDependency, AgentLostCheckerInput
 from .bgtask_registry import BgtaskRegistryDependency, BgtaskRegistryInput
 from .event_dispatcher import EventDispatcherDependency, EventDispatcherInput
-from .log_cleanup_timer import LogCleanupTimerDependency, LogCleanupTimerInput
 from .manager_status_watcher import ManagerStatusWatcherDependency, ManagerStatusWatcherInput
 from .processors import ProcessorsDependency, ProcessorsProviderInput
 from .stats_reporter import StatsReporterDependency, StatsReporterInput
@@ -130,9 +129,6 @@ class ProcessingInput:
 
     # BgtaskRegistry creation (additional)
     agent_client_pool: AgentClientPool
-
-    # Log cleanup timer
-    distributed_lock_factory: DistributedLockFactory
 
     # Lifecycle background tasks
     stats_monitor: StatsPluginContext
@@ -317,15 +313,6 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
         )
         dispatchers.dispatch(event_dispatcher)
         await event_dispatcher.start()
-
-        # Step 3.5: Create and start log cleanup timer
-        await stack.enter_dependency(
-            LogCleanupTimerDependency(),
-            LogCleanupTimerInput(
-                distributed_lock_factory=setup_input.distributed_lock_factory,
-                event_producer=setup_input.event_producer,
-            ),
-        )
 
         # Step 4: Create BgtaskRegistry
         await stack.enter_dependency(

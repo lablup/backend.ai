@@ -62,7 +62,6 @@ from ai.backend.common.events.event_types.kernel.broadcast import (
     KernelTerminatedBroadcastEvent,
     KernelTerminatingBroadcastEvent,
 )
-from ai.backend.common.events.event_types.log.anycast import DoLogCleanupEvent
 from ai.backend.common.events.event_types.notification.anycast import (
     NotificationTriggeredEvent,
 )
@@ -137,7 +136,6 @@ from .handlers.agent import AgentEventHandler
 from .handlers.idle_check import IdleCheckEventHandler
 from .handlers.image import ImageEventHandler
 from .handlers.kernel import KernelEventHandler
-from .handlers.log_cleanup import LogCleanupEventHandler
 from .handlers.notification import NotificationEventHandler
 from .handlers.service_catalog import ServiceCatalogEventHandler
 from .handlers.session import SessionEventHandler
@@ -185,7 +183,6 @@ class Dispatchers:
     _artifact_event_handler: ArtifactEventHandler
     _artifact_registry_event_handler: ArtifactRegistryEventHandler
     _service_catalog_event_handler: ServiceCatalogEventHandler
-    _log_cleanup_event_handler: LogCleanupEventHandler
     stream_cleanup_handler: StreamCleanupEventHandler
 
     def __init__(self, args: DispatcherArgs) -> None:
@@ -247,7 +244,6 @@ class Dispatchers:
             args.config_provider,
         )
         self._service_catalog_event_handler = ServiceCatalogEventHandler(args.db)
-        self._log_cleanup_event_handler = LogCleanupEventHandler(args.etcd, args.db)
         self.stream_cleanup_handler = StreamCleanupEventHandler(args.db)
 
     def dispatch(self, event_dispatcher: EventDispatcher) -> None:
@@ -266,7 +262,6 @@ class Dispatchers:
         self._dispatch_artifact_events(event_dispatcher)
         self._dispatch_artifact_registry_events(event_dispatcher)
         self._dispatch_service_catalog_events(event_dispatcher)
-        self._dispatch_log_cleanup_events(event_dispatcher)
         self._dispatch_session_broadcast_propagation(event_dispatcher)
         self._dispatch_stream_cleanup_events(event_dispatcher)
 
@@ -646,17 +641,6 @@ class Dispatchers:
             None,
             self._service_catalog_event_handler.handle_sweep_stale_services,
             name="service-catalog.sweep",
-        )
-
-    def _dispatch_log_cleanup_events(
-        self,
-        event_dispatcher: EventDispatcher,
-    ) -> None:
-        event_dispatcher.consume(
-            DoLogCleanupEvent,
-            None,
-            self._log_cleanup_event_handler.handle_log_cleanup,
-            name="log_cleanup",
         )
 
     def _dispatch_session_broadcast_propagation(
