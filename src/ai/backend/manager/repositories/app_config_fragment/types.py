@@ -25,12 +25,9 @@ __all__ = (
 
 @dataclass(frozen=True)
 class AppConfigScopeArguments:
-    """The scope arguments a caller supplies for a resolve.
+    """The scope arguments a caller supplies for a resolve — the domain, never the user.
 
-    Deliberately does **not** carry the user: that half is injected from the session, so a
-    caller has no field in which to name someone else's principal. Add new caller-supplied
-    scope dimensions here rather than growing method signatures; see
-    :class:`ResolvedAppConfigScope` for the completed scope the query runs on.
+    Add new caller-supplied scope dimensions here rather than growing method signatures.
     """
 
     domain_id: DomainID
@@ -40,9 +37,8 @@ class AppConfigScopeArguments:
 class ResolvedAppConfigScope:
     """The principal an ``AppConfig`` is resolved for: the resolving user and its domain.
 
-    :class:`AppConfigScopeArguments` plus the session user. Only the service builds one —
-    that is what makes "a caller resolves their own config" true by construction rather
-    than by a check. Plain value object — not a :class:`SearchScope`.
+    :class:`AppConfigScopeArguments` plus the session user. Plain value object — not a
+    :class:`SearchScope`.
     """
 
     domain_id: DomainID

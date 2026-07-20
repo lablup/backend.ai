@@ -19,12 +19,10 @@ __all__ = ("AppConfigService",)
 
 
 def _recursive_override(base: Mapping[str, Any], override: Mapping[str, Any]) -> dict[str, Any]:
-    """Merge ``override`` onto ``base``: nested dicts recurse; everything else replaces whole.
+    """Merge ``override`` onto ``base``: nested dicts recurse, everything else replaces whole.
 
-    An ``override`` value replaces the ``base`` one entirely — lists included (no
-    element-by-index blending), and an explicit ``None`` overwrites rather than being skipped.
-    The key itself stays either way; nothing here removes one. Unlike
-    :func:`ai.backend.common.utils.deep_merge`, which blends lists by index and ignores ``None``.
+    Lists replace wholesale (no per-index blending) and an explicit ``None`` overwrites rather
+    than being skipped — unlike :func:`ai.backend.common.utils.deep_merge`.
     """
     result: dict[str, Any] = dict(base)
     for key, override_value in override.items():
@@ -37,13 +35,7 @@ def _recursive_override(base: Mapping[str, Any], override: Mapping[str, Any]) ->
 
 
 def _merge_configs(fragments: Sequence[AppConfigFragmentData]) -> dict[str, Any]:
-    """Deep-merge fragment configs in ascending ``rank`` order.
-
-    Nested dicts recurse; lists and scalars are replaced wholesale by the higher-rank
-    fragment (a user's list overrides the lower scope's entirely — not by index). Keys are
-    only added or replaced, never dropped, and callers reject an empty ``fragments`` before
-    getting here — so ``{}`` back means every fragment's own ``config`` was ``{}``.
-    """
+    """Deep-merge fragment configs, lowest ``rank`` first — the caller passes them ordered."""
     merged: dict[str, Any] = {}
     for fragment in fragments:
         merged = _recursive_override(merged, fragment.config)
@@ -63,20 +55,10 @@ class AppConfigService:
     ) -> ResolveAppConfigsActionResult:
         """Resolve the merged ``AppConfig`` for each of ``config_names`` in a single query.
 
-        The only read the service offers — one name is a one-element request. One entry per
-        requested name, in request order; a name repeated in the input is repeated in the
-        output (each position resolves independently, never collapsed).
-
-        With ``scope_arguments`` **and** a ``user_id``, the merge overlays that user's domain
-        and user fragments on top of ``public``. Missing either one is the anonymous,
-        pre-login read: only ``public`` fragments contribute, and no user is not an error.
-        The handler fills ``user_id`` from the session, so a caller can only ever resolve
-        their own config.
-
-        All-or-nothing on ``AppConfigFragmentNotFound``: one requested name nothing
-        contributes to fails the whole call. A partial result would have to mark the absent
-        names somehow, and every way of doing that pushes the caller into branching on a
-        second, quieter kind of failure.
+        One entry per requested name, in request order; a repeated name is repeated in the
+        output. Without both ``scope_arguments`` and ``user_id`` this is the anonymous,
+        pre-login read — only ``public`` fragments contribute. A name nothing contributes to
+        fails the whole call with ``AppConfigFragmentNotFound``.
         """
         if action.scope_arguments is None or action.user_id is None:
             # Either half missing is the anonymous, pre-login read.

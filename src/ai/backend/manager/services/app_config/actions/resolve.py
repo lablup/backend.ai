@@ -19,16 +19,9 @@ from ai.backend.manager.services.app_config.actions.base import (
 class ResolveAppConfigsAction(AppConfigScopeAction):
     """Resolve the merged ``AppConfig`` for each of ``config_names``.
 
-    The only read shape: a single name is a one-element ``config_names``. Reads are the hot
-    path and a client bootstraps several configs at once, so batching is the default rather
-    than an optimization bolted beside a single-name variant.
-
-    ``scope_arguments`` carries what the caller may name — the domain, and any scope
-    dimension added later. ``user_id`` is the other half, and is not the caller's to name:
-    the handler fills it from the session, so a resolve can only ever be for the acting user.
-
-    Either half unset is the anonymous, pre-login read: only ``public``-scope fragments
-    contribute.
+    ``scope_arguments`` is the caller's to name; ``user_id`` is not — the handler fills it
+    from the session, so a resolve is only ever for the acting user. Either half unset is the
+    anonymous, pre-login read.
     """
 
     config_names: list[str]

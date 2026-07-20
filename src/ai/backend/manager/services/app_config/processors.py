@@ -22,11 +22,8 @@ class AppConfigProcessors(AbstractProcessorPackage):
         service: AppConfigService,
         action_monitors: list[ActionMonitor],
     ) -> None:
-        # No RBAC validator is injected here on purpose, and none is needed to keep a
-        # caller out of another user's config: the action carries no user_id at all. The
-        # service injects it from the session, so a resolve can only ever be for the
-        # acting user. (The allow-list could not have done this — it registers which
-        # (config_name, scope_type) pairs merge and at what rank, with no user dimension.)
+        # No RBAC validator on purpose: the handler fills the action's user_id from the
+        # session, so a resolve is only ever for the acting user.
         self.resolve_app_configs = ScopeActionProcessor(
             service.resolve_app_configs, action_monitors
         )
