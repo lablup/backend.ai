@@ -20,8 +20,8 @@ from ai.backend.manager.sokovan.scheduler.provisioner.sequencers.lifo import LIF
 
 class TestLIFOSequencer:
     @pytest.fixture
-    def scaling_group(self) -> str:
-        return "default"
+    def resource_group_id(self) -> ResourceGroupID:
+        return ResourceGroupID(uuid.uuid4())
 
     @pytest.fixture
     def sequencer(self) -> LIFOSequencer:
@@ -61,13 +61,19 @@ class TestLIFOSequencer:
         assert sequencer.name == "LIFOSequencer"
 
     async def test_empty_workload(
-        self, scaling_group: str, sequencer: LIFOSequencer, system_snapshot: SystemSnapshot
+        self,
+        resource_group_id: ResourceGroupID,
+        sequencer: LIFOSequencer,
+        system_snapshot: SystemSnapshot,
     ) -> None:
-        result = await sequencer.sequence(scaling_group, system_snapshot, [])
+        result = await sequencer.sequence(resource_group_id, system_snapshot, [])
         assert result == []
 
     async def test_reverses_order(
-        self, scaling_group: str, sequencer: LIFOSequencer, system_snapshot: SystemSnapshot
+        self,
+        resource_group_id: ResourceGroupID,
+        sequencer: LIFOSequencer,
+        system_snapshot: SystemSnapshot,
     ) -> None:
         workloads = [
             SessionWorkload(
@@ -105,7 +111,7 @@ class TestLIFOSequencer:
             ),
         ]
 
-        result = await sequencer.sequence(scaling_group, system_snapshot, workloads)
+        result = await sequencer.sequence(resource_group_id, system_snapshot, workloads)
 
         # LIFO should reverse the order
         assert len(result) == 3
@@ -114,7 +120,10 @@ class TestLIFOSequencer:
         assert result[2] == workloads[0]  # First becomes last
 
     async def test_single_workload(
-        self, scaling_group: str, sequencer: LIFOSequencer, system_snapshot: SystemSnapshot
+        self,
+        resource_group_id: ResourceGroupID,
+        sequencer: LIFOSequencer,
+        system_snapshot: SystemSnapshot,
     ) -> None:
         workloads = [
             SessionWorkload(
@@ -130,14 +139,14 @@ class TestLIFOSequencer:
             ),
         ]
 
-        result = await sequencer.sequence(scaling_group, system_snapshot, workloads)
+        result = await sequencer.sequence(resource_group_id, system_snapshot, workloads)
 
         # Single item should remain the same
         assert len(result) == 1
         assert result[0] == workloads[0]
 
     async def test_ignores_system_snapshot(
-        self, scaling_group: str, sequencer: LIFOSequencer
+        self, resource_group_id: ResourceGroupID, sequencer: LIFOSequencer
     ) -> None:
         # LIFO should work the same regardless of system state
         snapshot_with_allocations = SystemSnapshot(
@@ -221,7 +230,7 @@ class TestLIFOSequencer:
             ),
         ]
 
-        result = await sequencer.sequence(scaling_group, snapshot_with_allocations, workloads)
+        result = await sequencer.sequence(resource_group_id, snapshot_with_allocations, workloads)
 
         # Should still reverse order despite different allocations
         assert len(result) == 3

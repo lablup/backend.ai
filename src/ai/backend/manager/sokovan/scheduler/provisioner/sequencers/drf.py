@@ -3,6 +3,7 @@ from collections.abc import Sequence
 from decimal import Decimal
 from typing import override
 
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import AccessKey, ResourceSlot
 from ai.backend.manager.data.sokovan import SessionWorkload, SystemSnapshot
 
@@ -33,14 +34,14 @@ class DRFSequencer(WorkloadSequencer):
     @override
     async def sequence(
         self,
-        resource_group: str,
+        resource_group_id: ResourceGroupID,
         system_snapshot: SystemSnapshot,
         workloads: Sequence[SessionWorkload],
     ) -> Sequence[SessionWorkload]:
         """
         Sequence the workloads based on Dominant Resource Fairness.
 
-        :param resource_group: The resource group (scaling group) name.
+        :param resource_group_id: The resource group ID.
         :param system_snapshot: The current system snapshot containing resource state.
         :param workloads: A sequence of SessionWorkload objects to sequence.
         :return: A sequence of SessionWorkload objects sequenced by DRF.

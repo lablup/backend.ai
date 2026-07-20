@@ -13,6 +13,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.engine import CursorResult
 
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.models.kernel import KernelRow
@@ -253,7 +254,7 @@ class ResourceUsageHistoryDBSource:
             result = await execute_upserter(
                 db_sess,
                 upserter,
-                index_elements=["domain_name", "resource_group", "period_start"],
+                index_elements=["domain_name", "resource_group_id", "period_start"],
             )
             return DomainUsageBucketData.from_row(result.row)
 
@@ -298,7 +299,7 @@ class ResourceUsageHistoryDBSource:
             result = await execute_upserter(
                 db_sess,
                 upserter,
-                index_elements=["project_id", "resource_group", "period_start"],
+                index_elements=["project_id", "resource_group_id", "period_start"],
             )
             return ProjectUsageBucketData.from_row(result.row)
 
@@ -343,7 +344,7 @@ class ResourceUsageHistoryDBSource:
             result = await execute_upserter(
                 db_sess,
                 upserter,
-                index_elements=["user_uuid", "project_id", "resource_group", "period_start"],
+                index_elements=["user_uuid", "project_id", "resource_group_id", "period_start"],
             )
             return UserUsageBucketData.from_row(result.row)
 
@@ -370,7 +371,7 @@ class ResourceUsageHistoryDBSource:
 
     async def get_aggregated_usage_by_user(
         self,
-        resource_group: str,
+        resource_group_id: ResourceGroupID,
         lookback_start: date,
         lookback_end: date,
     ) -> Mapping[tuple[uuid.UUID, uuid.UUID], ResourceSlot]:
@@ -381,13 +382,13 @@ class ResourceUsageHistoryDBSource:
         """
         async with self._db.begin_readonly_session_read_committed() as db_sess:
             return await self._fetch_aggregated_usage_by_user(
-                db_sess, resource_group, lookback_start, lookback_end
+                db_sess, resource_group_id, lookback_start, lookback_end
             )
 
     async def _fetch_aggregated_usage_by_user(
         self,
         db_sess: SASession,
-        resource_group: str,
+        resource_group_id: ResourceGroupID,
         lookback_start: date,
         lookback_end: date,
     ) -> Mapping[tuple[uuid.UUID, uuid.UUID], ResourceSlot]:
@@ -409,7 +410,7 @@ class ResourceUsageHistoryDBSource:
             )
             .where(
                 sa.and_(
-                    UserUsageBucketRow.resource_group == resource_group,
+                    UserUsageBucketRow.resource_group_id == resource_group_id,
                     UserUsageBucketRow.period_start >= lookback_start,
                     UserUsageBucketRow.period_start <= lookback_end,
                     ube.c.bucket_type == "user",
@@ -434,7 +435,7 @@ class ResourceUsageHistoryDBSource:
 
     async def get_aggregated_usage_by_project(
         self,
-        resource_group: str,
+        resource_group_id: ResourceGroupID,
         lookback_start: date,
         lookback_end: date,
     ) -> Mapping[uuid.UUID, ResourceSlot]:
@@ -459,7 +460,7 @@ class ResourceUsageHistoryDBSource:
                 )
                 .where(
                     sa.and_(
-                        ProjectUsageBucketRow.resource_group == resource_group,
+                        ProjectUsageBucketRow.resource_group_id == resource_group_id,
                         ProjectUsageBucketRow.period_start >= lookback_start,
                         ProjectUsageBucketRow.period_start <= lookback_end,
                         ube.c.bucket_type == "project",
@@ -482,7 +483,7 @@ class ResourceUsageHistoryDBSource:
 
     async def get_aggregated_usage_by_domain(
         self,
-        resource_group: str,
+        resource_group_id: ResourceGroupID,
         lookback_start: date,
         lookback_end: date,
     ) -> Mapping[str, ResourceSlot]:
@@ -507,7 +508,7 @@ class ResourceUsageHistoryDBSource:
                 )
                 .where(
                     sa.and_(
-                        DomainUsageBucketRow.resource_group == resource_group,
+                        DomainUsageBucketRow.resource_group_id == resource_group_id,
                         DomainUsageBucketRow.period_start >= lookback_start,
                         DomainUsageBucketRow.period_start <= lookback_end,
                         ube.c.bucket_type == "domain",
@@ -585,7 +586,7 @@ class ResourceUsageHistoryDBSource:
         existing = await self._fetch_existing_user_buckets(db_sess, keys_list)
 
         for key, bucket_delta in deltas.items():
-            lookup_key = (key.user_uuid, key.project_id, key.resource_group, key.period_date)
+            lookup_key = (key.user_uuid, key.project_id, key.resource_group_id, key.period_date)
             existing_usage = existing.get(lookup_key, ResourceSlot())
             # JSONB stores resource-seconds (amount * seconds) for legacy compatibility
             resource_seconds = self._calculate_resource_seconds(
@@ -608,12 +609,13 @@ class ResourceUsageHistoryDBSource:
                     resource_usage=new_usage,
                 )
                 .on_conflict_do_update(
-                    index_elements=["user_uuid", "project_id", "resource_group", "period_start"],
-                    set_={
-                        "resource_group_id": key.resource_group_id,
-                        "resource_usage": new_usage,
-                        "updated_at": sa.func.now(),
-                    },
+                    index_elements=[
+                        "user_uuid",
+                        "project_id",
+                        "resource_group_id",
+                        "period_start",
+                    ],
+                    set_={"resource_usage": new_usage, "updated_at": sa.func.now()},
                 )
                 .returning(UserUsageBucketRow.__table__.c.id)
             )
@@ -632,7 +634,7 @@ class ResourceUsageHistoryDBSource:
         self,
         db_sess: SASession,
         keys: list[UserUsageBucketKey],
-    ) -> dict[tuple[uuid.UUID, uuid.UUID, str, date], ResourceSlot]:
+    ) -> dict[tuple[uuid.UUID, uuid.UUID, ResourceGroupID, date], ResourceSlot]:
         """Fetch existing user buckets for the given keys."""
         if not keys:
             return {}
@@ -642,7 +644,7 @@ class ResourceUsageHistoryDBSource:
             sa.and_(
                 UserUsageBucketRow.user_uuid == key.user_uuid,
                 UserUsageBucketRow.project_id == key.project_id,
-                UserUsageBucketRow.resource_group == key.resource_group,
+                UserUsageBucketRow.resource_group_id == key.resource_group_id,
                 UserUsageBucketRow.period_start == key.period_date,
             )
             for key in keys
@@ -651,7 +653,7 @@ class ResourceUsageHistoryDBSource:
         query = sa.select(
             UserUsageBucketRow.user_uuid,
             UserUsageBucketRow.project_id,
-            UserUsageBucketRow.resource_group,
+            UserUsageBucketRow.resource_group_id,
             UserUsageBucketRow.period_start,
             UserUsageBucketRow.resource_usage,
         ).where(sa.or_(*conditions))
@@ -661,7 +663,7 @@ class ResourceUsageHistoryDBSource:
             (
                 row.user_uuid,
                 row.project_id,
-                row.resource_group,
+                row.resource_group_id,
                 row.period_start,
             ): row.resource_usage
             for row in result.all()
@@ -682,7 +684,7 @@ class ResourceUsageHistoryDBSource:
         existing = await self._fetch_existing_project_buckets(db_sess, keys_list)
 
         for key, bucket_delta in deltas.items():
-            lookup_key = (key.project_id, key.resource_group, key.period_date)
+            lookup_key = (key.project_id, key.resource_group_id, key.period_date)
             existing_usage = existing.get(lookup_key, ResourceSlot())
             resource_seconds = self._calculate_resource_seconds(
                 bucket_delta.slots, bucket_delta.duration_seconds
@@ -703,12 +705,8 @@ class ResourceUsageHistoryDBSource:
                     resource_usage=new_usage,
                 )
                 .on_conflict_do_update(
-                    index_elements=["project_id", "resource_group", "period_start"],
-                    set_={
-                        "resource_group_id": key.resource_group_id,
-                        "resource_usage": new_usage,
-                        "updated_at": sa.func.now(),
-                    },
+                    index_elements=["project_id", "resource_group_id", "period_start"],
+                    set_={"resource_usage": new_usage, "updated_at": sa.func.now()},
                 )
                 .returning(ProjectUsageBucketRow.__table__.c.id)
             )
@@ -727,7 +725,7 @@ class ResourceUsageHistoryDBSource:
         self,
         db_sess: SASession,
         keys: list[ProjectUsageBucketKey],
-    ) -> dict[tuple[uuid.UUID, str, date], ResourceSlot]:
+    ) -> dict[tuple[uuid.UUID, ResourceGroupID, date], ResourceSlot]:
         """Fetch existing project buckets for the given keys."""
         if not keys:
             return {}
@@ -735,7 +733,7 @@ class ResourceUsageHistoryDBSource:
         conditions = [
             sa.and_(
                 ProjectUsageBucketRow.project_id == key.project_id,
-                ProjectUsageBucketRow.resource_group == key.resource_group,
+                ProjectUsageBucketRow.resource_group_id == key.resource_group_id,
                 ProjectUsageBucketRow.period_start == key.period_date,
             )
             for key in keys
@@ -743,14 +741,14 @@ class ResourceUsageHistoryDBSource:
 
         query = sa.select(
             ProjectUsageBucketRow.project_id,
-            ProjectUsageBucketRow.resource_group,
+            ProjectUsageBucketRow.resource_group_id,
             ProjectUsageBucketRow.period_start,
             ProjectUsageBucketRow.resource_usage,
         ).where(sa.or_(*conditions))
 
         result = await db_sess.execute(query)
         return {
-            (row.project_id, row.resource_group, row.period_start): row.resource_usage
+            (row.project_id, row.resource_group_id, row.period_start): row.resource_usage
             for row in result.all()
         }
 
@@ -769,7 +767,7 @@ class ResourceUsageHistoryDBSource:
         existing = await self._fetch_existing_domain_buckets(db_sess, keys_list)
 
         for key, bucket_delta in deltas.items():
-            lookup_key = (key.domain_name, key.resource_group, key.period_date)
+            lookup_key = (key.domain_name, key.resource_group_id, key.period_date)
             existing_usage = existing.get(lookup_key, ResourceSlot())
             resource_seconds = self._calculate_resource_seconds(
                 bucket_delta.slots, bucket_delta.duration_seconds
@@ -789,12 +787,8 @@ class ResourceUsageHistoryDBSource:
                     resource_usage=new_usage,
                 )
                 .on_conflict_do_update(
-                    index_elements=["domain_name", "resource_group", "period_start"],
-                    set_={
-                        "resource_group_id": key.resource_group_id,
-                        "resource_usage": new_usage,
-                        "updated_at": sa.func.now(),
-                    },
+                    index_elements=["domain_name", "resource_group_id", "period_start"],
+                    set_={"resource_usage": new_usage, "updated_at": sa.func.now()},
                 )
                 .returning(DomainUsageBucketRow.__table__.c.id)
             )
@@ -813,7 +807,7 @@ class ResourceUsageHistoryDBSource:
         self,
         db_sess: SASession,
         keys: list[DomainUsageBucketKey],
-    ) -> dict[tuple[str, str, date], ResourceSlot]:
+    ) -> dict[tuple[str, ResourceGroupID, date], ResourceSlot]:
         """Fetch existing domain buckets for the given keys."""
         if not keys:
             return {}
@@ -821,7 +815,7 @@ class ResourceUsageHistoryDBSource:
         conditions = [
             sa.and_(
                 DomainUsageBucketRow.domain_name == key.domain_name,
-                DomainUsageBucketRow.resource_group == key.resource_group,
+                DomainUsageBucketRow.resource_group_id == key.resource_group_id,
                 DomainUsageBucketRow.period_start == key.period_date,
             )
             for key in keys
@@ -829,14 +823,14 @@ class ResourceUsageHistoryDBSource:
 
         query = sa.select(
             DomainUsageBucketRow.domain_name,
-            DomainUsageBucketRow.resource_group,
+            DomainUsageBucketRow.resource_group_id,
             DomainUsageBucketRow.period_start,
             DomainUsageBucketRow.resource_usage,
         ).where(sa.or_(*conditions))
 
         result = await db_sess.execute(query)
         return {
-            (row.domain_name, row.resource_group, row.period_start): row.resource_usage
+            (row.domain_name, row.resource_group_id, row.period_start): row.resource_usage
             for row in result.all()
         }
 
@@ -887,7 +881,7 @@ class ResourceUsageHistoryDBSource:
 
     async def update_bucket_entry_capacities(
         self,
-        scaling_group: str,
+        resource_group_id: ResourceGroupID,
         capacity_by_slot: Mapping[str, Decimal],
     ) -> None:
         """Update capacity column on usage_bucket_entries for a scaling group.
@@ -896,7 +890,7 @@ class ResourceUsageHistoryDBSource:
         Updates all entries whose parent bucket belongs to the given scaling group.
 
         Args:
-            scaling_group: Scaling group name to filter buckets
+            resource_group_id: Resource group ID used to filter buckets
             capacity_by_slot: Mapping of slot_name to capacity value
         """
         if not capacity_by_slot:
@@ -916,7 +910,7 @@ class ResourceUsageHistoryDBSource:
                     # Subquery: bucket_ids in this scaling group
                     bucket_ids_subq = (
                         sa.select(parent_table.c.id)
-                        .where(parent_table.c.resource_group == scaling_group)
+                        .where(parent_table.c.resource_group_id == resource_group_id)
                         .scalar_subquery()
                     )
                     stmt = (

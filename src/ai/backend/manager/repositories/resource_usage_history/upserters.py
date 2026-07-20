@@ -21,7 +21,7 @@ from ai.backend.manager.repositories.base import UpserterSpec
 class DomainUsageBucketUpserterSpec(UpserterSpec[DomainUsageBucketRow]):
     """Upserter spec for DomainUsageBucketRow.
 
-    Unique constraint: (domain_name, resource_group, period_start)
+    Unique constraint: (domain_name, resource_group_id, period_start)
     """
 
     domain_name: str
@@ -68,7 +68,7 @@ class DomainUsageBucketUpserterSpec(UpserterSpec[DomainUsageBucketRow]):
 class ProjectUsageBucketUpserterSpec(UpserterSpec[ProjectUsageBucketRow]):
     """Upserter spec for ProjectUsageBucketRow.
 
-    Unique constraint: (project_id, resource_group, period_start)
+    Unique constraint: (project_id, resource_group_id, period_start)
     """
 
     project_id: uuid.UUID
@@ -117,7 +117,7 @@ class ProjectUsageBucketUpserterSpec(UpserterSpec[ProjectUsageBucketRow]):
 class UserUsageBucketUpserterSpec(UpserterSpec[UserUsageBucketRow]):
     """Upserter spec for UserUsageBucketRow.
 
-    Unique constraint: (user_uuid, project_id, resource_group, period_start)
+    Unique constraint: (user_uuid, project_id, resource_group_id, period_start)
     """
 
     user_uuid: uuid.UUID

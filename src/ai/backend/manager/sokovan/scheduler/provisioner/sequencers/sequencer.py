@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from collections import defaultdict
 from collections.abc import Sequence
 
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.manager.data.sokovan import SessionWorkload, SystemSnapshot
 
 
@@ -24,14 +25,14 @@ class WorkloadSequencer(ABC):
     @abstractmethod
     async def sequence(
         self,
-        resource_group: str,
+        resource_group_id: ResourceGroupID,
         system_snapshot: SystemSnapshot,
         workloads: Sequence[SessionWorkload],
     ) -> Sequence[SessionWorkload]:
         """
         Sequence the workloads based on the system snapshot.
 
-        :param resource_group: The resource group (scaling group) name.
+        :param resource_group_id: The resource group ID.
         :param system_snapshot: The current system snapshot containing resource state.
         :param workloads: A sequence of SessionWorkload objects to order.
         :return: A sequence of SessionWorkload objects ordered by the sequencer's logic.
@@ -60,14 +61,14 @@ class SchedulingSequencer:
 
     async def sequence(
         self,
-        resource_group: str,
+        resource_group_id: ResourceGroupID,
         system_snapshot: SystemSnapshot,
         workloads: Sequence[SessionWorkload],
     ) -> Sequence[SessionWorkload]:
         """
         Sequence the workloads based on their priority using the configured workload sequencer.
 
-        :param resource_group: The resource group (scaling group) name.
+        :param resource_group_id: The resource group ID.
         :param system_snapshot: The current system snapshot containing resource state.
         :param workloads: A sequence of SessionWorkload objects to order.
         :return: A sequence of SessionWorkload objects ordered by priority and the sequencer's logic.
@@ -79,7 +80,7 @@ class SchedulingSequencer:
         result: list[SessionWorkload] = []
         for priority in sorted(priority_workloads.keys(), reverse=True):
             sequenced = await self._workload_sequencer.sequence(
-                resource_group, system_snapshot, priority_workloads[priority]
+                resource_group_id, system_snapshot, priority_workloads[priority]
             )
             result.extend(sequenced)
         return result

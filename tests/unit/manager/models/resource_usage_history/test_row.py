@@ -27,11 +27,13 @@ class TestDomainUsageBucketRow:
         self,
         database_with_usage_tables: ExtendedAsyncSAEngine,
         domain_usage_bucket_id: uuid.UUID,
+        resource_group_id: ResourceGroupID,
     ) -> None:
         """Verify default values are set correctly."""
         async with database_with_usage_tables.begin_readonly_session() as db_sess:
             row = await db_sess.get(DomainUsageBucketRow, domain_usage_bucket_id)
             assert row is not None
+            assert row.resource_group_id == resource_group_id
             assert row.period_start == date(2024, 1, 1)
             assert row.decay_unit_days == 1
             assert row.resource_usage == ResourceSlot()
@@ -58,7 +60,7 @@ class TestDomainUsageBucketRow:
         scaling_group: str,
         resource_group_id: ResourceGroupID,
     ) -> None:
-        """Duplicate (domain_name, scaling_group, period_start) should raise IntegrityError."""
+        """Duplicate (domain_name, resource_group_id, period_start) should raise IntegrityError."""
         duplicate = DomainUsageBucketRow(
             domain_name=domain_name,
             resource_group=scaling_group,
@@ -83,12 +85,14 @@ class TestProjectUsageBucketRow:
         database_with_usage_tables: ExtendedAsyncSAEngine,
         project_usage_bucket_id: uuid.UUID,
         project_id: uuid.UUID,
+        resource_group_id: ResourceGroupID,
     ) -> None:
         """Verify project usage bucket is created with correct project_id."""
         async with database_with_usage_tables.begin_readonly_session() as db_sess:
             row = await db_sess.get(ProjectUsageBucketRow, project_usage_bucket_id)
             assert row is not None
             assert row.project_id == project_id
+            assert row.resource_group_id == resource_group_id
             assert row.period_start == date(2024, 1, 1)
 
     async def test_unique_constraint_violation(
@@ -100,7 +104,7 @@ class TestProjectUsageBucketRow:
         scaling_group: str,
         resource_group_id: ResourceGroupID,
     ) -> None:
-        """Duplicate (project_id, scaling_group, period_start) should raise IntegrityError."""
+        """Duplicate (project_id, resource_group_id, period_start) should raise IntegrityError."""
         duplicate = ProjectUsageBucketRow(
             project_id=project_id,
             domain_name=domain_name,
@@ -127,6 +131,7 @@ class TestUserUsageBucketRow:
         user_usage_bucket_id: uuid.UUID,
         user_uuid: uuid.UUID,
         project_id: uuid.UUID,
+        resource_group_id: ResourceGroupID,
     ) -> None:
         """Verify user usage bucket is created with correct user_uuid and project_id."""
         async with database_with_usage_tables.begin_readonly_session() as db_sess:
@@ -134,6 +139,7 @@ class TestUserUsageBucketRow:
             assert row is not None
             assert row.user_uuid == user_uuid
             assert row.project_id == project_id
+            assert row.resource_group_id == resource_group_id
             assert row.period_start == date(2024, 1, 1)
 
     async def test_unique_constraint_violation(
@@ -146,7 +152,7 @@ class TestUserUsageBucketRow:
         scaling_group: str,
         resource_group_id: ResourceGroupID,
     ) -> None:
-        """Duplicate (user_uuid, project_id, scaling_group, period_start) should raise IntegrityError."""
+        """Duplicate (user_uuid, project_id, resource_group_id, period_start) should raise IntegrityError."""
         duplicate = UserUsageBucketRow(
             user_uuid=user_uuid,
             project_id=project_id,
@@ -172,6 +178,7 @@ class TestKernelUsageRecordRow:
         self,
         database_with_usage_tables: ExtendedAsyncSAEngine,
         kernel_usage_record_id: tuple[uuid.UUID, uuid.UUID, uuid.UUID],
+        resource_group_id: ResourceGroupID,
     ) -> None:
         """Verify kernel usage record is created with correct IDs."""
         record_id, kernel_id, session_id = kernel_usage_record_id
@@ -180,6 +187,7 @@ class TestKernelUsageRecordRow:
             assert row is not None
             assert row.kernel_id == kernel_id
             assert row.session_id == session_id
+            assert row.resource_group_id == resource_group_id
             assert row.resource_usage == ResourceSlot()
 
     async def test_create_with_resource_usage(

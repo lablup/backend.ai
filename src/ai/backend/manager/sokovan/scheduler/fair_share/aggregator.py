@@ -94,7 +94,8 @@ class FairShareAggregator:
 
         Args:
             kernels: Kernels to process
-            scaling_group: The scaling group name
+            resource_group_id: The resource group ID
+            resource_group: The resource group name retained for compatibility
             now: Current time from DB
 
         Returns:
@@ -297,7 +298,8 @@ class FairShareAggregator:
 
         Args:
             kernel: Kernel to process
-            scaling_group: The scaling group
+            resource_group_id: The resource group ID
+            resource_group: The resource group name retained for compatibility
             now: Current time from DB
 
         Returns:
@@ -388,7 +390,8 @@ class FairShareAggregator:
 
         Args:
             kernel: Kernel info
-            scaling_group: The scaling group
+            resource_group_id: The resource group ID
+            resource_group: The resource group name retained for compatibility
             start_time: Start of observation period
             end_time: End of observation period
 

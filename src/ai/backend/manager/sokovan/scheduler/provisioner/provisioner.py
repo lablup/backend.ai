@@ -222,7 +222,9 @@ class SessionProvisioner:
                 sequencer.name, success_detail=sequencer.success_message()
             ),
         ):
-            sequenced_workloads = await sequencer.sequence(sg_info.name, system_snapshot, workloads)
+            sequenced_workloads = await sequencer.sequence(
+                resource_group_id, system_snapshot, workloads
+            )
 
         # Build mutable agents with occupancy data from snapshot
         agent_occupancy = (
