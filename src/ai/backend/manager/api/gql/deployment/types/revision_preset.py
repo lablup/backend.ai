@@ -413,6 +413,16 @@ class DeploymentRevisionPresetFilterGQL(PydanticInputMixin[FilterDTO]):
     runtime_variant_id: UUIDFilterGQL | None = gql_field(
         default=None, description="Variant ID filter."
     )
+    compatible_with_model_card_id: UUID | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.8.0",
+            description=(
+                "Return only presets whose resource requirements are satisfied by the "
+                "given model card — the same subset as ModelCardV2.availablePresets."
+            ),
+        ),
+        default=None,
+    )
     AND: list[Self] | None = gql_added_field(
         BackendAIGQLMeta(added_version="26.7.0", description="Match all of the given sub-filters."),
         default=None,

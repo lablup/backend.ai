@@ -182,6 +182,13 @@ class DeploymentRevisionPresetFilter(BaseRequestModel):
     id: UUIDFilter | None = Field(default=None, description="Filter by preset ID.")
     name: StringFilter | None = Field(default=None)
     runtime_variant_id: UUIDFilter | None = Field(default=None)
+    compatible_with_model_card_id: UUID | None = Field(
+        default=None,
+        description=(
+            "Return only presets whose resource requirements are satisfied by the "
+            "given model card (the same subset as ModelCardV2.availablePresets)."
+        ),
+    )
     AND: list[DeploymentRevisionPresetFilter] | None = Field(default=None)
     OR: list[DeploymentRevisionPresetFilter] | None = Field(default=None)
     NOT: list[DeploymentRevisionPresetFilter] | None = Field(default=None)

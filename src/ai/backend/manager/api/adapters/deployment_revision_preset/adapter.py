@@ -488,6 +488,12 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
             )
             if cond is not None:
                 conditions.append(cond)
+        if filter_.compatible_with_model_card_id is not None:
+            conditions.append(
+                DeploymentRevisionPresetConditions.by_model_card_compatible(
+                    filter_.compatible_with_model_card_id
+                )
+            )
         if filter_.name:
             cond = self.convert_string_filter(
                 filter_.name,

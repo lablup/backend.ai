@@ -37,16 +37,16 @@ from ai.backend.manager.errors.resource import (
     ProjectNotFound,
 )
 from ai.backend.manager.errors.storage import VFolderDeletionNotAllowed
+from ai.backend.manager.models.deployment_revision_preset.conditions import (
+    DeploymentRevisionPresetConditions,
+)
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
 from ai.backend.manager.models.group.row import GroupRow
 from ai.backend.manager.models.model_card.row import ModelCardRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
-from ai.backend.manager.models.resource_slot.row import (
-    ModelCardResourceRequirementRow,
-    PresetResourceSlotRow,
-)
+from ai.backend.manager.models.resource_slot.row import ModelCardResourceRequirementRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder.row import (
     DEAD_VFOLDER_STATUSES,
@@ -311,36 +311,14 @@ class ModelCardDBSource:
         in model_card_resource_requirements, there exists a matching row in
         preset_resource_slots with quantity >= min_quantity.
         """
-        mcr = ModelCardResourceRequirementRow.__table__
-        prs = PresetResourceSlotRow.__table__
         drp = DeploymentRevisionPresetRow.__table__
 
-        # Relational division: a preset is "available" iff for every required
-        # slot in model_card_resource_requirements there is a matching
-        # preset_resource_slot row whose quantity meets the requirement.
-        #
-        # Both sub-EXISTS clauses must correlate against the OUTER drp/mcr,
-        # otherwise SQLAlchemy injects fresh aliases into the inner FROM clause
-        # and the predicates degenerate into Cartesian-product matches that
-        # accept every preset.
-        satisfying_condition = ~sa.exists(
-            sa.select(sa.literal(1))
-            .select_from(mcr)
-            .correlate(drp)
-            .where(
-                mcr.c.model_card_id == model_card_id,
-                ~sa.exists(
-                    sa.select(sa.literal(1))
-                    .select_from(prs)
-                    .correlate(drp, mcr)
-                    .where(
-                        prs.c.preset_id == drp.c.id,
-                        prs.c.slot_name == mcr.c.slot_name,
-                        prs.c.quantity >= mcr.c.min_quantity,
-                    )
-                ),
-            )
-        )
+        # Reuse the shared relational-division condition so this path and the
+        # top-level `deploymentRevisionPresets(filter: { compatibleWithModelCardId })`
+        # query select the identical preset subset.
+        satisfying_condition = DeploymentRevisionPresetConditions.by_model_card_compatible(
+            model_card_id
+        )()
 
         async with self._db.begin_readonly_session() as db_sess:
             count_stmt = sa.select(sa.func.count()).select_from(drp).where(satisfying_condition)
