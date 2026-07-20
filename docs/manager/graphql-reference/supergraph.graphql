@@ -5962,6 +5962,11 @@ input DeploymentRevisionPresetFilter
   """Variant ID filter."""
   runtimeVariantId: UUIDFilter = null
 
+  """
+  Added in 26.8.0. Return only presets whose resource requirements are satisfied by the given model card — the same subset as ModelCardV2.availablePresets.
+  """
+  compatibleWithModelCardId: UUID = null
+
   """Added in 26.7.0. Match all of the given sub-filters."""
   AND: [DeploymentRevisionPresetFilter!] = null
 

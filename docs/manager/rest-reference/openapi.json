@@ -6775,6 +6775,20 @@
             ],
             "default": null
           },
+          "compatible_with_model_card_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Return only presets whose resource requirements are satisfied by the given model card (the same subset as ModelCardV2.availablePresets).",
+            "title": "Compatible With Model Card Id"
+          },
           "AND": {
             "anyOf": [
               {
