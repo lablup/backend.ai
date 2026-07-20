@@ -3,12 +3,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
+from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.permission.types import RBACElementType, ScopeType
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.user import UserID
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.app_config.types import AppConfigData
 from ai.backend.manager.data.permission.types import RBACElementRef
-from ai.backend.manager.repositories.app_config_fragment.types import AppConfigScopeArguments
 from ai.backend.manager.services.app_config.actions.base import (
     AppConfigScopeAction,
     AppConfigScopeActionResult,
@@ -17,15 +18,20 @@ from ai.backend.manager.services.app_config.actions.base import (
 
 @dataclass
 class ResolveAppConfigAction(AppConfigScopeAction):
-    """Resolve the merged ``AppConfig`` for one ``config_name``.
+    """Resolve the merged ``AppConfig`` for each of ``config_names``.
 
-    ``scope_arguments`` carries the resolving principal ``(user, domain)``. When it is
-    ``None`` — the anonymous, pre-login read — only ``public``-scope fragments contribute;
-    the action stays a ``USER``-scope read but carries no ``scope_id``.
+    The only read shape: a single name is a one-element ``config_names``. Reads are the hot
+    path and a client bootstraps several configs at once, so batching is the default rather
+    than an optimization bolted beside a single-name variant.
+
+    ``domain_id`` names the resolving principal's domain. The user half is taken from the
+    session, never from the caller — there is no field to put someone else's id in, so a
+    resolve can only ever be for the acting user. ``domain_id=None`` is the anonymous,
+    pre-login read: only ``public``-scope fragments contribute.
     """
 
-    config_name: str
-    scope_arguments: AppConfigScopeArguments | None = None
+    config_names: list[str]
+    domain_id: DomainID | None = None
 
     @override
     @classmethod
@@ -38,7 +44,9 @@ class ResolveAppConfigAction(AppConfigScopeAction):
 
     @override
     def scope_id(self) -> str:
-        return str(self.scope_arguments.user_id) if self.scope_arguments is not None else ""
+        # The same session the service resolves against — an anonymous read has no user.
+        user = current_user()
+        return str(user.user_id) if user is not None else ""
 
     @override
     def target_element(self) -> RBACElementRef:
@@ -47,7 +55,7 @@ class ResolveAppConfigAction(AppConfigScopeAction):
 
 @dataclass
 class ResolveAppConfigActionResult(AppConfigScopeActionResult):
-    app_config: AppConfigData
+    app_configs: list[AppConfigData]
     _user_id: UserID | None
 
     @override

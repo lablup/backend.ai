@@ -21,9 +21,9 @@ each managed independently.
 `config_name` is the **deep merge of every fragment that applies to
 them**, taken from `app_config_fragments` ordered by the `rank` of each
 fragment's allow-list entry — one indexed join, **no permission
-lookup**. A read does check that the principal it resolves is the
-caller's own (superadmins excepted), but that is an identity comparison
-against the session, not a query.
+lookup**. Nor is one needed to keep callers apart: a read names only the
+domain, and the user half of the scope is injected from the session, so
+a caller has no way to ask for anyone else's config.
 
 **Write authorization is set up ahead of time.** Every config name is
 **explicitly registered** in `app_config_definitions`, and `app_config_allow_list`
@@ -77,10 +77,10 @@ Three scopes cover the use cases (`public` for the pre-login shell):
   `app_config_fragments` to `app_config_allow_list` — `rank` lives only on
   the allow-list entry, so the ordering cannot be computed without it (an
   indexed `(config_name, scope_type)` join). The join is for `rank` alone;
-  no RBAC or policy is evaluated at read time. The one read-side check is
-  that the resolved principal is the caller's own — an identity comparison,
-  not a lookup. `domain_id` is not checked: the handler derives it from the
-  same principal.
+  no RBAC or policy is evaluated at read time. Tenancy is structural rather
+  than checked: the read takes a `domain_id` and nothing else, and the
+  service fills the user half of the scope from the session, so there is no
+  field in which to name another user.
 - **Allow-list = the write gate and the merge order.** `app_config_allow_list`
   holds **one record per `(config_name, scope_type)`**; a fragment at
   that scope may be created **only if** the record exists — through the
@@ -273,12 +273,9 @@ wholesale-replaced, and the higher `rank` wins on conflict.
 
 **Nothing to merge is a 404.** A `config_name` no visible fragment
 contributes to raises `AppConfigFragmentNotFound` rather than resolving
-to an empty or null value. Three causes share that one error — the name
-is unregistered, nothing is visible at the caller's scopes, or the named
-principal is not the caller's — and they are deliberately
-indistinguishable, so a caller cannot probe another user's config by
-reading the error apart. Clients fall back to their built-in defaults on
-the 404.
+to an empty or null value — the name is unregistered, or nothing is
+visible at the caller's scopes. Clients fall back to their built-in
+defaults on the 404.
 
 The merged `config` is therefore always an object, never null. It is
 empty only when every contributing fragment's own `config` was `{}`: the
@@ -287,15 +284,17 @@ non-empty fragments can reduce to `{}`.
 
 ### Read variants
 
-- **Single** — resolve one `(user, config_name)` to its `AppConfig`.
-- **Bulk** — resolve several `config_name`s for one principal in one
-  query. One entry per requested name, in request order; a repeated name
-  is repeated in the output. **All-or-nothing:** one requested name
-  nothing contributes to fails the whole batch, exactly as it would
-  resolved on its own. A partial result would have to mark the absent
-  names somehow, and every way of doing that reads differently from the
-  single-name path. The cost is that a client cannot batch optional
-  config names together with required ones.
+- **Resolve** — the only read. Takes a list of `config_name`s and
+  returns one `AppConfig` per requested name, in request order; a
+  repeated name is repeated in the output. A single name is a
+  one-element request — there is no separate single-name variant, since
+  a client bootstrapping its shell asks for several configs at once and
+  two entry points would only differ in how they report a missing name.
+  **All-or-nothing:** one requested name nothing contributes to fails
+  the whole call. A partial result would have to mark the absent names
+  somehow, and every way of doing that pushes the caller into branching
+  on a second, quieter kind of failure. The cost is that a client cannot
+  batch optional config names together with required ones.
 - **Search (self)** — paginate the user's own `AppConfig`s, grouped by
   `(user_id, config_name)`; each name's merge is evaluated
   independently.
