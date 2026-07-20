@@ -52,7 +52,6 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
     from ai.backend.manager.data.fair_share import (
-        BucketDelta,
         DomainUsageBucketKey,
         ProjectUsageBucketKey,
         UsageBucketAggregationResult,
@@ -399,7 +398,7 @@ class ResourceUsageHistoryDBSource:
                 UserUsageBucketRow.user_uuid,
                 UserUsageBucketRow.project_id,
                 ube.c.slot_name,
-                sa.func.sum(ube.c.amount).label("total_amount"),
+                sa.func.sum(ube.c.resource_usage).label("total_resource_usage"),
             )
             .select_from(
                 sa.join(
@@ -430,7 +429,7 @@ class ResourceUsageHistoryDBSource:
             key = (row.user_uuid, row.project_id)
             if key not in aggregated:
                 aggregated[key] = ResourceSlot()
-            aggregated[key][row.slot_name] = row.total_amount
+            aggregated[key][row.slot_name] = row.total_resource_usage
         return aggregated
 
     async def get_aggregated_usage_by_project(
@@ -449,7 +448,7 @@ class ResourceUsageHistoryDBSource:
                 sa.select(
                     ProjectUsageBucketRow.project_id,
                     ube.c.slot_name,
-                    sa.func.sum(ube.c.amount).label("total_amount"),
+                    sa.func.sum(ube.c.resource_usage).label("total_resource_usage"),
                 )
                 .select_from(
                     sa.join(
@@ -478,7 +477,7 @@ class ResourceUsageHistoryDBSource:
             for row in rows:
                 if row.project_id not in aggregated:
                     aggregated[row.project_id] = ResourceSlot()
-                aggregated[row.project_id][row.slot_name] = row.total_amount
+                aggregated[row.project_id][row.slot_name] = row.total_resource_usage
             return aggregated
 
     async def get_aggregated_usage_by_domain(
@@ -497,7 +496,7 @@ class ResourceUsageHistoryDBSource:
                 sa.select(
                     DomainUsageBucketRow.domain_name,
                     ube.c.slot_name,
-                    sa.func.sum(ube.c.amount).label("total_amount"),
+                    sa.func.sum(ube.c.resource_usage).label("total_resource_usage"),
                 )
                 .select_from(
                     sa.join(
@@ -526,7 +525,7 @@ class ResourceUsageHistoryDBSource:
             for row in rows:
                 if row.domain_name not in aggregated:
                     aggregated[row.domain_name] = ResourceSlot()
-                aggregated[row.domain_name][row.slot_name] = row.total_amount
+                aggregated[row.domain_name][row.slot_name] = row.total_resource_usage
             return aggregated
 
     # ==================== Bucket Delta Updates ====================
@@ -574,7 +573,7 @@ class ResourceUsageHistoryDBSource:
     async def _increment_user_usage_buckets(
         self,
         db_sess: SASession,
-        deltas: Mapping[UserUsageBucketKey, BucketDelta],
+        deltas: Mapping[UserUsageBucketKey, ResourceSlot],
         decay_unit_days: int,
     ) -> None:
         """Increment user usage buckets with deltas."""
@@ -585,14 +584,10 @@ class ResourceUsageHistoryDBSource:
         keys_list = list(deltas.keys())
         existing = await self._fetch_existing_user_buckets(db_sess, keys_list)
 
-        for key, bucket_delta in deltas.items():
+        for key, delta_usage in deltas.items():
             lookup_key = (key.user_uuid, key.project_id, key.resource_group_id, key.period_date)
             existing_usage = existing.get(lookup_key, ResourceSlot())
-            # JSONB stores resource-seconds (amount * seconds) for legacy compatibility
-            resource_seconds = self._calculate_resource_seconds(
-                bucket_delta.slots, bucket_delta.duration_seconds
-            )
-            new_usage = existing_usage + resource_seconds
+            new_usage = existing_usage + delta_usage
 
             # Upsert with merged usage (JSONB)
             stmt = (
@@ -627,7 +622,7 @@ class ResourceUsageHistoryDBSource:
                 db_sess,
                 bucket_id,
                 "user",
-                bucket_delta,
+                delta_usage,
             )
 
     async def _fetch_existing_user_buckets(
@@ -672,7 +667,7 @@ class ResourceUsageHistoryDBSource:
     async def _increment_project_usage_buckets(
         self,
         db_sess: SASession,
-        deltas: Mapping[ProjectUsageBucketKey, BucketDelta],
+        deltas: Mapping[ProjectUsageBucketKey, ResourceSlot],
         decay_unit_days: int,
     ) -> None:
         """Increment project usage buckets with deltas."""
@@ -683,13 +678,10 @@ class ResourceUsageHistoryDBSource:
         keys_list = list(deltas.keys())
         existing = await self._fetch_existing_project_buckets(db_sess, keys_list)
 
-        for key, bucket_delta in deltas.items():
+        for key, delta_usage in deltas.items():
             lookup_key = (key.project_id, key.resource_group_id, key.period_date)
             existing_usage = existing.get(lookup_key, ResourceSlot())
-            resource_seconds = self._calculate_resource_seconds(
-                bucket_delta.slots, bucket_delta.duration_seconds
-            )
-            new_usage = existing_usage + resource_seconds
+            new_usage = existing_usage + delta_usage
 
             # Upsert with merged usage (JSONB)
             stmt = (
@@ -718,7 +710,7 @@ class ResourceUsageHistoryDBSource:
                 db_sess,
                 bucket_id,
                 "project",
-                bucket_delta,
+                delta_usage,
             )
 
     async def _fetch_existing_project_buckets(
@@ -755,7 +747,7 @@ class ResourceUsageHistoryDBSource:
     async def _increment_domain_usage_buckets(
         self,
         db_sess: SASession,
-        deltas: Mapping[DomainUsageBucketKey, BucketDelta],
+        deltas: Mapping[DomainUsageBucketKey, ResourceSlot],
         decay_unit_days: int,
     ) -> None:
         """Increment domain usage buckets with deltas."""
@@ -766,13 +758,10 @@ class ResourceUsageHistoryDBSource:
         keys_list = list(deltas.keys())
         existing = await self._fetch_existing_domain_buckets(db_sess, keys_list)
 
-        for key, bucket_delta in deltas.items():
+        for key, delta_usage in deltas.items():
             lookup_key = (key.domain_name, key.resource_group_id, key.period_date)
             existing_usage = existing.get(lookup_key, ResourceSlot())
-            resource_seconds = self._calculate_resource_seconds(
-                bucket_delta.slots, bucket_delta.duration_seconds
-            )
-            new_usage = existing_usage + resource_seconds
+            new_usage = existing_usage + delta_usage
 
             # Upsert with merged usage (JSONB)
             stmt = (
@@ -800,7 +789,7 @@ class ResourceUsageHistoryDBSource:
                 db_sess,
                 bucket_id,
                 "domain",
-                bucket_delta,
+                delta_usage,
             )
 
     async def _fetch_existing_domain_buckets(
@@ -841,39 +830,30 @@ class ResourceUsageHistoryDBSource:
         db_sess: SASession,
         bucket_id: uuid.UUID,
         bucket_type: str,
-        bucket_delta: BucketDelta,
+        usage: ResourceSlot,
     ) -> None:
         """Upsert normalized usage_bucket_entries for a bucket.
 
-        For each slot in the delta, insert or update an entry row.
-        ``amount`` stores the raw resource amount (not pre-multiplied)
-        and ``duration_seconds`` stores the actual observation duration.
-        The product ``amount * duration_seconds`` is computed at SQL query
-        time where PostgreSQL auto-extends NUMERIC precision, eliminating
-        overflow risk for large memory values.
+        ``resource_usage`` accumulates server-side.
 
         ``capacity`` is set to 0 here; it is updated separately during
         fair share factor calculation when the cluster capacity is known.
         """
         entry_table = UsageBucketEntryRow.__table__
-        for slot_name, value in bucket_delta.slots.items():
+        for slot_name, delta_slot_seconds in usage.items():
             stmt = (
                 pg_insert(entry_table)
                 .values(
                     bucket_id=bucket_id,
                     bucket_type=bucket_type,
                     slot_name=slot_name,
-                    amount=value,
-                    duration_seconds=bucket_delta.duration_seconds,
+                    resource_usage=delta_slot_seconds,
                     capacity=0,
                 )
                 .on_conflict_do_update(
                     constraint="pk_usage_bucket_entries",
                     set_={
-                        "amount": entry_table.c.amount + value,
-                        "duration_seconds": (
-                            entry_table.c.duration_seconds + bucket_delta.duration_seconds
-                        ),
+                        "resource_usage": (entry_table.c.resource_usage + delta_slot_seconds),
                     },
                 )
             )
@@ -924,15 +904,3 @@ class ResourceUsageHistoryDBSource:
                         .values(capacity=capacity)
                     )
                     await db_sess.execute(stmt)
-
-    @staticmethod
-    def _calculate_resource_seconds(
-        slots: ResourceSlot,
-        seconds: int,
-    ) -> ResourceSlot:
-        """Convert resource slots to resource-seconds for legacy JSONB storage.
-
-        Multiplies each resource value by the number of seconds to get
-        the total resource-seconds consumed during the period.
-        """
-        return ResourceSlot({key: value * Decimal(str(seconds)) for key, value in slots.items()})
