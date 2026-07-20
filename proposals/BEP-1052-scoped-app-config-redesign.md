@@ -21,7 +21,9 @@ each managed independently.
 `config_name` is the **deep merge of every fragment that applies to
 them**, taken from `app_config_fragments` ordered by the `rank` of each
 fragment's allow-list entry — one indexed join, **no permission
-lookup**.
+lookup**. A read does check that the principal it resolves is the
+caller's own (superadmins excepted), but that is an identity comparison
+against the session, not a query.
 
 **Write authorization is set up ahead of time.** Every config name is
 **explicitly registered** in `app_config_definitions`, and `app_config_allow_list`
@@ -71,11 +73,14 @@ Three scopes cover the use cases (`public` for the pre-login shell):
   fragment requires an entry, and the entry requires a registered name — so
   no direct fragment FK is needed). No fragment may exist for an
   unregistered `config_name`.
-- **Reads are unconditional.** The merge **must** join
+- **Reads cost no permission query.** The merge **must** join
   `app_config_fragments` to `app_config_allow_list` — `rank` lives only on
   the allow-list entry, so the ordering cannot be computed without it (an
   indexed `(config_name, scope_type)` join). The join is for `rank` alone;
-  no permission or policy is evaluated at read time.
+  no RBAC or policy is evaluated at read time. The one read-side check is
+  that the resolved principal is the caller's own — an identity comparison,
+  not a lookup. `domain_id` is not checked: the handler derives it from the
+  same principal.
 - **Allow-list = the write gate and the merge order.** `app_config_allow_list`
   holds **one record per `(config_name, scope_type)`**; a fragment at
   that scope may be created **only if** the record exists — through the
@@ -192,10 +197,11 @@ Two kinds of mutation:
 
 `create` errors if the natural key already exists; `update` errors if it
 does not; `purge` removes the row (and thus its contribution to the
-merge). A caller "clears" a config without deleting it by `update`-ing
-with `{}`, which reads back as `null` (null projection, §3). `update`
-replaces the stored JSON wholesale — no partial/deep update at the write
-boundary.
+merge). `update` replaces the stored JSON wholesale — no partial/deep
+update at the write boundary. A caller "clears" a config without deleting
+it by `update`-ing with `{}`; the fragment stays and still counts as a
+contribution, so the merge succeeds and yields whatever the other
+fragments hold. Removing the contribution entirely is `purge`.
 
 **Overridability is a write-grant decision:**
 
@@ -260,18 +266,36 @@ those whose scope applies to them:
 - the user's `user` fragment (`scope_id = the user's id`).
 
 A single `app_config_fragments` query selects exactly those rows (the
-user's domain is known from the session — no permission check), joins
+user's domain is known from the session — no RBAC lookup), joins
 each to its allow-list entry for the `rank`, orders by it (low → high),
 and deep-merges: nested objects recurse, scalars and lists are
 wholesale-replaced, and the higher `rank` wins on conflict.
 
-**Null projection.** A stored `config` of `{}` reads back as `null`, and
-a merged `config` that is empty after combining every fragment is
-likewise `null` — clients fall back to their built-in defaults.
+**Nothing to merge is a 404.** A `config_name` no visible fragment
+contributes to raises `AppConfigFragmentNotFound` rather than resolving
+to an empty or null value. Three causes share that one error — the name
+is unregistered, nothing is visible at the caller's scopes, or the named
+principal is not the caller's — and they are deliberately
+indistinguishable, so a caller cannot probe another user's config by
+reading the error apart. Clients fall back to their built-in defaults on
+the 404.
+
+The merged `config` is therefore always an object, never null. It is
+empty only when every contributing fragment's own `config` was `{}`: the
+merge adds and replaces keys but never drops one, so no combination of
+non-empty fragments can reduce to `{}`.
 
 ### Read variants
 
 - **Single** — resolve one `(user, config_name)` to its `AppConfig`.
+- **Bulk** — resolve several `config_name`s for one principal in one
+  query. One entry per requested name, in request order; a repeated name
+  is repeated in the output. **All-or-nothing:** one requested name
+  nothing contributes to fails the whole batch, exactly as it would
+  resolved on its own. A partial result would have to mark the absent
+  names somehow, and every way of doing that reads differently from the
+  single-name path. The cost is that a client cannot batch optional
+  config names together with required ones.
 - **Search (self)** — paginate the user's own `AppConfig`s, grouped by
   `(user_id, config_name)`; each name's merge is evaluated
   independently.

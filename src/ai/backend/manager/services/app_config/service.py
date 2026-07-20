@@ -27,8 +27,9 @@ __all__ = ("AppConfigService",)
 def _recursive_override(base: Mapping[str, Any], override: Mapping[str, Any]) -> dict[str, Any]:
     """Merge ``override`` onto ``base``: nested dicts recurse; everything else replaces whole.
 
-    A higher-rank value replaces the lower one entirely — lists included (no element-by-index
-    blending), and an explicit ``None`` erases the inherited value (unset). Unlike
+    An ``override`` value replaces the ``base`` one entirely — lists included (no
+    element-by-index blending), and an explicit ``None`` overwrites rather than being skipped.
+    The key itself stays either way; nothing here removes one. Unlike
     :func:`ai.backend.common.utils.deep_merge`, which blends lists by index and ignores ``None``.
     """
     result: dict[str, Any] = dict(base)
@@ -73,9 +74,9 @@ def _merge_configs(fragments: Sequence[AppConfigFragmentData]) -> dict[str, Any]
     """Deep-merge fragment configs in ascending ``rank`` order.
 
     Nested dicts recurse; lists and scalars are replaced wholesale by the higher-rank
-    fragment (a user's list overrides the lower scope's entirely — not by index). Callers
-    reject an empty ``fragments`` before getting here, so ``{}`` back means the fragments
-    themselves merged to nothing.
+    fragment (a user's list overrides the lower scope's entirely — not by index). Keys are
+    only added or replaced, never dropped, and callers reject an empty ``fragments`` before
+    getting here — so ``{}`` back means every fragment's own ``config`` was ``{}``.
     """
     merged: dict[str, Any] = {}
     for fragment in fragments:

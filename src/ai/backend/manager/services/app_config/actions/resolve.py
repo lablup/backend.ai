@@ -19,9 +19,9 @@ from ai.backend.manager.services.app_config.actions.base import (
 class ResolveAppConfigAction(AppConfigScopeAction):
     """Resolve the merged ``AppConfig`` for one ``config_name``.
 
-    ``scope`` carries the resolving principal ``(user, domain)``. When it is ``None`` — the
-    anonymous, pre-login read — only ``public``-scope fragments contribute; the action stays
-    a ``USER``-scope read but carries no ``scope_id``.
+    ``scope_arguments`` carries the resolving principal ``(user, domain)``. When it is
+    ``None`` — the anonymous, pre-login read — only ``public``-scope fragments contribute;
+    the action stays a ``USER``-scope read but carries no ``scope_id``.
     """
 
     config_name: str
