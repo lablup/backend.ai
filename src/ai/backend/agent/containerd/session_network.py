@@ -847,7 +847,7 @@ def build_containerd_session_network(
     )
 
     runtime = runtime or ContainerdGrpcRuntime(namespace="backend-ai")
-    cni_runner = cni_runner or NativeBridgeAttachRunner()
+    cni_runner = cni_runner or NativeBridgeAttachRunner(uplink=uplink)
 
     # With a privnet socket, every privileged host op (bridge setup/teardown + veth/netns
     # attach) is delegated to the CAP_NET_ADMIN/CAP_SYS_ADMIN privnet, so this (agent) process

@@ -152,7 +152,7 @@ async def _amain() -> None:
         # the privnet refuses vxlan sessions instead of stranding them (see network.vtep).
         vtep_ip=usable_vtep(host_ip),
         runtime=runtime,
-        cni_runner=NativeBridgeAttachRunner(),
+        cni_runner=NativeBridgeAttachRunner(uplink=uplink),
         backends=backends,
     )
     await server.serve_forever()

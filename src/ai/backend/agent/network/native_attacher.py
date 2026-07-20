@@ -241,10 +241,17 @@ class NativeBridgeAttachRunner:
     """Drop-in ``CniRunner`` that attaches/detaches a container to a bridge natively."""
 
     _ipam: HostLocalIpam
+    _uplink: str | None
 
-    def __init__(self, *, ipam_state_dir: Path = _DEFAULT_IPAM_STATE_DIR) -> None:
+    def __init__(
+        self, *, uplink: str | None = None, ipam_state_dir: Path = _DEFAULT_IPAM_STATE_DIR
+    ) -> None:
         # The process-wide owner: every agent this runtime hosts shares one node-local IP space.
         self._ipam = get_host_local_ipam(ipam_state_dir)
+        # The egress interface LOCAL-bridge traffic may leave the node on. Cross-session isolation
+        # (see _forward_accept_rules) depends on egress being scoped to exactly this device; the
+        # privnet passes it, and it is detected from the default route when omitted.
+        self._uplink = uplink
 
     async def __call__(
         self,
@@ -385,23 +392,65 @@ class NativeBridgeAttachRunner:
     async def _del_masq(self, subnet: str) -> None:
         await _run(["iptables", "-t", "nat", "-D", *self._masq_rule(subnet)], check=False)
 
-    def _forward_accept_rules(self, bridge: str) -> list[list[str]]:
+    async def _resolve_uplink(self) -> str:
+        """The node's egress uplink. Taken from config when given (the privnet passes it), else
+        the default-route device. Cached so setup and teardown program the identical rule."""
+        if self._uplink:
+            return self._uplink
+        _, out, _ = await _run(["ip", "-o", "route", "show", "default"], check=False)
+        for line in out.decode(errors="replace").splitlines():
+            tokens = line.split()
+            if "dev" in tokens:
+                self._uplink = tokens[tokens.index("dev") + 1]
+                return self._uplink
+        raise RuntimeError(
+            "cannot determine the egress uplink for LOCAL-bridge isolation (no default route)"
+        )
+
+    def _forward_accept_rules(self, bridge: str, uplink: str) -> list[list[str]]:
         # br_netfilter + a DROP FORWARD policy (a node co-hosting Docker or kube-proxy, or a
-        # hardened host) routes bridged frames through iptables FORWARD, so egress leaving the
-        # LOCAL bridge -- and same-node container<->container over it -- is dropped and the bridge
-        # goes silently dead. Accept traffic in and out of this bridge, as Docker does for its own.
-        # Paired with the NAT MASQUERADE above and torn down on the same last-owner path.
+        # hardened host) routes bridged frames through iptables FORWARD, so the LOCAL bridge needs
+        # explicit FORWARD rules or it goes silently dead. But a blanket ``-i/-o bridge -j ACCEPT``
+        # also forwards bridge -> sibling-bridge, so two different sessions' LOCAL interfaces reach
+        # each other on the same node -- a cross-session leak the per-session bridges do NOT stop by
+        # themselves, because the host L3-routes between their subnets. (The overlay bridge is safe
+        # only because nothing routes to another VNI's subnet; the LOCAL bridge is not.)
+        #
+        # Mirror what Docker does for its own networks: allow only egress (to the uplink), its
+        # established return, and intra-bridge (same session -- single-node clusters need it), and
+        # drop everything else destined to this bridge. Scoping egress to the uplink (not a blanket
+        # ``-i bridge``) keeps it order-independent: no rule ever accepts bridge -> other-bridge, so
+        # the destination bridge's own ``-o bridge -j DROP`` always catches it.
+        #
+        # Ordered DROP-first because _ensure_forward_accept inserts with ``-I`` (prepend): the DROP
+        # ends up last, evaluated only after the three accepts. Torn down on the same owner path.
         return [
-            ["FORWARD", "-i", bridge, "-j", "ACCEPT"],
-            ["FORWARD", "-o", bridge, "-j", "ACCEPT"],
+            ["FORWARD", "-o", bridge, "-j", "DROP"],
+            ["FORWARD", "-i", bridge, "-o", uplink, "-j", "ACCEPT"],
+            ["FORWARD", "-i", bridge, "-o", bridge, "-j", "ACCEPT"],
+            [
+                "FORWARD",
+                "-o",
+                bridge,
+                "-i",
+                uplink,
+                "-m",
+                "conntrack",
+                "--ctstate",
+                "RELATED,ESTABLISHED",
+                "-j",
+                "ACCEPT",
+            ],
         ]
 
     async def _ensure_forward_accept(self, bridge: str) -> None:
-        for rule in self._forward_accept_rules(bridge):
+        uplink = await self._resolve_uplink()
+        for rule in self._forward_accept_rules(bridge, uplink):
             rc, _, _ = await _run(["iptables", "-C", *rule], check=False)
             if rc != 0:
                 await _run(["iptables", "-I", *rule], check=False)
 
     async def _del_forward_accept(self, bridge: str) -> None:
-        for rule in self._forward_accept_rules(bridge):
+        uplink = await self._resolve_uplink()
+        for rule in self._forward_accept_rules(bridge, uplink):
             await _run(["iptables", "-D", *rule], check=False)

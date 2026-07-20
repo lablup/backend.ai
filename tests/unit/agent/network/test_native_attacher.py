@@ -243,6 +243,9 @@ class _RunRecorder:
         # emulate `nsenter --net=... -- ip link show <dev>` (the container side of the check)
         if argv[0] == "nsenter" and argv[3:6] == ["ip", "link", "show"]:
             return (0 if argv[6] in self._in_netns else 1), b"", b""
+        # emulate `ip -o route show default` (LOCAL-bridge isolation resolves its uplink from it)
+        if argv[:2] == ["ip", "-o"] and "default" in argv:
+            return 0, b"default via 172.30.0.1 dev eth0\n", b""
         # emulate `ip link show <dev>` / `iptables -C`: rc 0 if present, else 1
         if argv[:3] == ["ip", "link", "show"]:
             return (0 if argv[3] in self._existing else 1), b"", b""
@@ -312,7 +315,7 @@ class TestNativeAttachLocal:
     ) -> None:
         rec = _RunRecorder(existing=set())  # local bridge must be created
         monkeypatch.setattr(na, "_run", rec)
-        runner = NativeBridgeAttachRunner(ipam_state_dir=tmp_path)
+        runner = NativeBridgeAttachRunner(uplink="eth0", ipam_state_dir=tmp_path)
         result = await runner(
             "ADD", ifname="eth0", netns=_NETNS, container_id="cid", config=_LOCAL_CFG
         )
@@ -325,10 +328,19 @@ class TestNativeAttachLocal:
             "iptables -t nat -A POSTROUTING -s 172.30.1.0/24 ! -d 172.30.1.0/24 -j MASQUERADE"
             in flat
         )
-        # survive a DROP FORWARD policy (br_netfilter on a Docker/kube-proxy/hardened host):
-        # accept traffic in and out of the LOCAL bridge, or egress + same-node ICC go silently dead.
-        assert "iptables -I FORWARD -i bailo4097 -j ACCEPT" in flat
-        assert "iptables -I FORWARD -o bailo4097 -j ACCEPT" in flat
+        # LOCAL-bridge FORWARD isolation (Docker-parity): egress to the uplink + its established
+        # return + intra-bridge (same session) are accepted; everything else destined to the bridge
+        # -- notably another session's LOCAL bridge -- is dropped. A blanket -i/-o bridge ACCEPT
+        # would instead forward bridge->sibling-bridge and leak across sessions on the same node.
+        assert "iptables -I FORWARD -i bailo4097 -o eth0 -j ACCEPT" in flat  # egress out
+        assert "iptables -I FORWARD -i bailo4097 -o bailo4097 -j ACCEPT" in flat  # intra-session
+        assert (
+            "iptables -I FORWARD -o bailo4097 -i eth0 "
+            "-m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT" in flat  # egress return
+        )
+        assert "iptables -I FORWARD -o bailo4097 -j DROP" in flat  # cross-session / unsolicited
+        # the old blanket accept that leaked across sessions must be gone
+        assert "iptables -I FORWARD -i bailo4097 -j ACCEPT" not in flat
 
     async def test_an_already_attached_container_is_a_noop(
         self, tmp_path: Path, monkeypatch: Any
@@ -411,8 +423,14 @@ class TestNativeAttachLocal:
         rec.calls.clear()
         await runner("DEL", ifname="eth0", netns=_NETNS, container_id="cid", config=_LOCAL_CFG)
         flat = rec.flat()
-        assert "iptables -D FORWARD -i bailo4097 -j ACCEPT" in flat
-        assert "iptables -D FORWARD -o bailo4097 -j ACCEPT" in flat
+        # every isolation rule the ADD installed is withdrawn on the same last-owner path
+        assert "iptables -D FORWARD -o bailo4097 -j DROP" in flat
+        assert "iptables -D FORWARD -i bailo4097 -o eth0 -j ACCEPT" in flat
+        assert "iptables -D FORWARD -i bailo4097 -o bailo4097 -j ACCEPT" in flat
+        assert (
+            "iptables -D FORWARD -o bailo4097 -i eth0 "
+            "-m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT" in flat
+        )
         assert "MASQUERADE" in flat  # removed alongside
 
 
