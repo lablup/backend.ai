@@ -17715,6 +17715,16 @@ type RuntimeVariant implements Node
   """
   description: String
 
+  """
+  Added in 26.8.0. Whether legacy model configuration files in the model vfolder participate in revision resolution.
+  """
+  readsVfolderConfigFiles: Boolean!
+
+  """
+  Added in 26.8.0. Model definition defaults stored for this runtime variant.
+  """
+  defaultModelDefinition: RuntimeVariantModelDefinition!
+
   """Timestamp when this runtime variant was registered."""
   createdAt: DateTime!
 
@@ -17768,6 +17778,85 @@ type RuntimeVariantInfo
 {
   name: String
   human_readable_name: String
+}
+
+"""
+Added in 26.8.0. Default model configuration stored for a runtime variant.
+"""
+type RuntimeVariantModelConfig
+  @join__type(graph: STRAWBERRY)
+{
+  """Default model name."""
+  name: String
+
+  """Default model path."""
+  modelPath: String
+
+  """Default model service configuration."""
+  service: RuntimeVariantModelServiceConfig
+
+  """Default model metadata."""
+  metadata: ModelMetadata
+}
+
+"""
+Added in 26.8.0. Model definition defaults stored for a runtime variant.
+"""
+type RuntimeVariantModelDefinition
+  @join__type(graph: STRAWBERRY)
+{
+  """Default model configurations supplied by the runtime variant."""
+  models: [RuntimeVariantModelConfig!]
+}
+
+"""
+Added in 26.8.0. Default health-check settings stored for a runtime variant.
+"""
+type RuntimeVariantModelHealthCheck
+  @join__type(graph: STRAWBERRY)
+{
+  """Whether health checks are enabled."""
+  enable: Boolean
+
+  """Health-check interval in seconds."""
+  interval: Float
+
+  """Health-check endpoint path."""
+  path: String
+
+  """Maximum number of retries."""
+  maxRetries: Int
+
+  """Maximum time to wait for a health check."""
+  maxWaitTime: Float
+
+  """Expected healthy HTTP status code."""
+  expectedStatusCode: Int
+
+  """Initial health-check grace period in seconds."""
+  initialDelay: Float
+}
+
+"""
+Added in 26.8.0. Default model service configuration stored for a runtime variant.
+"""
+type RuntimeVariantModelServiceConfig
+  @join__type(graph: STRAWBERRY)
+{
+  """Actions to run before starting the model service."""
+  preStartActions: [PreStartAction!]
+
+  """Command that starts the model service."""
+  command: String
+
+  """Shell used to run the command."""
+  shell: String
+
+  """Model service port."""
+  port: Int
+
+  """Default model service health-check settings."""
+  healthCheck: RuntimeVariantModelHealthCheck
 }
 
 """Added in 26.4.2. Order specification."""
