@@ -63,6 +63,7 @@ from .types.search import (
     SessionWithKernelsSearchResult,
 )
 from .types.session import (
+    IdleCheckTerminationData,
     MarkTerminatingResult,
     SweptSessionInfo,
     TerminatingKernelWithAgentData,
@@ -157,6 +158,13 @@ class SchedulerRepository:
         """
         # Delegate to DB source
         return await self._db_source.mark_sessions_terminating(session_ids, reason, forced=forced)
+
+    @scheduler_repository_resilience.apply()
+    async def mark_idle_check_sessions_terminating(
+        self,
+        data: Sequence[IdleCheckTerminationData],
+    ) -> MarkTerminatingResult:
+        return await self._db_source.mark_idle_check_sessions_terminating(data)
 
     @scheduler_repository_resilience.apply()
     async def get_all_scaling_groups(self) -> list[ResourceGroupID]:

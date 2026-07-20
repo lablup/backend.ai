@@ -193,3 +193,9 @@ class MarkTerminatingResult:
             + len(self.terminating_sessions)
             + len(self.force_terminated_sessions)
         )
+
+
+@dataclass(frozen=True)
+class IdleCheckTerminationData:
+    session_id: SessionId
+    history_message: str

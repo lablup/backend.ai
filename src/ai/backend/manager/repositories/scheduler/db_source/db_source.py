@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
-from collections.abc import AsyncIterator, Mapping, Sequence
+from collections.abc import AsyncIterator, Collection, Mapping, Sequence
 from contextlib import asynccontextmanager as actxmgr
 from dataclasses import dataclass
 from datetime import datetime
@@ -28,6 +28,7 @@ from ai.backend.common import msgpack
 from ai.backend.common.data.permission.types import (
     RBACElementType,
 )
+from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.identifier.domain import DomainID, DomainName
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.project import ProjectID
@@ -152,6 +153,7 @@ from ai.backend.manager.repositories.scheduler.types.search import (
     SessionWithKernelsSearchResult,
 )
 from ai.backend.manager.repositories.scheduler.types.session import (
+    IdleCheckTerminationData,
     KernelData,
     MarkTerminatingResult,
     PendingSessionData,
@@ -907,6 +909,36 @@ class ScheduleDBSource:
                 skipped_sessions=skipped_sessions,
             )
 
+    async def mark_idle_check_sessions_terminating(
+        self,
+        data: Sequence[IdleCheckTerminationData],
+    ) -> MarkTerminatingResult:
+        """Atomically mark still-RUNNING sessions and record their idle reasons."""
+        session_ids = [item.session_id for item in data]
+        history_messages = {item.session_id: item.history_message for item in data}
+        async with self._begin_session_read_committed() as db_sess:
+            now = await self._get_db_now_in_session(db_sess)
+            terminating_sessions, from_statuses = await self._transition_sessions_to_terminating(
+                db_sess,
+                session_ids,
+                str(KernelLifecycleEventReason.IDLE_TIMEOUT),
+                now,
+                source_statuses=frozenset({SessionStatus.RUNNING}),
+            )
+            await self._record_sessions_terminating_history(
+                db_sess,
+                terminating_sessions,
+                from_statuses,
+                history_messages,
+            )
+            terminating_ids = set(terminating_sessions)
+            return MarkTerminatingResult(
+                cancelled_sessions=[],
+                terminating_sessions=terminating_sessions,
+                force_terminated_sessions=[],
+                skipped_sessions=[sid for sid in session_ids if sid not in terminating_ids],
+            )
+
     async def _free_kernel_allocations(
         self,
         db_sess: SASession,
@@ -1001,14 +1033,43 @@ class ScheduleDBSource:
         return cancelled_sessions
 
     async def _mark_sessions_as_terminating(
-        self, db_sess: SASession, session_ids: list[SessionId], reason: str, now: datetime
+        self,
+        db_sess: SASession,
+        session_ids: list[SessionId],
+        reason: str,
+        now: datetime,
     ) -> list[SessionId]:
         """Mark terminatable sessions and their kernels as terminating."""
+        terminating_sessions, from_statuses = await self._transition_sessions_to_terminating(
+            db_sess,
+            session_ids,
+            reason,
+            now,
+            source_statuses=SessionStatus.terminatable_statuses(),
+        )
+        await self._record_sessions_terminating_history(
+            db_sess,
+            terminating_sessions,
+            from_statuses,
+            dict.fromkeys(terminating_sessions, "mark_terminating success"),
+        )
+        return terminating_sessions
+
+    async def _transition_sessions_to_terminating(
+        self,
+        db_sess: SASession,
+        session_ids: list[SessionId],
+        reason: str,
+        now: datetime,
+        *,
+        source_statuses: Collection[SessionStatus],
+    ) -> tuple[list[SessionId], dict[SessionId, SessionStatus]]:
+        """Transition matching sessions and kernels without recording history."""
         # Capture from_statuses before update
         status_query = sa.select(SessionRow.id, SessionRow.status).where(
             sa.and_(
                 SessionRow.id.in_(session_ids),
-                SessionRow.status.in_(SessionStatus.terminatable_statuses()),
+                SessionRow.status.in_(source_statuses),
             )
         )
         status_result = await db_sess.execute(status_query)
@@ -1031,7 +1092,7 @@ class ScheduleDBSource:
             .where(
                 sa.and_(
                     SessionRow.id.in_(session_ids),
-                    SessionRow.status.in_(SessionStatus.terminatable_statuses()),
+                    SessionRow.status.in_(source_statuses),
                 )
             )
             .returning(SessionRow.id)
@@ -1060,21 +1121,29 @@ class ScheduleDBSource:
                 )
             )
 
-            # Record scheduling history for terminating transition
-            history_specs = [
-                SessionSchedulingHistoryCreatorSpec(
-                    session_id=sid,
-                    phase="mark_terminating",
-                    result=SchedulingResult.SUCCESS,
-                    message="mark_terminating success",
-                    from_status=from_statuses.get(sid),
-                    to_status=SessionStatus.TERMINATING,
-                )
-                for sid in terminating_sessions
-            ]
-            await self._record_scheduling_history(db_sess, BulkCreator(specs=history_specs))
+        return terminating_sessions, from_statuses
 
-        return terminating_sessions
+    async def _record_sessions_terminating_history(
+        self,
+        db_sess: SASession,
+        session_ids: Sequence[SessionId],
+        from_statuses: Mapping[SessionId, SessionStatus],
+        messages: Mapping[SessionId, str],
+    ) -> None:
+        if not session_ids:
+            return
+        history_specs = [
+            SessionSchedulingHistoryCreatorSpec(
+                session_id=session_id,
+                phase="mark_terminating",
+                result=SchedulingResult.SUCCESS,
+                message=messages.get(session_id, "mark_terminating success"),
+                from_status=from_statuses.get(session_id),
+                to_status=SessionStatus.TERMINATING,
+            )
+            for session_id in session_ids
+        ]
+        await self._record_scheduling_history(db_sess, BulkCreator(specs=history_specs))
 
     async def _mark_sessions_as_force_terminated(
         self, db_sess: SASession, session_ids: list[SessionId], reason: str, now: datetime

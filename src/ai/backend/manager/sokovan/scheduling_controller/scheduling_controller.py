@@ -46,6 +46,9 @@ from ai.backend.manager.repositories.scheduler import (
     MarkTerminatingResult,
     SchedulerRepository,
 )
+from ai.backend.manager.repositories.scheduler.types.session import (
+    IdleCheckTerminationData,
+)
 from ai.backend.manager.repositories.scheduler.types.session_creation import SessionSpecContextFetch
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.exceptions import (
     BatchAgentSelectionFailedError,
@@ -521,7 +524,23 @@ class SchedulingController:
         result = await self._repository.mark_sessions_terminating(
             session_ids, reason, forced=forced
         )
+        await self._post_mark_sessions_for_termination(result, reason)
+        return result
 
+    async def mark_idle_check_sessions_for_termination(
+        self,
+        data: Sequence[IdleCheckTerminationData],
+    ) -> MarkTerminatingResult:
+        """Conditionally terminate still-RUNNING sessions from idle-check sweep data."""
+        result = await self._repository.mark_idle_check_sessions_terminating(data)
+        await self._post_mark_sessions_for_termination(result, "IDLE_TIMEOUT")
+        return result
+
+    async def _post_mark_sessions_for_termination(
+        self,
+        result: MarkTerminatingResult,
+        reason: str,
+    ) -> None:
         if result.has_processed():
             log.info(
                 "Marked {} sessions for termination"
@@ -578,8 +597,6 @@ class SchedulingController:
                 schedule_types.append(ScheduleType.CLEANUP_FORCE_TERMINATED)
 
             await self.mark_scheduling_needed(schedule_types)
-
-        return result
 
     async def validate_session_spec(self, spec: SessionValidationSpec) -> None:
         # TODO: Refactor to use ValidationRule
