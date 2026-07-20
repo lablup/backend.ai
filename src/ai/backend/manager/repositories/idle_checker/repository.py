@@ -6,10 +6,7 @@ from collections.abc import Collection
 from ai.backend.common.types import SessionTypes
 from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.models.idle_checker.conditions import (
-    IdleCheckerBindingConditions,
-    SessionIdleCheckConditions,
-)
+from ai.backend.manager.models.idle_checker.conditions import IdleCheckerBindingConditions
 from ai.backend.manager.models.session.conditions import SessionConditions
 from ai.backend.manager.repositories.base import BatchQuerier, NoPagination
 from ai.backend.manager.repositories.idle_checker.db_source.db_source import IdleCheckerDBSource
@@ -93,13 +90,4 @@ class IdleCheckerRepository:
     async def fetch_expired_idle_checks(
         self, session_statuses: Collection[SessionStatus]
     ) -> ExpiredIdleCheckBatchData:
-        now = await self._db_source.current_time()
-        querier = BatchQuerier(
-            pagination=NoPagination(),
-            conditions=[
-                SessionIdleCheckConditions.expired(now),
-                SessionConditions.by_statuses(session_statuses),
-            ],
-        )
-        checks = await self._db_source.fetch_expired_idle_checks(querier)
-        return ExpiredIdleCheckBatchData(checks=checks, now=now)
+        return await self._db_source.fetch_expired_idle_checks(session_statuses)
