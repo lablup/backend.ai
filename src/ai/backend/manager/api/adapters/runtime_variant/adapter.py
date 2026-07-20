@@ -16,6 +16,7 @@ from ai.backend.common.dto.manager.v2.runtime_variant.response import (
     CreateRuntimeVariantPayload,
     DeleteRuntimeVariantPayload,
     DeleteRuntimeVariantsPayload,
+    RuntimeVariantModelDefinitionInfo,
     RuntimeVariantNode,
     SearchRuntimeVariantsPayload,
     UpdateRuntimeVariantPayload,
@@ -231,6 +232,11 @@ class RuntimeVariantAdapter(BaseAdapter):
             id=data.id,
             name=data.name,
             description=data.description,
+            reads_vfolder_config_files=data.reads_vfolder_config_files,
+            default_model_definition=RuntimeVariantModelDefinitionInfo.model_validate(
+                data.default_model_definition,
+                from_attributes=True,
+            ),
             created_at=data.created_at,
             updated_at=data.updated_at,
         )
