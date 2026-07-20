@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.permission.types import RBACElementType, ScopeType
 from ai.backend.common.identifier.user import UserID
 from ai.backend.manager.actions.types import ActionOperationType
@@ -25,14 +24,16 @@ class ResolveAppConfigsAction(AppConfigScopeAction):
     than an optimization bolted beside a single-name variant.
 
     ``scope_arguments`` carries what the caller may name — the domain, and any scope
-    dimension added later. Not the user: that half is injected from the session, so there is
-    no field to put someone else's id in and a resolve can only ever be for the acting user.
-    Leaving ``scope_arguments`` unset, or resolving with no session at all, is the anonymous
-    pre-login read: only ``public``-scope fragments contribute.
+    dimension added later. ``user_id`` is the other half, and is not the caller's to name:
+    the handler fills it from the session, so a resolve can only ever be for the acting user.
+
+    Either half unset is the anonymous, pre-login read: only ``public``-scope fragments
+    contribute.
     """
 
     config_names: list[str]
     scope_arguments: AppConfigScopeArguments | None = None
+    user_id: UserID | None = None
 
     @override
     @classmethod
@@ -45,9 +46,7 @@ class ResolveAppConfigsAction(AppConfigScopeAction):
 
     @override
     def scope_id(self) -> str:
-        # The same session the service resolves against — an anonymous read has no user.
-        user = current_user()
-        return str(user.user_id) if user is not None else ""
+        return str(self.user_id) if self.user_id is not None else ""
 
     @override
     def target_element(self) -> RBACElementRef:

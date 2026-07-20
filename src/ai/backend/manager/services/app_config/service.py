@@ -3,8 +3,6 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-from ai.backend.common.contexts.user import current_user
-from ai.backend.common.identifier.user import UserID
 from ai.backend.manager.data.app_config.types import AppConfigData
 from ai.backend.manager.data.app_config_fragment.types import AppConfigFragmentData
 from ai.backend.manager.errors.app_config import AppConfigFragmentNotFound
@@ -69,24 +67,23 @@ class AppConfigService:
         requested name, in request order; a name repeated in the input is repeated in the
         output (each position resolves independently, never collapsed).
 
-        With ``scope_arguments`` **and** a session user, the merge overlays that user's
-        domain and user fragments on top of ``public``. Missing either one is the anonymous,
-        pre-login read: only ``public`` fragments contribute, and no session is not an error.
-        The user half of the scope always comes from the session, so a caller can only ever
-        resolve their own config.
+        With ``scope_arguments`` **and** a ``user_id``, the merge overlays that user's domain
+        and user fragments on top of ``public``. Missing either one is the anonymous,
+        pre-login read: only ``public`` fragments contribute, and no user is not an error.
+        The handler fills ``user_id`` from the session, so a caller can only ever resolve
+        their own config.
 
         All-or-nothing on ``AppConfigFragmentNotFound``: one requested name nothing
         contributes to fails the whole call. A partial result would have to mark the absent
         names somehow, and every way of doing that pushes the caller into branching on a
         second, quieter kind of failure.
         """
-        user = current_user()
-        if action.scope_arguments is None or user is None:
-            # The caller named no scope: the anonymous, pre-login read.
+        if action.scope_arguments is None or action.user_id is None:
+            # Either half missing is the anonymous, pre-login read.
             scope = None
         else:
             scope = ResolvedAppConfigScope(
-                domain_id=action.scope_arguments.domain_id, user_id=UserID(user.user_id)
+                domain_id=action.scope_arguments.domain_id, user_id=action.user_id
             )
         fragments = await self._fragment_repository.list_visible_fragments_bulk(
             action.config_names, scope
