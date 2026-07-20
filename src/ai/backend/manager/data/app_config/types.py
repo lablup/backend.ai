@@ -11,11 +11,11 @@ class AppConfigData:
     """Merged per-user view of one ``config_name``.
 
     The ordered contributing ``fragments`` (rank low -> high) plus their deep-merged
-    ``merged_config``. ``merged_config`` is ``None`` when no fragment contributes (the config
-    name is defined but unconfigured for this scope) — distinct from a fragment that merges
-    to an empty ``{}``.
+    ``merged_config``. At least one fragment always contributes — a ``config_name`` nothing
+    is visible for never reaches this type, it is an ``AppConfigFragmentNotFound``. An empty
+    ``merged_config`` therefore means fragments merged to ``{}``, not that none were found.
     """
 
     config_name: str
     fragments: list[AppConfigFragmentData]
-    merged_config: dict[str, Any] | None
+    merged_config: dict[str, Any]

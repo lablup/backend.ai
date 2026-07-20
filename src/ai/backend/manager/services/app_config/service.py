@@ -7,10 +7,7 @@ from ai.backend.common.contexts.user import current_user
 from ai.backend.common.exception import UnreachableError
 from ai.backend.manager.data.app_config.types import AppConfigData
 from ai.backend.manager.data.app_config_fragment.types import AppConfigFragmentData
-from ai.backend.manager.errors.app_config import (
-    AppConfigFragmentNotFound,
-    AppConfigResolveNotAllowed,
-)
+from ai.backend.manager.errors.app_config import AppConfigFragmentNotFound
 from ai.backend.manager.repositories.app_config_fragment.repository import (
     AppConfigFragmentRepository,
 )
@@ -51,6 +48,11 @@ def _authorize_resolve_principal(scope: AppConfigScopeArguments | None) -> None:
     resolving someone else's would hand back their config. ``domain_id`` is deliberately left
     unchecked — the handler is expected to derive it from the same principal. Superadmins may
     resolve any principal.
+
+    Reported as ``AppConfigFragmentNotFound``, not a permission error: another user's config
+    is not something this caller is forbidden to read, it is something that does not exist as
+    far as they can see. The message is the one an empty resolve raises, word for word —
+    naming the principal here would undo that.
     """
     user = current_user()
     if user is not None and user.is_superadmin:
@@ -64,21 +66,17 @@ def _authorize_resolve_principal(scope: AppConfigScopeArguments | None) -> None:
         raise UnreachableError("User context is not available")
     if user.user_id == scope.user_id:
         return
-    raise AppConfigResolveNotAllowed(
-        f"User {user.user_id} may not resolve the app config of user {scope.user_id}."
-    )
+    raise AppConfigFragmentNotFound("No visible fragment contributes to this app config.")
 
 
-def _merge_configs(fragments: Sequence[AppConfigFragmentData]) -> dict[str, Any] | None:
-    """Deep-merge fragment configs in ascending ``rank`` order; ``None`` when none contribute.
+def _merge_configs(fragments: Sequence[AppConfigFragmentData]) -> dict[str, Any]:
+    """Deep-merge fragment configs in ascending ``rank`` order.
 
     Nested dicts recurse; lists and scalars are replaced wholesale by the higher-rank
-    fragment (a user's list overrides the lower scope's entirely — not by index). ``None``
-    marks a config name that is defined but left unconfigured for this scope, distinct from
-    a fragment that merges to an empty ``{}``.
+    fragment (a user's list overrides the lower scope's entirely — not by index). Callers
+    reject an empty ``fragments`` before getting here, so ``{}`` back means the fragments
+    themselves merged to nothing.
     """
-    if not fragments:
-        return None
     merged: dict[str, Any] = {}
     for fragment in fragments:
         merged = _recursive_override(merged, fragment.config)
@@ -100,21 +98,18 @@ class AppConfigService:
 
         With a principal ``scope`` the merge overlays the caller's domain and user fragments
         on top of ``public``; with ``scope=None`` (anonymous, pre-login) only ``public``
-        fragments contribute. Naming another user raises ``AppConfigResolveNotAllowed``.
+        fragments contribute.
 
-        A ``config_name`` nothing contributes to is an ``AppConfigFragmentNotFound`` — either
-        the name is unregistered or no fragment is visible at this scope. (The bulk path
-        diverges here: it reports such a name as a ``None`` ``merged_config`` entry so one
-        absent name cannot fail the whole batch.)
+        ``AppConfigFragmentNotFound`` covers every way this comes back empty — the name is
+        unregistered, nothing is visible at this scope, or the named principal is not the
+        caller's. The three are deliberately indistinguishable.
         """
         _authorize_resolve_principal(action.scope_arguments)
         fragments = await self._fragment_repository.list_visible_fragments_bulk(
             [action.config_name], action.scope_arguments
         )
         if not fragments:
-            raise AppConfigFragmentNotFound(
-                f"No visible fragment contributes to app config '{action.config_name}'."
-            )
+            raise AppConfigFragmentNotFound("No visible fragment contributes to this app config.")
         app_config = AppConfigData(
             config_name=action.config_name,
             fragments=fragments,
@@ -131,11 +126,12 @@ class AppConfigService:
         One entry per requested ``config_name``, in request order — a name repeated in the
         input is repeated in the output (each position resolves independently, never
         collapsed). With ``scope=None`` (anonymous, pre-login) only ``public`` fragments
-        contribute to every entry. Naming another user raises ``AppConfigResolveNotAllowed``.
+        contribute to every entry.
 
-        A name nothing contributes to yields a ``None`` ``merged_config`` rather than the
-        ``AppConfigFragmentNotFound`` its single-name counterpart raises — one absent name
-        must not fail the whole batch.
+        All-or-nothing on ``AppConfigFragmentNotFound``: one requested name nothing
+        contributes to fails the whole batch, exactly as it would resolved on its own. A
+        partial result would have to mark the absent names somehow, and every way of doing
+        that reads differently from the single-name path.
         """
         _authorize_resolve_principal(action.scope)
         fragments = await self._fragment_repository.list_visible_fragments_bulk(
@@ -144,6 +140,10 @@ class AppConfigService:
         app_configs: list[AppConfigData] = []
         for config_name in action.config_names:
             visible = [fragment for fragment in fragments if fragment.config_name == config_name]
+            if not visible:
+                raise AppConfigFragmentNotFound(
+                    "No visible fragment contributes to this app config."
+                )
             app_configs.append(
                 AppConfigData(
                     config_name=config_name,

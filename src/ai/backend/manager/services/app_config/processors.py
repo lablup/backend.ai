@@ -31,7 +31,8 @@ class AppConfigProcessors(AbstractProcessorPackage):
         # (config_name, scope_type) pairs merge and at what rank — it carries no user
         # dimension, so it cannot keep one user from naming another's principal. That is
         # the service's own check (``_authorize_resolve_principal``): the resolving
-        # user_id must be the acting user's own, superadmins excepted.
+        # user_id must be the acting user's own, superadmins excepted. It reports a
+        # foreign principal as not-found rather than forbidden.
         self.resolve_app_config = ScopeActionProcessor(service.resolve_app_config, action_monitors)
         self.resolve_app_config_bulk = ScopeActionProcessor(
             service.resolve_app_config_bulk, action_monitors

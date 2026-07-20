@@ -18,10 +18,7 @@ from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
 from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.user import UserID
 from ai.backend.manager.data.app_config_fragment.types import AppConfigFragmentData
-from ai.backend.manager.errors.app_config import (
-    AppConfigFragmentNotFound,
-    AppConfigResolveNotAllowed,
-)
+from ai.backend.manager.errors.app_config import AppConfigFragmentNotFound
 from ai.backend.manager.repositories.app_config_fragment.repository import (
     AppConfigFragmentRepository,
 )
@@ -242,20 +239,30 @@ class TestAppConfigService:
         bulk_fragments: list[AppConfigFragmentData],
     ) -> None:
         result = await service.resolve_app_config_bulk(
-            ResolveBulkAppConfigAction(config_names=["theme", "menu", "unknown"], scope=_SCOPE)
+            ResolveBulkAppConfigAction(config_names=["theme", "menu"], scope=_SCOPE)
         )
 
         # One AppConfigData per requested name, in request order.
-        assert [c.config_name for c in result.app_configs] == ["theme", "menu", "unknown"]
+        assert [c.config_name for c in result.app_configs] == ["theme", "menu"]
         assert result.app_configs[0].merged_config == {"theme": "dark", "lang": "en"}
         assert result.app_configs[1].merged_config == {"items": ["a"]}
-        # A name nothing contributes to yields None here — the single resolve raises 404 for
-        # the same input, so one absent name cannot fail the whole batch.
-        assert result.app_configs[2].merged_config is None
         assert result.scope_id() == str(_USER_ID)
         mock_fragment_repository.list_visible_fragments_bulk.assert_called_once_with(
-            ["theme", "menu", "unknown"], _SCOPE
+            ["theme", "menu"], _SCOPE
         )
+
+    async def test_resolve_bulk_fails_whole_batch_on_one_absent_name(
+        self,
+        service: AppConfigService,
+        acting_user: UserData,
+        bulk_fragments: list[AppConfigFragmentData],
+    ) -> None:
+        # "unknown" contributes nothing, so the batch fails as a whole — the names that did
+        # resolve are not returned alongside it.
+        with pytest.raises(AppConfigFragmentNotFound):
+            await service.resolve_app_config_bulk(
+                ResolveBulkAppConfigAction(config_names=["theme", "menu", "unknown"], scope=_SCOPE)
+            )
 
     async def test_resolve_bulk_repeats_duplicate_config_names_in_output(
         self,
@@ -338,15 +345,21 @@ class TestAppConfigService:
         self,
         service: AppConfigService,
         acting_user: UserData,
-        mock_fragment_repository: MagicMock,
+        no_fragments: list[AppConfigFragmentData],
     ) -> None:
-        # The repository must never be reached — the principal is rejected before the read.
-        with pytest.raises(AppConfigResolveNotAllowed):
+        # Not-found, not forbidden: another user's config does not exist as far as this
+        # caller can see. Same error and message a config with no fragments raises, so the
+        # two cannot be told apart.
+        with pytest.raises(AppConfigFragmentNotFound) as foreign_principal:
             await service.resolve_app_config(
                 ResolveAppConfigAction(config_name="theme", scope_arguments=_OTHER_SCOPE)
             )
+        with pytest.raises(AppConfigFragmentNotFound) as nothing_contributes:
+            await service.resolve_app_config(
+                ResolveAppConfigAction(config_name="theme", scope_arguments=_SCOPE)
+            )
 
-        mock_fragment_repository.list_visible_fragments_bulk.assert_not_called()
+        assert str(foreign_principal.value) == str(nothing_contributes.value)
 
     async def test_resolve_bulk_rejects_another_users_principal(
         self,
@@ -355,7 +368,7 @@ class TestAppConfigService:
         mock_fragment_repository: MagicMock,
     ) -> None:
         # Same gate on the bulk path — otherwise it would be a way around the single resolve.
-        with pytest.raises(AppConfigResolveNotAllowed):
+        with pytest.raises(AppConfigFragmentNotFound):
             await service.resolve_app_config_bulk(
                 ResolveBulkAppConfigAction(config_names=["theme"], scope=_OTHER_SCOPE)
             )
