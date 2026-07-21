@@ -52,6 +52,11 @@ class KernelHistoryOrderField(StrEnum):
 
     CREATED_AT = "created_at"
     UPDATED_AT = "updated_at"
+    PHASE = "phase"
+    FROM_STATUS = "from_status"
+    TO_STATUS = "to_status"
+    RESULT = "result"
+    ATTEMPTS = "attempts"
 
 
 class DeploymentHistoryOrderField(StrEnum):

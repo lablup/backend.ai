@@ -67,6 +67,11 @@ def resolve_session_order(field: SessionHistoryOrderField, direction: OrderDirec
 KERNEL_ORDER_FIELD_MAP: dict[KernelHistoryOrderField, _OrderColumn] = {
     KernelHistoryOrderField.CREATED_AT: KernelSchedulingHistoryRow.created_at,
     KernelHistoryOrderField.UPDATED_AT: KernelSchedulingHistoryRow.updated_at,
+    KernelHistoryOrderField.PHASE: KernelSchedulingHistoryRow.phase,
+    KernelHistoryOrderField.FROM_STATUS: KernelSchedulingHistoryRow.from_status,
+    KernelHistoryOrderField.TO_STATUS: KernelSchedulingHistoryRow.to_status,
+    KernelHistoryOrderField.RESULT: KernelSchedulingHistoryRow.result,
+    KernelHistoryOrderField.ATTEMPTS: KernelSchedulingHistoryRow.attempts,
 }
 
 KERNEL_DEFAULT_FORWARD_ORDER: QueryOrder = KernelSchedulingHistoryRow.created_at.desc()

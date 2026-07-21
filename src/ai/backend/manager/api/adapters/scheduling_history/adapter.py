@@ -31,6 +31,7 @@ from ai.backend.common.dto.manager.v2.scheduling_history.response import (
     SessionHistoryNode,
 )
 from ai.backend.common.dto.manager.v2.scheduling_history.types import SubStepResultInfo
+from ai.backend.common.identifier.kernel_scheduling_history import KernelSchedulingHistoryID
 from ai.backend.common.identifier.replica import ReplicaID
 from ai.backend.common.types import KernelId
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
@@ -160,6 +161,27 @@ class SchedulingHistoryAdapter(BaseAdapter):
             )
         )
         history_map = {h.id: self._session_data_to_dto(h) for h in action_result.histories}
+        return [history_map.get(history_id) for history_id in ids]
+
+    async def batch_load_kernel_histories_by_ids(
+        self, ids: Sequence[KernelSchedulingHistoryID]
+    ) -> list[KernelHistoryNode | None]:
+        """Batch load kernel scheduling histories by their IDs for DataLoader use.
+
+        Returns KernelHistoryNode DTOs in the same order as the input ids list.
+        """
+        if not ids:
+            return []
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=len(ids)),
+            conditions=[KernelSchedulingHistoryConditions.by_ids(ids)],
+        )
+        action_result = (
+            await self._processors.scheduling_history.search_kernel_history.wait_for_complete(
+                SearchKernelHistoryAction(querier=querier)
+            )
+        )
+        history_map = {h.id: self._kernel_data_to_dto(h) for h in action_result.items}
         return [history_map.get(history_id) for history_id in ids]
 
     async def batch_load_deployment_histories_by_ids(

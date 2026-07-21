@@ -5632,6 +5632,85 @@ enum KernelResourceAllocationOrderField {
   USED
 }
 
+"""Added in 26.8.0. Kernel scheduling history record."""
+type KernelSchedulingHistory implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+  kernelId: ID!
+  sessionId: ID!
+  phase: String!
+  fromStatus: String
+  toStatus: String
+  result: SchedulingResult!
+  errorCode: String
+  message: String
+  attempts: Int!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+"""Added in 26.8.0. Kernel scheduling history connection."""
+type KernelSchedulingHistoryConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [KernelSchedulingHistoryEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type KernelSchedulingHistoryEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: KernelSchedulingHistory!
+}
+
+"""Added in 26.8.0. Filter for kernel scheduling history"""
+input KernelSchedulingHistoryFilter {
+  id: UUIDFilter = null
+  kernelId: UUIDFilter = null
+  sessionId: UUIDFilter = null
+  phase: StringFilter = null
+  fromStatus: [String!] = null
+  toStatus: [String!] = null
+  result: SchedulingResultFilter = null
+  errorCode: StringFilter = null
+  message: StringFilter = null
+  createdAt: DateTimeFilter = null
+  updatedAt: DateTimeFilter = null
+  AND: [KernelSchedulingHistoryFilter!] = null
+  OR: [KernelSchedulingHistoryFilter!] = null
+  NOT: [KernelSchedulingHistoryFilter!] = null
+}
+
+"""Added in 26.8.0. Order by specification for kernel scheduling history"""
+input KernelSchedulingHistoryOrderBy {
+  field: KernelSchedulingHistoryOrderField!
+  direction: OrderDirection! = DESC
+}
+
+"""
+Added in 26.8.0. Fields available for ordering kernel scheduling history
+"""
+enum KernelSchedulingHistoryOrderField {
+  CREATED_AT
+  UPDATED_AT
+  PHASE
+  FROM_STATUS
+  TO_STATUS
+  RESULT
+  ATTEMPTS
+}
+
+"""Added in 26.8.0. Scope for kernel scheduling history query"""
+input KernelScope {
+  """Kernel ID to get history for"""
+  kernelId: UUID!
+}
+
 """
 Added in 26.2.0. Represents a kernel (compute container) in Backend.AI.
 """
@@ -5693,6 +5772,11 @@ type KernelV2 implements Node {
 
   """Added in 26.3.0. Per-slot resource allocation for this kernel."""
   resourceAllocations(filter: KernelResourceAllocationFilter = null, orderBy: [KernelResourceAllocationOrderBy!] = null, first: Int = null, after: String = null, last: Int = null, before: String = null, limit: Int = null, offset: Int = null): ResourceAllocationConnection
+
+  """
+  Added in 26.8.0. Scheduling history of this kernel with pagination support.
+  """
+  schedulingHistories(filter: KernelSchedulingHistoryFilter = null, orderBy: [KernelSchedulingHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KernelSchedulingHistoryConnection
 }
 
 """
@@ -9748,6 +9832,9 @@ type Query {
   """Added in 26.4.2. List session scheduling history (admin only)"""
   adminSessionSchedulingHistories(filter: SessionSchedulingHistoryFilter = null, orderBy: [SessionSchedulingHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionSchedulingHistoryConnection
 
+  """Added in 26.8.0. List kernel scheduling history (superadmin only)"""
+  adminKernelSchedulingHistories(filter: KernelSchedulingHistoryFilter = null, orderBy: [KernelSchedulingHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KernelSchedulingHistoryConnection
+
   """Added in 25.16.0. List all deployments (superadmin only)."""
   adminDeployments(filter: DeploymentFilter = null, orderBy: [DeploymentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelDeploymentConnection
 
@@ -10028,6 +10115,9 @@ type Query {
 
   """Added in 26.2.0. Get scheduling history for a specific session."""
   sessionScopedSchedulingHistories(scope: SessionScope!, filter: SessionSchedulingHistoryFilter = null, orderBy: [SessionSchedulingHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionSchedulingHistoryConnection
+
+  """Added in 26.8.0. Get scheduling history for a specific kernel."""
+  scopedKernelSchedulingHistories(scope: KernelScope!, filter: KernelSchedulingHistoryFilter = null, orderBy: [KernelSchedulingHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KernelSchedulingHistoryConnection
 
   """Added in 26.2.0. Get scheduling history for a specific deployment."""
   deploymentScopedSchedulingHistories(scope: DeploymentScope!, filter: DeploymentHistoryFilter = null, orderBy: [DeploymentHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DeploymentHistoryConnection
