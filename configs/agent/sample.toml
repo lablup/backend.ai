@@ -24,9 +24,7 @@
   # Added in 25.12.0
   agent-sock-port = 6007
   # Name of the resource group used as the seed only at the agent's first
-  # registration. The manager DB is the source of truth afterwards, so changing
-  # this value has no effect on an already-registered agent. When unset, the
-  # manager assigns the default resource group.
+  # registration. When unset, the default resource group is used.
   # Added in 26.8.0
   ## initial-resource-group-name = "gpu-cluster"
   # Type of resource group this agent serves. 'compute' for general-purpose

@@ -15,8 +15,6 @@ class ImageOpts(BackendAISchema):
 class AgentInfo(BackendAISchema):
     ip: str
     region: str | None
-    # Seed for the first registration only; the manager DB is the source of truth
-    # afterwards and ignores this value on subsequent heartbeats.
     scaling_group: str | None
     addr: str
     public_key: PublicKey | None

@@ -89,7 +89,6 @@ class AgentMetadata:
     id: AgentId
     status: AgentStatus
     region: str | None
-    # Seed for the first registration only; None means "use the default resource group".
     scaling_group: str | None
     architecture: str
     version: str

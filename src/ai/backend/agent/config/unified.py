@@ -1218,9 +1218,7 @@ class OverridableAgentConfig(BaseConfigSchema):
         BackendAIConfigMeta(
             description=(
                 "Name of the resource group used as the seed only at the agent's first "
-                "registration. The manager DB is the source of truth afterwards, so changing "
-                "this value has no effect on an already-registered agent. "
-                "When unset, the manager assigns the default resource group."
+                "registration. When unset, the default resource group is used."
             ),
             added_version="26.8.0",
             example=ConfigExample(local="default", prod="gpu-cluster"),
@@ -1328,11 +1326,8 @@ class OverridableAgentConfig(BaseConfigSchema):
             for removed_key in ("scaling-group", "scaling_group"):
                 if removed_key in data:
                     raise ValueError(
-                        f"The '{removed_key}' agent config key has been removed. "
-                        "The manager DB is now the source of truth for an agent's "
-                        "resource group. Use 'initial-resource-group-name' to seed "
-                        "the group at first registration, or remove the key to use "
-                        "the default resource group."
+                        f"The '{removed_key}' agent config key is deprecated. "
+                        "Use 'initial-resource-group-name' instead."
                     )
         return data
 
