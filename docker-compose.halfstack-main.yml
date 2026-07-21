@@ -277,8 +277,12 @@ services:
     networks:
       - half
     ports:
+      # portproxy_* entrypoints (port sub-mode); 10250 is split out because it
+      # doubles as the domainproxy entrypoint in the wildcard sub-mode.
       - "8080:8080"                # traefik API entrypoint
-      - "10205-10300:10205-10300"  # portproxy_* entrypoints
+      - "10205-10249:10205-10249"
+      - "10250:10250"              # portproxy_10250 / domainproxy
+      - "10251-10300:10251-10300"
     volumes:
       - "./traefik.halfstack.current.yml:/etc/traefik/traefik.yml:ro"
       - "./volumes/traefik/plugins-local:/plugins-local:ro"

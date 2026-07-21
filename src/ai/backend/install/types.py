@@ -49,6 +49,22 @@ class Platform(enum.StrEnum):
 class FrontendMode(enum.StrEnum):
     PORT = "port"
     WILDCARD = "wildcard"
+    # Deprecated alias: "--frontend-mode traefik" used to select the Traefik
+    # backend with the port traffic pattern in one flag. It is normalized to
+    # (frontend_mode=PORT, proxy_backend=TRAEFIK) at CLI parsing time; no other
+    # code should match on this member.
+    TRAEFIK = "traefik"
+
+
+class ProxyBackend(enum.StrEnum):
+    """The dataplane implementation serving the app-proxy frontend traffic.
+
+    Orthogonal to ``FrontendMode`` (the traffic pattern): both port and
+    wildcard patterns can be served either by the worker's builtin proxy or
+    by a Traefik container fed through the coordinator's etcd provider.
+    """
+
+    BUILTIN = "builtin"
     TRAEFIK = "traefik"
 
 
@@ -72,6 +88,7 @@ class CliArgs:
     advertised_port: int = 443
     endpoint_protocol: EndpointProtocol | None = None
     frontend_mode: FrontendMode = FrontendMode.PORT
+    proxy_backend: ProxyBackend = ProxyBackend.BUILTIN
     use_wildcard_binding: bool = False
     otel_endpoint: str | None = None
     metric_access_cidr: str = "0.0.0.0/0"
@@ -241,8 +258,10 @@ class ServiceConfig:
     harbor: HarborOptions | None = None
     # Optional dedicated SFTP agent, multi-agent per node (None when disabled).
     sftp_agent: SftpAgentOptions | None = None
-    # The app-proxy worker frontend dataplane mode chosen at install time.
+    # The app-proxy worker frontend traffic pattern chosen at install time.
     frontend_mode: FrontendMode = FrontendMode.PORT
+    # The dataplane implementation serving that pattern (builtin or Traefik).
+    proxy_backend: ProxyBackend = ProxyBackend.BUILTIN
 
 
 @dataclasses.dataclass
@@ -256,6 +275,7 @@ class InstallVariable:
     advertised_port: int = 443
     endpoint_protocol: EndpointProtocol | None = None
     frontend_mode: FrontendMode = FrontendMode.PORT
+    proxy_backend: ProxyBackend = ProxyBackend.BUILTIN
     use_wildcard_binding: bool = False
     otel_endpoint: str | None = None
     metric_access_cidr: str = "0.0.0.0/0"
