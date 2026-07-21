@@ -94,7 +94,7 @@ class PrivateContext:
     zctx: zmq.asyncio.Context
     conn_tracker_lock: asyncio.Lock
     conn_tracker_gc_task: asyncio.Task[Any]
-    active_session_ids: defaultdict[KernelId, int]
+    active_connection_counts: defaultdict[SessionId, int]
 
 
 class StreamHandler:
@@ -151,7 +151,7 @@ class StreamHandler:
             GetStreamingSessionAction(session_name=session_name, user_uuid=user_id),
         )
         log.info("STREAM_PTY(s:{0})", session_name)
-        stream_key = KernelId(uuid.UUID(result.kernel_id))
+        stream_key = result.kernel_id
         kernel_host: str
         if result.kernel_host is None:
             hostname = urlparse(result.agent_addr).hostname
@@ -347,7 +347,7 @@ class StreamHandler:
         session_result = await self._stream.get_streaming_session.wait_for_complete(
             GetStreamingSessionAction(session_name=session_name, user_uuid=user_id),
         )
-        stream_key = KernelId(uuid.UUID(session_result.kernel_id))
+        stream_key = session_result.kernel_id
 
         ws = web.WebSocketResponse(max_msg_size=config.manager.max_wsmsg_size)
         await ws.prepare(request)
@@ -464,8 +464,8 @@ class StreamHandler:
         session_result = await self._stream.get_streaming_session.wait_for_complete(
             GetStreamingSessionAction(session_name=session_name, user_uuid=user_id),
         )
-        kernel_id = KernelId(uuid.UUID(session_result.kernel_id))
-        session_id = SessionId(uuid.UUID(session_result.session_id))
+        kernel_id = session_result.kernel_id
+        session_id = session_result.session_id
         stream_key = kernel_id
         stream_id = uuid.uuid4().hex
         app_ctx.stream_proxy_handlers[stream_key].add(myself)
@@ -519,16 +519,16 @@ class StreamHandler:
         else:
             raise InvalidAPIParameters(f"Unsupported service protocol: {sport['protocol']}")
 
-        conn_tracker_key = f"session.{kernel_id}.active_app_connections"
+        connection_tracker_throttle_key = (session_id, kernel_id, service, stream_id)
         update_connection_tracker = self._stream.create_connection_refresh_callback(
-            kernel_id, service, stream_id
+            session_id, kernel_id, service, stream_id
         )
 
         async def refresh_cb(_kernel_id_str: str, _data: bytes) -> None:
             await asyncio.shield(
                 rpc_ptask_group.create_task(
                     call_non_bursty(
-                        conn_tracker_key,
+                        connection_tracker_throttle_key,
                         update_connection_tracker,
                         max_bursts=128,
                         max_idle=5000,
@@ -542,7 +542,7 @@ class StreamHandler:
 
         async def add_conn_track() -> None:
             async with app_ctx.conn_tracker_lock:
-                app_ctx.active_session_ids[kernel_id] += 1
+                app_ctx.active_connection_counts[session_id] += 1
                 await self._stream.track_connection.wait_for_complete(
                     TrackConnectionAction(
                         kernel_id=kernel_id,
@@ -554,9 +554,9 @@ class StreamHandler:
 
         async def clear_conn_track() -> None:
             async with app_ctx.conn_tracker_lock:
-                app_ctx.active_session_ids[kernel_id] -= 1
-                if app_ctx.active_session_ids[kernel_id] <= 0:
-                    del app_ctx.active_session_ids[kernel_id]
+                app_ctx.active_connection_counts[session_id] -= 1
+                if app_ctx.active_connection_counts[session_id] <= 0:
+                    del app_ctx.active_connection_counts[session_id]
                 await self._stream.untrack_connection.wait_for_complete(
                     UntrackConnectionAction(
                         kernel_id=kernel_id,
@@ -677,11 +677,11 @@ async def stream_conn_tracker_gc(
 ) -> None:
     try:
         while True:
-            active_ids = list(app_ctx.active_session_ids.keys())
-            if active_ids:
+            active_session_ids = list(app_ctx.active_connection_counts.keys())
+            if active_session_ids:
                 try:
                     await stream_processors.gc_stale_connections.wait_for_complete(
-                        GCStaleConnectionsAction(active_session_ids=active_ids),
+                        GCStaleConnectionsAction(active_session_ids=active_session_ids),
                     )
                 except Exception:
                     log.warning("stream_conn_tracker_gc(): error during GC, retrying...")
@@ -708,7 +708,7 @@ async def stream_app_ctx(
     app_ctx.stream_stdin_socks = defaultdict(weakref.WeakSet)
     app_ctx.zctx = zmq.asyncio.Context()
     app_ctx.conn_tracker_lock = asyncio.Lock()
-    app_ctx.active_session_ids = defaultdict(int)
+    app_ctx.active_connection_counts = defaultdict(int)
     app_ctx.conn_tracker_gc_task = asyncio.create_task(
         stream_conn_tracker_gc(
             app_ctx,
