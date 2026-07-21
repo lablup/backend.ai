@@ -41,7 +41,7 @@ class DomainFairShareAction(BaseAction):
 class GetDomainFairShareAction(DomainFairShareAction):
     """Action to get a domain fair share record."""
 
-    resource_group: str
+    resource_group_id: ResourceGroupID
     domain_name: str
 
     @override
@@ -51,7 +51,7 @@ class GetDomainFairShareAction(DomainFairShareAction):
 
     @override
     def entity_id(self) -> str | None:
-        return f"{self.resource_group}:{self.domain_name}"
+        return f"{self.resource_group_id}:{self.domain_name}"
 
 
 @dataclass
@@ -113,7 +113,7 @@ class SearchRGDomainFairSharesAction(DomainFairShareAction):
 
     @override
     def entity_id(self) -> str | None:
-        return self.scope.resource_group
+        return str(self.scope.resource_group_id)
 
 
 @dataclass
@@ -145,7 +145,7 @@ class ProjectFairShareAction(BaseAction):
 class GetProjectFairShareAction(ProjectFairShareAction):
     """Action to get a project fair share record."""
 
-    resource_group: str
+    resource_group_id: ResourceGroupID
     project_id: uuid.UUID
 
     @override
@@ -155,7 +155,7 @@ class GetProjectFairShareAction(ProjectFairShareAction):
 
     @override
     def entity_id(self) -> str | None:
-        return f"{self.resource_group}:{self.project_id}"
+        return f"{self.resource_group_id}:{self.project_id}"
 
 
 @dataclass
@@ -217,7 +217,7 @@ class SearchRGProjectFairSharesAction(ProjectFairShareAction):
 
     @override
     def entity_id(self) -> str | None:
-        return self.scope.resource_group
+        return str(self.scope.resource_group_id)
 
 
 @dataclass
@@ -249,7 +249,7 @@ class UserFairShareAction(BaseAction):
 class GetUserFairShareAction(UserFairShareAction):
     """Action to get a user fair share record."""
 
-    resource_group: str
+    resource_group_id: ResourceGroupID
     project_id: uuid.UUID
     user_uuid: uuid.UUID
 
@@ -260,7 +260,7 @@ class GetUserFairShareAction(UserFairShareAction):
 
     @override
     def entity_id(self) -> str | None:
-        return f"{self.resource_group}:{self.project_id}:{self.user_uuid}"
+        return f"{self.resource_group_id}:{self.project_id}:{self.user_uuid}"
 
 
 @dataclass
@@ -322,7 +322,7 @@ class SearchRGUserFairSharesAction(UserFairShareAction):
 
     @override
     def entity_id(self) -> str | None:
-        return self.scope.resource_group
+        return str(self.scope.resource_group_id)
 
 
 @dataclass
@@ -356,7 +356,7 @@ class UpsertDomainFairShareWeightAction(DomainFairShareAction):
 
     @override
     def entity_id(self) -> str | None:
-        return f"{self.resource_group}:{self.domain_name}"
+        return f"{self.resource_group_id}:{self.domain_name}"
 
 
 @dataclass
@@ -387,7 +387,7 @@ class UpsertProjectFairShareWeightAction(ProjectFairShareAction):
 
     @override
     def entity_id(self) -> str | None:
-        return f"{self.resource_group}:{self.project_id}"
+        return f"{self.resource_group_id}:{self.project_id}"
 
 
 @dataclass
@@ -419,7 +419,7 @@ class UpsertUserFairShareWeightAction(UserFairShareAction):
 
     @override
     def entity_id(self) -> str | None:
-        return f"{self.resource_group}:{self.project_id}:{self.user_uuid}"
+        return f"{self.resource_group_id}:{self.project_id}:{self.user_uuid}"
 
 
 @dataclass
@@ -459,7 +459,7 @@ class BulkUpsertDomainFairShareWeightAction(DomainFairShareAction):
 
     @override
     def entity_id(self) -> str | None:
-        return f"{self.resource_group}:[{len(self.inputs)} domains]"
+        return f"{self.resource_group_id}:[{len(self.inputs)} domains]"
 
 
 @dataclass
@@ -497,7 +497,7 @@ class BulkUpsertProjectFairShareWeightAction(ProjectFairShareAction):
 
     @override
     def entity_id(self) -> str | None:
-        return f"{self.resource_group}:[{len(self.inputs)} projects]"
+        return f"{self.resource_group_id}:[{len(self.inputs)} projects]"
 
 
 @dataclass
@@ -536,7 +536,7 @@ class BulkUpsertUserFairShareWeightAction(UserFairShareAction):
 
     @override
     def entity_id(self) -> str | None:
-        return f"{self.resource_group}:[{len(self.inputs)} users]"
+        return f"{self.resource_group_id}:[{len(self.inputs)} users]"
 
 
 @dataclass

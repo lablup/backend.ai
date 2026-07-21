@@ -56,7 +56,7 @@ class TestDomainFairShareRow:
         scaling_group: str,
         resource_group_id: ResourceGroupID,
     ) -> None:
-        """Duplicate (scaling_group, domain_name) should raise IntegrityError."""
+        """Duplicate (resource_group_id, domain_name) should raise IntegrityError."""
         duplicate = DomainFairShareRow(
             domain_name=domain_name,
             resource_group=scaling_group,
@@ -126,7 +126,7 @@ class TestProjectFairShareRow:
         scaling_group: str,
         resource_group_id: ResourceGroupID,
     ) -> None:
-        """Duplicate (scaling_group, project_id) should raise IntegrityError."""
+        """Duplicate (resource_group_id, project_id) should raise IntegrityError."""
         duplicate = ProjectFairShareRow(
             project_id=project_id,
             domain_name=domain_name,
@@ -172,7 +172,7 @@ class TestUserFairShareRow:
         scaling_group: str,
         resource_group_id: ResourceGroupID,
     ) -> None:
-        """Duplicate (scaling_group, user_uuid, project_id) should raise IntegrityError."""
+        """Duplicate (resource_group_id, user_uuid, project_id) should raise IntegrityError."""
         duplicate = UserFairShareRow(
             user_uuid=user_uuid,
             project_id=project_id,

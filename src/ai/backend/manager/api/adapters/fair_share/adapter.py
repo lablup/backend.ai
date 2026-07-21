@@ -154,9 +154,12 @@ class FairShareAdapter(BaseAdapter):
 
     async def get_domain(self, input: GetDomainFairShareInput) -> GetDomainFairSharePayload:
         """Get a single domain fair share record."""
+        resource_group_id_result = await self._processors.scaling_group.resolve_resource_group_id_by_name.wait_for_complete(
+            ResolveResourceGroupIDByNameAction(name=ResourceGroupName(input.resource_group))
+        )
         result = await self._processors.fair_share.get_domain_fair_share.wait_for_complete(
             GetDomainFairShareAction(
-                resource_group=input.resource_group,
+                resource_group_id=resource_group_id_result.resource_group_id,
                 domain_name=input.domain_name,
             )
         )
@@ -200,6 +203,9 @@ class FairShareAdapter(BaseAdapter):
         resource_group: str,
     ) -> SearchDomainFairSharesPayload:
         """Search domain fair shares within a resource group (entity-based, cursor/offset)."""
+        resource_group_id_result = await self._processors.scaling_group.resolve_resource_group_id_by_name.wait_for_complete(
+            ResolveResourceGroupIDByNameAction(name=ResourceGroupName(resource_group))
+        )
         conditions = self._convert_domain_filter_rg(input.filter) if input.filter else []
         orders = self._convert_domain_orders_rg(input.order) if input.order else []
         querier = self._build_querier(
@@ -216,7 +222,9 @@ class FairShareAdapter(BaseAdapter):
 
         result = await self._processors.fair_share.search_rg_domain_fair_shares.wait_for_complete(
             SearchRGDomainFairSharesAction(
-                scope=DomainFairShareSearchScope(resource_group=resource_group),
+                scope=DomainFairShareSearchScope(
+                    resource_group_id=resource_group_id_result.resource_group_id,
+                ),
                 querier=querier,
             )
         )
@@ -271,9 +279,12 @@ class FairShareAdapter(BaseAdapter):
 
     async def get_project(self, input: GetProjectFairShareInput) -> GetProjectFairSharePayload:
         """Get a single project fair share record."""
+        resource_group_id_result = await self._processors.scaling_group.resolve_resource_group_id_by_name.wait_for_complete(
+            ResolveResourceGroupIDByNameAction(name=ResourceGroupName(input.resource_group))
+        )
         result = await self._processors.fair_share.get_project_fair_share.wait_for_complete(
             GetProjectFairShareAction(
-                resource_group=input.resource_group,
+                resource_group_id=resource_group_id_result.resource_group_id,
                 project_id=input.project_id,
             )
         )
@@ -316,6 +327,9 @@ class FairShareAdapter(BaseAdapter):
         domain_name: str,
     ) -> SearchProjectFairSharesPayload:
         """Search project fair shares within a resource group scope (entity-based, cursor/offset)."""
+        resource_group_id_result = await self._processors.scaling_group.resolve_resource_group_id_by_name.wait_for_complete(
+            ResolveResourceGroupIDByNameAction(name=ResourceGroupName(resource_group))
+        )
         conditions = self._convert_project_filter_rg(input.filter) if input.filter else []
         orders = self._convert_project_orders_rg(input.order) if input.order else []
         querier = self._build_querier(
@@ -333,8 +347,8 @@ class FairShareAdapter(BaseAdapter):
         result = await self._processors.fair_share.search_rg_project_fair_shares.wait_for_complete(
             SearchRGProjectFairSharesAction(
                 scope=ProjectFairShareSearchScope(
-                    resource_group=resource_group,
                     domain_name=domain_name,
+                    resource_group_id=resource_group_id_result.resource_group_id,
                 ),
                 querier=querier,
             )
@@ -395,9 +409,12 @@ class FairShareAdapter(BaseAdapter):
 
     async def get_user(self, input: GetUserFairShareInput) -> GetUserFairSharePayload:
         """Get a single user fair share record."""
+        resource_group_id_result = await self._processors.scaling_group.resolve_resource_group_id_by_name.wait_for_complete(
+            ResolveResourceGroupIDByNameAction(name=ResourceGroupName(input.resource_group))
+        )
         result = await self._processors.fair_share.get_user_fair_share.wait_for_complete(
             GetUserFairShareAction(
-                resource_group=input.resource_group,
+                resource_group_id=resource_group_id_result.resource_group_id,
                 project_id=input.project_id,
                 user_uuid=input.user_uuid,
             )
@@ -440,6 +457,9 @@ class FairShareAdapter(BaseAdapter):
         project_id: UUID,
     ) -> SearchUserFairSharesPayload:
         """Search user fair shares within a resource group scope (entity-based, cursor/offset)."""
+        resource_group_id_result = await self._processors.scaling_group.resolve_resource_group_id_by_name.wait_for_complete(
+            ResolveResourceGroupIDByNameAction(name=ResourceGroupName(resource_group))
+        )
         conditions = self._convert_user_filter_rg(input.filter) if input.filter else []
         orders = self._convert_user_orders_rg(input.order) if input.order else []
         querier = self._build_querier(
@@ -457,9 +477,9 @@ class FairShareAdapter(BaseAdapter):
         result = await self._processors.fair_share.search_rg_user_fair_shares.wait_for_complete(
             SearchRGUserFairSharesAction(
                 scope=UserFairShareSearchScope(
-                    resource_group=resource_group,
                     domain_name=domain_name,
                     project_id=project_id,
+                    resource_group_id=resource_group_id_result.resource_group_id,
                 ),
                 querier=querier,
             )

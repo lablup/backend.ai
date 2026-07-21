@@ -235,7 +235,7 @@ class DomainFairShareRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
     )
 
     __table_args__ = (
-        sa.UniqueConstraint("resource_group", "domain_name", name="uq_domain_fair_share"),
+        sa.UniqueConstraint("resource_group_id", "domain_name", name="uq_domain_fair_share_rg_id"),
         sa.Index("ix_domain_fair_share_lookup", "resource_group", "domain_name"),
     )
 
@@ -272,6 +272,7 @@ class DomainFairShareRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
 
         return DomainFairShareData(
             resource_group=self.resource_group,
+            resource_group_id=self.resource_group_id,
             domain_name=self.domain_name,
             data=FairShareData(
                 spec=FairShareSpec(
@@ -442,7 +443,7 @@ class ProjectFairShareRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
     )
 
     __table_args__ = (
-        sa.UniqueConstraint("resource_group", "project_id", name="uq_project_fair_share"),
+        sa.UniqueConstraint("resource_group_id", "project_id", name="uq_project_fair_share_rg_id"),
         sa.Index("ix_project_fair_share_lookup", "resource_group", "project_id"),
     )
 
@@ -479,6 +480,7 @@ class ProjectFairShareRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
 
         return ProjectFairShareData(
             resource_group=self.resource_group,
+            resource_group_id=self.resource_group_id,
             project_id=self.project_id,
             domain_name=self.domain_name,
             data=FairShareData(
@@ -676,10 +678,10 @@ class UserFairShareRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
 
     __table_args__ = (
         sa.UniqueConstraint(
-            "resource_group",
+            "resource_group_id",
             "user_uuid",
             "project_id",
-            name="uq_user_fair_share",
+            name="uq_user_fair_share_rg_id",
         ),
         sa.Index("ix_user_fair_share_lookup", "resource_group", "user_uuid", "project_id"),
     )
@@ -717,6 +719,7 @@ class UserFairShareRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
 
         return UserFairShareData(
             resource_group=self.resource_group,
+            resource_group_id=self.resource_group_id,
             user_uuid=self.user_uuid,
             project_id=self.project_id,
             domain_name=self.domain_name,

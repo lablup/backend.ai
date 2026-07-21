@@ -20,8 +20,8 @@ from ai.backend.manager.sokovan.scheduler.provisioner.sequencers.fifo import FIF
 
 class TestFIFOSequencer:
     @pytest.fixture
-    def scaling_group(self) -> str:
-        return "default"
+    def resource_group_id(self) -> ResourceGroupID:
+        return ResourceGroupID(uuid.uuid4())
 
     @pytest.fixture
     def sequencer(self) -> FIFOSequencer:
@@ -61,13 +61,19 @@ class TestFIFOSequencer:
         assert sequencer.name == "FIFOSequencer"
 
     async def test_empty_workload(
-        self, scaling_group: str, sequencer: FIFOSequencer, system_snapshot: SystemSnapshot
+        self,
+        resource_group_id: ResourceGroupID,
+        sequencer: FIFOSequencer,
+        system_snapshot: SystemSnapshot,
     ) -> None:
-        result = await sequencer.sequence(scaling_group, system_snapshot, [])
+        result = await sequencer.sequence(resource_group_id, system_snapshot, [])
         assert result == []
 
     async def test_preserves_order(
-        self, scaling_group: str, sequencer: FIFOSequencer, system_snapshot: SystemSnapshot
+        self,
+        resource_group_id: ResourceGroupID,
+        sequencer: FIFOSequencer,
+        system_snapshot: SystemSnapshot,
     ) -> None:
         workloads = [
             SessionWorkload(
@@ -105,7 +111,7 @@ class TestFIFOSequencer:
             ),
         ]
 
-        result = await sequencer.sequence(scaling_group, system_snapshot, workloads)
+        result = await sequencer.sequence(resource_group_id, system_snapshot, workloads)
 
         # FIFO should preserve the original order
         assert len(result) == 3
@@ -114,7 +120,7 @@ class TestFIFOSequencer:
         assert result[2] == workloads[2]
 
     async def test_ignores_system_snapshot(
-        self, scaling_group: str, sequencer: FIFOSequencer
+        self, resource_group_id: ResourceGroupID, sequencer: FIFOSequencer
     ) -> None:
         # FIFO should work the same regardless of system state
         snapshot_with_allocations = SystemSnapshot(
@@ -187,7 +193,7 @@ class TestFIFOSequencer:
             ),
         ]
 
-        result = await sequencer.sequence(scaling_group, snapshot_with_allocations, workloads)
+        result = await sequencer.sequence(resource_group_id, snapshot_with_allocations, workloads)
 
         # Should still preserve original order despite different allocations
         assert len(result) == 2

@@ -127,6 +127,7 @@ class TestUsageBucketEntries:
         raw_slots = ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("4096000")})
         duration = 300  # 5-minute slice
         period = date(2024, 1, 15)
+        resource_group_id = ResourceGroupID(uuid.uuid4())
 
         result = UsageBucketAggregationResult(
             user_usage_deltas={},
@@ -135,7 +136,7 @@ class TestUsageBucketEntries:
                 DomainUsageBucketKey(
                     domain_name=test_domain_name,
                     resource_group="default",
-                    resource_group_id=RESOURCE_GROUP_ID,
+                    resource_group_id=resource_group_id,
                     period_date=period,
                 ): BucketDelta(slots=raw_slots, duration_seconds=duration),
             },
@@ -174,10 +175,11 @@ class TestUsageBucketEntries:
     ) -> None:
         """Verify that multiple increments accumulate amount and duration."""
         period = date(2024, 1, 15)
+        resource_group_id = ResourceGroupID(uuid.uuid4())
         key = DomainUsageBucketKey(
             domain_name=test_domain_name,
             resource_group="default",
-            resource_group_id=RESOURCE_GROUP_ID,
+            resource_group_id=resource_group_id,
             period_date=period,
         )
 
@@ -195,18 +197,11 @@ class TestUsageBucketEntries:
         await db_source.increment_usage_buckets(result1)
 
         # Second increment: 3 CPUs for 300 seconds
-        replacement_resource_group_id = ResourceGroupID(uuid.uuid4())
-        replacement_key = DomainUsageBucketKey(
-            domain_name=test_domain_name,
-            resource_group="default",
-            resource_group_id=replacement_resource_group_id,
-            period_date=period,
-        )
         result2 = UsageBucketAggregationResult(
             user_usage_deltas={},
             project_usage_deltas={},
             domain_usage_deltas={
-                replacement_key: BucketDelta(
+                key: BucketDelta(
                     slots=ResourceSlot({"cpu": Decimal("3")}),
                     duration_seconds=300,
                 ),
@@ -240,7 +235,7 @@ class TestUsageBucketEntries:
                     DomainUsageBucketRow.period_start == period,
                 )
             )
-            assert stored_resource_group_id == replacement_resource_group_id
+            assert stored_resource_group_id == resource_group_id
 
     async def test_increment_user_buckets_creates_entries(
         self,
@@ -254,6 +249,7 @@ class TestUsageBucketEntries:
         raw_slots = ResourceSlot({"cpu": Decimal("3"), "cuda.device": Decimal("2")})
         duration = 300  # 5-minute slice
         period = date(2024, 1, 15)
+        resource_group_id = ResourceGroupID(uuid.uuid4())
 
         result = UsageBucketAggregationResult(
             user_usage_deltas={
@@ -262,7 +258,7 @@ class TestUsageBucketEntries:
                     project_id=project_id,
                     domain_name=test_domain_name,
                     resource_group="default",
-                    resource_group_id=RESOURCE_GROUP_ID,
+                    resource_group_id=resource_group_id,
                     period_date=period,
                 ): BucketDelta(slots=raw_slots, duration_seconds=duration),
             },
@@ -301,6 +297,7 @@ class TestUsageBucketEntries:
         """Verify that aggregation queries read from normalized entries."""
         period1 = date(2024, 1, 15)
         period2 = date(2024, 1, 16)
+        resource_group_id = ResourceGroupID(uuid.uuid4())
 
         # Insert two domain buckets with entries (raw amount, not resource-seconds)
         result = UsageBucketAggregationResult(
@@ -310,7 +307,7 @@ class TestUsageBucketEntries:
                 DomainUsageBucketKey(
                     domain_name=test_domain_name,
                     resource_group="default",
-                    resource_group_id=RESOURCE_GROUP_ID,
+                    resource_group_id=resource_group_id,
                     period_date=period1,
                 ): BucketDelta(
                     slots=ResourceSlot({"cpu": Decimal("2")}),
@@ -319,7 +316,7 @@ class TestUsageBucketEntries:
                 DomainUsageBucketKey(
                     domain_name=test_domain_name,
                     resource_group="default",
-                    resource_group_id=RESOURCE_GROUP_ID,
+                    resource_group_id=resource_group_id,
                     period_date=period2,
                 ): BucketDelta(
                     slots=ResourceSlot({"cpu": Decimal("3")}),
@@ -331,7 +328,7 @@ class TestUsageBucketEntries:
 
         # Query aggregated usage — SUM(amount) across buckets
         aggregated = await db_source.get_aggregated_usage_by_domain(
-            resource_group="default",
+            resource_group_id=resource_group_id,
             lookback_start=date(2024, 1, 14),
             lookback_end=date(2024, 1, 17),
         )

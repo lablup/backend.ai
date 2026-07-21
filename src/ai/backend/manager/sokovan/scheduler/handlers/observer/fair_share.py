@@ -138,12 +138,13 @@ class FairShareObserver(KernelObserver):
             return ObservationResult(observed_count=0)
 
         now = await self._scheduler_repository.get_db_now()
-        # Fair share records and factor queries are keyed by name.
+        # Keep the legacy name alongside the ID while name-based writes remain supported.
         resource_group_name = await self._scheduler_repository.get_resource_group_name_by_id(
             resource_group_id
         )
 
         # ===== Phase 1: Record usage =====
+        # TODO: Remove resource_group name from spec once DB schema is updated
         preparation_result = self._aggregator.prepare_kernel_usage_records(
             kernels, resource_group_id, resource_group_name, now
         )
@@ -206,16 +207,16 @@ class FairShareObserver(KernelObserver):
         4. WRITE: update factors + ranks together
 
         Args:
-            scaling_group: The scaling group being processed
+            resource_group_id: The resource group ID being processed
             today: Current date for decay calculation
         """
         try:
-            log.debug("[FairShareObserver] Phase 2: calculating factors for {}", scaling_group)
+            log.debug("[FairShareObserver] Phase 2: calculating factors for {}", resource_group_id)
 
             # ===== Single batched DB read =====
             # Get all data needed for calculation in one database session
             context = await self._fair_share_repository.get_fair_share_calculation_context(
-                scaling_group, today
+                resource_group_id, today
             )
 
             log.debug(
@@ -229,7 +230,7 @@ class FairShareObserver(KernelObserver):
             if context.cluster_capacity:
                 capacity_by_slot = {sq.slot_name: sq.quantity for sq in context.cluster_capacity}
                 await self._resource_usage_repository.update_bucket_entry_capacities(
-                    scaling_group,
+                    resource_group_id,
                     capacity_by_slot,
                 )
 
@@ -274,7 +275,7 @@ class FairShareObserver(KernelObserver):
         except Exception as e:
             log.warning(
                 "Failed to calculate fair share factors and ranks for {}: {}",
-                scaling_group,
+                resource_group_id,
                 e,
             )
             # Don't fail the observation for calculation errors

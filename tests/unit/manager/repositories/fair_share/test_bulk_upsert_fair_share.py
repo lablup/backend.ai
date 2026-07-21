@@ -196,7 +196,7 @@ class TestBulkUpsertDomainFairShare:
             for name, weight in existing_weights.items():
                 row = DomainFairShareRow(
                     resource_group=sg_name,
-                    resource_group_id=ResourceGroupID(uuid.uuid4()),
+                    resource_group_id=rg_id,
                     domain_name=name,
                     weight=weight,
                 )
@@ -543,7 +543,7 @@ class TestBulkUpsertProjectFairShare:
             for pid, weight in existing_weights.items():
                 row = ProjectFairShareRow(
                     resource_group=sg_name,
-                    resource_group_id=ResourceGroupID(uuid.uuid4()),
+                    resource_group_id=rg_id,
                     project_id=pid,
                     domain_name=domain_name,
                     weight=weight,
@@ -856,7 +856,7 @@ class TestBulkUpsertUserFairShare:
             for uid, weight in existing_weights.items():
                 row = UserFairShareRow(
                     resource_group=sg_name,
-                    resource_group_id=ResourceGroupID(uuid.uuid4()),
+                    resource_group_id=rg_id,
                     user_uuid=uid,
                     project_id=project_id,
                     domain_name=domain_name,
