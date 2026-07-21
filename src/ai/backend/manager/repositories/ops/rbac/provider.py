@@ -285,18 +285,18 @@ class RBACWriteOps(WriteOps):
     async def create_scope[TRow: Base](
         self,
         creation: ScopeCreation[TRow],
-        parent: ScopeRef | None = None,
+        bound_scope: ScopeRef | None = None,
     ) -> CreatorResult[TRow]:
         """Create the real scope entity via ``creation.creator`` and its virtual scope node.
 
-        ``creation.scope.scope_id`` must match the id the created row carries. When ``parent``
-        is given, the parent scope is bound to this scope's virtual scope so it can reach this
-        scope's entities.
+        ``creation.scope.scope_id`` must match the id the created row carries. When
+        ``bound_scope`` is given, it is bound to this scope's virtual scope so it can reach
+        this scope's entities.
         """
         result = await self.create(creation.creator)
         await self._insert_virtual_scopes([creation.scope])
-        if parent is not None:
-            await self.bind_scope(parent, creation.scope, permission_cap=None)
+        if bound_scope is not None:
+            await self.bind_scope(bound_scope, creation.scope, permission_cap=None)
         return result
 
     async def bulk_create_scopes[TRow: Base](
@@ -430,14 +430,14 @@ class RBACWriteOps(WriteOps):
     async def ensure_scope(
         self,
         scope: ScopeRef,
-        parent: ScopeRef | None = None,
+        bound_scope: ScopeRef | None = None,
     ) -> None:
-        """Ensure the virtual scope node for an already-created ``scope``. When ``parent`` is
-        given, the parent scope is bound to this scope's virtual scope. Idempotent.
+        """Ensure the virtual scope node for an already-created ``scope``. When ``bound_scope``
+        is given, it is bound to this scope's virtual scope. Idempotent.
         """
         await self._insert_virtual_scopes([scope])
-        if parent is not None:
-            await self.bind_scope(parent, scope, permission_cap=None)
+        if bound_scope is not None:
+            await self.bind_scope(bound_scope, scope, permission_cap=None)
 
 
 class RBACOpsProvider(DBOpsProvider):

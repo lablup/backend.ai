@@ -1,15 +1,4 @@
-"""Integration tests for the RBAC ops provider (RBACWriteOps) with a real database.
-
-These verify observable outcomes — which rows and which scope associations survive an
-operation — rather than internal call wiring. Two surfaces are covered:
-
-- ``create_scope`` / ``bulk_create_scopes`` / ``ensure_scope`` materialize the virtual
-  scope node, the scope-as-entity membership, and the self scope_binding in the scope's own
-  virtual scope; a ``parent`` additionally binds the parent scope to that virtual scope.
-- ``bulk_create_scoped_partial`` / ``bulk_purge_scoped_partial`` isolate each item so a
-  rejected one leaves the rest of the batch intact. The unscoped counterparts
-  (``bulk_create_partial`` / ``bulk_purge_partial``) are covered by the base ops tests.
-"""
+"""Integration tests for the RBAC ops provider (RBACWriteOps) with a real database."""
 
 from __future__ import annotations
 
@@ -82,7 +71,7 @@ _ORM_CLUSTER = (
 
 _TEST_SCOPE_TYPE = ScopeType("test-scope")
 _TEST_ENTITY_TYPE = VirtualScopeEntityType("test-scope")
-_TEST_PARENT_SCOPE_TYPE = ScopeType("test-parent-scope")
+_TEST_BOUND_SCOPE_TYPE = ScopeType("test-bound-scope")
 
 _USER_SCOPE_ID = str(uuid.uuid4())
 _USER_SCOPE_REF = RBACElementRef(RBACElementType.USER, _USER_SCOPE_ID)
@@ -245,7 +234,7 @@ def bulk_scopes() -> BulkScopeContext:
 
 class TestScopeCreationVirtualScope:
     """create_scope / bulk_create_scopes materialize the VS node, self-membership, and
-    self scope_binding (plus a parent hierarchy binding when a parent is given)."""
+    self scope_binding (plus a bound-scope binding when a bound_scope is given)."""
 
     async def test_create_scope_adds_virtual_scope_membership_and_self_binding(
         self,
@@ -295,20 +284,20 @@ class TestScopeCreationVirtualScope:
         assert binding.scope_id == scope_id
         assert binding.permission_cap is None
 
-    async def test_create_scope_with_parent_binds_parent_to_its_virtual_scope(
+    async def test_create_scope_with_bound_scope_binds_it_to_its_virtual_scope(
         self,
         database_connection: ExtendedAsyncSAEngine,
         provider: RBACOpsProvider,
         scope_tables: None,
         single_scope: SingleScopeContext,
     ) -> None:
-        """create_scope(parent=...) binds the parent scope to the new scope's VS on top of
-        the self binding, so the parent reaches this scope's entities in one hop."""
+        """create_scope(bound_scope=...) binds that scope to the new scope's VS on top of
+        the self binding, so it reaches this scope's entities in one hop."""
         scope_id = single_scope.scope_id
-        parent = ScopeRef(scope_type=_TEST_PARENT_SCOPE_TYPE, scope_id=uuid.uuid4())
+        bound_scope = ScopeRef(scope_type=_TEST_BOUND_SCOPE_TYPE, scope_id=uuid.uuid4())
 
         async with provider.write_ops() as w:
-            await w.create_scope(single_scope.creation, parent=parent)
+            await w.create_scope(single_scope.creation, bound_scope=bound_scope)
 
         async with database_connection.begin_session_read_committed() as sess:
             vs = (
@@ -328,7 +317,7 @@ class TestScopeCreationVirtualScope:
 
         assert {(b.scope_type, b.scope_id) for b in binding_rows} == {
             (_TEST_SCOPE_TYPE, scope_id),  # self binding
-            (_TEST_PARENT_SCOPE_TYPE, parent.scope_id),  # hierarchy binding
+            (_TEST_BOUND_SCOPE_TYPE, bound_scope.scope_id),  # bound-scope binding
         }
 
     async def test_bulk_create_scopes_adds_vs_membership_and_self_binding_per_scope(
@@ -435,20 +424,20 @@ class TestEnsureScope:
         assert membership_count == 1
         assert binding_count == 1
 
-    async def test_ensure_scope_with_parent_adds_hierarchy_binding(
+    async def test_ensure_scope_with_bound_scope_adds_binding(
         self,
         database_connection: ExtendedAsyncSAEngine,
         provider: RBACOpsProvider,
         scope_tables: None,
     ) -> None:
-        """ensure_scope(scope, parent) binds both the scope itself and its parent to the
-        scope's VS."""
+        """ensure_scope(scope, bound_scope) binds both the scope itself and the bound scope
+        to the scope's VS."""
         scope_id = uuid.uuid4()
         scope = ScopeRef(scope_type=_TEST_SCOPE_TYPE, scope_id=scope_id)
-        parent = ScopeRef(scope_type=_TEST_PARENT_SCOPE_TYPE, scope_id=uuid.uuid4())
+        bound_scope = ScopeRef(scope_type=_TEST_BOUND_SCOPE_TYPE, scope_id=uuid.uuid4())
 
         async with provider.write_ops() as w:
-            await w.ensure_scope(scope, parent=parent)
+            await w.ensure_scope(scope, bound_scope=bound_scope)
 
         async with database_connection.begin_session_read_committed() as sess:
             vs = (
@@ -468,7 +457,7 @@ class TestEnsureScope:
 
         assert {(b.scope_type, b.scope_id) for b in binding_rows} == {
             (_TEST_SCOPE_TYPE, scope_id),  # self binding
-            (_TEST_PARENT_SCOPE_TYPE, parent.scope_id),  # hierarchy binding
+            (_TEST_BOUND_SCOPE_TYPE, bound_scope.scope_id),  # bound-scope binding
         }
 
 
