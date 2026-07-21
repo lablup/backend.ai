@@ -599,8 +599,8 @@
         "title": "CreateAppConfigFragmentInput",
         "type": "object"
       },
-      "UpdateAppConfigFragmentInput": {
-        "description": "Input for updating an app config fragment's config document.",
+      "AppConfigFragmentUpdateItem": {
+        "description": "One item of a bulk update, carrying its own target id.\n\nBulk requests address many fragments in a single call, so the id belongs in the body\nhere — unlike the single-fragment :class:`UpdateAppConfigFragmentInput`.",
         "properties": {
           "id": {
             "description": "App config fragment id to update.",
@@ -619,7 +619,7 @@
           "id",
           "config"
         ],
-        "title": "UpdateAppConfigFragmentInput",
+        "title": "AppConfigFragmentUpdateItem",
         "type": "object"
       },
       "BulkUpdateAppConfigFragmentInput": {
@@ -628,7 +628,7 @@
           "items": {
             "description": "Fragments to update, each identified by its id.",
             "items": {
-              "$ref": "#/components/schemas/UpdateAppConfigFragmentInput"
+              "$ref": "#/components/schemas/AppConfigFragmentUpdateItem"
             },
             "minItems": 1,
             "title": "Items",
@@ -659,6 +659,22 @@
           "ids"
         ],
         "title": "BulkPurgeAppConfigFragmentInput",
+        "type": "object"
+      },
+      "UpdateAppConfigFragmentInput": {
+        "description": "Input for updating one app config fragment's config document.\n\nThe target fragment is identified by the request path, not by this body.",
+        "properties": {
+          "config": {
+            "additionalProperties": true,
+            "description": "The replacement JSON config document.",
+            "title": "Config",
+            "type": "object"
+          }
+        },
+        "required": [
+          "config"
+        ],
+        "title": "UpdateAppConfigFragmentInput",
         "type": "object"
       },
       "CreateAppConfigAllowListInput": {

@@ -11,7 +11,6 @@ from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
     BulkPurgeAppConfigFragmentInput,
     BulkUpdateAppConfigFragmentInput,
     CreateAppConfigFragmentInput,
-    PurgeAppConfigFragmentInput,
     UpdateAppConfigFragmentInput,
 )
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
@@ -54,8 +53,9 @@ class V2AppConfigFragmentHandler:
         body: BodyParam[UpdateAppConfigFragmentInput],
     ) -> APIResponse:
         """Update a fragment's config document by id (auth required, RBAC-gated)."""
-        merged = body.parsed.model_copy(update={"id": path.parsed.fragment_id})
-        result = await self._adapter.update(merged)
+        result = await self._adapter.update(
+            AppConfigFragmentID(path.parsed.fragment_id), body.parsed
+        )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def purge(
@@ -63,7 +63,7 @@ class V2AppConfigFragmentHandler:
         path: PathParam[AppConfigFragmentIdPathParam],
     ) -> APIResponse:
         """Purge a fragment by id (auth required, RBAC-gated)."""
-        result = await self._adapter.purge(PurgeAppConfigFragmentInput(id=path.parsed.fragment_id))
+        result = await self._adapter.purge(AppConfigFragmentID(path.parsed.fragment_id))
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def bulk_update(

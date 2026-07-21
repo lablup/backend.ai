@@ -8,7 +8,6 @@ from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
     BulkPurgeAppConfigFragmentInput,
     BulkUpdateAppConfigFragmentInput,
     CreateAppConfigFragmentInput,
-    PurgeAppConfigFragmentInput,
     UpdateAppConfigFragmentInput,
 )
 from ai.backend.common.dto.manager.v2.app_config_fragment.response import (
@@ -89,10 +88,12 @@ class AppConfigFragmentAdapter(BaseAdapter):
         )
         return self._fragment_to_node(action_result.fragment)
 
-    async def update(self, input: UpdateAppConfigFragmentInput) -> UpdateAppConfigFragmentPayload:
+    async def update(
+        self, fragment_id: AppConfigFragmentID, input: UpdateAppConfigFragmentInput
+    ) -> UpdateAppConfigFragmentPayload:
         updater = Updater(
             spec=AppConfigFragmentUpdaterSpec(config=OptionalState.update(input.config)),
-            pk_value=AppConfigFragmentID(input.id),
+            pk_value=fragment_id,
         )
         # No allow-list gate: a fragment row exists only while its entry does (FK with
         # cascade), so an existing fragment is always writable at its own scope.
@@ -103,8 +104,7 @@ class AppConfigFragmentAdapter(BaseAdapter):
             app_config_fragment=self._fragment_to_node(action_result.fragment),
         )
 
-    async def purge(self, input: PurgeAppConfigFragmentInput) -> PurgeAppConfigFragmentPayload:
-        fragment_id = AppConfigFragmentID(input.id)
+    async def purge(self, fragment_id: AppConfigFragmentID) -> PurgeAppConfigFragmentPayload:
         purger_spec = AppConfigFragmentPurgerSpec(fragment_id=fragment_id)
         # No allow-list gate — see ``update``.
         action_result = await self._processors.app_config_fragment.purge.wait_for_complete(
