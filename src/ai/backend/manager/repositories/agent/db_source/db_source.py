@@ -8,6 +8,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import selectinload
 
 from ai.backend.common.exception import AgentNotFound
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import AgentId, ImageID
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.agent.types import (
@@ -19,10 +20,13 @@ from ai.backend.manager.data.agent.types import (
     UpsertResult,
 )
 from ai.backend.manager.data.image.types import ImageDataWithDetails, ImageIdentifier
+from ai.backend.manager.data.kernel.types import KernelInfo, KernelStatus
+from ai.backend.manager.errors.agent import AgentHasConflictingSessions
 from ai.backend.manager.errors.resource import UnresolvableResourceGroup
 from ai.backend.manager.models.agent import ADMIN_PERMISSIONS as ADMIN_AGENT_PERMISSIONS
 from ai.backend.manager.models.agent import AgentRow, agents
 from ai.backend.manager.models.image import ImageRow
+from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.resource_slot import AgentResourceRow
 from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -180,6 +184,54 @@ class AgentDBSource:
     async def update_agent_status(self, updater: Updater[AgentRow]) -> None:
         async with self._db.begin_session() as session:
             await execute_updater(session, updater)
+
+    async def update_resource_group(
+        self,
+        agent_id: AgentId,
+        resource_group_id: ResourceGroupID,
+        *,
+        force: bool,
+    ) -> list[KernelInfo]:
+        """
+        Change the agent's resource group, gating on the kernels running on it.
+
+        Finds the active kernels on the agent. If any exist and ``force`` is not
+        set, raises without changing anything. Otherwise updates the agent's group
+        (name + id columns) and returns those kernels so the caller can transition
+        their sessions. The check and the update run in one transaction.
+        """
+        active_statuses = (
+            KernelStatus.resource_occupied_statuses() | KernelStatus.resource_requested_statuses()
+        )
+        async with self._db.begin_session_read_committed() as session:
+            rows = (
+                (
+                    await session.execute(
+                        sa.select(KernelRow).where(
+                            KernelRow.agent == agent_id,
+                            KernelRow.status.in_(active_statuses),
+                        )
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            kernels = [row.to_kernel_info() for row in rows]
+            if kernels and not force:
+                distinct_sessions = len({kernel.session.session_id for kernel in kernels})
+                raise AgentHasConflictingSessions(agent_id, distinct_sessions)
+
+            await session.execute(
+                sa.update(agents)
+                .where(agents.c.id == agent_id)
+                .values(
+                    resource_group_id=resource_group_id,
+                    scaling_group=sa.select(ScalingGroupRow.name)
+                    .where(ScalingGroupRow.id == resource_group_id)
+                    .scalar_subquery(),
+                )
+            )
+        return kernels
 
     async def search_agents(
         self,
