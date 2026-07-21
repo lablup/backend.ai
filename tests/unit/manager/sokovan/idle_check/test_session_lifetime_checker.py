@@ -21,10 +21,10 @@ from ai.backend.manager.repositories.idle_checker.types import IdleCheckerDefini
 from ai.backend.manager.sokovan.idle_check.checkers.base import (
     CheckerAssignment,
     IdleCheckerContext,
-    IdleJudgmentStatus,
 )
 from ai.backend.manager.sokovan.idle_check.checkers.session_lifetime import (
     SessionLifetimeChecker,
+    SessionLifetimeStatus,
 )
 
 _BASE_TIME = datetime(2026, 1, 1, tzinfo=UTC)
@@ -123,7 +123,7 @@ class TestSessionLifetimeChecker:
         assert judgments[0].session_id == session.session_id
         assert judgments[0].is_idle is False
         assert judgments[0].expire_at is None
-        assert judgments[0].status is IdleJudgmentStatus.BUSY
+        assert judgments[0].status is SessionLifetimeStatus.WITHIN_LIMIT
         assert judgments[0].message == (
             "Session lifetime check: max_lifetime_seconds=30, running_seconds=29"
         )
@@ -148,7 +148,7 @@ class TestSessionLifetimeChecker:
         assert judgments[0].session_id == session.session_id
         assert judgments[0].is_idle is True
         assert judgments[0].expire_at == _BASE_TIME + timedelta(seconds=30)
-        assert judgments[0].status is IdleJudgmentStatus.IDLE
+        assert judgments[0].status is SessionLifetimeStatus.EXCEEDED
         assert judgments[0].message == (
             "Session lifetime check: max_lifetime_seconds=30, running_seconds=30"
         )
@@ -171,7 +171,7 @@ class TestSessionLifetimeChecker:
 
         assert judgments[0].is_idle is True
         assert judgments[0].expire_at == _BASE_TIME + timedelta(seconds=30)
-        assert judgments[0].status is IdleJudgmentStatus.IDLE
+        assert judgments[0].status is SessionLifetimeStatus.EXCEEDED
         assert judgments[0].message == (
             "Session lifetime check: max_lifetime_seconds=30, running_seconds=31.2"
         )
