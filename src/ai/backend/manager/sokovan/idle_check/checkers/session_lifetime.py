@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Sequence
+from datetime import timedelta
 from decimal import Decimal
 from typing import override
 
@@ -11,6 +12,7 @@ from ai.backend.manager.sokovan.idle_check.checkers.base import (
     IdleChecker,
     IdleCheckerContext,
     IdleJudgment,
+    IdleJudgmentStatus,
 )
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
@@ -45,13 +47,22 @@ class SessionLifetimeChecker(IdleChecker):
                 running_seconds = Decimal(
                     str((context.current_time - session.starts_at).total_seconds())
                 ).normalize()
+                is_idle = running_seconds >= max_lifetime_seconds
+                if is_idle:
+                    expires_at = session.starts_at + timedelta(
+                        seconds=lifetime_spec.max_lifetime_seconds
+                    )
+                else:
+                    expires_at = None
                 judgments.append(
                     IdleJudgment(
                         checker_id=assignment.definition.checker_id,
                         session_id=session.session_id,
-                        is_idle=running_seconds >= max_lifetime_seconds,
+                        is_idle=is_idle,
+                        expire_at=expires_at,
+                        status=IdleJudgmentStatus.IDLE if is_idle else IdleJudgmentStatus.BUSY,
                         message=(
-                            "Session lifetime exceeded: "
+                            "Session lifetime check: "
                             f"max_lifetime_seconds={max_lifetime_seconds:f}, "
                             f"running_seconds={running_seconds:f}"
                         ),

@@ -21,6 +21,7 @@ from ai.backend.manager.repositories.idle_checker.types import IdleCheckerDefini
 from ai.backend.manager.sokovan.idle_check.checkers.base import (
     CheckerAssignment,
     IdleCheckerContext,
+    IdleJudgmentStatus,
 )
 from ai.backend.manager.sokovan.idle_check.checkers.session_lifetime import (
     SessionLifetimeChecker,
@@ -121,6 +122,11 @@ class TestSessionLifetimeChecker:
         assert len(judgments) == 1
         assert judgments[0].session_id == session.session_id
         assert judgments[0].is_idle is False
+        assert judgments[0].expire_at is None
+        assert judgments[0].status is IdleJudgmentStatus.BUSY
+        assert judgments[0].message == (
+            "Session lifetime check: max_lifetime_seconds=30, running_seconds=29"
+        )
 
     async def test_session_at_deadline_is_idle(
         self,
@@ -141,8 +147,10 @@ class TestSessionLifetimeChecker:
         assert len(judgments) == 1
         assert judgments[0].session_id == session.session_id
         assert judgments[0].is_idle is True
+        assert judgments[0].expire_at == _BASE_TIME + timedelta(seconds=30)
+        assert judgments[0].status is IdleJudgmentStatus.IDLE
         assert judgments[0].message == (
-            "Session lifetime exceeded: max_lifetime_seconds=30, running_seconds=30"
+            "Session lifetime check: max_lifetime_seconds=30, running_seconds=30"
         )
 
     async def test_session_after_deadline_is_idle(
@@ -162,8 +170,10 @@ class TestSessionLifetimeChecker:
         )
 
         assert judgments[0].is_idle is True
+        assert judgments[0].expire_at == _BASE_TIME + timedelta(seconds=30)
+        assert judgments[0].status is IdleJudgmentStatus.IDLE
         assert judgments[0].message == (
-            "Session lifetime exceeded: max_lifetime_seconds=30, running_seconds=31.2"
+            "Session lifetime check: max_lifetime_seconds=30, running_seconds=31.2"
         )
 
     async def test_disabled_lifetime_skips_assignment(

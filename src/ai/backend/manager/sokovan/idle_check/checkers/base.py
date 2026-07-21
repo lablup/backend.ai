@@ -6,6 +6,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
+from enum import StrEnum
 
 from ai.backend.common.identifier.idle_checker import IdleCheckerID
 from ai.backend.common.types import SessionId
@@ -28,6 +29,11 @@ class CheckerAssignment:
     sessions: Sequence[IdleCheckSession]
 
 
+class IdleJudgmentStatus(StrEnum):
+    IDLE = "idle"
+    BUSY = "busy"
+
+
 @dataclass(frozen=True)
 class IdleJudgment:
     """One session's judgment from one checker definition."""
@@ -35,6 +41,8 @@ class IdleJudgment:
     checker_id: IdleCheckerID
     session_id: SessionId
     is_idle: bool
+    expire_at: datetime | None
+    status: IdleJudgmentStatus
     message: str
 
 
