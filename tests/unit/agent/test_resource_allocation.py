@@ -56,7 +56,7 @@ def create_test_config(
         "agent": {
             "id": "agent1",
             "region": "local",
-            "scaling_group": "default",
+            "initial_resource_group_name": "default",
             "backend": "dummy",
             "rpc_listen_addr": "127.0.0.1:6001",
         },
