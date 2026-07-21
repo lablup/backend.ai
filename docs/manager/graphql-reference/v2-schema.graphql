@@ -4135,9 +4135,9 @@ input DeploymentRevisionPresetFilter {
   runtimeVariantId: UUIDFilter = null
 
   """
-  Added in 26.8.0. Return only presets whose resource requirements are satisfied by the given model card — the same subset as ModelCardV2.availablePresets.
+  Added in 26.8.0. Return only presets whose resource slots satisfy the given model card's minimum resource requirements — the same subset as ModelCardV2.availablePresets. Only the `equals` operator is supported.
   """
-  compatibleWithModelCardId: UUID = null
+  compatibleWithModelCardId: UUIDFilter = null
 
   """Added in 26.7.0. Match all of the given sub-filters."""
   AND: [DeploymentRevisionPresetFilter!] = null

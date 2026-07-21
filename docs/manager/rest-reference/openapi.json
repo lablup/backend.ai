@@ -6778,16 +6778,14 @@
           "compatible_with_model_card_id": {
             "anyOf": [
               {
-                "format": "uuid",
-                "type": "string"
+                "$ref": "#/components/schemas/UUIDFilter"
               },
               {
                 "type": "null"
               }
             ],
             "default": null,
-            "description": "Return only presets whose resource requirements are satisfied by the given model card (the same subset as ModelCardV2.availablePresets).",
-            "title": "Compatible With Model Card Id"
+            "description": "Return only presets whose resource slots satisfy the given model card's minimum resource requirements (the same subset as ModelCardV2.availablePresets). Only the `equals` operator is supported."
           },
           "AND": {
             "anyOf": [
