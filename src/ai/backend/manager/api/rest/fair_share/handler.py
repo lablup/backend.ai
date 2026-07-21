@@ -68,7 +68,7 @@ from ai.backend.common.dto.manager.fair_share import (
     UserUsageBucketFilter,
 )
 from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
-from ai.backend.common.identifier.resource_group import ResourceGroupName
+from ai.backend.common.identifier.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.manager.models.scaling_group.conditions import ScalingGroupConditions
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
@@ -138,6 +138,12 @@ class FairShareAPIHandler:
         self._scaling_group = scaling_group
         self._adapter = FairShareAdapter()
 
+    async def _resolve_resource_group_id(self, resource_group: str) -> ResourceGroupID:
+        result = await self._scaling_group.resolve_resource_group_id_by_name.wait_for_complete(
+            ResolveResourceGroupIDByNameAction(name=ResourceGroupName(resource_group))
+        )
+        return result.resource_group_id
+
     # Domain Fair Share
 
     async def get_domain_fair_share(
@@ -145,9 +151,10 @@ class FairShareAPIHandler:
         path: PathParam[GetDomainFairSharePathParam],
     ) -> APIResponse:
         """Get a single domain fair share."""
+        resource_group_id = await self._resolve_resource_group_id(path.parsed.resource_group)
         action_result = await self._fair_share.get_domain_fair_share.wait_for_complete(
             GetDomainFairShareAction(
-                resource_group=path.parsed.resource_group, domain_name=path.parsed.domain_name
+                resource_group_id=resource_group_id, domain_name=path.parsed.domain_name
             )
         )
 
@@ -192,9 +199,10 @@ class FairShareAPIHandler:
         path: PathParam[GetProjectFairSharePathParam],
     ) -> APIResponse:
         """Get a single project fair share."""
+        resource_group_id = await self._resolve_resource_group_id(path.parsed.resource_group)
         action_result = await self._fair_share.get_project_fair_share.wait_for_complete(
             GetProjectFairShareAction(
-                resource_group=path.parsed.resource_group, project_id=path.parsed.project_id
+                resource_group_id=resource_group_id, project_id=path.parsed.project_id
             )
         )
 
@@ -239,9 +247,10 @@ class FairShareAPIHandler:
         path: PathParam[GetUserFairSharePathParam],
     ) -> APIResponse:
         """Get a single user fair share."""
+        resource_group_id = await self._resolve_resource_group_id(path.parsed.resource_group)
         action_result = await self._fair_share.get_user_fair_share.wait_for_complete(
             GetUserFairShareAction(
-                resource_group=path.parsed.resource_group,
+                resource_group_id=resource_group_id,
                 project_id=path.parsed.project_id,
                 user_uuid=path.parsed.user_uuid,
             )
@@ -534,9 +543,10 @@ class FairShareAPIHandler:
         path: PathParam[RGDomainFairSharePathParam],
     ) -> APIResponse:
         """Get a single domain fair share within RG scope."""
+        resource_group_id = await self._resolve_resource_group_id(path.parsed.resource_group)
         action_result = await self._fair_share.get_domain_fair_share.wait_for_complete(
             GetDomainFairShareAction(
-                resource_group=path.parsed.resource_group, domain_name=path.parsed.domain_name
+                resource_group_id=resource_group_id, domain_name=path.parsed.domain_name
             )
         )
 
@@ -555,7 +565,8 @@ class FairShareAPIHandler:
         """Search domain fair shares within RG scope."""
 
         querier = self._adapter.build_domain_fair_share_querier_rg(body.parsed)
-        scope = DomainFairShareSearchScope(resource_group=path.parsed.resource_group)
+        resource_group_id = await self._resolve_resource_group_id(path.parsed.resource_group)
+        scope = DomainFairShareSearchScope(resource_group_id=resource_group_id)
 
         action_result = await self._fair_share.search_rg_domain_fair_shares.wait_for_complete(
             SearchRGDomainFairSharesAction(
@@ -583,9 +594,10 @@ class FairShareAPIHandler:
         path: PathParam[RGProjectFairSharePathParam],
     ) -> APIResponse:
         """Get a single project fair share within RG scope."""
+        resource_group_id = await self._resolve_resource_group_id(path.parsed.resource_group)
         action_result = await self._fair_share.get_project_fair_share.wait_for_complete(
             GetProjectFairShareAction(
-                resource_group=path.parsed.resource_group, project_id=path.parsed.project_id
+                resource_group_id=resource_group_id, project_id=path.parsed.project_id
             )
         )
 
@@ -604,9 +616,10 @@ class FairShareAPIHandler:
         """Search project fair shares within RG scope."""
 
         querier = self._adapter.build_project_fair_share_querier_rg(body.parsed)
+        resource_group_id = await self._resolve_resource_group_id(path.parsed.resource_group)
         scope = ProjectFairShareSearchScope(
-            resource_group=path.parsed.resource_group,
             domain_name=path.parsed.domain_name,
+            resource_group_id=resource_group_id,
         )
 
         action_result = await self._fair_share.search_rg_project_fair_shares.wait_for_complete(
@@ -635,9 +648,10 @@ class FairShareAPIHandler:
         path: PathParam[RGUserFairSharePathParam],
     ) -> APIResponse:
         """Get a single user fair share within RG scope."""
+        resource_group_id = await self._resolve_resource_group_id(path.parsed.resource_group)
         action_result = await self._fair_share.get_user_fair_share.wait_for_complete(
             GetUserFairShareAction(
-                resource_group=path.parsed.resource_group,
+                resource_group_id=resource_group_id,
                 project_id=path.parsed.project_id,
                 user_uuid=path.parsed.user_uuid,
             )
@@ -658,10 +672,11 @@ class FairShareAPIHandler:
         """Search user fair shares within RG scope."""
 
         querier = self._adapter.build_user_fair_share_querier_rg(body.parsed)
+        resource_group_id = await self._resolve_resource_group_id(path.parsed.resource_group)
         scope = UserFairShareSearchScope(
-            resource_group=path.parsed.resource_group,
             domain_name=path.parsed.domain_name,
             project_id=path.parsed.project_id,
+            resource_group_id=resource_group_id,
         )
 
         action_result = await self._fair_share.search_rg_user_fair_shares.wait_for_complete(

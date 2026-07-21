@@ -1,14 +1,4 @@
-"""Integration tests for the RBAC ops provider (RBACWriteOps) with a real database.
-
-These verify observable outcomes — which rows and which scope associations survive an
-operation — rather than internal call wiring. Two surfaces are covered:
-
-- ``create_scope`` / ``bulk_create_scopes`` materialize both the virtual scope node and
-  the scope-as-entity membership in the scope's own virtual scope.
-- ``bulk_create_scoped_partial`` / ``bulk_purge_scoped_partial`` isolate each item so a
-  rejected one leaves the rest of the batch intact. The unscoped counterparts
-  (``bulk_create_partial`` / ``bulk_purge_partial``) are covered by the base ops tests.
-"""
+"""Integration tests for the RBAC ops provider (RBACWriteOps) with a real database."""
 
 from __future__ import annotations
 
@@ -50,6 +40,7 @@ from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.manager.repositories.base import Creator, CreatorSpec
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
@@ -80,6 +71,7 @@ _ORM_CLUSTER = (
 
 _TEST_SCOPE_TYPE = ScopeType("test-scope")
 _TEST_ENTITY_TYPE = VirtualScopeEntityType("test-scope")
+_TEST_BOUND_SCOPE_TYPE = ScopeType("test-bound-scope")
 
 _USER_SCOPE_ID = str(uuid.uuid4())
 _USER_SCOPE_REF = RBACElementRef(RBACElementType.USER, _USER_SCOPE_ID)
@@ -175,6 +167,7 @@ _SCOPE_TABLES = [
     OpsRBACScopeRow,
     VirtualScopeRow,
     EntityMembershipRow,
+    ScopeBindingRow,
 ]
 
 
@@ -240,16 +233,18 @@ def bulk_scopes() -> BulkScopeContext:
 
 
 class TestScopeCreationVirtualScope:
-    """create_scope / bulk_create_scopes materialize the VS node and self-membership."""
+    """create_scope / bulk_create_scopes materialize the VS node, self-membership, and
+    self scope_binding (plus a bound-scope binding when a bound_scope is given)."""
 
-    async def test_create_scope_adds_virtual_scope_and_self_membership(
+    async def test_create_scope_adds_virtual_scope_membership_and_self_binding(
         self,
         database_connection: ExtendedAsyncSAEngine,
         provider: RBACOpsProvider,
         scope_tables: None,
         single_scope: SingleScopeContext,
     ) -> None:
-        """create_scope creates the VS node and registers the scope in its own VS."""
+        """create_scope creates the VS node, registers the scope in its own VS, and binds
+        the scope to its own VS."""
         scope_id = single_scope.scope_id
 
         async with provider.write_ops() as w:
@@ -268,6 +263,7 @@ class TestScopeCreationVirtualScope:
                 .all()
             )
             membership_rows = (await sess.execute(sa.select(EntityMembershipRow))).scalars().all()
+            binding_rows = (await sess.execute(sa.select(ScopeBindingRow))).scalars().all()
 
         assert len(vs_rows) == 1
         vs = vs_rows[0]
@@ -281,14 +277,58 @@ class TestScopeCreationVirtualScope:
         assert membership.entity_id == scope_id
         assert membership.permission_cap is None
 
-    async def test_bulk_create_scopes_adds_vs_and_self_membership_per_scope(
+        assert len(binding_rows) == 1
+        binding = binding_rows[0]
+        assert binding.virtual_scope_id == vs.id
+        assert binding.scope_type == _TEST_SCOPE_TYPE
+        assert binding.scope_id == scope_id
+        assert binding.permission_cap is None
+
+    async def test_create_scope_with_bound_scope_binds_it_to_its_virtual_scope(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        provider: RBACOpsProvider,
+        scope_tables: None,
+        single_scope: SingleScopeContext,
+    ) -> None:
+        """create_scope(bound_scope=...) binds that scope to the new scope's VS on top of
+        the self binding, so it reaches this scope's entities in one hop."""
+        scope_id = single_scope.scope_id
+        bound_scope = ScopeRef(scope_type=_TEST_BOUND_SCOPE_TYPE, scope_id=uuid.uuid4())
+
+        async with provider.write_ops() as w:
+            await w.create_scope(single_scope.creation, bound_scope=bound_scope)
+
+        async with database_connection.begin_session_read_committed() as sess:
+            vs = (
+                await sess.execute(
+                    sa.select(VirtualScopeRow).where(VirtualScopeRow.scope_id == scope_id)
+                )
+            ).scalar_one()
+            binding_rows = (
+                (
+                    await sess.execute(
+                        sa.select(ScopeBindingRow).where(ScopeBindingRow.virtual_scope_id == vs.id)
+                    )
+                )
+                .scalars()
+                .all()
+            )
+
+        assert {(b.scope_type, b.scope_id) for b in binding_rows} == {
+            (_TEST_SCOPE_TYPE, scope_id),  # self binding
+            (_TEST_BOUND_SCOPE_TYPE, bound_scope.scope_id),  # bound-scope binding
+        }
+
+    async def test_bulk_create_scopes_adds_vs_membership_and_self_binding_per_scope(
         self,
         database_connection: ExtendedAsyncSAEngine,
         provider: RBACOpsProvider,
         scope_tables: None,
         bulk_scopes: BulkScopeContext,
     ) -> None:
-        """bulk_create_scopes creates one VS node and one self-membership per scope."""
+        """bulk_create_scopes creates one VS node, self-membership, and self binding per
+        scope."""
         scope_ids = bulk_scopes.scope_ids
 
         async with provider.write_ops() as w:
@@ -297,6 +337,7 @@ class TestScopeCreationVirtualScope:
         async with database_connection.begin_session_read_committed() as sess:
             vs_rows = (await sess.execute(sa.select(VirtualScopeRow))).scalars().all()
             membership_rows = (await sess.execute(sa.select(EntityMembershipRow))).scalars().all()
+            binding_rows = (await sess.execute(sa.select(ScopeBindingRow))).scalars().all()
 
         assert {vs.scope_id for vs in vs_rows} == set(scope_ids)
         vs_by_scope = {vs.scope_id: vs for vs in vs_rows}
@@ -307,6 +348,117 @@ class TestScopeCreationVirtualScope:
             assert membership.entity_id in scope_ids
             assert membership.virtual_scope_id == vs_by_scope[membership.entity_id].id
             assert membership.permission_cap is None
+
+        assert len(binding_rows) == 3
+        for binding in binding_rows:
+            assert binding.scope_type == _TEST_SCOPE_TYPE
+            assert binding.scope_id in scope_ids
+            assert binding.virtual_scope_id == vs_by_scope[binding.scope_id].id
+            assert binding.permission_cap is None
+
+
+class TestEnsureScope:
+    """ensure_scope backfills the VS node, self-membership, and self binding for an
+    already-created scope, without creating the real scope row."""
+
+    async def test_ensure_scope_adds_vs_membership_and_self_binding_without_real_row(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        provider: RBACOpsProvider,
+        scope_tables: None,
+    ) -> None:
+        """ensure_scope creates the VS node, self-membership, and self binding, and leaves
+        no real scope row behind."""
+        scope_id = uuid.uuid4()
+        scope = ScopeRef(scope_type=_TEST_SCOPE_TYPE, scope_id=scope_id)
+
+        async with provider.write_ops() as w:
+            await w.ensure_scope(scope)
+
+        async with database_connection.begin_session_read_committed() as sess:
+            vs_rows = (await sess.execute(sa.select(VirtualScopeRow))).scalars().all()
+            membership_rows = (await sess.execute(sa.select(EntityMembershipRow))).scalars().all()
+            binding_rows = (await sess.execute(sa.select(ScopeBindingRow))).scalars().all()
+            real_row_count = await sess.scalar(
+                sa.select(sa.func.count()).select_from(OpsRBACScopeRow)
+            )
+
+        assert len(vs_rows) == 1
+        vs = vs_rows[0]
+        assert vs.scope_id == scope_id
+
+        assert len(membership_rows) == 1
+        assert membership_rows[0].virtual_scope_id == vs.id
+        assert membership_rows[0].entity_id == scope_id
+
+        assert len(binding_rows) == 1
+        assert binding_rows[0].virtual_scope_id == vs.id
+        assert binding_rows[0].scope_id == scope_id
+        assert binding_rows[0].permission_cap is None
+
+        assert real_row_count == 0
+
+    async def test_ensure_scope_is_idempotent(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        provider: RBACOpsProvider,
+        scope_tables: None,
+    ) -> None:
+        """Calling ensure_scope twice leaves exactly one VS node, membership, and binding."""
+        scope = ScopeRef(scope_type=_TEST_SCOPE_TYPE, scope_id=uuid.uuid4())
+
+        async with provider.write_ops() as w:
+            await w.ensure_scope(scope)
+            await w.ensure_scope(scope)
+
+        async with database_connection.begin_session_read_committed() as sess:
+            vs_count = await sess.scalar(sa.select(sa.func.count()).select_from(VirtualScopeRow))
+            membership_count = await sess.scalar(
+                sa.select(sa.func.count()).select_from(EntityMembershipRow)
+            )
+            binding_count = await sess.scalar(
+                sa.select(sa.func.count()).select_from(ScopeBindingRow)
+            )
+
+        assert vs_count == 1
+        assert membership_count == 1
+        assert binding_count == 1
+
+    async def test_ensure_scope_with_bound_scope_adds_binding(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        provider: RBACOpsProvider,
+        scope_tables: None,
+    ) -> None:
+        """ensure_scope(scope, bound_scope) binds both the scope itself and the bound scope
+        to the scope's VS."""
+        scope_id = uuid.uuid4()
+        scope = ScopeRef(scope_type=_TEST_SCOPE_TYPE, scope_id=scope_id)
+        bound_scope = ScopeRef(scope_type=_TEST_BOUND_SCOPE_TYPE, scope_id=uuid.uuid4())
+
+        async with provider.write_ops() as w:
+            await w.ensure_scope(scope, bound_scope=bound_scope)
+
+        async with database_connection.begin_session_read_committed() as sess:
+            vs = (
+                await sess.execute(
+                    sa.select(VirtualScopeRow).where(VirtualScopeRow.scope_id == scope_id)
+                )
+            ).scalar_one()
+            binding_rows = (
+                (
+                    await sess.execute(
+                        sa.select(ScopeBindingRow).where(ScopeBindingRow.virtual_scope_id == vs.id)
+                    )
+                )
+                .scalars()
+                .all()
+            )
+
+        assert {(b.scope_type, b.scope_id) for b in binding_rows} == {
+            (_TEST_SCOPE_TYPE, scope_id),  # self binding
+            (_TEST_BOUND_SCOPE_TYPE, bound_scope.scope_id),  # bound-scope binding
+        }
 
 
 @pytest.fixture

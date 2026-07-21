@@ -127,7 +127,7 @@ class SchedulingHistoryDBSource:
         querier: BatchQuerier,
         scope: KernelSchedulingHistorySearchScope,
     ) -> KernelSchedulingHistoryListResult:
-        """Search kernel scheduling history within scope."""
+        """Search kernel history whose rows match any of ``scopes`` (OR), narrowed by ``querier``."""
         async with self._db.begin_readonly_session() as db_sess:
             query = sa.select(KernelSchedulingHistoryRow)
 

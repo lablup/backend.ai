@@ -151,12 +151,18 @@ class SchedulerRepository:
         reason: str = "USER_REQUESTED",
         *,
         forced: bool = False,
+        message: str = "mark_terminating success",
     ) -> MarkTerminatingResult:
         """
         Mark sessions for termination.
         """
         # Delegate to DB source
-        return await self._db_source.mark_sessions_terminating(session_ids, reason, forced=forced)
+        return await self._db_source.mark_sessions_terminating(
+            session_ids,
+            reason,
+            forced=forced,
+            message=message,
+        )
 
     @scheduler_repository_resilience.apply()
     async def get_all_scaling_groups(self) -> list[ResourceGroupID]:

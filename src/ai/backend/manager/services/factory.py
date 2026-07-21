@@ -6,6 +6,12 @@ from ai.backend.manager.repositories.resource_allocation.repository import (
 )
 from ai.backend.manager.services.agent.processors import AgentProcessors
 from ai.backend.manager.services.agent.service import AgentService
+from ai.backend.manager.services.app_config.processors import (
+    AppConfigProcessors,
+)
+from ai.backend.manager.services.app_config.service import (
+    AppConfigService,
+)
 from ai.backend.manager.services.app_config_allow_list.processors import (
     AppConfigAllowListProcessors,
 )
@@ -17,6 +23,12 @@ from ai.backend.manager.services.app_config_definition.processors import (
 )
 from ai.backend.manager.services.app_config_definition.service import (
     AppConfigDefinitionService,
+)
+from ai.backend.manager.services.app_config_fragment.processors import (
+    AppConfigFragmentProcessors,
+)
+from ai.backend.manager.services.app_config_fragment.service import (
+    AppConfigFragmentService,
 )
 from ai.backend.manager.services.artifact.processors import ArtifactProcessors
 from ai.backend.manager.services.artifact.service import ArtifactService
@@ -176,8 +188,14 @@ def create_services(args: ServiceArgs) -> Services:
             args.event_producer,
             args.agent_cache,
         ),
+        app_config=AppConfigService(
+            fragment_repository=repositories.app_config_fragment.repository,
+        ),
         app_config_allow_list=AppConfigAllowListService(
             repository=repositories.app_config_allow_list.repository,
+        ),
+        app_config_fragment=AppConfigFragmentService(
+            repository=repositories.app_config_fragment.repository,
         ),
         domain=DomainService(repositories.domain.repository),
         dotfile=DotfileService(
@@ -444,8 +462,12 @@ def create_processors(
     services = create_services(args.service_args)
     return Processors(
         agent=AgentProcessors(services.agent, action_monitors, validators),
+        app_config=AppConfigProcessors(services.app_config, action_monitors),
         app_config_allow_list=AppConfigAllowListProcessors(
             services.app_config_allow_list, action_monitors
+        ),
+        app_config_fragment=AppConfigFragmentProcessors(
+            services.app_config_fragment, action_monitors, validators
         ),
         domain=DomainProcessors(services.domain, action_monitors, validators),
         dotfile=DotfileProcessors(services.dotfile, action_monitors, validators),

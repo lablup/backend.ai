@@ -165,6 +165,7 @@ class KernelUsageRecordRow(Base):  # type: ignore[misc]
 
     __table_args__ = (
         sa.Index("ix_kernel_usage_rg_period", "resource_group", "period_start"),
+        sa.Index("ix_kernel_usage_rg_id_period", "resource_group_id", "period_start"),
         sa.Index("ix_kernel_usage_user_period", "user_uuid", "period_start"),
     )
 
@@ -233,9 +234,9 @@ class DomainUsageBucketRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc
     __table_args__ = (
         sa.UniqueConstraint(
             "domain_name",
-            "resource_group",
+            "resource_group_id",
             "period_start",
-            name="uq_domain_usage_bucket",
+            name="uq_domain_usage_bucket_rg_id",
         ),
         sa.Index("ix_domain_usage_bucket_lookup", "domain_name", "resource_group", "period_start"),
     )
@@ -319,9 +320,9 @@ class ProjectUsageBucketRow(LifecycleTimestampsMixin, Base):  # type: ignore[mis
     __table_args__ = (
         sa.UniqueConstraint(
             "project_id",
-            "resource_group",
+            "resource_group_id",
             "period_start",
-            name="uq_project_usage_bucket",
+            name="uq_project_usage_bucket_rg_id",
         ),
         sa.Index("ix_project_usage_bucket_lookup", "project_id", "resource_group", "period_start"),
     )
@@ -425,9 +426,9 @@ class UserUsageBucketRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
         sa.UniqueConstraint(
             "user_uuid",
             "project_id",
-            "resource_group",
+            "resource_group_id",
             "period_start",
-            name="uq_user_usage_bucket",
+            name="uq_user_usage_bucket_rg_id",
         ),
         sa.Index(
             "ix_user_usage_bucket_lookup",

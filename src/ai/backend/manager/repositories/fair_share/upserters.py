@@ -23,7 +23,7 @@ from ai.backend.manager.types import OptionalState, TriState
 class DomainFairShareUpserterSpec(UpserterSpec[DomainFairShareRow]):
     """Upserter spec for DomainFairShareRow.
 
-    Unique constraint: (resource_group, domain_name)
+    Unique constraint: (resource_group_id, domain_name)
 
     - Identity fields are required (for unique constraint)
     - Spec fields use Row defaults on INSERT if NOP
@@ -127,7 +127,7 @@ class DomainFairShareBulkWeightUpserterSpec(UpserterSpec[DomainFairShareRow]):
 class ProjectFairShareUpserterSpec(UpserterSpec[ProjectFairShareRow]):
     """Upserter spec for ProjectFairShareRow.
 
-    Unique constraint: (resource_group, project_id)
+    Unique constraint: (resource_group_id, project_id)
 
     - Identity fields are required (for unique constraint)
     - Spec fields use Row defaults on INSERT if NOP
@@ -235,7 +235,7 @@ class ProjectFairShareBulkWeightUpserterSpec(UpserterSpec[ProjectFairShareRow]):
 class UserFairShareUpserterSpec(UpserterSpec[UserFairShareRow]):
     """Upserter spec for UserFairShareRow.
 
-    Unique constraint: (resource_group, user_uuid, project_id)
+    Unique constraint: (resource_group_id, user_uuid, project_id)
 
     - Identity fields are required (for unique constraint)
     - Spec fields use Row defaults on INSERT if NOP

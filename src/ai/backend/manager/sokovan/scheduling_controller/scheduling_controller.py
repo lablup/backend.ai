@@ -503,6 +503,7 @@ class SchedulingController:
         reason: str = "USER_REQUESTED",
         *,
         forced: bool = False,
+        message: str = "mark_terminating success",
     ) -> MarkTerminatingResult:
         """
         Mark multiple sessions and their kernels for termination by updating their status to TERMINATING.
@@ -514,14 +515,17 @@ class SchedulingController:
             session_ids: List of session IDs to terminate
             reason: Reason for termination
             forced: If True, skip TERMINATING and set directly to TERMINATED
+            message: Optional scheduling-history message for a TERMINATING transition
 
         Returns:
             MarkTerminatingResult with categorized session statuses
         """
         result = await self._repository.mark_sessions_terminating(
-            session_ids, reason, forced=forced
+            session_ids,
+            reason,
+            forced=forced,
+            message=message,
         )
-
         if result.has_processed():
             log.info(
                 "Marked {} sessions for termination"

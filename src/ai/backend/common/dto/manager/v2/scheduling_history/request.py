@@ -11,6 +11,7 @@ from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UU
 
 from .types import (
     DeploymentHistoryOrderField,
+    KernelHistoryOrderField,
     OrderDirection,
     RouteHistoryOrderField,
     SchedulingResultType,
@@ -19,10 +20,13 @@ from .types import (
 
 __all__ = (
     "AdminSearchDeploymentHistoriesInput",
+    "AdminSearchKernelHistoriesInput",
     "AdminSearchRouteHistoriesInput",
     "AdminSearchSessionHistoriesInput",
     "DeploymentHistoryFilter",
     "DeploymentHistoryOrder",
+    "KernelHistoryFilter",
+    "KernelHistoryOrder",
     "RouteHistoryFilter",
     "RouteHistoryOrder",
     "SchedulingResultFilter",
@@ -84,6 +88,37 @@ class SearchSessionHistoryInput(BaseRequestModel):
     )
     limit: int = Field(default=50, ge=1, le=1000, description="Maximum items to return")
     offset: int = Field(default=0, ge=0, description="Number of items to skip")
+
+
+class KernelHistoryFilter(BaseRequestModel):
+    """Filter conditions for kernel scheduling history search."""
+
+    id: UUIDFilter | None = Field(default=None, description="Filter by history record ID")
+    kernel_id: UUIDFilter | None = Field(default=None, description="Filter by kernel ID")
+    session_id: UUIDFilter | None = Field(default=None, description="Filter by session ID")
+    phase: StringFilter | None = Field(default=None, description="Filter by scheduling phase")
+    from_status: list[str] | None = Field(default=None, description="Filter by from_status values")
+    to_status: list[str] | None = Field(default=None, description="Filter by to_status values")
+    result: SchedulingResultFilter | None = Field(
+        default=None, description="Filter by scheduling result"
+    )
+    error_code: StringFilter | None = Field(default=None, description="Filter by error code")
+    message: StringFilter | None = Field(default=None, description="Filter by message")
+    created_at: DateTimeFilter | None = Field(default=None, description="Filter by created_at")
+    updated_at: DateTimeFilter | None = Field(default=None, description="Filter by updated_at")
+    AND: list[KernelHistoryFilter] | None = Field(default=None, description="AND conjunction.")
+    OR: list[KernelHistoryFilter] | None = Field(default=None, description="OR conjunction.")
+    NOT: list[KernelHistoryFilter] | None = Field(default=None, description="NOT negation.")
+
+
+KernelHistoryFilter.model_rebuild()
+
+
+class KernelHistoryOrder(BaseRequestModel):
+    """Order specification for kernel scheduling history."""
+
+    field: KernelHistoryOrderField = Field(description="Field to order by")
+    direction: OrderDirection = Field(default=OrderDirection.DESC, description="Order direction")
 
 
 class DeploymentHistoryFilter(BaseRequestModel):
@@ -174,6 +209,19 @@ class AdminSearchSessionHistoriesInput(BaseRequestModel):
     order: list[SessionHistoryOrder] | None = Field(
         default=None, description="Order specifications"
     )
+    first: int | None = Field(default=None, description="Cursor pagination: number of items")
+    after: str | None = Field(default=None, description="Cursor pagination: after cursor")
+    last: int | None = Field(default=None, description="Cursor pagination: last N items")
+    before: str | None = Field(default=None, description="Cursor pagination: before cursor")
+    limit: int | None = Field(default=None, description="Offset pagination: maximum items")
+    offset: int | None = Field(default=None, description="Offset pagination: number to skip")
+
+
+class AdminSearchKernelHistoriesInput(BaseRequestModel):
+    """Input for admin search of kernel scheduling histories."""
+
+    filter: KernelHistoryFilter | None = Field(default=None, description="Filter conditions")
+    order: list[KernelHistoryOrder] | None = Field(default=None, description="Order specifications")
     first: int | None = Field(default=None, description="Cursor pagination: number of items")
     after: str | None = Field(default=None, description="Cursor pagination: after cursor")
     last: int | None = Field(default=None, description="Cursor pagination: last N items")

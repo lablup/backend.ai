@@ -20,8 +20,8 @@ from ai.backend.manager.sokovan.scheduler.provisioner.sequencers.drf import DRFS
 
 class TestDRFSequencer:
     @pytest.fixture
-    def scaling_group(self) -> str:
-        return "default"
+    def resource_group_id(self) -> ResourceGroupID:
+        return ResourceGroupID(uuid.uuid4())
 
     @pytest.fixture
     def sequencer(self) -> DRFSequencer:
@@ -116,13 +116,19 @@ class TestDRFSequencer:
         assert sequencer.name == "DRFSequencer"
 
     async def test_empty_workload(
-        self, scaling_group: str, sequencer: DRFSequencer, empty_system_snapshot: SystemSnapshot
+        self,
+        resource_group_id: ResourceGroupID,
+        sequencer: DRFSequencer,
+        empty_system_snapshot: SystemSnapshot,
     ) -> None:
-        result = await sequencer.sequence(scaling_group, empty_system_snapshot, [])
+        result = await sequencer.sequence(resource_group_id, empty_system_snapshot, [])
         assert result == []
 
     async def test_single_user_workloads(
-        self, scaling_group: str, sequencer: DRFSequencer, empty_system_snapshot: SystemSnapshot
+        self,
+        resource_group_id: ResourceGroupID,
+        sequencer: DRFSequencer,
+        empty_system_snapshot: SystemSnapshot,
     ) -> None:
         workloads = [
             SessionWorkload(
@@ -149,7 +155,7 @@ class TestDRFSequencer:
             ),
         ]
 
-        result = await sequencer.sequence(scaling_group, empty_system_snapshot, workloads)
+        result = await sequencer.sequence(resource_group_id, empty_system_snapshot, workloads)
 
         # With no existing allocations, order should be preserved
         assert len(result) == 2
@@ -158,7 +164,7 @@ class TestDRFSequencer:
 
     async def test_multiple_users_different_dominant_shares(
         self,
-        scaling_group: str,
+        resource_group_id: ResourceGroupID,
         sequencer: DRFSequencer,
         system_snapshot_with_allocations: SystemSnapshot,
     ) -> None:
@@ -199,7 +205,7 @@ class TestDRFSequencer:
         ]
 
         result = await sequencer.sequence(
-            scaling_group, system_snapshot_with_allocations, workloads
+            resource_group_id, system_snapshot_with_allocations, workloads
         )
 
         # Should be ordered by dominant share (ascending): user3 (5%), user1 (20%), user2 (30%)
@@ -209,7 +215,10 @@ class TestDRFSequencer:
         assert result[2].access_key == AccessKey("user2")
 
     async def test_multiple_users_same_dominant_share(
-        self, scaling_group: str, sequencer: DRFSequencer, empty_system_snapshot: SystemSnapshot
+        self,
+        resource_group_id: ResourceGroupID,
+        sequencer: DRFSequencer,
+        empty_system_snapshot: SystemSnapshot,
     ) -> None:
         # All users have no existing allocations (0% dominant share)
         workloads = [
@@ -248,7 +257,7 @@ class TestDRFSequencer:
             ),
         ]
 
-        result = await sequencer.sequence(scaling_group, empty_system_snapshot, workloads)
+        result = await sequencer.sequence(resource_group_id, empty_system_snapshot, workloads)
 
         # With same dominant share, order should be preserved
         assert len(result) == 3
@@ -258,7 +267,7 @@ class TestDRFSequencer:
 
     async def test_new_user_gets_priority(
         self,
-        scaling_group: str,
+        resource_group_id: ResourceGroupID,
         sequencer: DRFSequencer,
         system_snapshot_with_allocations: SystemSnapshot,
     ) -> None:
@@ -288,7 +297,7 @@ class TestDRFSequencer:
         ]
 
         result = await sequencer.sequence(
-            scaling_group, system_snapshot_with_allocations, workloads
+            resource_group_id, system_snapshot_with_allocations, workloads
         )
 
         # New user with 0% dominant share should get priority
@@ -297,7 +306,7 @@ class TestDRFSequencer:
         assert result[1].access_key == AccessKey("user2")
 
     async def test_dominant_share_calculation_with_zero_capacity(
-        self, scaling_group: str, sequencer: DRFSequencer
+        self, resource_group_id: ResourceGroupID, sequencer: DRFSequencer
     ) -> None:
         # Test edge case where some resource has zero capacity
         system_snapshot = SystemSnapshot(
@@ -354,5 +363,5 @@ class TestDRFSequencer:
         ]
 
         # Should not crash when dividing by zero capacity
-        result = await sequencer.sequence(scaling_group, system_snapshot, workloads)
+        result = await sequencer.sequence(resource_group_id, system_snapshot, workloads)
         assert len(result) == 1

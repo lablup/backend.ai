@@ -6,6 +6,7 @@ from decimal import Decimal
 from typing import TYPE_CHECKING, override
 from uuid import UUID
 
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.manager.data.fair_share import ProjectUserIds, UserFairShareFactors
 from ai.backend.manager.data.sokovan import SessionWorkload, SystemSnapshot
 
@@ -55,7 +56,7 @@ class FairShareSequencer(WorkloadSequencer):
     @override
     async def sequence(
         self,
-        resource_group: str,
+        resource_group_id: ResourceGroupID,
         system_snapshot: SystemSnapshot,
         workloads: Sequence[SessionWorkload],
     ) -> Sequence[SessionWorkload]:
@@ -65,7 +66,7 @@ class FairShareSequencer(WorkloadSequencer):
         Workloads are sorted by (domain_factor, project_factor, user_factor) in descending order.
         Higher factor = higher priority (users with lower historical usage get scheduled first).
 
-        :param resource_group: The resource group (scaling group) name.
+        :param resource_group_id: The resource group ID.
         :param system_snapshot: The current system snapshot containing resource state.
         :param workloads: A sequence of SessionWorkload objects to sequence.
         :return: A sequence of SessionWorkload objects ordered by fair share factors.
@@ -74,7 +75,7 @@ class FairShareSequencer(WorkloadSequencer):
             return []
 
         # Load fair share factors from repository using 3-way JOIN
-        user_factors = await self._load_factors(resource_group, workloads)
+        user_factors = await self._load_factors(resource_group_id, workloads)
 
         # Sort by factors in descending order (higher factor = higher priority)
         # If a user doesn't have recorded factors, use default (lowest priority)
@@ -85,7 +86,7 @@ class FairShareSequencer(WorkloadSequencer):
 
     async def _load_factors(
         self,
-        resource_group: str,
+        resource_group_id: ResourceGroupID,
         workloads: Sequence[SessionWorkload],
     ) -> dict[UUID, UserFairShareFactors]:
         """Load fair share factors from the repository for the given workloads."""
@@ -102,7 +103,7 @@ class FairShareSequencer(WorkloadSequencer):
 
         # Fetch factors from repository using 3-way JOIN
         return await self._repository.get_user_fair_share_factors_batch(
-            resource_group, project_user_ids
+            resource_group_id, project_user_ids
         )
 
     def _get_sort_key(

@@ -8,10 +8,11 @@ from __future__ import annotations
 import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import override
+from typing import Any, override
 
 import sqlalchemy as sa
 
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.manager.data.fair_share import (
     DomainFairShareData,
     ProjectFairShareData,
@@ -47,11 +48,12 @@ __all__ = (
 class DomainFairShareSearchScope(SearchScope):
     """Required scope for domain fair share entity search.
 
-    Used for Field-level queries where resource_group is determined by parent context.
+    Used for field-level queries where the resource group is determined by
+    parent context.
     """
 
-    resource_group: str
-    """Required. The scaling group to search within."""
+    resource_group_id: ResourceGroupID
+    """Required. The scaling group id to search within."""
 
     @override
     def to_condition(self) -> QueryCondition:
@@ -68,13 +70,13 @@ class DomainFairShareSearchScope(SearchScope):
 
     @property
     @override
-    def existence_checks(self) -> Sequence[ExistenceCheck[str]]:
+    def existence_checks(self) -> Sequence[ExistenceCheck[ResourceGroupID]]:
         """Return existence checks for scope validation."""
         return [
             ExistenceCheck(
-                column=ScalingGroupRow.name,
-                value=self.resource_group,
-                error=ScalingGroupNotFound(self.resource_group),
+                column=ScalingGroupRow.id,
+                value=self.resource_group_id,
+                error=ScalingGroupNotFound(str(self.resource_group_id)),
             ),
         ]
 
@@ -83,14 +85,15 @@ class DomainFairShareSearchScope(SearchScope):
 class ProjectFairShareSearchScope(SearchScope):
     """Required scope for project fair share entity search.
 
-    Used for Field-level queries where resource_group and domain are determined by parent context.
+    Used for field-level queries where the resource group and domain are
+    determined by parent context.
     """
-
-    resource_group: str
-    """Required. The scaling group to search within."""
 
     domain_name: str
     """Required. The domain to search within."""
+
+    resource_group_id: ResourceGroupID
+    """Required. The scaling group id to search within."""
 
     @override
     def to_condition(self) -> QueryCondition:
@@ -108,13 +111,13 @@ class ProjectFairShareSearchScope(SearchScope):
 
     @property
     @override
-    def existence_checks(self) -> Sequence[ExistenceCheck[str]]:
+    def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
         """Return existence checks for scope validation."""
         return [
             ExistenceCheck(
-                column=ScalingGroupRow.name,
-                value=self.resource_group,
-                error=ScalingGroupNotFound(self.resource_group),
+                column=ScalingGroupRow.id,
+                value=self.resource_group_id,
+                error=ScalingGroupNotFound(str(self.resource_group_id)),
             ),
             ExistenceCheck(
                 column=DomainRow.name,
@@ -128,17 +131,18 @@ class ProjectFairShareSearchScope(SearchScope):
 class UserFairShareSearchScope(SearchScope):
     """Required scope for user fair share entity search.
 
-    Used for Field-level queries where resource_group, domain, and project are determined by parent context.
+    Used for field-level queries where the resource group, domain, and project
+    are determined by parent context.
     """
-
-    resource_group: str
-    """Required. The scaling group to search within."""
 
     domain_name: str
     """Required. The domain to search within."""
 
     project_id: uuid.UUID
     """Required. The project to search within."""
+
+    resource_group_id: ResourceGroupID
+    """Required. The scaling group id to search within."""
 
     @override
     def to_condition(self) -> QueryCondition:
@@ -162,13 +166,15 @@ class UserFairShareSearchScope(SearchScope):
     @override
     def existence_checks(
         self,
-    ) -> Sequence[ExistenceCheck[str] | ExistenceCheck[uuid.UUID]]:
+    ) -> Sequence[
+        ExistenceCheck[str] | ExistenceCheck[uuid.UUID] | ExistenceCheck[ResourceGroupID]
+    ]:
         """Return existence checks for scope validation."""
         return [
             ExistenceCheck(
-                column=ScalingGroupRow.name,
-                value=self.resource_group,
-                error=ScalingGroupNotFound(self.resource_group),
+                column=ScalingGroupRow.id,
+                value=self.resource_group_id,
+                error=ScalingGroupNotFound(str(self.resource_group_id)),
             ),
             ExistenceCheck(
                 column=DomainRow.name,

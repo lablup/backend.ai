@@ -239,6 +239,7 @@ class PermissionGQL(PydanticNodeMixin[PermissionNodeDTO]):
                 | RBACElementType.KEYPAIR_RESOURCE_POLICY
                 | RBACElementType.PROJECT_RESOURCE_POLICY
                 | RBACElementType.AUDIT_LOG
+                | RBACElementType.KERNEL_HISTORY
                 | RBACElementType.EVENT_LOG
                 | RBACElementType.NOTIFICATION_RULE
                 | RBACElementType.AGENT

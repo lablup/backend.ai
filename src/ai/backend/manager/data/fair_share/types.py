@@ -144,6 +144,7 @@ class DomainFairShareData:
     """Domain-level fair share data."""
 
     resource_group: str
+    resource_group_id: ResourceGroupID
     domain_name: str
     data: FairShareData
     """Nested fair share data structure."""
@@ -154,6 +155,7 @@ class ProjectFairShareData:
     """Project-level fair share data."""
 
     resource_group: str
+    resource_group_id: ResourceGroupID
     project_id: uuid.UUID
     domain_name: str
     data: FairShareData
@@ -165,6 +167,7 @@ class UserFairShareData:
     """User-level fair share data."""
 
     resource_group: str
+    resource_group_id: ResourceGroupID
     user_uuid: uuid.UUID
     project_id: uuid.UUID
     domain_name: str

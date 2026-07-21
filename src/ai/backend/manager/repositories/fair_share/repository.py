@@ -105,17 +105,17 @@ class FairShareRepository:
     @fair_share_repository_resilience.apply()
     async def get_domain_fair_share(
         self,
-        resource_group: str,
+        resource_group_id: ResourceGroupID,
         domain_name: str,
     ) -> DomainFairShareData:
-        """Get a domain fair share record by scaling group and domain name.
+        """Get a domain fair share record by scaling group id and domain name.
 
         Returns default values if the domain exists but has no fair share record.
 
         Raises:
             DomainNotFound: If the domain does not exist.
         """
-        return await self._db_source.get_domain_fair_share(resource_group, domain_name)
+        return await self._db_source.get_domain_fair_share(resource_group_id, domain_name)
 
     @fair_share_repository_resilience.apply()
     async def search_domain_fair_shares(
@@ -165,17 +165,17 @@ class FairShareRepository:
     @fair_share_repository_resilience.apply()
     async def get_project_fair_share(
         self,
-        resource_group: str,
+        resource_group_id: ResourceGroupID,
         project_id: uuid.UUID,
     ) -> ProjectFairShareData:
-        """Get a project fair share record by scaling group and project ID.
+        """Get a project fair share record by scaling group id and project ID.
 
         Returns default values if the project exists but has no fair share record.
 
         Raises:
             ProjectNotFound: If the project does not exist.
         """
-        return await self._db_source.get_project_fair_share(resource_group, project_id)
+        return await self._db_source.get_project_fair_share(resource_group_id, project_id)
 
     @fair_share_repository_resilience.apply()
     async def search_project_fair_shares(
@@ -251,18 +251,18 @@ class FairShareRepository:
     @fair_share_repository_resilience.apply()
     async def get_user_fair_share(
         self,
-        resource_group: str,
+        resource_group_id: ResourceGroupID,
         project_id: uuid.UUID,
         user_uuid: uuid.UUID,
     ) -> UserFairShareData:
-        """Get a user fair share record by scaling group, project ID, and user UUID.
+        """Get a user fair share record by scaling group id, project ID, and user UUID.
 
         Returns default values if the user exists in the project but has no fair share record.
 
         Raises:
             UserNotFound: If the user does not exist in the project.
         """
-        return await self._db_source.get_user_fair_share(resource_group, project_id, user_uuid)
+        return await self._db_source.get_user_fair_share(resource_group_id, project_id, user_uuid)
 
     @fair_share_repository_resilience.apply()
     async def search_user_fair_shares(
@@ -334,9 +334,9 @@ class FairShareRepository:
     @fair_share_repository_resilience.apply()
     async def get_scaling_group_fair_share_spec(
         self,
-        scaling_group: str,
+        resource_group_id: ResourceGroupID,
     ) -> FairShareScalingGroupSpec:
-        """Get fair share spec for scaling group.
+        """Get fair share spec for a resource group.
 
         Returns:
             FairShareScalingGroupSpec with defaults if not configured.
@@ -344,18 +344,18 @@ class FairShareRepository:
         Raises:
             ScalingGroupNotFound: If scaling group doesn't exist.
         """
-        return await self._db_source.get_scaling_group_fair_share_spec(scaling_group)
+        return await self._db_source.get_scaling_group_fair_share_spec(resource_group_id)
 
     @fair_share_repository_resilience.apply()
     async def get_user_scheduling_ranks_batch(
         self,
-        resource_group: str,
+        resource_group_id: ResourceGroupID,
         project_user_ids: Sequence[ProjectUserIds],
     ) -> dict[uuid.UUID, int]:
         """Get scheduling ranks for multiple users across projects.
 
         Args:
-            resource_group: The resource group (scaling group) name.
+            resource_group_id: The resource group (scaling group) id.
             project_user_ids: Sequence of ProjectUserIds containing project and user IDs.
 
         Returns:
@@ -363,7 +363,7 @@ class FairShareRepository:
             Users not found in the database or with NULL rank are omitted.
         """
         return await self._db_source.get_user_scheduling_ranks_batch(
-            resource_group, project_user_ids
+            resource_group_id, project_user_ids
         )
 
     # ==================== Bulk Factor Updates ====================
@@ -383,7 +383,7 @@ class FairShareRepository:
         factors in a single transaction.
 
         Args:
-            resource_group: The resource group being updated
+            resource_group_id: The resource group ID
             calculation_result: Calculated factors from FairShareFactorCalculator
             lookback_start: Start of lookback period used in calculation
             lookback_end: End of lookback period used in calculation
@@ -401,7 +401,7 @@ class FairShareRepository:
     @fair_share_repository_resilience.apply()
     async def get_user_fair_share_factors_batch(
         self,
-        resource_group: str,
+        resource_group_id: ResourceGroupID,
         project_user_ids: Sequence[ProjectUserIds],
     ) -> dict[uuid.UUID, UserFairShareFactors]:
         """Get combined fair share factors for multiple users with 3-way JOIN.
@@ -411,7 +411,7 @@ class FairShareRepository:
         sequencing in FairShareSequencer.
 
         Args:
-            resource_group: The resource group (scaling group) name.
+            resource_group_id: The resource group ID.
             project_user_ids: Sequence of ProjectUserIds containing project and user IDs.
 
         Returns:
@@ -419,13 +419,13 @@ class FairShareRepository:
             Users not found in any of the fair share tables are omitted.
         """
         return await self._db_source.get_user_fair_share_factors_batch(
-            resource_group, project_user_ids
+            resource_group_id, project_user_ids
         )
 
     @fair_share_repository_resilience.apply()
     async def get_fair_share_calculation_context(
         self,
-        scaling_group: str,
+        resource_group_id: ResourceGroupID,
         today: date,
     ) -> FairShareCalculationContext:
         """Get all data needed for fair share factor calculation.
@@ -434,7 +434,7 @@ class FairShareRepository:
         in one database session for consistency and efficiency.
 
         Args:
-            scaling_group: The scaling group name
+            resource_group_id: The resource group ID
             today: Current date for decay calculation
 
         Returns:
@@ -443,4 +443,4 @@ class FairShareRepository:
         Raises:
             ScalingGroupNotFound: If the scaling group doesn't exist
         """
-        return await self._db_source.get_fair_share_calculation_context(scaling_group, today)
+        return await self._db_source.get_fair_share_calculation_context(resource_group_id, today)

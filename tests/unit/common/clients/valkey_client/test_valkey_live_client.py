@@ -6,7 +6,7 @@ from uuid import uuid4
 import pytest
 
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
-from ai.backend.common.types import SessionId
+from ai.backend.common.types import KernelId, SessionId
 
 
 async def test_valkey_live_hset_operations(test_valkey_live: ValkeyLiveClient) -> None:
@@ -102,6 +102,56 @@ class TestSessionLastAccessMarker:
         await test_valkey_live.delete_session_last_access(session_id)
 
         assert await test_valkey_live.get_live_data(marker_key) is None
+
+
+class TestActiveAppConnections:
+    @pytest.fixture()
+    def session_id(self) -> SessionId:
+        return SessionId(uuid4())
+
+    @pytest.fixture()
+    def kernel_id(self) -> KernelId:
+        return KernelId(uuid4())
+
+    @pytest.fixture()
+    def other_kernel_id(self) -> KernelId:
+        return KernelId(uuid4())
+
+    async def test_tracker_uses_session_key_and_kernel_member(
+        self,
+        test_valkey_live: ValkeyLiveClient,
+        session_id: SessionId,
+        kernel_id: KernelId,
+        other_kernel_id: KernelId,
+    ) -> None:
+        await test_valkey_live.update_connection_tracker(
+            session_id,
+            kernel_id,
+            "jupyter",
+            "stream-001",
+        )
+
+        assert await test_valkey_live.count_active_connections(session_id) == 1
+
+        unrelated_removed_count = await test_valkey_live.remove_connection_tracker(
+            session_id,
+            other_kernel_id,
+            "jupyter",
+            "stream-001",
+        )
+
+        assert unrelated_removed_count == 0
+        assert await test_valkey_live.count_active_connections(session_id) == 1
+
+        removed_count = await test_valkey_live.remove_connection_tracker(
+            session_id,
+            kernel_id,
+            "jupyter",
+            "stream-001",
+        )
+
+        assert removed_count == 1
+        assert await test_valkey_live.count_active_connections(session_id) == 0
 
 
 async def test_valkey_live_client_lifecycle(test_valkey_live: ValkeyLiveClient) -> None:

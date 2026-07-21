@@ -66,7 +66,7 @@ from ai.backend.manager.repositories.fair_share import (
 from ai.backend.manager.types import OptionalState, TriState
 from ai.backend.testutils.db import with_tables
 
-RESOURCE_GROUP_ID = ResourceGroupID(uuid.UUID("00000000-0000-0000-0000-000000000001"))
+RESOURCE_GROUP_ID = ResourceGroupID(uuid.uuid4())
 
 
 class TestFairShareRepository:
@@ -121,6 +121,7 @@ class TestFairShareRepository:
 
         async with db_with_cleanup.begin_session() as db_sess:
             sg = ScalingGroupRow(
+                id=RESOURCE_GROUP_ID,
                 name=sg_name,
                 description="Test scaling group for fair share",
                 is_active=True,
@@ -338,13 +339,11 @@ class TestFairShareRepository:
         )
         await fair_share_repository.upsert_domain_fair_share(upserter1)
 
-        replacement_resource_group_id = ResourceGroupID(uuid.uuid4())
-
-        # Second upsert - should update calculated fields and synchronize the resource group ID
+        # Second upsert - should update calculated fields
         upserter2 = Upserter(
             spec=DomainFairShareUpserterSpec(
                 resource_group=test_scaling_group,
-                resource_group_id=replacement_resource_group_id,
+                resource_group_id=RESOURCE_GROUP_ID,
                 domain_name=test_domain_name,
                 fair_share_factor=OptionalState.update(Decimal("0.75")),
                 normalized_usage=OptionalState.update(Decimal("0.5")),
@@ -364,7 +363,7 @@ class TestFairShareRepository:
                     DomainFairShareRow.domain_name == test_domain_name,
                 )
             )
-        assert stored_resource_group_id == replacement_resource_group_id
+        assert stored_resource_group_id == RESOURCE_GROUP_ID
 
     async def test_get_domain_fair_share(
         self,
@@ -386,7 +385,7 @@ class TestFairShareRepository:
 
         # Get
         result = await fair_share_repository.get_domain_fair_share(
-            resource_group=test_scaling_group,
+            resource_group_id=RESOURCE_GROUP_ID,
             domain_name=test_domain_name,
         )
 
@@ -401,7 +400,7 @@ class TestFairShareRepository:
         """Test getting non-existent domain fair share raises DomainNotFound"""
         with pytest.raises(DomainNotFound):
             await fair_share_repository.get_domain_fair_share(
-                resource_group="non-existent-sg",
+                resource_group_id=ResourceGroupID(uuid.uuid4()),
                 domain_name="non-existent-domain",
             )
 
@@ -522,7 +521,7 @@ class TestFairShareRepository:
         await fair_share_repository.create_project_fair_share(creator)
 
         result = await fair_share_repository.get_project_fair_share(
-            resource_group=test_scaling_group,
+            resource_group_id=RESOURCE_GROUP_ID,
             project_id=test_project_id,
         )
 
@@ -605,7 +604,7 @@ class TestFairShareRepository:
         await fair_share_repository.create_user_fair_share(creator)
 
         result = await fair_share_repository.get_user_fair_share(
-            resource_group=test_scaling_group,
+            resource_group_id=RESOURCE_GROUP_ID,
             project_id=test_project_id,
             user_uuid=test_user_uuid,
         )
@@ -626,6 +625,7 @@ class TestFairShareRepository:
         regardless of resource group membership.
         """
         non_existent_sg = f"non-existent-sg-{uuid.uuid4().hex[:8]}"
+        non_existent_sg_id = ResourceGroupID(uuid.uuid4())
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
 
         # Create domain row (required for the fair share row's domain_name column)
@@ -644,7 +644,7 @@ class TestFairShareRepository:
         upserter = Upserter(
             spec=DomainFairShareUpserterSpec(
                 resource_group=non_existent_sg,
-                resource_group_id=RESOURCE_GROUP_ID,
+                resource_group_id=non_existent_sg_id,
                 domain_name=domain_name,
                 weight=TriState.update(Decimal("2.5")),
                 fair_share_factor=OptionalState.update(Decimal("1.0")),
@@ -654,6 +654,7 @@ class TestFairShareRepository:
         result = await fair_share_repository.upsert_domain_fair_share(upserter)
 
         assert result.resource_group == non_existent_sg
+        assert result.resource_group_id == non_existent_sg_id
         assert result.domain_name == domain_name
         assert result.data.spec.weight == Decimal("2.5")
 
@@ -668,6 +669,7 @@ class TestFairShareRepository:
         Regression test for BA-4683.
         """
         non_existent_sg = f"non-existent-sg-{uuid.uuid4().hex[:8]}"
+        non_existent_sg_id = ResourceGroupID(uuid.uuid4())
         project_id = uuid.uuid4()
 
         # Create project resource policy and project
@@ -695,7 +697,7 @@ class TestFairShareRepository:
         upserter = Upserter(
             spec=ProjectFairShareUpserterSpec(
                 resource_group=non_existent_sg,
-                resource_group_id=RESOURCE_GROUP_ID,
+                resource_group_id=non_existent_sg_id,
                 project_id=project_id,
                 domain_name=test_domain_name,
                 weight=TriState.update(Decimal("3.0")),
@@ -706,6 +708,7 @@ class TestFairShareRepository:
         result = await fair_share_repository.upsert_project_fair_share(upserter)
 
         assert result.resource_group == non_existent_sg
+        assert result.resource_group_id == non_existent_sg_id
         assert result.project_id == project_id
         assert result.data.spec.weight == Decimal("3.0")
 
@@ -722,11 +725,12 @@ class TestFairShareRepository:
         Regression test for BA-4683.
         """
         non_existent_sg = f"non-existent-sg-{uuid.uuid4().hex[:8]}"
+        non_existent_sg_id = ResourceGroupID(uuid.uuid4())
 
         upserter = Upserter(
             spec=UserFairShareUpserterSpec(
                 resource_group=non_existent_sg,
-                resource_group_id=RESOURCE_GROUP_ID,
+                resource_group_id=non_existent_sg_id,
                 user_uuid=test_user_uuid,
                 project_id=test_project_id,
                 domain_name=test_domain_name,
@@ -738,6 +742,7 @@ class TestFairShareRepository:
         result = await fair_share_repository.upsert_user_fair_share(upserter)
 
         assert result.resource_group == non_existent_sg
+        assert result.resource_group_id == non_existent_sg_id
         assert result.user_uuid == test_user_uuid
         assert result.project_id == test_project_id
         assert result.data.spec.weight == Decimal("1.8")
@@ -806,7 +811,7 @@ class TestFairShareRepository:
     ) -> None:
         """BA-4682: Domain not in any RG should return default fair share, not raise."""
         result = await fair_share_repository.get_domain_fair_share(
-            resource_group=test_scaling_group,
+            resource_group_id=RESOURCE_GROUP_ID,
             domain_name=domain_not_in_rg,
         )
 
@@ -822,7 +827,7 @@ class TestFairShareRepository:
     ) -> None:
         """BA-4682: Project not in any RG should return default fair share, not raise."""
         result = await fair_share_repository.get_project_fair_share(
-            resource_group=test_scaling_group,
+            resource_group_id=RESOURCE_GROUP_ID,
             project_id=project_not_in_rg,
         )
 

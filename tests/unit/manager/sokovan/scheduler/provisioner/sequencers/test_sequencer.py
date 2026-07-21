@@ -36,8 +36,8 @@ def make_workload(access_key: str, priority: int) -> SessionWorkload:
 
 class TestSchedulingSequencer:
     @pytest.fixture
-    def scaling_group(self) -> str:
-        return "default"
+    def resource_group_id(self) -> ResourceGroupID:
+        return ResourceGroupID(uuid.uuid4())
 
     @pytest.fixture
     def sequencer(self) -> SchedulingSequencer:
@@ -75,16 +75,16 @@ class TestSchedulingSequencer:
 
     async def test_empty_workloads(
         self,
-        scaling_group: str,
+        resource_group_id: ResourceGroupID,
         sequencer: SchedulingSequencer,
         system_snapshot: SystemSnapshot,
     ) -> None:
-        result = await sequencer.sequence(scaling_group, system_snapshot, [])
+        result = await sequencer.sequence(resource_group_id, system_snapshot, [])
         assert result == []
 
     async def test_keeps_all_workloads_across_priorities(
         self,
-        scaling_group: str,
+        resource_group_id: ResourceGroupID,
         sequencer: SchedulingSequencer,
         system_snapshot: SystemSnapshot,
     ) -> None:
@@ -94,13 +94,13 @@ class TestSchedulingSequencer:
             make_workload("low", priority=0),
         ]
 
-        result = await sequencer.sequence(scaling_group, system_snapshot, workloads)
+        result = await sequencer.sequence(resource_group_id, system_snapshot, workloads)
 
         assert {w.access_key for w in result} == {AccessKey(k) for k in ("high", "mid", "low")}
 
     async def test_orders_by_descending_priority(
         self,
-        scaling_group: str,
+        resource_group_id: ResourceGroupID,
         sequencer: SchedulingSequencer,
         system_snapshot: SystemSnapshot,
     ) -> None:
@@ -110,13 +110,13 @@ class TestSchedulingSequencer:
             make_workload("mid", priority=5),
         ]
 
-        result = await sequencer.sequence(scaling_group, system_snapshot, workloads)
+        result = await sequencer.sequence(resource_group_id, system_snapshot, workloads)
 
         assert [w.access_key for w in result] == [AccessKey(k) for k in ("high", "mid", "low")]
 
     async def test_preserves_order_within_same_priority(
         self,
-        scaling_group: str,
+        resource_group_id: ResourceGroupID,
         sequencer: SchedulingSequencer,
         system_snapshot: SystemSnapshot,
     ) -> None:
@@ -127,7 +127,7 @@ class TestSchedulingSequencer:
             make_workload("low-second", priority=0),
         ]
 
-        result = await sequencer.sequence(scaling_group, system_snapshot, workloads)
+        result = await sequencer.sequence(resource_group_id, system_snapshot, workloads)
 
         assert [w.access_key for w in result] == [
             AccessKey(k) for k in ("high-first", "high-second", "low-first", "low-second")
