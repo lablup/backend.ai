@@ -42,8 +42,8 @@ from ai.backend.manager.repositories.app_config_fragment.repository import (
     AppConfigFragmentRepository,
 )
 from ai.backend.manager.repositories.app_config_fragment.types import (
-    AppConfigScopeArguments,
     DomainAppConfigFragmentSearchScope,
+    ResolvedAppConfigScope,
     UserAppConfigFragmentSearchScope,
 )
 from ai.backend.manager.repositories.app_config_fragment.updaters import (
@@ -584,7 +584,7 @@ class TestApplicableFragments:
     ) -> None:
         applicable = await repository.list_visible_fragments_bulk(
             ["theme"],
-            AppConfigScopeArguments(domain_id=DomainID(_DOMAIN_UUID), user_id=UserID(_USER_UUID)),
+            ResolvedAppConfigScope(domain_id=DomainID(_DOMAIN_UUID), user_id=UserID(_USER_UUID)),
         )
         # public + the caller's domain + the caller's own user fragment, ordered by the
         # allow-list entries' ranks (scope-type defaults: public < domain < user).
@@ -612,7 +612,7 @@ class TestApplicableFragments:
     ) -> None:
         applicable = await repository.list_visible_fragments_bulk(
             ["unregistered"],
-            AppConfigScopeArguments(domain_id=DomainID(_DOMAIN_UUID), user_id=UserID(_USER_UUID)),
+            ResolvedAppConfigScope(domain_id=DomainID(_DOMAIN_UUID), user_id=UserID(_USER_UUID)),
         )
         assert applicable == []
 
@@ -623,7 +623,7 @@ class TestApplicableFragments:
     ) -> None:
         applicable = await repository.list_visible_fragments_bulk(
             ["theme", "menu"],
-            AppConfigScopeArguments(domain_id=DomainID(_DOMAIN_UUID), user_id=UserID(_USER_UUID)),
+            ResolvedAppConfigScope(domain_id=DomainID(_DOMAIN_UUID), user_id=UserID(_USER_UUID)),
         )
         # public + the caller's domain + the caller's own user fragment, for both names.
         expected = {
@@ -650,7 +650,7 @@ class TestApplicableFragments:
     ) -> None:
         applicable = await repository.list_visible_fragments_bulk(
             [],
-            AppConfigScopeArguments(domain_id=DomainID(_DOMAIN_UUID), user_id=UserID(_USER_UUID)),
+            ResolvedAppConfigScope(domain_id=DomainID(_DOMAIN_UUID), user_id=UserID(_USER_UUID)),
         )
         assert applicable == []
 

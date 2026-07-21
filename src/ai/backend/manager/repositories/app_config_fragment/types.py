@@ -17,6 +17,7 @@ from ai.backend.manager.models.scopes import ExistenceCheck, SearchScope
 
 __all__ = (
     "AppConfigScopeArguments",
+    "ResolvedAppConfigScope",
     "DomainAppConfigFragmentSearchScope",
     "UserAppConfigFragmentSearchScope",
 )
@@ -24,10 +25,19 @@ __all__ = (
 
 @dataclass(frozen=True)
 class AppConfigScopeArguments:
+    """The scope arguments a caller supplies for a resolve — the domain, never the user.
+
+    Add new caller-supplied scope dimensions here rather than growing method signatures.
+    """
+
+    domain_id: DomainID
+
+
+@dataclass(frozen=True)
+class ResolvedAppConfigScope:
     """The principal an ``AppConfig`` is resolved for: the resolving user and its domain.
 
-    Bundles the scope-identifying arguments so they travel together (add new principal
-    dimensions here rather than growing method signatures). Plain value object — not a
+    :class:`AppConfigScopeArguments` plus the session user. Plain value object — not a
     :class:`SearchScope`.
     """
 
