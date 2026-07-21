@@ -627,14 +627,14 @@ class Context(metaclass=ABCMeta):
             f"https://github.com/{APPPROXY_TRAEFIK_PLUGIN_REPO}/releases/download/"
             f"{APPPROXY_TRAEFIK_PLUGIN_VERSION}/appproxy-traefik-plugin.tar.gz"
         )
-        # Fall back to the GitHub CLI while the plugin repository is private.
-        await self.run_shell(
-            f'curl -fsSL "{plugin_url}" | tar xz -C "{plugin_root}" || '
-            f'gh release download "{APPPROXY_TRAEFIK_PLUGIN_VERSION}" '
-            f'--repo "{APPPROXY_TRAEFIK_PLUGIN_REPO}" '
-            f"--pattern appproxy-traefik-plugin.tar.gz --output - "
-            f'| tar xz -C "{plugin_root}"',
+        exit_code = await self.run_shell(
+            f'curl -fsSL "{plugin_url}" | tar xz -C "{plugin_root}"',
         )
+        if exit_code != 0:
+            raise RuntimeError(
+                f"Failed to download and extract the appproxy Traefik plugin "
+                f"(exit {exit_code}); URL: {plugin_url}"
+            )
 
     async def load_fixtures(self) -> None:
         with self.resource_path("ai.backend.install.fixtures", "example-users.json") as path:
