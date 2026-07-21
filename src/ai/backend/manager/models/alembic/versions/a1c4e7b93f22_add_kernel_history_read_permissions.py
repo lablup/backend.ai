@@ -1,7 +1,7 @@
 """add kernel history read permissions to roles that can read kernels
 
 Revision ID: a1c4e7b93f22
-Revises: b988f01b17a1
+Revises: 3f9a1c7b2e04
 Create Date: 2026-07-20 00:00:00.000000
 
 """
@@ -11,7 +11,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "a1c4e7b93f22"
-down_revision = "b988f01b17a1"
+down_revision = "3f9a1c7b2e04"
 branch_labels = None
 depends_on = None
 
