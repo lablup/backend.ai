@@ -28,7 +28,7 @@ class RetentionPolicyRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
         "retention_period", sa.Interval, nullable=False
     )
     enabled: Mapped[bool] = mapped_column(
-        "enabled", sa.Boolean, nullable=False, server_default=sa.true()
+        "enabled", sa.Boolean, nullable=False, server_default=sa.false()
     )
     last_swept_at: Mapped[datetime | None] = mapped_column(
         "last_swept_at", sa.DateTime(timezone=True), nullable=True

@@ -1295,6 +1295,7 @@ configure_backendai() {
   ./backend.ai mgr fixture populate fixtures/manager/example-roles.json
   ./backend.ai mgr fixture populate fixtures/manager/example-prometheus-query-preset-categories.json
   ./backend.ai mgr fixture populate fixtures/manager/example-prometheus-query-presets.json
+  ./backend.ai mgr fixture populate fixtures/manager/example-retention-policies.json
 
   # Populate artifact registries only when the storage halfstack profile is
   # active; the example registry points at the local MinIO and depends on

@@ -59,7 +59,8 @@ class TestRetentionPolicyRow:
             ).scalar_one()
         assert row.category is RetentionCategory.USAGE_RECORDS
         assert row.retention_period == timedelta(days=90)
-        assert row.enabled is True
+        # Retention is opt-in: rows default to disabled (server_default=false).
+        assert row.enabled is False
         assert row.last_swept_at is None
         # created_at / updated_at come from LifecycleTimestampsMixin (server_default).
         assert row.created_at is not None
