@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import enum
+import uuid
 
 from ai.backend.common.data.permission.types import RBACElementType, ScopeType
 
@@ -49,13 +50,14 @@ class AppConfigScopeType(enum.StrEnum):
             case AppConfigScopeType.USER:
                 return RBACElementType.USER
 
-    def to_rbac_scope_id(self, scope_id: str) -> str:
+    def to_rbac_scope_id(self, scope_id: uuid.UUID | None) -> str:
         """The RBAC scope id for a write at this fragment scope.
 
         ``public`` is system-wide (no per-entity scope id); ``domain`` / ``user`` carry
-        their own ``scope_id``.
+        their own ``scope_id``. RBAC identifies scopes by string, so the owner id is
+        rendered as text here even though it is stored as a UUID.
         """
-        return "" if self is AppConfigScopeType.PUBLIC else scope_id
+        return "" if self is AppConfigScopeType.PUBLIC else str(scope_id)
 
     def default_rank(self) -> int:
         """Default merge rank for an allow-list entry at this scope type (BEP-1052).

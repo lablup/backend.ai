@@ -85,7 +85,9 @@ class AppConfigFragmentDBSource:
             spec=spec,
             element_type=RBACElementType.APP_CONFIG_FRAGMENT,
             scope_ref=(
-                RBACElementRef(element_type, spec.scope_id) if element_type is not None else None
+                RBACElementRef(element_type, str(spec.scope_id))
+                if element_type is not None
+                else None
             ),
         )
         async with self._rbac_ops_provider.write_ops() as w:
@@ -223,8 +225,8 @@ class AppConfigFragmentDBSource:
         scope_visibility = [AppConfigFragmentConditions.by_public_visibility()]
         if scope is not None:
             scope_visibility += [
-                AppConfigFragmentConditions.by_domain_visibility(str(scope.domain_id)),
-                AppConfigFragmentConditions.by_user_visibility(str(scope.user_id)),
+                AppConfigFragmentConditions.by_domain_visibility(scope.domain_id),
+                AppConfigFragmentConditions.by_user_visibility(scope.user_id),
             ]
         querier = BatchQuerier(
             pagination=NoPagination(),

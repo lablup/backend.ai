@@ -63,7 +63,7 @@ class DomainAppConfigFragmentSearchScope(SearchScope):
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return sa.and_(
                 AppConfigFragmentRow.scope_type == AppConfigScopeType.DOMAIN,
-                AppConfigFragmentRow.scope_id == str(domain_id),
+                AppConfigFragmentRow.scope_id == domain_id,
             )
 
         return inner
@@ -87,7 +87,7 @@ class UserAppConfigFragmentSearchScope(SearchScope):
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return sa.and_(
                 AppConfigFragmentRow.scope_type == AppConfigScopeType.USER,
-                AppConfigFragmentRow.scope_id == str(user_id),
+                AppConfigFragmentRow.scope_id == user_id,
             )
 
         return inner
