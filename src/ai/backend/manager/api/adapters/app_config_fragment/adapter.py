@@ -124,7 +124,7 @@ class AppConfigFragmentAdapter(BaseAdapter):
         return BulkUpdateAppConfigFragmentPayload(
             succeeded=[self._fragment_to_node(fragment) for fragment in action_result.succeeded],
             failed=[
-                AppConfigFragmentBulkErrorInfo(index=error.index, message=error.message)
+                AppConfigFragmentBulkErrorInfo(id=error.id, message=error.message)
                 for error in action_result.failed
             ],
         )
@@ -142,7 +142,7 @@ class AppConfigFragmentAdapter(BaseAdapter):
         return BulkPurgeAppConfigFragmentPayload(
             purged_ids=[fragment.id for fragment in action_result.succeeded],
             failed=[
-                AppConfigFragmentBulkErrorInfo(index=error.index, message=error.message)
+                AppConfigFragmentBulkErrorInfo(id=error.id, message=error.message)
                 for error in action_result.failed
             ],
         )

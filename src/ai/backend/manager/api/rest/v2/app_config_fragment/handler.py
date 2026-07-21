@@ -28,6 +28,8 @@ log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 class V2AppConfigFragmentHandler:
     """REST v2 handler for raw app config fragment operations."""
 
+    _adapter: AppConfigFragmentAdapter
+
     def __init__(self, *, adapter: AppConfigFragmentAdapter) -> None:
         self._adapter = adapter
 

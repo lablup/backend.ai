@@ -57,7 +57,7 @@ class PurgeAppConfigFragmentPayload(BaseResponseModel):
 class AppConfigFragmentBulkErrorInfo(BaseResponseModel):
     """One failed item of a partial-success bulk mutation."""
 
-    index: int = Field(description="Zero-based index of the failed item in the request batch.")
+    id: UUID = Field(description="Id of the fragment the failed item targeted.")
     message: str = Field(description="Reason the item failed.")
 
 
@@ -66,7 +66,7 @@ class BulkUpdateAppConfigFragmentPayload(BaseResponseModel):
 
     succeeded: list[AppConfigFragmentNode] = Field(description="Successfully updated fragments.")
     failed: list[AppConfigFragmentBulkErrorInfo] = Field(
-        description="Per-item failures with their batch index."
+        description="Per-item failures, each naming the fragment it targeted."
     )
 
 
@@ -75,5 +75,5 @@ class BulkPurgeAppConfigFragmentPayload(BaseResponseModel):
 
     purged_ids: list[UUID] = Field(description="Ids of successfully purged fragments.")
     failed: list[AppConfigFragmentBulkErrorInfo] = Field(
-        description="Per-item failures with their batch index."
+        description="Per-item failures, each naming the fragment it targeted."
     )

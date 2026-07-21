@@ -34,9 +34,13 @@ class AppConfigFragmentSearchResult:
 
 @dataclass(frozen=True)
 class AppConfigFragmentBulkItemError:
-    """One failed item of a partial bulk mutation: its batch position and a reason."""
+    """One failed item of a partial bulk mutation: the fragment it targeted and a reason.
 
-    index: int
+    Every bulk item names its own fragment, so the id is what the caller can act on — a
+    batch position would make them correlate the failure back by hand.
+    """
+
+    id: AppConfigFragmentID
     message: str
 
 

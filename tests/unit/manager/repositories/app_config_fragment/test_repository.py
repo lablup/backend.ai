@@ -535,9 +535,9 @@ class TestBulkUpdate:
                 pk_value=missing_id,  # missing -> reported
             ),
         ])
-        # partial: the existing fragment is updated; the missing one (index 1) is reported
+        # partial: the existing fragment is updated; the missing one is reported by its id
         assert [u.config for u in result.succeeded] == [{"x": 1}]
-        assert [f.index for f in result.failed] == [1]
+        assert [f.id for f in result.failed] == [missing_id]
         assert (await repository.get_by_id(two_fragments[0].id)).config == {"x": 1}
 
 
@@ -566,9 +566,9 @@ class TestBulkPurge:
             AppConfigFragmentPurgerSpec(fragment_id=two_fragments[0].id),
             AppConfigFragmentPurgerSpec(fragment_id=missing_id),  # missing -> reported
         ])
-        # partial: the existing fragment is purged; the missing one (index 1) is reported
+        # partial: the existing fragment is purged; the missing one is reported by its id
         assert [p.id for p in result.succeeded] == [two_fragments[0].id]
-        assert [f.index for f in result.failed] == [1]
+        assert [f.id for f in result.failed] == [missing_id]
         with pytest.raises(AppConfigFragmentNotFound):
             await repository.get_by_id(two_fragments[0].id)
 

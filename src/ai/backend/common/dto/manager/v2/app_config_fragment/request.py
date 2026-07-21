@@ -25,7 +25,7 @@ class CreateAppConfigFragmentInput(BaseRequestModel):
     config_name: str = Field(
         min_length=1,
         max_length=128,
-        description="Registered config name (FK to app_config_definitions).",
+        description="Registered config name.",
     )
     scope_type: AppConfigScopeType = Field(
         description="Scope the fragment is written at (public | domain | user)."

@@ -561,7 +561,7 @@
         "description": "Input for creating a new app config fragment at a given scope.",
         "properties": {
           "config_name": {
-            "description": "Registered config name (FK to app_config_definitions).",
+            "description": "Registered config name.",
             "maxLength": 128,
             "minLength": 1,
             "title": "Config Name",

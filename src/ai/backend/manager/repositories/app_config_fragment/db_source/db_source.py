@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from typing import cast
 
 import sqlalchemy as sa
 
@@ -138,7 +139,9 @@ class AppConfigFragmentDBSource:
             # A missing PK is skipped by the partial op (no row, no error); report as not-found.
             failed = [
                 AppConfigFragmentBulkItemError(
-                    index=index,
+                    # Updater types pk_value generically; this repository only ever
+                    # builds fragment updaters.
+                    id=cast(AppConfigFragmentID, updater.pk_value),
                     message=errors_by_index.get(
                         index, f"App config fragment {updater.pk_value} not found"
                     ),
@@ -170,7 +173,7 @@ class AppConfigFragmentDBSource:
             # A missing PK is skipped by the partial op (no row, no error); report as not-found.
             failed = [
                 AppConfigFragmentBulkItemError(
-                    index=index,
+                    id=spec.fragment_id,
                     message=errors_by_index.get(
                         index, f"App config fragment {spec.fragment_id} not found"
                     ),
