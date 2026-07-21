@@ -61,6 +61,7 @@ from ai.backend.manager.data.deployment_revision_preset.types import (
     DeploymentRevisionPresetData,
     ResourceSlotEntryData,
 )
+from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.resource import DeploymentRevisionPresetNotFound
 from ai.backend.manager.models.base import ResourceOptsEntry
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
@@ -489,10 +490,13 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
             if cond is not None:
                 conditions.append(cond)
         if filter_.compatible_with_model_card_id is not None:
-            conditions.append(
-                DeploymentRevisionPresetConditions.by_model_card_compatible(
-                    filter_.compatible_with_model_card_id
+            card_filter = filter_.compatible_with_model_card_id
+            if card_filter.equals is None:
+                raise InvalidAPIParameters(
+                    "compatibleWithModelCardId only supports the `equals` operator."
                 )
+            conditions.append(
+                DeploymentRevisionPresetConditions.by_model_card_compatible(card_filter.equals)
             )
         if filter_.name:
             cond = self.convert_string_filter(
