@@ -159,7 +159,7 @@ class TestBuildIdleCheckSweepStage:
         assert registration.stage.lock_id == LockID.LOCKID_IDLE_CHECK_SWEEP_RECONCILE
         assert registration.task_spec.reconcile_type == "idle_check_sweep"
         assert registration.task_spec.short_interval is None
-        assert registration.task_spec.long_interval == 10.0
+        assert registration.task_spec.long_interval == 30.0
 
     async def test_runs_expiry_sweep(self, sweep_stage: IdleCheckSweepStageSetup) -> None:
         await sweep_stage.registration.stage.run()

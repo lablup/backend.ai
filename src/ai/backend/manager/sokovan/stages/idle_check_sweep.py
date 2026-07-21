@@ -55,7 +55,7 @@ def build_idle_check_sweep_stage(
         reconcile_type=reconcile_type,
         if_needed_event_factory=DoReconcileProcessIfNeededEvent,
         process_event_factory=DoReconcileProcessEvent,
-        long_interval=10.0,
+        long_interval=30.0,
     )
     return ReconcilerStageRegistration(
         reconcile_type=reconcile_type,
