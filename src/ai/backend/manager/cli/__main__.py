@@ -270,6 +270,7 @@ def clear_history(cli_ctx: CLIContext, retention: str, vacuum_full: bool) -> Non
     from more_itertools import chunked
 
     from ai.backend.common.validators import TimeDuration
+    from ai.backend.manager.models.base import ensure_all_tables_registered
     from ai.backend.manager.models.kernel import kernels
     from ai.backend.manager.repositories.db.engine import connect_database, vacuum_db
     from ai.backend.manager.repositories.ops import DBOpsProvider
@@ -324,6 +325,9 @@ def clear_history(cli_ctx: CLIContext, retention: str, vacuum_full: bool) -> Non
 
     async def _force_retention_sweep() -> None:
         log.info("Triggering an immediate DB record retention sweep...")
+        # This standalone CLI process has not imported the full model tree, so
+        # register every table before the sweep issues its first ORM query.
+        ensure_all_tables_registered()
         async with (
             connect_database(bootstrap_config.db) as db,
             config_provider_ctx(cli_ctx) as config_provider,

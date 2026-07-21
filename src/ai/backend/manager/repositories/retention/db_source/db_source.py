@@ -288,14 +288,15 @@ class RetentionDBSource:
         return specs
 
     async def sweep(self) -> list[RetentionPurgeResult]:
-        """Purge every enabled category once, within a single transaction.
+        """Purge every enabled category once, each isolated by a savepoint.
 
         Reads ``batch_size`` / ``per_tick_budget`` from config at call time (so a
-        config change takes effect on the next tick). The whole sweep runs in one
-        ``write_ops`` session, so reading DB ``now``, loading policies, draining
-        each category, and stamping ``last_swept_at`` all share one snapshot and
-        commit atomically at the end — a crash mid-tick rolls the entire tick
-        back, leaving no delete-without-stamp drift.
+        config change takes effect on the next tick). The tick runs in one
+        ``write_ops`` session sharing a single ``now`` snapshot, but each category
+        drains and stamps ``last_swept_at`` inside its own savepoint: a category
+        keeps the delete-and-stamp together (no delete-without-stamp drift) while a
+        failing category rolls back only its own savepoint and is skipped, so one
+        broken category no longer aborts the whole tick.
 
         Policies are visited least-recently-swept first. A category with no wired
         cleanup raises :class:`RetentionCategoryNotSupportedError`; the loop
@@ -328,8 +329,18 @@ class RetentionDBSource:
                         policy.category.value,
                     )
                     continue
-                deleted = await self._drain_specs(w, specs, batch_size)
-                await w.update(Updater(spec=LastSweptAtUpdaterSpec(now), pk_value=policy.id))
+                try:
+                    async with w.savepoint() as sp:
+                        deleted = await self._drain_specs(sp, specs, batch_size)
+                        await sp.update(
+                            Updater(spec=LastSweptAtUpdaterSpec(now), pk_value=policy.id)
+                        )
+                except Exception:
+                    log.exception(
+                        "retention sweep failed for category {}; isolated and skipped",
+                        policy.category.value,
+                    )
+                    continue
                 results.append(
                     RetentionPurgeResult(category=policy.category, deleted_count=deleted)
                 )

@@ -333,9 +333,12 @@ async def execute_batch_purger[TRow: Base](
         purger = BatchPurger(spec=OldSessionBatchPurgerSpec(cutoff_date))
         result = await execute_batch_purger(db_sess, purger)
     """
-    # Extract table and PK columns from the subquery
+    # Resolve the target table from the mapped entity rather than the query's
+    # FROM clause: an entity with an eager (``lazy="joined"``) relationship
+    # compiles to an _ORMJoin whose primary_key is a ColumnSet, not a Table.
     base_subquery = purger.spec.build_subquery()
-    table = cast(sa.Table, base_subquery.froms[0])
+    entity = base_subquery.column_descriptions[0]["entity"]
+    table = sa.inspect(entity).local_table
     pk_columns = list(table.primary_key.columns)
 
     total_deleted = 0
