@@ -102,6 +102,7 @@ from ai.backend.common.metrics.http import (
 )
 from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.common.metrics.profiler import Profiler, PyroscopeArgs
+from ai.backend.common.networking import force_threaded_dns_resolver
 from ai.backend.common.service_discovery.etcd_discovery.service_discovery import (
     ETCDServiceDiscovery,
     ETCDServiceDiscoveryArgs,
@@ -1716,6 +1717,7 @@ def main(
     log_level: LogLevel,
 ) -> int:
     """Start the agent service as a foreground process."""
+    force_threaded_dns_resolver()
     if debug:
         log_level = LogLevel.DEBUG
 
