@@ -4,7 +4,6 @@ python_sources(
     dependencies=[
         ":resources",
         "stubs/trafaret:stubs",
-        "//:reqs#pycares",  # aiodns runtime dependency - pin version explicitly
     ],
 )
 
