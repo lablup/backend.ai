@@ -13,7 +13,6 @@ from ai.backend.common.types import (
     AgentId,
     AgentSelectionStrategy,
     SessionId,
-    SlotQuantity,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -22,7 +21,6 @@ from ai.backend.manager.data.sokovan import (
     AgentInfo,
     AllocationBatch,
     KernelAllocation,
-    KeypairOccupancy,
     SchedulingFailure,
     SchedulingPredicate,
     SessionAllocation,
@@ -33,10 +31,6 @@ from ai.backend.manager.metrics.scheduler import (
     SchedulerPhaseMetricObserver,
 )
 from ai.backend.manager.repositories.fair_share import FairShareRepository
-from ai.backend.manager.repositories.resource_slot.types import (
-    add_quantities,
-    resource_slot_to_quantities,
-)
 from ai.backend.manager.repositories.scheduler import (
     SchedulerRepository,
     SchedulingData,
@@ -175,14 +169,12 @@ class SessionProvisioner:
             ScheduleResult containing scheduled session data
         """
         # Use data from scheduling_data instead of making DB calls
-        # Convert PendingSessionData to SessionWorkload
-        base_workloads = [
-            session.to_session_workload() for session in scheduling_data.pending_sessions.sessions
-        ]
-        sg_info = scheduling_data.scaling_group
+        base_workloads = scheduling_data.workloads
+        sg_info = scheduling_data.resource_group
         resource_group_id = sg_info.id
 
-        if not scheduling_data.snapshot_data:
+        system_snapshot = scheduling_data.system_snapshot
+        if system_snapshot is None:
             log.warning("Missing snapshot data for resource group {}", resource_group_id)
             return ScheduleResult(scheduled_session_ids=[], scheduling_failures=[])
 
@@ -198,14 +190,9 @@ class SessionProvisioner:
             for workload, failed_agents in zip(base_workloads, failed_agents_list, strict=True)
         ]
 
-        # Convert snapshot data to SystemSnapshot
-        system_snapshot = scheduling_data.snapshot_data.to_system_snapshot(
-            scheduling_data.spec.known_slot_types, scheduling_data.total_capacity
-        )
-
-        # Create agent selection config directly from spec and scaling group opts
+        # Create agent selection config directly from scheduling data and scaling group opts
         selection_config = AgentSelectionConfig(
-            max_container_count=scheduling_data.spec.max_container_count,
+            max_container_count=scheduling_data.max_container_count,
             enforce_spreading_endpoint_replica=sg_info.scheduler_opts.enforce_spreading_endpoint_replica,
         )
         # Perform sequencing (batch operation for all workloads)
@@ -226,13 +213,8 @@ class SessionProvisioner:
                 resource_group_id, system_snapshot, workloads
             )
 
-        # Build mutable agents with occupancy data from snapshot
-        agent_occupancy = (
-            scheduling_data.snapshot_data.resource_occupancy.by_agent
-            if scheduling_data.snapshot_data
-            else {}
-        )
-        mutable_agents = [agent.to_agent_info(agent_occupancy) for agent in scheduling_data.agents]
+        # Build mutable agents from the fetched agent metadata
+        mutable_agents = [agent.to_agent_info() for agent in scheduling_data.agents]
         session_allocations: list[SessionAllocation] = []
         scheduling_failures: list[SchedulingFailure] = []
         # Get agent selection strategy from scheduler opts config
@@ -345,7 +327,6 @@ class SessionProvisioner:
                 self._update_system_snapshot(
                     mutable_snapshot,
                     session_workload,
-                    session_allocation,
                 )
 
         return session_allocation
@@ -354,71 +335,23 @@ class SessionProvisioner:
         self,
         snapshot: SystemSnapshot,
         workload: SessionWorkload,
-        allocation: SessionAllocation,
     ) -> None:
         """
         Update the system snapshot after a session allocation.
         This ensures the next validation uses up-to-date information.
 
+        Folding the workload's request advances both the slot reservations
+        and the session counts of every owner scope.
+
         :param snapshot: The system snapshot to update (modified in-place)
         :param workload: The session workload that was allocated
-        :param allocation: The session allocation result containing agent allocations
         """
-        # Calculate total allocated resources from allocation
-        # allocated_slots are list[ResourceSlot]; convert to list[SlotQuantity] for occupancy
-        total_quantities: list[SlotQuantity] = []
-        for agent_alloc in allocation.agent_allocations:
-            for slot in agent_alloc.allocated_slots:
-                total_quantities = add_quantities(
-                    total_quantities, resource_slot_to_quantities(slot)
-                )
-
-        # 1. Update resource occupancy - add the session's allocated slots
-        # Update keypair occupancy
-        current_keypair = snapshot.resource_occupancy.by_keypair.get(workload.access_key)
-        if current_keypair is None:
-            current_keypair = KeypairOccupancy(
-                occupied_slots=[], session_count=0, sftp_session_count=0
-            )
-
-        # Update occupied slots and session counts
-        current_keypair.occupied_slots = add_quantities(
-            current_keypair.occupied_slots, total_quantities
+        snapshot.global_scope.occupancy.add_occupancy(
+            workload.user_uuid,
+            workload.project_id,
+            workload.domain_id,
+            workload.requested_slots,
         )
-        if workload.is_private:
-            current_keypair.sftp_session_count += 1
-        else:
-            current_keypair.session_count += 1
-
-        snapshot.resource_occupancy.by_keypair[workload.access_key] = current_keypair
-
-        # Update user occupancy
-        current_user = snapshot.resource_occupancy.by_user.get(workload.user_uuid, [])
-        snapshot.resource_occupancy.by_user[workload.user_uuid] = add_quantities(
-            current_user, total_quantities
-        )
-
-        # Update group occupancy
-        current_group = snapshot.resource_occupancy.by_group.get(workload.group_id, [])
-        snapshot.resource_occupancy.by_group[workload.group_id] = add_quantities(
-            current_group, total_quantities
-        )
-
-        # Update domain occupancy
-        current_domain = snapshot.resource_occupancy.by_domain.get(workload.domain_name, [])
-        snapshot.resource_occupancy.by_domain[workload.domain_name] = add_quantities(
-            current_domain, total_quantities
-        )
-
-        # 2. Update concurrency counts
-        if workload.is_private:
-            # Increment SFTP session count
-            current_sftp = snapshot.concurrency.sftp_sessions_by_keypair.get(workload.access_key, 0)
-            snapshot.concurrency.sftp_sessions_by_keypair[workload.access_key] = current_sftp + 1
-        else:
-            # Increment regular session count
-            current_sessions = snapshot.concurrency.sessions_by_keypair.get(workload.access_key, 0)
-            snapshot.concurrency.sessions_by_keypair[workload.access_key] = current_sessions + 1
 
     async def _allocate_workload(
         self,

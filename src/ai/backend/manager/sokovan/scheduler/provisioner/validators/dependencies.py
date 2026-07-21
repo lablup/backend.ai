@@ -29,7 +29,9 @@ class DependenciesValidator(ValidatorRule):
     @override
     def validate(self, snapshot: SystemSnapshot, workload: SessionWorkload) -> None:
         # Get dependencies for this session
-        dependencies = snapshot.session_dependencies.by_session.get(workload.session_id, [])
+        dependencies = snapshot.resource_group.session_dependencies.by_session.get(
+            workload.session_id, []
+        )
 
         # Check if all dependencies are satisfied
         pending_dependencies = []

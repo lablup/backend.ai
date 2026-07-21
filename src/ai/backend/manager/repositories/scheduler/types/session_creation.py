@@ -60,5 +60,4 @@ class SessionSpecContextFetch:
     keypair_resource_policy: KeyPairResourcePolicyData | None
     known_slot_types: Mapping[SlotName, SlotTypes] = field(default_factory=dict)
     slot_type_policy: SlotTypePolicy = field(default_factory=SlotTypePolicy)
-    active_session_count: int = 0
-    active_sftp_session_count: int = 0
+    pending_session_count: int = 0

@@ -93,7 +93,7 @@ class FairShareSequencer(WorkloadSequencer):
         # Group user_ids by project_id
         project_users: dict[UUID, set[UUID]] = defaultdict(set)
         for w in workloads:
-            project_users[w.group_id].add(w.user_uuid)
+            project_users[w.project_id].add(w.user_uuid)
 
         # Build ProjectUserIds list
         project_user_ids = [

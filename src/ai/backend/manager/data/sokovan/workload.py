@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
-from uuid import UUID
+from decimal import Decimal
 
 from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.project import ProjectID
@@ -14,27 +15,33 @@ from ai.backend.common.types import (
     AccessKey,
     AgentId,
     ClusterMode,
-    ResourceSlot,
+    KernelId,
     SessionId,
     SessionResult,
     SessionTypes,
+    SlotName,
 )
 from ai.backend.manager.data.session.types import SessionStatus
 
 
 @dataclass(frozen=True)
-class UserResourcePolicy:
-    """Resource policy for a user, applied per user by the scheduler.
+class ResourceRequest:
+    """Requested slot amounts of one workload (kernel-level granularity)."""
 
-    All limits are sourced from the user's main keypair policy (no
-    user-level DB columns yet). This is the single policy the scheduler
-    snapshot carries; per-keypair policies are no longer tracked.
+    slots: Mapping[SlotName, Decimal]
+
+
+@dataclass(frozen=True)
+class SessionResourceRequest(ResourceRequest):
+    """Session-level request: slot amounts plus the session itself.
+
+    Exactly one of the session counts is 1 (sftp for private sessions),
+    so folding a request into an allocation advances both the slot
+    reservation and the session count.
     """
 
-    name: str
-    total_resource_slots: ResourceSlot
-    max_concurrent_sessions: int | None
-    max_concurrent_sftp_sessions: int | None
+    session_count: int
+    sftp_session_count: int
 
 
 @dataclass(frozen=True)
@@ -52,13 +59,13 @@ class KernelWorkload:
     """Represents a kernel workload within a session."""
 
     # Unique identifier of the kernel
-    kernel_id: UUID
+    kernel_id: KernelId
     # Image name for the kernel
     image: str
     # Architecture required for the kernel
     architecture: str
     # Resource requirements for this kernel
-    requested_slots: ResourceSlot
+    requested_slots: ResourceRequest
 
 
 @dataclass(frozen=True)
@@ -70,7 +77,7 @@ class SessionWorkload:
     # User identification for fairness calculation
     access_key: AccessKey
     # Resource requirements
-    requested_slots: ResourceSlot
+    requested_slots: SessionResourceRequest
     # User ID for user resource limit checks
     user_uuid: UserID
     # Project ID for project resource limit checks

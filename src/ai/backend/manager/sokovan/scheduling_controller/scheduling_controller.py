@@ -74,12 +74,12 @@ from .preparers import (
     SessionSpecPreparer,
 )
 from .validators import (
-    ConcurrentSessionLimitRule,
     ContainerLimitRule,
     DotfileVFolderConflictRule,
     ImageSlotTypeRule,
     InferenceModelFolderRule,
     MountNameValidationRule,
+    PendingSessionCountLimitRule,
     RequestedSlotTypeRule,
     RequiredResourceSlotRule,
     ResourceLimitRule,
@@ -178,7 +178,7 @@ class SchedulingController:
         # Draft-based spec validator chain. Runs against the finalized
         # ``SessionSpec`` + ``SessionSpecValidationContext``.
         self._spec_validator = SessionSpecValidator([
-            ConcurrentSessionLimitRule(),
+            PendingSessionCountLimitRule(),
             ContainerLimitRule(),
             ImageSlotTypeRule(),
             RequestedSlotTypeRule(),
@@ -281,7 +281,7 @@ class SchedulingController:
             known_slot_types=fetched.known_slot_types,
             slot_type_policy=fetched.slot_type_policy,
             dotfile_data=fetched.dotfile_data,
-            active_session_count=fetched.active_session_count,
+            pending_session_count=fetched.pending_session_count,
         )
 
         with self._metric_observer.measure_phase(
@@ -403,16 +403,9 @@ class SchedulingController:
             # An unknown resource group (ScalingGroupNotFound) is a request error,
             # not a per-kernel fitting outcome, so let it propagate to the caller.
             scheduling_data = await self._repository.get_scheduling_data(resource_group_id)
-            agent_occupancy = (
-                scheduling_data.snapshot_data.resource_occupancy.by_agent
-                if scheduling_data.snapshot_data
-                else {}
-            )
             # The selector mutates the agents list on full success; feed clones so
             # the live snapshot is never altered.
-            mutable_agents = [
-                agent.to_agent_info(agent_occupancy) for agent in scheduling_data.agents
-            ]
+            mutable_agents = [agent.to_agent_info() for agent in scheduling_data.agents]
             # A resource group with no candidate agents (NoAgentsInResourceGroupError)
             # is likewise a whole-request error, so it propagates too.
             try:

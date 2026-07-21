@@ -1,18 +1,14 @@
 """Session related types."""
 
 from dataclasses import dataclass
-from datetime import datetime
 from functools import cached_property
-from uuid import UUID
 
 from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.project import ProjectID
-from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
-    ClusterMode,
     KernelId,
     ResourceSlot,
     SessionId,
@@ -20,88 +16,14 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.data.sokovan import KernelWorkload, SessionWorkload
-
-
-@dataclass
-class KernelData:
-    """Kernel data for scheduling."""
-
-    id: UUID
-    image: str
-    architecture: str
-    requested_slots: ResourceSlot
-    agent: AgentId | None
-
-    def to_kernel_workload(self) -> KernelWorkload:
-        """Convert to KernelWorkload entity."""
-        return KernelWorkload(
-            kernel_id=self.id,
-            image=self.image,
-            architecture=self.architecture,
-            requested_slots=self.requested_slots,
-        )
-
-
-@dataclass
-class PendingSessionData:
-    """Pending session data for scheduling."""
-
-    id: SessionId
-    access_key: AccessKey
-    requested_slots: ResourceSlot
-    user_uuid: UserID
-    project_id: ProjectID
-    domain_id: DomainID
-    # Domain name kept alongside the ID; some lookups (e.g. domain limits)
-    # still filter by name.
-    domain_name: str
-    scaling_group_name: str
-    resource_group_id: ResourceGroupID
-    priority: int
-    job_priority: int
-    is_preemptible: bool
-    session_type: SessionTypes
-    cluster_mode: ClusterMode
-    starts_at: datetime | None
-    is_private: bool
-    designated_agent_ids: list[AgentId] | None
-    kernels: list[KernelData]
-
-    def to_session_workload(self) -> SessionWorkload:
-        """Convert to SessionWorkload entity."""
-        kernel_workloads = [k.to_kernel_workload() for k in self.kernels]
-        return SessionWorkload(
-            session_id=self.id,
-            access_key=self.access_key,
-            requested_slots=self.requested_slots,
-            user_uuid=self.user_uuid,
-            project_id=self.project_id,
-            domain_id=self.domain_id,
-            scaling_group=self.scaling_group_name,
-            resource_group_id=self.resource_group_id,
-            priority=self.priority,
-            job_priority=self.job_priority,
-            session_type=self.session_type,
-            cluster_mode=self.cluster_mode,
-            starts_at=self.starts_at,
-            is_private=self.is_private,
-            is_preemptible=self.is_preemptible,
-            kernels=kernel_workloads,
-            designated_agent_ids=self.designated_agent_ids,
-        )
+from ai.backend.manager.data.sokovan import SessionWorkload
 
 
 @dataclass
 class PendingSessions:
-    """Wrapper for pending sessions with cached properties for entity extraction."""
+    """Wrapper for pending session workloads with cached owner-key extraction."""
 
-    sessions: list[PendingSessionData]
-
-    @cached_property
-    def access_keys(self) -> set[AccessKey]:
-        """Extract unique access keys from pending sessions."""
-        return {s.access_key for s in self.sessions}
+    sessions: list[SessionWorkload]
 
     @cached_property
     def user_uuids(self) -> set[UserID]:
@@ -114,9 +36,9 @@ class PendingSessions:
         return {s.project_id for s in self.sessions}
 
     @cached_property
-    def domain_names(self) -> set[str]:
-        """Extract unique domain names from pending sessions."""
-        return {s.domain_name for s in self.sessions}
+    def domain_ids(self) -> set[DomainID]:
+        """Extract unique domain IDs from pending sessions."""
+        return {s.domain_id for s in self.sessions}
 
 
 @dataclass

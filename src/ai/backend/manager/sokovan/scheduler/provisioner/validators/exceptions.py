@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 from abc import abstractmethod
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from datetime import datetime
+from decimal import Decimal
 from typing import override
 
 from aiohttp import web
@@ -15,7 +16,7 @@ from ai.backend.common.exception import (
     ErrorDomain,
     ErrorOperation,
 )
-from ai.backend.common.types import ResourceSlot
+from ai.backend.common.types import SlotName
 from ai.backend.manager.data.sokovan import SchedulingPredicate
 from ai.backend.manager.sokovan.scheduler.exceptions import SchedulingError
 
@@ -54,7 +55,7 @@ class SchedulingValidationError(SchedulingError, web.HTTPPreconditionFailed):
         return [SchedulingPredicate(name=type(self).__name__, msg=str(self))]
 
 
-def _format_slots(slots: ResourceSlot) -> str:
+def _format_slots(slots: Mapping[SlotName, Decimal]) -> str:
     return " ".join(f"{k}={v}" for k, v in slots.items() if v)
 
 
@@ -111,40 +112,15 @@ class DependenciesNotSatisfied(SchedulingValidationError):
         )
 
 
-class KeypairResourceQuotaExceeded(SchedulingValidationError):
-    """Raised when keypair resource quota is exceeded."""
-
-    error_type = "https://api.backend.ai/probs/keypair-resource-quota-exceeded"
-    error_title = "Keypair resource quota exceeded."
-
-    _quota_slots: ResourceSlot
-
-    def __init__(self, *, quota_slots: ResourceSlot) -> None:
-        self._quota_slots = quota_slots
-        super().__init__(self.summary())
-
-    @override
-    def summary(self) -> str:
-        return f"Your keypair resource quota is exceeded. ({_format_slots(self._quota_slots)})"
-
-    @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.KEYPAIR,
-            operation=ErrorOperation.CHECK_LIMIT,
-            error_detail=ErrorDetail.FORBIDDEN,
-        )
-
-
 class UserResourceQuotaExceeded(SchedulingValidationError):
     """Raised when user resource quota is exceeded."""
 
     error_type = "https://api.backend.ai/probs/user-resource-quota-exceeded"
     error_title = "User resource quota exceeded."
 
-    _quota_slots: ResourceSlot
+    _quota_slots: Mapping[SlotName, Decimal]
 
-    def __init__(self, *, quota_slots: ResourceSlot) -> None:
+    def __init__(self, *, quota_slots: Mapping[SlotName, Decimal]) -> None:
         self._quota_slots = quota_slots
         super().__init__(self.summary())
 
@@ -161,21 +137,21 @@ class UserResourceQuotaExceeded(SchedulingValidationError):
         )
 
 
-class GroupResourceQuotaExceeded(SchedulingValidationError):
-    """Raised when group resource quota is exceeded."""
+class ProjectResourceQuotaExceeded(SchedulingValidationError):
+    """Raised when project resource quota is exceeded."""
 
     error_type = "https://api.backend.ai/probs/group-resource-quota-exceeded"
-    error_title = "Group resource quota exceeded."
+    error_title = "Project resource quota exceeded."
 
-    _quota_slots: ResourceSlot
+    _quota_slots: Mapping[SlotName, Decimal]
 
-    def __init__(self, *, quota_slots: ResourceSlot) -> None:
+    def __init__(self, *, quota_slots: Mapping[SlotName, Decimal]) -> None:
         self._quota_slots = quota_slots
         super().__init__(self.summary())
 
     @override
     def summary(self) -> str:
-        return f"Your group resource quota is exceeded. ({_format_slots(self._quota_slots)})"
+        return f"Your project resource quota is exceeded. ({_format_slots(self._quota_slots)})"
 
     @override
     def error_code(self) -> ErrorCode:
@@ -192,9 +168,9 @@ class DomainResourceQuotaExceeded(SchedulingValidationError):
     error_type = "https://api.backend.ai/probs/domain-resource-quota-exceeded"
     error_title = "Domain resource quota exceeded."
 
-    _quota_slots: ResourceSlot
+    _quota_slots: Mapping[SlotName, Decimal]
 
-    def __init__(self, *, quota_slots: ResourceSlot) -> None:
+    def __init__(self, *, quota_slots: Mapping[SlotName, Decimal]) -> None:
         self._quota_slots = quota_slots
         super().__init__(self.summary())
 
@@ -206,59 +182,6 @@ class DomainResourceQuotaExceeded(SchedulingValidationError):
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.DOMAIN,
-            operation=ErrorOperation.CHECK_LIMIT,
-            error_detail=ErrorDetail.FORBIDDEN,
-        )
-
-
-class PendingSessionCountLimitExceeded(SchedulingValidationError):
-    """Raised when pending session count limit is exceeded."""
-
-    error_type = "https://api.backend.ai/probs/pending-session-count-limit-exceeded"
-    error_title = "Pending session count limit exceeded."
-
-    _max_pending_session_count: int
-
-    def __init__(self, *, max_pending_session_count: int) -> None:
-        self._max_pending_session_count = max_pending_session_count
-        super().__init__(self.summary())
-
-    @override
-    def summary(self) -> str:
-        return f"You cannot create more than {self._max_pending_session_count} pending session(s)."
-
-    @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.SESSION,
-            operation=ErrorOperation.CHECK_LIMIT,
-            error_detail=ErrorDetail.FORBIDDEN,
-        )
-
-
-class PendingSessionResourceLimitExceeded(SchedulingValidationError):
-    """Raised when pending session resource limit is exceeded."""
-
-    error_type = "https://api.backend.ai/probs/pending-session-resource-limit-exceeded"
-    error_title = "Pending session resource limit exceeded."
-
-    _current_pending_slots: ResourceSlot
-
-    def __init__(self, *, current_pending_slots: ResourceSlot) -> None:
-        self._current_pending_slots = current_pending_slots
-        super().__init__(self.summary())
-
-    @override
-    def summary(self) -> str:
-        return (
-            f"Your pending session quota is exceeded."
-            f" ({_format_slots(self._current_pending_slots)})"
-        )
-
-    @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.SESSION,
             operation=ErrorOperation.CHECK_LIMIT,
             error_detail=ErrorDetail.FORBIDDEN,
         )

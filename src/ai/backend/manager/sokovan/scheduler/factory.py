@@ -61,32 +61,14 @@ from ai.backend.manager.sokovan.scheduler.provisioner.provisioner import (
 )
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import AgentSelector
 from ai.backend.manager.sokovan.scheduler.provisioner.sequencers.fifo import FIFOSequencer
-from ai.backend.manager.sokovan.scheduler.provisioner.validators.concurrency import (
-    ConcurrencyValidator,
-)
 from ai.backend.manager.sokovan.scheduler.provisioner.validators.dependencies import (
     DependenciesValidator,
-)
-from ai.backend.manager.sokovan.scheduler.provisioner.validators.domain_resource_limit import (
-    DomainResourceLimitValidator,
-)
-from ai.backend.manager.sokovan.scheduler.provisioner.validators.group_resource_limit import (
-    GroupResourceLimitValidator,
-)
-from ai.backend.manager.sokovan.scheduler.provisioner.validators.keypair_resource_limit import (
-    KeypairResourceLimitValidator,
-)
-from ai.backend.manager.sokovan.scheduler.provisioner.validators.pending_session_count_limit import (
-    PendingSessionCountLimitValidator,
-)
-from ai.backend.manager.sokovan.scheduler.provisioner.validators.pending_session_resource_limit import (
-    PendingSessionResourceLimitValidator,
 )
 from ai.backend.manager.sokovan.scheduler.provisioner.validators.reserved_batch import (
     ReservedBatchSessionValidator,
 )
-from ai.backend.manager.sokovan.scheduler.provisioner.validators.user_resource_limit import (
-    UserResourceLimitValidator,
+from ai.backend.manager.sokovan.scheduler.provisioner.validators.resource_policy import (
+    ResourcePolicyValidator,
 )
 from ai.backend.manager.sokovan.scheduler.provisioner.validators.validator import (
     SchedulingValidator,
@@ -128,15 +110,9 @@ def create_default_scheduler_components(
     # Create provisioner components
     sequencer = FIFOSequencer()
     validator = SchedulingValidator([
-        ConcurrencyValidator(),
         DependenciesValidator(),
-        DomainResourceLimitValidator(),
-        GroupResourceLimitValidator(),
-        KeypairResourceLimitValidator(),
-        PendingSessionCountLimitValidator(),
-        PendingSessionResourceLimitValidator(),
         ReservedBatchSessionValidator(),
-        UserResourceLimitValidator(),
+        ResourcePolicyValidator(),
     ])
     allocator = RepositoryAllocator(repository)
 

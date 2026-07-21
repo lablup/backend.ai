@@ -48,11 +48,10 @@ class SessionSpecValidationContext:
     resolved vfolder mounts — the conflict branch the legacy
     ``prepare_dotfiles`` used to run inline.
 
-    ``active_session_count`` / ``active_sftp_session_count`` feed the
-    ``ConcurrentSessionLimitRule`` so the validator can compare the
-    current active session count against ``max_concurrent_sessions`` on
-    the keypair resource policy. Counts are scoped per user (the session
-    owner), not per access key.
+    ``pending_session_count`` feeds the ``PendingSessionCountLimitRule``
+    so the validator can bound the user's pending-queue depth against
+    ``max_pending_session_count`` on the keypair resource policy. The
+    count is scoped per user (the session owner), not per access key.
     """
 
     keypair_resource_policy: KeyPairResourcePolicyData | None = None
@@ -60,8 +59,7 @@ class SessionSpecValidationContext:
     known_slot_types: Mapping[SlotName, SlotTypes] = field(default_factory=dict)
     slot_type_policy: SlotTypePolicy = field(default_factory=SlotTypePolicy)
     dotfile_data: DotfileBundle = field(default_factory=DotfileBundle)
-    active_session_count: int = 0
-    active_sftp_session_count: int = 0
+    pending_session_count: int = 0
 
 
 class SessionSpecValidatorRule(ABC):

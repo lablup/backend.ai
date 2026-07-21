@@ -41,13 +41,11 @@ from .snapshot import (
     ResourcePolicySnapshot,
     SessionDependencySnapshot,
     SystemSnapshot,
-    UserSessionCounts,
 )
 from .workload import (
     KernelWorkload,
     SessionDependencyInfo,
     SessionWorkload,
-    UserResourcePolicy,
 )
 
 __all__ = [
@@ -95,10 +93,8 @@ __all__ = [
     "ResourcePolicySnapshot",
     "SessionDependencySnapshot",
     "SystemSnapshot",
-    "UserSessionCounts",
     # workload
     "KernelWorkload",
     "SessionDependencyInfo",
     "SessionWorkload",
-    "UserResourcePolicy",
 ]
