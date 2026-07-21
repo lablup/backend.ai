@@ -11,16 +11,11 @@ from ai.backend.manager.sokovan.idle_check.checkers.base import (
     CheckerAssignment,
     IdleChecker,
     IdleCheckerContext,
-    IdleCheckerStatus,
     IdleJudgment,
+    IdleJudgmentStatus,
 )
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
-
-
-class SessionLifetimeStatus(IdleCheckerStatus):
-    WITHIN_LIMIT = "within_limit"
-    EXCEEDED = "exceeded"
 
 
 class SessionLifetimeChecker(IdleChecker):
@@ -65,11 +60,7 @@ class SessionLifetimeChecker(IdleChecker):
                         session_id=session.session_id,
                         is_idle=is_idle,
                         expire_at=expires_at,
-                        status=(
-                            SessionLifetimeStatus.EXCEEDED
-                            if is_idle
-                            else SessionLifetimeStatus.WITHIN_LIMIT
-                        ),
+                        status=IdleJudgmentStatus.IDLE if is_idle else IdleJudgmentStatus.BUSY,
                         message=(
                             "Session lifetime check: "
                             f"max_lifetime_seconds={max_lifetime_seconds:f}, "

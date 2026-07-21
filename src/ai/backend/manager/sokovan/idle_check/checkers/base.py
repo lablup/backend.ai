@@ -29,8 +29,9 @@ class CheckerAssignment:
     sessions: Sequence[IdleCheckSession]
 
 
-class IdleCheckerStatus(StrEnum):
-    """Marker base for checker-specific judgment statuses."""
+class IdleJudgmentStatus(StrEnum):
+    IDLE = "idle"
+    BUSY = "busy"
 
 
 @dataclass(frozen=True)
@@ -41,7 +42,7 @@ class IdleJudgment:
     session_id: SessionId
     is_idle: bool
     expire_at: datetime | None
-    status: IdleCheckerStatus
+    status: IdleJudgmentStatus
     message: str
 
 
