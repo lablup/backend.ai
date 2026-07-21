@@ -38,7 +38,7 @@ class FIFOSequencer(WorkloadSequencer):
         """
         Sequence the workloads in FIFO order.
 
-        :param resource_group_id: The resource group ID.
+        :param resource_group_id: The resource group (scaling group) ID.
         :param system_snapshot: The current system snapshot containing resource state.
         :param workloads: A sequence of SessionWorkload objects to sequence.
         :return: A sequence of SessionWorkload objects in FIFO order.

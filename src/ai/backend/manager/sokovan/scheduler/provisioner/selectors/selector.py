@@ -54,6 +54,8 @@ class AgentStateTracker:
     """
 
     original_agent: AgentInfo
+    # Sessions that previously failed on this agent (retry deprioritization hint)
+    failed_session_ids: frozenset[SessionId] = frozenset()
     committed_slots: dict[SlotName, Decimal] = field(default_factory=dict)
     committed_containers: int = 0
     pending_slots: dict[SlotName, Decimal] = field(default_factory=dict)
@@ -121,8 +123,6 @@ class AgentSelectionConfig:
 
     # Maximum number of containers allowed per agent
     max_container_count: int | None
-    # Whether to enforce endpoint replica spreading (from sgroup_opts)
-    enforce_spreading_endpoint_replica: bool = False
 
 
 @dataclass
@@ -154,10 +154,6 @@ class AgentSelectionCriteria:
     kernel_requirements: Mapping[KernelId, KernelResourceSpec]
     # How designated agents are enforced (STRICT fails, PREFERRED falls back)
     agent_selection_policy: AgentSelectionPolicy
-    # Kernel counts at endpoint for each agent (for concentrated selector spreading)
-    kernel_counts_at_endpoint: Mapping[AgentId, int] | None = None
-    # Agents that previously failed for this session (for deprioritization on retry)
-    failed_agent_ids: frozenset[AgentId] = frozenset()
     # Manually designated agents (user's explicit choice takes precedence)
     designated_agent_ids: list[AgentId] | None = None
 
@@ -425,35 +421,36 @@ class AgentSelector:
             # PREFERRED: designated agents have no capacity - fall back to
             # the normal candidate path below
 
-        # Third pass: deprioritize agents that previously failed for this session
+        # Third pass: deprioritize agents where this session previously failed
+        session_id = criteria.session_metadata.session_id
         candidate_trackers = compatible_trackers
-        if criteria.failed_agent_ids:
-            non_failed = [
-                tracker
-                for tracker in compatible_trackers
-                if tracker.original_agent.agent_id not in criteria.failed_agent_ids
-            ]
+        non_failed = [
+            tracker
+            for tracker in compatible_trackers
+            if session_id not in tracker.failed_session_ids
+        ]
+        if len(non_failed) < len(compatible_trackers):
             if non_failed:
                 excluded = [
                     tracker.original_agent.agent_id
                     for tracker in compatible_trackers
-                    if tracker.original_agent.agent_id in criteria.failed_agent_ids
+                    if session_id in tracker.failed_session_ids
                 ]
                 log.debug(
                     "failed-agent filter(session:{}): excluding {} → candidates: {}",
-                    criteria.session_metadata.session_id,
+                    session_id,
                     excluded,
                     [tracker.original_agent.agent_id for tracker in non_failed],
                 )
                 candidate_trackers = non_failed
             else:
+                # If ALL compatible agents have failed, keep all of them to avoid blocking
                 log.debug(
                     "failed-agent filter(session:{}): all {} compatible agents have failed, "
                     "skipping filter to avoid blocking",
-                    criteria.session_metadata.session_id,
+                    session_id,
                     len(compatible_trackers),
                 )
-            # If ALL compatible agents have failed, keep all of them to avoid blocking
 
         # Use strategy to select from candidates
         return self._strategy.select_tracker_by_strategy(

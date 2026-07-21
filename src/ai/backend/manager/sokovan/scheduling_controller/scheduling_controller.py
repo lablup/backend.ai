@@ -406,7 +406,6 @@ class SchedulingController:
             # per-agent container limit is not enforced for the fitting check.
             config = AgentSelectionConfig(
                 max_container_count=None,
-                enforce_spreading_endpoint_replica=False,
             )
             # An unknown resource group (ScalingGroupNotFound) is a request error,
             # not a per-kernel fitting outcome, so let it propagate to the caller.

@@ -66,7 +66,7 @@ class FairShareSequencer(WorkloadSequencer):
         Workloads are sorted by (domain_factor, project_factor, user_factor) in descending order.
         Higher factor = higher priority (users with lower historical usage get scheduled first).
 
-        :param resource_group_id: The resource group ID.
+        :param resource_group_id: The resource group (scaling group) ID.
         :param system_snapshot: The current system snapshot containing resource state.
         :param workloads: A sequence of SessionWorkload objects to sequence.
         :return: A sequence of SessionWorkload objects ordered by fair share factors.

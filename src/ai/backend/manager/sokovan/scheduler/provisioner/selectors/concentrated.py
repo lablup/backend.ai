@@ -12,8 +12,6 @@ from collections.abc import Sequence
 from decimal import Decimal
 from typing import override
 
-from ai.backend.common.types import SessionTypes
-
 from .selector import (
     AbstractAgentSelector,
     AgentSelectionConfig,
@@ -29,9 +27,8 @@ class ConcentratedAgentSelector(AbstractAgentSelector):
     Concentrated agent selector that maximizes resource utilization.
 
     This selector prefers agents with:
-    1. Fewer kernels at the same endpoint (for endpoint replica spreading)
-    2. Fewer unutilized capabilities
-    3. Less available resources (to concentrate workloads)
+    1. Fewer unutilized capabilities
+    2. Less remaining resources (to concentrate workloads)
     """
 
     def __init__(self, agent_selection_resource_priority: list[str]) -> None:
@@ -62,8 +59,8 @@ class ConcentratedAgentSelector(AbstractAgentSelector):
         self,
         trackers: Sequence[AgentStateTracker],
         resource_req: ResourceRequirements,
-        criteria: AgentSelectionCriteria,
-        config: AgentSelectionConfig,
+        _criteria: AgentSelectionCriteria,
+        _config: AgentSelectionConfig,
     ) -> AgentStateTracker:
         """
         Select an agent tracker to concentrate workloads.
@@ -81,19 +78,10 @@ class ConcentratedAgentSelector(AbstractAgentSelector):
             remaining_slots = tracker.remaining_slots()
             sort_key: list[int | Decimal] = []
 
-            # First, consider kernel counts at endpoint for replica spreading
-            if (
-                config.enforce_spreading_endpoint_replica
-                and criteria.kernel_counts_at_endpoint
-                and criteria.session_metadata.session_type == SessionTypes.INFERENCE
-            ):
-                kernel_count = criteria.kernel_counts_at_endpoint.get(agent.agent_id, 0)
-                sort_key.append(kernel_count)
-
-            # Then, prefer agents with fewer unutilized capabilities
+            # First, prefer agents with fewer unutilized capabilities
             sort_key.append(count_unutilized_capabilities(agent, resource_req.requested_slots))
 
-            # Finally, prefer agents with less remaining resources (using current state)
+            # Then, prefer agents with less remaining resources (using current state)
             for key in resource_priorities:
                 sort_key.append(remaining_slots.get(key, sys.maxsize))
 

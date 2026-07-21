@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import dataclasses
 import logging
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
@@ -96,7 +95,7 @@ class SessionProvisioner:
     _repository: SchedulerRepository
     _fair_share_repository: FairShareRepository
     _config_provider: ManagerConfigProvider
-    _sequencer_pool: Mapping[str, WorkloadSequencer]
+    _sequencer: SchedulingSequencer
     _agent_selector_pool: Mapping[AgentSelectionStrategy, AgentSelector]
     _phase_metrics: SchedulerPhaseMetricObserver
     _valkey_schedule: ValkeyScheduleClient
@@ -110,7 +109,7 @@ class SessionProvisioner:
         self._fair_share_repository = args.fair_share_repository
         self._config_provider = args.config_provider
         self._valkey_schedule = args.valkey_schedule
-        self._sequencer_pool = self._make_sequencer_pool()
+        self._sequencer = SchedulingSequencer(self._make_sequencer_pool())
         self._agent_selector_pool = self._make_agent_selector_pool(
             args.config_provider.config.manager.agent_selection_resource_priority
         )
@@ -145,10 +144,6 @@ class SessionProvisioner:
         )
         return pool
 
-    def _get_sequencer(self, name: str) -> SchedulingSequencer:
-        sequncer = self._sequencer_pool[name]
-        return SchedulingSequencer(sequncer)
-
     async def schedule_scaling_group(
         self,
         scheduling_data: SchedulingData,
@@ -179,45 +174,47 @@ class SessionProvisioner:
             log.warning("Missing snapshot data for resource group {}", resource_group_id)
             return ScheduleResult(scheduled_session_ids=[], scheduling_failures=[])
 
-        # Load per-session failed agents from Valkey for retry deprioritization.
+        # Load per-session failed agents from Valkey for retry deprioritization,
+        # inverted into a per-agent view for the state trackers below.
         # Uses a single pipelined Batch request instead of N parallel round-trips.
         failed_agents_list = await self._valkey_schedule.get_multiple_session_failed_agents([
             workload.session_id for workload in base_workloads
         ])
-        workloads = [
-            dataclasses.replace(workload, failed_agent_ids=failed_agents)
-            if failed_agents
-            else workload
-            for workload, failed_agents in zip(base_workloads, failed_agents_list, strict=True)
-        ]
+        failed_sessions_by_agent: dict[AgentId, set[SessionId]] = defaultdict(set)
+        for workload, failed_agents in zip(base_workloads, failed_agents_list, strict=True):
+            for agent_id in failed_agents:
+                failed_sessions_by_agent[agent_id].add(workload.session_id)
 
-        # Create agent selection config directly from scheduling data and scaling group opts
+        # Create agent selection config directly from scheduling data
         selection_config = AgentSelectionConfig(
             max_container_count=scheduling_data.max_container_count,
-            enforce_spreading_endpoint_replica=sg_info.scheduler_opts.enforce_spreading_endpoint_replica,
         )
         # Perform sequencing (batch operation for all workloads)
         # Record as shared phase so all entity records include it
-        sequencer = self._get_sequencer(sg_info.scheduler)
+        scheduler = sg_info.scheduler
         with (
             self._phase_metrics.measure_phase(
-                "scheduler", resource_group_id, f"sequencing_{sg_info.scheduler}"
+                "scheduler", resource_group_id, f"sequencing_{scheduler}"
             ),
             RecorderContext[SessionId].shared_phase(
-                "sequencing", success_detail=sequencer.success_message()
+                "sequencing", success_detail=self._sequencer.strategy_success_message(scheduler)
             ),
             RecorderContext[SessionId].shared_step(
-                sequencer.name, success_detail=sequencer.success_message()
+                self._sequencer.strategy_name(scheduler),
+                success_detail=self._sequencer.strategy_success_message(scheduler),
             ),
         ):
-            sequenced_workloads = await sequencer.sequence(
-                resource_group_id, system_snapshot, workloads
+            sequenced_workloads = await self._sequencer.sequence(
+                scheduler, resource_group_id, system_snapshot, base_workloads
             )
 
         # Batch-scoped agent state: observations stay immutable, in-batch
-        # allocations accumulate in the trackers across sessions of this pass
+        # allocations and retry-failure hints live in the trackers
         agent_trackers = [
-            AgentStateTracker(original_agent=agent.to_agent_info())
+            AgentStateTracker(
+                original_agent=agent.to_agent_info(),
+                failed_session_ids=frozenset(failed_sessions_by_agent.get(agent.id, ())),
+            )
             for agent in scheduling_data.agents
         ]
         session_allocations: list[SessionAllocation] = []
@@ -375,29 +372,7 @@ class SessionProvisioner:
         :raises AgentSelectionError: If agent selection fails
         """
         # Convert session workload to agent selection criteria
-        session_metadata = SessionMetadata(
-            session_id=session_workload.session_id,
-            session_type=session_workload.session_type,
-            resource_group_id=session_workload.resource_group_id,
-            cluster_mode=session_workload.cluster_mode,
-        )
-
-        kernel_requirements = {
-            kernel.kernel_id: KernelResourceSpec(
-                requested_slots=kernel.requested_slots,
-                required_architecture=kernel.architecture,
-            )
-            for kernel in session_workload.kernels
-        }
-
-        criteria = AgentSelectionCriteria(
-            session_metadata=session_metadata,
-            kernel_requirements=kernel_requirements,
-            kernel_counts_at_endpoint=session_workload.kernel_counts_at_endpoint,
-            failed_agent_ids=session_workload.failed_agent_ids,
-            designated_agent_ids=session_workload.designated_agent_ids,
-            agent_selection_policy=session_workload.agent_selection_policy,
-        )
+        criteria = self._build_selection_criteria(session_workload)
 
         # Use batch selection method - it will get resource requirements internally
         # and commit state changes into the trackers
@@ -409,6 +384,27 @@ class SessionProvisioner:
 
         # Build session allocation from selections
         return self._build_session_allocation(session_workload, selections)
+
+    @staticmethod
+    def _build_selection_criteria(workload: SessionWorkload) -> AgentSelectionCriteria:
+        """Project one session workload into agent selection criteria."""
+        return AgentSelectionCriteria(
+            session_metadata=SessionMetadata(
+                session_id=workload.session_id,
+                session_type=workload.session_type,
+                resource_group_id=workload.resource_group_id,
+                cluster_mode=workload.cluster_mode,
+            ),
+            kernel_requirements={
+                kernel.kernel_id: KernelResourceSpec(
+                    requested_slots=kernel.requested_slots,
+                    required_architecture=kernel.architecture,
+                )
+                for kernel in workload.kernels
+            },
+            agent_selection_policy=workload.agent_selection_policy,
+            designated_agent_ids=workload.designated_agent_ids,
+        )
 
     @staticmethod
     def _build_session_allocation(
