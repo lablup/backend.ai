@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import uuid
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
@@ -15,7 +16,7 @@ class AppConfigFragmentData:
     id: AppConfigFragmentID
     config_name: str
     scope_type: AppConfigScopeType
-    scope_id: str
+    scope_id: uuid.UUID | None
     config: dict[str, Any]
     created_at: datetime
     updated_at: datetime

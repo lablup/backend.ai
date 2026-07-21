@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import uuid
 from typing import Any
 
 import sqlalchemy as sa
@@ -32,6 +33,17 @@ class AppConfigFragmentRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc
             "scope_id",
             name="uq_app_config_fragments_config_name_scope_type_scope_id",
         ),
+        # The constraint above only covers domain and user fragments: Postgres counts NULLs
+        # as distinct, so it would let a config take any number of public fragments. This
+        # partial index restores that guarantee for the NULL (public) rows. It replaces the
+        # NULLS NOT DISTINCT the constraint would otherwise want, which needs Postgres 15+.
+        sa.Index(
+            "uq_app_config_fragments_public_config_name",
+            "config_name",
+            "scope_type",
+            unique=True,
+            postgresql_where=sa.text("scope_id IS NULL"),
+        ),
         sa.ForeignKeyConstraint(
             ["config_name", "scope_type"],
             ["app_config_allow_list.config_name", "app_config_allow_list.scope_type"],
@@ -56,10 +68,12 @@ class AppConfigFragmentRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc
         StrEnumType(AppConfigScopeType),
         nullable=False,
     )
-    scope_id: Mapped[str] = mapped_column(
+    # NULL is the public scope: it has no owner. Domain and user fragments carry the id of
+    # the domain or user that owns them.
+    scope_id: Mapped[uuid.UUID | None] = mapped_column(
         "scope_id",
-        sa.String(length=255),
-        nullable=False,
+        GUID,
+        nullable=True,
     )
     config: Mapped[dict[str, Any]] = mapped_column(
         "config",

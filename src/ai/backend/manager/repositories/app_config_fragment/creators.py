@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, override
@@ -23,7 +24,7 @@ class AppConfigFragmentCreatorSpec(CreatorSpec[AppConfigFragmentRow]):
 
     config_name: str
     scope_type: AppConfigScopeType
-    scope_id: str
+    scope_id: uuid.UUID | None
     config: dict[str, Any]
 
     @property

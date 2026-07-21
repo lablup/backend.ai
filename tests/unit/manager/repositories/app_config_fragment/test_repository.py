@@ -60,9 +60,8 @@ from ai.backend.testutils.db import with_tables
 
 _DOMAIN_UUID = uuid.uuid4()
 _USER_UUID = uuid.uuid4()
-_DOMAIN_ID = str(_DOMAIN_UUID)
-_USER_ID = str(_USER_UUID)
-_OTHER_USER_ID = str(uuid.uuid4())
+_OTHER_DOMAIN_UUID = uuid.uuid4()
+_OTHER_USER_UUID = uuid.uuid4()
 
 
 @pytest.fixture
@@ -129,7 +128,7 @@ async def domain_scoped_fragment(database: ExtendedAsyncSAEngine) -> AppConfigFr
         row = AppConfigFragmentRow(
             config_name="theme",
             scope_type=AppConfigScopeType.DOMAIN,
-            scope_id=_DOMAIN_ID,
+            scope_id=_DOMAIN_UUID,
             config={"k": "v"},
         )
         db_sess.add(row)
@@ -160,37 +159,37 @@ async def fragments_across_scopes(database: ExtendedAsyncSAEngine) -> list[AppCo
             AppConfigFragmentRow(
                 config_name="theme",
                 scope_type=AppConfigScopeType.PUBLIC,
-                scope_id="public",
+                scope_id=None,
                 config={"k": "v"},
             ),
             AppConfigFragmentRow(
                 config_name="theme",
                 scope_type=AppConfigScopeType.DOMAIN,
-                scope_id=_DOMAIN_ID,
+                scope_id=_DOMAIN_UUID,
                 config={"k": "v"},
             ),
             AppConfigFragmentRow(
                 config_name="theme",
                 scope_type=AppConfigScopeType.DOMAIN,
-                scope_id="other",
+                scope_id=_OTHER_DOMAIN_UUID,
                 config={"k": "v"},
             ),
             AppConfigFragmentRow(
                 config_name="theme",
                 scope_type=AppConfigScopeType.USER,
-                scope_id=_USER_ID,
+                scope_id=_USER_UUID,
                 config={"k": "v"},
             ),
             AppConfigFragmentRow(
                 config_name="theme",
                 scope_type=AppConfigScopeType.USER,
-                scope_id=_OTHER_USER_ID,
+                scope_id=_OTHER_USER_UUID,
                 config={"k": "v"},
             ),
             AppConfigFragmentRow(
                 config_name="menu",
                 scope_type=AppConfigScopeType.PUBLIC,
-                scope_id="public",
+                scope_id=None,
                 config={"k": "v"},
             ),
         ]
@@ -207,7 +206,7 @@ class TestCreateAndGet:
             AppConfigFragmentCreatorSpec(
                 config_name="theme",
                 scope_type=AppConfigScopeType.PUBLIC,
-                scope_id="public",
+                scope_id=None,
                 config={"theme": "dark"},
             )
         )
@@ -229,7 +228,7 @@ class TestCreateAndGet:
                 AppConfigFragmentCreatorSpec(
                     config_name="theme",
                     scope_type=AppConfigScopeType.PUBLIC,
-                    scope_id="public",
+                    scope_id=None,
                     config={"theme": "dark"},
                 )
             )
@@ -336,10 +335,10 @@ class TestSearch:
         result = await repository.admin_search(
             BatchQuerier(
                 pagination=OffsetPagination(limit=10, offset=0),
-                conditions=[AppConfigFragmentConditions.by_scope_id_equals(_USER_ID)],
+                conditions=[AppConfigFragmentConditions.by_scope_id_equals(_USER_UUID)],
             )
         )
-        expected = {f.id for f in fragments_across_scopes if f.scope_id == _USER_ID}
+        expected = {f.id for f in fragments_across_scopes if f.scope_id == _USER_UUID}
         assert {item.id for item in result.items} == expected
 
 
@@ -357,7 +356,7 @@ class TestScopedSearch:
         expected = {
             f.id
             for f in fragments_across_scopes
-            if f.scope_type is AppConfigScopeType.DOMAIN and f.scope_id == _DOMAIN_ID
+            if f.scope_type is AppConfigScopeType.DOMAIN and f.scope_id == _DOMAIN_UUID
         }
         assert {item.id for item in result.items} == expected
         assert result.total_count == len(expected)
@@ -374,7 +373,7 @@ class TestScopedSearch:
         expected = {
             f.id
             for f in fragments_across_scopes
-            if f.scope_type is AppConfigScopeType.USER and f.scope_id == _USER_ID
+            if f.scope_type is AppConfigScopeType.USER and f.scope_id == _USER_UUID
         }
         assert {item.id for item in result.items} == expected
 
@@ -393,8 +392,8 @@ class TestScopedSearch:
         expected = {
             f.id
             for f in fragments_across_scopes
-            if (f.scope_type is AppConfigScopeType.DOMAIN and f.scope_id == _DOMAIN_ID)
-            or (f.scope_type is AppConfigScopeType.USER and f.scope_id == _USER_ID)
+            if (f.scope_type is AppConfigScopeType.DOMAIN and f.scope_id == _DOMAIN_UUID)
+            or (f.scope_type is AppConfigScopeType.USER and f.scope_id == _USER_UUID)
         }
         assert {item.id for item in result.items} == expected
 
@@ -432,13 +431,13 @@ async def two_fragments(database: ExtendedAsyncSAEngine) -> list[AppConfigFragme
             AppConfigFragmentRow(
                 config_name="theme",
                 scope_type=AppConfigScopeType.DOMAIN,
-                scope_id=_DOMAIN_ID,
+                scope_id=_DOMAIN_UUID,
                 config={"a": 1},
             ),
             AppConfigFragmentRow(
                 config_name="theme",
                 scope_type=AppConfigScopeType.USER,
-                scope_id=_USER_ID,
+                scope_id=_USER_UUID,
                 config={"b": 2},
             ),
         ]
@@ -547,13 +546,15 @@ class TestVisibilityConditions:
         result = await repository.admin_search(
             BatchQuerier(
                 pagination=OffsetPagination(limit=10, offset=0),
-                conditions=[AppConfigFragmentConditions.by_domain_visibility(_DOMAIN_ID)],
+                conditions=[
+                    AppConfigFragmentConditions.by_domain_visibility(DomainID(_DOMAIN_UUID))
+                ],
             )
         )
         expected = {
             f.id
             for f in fragments_across_scopes
-            if f.scope_type is AppConfigScopeType.DOMAIN and f.scope_id == _DOMAIN_ID
+            if f.scope_type is AppConfigScopeType.DOMAIN and f.scope_id == _DOMAIN_UUID
         }
         assert {item.id for item in result.items} == expected
 
@@ -565,13 +566,13 @@ class TestVisibilityConditions:
         result = await repository.admin_search(
             BatchQuerier(
                 pagination=OffsetPagination(limit=10, offset=0),
-                conditions=[AppConfigFragmentConditions.by_user_visibility(_USER_ID)],
+                conditions=[AppConfigFragmentConditions.by_user_visibility(UserID(_USER_UUID))],
             )
         )
         expected = {
             f.id
             for f in fragments_across_scopes
-            if f.scope_type is AppConfigScopeType.USER and f.scope_id == _USER_ID
+            if f.scope_type is AppConfigScopeType.USER and f.scope_id == _USER_UUID
         }
         assert {item.id for item in result.items} == expected
 
@@ -594,8 +595,8 @@ class TestApplicableFragments:
             if f.config_name == "theme"
             and (
                 f.scope_type is AppConfigScopeType.PUBLIC
-                or (f.scope_type is AppConfigScopeType.DOMAIN and f.scope_id == _DOMAIN_ID)
-                or (f.scope_type is AppConfigScopeType.USER and f.scope_id == _USER_ID)
+                or (f.scope_type is AppConfigScopeType.DOMAIN and f.scope_id == _DOMAIN_UUID)
+                or (f.scope_type is AppConfigScopeType.USER and f.scope_id == _USER_UUID)
             )
         ]
         assert [f.id for f in applicable] == [f.id for f in expected]
@@ -632,8 +633,8 @@ class TestApplicableFragments:
             if f.config_name in ("theme", "menu")
             and (
                 f.scope_type is AppConfigScopeType.PUBLIC
-                or (f.scope_type is AppConfigScopeType.DOMAIN and f.scope_id == _DOMAIN_ID)
-                or (f.scope_type is AppConfigScopeType.USER and f.scope_id == _USER_ID)
+                or (f.scope_type is AppConfigScopeType.DOMAIN and f.scope_id == _DOMAIN_UUID)
+                or (f.scope_type is AppConfigScopeType.USER and f.scope_id == _USER_UUID)
             )
         }
         assert {f.id for f in applicable} == expected
@@ -672,7 +673,7 @@ class _FragmentScopeCase:
     """
 
     scope_type: AppConfigScopeType
-    scope_id: str
+    scope_id: uuid.UUID | None
     expected_bindings: list[_ScopeBinding] = field(default_factory=list)
 
 
@@ -699,15 +700,19 @@ class TestRBACScopeAssociation:
         [
             _FragmentScopeCase(
                 scope_type=AppConfigScopeType.USER,
-                scope_id=_USER_ID,
-                expected_bindings=[_ScopeBinding(scope_type=ScopeType.USER, scope_id=_USER_ID)],
+                scope_id=_USER_UUID,
+                expected_bindings=[
+                    _ScopeBinding(scope_type=ScopeType.USER, scope_id=str(_USER_UUID))
+                ],
             ),
             _FragmentScopeCase(
                 scope_type=AppConfigScopeType.DOMAIN,
-                scope_id=_DOMAIN_ID,
-                expected_bindings=[_ScopeBinding(scope_type=ScopeType.DOMAIN, scope_id=_DOMAIN_ID)],
+                scope_id=_DOMAIN_UUID,
+                expected_bindings=[
+                    _ScopeBinding(scope_type=ScopeType.DOMAIN, scope_id=str(_DOMAIN_UUID))
+                ],
             ),
-            _FragmentScopeCase(scope_type=AppConfigScopeType.PUBLIC, scope_id="public"),
+            _FragmentScopeCase(scope_type=AppConfigScopeType.PUBLIC, scope_id=None),
         ],
         ids=lambda case: case.scope_type.value,
     )
@@ -733,15 +738,19 @@ class TestRBACScopeAssociation:
         [
             _FragmentScopeCase(
                 scope_type=AppConfigScopeType.USER,
-                scope_id=_USER_ID,
-                expected_bindings=[_ScopeBinding(scope_type=ScopeType.USER, scope_id=_USER_ID)],
+                scope_id=_USER_UUID,
+                expected_bindings=[
+                    _ScopeBinding(scope_type=ScopeType.USER, scope_id=str(_USER_UUID))
+                ],
             ),
             _FragmentScopeCase(
                 scope_type=AppConfigScopeType.DOMAIN,
-                scope_id=_DOMAIN_ID,
-                expected_bindings=[_ScopeBinding(scope_type=ScopeType.DOMAIN, scope_id=_DOMAIN_ID)],
+                scope_id=_DOMAIN_UUID,
+                expected_bindings=[
+                    _ScopeBinding(scope_type=ScopeType.DOMAIN, scope_id=str(_DOMAIN_UUID))
+                ],
             ),
-            _FragmentScopeCase(scope_type=AppConfigScopeType.PUBLIC, scope_id="public"),
+            _FragmentScopeCase(scope_type=AppConfigScopeType.PUBLIC, scope_id=None),
         ],
         ids=lambda case: case.scope_type.value,
     )
@@ -780,12 +789,12 @@ class TestRBACScopeAssociation:
             AppConfigFragmentCreatorSpec(
                 config_name="theme",
                 scope_type=AppConfigScopeType.USER,
-                scope_id=_USER_ID,
+                scope_id=_USER_UUID,
                 config={"k": "v"},
             )
         )
         assert await self._scope_bindings(database, str(created.id)) == [
-            _ScopeBinding(scope_type=ScopeType.USER, scope_id=_USER_ID)
+            _ScopeBinding(scope_type=ScopeType.USER, scope_id=str(_USER_UUID))
         ]
         result = await repository.bulk_purge([AppConfigFragmentPurgerSpec(fragment_id=created.id)])
         assert [p.id for p in result.succeeded] == [created.id]
