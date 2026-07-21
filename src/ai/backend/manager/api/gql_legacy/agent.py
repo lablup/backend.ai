@@ -927,14 +927,14 @@ class ModifyAgent(graphene.Mutation):  # type: ignore[misc]
                 )
             if resource_group_id is None:
                 return cls(False, f"no such scaling group: {scaling_group}")
-            # The v1 mutation always terminates the sessions conflicting with the
-            # new group; drain first to keep them.
+            # The v1 mutation refuses to move an agent that still has sessions
+            # under the old group; drain them first.
             await graph_ctx.processors.agent.update_resource_group.wait_for_complete(
                 UpdateAgentResourceGroupAction(
                     agent_id=AgentId(id),
                     resource_group_id=ResourceGroupID(resource_group_id),
                     policy=ConflictingSessionCleanupPolicy.TERMINATE,
-                    force=True,
+                    force=False,
                 )
             )
             if not data:
