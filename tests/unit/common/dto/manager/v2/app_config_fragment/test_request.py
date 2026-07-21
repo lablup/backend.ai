@@ -7,7 +7,6 @@ from dataclasses import dataclass
 from typing import Any
 
 import pytest
-from pydantic import ValidationError
 
 from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
@@ -18,14 +17,15 @@ from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
     UpdateAppConfigFragmentInput,
 )
 from ai.backend.common.exception import BackendAISchemaValidationFailed
+from ai.backend.common.identifier.app_config import AppConfigScopeIdentifier
 
-_SCOPE_ID = uuid.UUID("11111111-1111-1111-1111-111111111111")
+_SCOPE_ID = AppConfigScopeIdentifier(uuid.UUID("11111111-1111-1111-1111-111111111111"))
 
 
 @dataclass(frozen=True)
 class _ScopeCase:
     scope_type: AppConfigScopeType
-    scope_id: uuid.UUID | None
+    scope_id: AppConfigScopeIdentifier | None
 
 
 @pytest.fixture
@@ -61,9 +61,7 @@ class TestCreateAppConfigFragmentInput:
     @pytest.mark.parametrize(
         "case",
         [
-            # public has no owner, so naming one is a contradiction.
             _ScopeCase(scope_type=AppConfigScopeType.PUBLIC, scope_id=_SCOPE_ID),
-            # domain and user both require an owner.
             _ScopeCase(scope_type=AppConfigScopeType.DOMAIN, scope_id=None),
             _ScopeCase(scope_type=AppConfigScopeType.USER, scope_id=None),
         ],
@@ -72,13 +70,13 @@ class TestCreateAppConfigFragmentInput:
     def test_scope_id_disagreeing_with_its_scope_type_is_rejected(
         self, case: _ScopeCase, config_document: dict[str, Any]
     ) -> None:
-        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
-            CreateAppConfigFragmentInput(
-                config_name="theme",
-                scope_type=case.scope_type,
-                scope_id=case.scope_id,
-                config=config_document,
-            )
+        with pytest.raises(BackendAISchemaValidationFailed):
+            CreateAppConfigFragmentInput.model_validate({
+                "config_name": "theme",
+                "scope_type": case.scope_type,
+                "scope_id": case.scope_id,
+                "config": config_document,
+            })
 
     @pytest.mark.parametrize(
         "scope_type",
@@ -89,9 +87,7 @@ class TestCreateAppConfigFragmentInput:
     def test_scope_id_that_is_not_a_uuid_is_rejected(
         self, scope_type: AppConfigScopeType, scope_id: str, config_document: dict[str, Any]
     ) -> None:
-        # Validated from a mapping because the field is typed UUID: a string only ever
-        # reaches it from a request payload, never from a type-checked call.
-        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
+        with pytest.raises(BackendAISchemaValidationFailed):
             CreateAppConfigFragmentInput.model_validate({
                 "config_name": "theme",
                 "scope_type": scope_type,
@@ -112,12 +108,12 @@ class TestCreateAppConfigFragmentInput:
     def test_config_name_outside_its_length_bounds_is_rejected(
         self, config_name: str, config_document: dict[str, Any]
     ) -> None:
-        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
-            CreateAppConfigFragmentInput(
-                config_name=config_name,
-                scope_type=AppConfigScopeType.PUBLIC,
-                config=config_document,
-            )
+        with pytest.raises(BackendAISchemaValidationFailed):
+            CreateAppConfigFragmentInput.model_validate({
+                "config_name": config_name,
+                "scope_type": AppConfigScopeType.PUBLIC,
+                "config": config_document,
+            })
 
 
 class TestUpdateAppConfigFragmentInput:
@@ -130,9 +126,7 @@ class TestUpdateAppConfigFragmentInput:
         assert not hasattr(req, "id")
 
     def test_config_is_required(self) -> None:
-        # Validated from a mapping rather than the constructor: a body arriving without
-        # ``config`` is a runtime payload, not a call the type checker would ever allow.
-        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
+        with pytest.raises(BackendAISchemaValidationFailed):
             UpdateAppConfigFragmentInput.model_validate({})
 
 
@@ -148,7 +142,7 @@ class TestAppConfigFragmentUpdateItem:
         assert item.config == config_document
 
     def test_omitting_id_is_rejected(self, config_document: dict[str, Any]) -> None:
-        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
+        with pytest.raises(BackendAISchemaValidationFailed):
             AppConfigFragmentUpdateItem.model_validate({"config": config_document})
 
 
@@ -163,8 +157,8 @@ class TestBulkAppConfigFragmentInputs:
         assert len(req.items) == 1
 
     def test_bulk_update_rejects_an_empty_batch(self) -> None:
-        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
-            BulkUpdateAppConfigFragmentInput(items=[])
+        with pytest.raises(BackendAISchemaValidationFailed):
+            BulkUpdateAppConfigFragmentInput.model_validate({"items": []})
 
     def test_bulk_purge_accepts_ids(self) -> None:
         fragment_id = uuid.uuid4()
@@ -174,5 +168,5 @@ class TestBulkAppConfigFragmentInputs:
         assert req.ids == [fragment_id]
 
     def test_bulk_purge_rejects_an_empty_batch(self) -> None:
-        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
-            BulkPurgeAppConfigFragmentInput(ids=[])
+        with pytest.raises(BackendAISchemaValidationFailed):
+            BulkPurgeAppConfigFragmentInput.model_validate({"ids": []})

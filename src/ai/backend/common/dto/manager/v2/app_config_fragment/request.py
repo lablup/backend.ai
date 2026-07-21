@@ -9,6 +9,7 @@ from pydantic import Field, model_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.data.app_config.types import AppConfigScopeType
+from ai.backend.common.identifier.app_config import AppConfigScopeIdentifier
 
 __all__ = (
     "AppConfigFragmentUpdateItem",
@@ -30,7 +31,7 @@ class CreateAppConfigFragmentInput(BaseRequestModel):
     scope_type: AppConfigScopeType = Field(
         description="Scope the fragment is written at (public | domain | user)."
     )
-    scope_id: UUID | None = Field(
+    scope_id: AppConfigScopeIdentifier | None = Field(
         default=None,
         description="Scope identifier: the domain id (domain scope) or the user id (user scope). "
         "Null for public scope, which has no owner.",

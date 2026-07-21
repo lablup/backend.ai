@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from uuid import UUID
-
 from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.common.data.app_config.types import AppConfigScopeType as AppConfigScopeTypeDTO
 from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
@@ -21,15 +19,11 @@ from ai.backend.common.dto.manager.v2.app_config_fragment.response import (
     PurgeAppConfigFragmentPayload,
     UpdateAppConfigFragmentPayload,
 )
-from ai.backend.common.identifier.app_config import AppConfigScopeIdentifier
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
-from ai.backend.common.identifier.domain import DomainID
-from ai.backend.common.identifier.user import UserID
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.app_config_fragment.types import (
     AppConfigFragmentData,
 )
-from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.repositories.app_config_fragment.creators import (
     AppConfigFragmentCreatorSpec,
 )
@@ -63,35 +57,16 @@ from ai.backend.manager.services.app_config_fragment.actions.update import (
 from ai.backend.manager.types import OptionalState
 
 
-def _scope_owner(scope_type: AppConfigScopeType, scope_id: UUID | None) -> AppConfigScopeIdentifier:
-    """Read a request's raw ``scope_id`` as the kind of owner its ``scope_type`` calls for.
-
-    A request body carries ``scope_id`` as a plain UUID; only ``scope_type`` says whether it
-    names a domain or a user. The DTO validator already rejects the mismatched combinations,
-    so the final branch is a boundary guard rather than a reachable path.
-    """
-    match scope_type, scope_id:
-        case AppConfigScopeType.PUBLIC, None:
-            return None
-        case AppConfigScopeType.DOMAIN, UUID() as owner:
-            return DomainID(owner)
-        case AppConfigScopeType.USER, UUID() as owner:
-            return UserID(owner)
-        case _:
-            raise InvalidAPIParameters(f"scope_id does not match the {scope_type.value} scope.")
-
-
 class AppConfigFragmentAdapter(BaseAdapter):
     """Adapter for raw app config fragment write operations."""
 
     # --- fragment CRUD (RBAC-gated at the processor) ---
 
     async def create(self, input: CreateAppConfigFragmentInput) -> CreateAppConfigFragmentPayload:
-        scope_type = AppConfigScopeType(input.scope_type.value)
         spec = AppConfigFragmentCreatorSpec(
             config_name=input.config_name,
-            scope_type=scope_type,
-            scope_id=_scope_owner(scope_type, input.scope_id),
+            scope_type=AppConfigScopeType(input.scope_type.value),
+            scope_id=input.scope_id,
             config=input.config,
         )
         action_result = await self._processors.app_config_fragment.create.wait_for_complete(
@@ -114,8 +89,7 @@ class AppConfigFragmentAdapter(BaseAdapter):
             spec=AppConfigFragmentUpdaterSpec(config=OptionalState.update(input.config)),
             pk_value=fragment_id,
         )
-        # No allow-list gate: a fragment row exists only while its entry does (FK with
-        # cascade), so an existing fragment is always writable at its own scope.
+        # No allow-list gate: the entry's FK cascade means an existing fragment is writable.
         action_result = await self._processors.app_config_fragment.update.wait_for_complete(
             UpdateAppConfigFragmentAction(updater=updater)
         )
@@ -125,7 +99,6 @@ class AppConfigFragmentAdapter(BaseAdapter):
 
     async def purge(self, fragment_id: AppConfigFragmentID) -> PurgeAppConfigFragmentPayload:
         purger_spec = AppConfigFragmentPurgerSpec(fragment_id=fragment_id)
-        # No allow-list gate — see ``update``.
         action_result = await self._processors.app_config_fragment.purge.wait_for_complete(
             PurgeAppConfigFragmentAction(purger_spec=purger_spec)
         )

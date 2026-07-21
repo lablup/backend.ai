@@ -139,8 +139,6 @@ class AppConfigFragmentDBSource:
             # A missing PK is skipped by the partial op (no row, no error); report as not-found.
             failed = [
                 AppConfigFragmentBulkItemError(
-                    # Updater types pk_value generically; this repository only ever
-                    # builds fragment updaters.
                     id=cast(AppConfigFragmentID, updater.pk_value),
                     message=errors_by_index.get(
                         index, f"App config fragment {updater.pk_value} not found"
