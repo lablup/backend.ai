@@ -55,6 +55,7 @@ class DomainData:
             for entity in EntityType.admin_accessible_entity_types_in_domain()
         }
         operations[RBACElementType.DOMAIN_ADMIN_PAGE] = {OperationType.READ}
+        operations[RBACElementType.KERNEL_HISTORY] = {OperationType.READ}
         return operations
 
 

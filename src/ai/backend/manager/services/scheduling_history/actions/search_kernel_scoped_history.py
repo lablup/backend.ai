@@ -18,8 +18,9 @@ class SearchKernelScopedHistoryAction(BaseScopeAction):
 
     The history is the entity being read and the kernel is the scope containing it,
     mirroring the other scoped searches (a role assignment within a role, a vfolder
-    within a user). Authorization therefore needs a ``kernel:history`` read
-    permission on the role preset; without one, only super admins pass.
+    within a user). Authorization needs a ``kernel:history`` read grant at a scope
+    covering the kernel; scope roles receive it alongside ``session`` read, since
+    kernels are reached through their owning session.
     """
 
     kernel_id: KernelId

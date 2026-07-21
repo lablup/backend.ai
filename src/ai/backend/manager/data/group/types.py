@@ -72,6 +72,7 @@ class GroupData:
             for entity in EntityType.admin_accessible_entity_types_in_project()
         }
         operations[RBACElementType.PROJECT_ADMIN_PAGE] = {OperationType.READ}
+        operations[RBACElementType.KERNEL_HISTORY] = {OperationType.READ}
         return operations
 
 
@@ -99,10 +100,12 @@ class ProjectMemberRoleSpec:
         return f"project-{str(self.project_id)[:8]}-member"
 
     def entity_operations(self) -> Mapping[RBACElementType, Iterable[OperationType]]:
-        return {
+        operations: dict[RBACElementType, Iterable[OperationType]] = {
             entity.to_element(): OperationType.member_operations()
             for entity in EntityType.member_accessible_entity_types_in_project()
         }
+        operations[RBACElementType.KERNEL_HISTORY] = {OperationType.READ}
+        return operations
 
 
 @dataclass

@@ -34,6 +34,12 @@ class TestDomainDataEntityOperations:
         assert RBACElementType.DOMAIN_ADMIN_PAGE in operations
         assert set(operations[RBACElementType.DOMAIN_ADMIN_PAGE]) == {OperationType.READ}
 
+    def test_includes_kernel_history_read(self) -> None:
+        operations = _make_domain_data().entity_operations()
+
+        assert RBACElementType.KERNEL_HISTORY in operations
+        assert set(operations[RBACElementType.KERNEL_HISTORY]) == {OperationType.READ}
+
     def test_admin_resource_entries_unchanged(self) -> None:
         operations = _make_domain_data().entity_operations()
 

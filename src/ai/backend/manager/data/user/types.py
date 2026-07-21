@@ -110,6 +110,7 @@ class UserData:
             entity.to_element(): OperationType.owner_operations()
             for entity in EntityType.owner_accessible_entity_types_in_user()
         }
+        resource_entity_permissions[RBACElementType.KERNEL_HISTORY] = {OperationType.READ}
         user_permissions = OperationType.owner_operations() - {OperationType.CREATE}
         return {RBACElementType.USER: user_permissions, **resource_entity_permissions}
 
