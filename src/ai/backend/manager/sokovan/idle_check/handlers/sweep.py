@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import json
 from collections import defaultdict
 from typing import override
 
 from ai.backend.common.types import SessionId
+from ai.backend.manager.repositories.scheduler.types.session import IdleCheckTerminationData
 from ai.backend.manager.sokovan.idle_check.sweep.types import (
     IdleCheckSweepReason,
     IdleCheckSweepReconcileInfo,
@@ -13,10 +15,16 @@ from ai.backend.manager.sokovan.idle_check.sweep.types import (
     IdleCheckSweepResult,
 )
 from ai.backend.manager.sokovan.reconciler.base import ReconcilerHandler
+from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 
 
 class IdleCheckSweepHandler(ReconcilerHandler[IdleCheckSweepReconcileInfo, IdleCheckSweepResult]):
-    """Group stored due rows without re-running idle checkers."""
+    """Group stored due rows and request their session termination."""
+
+    _scheduling_controller: SchedulingController
+
+    def __init__(self, scheduling_controller: SchedulingController) -> None:
+        self._scheduling_controller = scheduling_controller
 
     @override
     async def execute(self, reconcile_info: IdleCheckSweepReconcileInfo) -> IdleCheckSweepResult:
@@ -29,15 +37,38 @@ class IdleCheckSweepHandler(ReconcilerHandler[IdleCheckSweepReconcileInfo, IdleC
                     last_message=check.last_message,
                 )
             )
-        return IdleCheckSweepResult(
-            reports=[
-                IdleCheckSweepReport(
-                    session_id=session_id,
-                    reasons=reasons,
+        reports = [
+            IdleCheckSweepReport(
+                session_id=session_id,
+                reasons=reasons,
+            )
+            for session_id, reasons in reasons_by_session.items()
+        ]
+        if reports:
+            data = [
+                IdleCheckTerminationData(
+                    session_id=report.session_id,
+                    history_message=json.dumps(
+                        {
+                            "idle_checks": [
+                                {
+                                    "checker_id": str(reason.checker_id),
+                                    "last_message": reason.last_message,
+                                }
+                                for reason in sorted(
+                                    report.reasons,
+                                    key=lambda item: str(item.checker_id),
+                                )
+                            ]
+                        },
+                        ensure_ascii=False,
+                        separators=(",", ":"),
+                    ),
                 )
-                for session_id, reasons in reasons_by_session.items()
+                for report in reports
             ]
-        )
+            await self._scheduling_controller.mark_idle_check_sessions_for_termination(data)
+        return IdleCheckSweepResult(reports=reports)
 
     @override
     async def post_process(self, result: IdleCheckSweepResult) -> None:

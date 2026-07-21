@@ -59,7 +59,7 @@ Two properties matter for this proposal:
 
 The redesign rests on two ideas:
 
-1. **Idle checking becomes sokovan reconciler stages.** A `Source` gathers what to evaluate, a `Handler` drives each checker's batched I/O and judgment contract, and an `Applier` writes the outcome — the same shape as other reconciler stages. Computing each session's cleanup deadline and acting on an elapsed deadline are split into two such stages (see *Reconciler Stages*).
+1. **Idle checking becomes sokovan reconciler stages.** A `Source` gathers what to evaluate, a `Handler` drives the stage work, and an `Applier` writes stage-owned outcomes where applicable — the same shape as other reconciler stages. Computing each session's cleanup deadline and acting on an elapsed deadline are split into two such stages (see *Reconciler Stages*). The sweep delegates its cross-domain session transition from the Handler to the scheduling controller and keeps its Applier as a no-op.
 2. **The idle checker becomes a first-class DB object.** A checker is a reusable, scope-agnostic spec. Whether and where it applies is expressed by separate association rows that bind it to a domain, project, or resource group.
 
 ### Data Model
@@ -196,8 +196,8 @@ Idle checking is split into **two reconciler stages** so that computing and repo
 **2. Expiry-sweep stage** — terminates sessions whose deadline has already passed.
 
 - **Source** — reads `session_idle_checks` rows with non-null `expire_at <= now`, joined to `RUNNING` sessions. No per-resource-group iteration is required. Multiple due rows for one session remain available as separate reasons, while the session itself is transitioned at most once.
-- **Handler** — groups the due rows by session without running the checker again. The stored deadlines and latest checker results are the sweep input.
-- **Applier** — conditionally marks each still-`RUNNING` session `TERMINATING` and records the stored checker results in scheduling history in the same transaction. A session whose status changed after the Source read is skipped.
+- **Handler** — groups the due rows by session without running the checker again, then passes the grouped per-session reasons to the scheduling controller's termination operation. That operation conditionally marks each still-`RUNNING` session `TERMINATING` and records the stored checker results in scheduling history in the same transaction. A session whose status changed after the Source read is skipped.
+- **Applier** — no-op. The Handler delegates the state-changing operation to the session scheduling domain instead of applying an idle-check-owned persistence result.
 
 The refresh stage is the only stage that runs checkers. It may update or remove a future deadline when activity, bindings, or checker definitions change. Once a stored deadline elapses, ownership passes to the sweep stage and refresh no longer changes that row. A change affects the deadline only if refresh persists it before the stored deadline elapses; the sweep does not re-evaluate runtime signals or checker applicability. Refresh cadence therefore determines how quickly such changes are reflected, while sweep cadence determines how long termination may occur after the deadline.
 
@@ -269,7 +269,7 @@ Utilization is evaluated from agent-emitted Prometheus metrics aggregated over a
 
 ### Termination Handling
 
-The **sweep** stage's Applier does not kill containers or perform the final `TERMINATED` transition. It marks sessions with elapsed deadlines as `TERMINATING` through the existing scheduler termination lifecycle, which is idempotent for sessions already terminating or terminal. The existing session scheduler coordinator then reads `TERMINATING` sessions per resource group and drives agent termination as it does today.
+The **sweep** stage's Handler does not kill containers or perform the final `TERMINATED` transition. It asks the scheduling controller to mark sessions with elapsed deadlines as `TERMINATING` through the existing scheduler termination lifecycle, which is idempotent for sessions already terminating or terminal. The sweep Applier is a no-op. The existing session scheduler coordinator then reads `TERMINATING` sessions per resource group and drives agent termination as it does today.
 
 The termination operation accepts per-session idle reasons rather than one batch-wide generic message. For every session actually transitioned, the session status update, kernel status updates, and scheduling-history write happen atomically. The history entry records `RUNNING → TERMINATING` and identifies every checker whose deadline elapsed together with its stored `last_status` and `last_message`, in deterministic checker order. This preserves why the session was swept even after the live result row changes or is removed.
 
