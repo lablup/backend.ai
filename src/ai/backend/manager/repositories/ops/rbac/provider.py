@@ -3,7 +3,9 @@ on top of the base write ops."""
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator, Collection, Sequence
+from abc import ABC, abstractmethod
+from collections import defaultdict
+from collections.abc import AsyncIterator, Collection, Iterable, Mapping, Sequence
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import override
@@ -13,16 +15,36 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.data.entity.types import EntityRef, ScopeRef
-from ai.backend.common.data.permission.types import Permission, RelationType
+from ai.backend.common.data.permission.types import (
+    Permission,
+    RBACElementType,
+    RelationType,
+    ScopeType,
+)
+from ai.backend.common.exception import RBACTypeConversionError
+from ai.backend.common.identifier.role_preset import RolePresetID
 from ai.backend.common.identifier.user import UserID
 from ai.backend.common.identifier.virtual_scope import VirtualScopeID
 from ai.backend.manager.data.permission.id import ScopeId
-from ai.backend.manager.data.permission.types import EntityType
+from ai.backend.manager.data.permission.status import RoleStatus
+from ai.backend.manager.data.permission.types import (
+    EntityType,
+    OperationType,
+    RBACElementRef,
+    RoleSource,
+)
+from ai.backend.manager.data.permission.types import (
+    ScopeType as LegacyScopeType,
+)
 from ai.backend.manager.errors.permission import VirtualScopeNotFound
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
+from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
+    RolePermissionPresetRow,
+)
+from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
 from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
@@ -30,9 +52,6 @@ from ai.backend.manager.repositories.base import (
     BatchPurger,
     BatchPurgerResult,
     BulkCreator,
-    BulkCreatorResult,
-    Creator,
-    CreatorResult,
     Purger,
     PurgerResult,
 )
@@ -56,18 +75,56 @@ from ai.backend.manager.repositories.base.rbac.entity_purger import (
     execute_rbac_entity_purger,
 )
 from ai.backend.manager.repositories.ops.base.provider import DBOpsProvider, WriteOps
-from ai.backend.manager.repositories.permission_controller.role_manager import RoleManager
+from ai.backend.manager.repositories.permission_controller.creators import (
+    PermissionCreatorSpec,
+    RoleCreatorSpec,
+)
+from ai.backend.manager.repositories.permission_controller.role_manager import (
+    RoleManager,
+    ScopeSystemRoleData,
+)
+
+
+@dataclass(frozen=True)
+class _RoleSpec:
+    scope: ScopeRef
+    creator: RoleCreatorSpec
+    entity_operations: Mapping[RBACElementType, Iterable[OperationType]]
+
+
+class ScopeCreation[TRow: Base](ABC):
+    """A real scope-entity row to create, and how the RBAC layers address the result."""
+
+    @abstractmethod
+    def creator(self) -> RBACEntityCreator[TRow]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def scope_of(self, row: TRow) -> ScopeRef:
+        raise NotImplementedError
+
+    @abstractmethod
+    def system_roles_of(self, row: TRow) -> Collection[ScopeSystemRoleData]:
+        raise NotImplementedError
+
+
+class ScopeMember(ABC):
+    """A member to attach to a scope; ``assign_role_on`` names the user to grant its
+    auto_assign roles, or ``None`` to skip."""
+
+    @abstractmethod
+    def entity_ref(self) -> EntityRef:
+        raise NotImplementedError
+
+    @abstractmethod
+    def assign_role_on(self) -> UserID | None:
+        raise NotImplementedError
 
 
 @dataclass
-class ScopeCreation[TRow: Base]:
-    """A real scope-entity row to create together with the scope it materializes.
-
-    ``scope.scope_id`` must be the id the created row will carry.
-    """
-
-    creator: Creator[TRow]
+class EntityMembersAddition:
     scope: ScopeRef
+    members: Collection[ScopeMember]
 
 
 @dataclass
@@ -286,34 +343,165 @@ class RBACWriteOps(WriteOps):
         self,
         creation: ScopeCreation[TRow],
         bound_scope: ScopeRef | None = None,
-    ) -> CreatorResult[TRow]:
-        """Create the real scope entity via ``creation.creator`` and its virtual scope node.
+    ) -> RBACEntityCreatorResult[TRow]:
+        """Create a scope in full: the real row with its parent scope association, its
+        virtual scope node, its SYSTEM roles, and the roles from matching presets.
 
-        ``creation.scope.scope_id`` must match the id the created row carries. When
+        The row is inserted first, so ``creation`` sees the id the database assigned. When
         ``bound_scope`` is given, it is bound to this scope's virtual scope so it can reach
         this scope's entities.
         """
-        result = await self.create(creation.creator)
-        await self._insert_virtual_scopes([creation.scope])
+        result = await self.create_scoped(creation.creator())
+        scope = creation.scope_of(result.row)
+        await self._insert_virtual_scopes([scope])
         if bound_scope is not None:
-            await self.bind_scope(bound_scope, creation.scope, permission_cap=None)
+            await self.bind_scope(bound_scope, scope, permission_cap=None)
+        await self._provision_scope_roles({scope: creation.system_roles_of(result.row)})
         return result
 
     async def bulk_create_scopes[TRow: Base](
         self,
         creations: Sequence[ScopeCreation[TRow]],
-    ) -> BulkCreatorResult[TRow]:
-        """Create multiple real scope entities and their virtual scope nodes.
+    ) -> RBACBulkEntityCreatorResult[TRow]:
+        """Create multiple scopes in full, as :meth:`create_scope` does for one.
 
         The real scope rows are created atomically via a single bulk insert: either all
-        rows and their virtual scope nodes are materialized, or the whole batch fails and
+        rows and their scope associations are materialized, or the whole batch fails and
         nothing is created. The virtual scope inserts are idempotent (get-or-create).
         """
-        result = await self.bulk_create(
-            BulkCreator(specs=[creation.creator.spec for creation in creations]),
-        )
-        await self._insert_virtual_scopes([creation.scope for creation in creations])
+        result = await self.bulk_create_scoped([creation.creator() for creation in creations])
+        scope_roles = {
+            creation.scope_of(row): creation.system_roles_of(row)
+            for creation, row in zip(creations, result.rows, strict=True)
+        }
+        await self._insert_virtual_scopes(list(scope_roles.keys()))
+        await self._provision_scope_roles(scope_roles)
         return result
+
+    # -- Scope lifecycle: roles provisioned with the scope ------------------------
+
+    @staticmethod
+    def _scope_element_type(scope: ScopeRef) -> RBACElementType:
+        try:
+            return RBACElementType(scope.scope_type)
+        except ValueError as e:
+            raise RBACTypeConversionError(
+                f"Scope type {scope.scope_type!r} has no corresponding RBAC element type"
+            ) from e
+
+    @staticmethod
+    def _system_role_specs(
+        scope_roles: Mapping[ScopeRef, Collection[ScopeSystemRoleData]],
+    ) -> list[_RoleSpec]:
+        return [
+            _RoleSpec(
+                scope=scope,
+                creator=RoleCreatorSpec(
+                    name=role_data.role_name(),
+                    source=RoleSource.SYSTEM,
+                    status=RoleStatus.ACTIVE,
+                ),
+                entity_operations=role_data.entity_operations(),
+            )
+            for scope, role_datas in scope_roles.items()
+            for role_data in role_datas
+        ]
+
+    async def _provision_scope_roles(
+        self,
+        scope_roles: Mapping[ScopeRef, Collection[ScopeSystemRoleData]],
+    ) -> None:
+        """Create every scope's declared SYSTEM roles and its preset-derived roles.
+
+        Whatever the number of scopes and roles, this issues one insert for all the roles
+        and one for all their permissions.
+        """
+        role_specs = self._system_role_specs(scope_roles)
+        preset_role_specs = await self._preset_role_specs(scope_roles.keys())
+        specs = [*role_specs, *preset_role_specs]
+        if not specs:
+            return
+        await self._create_roles(specs)
+
+    async def _preset_role_specs(self, scopes: Collection[ScopeRef]) -> list[_RoleSpec]:
+        """The roles the active presets matching ``scopes``' types call for."""
+        if not scopes:
+            return []
+        preset_rows = (
+            await self._sess.scalars(
+                sa.select(RolePresetRow).where(
+                    RolePresetRow.scope_type.in_({
+                        self._scope_element_type(scope).to_scope_type() for scope in scopes
+                    }),
+                    RolePresetRow.deleted.is_(False),
+                )
+            )
+        ).all()
+        if not preset_rows:
+            return []
+        operations_by_preset: dict[RolePresetID, dict[RBACElementType, list[OperationType]]] = (
+            defaultdict(lambda: defaultdict(list))
+        )
+        preset_permission_rows = (
+            await self._sess.scalars(
+                sa.select(RolePermissionPresetRow).where(
+                    RolePermissionPresetRow.role_preset_id.in_([
+                        preset.id for preset in preset_rows
+                    ])
+                )
+            )
+        ).all()
+        for preset_permission in preset_permission_rows:
+            operations_by_preset[preset_permission.role_preset_id][
+                preset_permission.entity_type.to_element()
+            ].append(preset_permission.operation)
+        presets_by_scope_type: dict[ScopeType, list[RolePresetRow]] = defaultdict(list)
+        for preset in preset_rows:
+            presets_by_scope_type[preset.scope_type].append(preset)
+        return [
+            _RoleSpec(
+                scope=scope,
+                creator=RoleCreatorSpec(
+                    name=preset.name,
+                    source=RoleSource.SYSTEM,
+                    status=RoleStatus.ACTIVE,
+                    auto_assign=preset.auto_assign,
+                ),
+                entity_operations=operations_by_preset[preset.id],
+            )
+            for scope in scopes
+            for preset in presets_by_scope_type[self._scope_element_type(scope).to_scope_type()]
+        ]
+
+    async def _create_roles(self, specs: Sequence[_RoleSpec]) -> None:
+        """Create ``specs`` and the permissions they grant: one insert for each."""
+        if not specs:
+            return
+        roles = await self.bulk_create_scoped([
+            RBACEntityCreator(
+                spec=spec.creator,
+                element_type=RBACElementType.ROLE,
+                scope_ref=RBACElementRef(
+                    element_type=self._scope_element_type(spec.scope),
+                    element_id=str(spec.scope.scope_id),
+                ),
+            )
+            for spec in specs
+        ])
+        permissions = [
+            PermissionCreatorSpec(
+                role_id=row.id,
+                scope_type=self._scope_element_type(spec.scope),
+                scope_id=str(spec.scope.scope_id),
+                entity_type=entity_type,
+                operation=operation,
+            )
+            for spec, row in zip(specs, roles.rows, strict=True)
+            for entity_type, operations in spec.entity_operations.items()
+            for operation in operations
+        ]
+        if permissions:
+            await self.bulk_create(BulkCreator(specs=permissions))
 
     async def delete_scope[TRow: Base](
         self,
@@ -384,46 +572,86 @@ class RBACWriteOps(WriteOps):
 
     async def add_entity_members(
         self,
-        scope: ScopeRef,
-        entities: Collection[EntityRef],
-        permission_cap: Permission | None,
+        addition: EntityMembersAddition,
     ) -> None:
-        """Attach ``entities`` (possibly of mixed types) to ``scope``'s virtual scope.
-
-        Resolves ``scope``'s virtual scope (raises :class:`VirtualScopeNotFound` if
-        absent). Idempotent: ON CONFLICT DO NOTHING on the membership's primary key.
-        """
-        if not entities:
+        """Write each member's virtual-scope membership and scope association, and grant the
+        scope's auto_assign roles to members whose ``assign_role_on`` returns a user id."""
+        members = list(addition.members)
+        if not members:
             return
+        scope = addition.scope
         virtual_scope_id = await self._resolve_virtual_scope_id(scope)
-        values = [
+        entity_refs = [member.entity_ref() for member in members]
+        membership_values = [
             {
                 "virtual_scope_id": virtual_scope_id,
-                "entity_type": entity.entity_type,
-                "entity_id": entity.entity_id,
-                "permission_cap": permission_cap,
+                "entity_type": ref.entity_type,
+                "entity_id": ref.entity_id,
+                "permission_cap": None,
             }
-            for entity in entities
+            for ref in entity_refs
         ]
-        stmt = pg_insert(EntityMembershipRow).values(values).on_conflict_do_nothing()
-        await self._sess.execute(stmt)
+        await self._sess.execute(
+            pg_insert(EntityMembershipRow).values(membership_values).on_conflict_do_nothing()
+        )
+        association_values = [
+            {
+                "scope_type": LegacyScopeType(scope.scope_type),
+                "scope_id": str(scope.scope_id),
+                "entity_type": EntityType(ref.entity_type),
+                "entity_id": str(ref.entity_id),
+                "relation_type": RelationType.AUTO,
+                "permission_cap": None,
+            }
+            for ref in entity_refs
+        ]
+        await self._sess.execute(
+            pg_insert(AssociationScopesEntitiesRow)
+            .values(association_values)
+            .on_conflict_do_nothing()
+        )
+        role_user_ids = [
+            user_id for member in members if (user_id := member.assign_role_on()) is not None
+        ]
+        if role_user_ids:
+            await self._role_manager.assign_auto_assign_roles(
+                self._sess,
+                role_user_ids,
+                ScopeId(
+                    scope_type=LegacyScopeType(scope.scope_type),
+                    scope_id=str(scope.scope_id),
+                ),
+            )
 
     async def remove_entity_members(
         self,
         scope: ScopeRef,
         entities: Collection[EntityRef],
     ) -> None:
-        """Detach ``entities`` from ``scope``'s virtual scope."""
-        if not entities:
+        """Delete each entity's virtual-scope membership and scope association; role mappings
+        are left untouched."""
+        entity_refs = list(entities)
+        if not entity_refs:
             return
         virtual_scope_id = await self._resolve_virtual_scope_id(scope)
-        stmt = sa.delete(EntityMembershipRow).where(
-            EntityMembershipRow.virtual_scope_id == virtual_scope_id,
-            sa.tuple_(EntityMembershipRow.entity_type, EntityMembershipRow.entity_id).in_([
-                (entity.entity_type, entity.entity_id) for entity in entities
-            ]),
+        await self._sess.execute(
+            sa.delete(EntityMembershipRow).where(
+                EntityMembershipRow.virtual_scope_id == virtual_scope_id,
+                sa.tuple_(EntityMembershipRow.entity_type, EntityMembershipRow.entity_id).in_([
+                    (ref.entity_type, ref.entity_id) for ref in entity_refs
+                ]),
+            )
         )
-        await self._sess.execute(stmt)
+        await self._sess.execute(
+            sa.delete(AssociationScopesEntitiesRow).where(
+                AssociationScopesEntitiesRow.scope_type == LegacyScopeType(scope.scope_type),
+                AssociationScopesEntitiesRow.scope_id == str(scope.scope_id),
+                sa.tuple_(
+                    AssociationScopesEntitiesRow.entity_type,
+                    AssociationScopesEntitiesRow.entity_id,
+                ).in_([(EntityType(ref.entity_type), str(ref.entity_id)) for ref in entity_refs]),
+            )
+        )
 
     # -- Virtual scope: ensure compatibility for externally-created rows ----------
 

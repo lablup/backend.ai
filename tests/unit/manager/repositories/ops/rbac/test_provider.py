@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Collection
 from dataclasses import dataclass, field
 from typing import override
 from uuid import UUID
@@ -13,13 +13,16 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common.data.entity.types import (
-    EntityType as VirtualScopeEntityType,
-)
-from ai.backend.common.data.entity.types import (
+    EntityRef,
     ScopeRef,
     ScopeType,
 )
+from ai.backend.common.data.entity.types import (
+    EntityType as VirtualScopeEntityType,
+)
 from ai.backend.common.data.permission.types import EntityType, RBACElementType, RelationType
+from ai.backend.common.data.permission.types import ScopeType as PermissionScopeType
+from ai.backend.common.identifier.user import UserID
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.base import GUID, Base
@@ -31,6 +34,10 @@ from ai.backend.manager.models.rbac_models.association_scopes_entities import (
 from ai.backend.manager.models.rbac_models.permission.object_permission import ObjectPermissionRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
+    RolePermissionPresetRow,
+)
+from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
@@ -42,13 +49,21 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
-from ai.backend.manager.repositories.base import Creator, CreatorSpec
+from ai.backend.manager.repositories.base import CreatorSpec
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.base.rbac.entity_purger import (
     RBACEntityPurger,
     RBACEntityPurgerSpec,
 )
-from ai.backend.manager.repositories.ops.rbac.provider import RBACOpsProvider, ScopeCreation
+from ai.backend.manager.repositories.ops.rbac.provider import (
+    EntityMembersAddition,
+    RBACOpsProvider,
+    ScopeCreation,
+    ScopeMember,
+)
+from ai.backend.manager.repositories.permission_controller.role_manager import (
+    ScopeSystemRoleData,
+)
 from ai.backend.testutils.db import with_tables
 
 # ORM cluster registration: create()/flush triggers configure_mappers() over the whole
@@ -69,9 +84,12 @@ _ORM_CLUSTER = (
     UserRow,
 )
 
-_TEST_SCOPE_TYPE = ScopeType("test-scope")
-_TEST_ENTITY_TYPE = VirtualScopeEntityType("test-scope")
+# A scope that carries roles must name a type the permission layer knows; a scope merely
+# bound to a virtual scope is free-form, which _TEST_BOUND_SCOPE_TYPE exercises.
+_TEST_SCOPE_TYPE = ScopeType(PermissionScopeType.PROJECT.value)
+_TEST_ENTITY_TYPE = VirtualScopeEntityType(PermissionScopeType.PROJECT.value)
 _TEST_BOUND_SCOPE_TYPE = ScopeType("test-bound-scope")
+_TEST_MEMBER_ENTITY_TYPE = VirtualScopeEntityType(RBACElementType.USER.value)
 
 _USER_SCOPE_ID = str(uuid.uuid4())
 _USER_SCOPE_REF = RBACElementRef(RBACElementType.USER, _USER_SCOPE_ID)
@@ -102,11 +120,43 @@ class ScopeRowCreatorSpec(CreatorSpec[OpsRBACScopeRow]):
         return OpsRBACScopeRow(id=self.scope_id, name=self.name)
 
 
+@dataclass
+class OpsRBACScopeCreation(ScopeCreation[OpsRBACScopeRow]):
+    spec: ScopeRowCreatorSpec
+
+    @override
+    def creator(self) -> RBACEntityCreator[OpsRBACScopeRow]:
+        return RBACEntityCreator(
+            spec=self.spec,
+            element_type=RBACElementType.PROJECT,
+            scope_ref=None,  # GLOBAL: no parent scope association to write
+        )
+
+    @override
+    def scope_of(self, row: OpsRBACScopeRow) -> ScopeRef:
+        return ScopeRef(scope_type=_TEST_SCOPE_TYPE, scope_id=row.id)
+
+    @override
+    def system_roles_of(self, row: OpsRBACScopeRow) -> Collection[ScopeSystemRoleData]:
+        return ()
+
+
 def make_scope_creation(scope_id: UUID, name: str) -> ScopeCreation[OpsRBACScopeRow]:
-    return ScopeCreation(
-        creator=Creator(spec=ScopeRowCreatorSpec(scope_id=scope_id, name=name)),
-        scope=ScopeRef(scope_type=_TEST_SCOPE_TYPE, scope_id=scope_id),
-    )
+    return OpsRBACScopeCreation(spec=ScopeRowCreatorSpec(scope_id=scope_id, name=name))
+
+
+@dataclass
+class StubMember(ScopeMember):
+    member_id: UUID
+    role_user: UserID | None = None
+
+    @override
+    def entity_ref(self) -> EntityRef:
+        return EntityRef(entity_type=_TEST_MEMBER_ENTITY_TYPE, entity_id=self.member_id)
+
+    @override
+    def assign_role_on(self) -> UserID | None:
+        return self.role_user
 
 
 class RBACOpsTestRow(Base):  # type: ignore[misc]
@@ -168,6 +218,9 @@ _SCOPE_TABLES = [
     VirtualScopeRow,
     EntityMembershipRow,
     ScopeBindingRow,
+    # create_scope provisions preset-derived roles, so it reads these even when empty.
+    RolePresetRow,
+    RolePermissionPresetRow,
 ]
 
 
@@ -187,6 +240,22 @@ async def rbac_ops_tables(
         database_connection,
         [RBACOpsTestRow, RBACOpsBlockerRow, AssociationScopesEntitiesRow, RoleRow, PermissionRow],
     ):
+        yield
+
+
+_ENTITY_MEMBER_TABLES = [
+    VirtualScopeRow,
+    EntityMembershipRow,
+    ScopeBindingRow,
+    AssociationScopesEntitiesRow,
+]
+
+
+@pytest.fixture
+async def entity_member_tables(
+    database_connection: ExtendedAsyncSAEngine,
+) -> AsyncGenerator[None, None]:
+    async with with_tables(database_connection, _ENTITY_MEMBER_TABLES):  # type: ignore[arg-type]
         yield
 
 
@@ -685,3 +754,140 @@ class TestBulkPurgeScopedPartial:
                 )
             )
             assert list(blocked_scope_ids) == [_USER_SCOPE_ID]
+
+
+class TestAddEntityMembers:
+    """add_entity_members writes both the virtual-scope membership and the scope association."""
+
+    async def test_add_entity_members_writes_membership_and_association(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        provider: RBACOpsProvider,
+        entity_member_tables: None,
+    ) -> None:
+        """Each member gets a VS membership row and a scope association row."""
+        scope_id = uuid.uuid4()
+        scope = ScopeRef(scope_type=_TEST_SCOPE_TYPE, scope_id=scope_id)
+        member_ids = [uuid.uuid4(), uuid.uuid4()]
+
+        async with provider.write_ops() as w:
+            await w.ensure_scope(scope)
+            await w.add_entity_members(
+                EntityMembersAddition(
+                    scope=scope,
+                    members=[StubMember(member_id=mid) for mid in member_ids],
+                )
+            )
+
+        async with database_connection.begin_session_read_committed() as sess:
+            vs = (
+                await sess.execute(
+                    sa.select(VirtualScopeRow).where(VirtualScopeRow.scope_id == scope_id)
+                )
+            ).scalar_one()
+            membership_ids = set(
+                (
+                    await sess.scalars(
+                        sa.select(EntityMembershipRow.entity_id).where(
+                            EntityMembershipRow.virtual_scope_id == vs.id,
+                            EntityMembershipRow.entity_type == _TEST_MEMBER_ENTITY_TYPE,
+                        )
+                    )
+                ).all()
+            )
+            assoc_ids = set(
+                (
+                    await sess.scalars(
+                        sa.select(AssociationScopesEntitiesRow.entity_id).where(
+                            AssociationScopesEntitiesRow.scope_id == str(scope_id),
+                            AssociationScopesEntitiesRow.entity_type == EntityType.USER,
+                        )
+                    )
+                ).all()
+            )
+
+        assert membership_ids == set(member_ids)
+        assert assoc_ids == {str(mid) for mid in member_ids}
+
+    async def test_add_entity_members_is_idempotent(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        provider: RBACOpsProvider,
+        entity_member_tables: None,
+    ) -> None:
+        """Re-adding the same member is a no-op — no duplicate membership or association."""
+        scope_id = uuid.uuid4()
+        scope = ScopeRef(scope_type=_TEST_SCOPE_TYPE, scope_id=scope_id)
+        member_id = uuid.uuid4()
+        addition = EntityMembersAddition(scope=scope, members=[StubMember(member_id=member_id)])
+
+        async with provider.write_ops() as w:
+            await w.ensure_scope(scope)
+            await w.add_entity_members(addition)
+            await w.add_entity_members(addition)
+
+        async with database_connection.begin_session_read_committed() as sess:
+            membership_count = await sess.scalar(
+                sa.select(sa.func.count())
+                .select_from(EntityMembershipRow)
+                .where(EntityMembershipRow.entity_type == _TEST_MEMBER_ENTITY_TYPE)
+            )
+            assoc_count = await sess.scalar(
+                sa.select(sa.func.count())
+                .select_from(AssociationScopesEntitiesRow)
+                .where(AssociationScopesEntitiesRow.entity_id == str(member_id))
+            )
+
+        assert membership_count == 1
+        assert assoc_count == 1
+
+
+class TestRemoveEntityMembers:
+    """remove_entity_members deletes both the VS membership and the scope association."""
+
+    async def test_remove_entity_members_deletes_membership_and_association(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        provider: RBACOpsProvider,
+        entity_member_tables: None,
+    ) -> None:
+        """The removed member loses both rows; the other member keeps both."""
+        scope_id = uuid.uuid4()
+        scope = ScopeRef(scope_type=_TEST_SCOPE_TYPE, scope_id=scope_id)
+        removed_id, kept_id = uuid.uuid4(), uuid.uuid4()
+
+        async with provider.write_ops() as w:
+            await w.ensure_scope(scope)
+            await w.add_entity_members(
+                EntityMembersAddition(
+                    scope=scope,
+                    members=[StubMember(member_id=removed_id), StubMember(member_id=kept_id)],
+                )
+            )
+            await w.remove_entity_members(
+                scope,
+                [EntityRef(entity_type=_TEST_MEMBER_ENTITY_TYPE, entity_id=removed_id)],
+            )
+
+        async with database_connection.begin_session_read_committed() as sess:
+            membership_ids = set(
+                (
+                    await sess.scalars(
+                        sa.select(EntityMembershipRow.entity_id).where(
+                            EntityMembershipRow.entity_type == _TEST_MEMBER_ENTITY_TYPE,
+                        )
+                    )
+                ).all()
+            )
+            assoc_ids = set(
+                (
+                    await sess.scalars(
+                        sa.select(AssociationScopesEntitiesRow.entity_id).where(
+                            AssociationScopesEntitiesRow.entity_type == EntityType.USER,
+                        )
+                    )
+                ).all()
+            )
+
+        assert membership_ids == {kept_id}
+        assert assoc_ids == {str(kept_id)}
