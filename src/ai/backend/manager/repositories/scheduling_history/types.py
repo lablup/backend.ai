@@ -6,11 +6,9 @@ from dataclasses import dataclass
 from typing import Any, override
 from uuid import UUID
 
-import sqlalchemy as sa
-
 from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec
 from ai.backend.common.identifier.replica import ReplicaID
-from ai.backend.common.types import KernelId, SessionId
+from ai.backend.common.types import KernelId
 from ai.backend.manager.errors.deployment import EndpointNotFound
 from ai.backend.manager.errors.kernel import (
     KernelNotFound,
@@ -78,60 +76,30 @@ class SessionSchedulingHistorySearchScope(SearchScope):
 class KernelSchedulingHistorySearchScope(SearchScope):
     """Scope for kernel scheduling history search.
 
-    Either axis may be given; when both are, they intersect. The request DTO
-    rejects an empty scope before one is built.
+    Used for entity-scoped queries where kernel_id is the scope parameter.
     """
 
-    session_id: SessionId | None = None
-    """Restrict to the kernels of this session."""
-
-    kernel_id: KernelId | None = None
-    """Restrict to this kernel."""
+    kernel_id: KernelId
+    """Required. The kernel to search history for."""
 
     @override
     def to_condition(self) -> QueryCondition:
         """Convert scope to a query condition for KernelSchedulingHistoryRow."""
-        conditions: list[QueryCondition] = []
-        if self.session_id is not None:
-            conditions.append(
-                KernelSchedulingHistoryConditions.by_session_id_filter(
-                    UUIDEqualMatchSpec(value=self.session_id, negated=False)
-                )
-            )
-        if self.kernel_id is not None:
-            conditions.append(
-                KernelSchedulingHistoryConditions.by_kernel_id_filter(
-                    UUIDEqualMatchSpec(value=self.kernel_id, negated=False)
-                )
-            )
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return sa.and_(*(cond() for cond in conditions))
-
-        return inner
+        return KernelSchedulingHistoryConditions.by_kernel_id_filter(
+            UUIDEqualMatchSpec(value=self.kernel_id, negated=False)
+        )
 
     @property
     @override
     def existence_checks(self) -> list[ExistenceCheck[Any]]:
-        """Check that each scoped entity exists."""
-        checks: list[ExistenceCheck[Any]] = []
-        if self.session_id is not None:
-            checks.append(
-                ExistenceCheck(
-                    column=SessionRow.id,
-                    value=self.session_id,
-                    error=SessionNotFound(str(self.session_id)),
-                )
-            )
-        if self.kernel_id is not None:
-            checks.append(
-                ExistenceCheck(
-                    column=KernelRow.id,
-                    value=self.kernel_id,
-                    error=KernelNotFound(str(self.kernel_id)),
-                )
-            )
-        return checks
+        """Check that the kernel exists."""
+        return [
+            ExistenceCheck(
+                column=KernelRow.id,
+                value=self.kernel_id,
+                error=KernelNotFound(str(self.kernel_id)),
+            ),
+        ]
 
 
 # Deployment History Scope

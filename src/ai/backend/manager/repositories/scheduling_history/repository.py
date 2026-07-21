@@ -100,7 +100,7 @@ class SchedulingHistoryRepository:
         querier: BatchQuerier,
         scope: KernelSchedulingHistorySearchScope,
     ) -> KernelSchedulingHistoryListResult:
-        """Search kernel scheduling history within scope."""
+        """Search kernel history whose rows match any of ``scopes`` (OR)."""
         return await self._db_source.search_kernel_scoped_history(querier, scope)
 
     # ========== Deployment History (Admin) ==========

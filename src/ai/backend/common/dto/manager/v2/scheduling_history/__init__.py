@@ -4,10 +4,13 @@ Scheduling history DTOs v2 for Manager API.
 
 from ai.backend.common.dto.manager.v2.scheduling_history.request import (
     AdminSearchDeploymentHistoriesInput,
+    AdminSearchKernelHistoriesInput,
     AdminSearchRouteHistoriesInput,
     AdminSearchSessionHistoriesInput,
     DeploymentHistoryFilter,
     DeploymentHistoryOrder,
+    KernelHistoryFilter,
+    KernelHistoryOrder,
     RouteHistoryFilter,
     RouteHistoryOrder,
     SearchDeploymentHistoryInput,
@@ -18,9 +21,11 @@ from ai.backend.common.dto.manager.v2.scheduling_history.request import (
 )
 from ai.backend.common.dto.manager.v2.scheduling_history.response import (
     AdminSearchDeploymentHistoriesPayload,
+    AdminSearchKernelHistoriesPayload,
     AdminSearchRouteHistoriesPayload,
     AdminSearchSessionHistoriesPayload,
     DeploymentHistoryNode,
+    KernelHistoryNode,
     ListDeploymentHistoryPayload,
     ListRouteHistoryPayload,
     ListSessionHistoryPayload,
@@ -30,6 +35,7 @@ from ai.backend.common.dto.manager.v2.scheduling_history.response import (
 from ai.backend.common.dto.manager.v2.scheduling_history.types import (
     DeploymentHistoryOrderField,
     DeploymentHistoryScopeDTO,
+    KernelHistoryOrderField,
     OrderDirection,
     RouteHistoryOrderField,
     RouteHistoryScopeDTO,
@@ -43,6 +49,7 @@ __all__ = (
     # Types
     "DeploymentHistoryOrderField",
     "DeploymentHistoryScopeDTO",
+    "KernelHistoryOrderField",
     "OrderDirection",
     "RouteHistoryOrderField",
     "RouteHistoryScopeDTO",
@@ -52,10 +59,13 @@ __all__ = (
     "SubStepResultInfo",
     # Input models (request)
     "AdminSearchDeploymentHistoriesInput",
+    "AdminSearchKernelHistoriesInput",
     "AdminSearchRouteHistoriesInput",
     "AdminSearchSessionHistoriesInput",
     "DeploymentHistoryFilter",
     "DeploymentHistoryOrder",
+    "KernelHistoryFilter",
+    "KernelHistoryOrder",
     "RouteHistoryFilter",
     "RouteHistoryOrder",
     "SearchDeploymentHistoryInput",
@@ -65,9 +75,11 @@ __all__ = (
     "SessionHistoryOrder",
     # Response models
     "AdminSearchDeploymentHistoriesPayload",
+    "AdminSearchKernelHistoriesPayload",
     "AdminSearchRouteHistoriesPayload",
     "AdminSearchSessionHistoriesPayload",
     "DeploymentHistoryNode",
+    "KernelHistoryNode",
     "ListDeploymentHistoryPayload",
     "ListRouteHistoryPayload",
     "ListSessionHistoryPayload",
