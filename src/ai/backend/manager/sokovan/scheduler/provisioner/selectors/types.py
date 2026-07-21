@@ -7,10 +7,12 @@ importing the selection logic. These types depend only on common value types.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from decimal import Decimal
 
-from ai.backend.common.types import AgentId, KernelId, ResourceSlot
+from ai.backend.common.types import AgentId, KernelId, SlotName
+from ai.backend.manager.data.sokovan.workload import ResourceRequest
 
 
 @dataclass
@@ -18,7 +20,7 @@ class ResourceRequirements:
     """Resource requirements for allocation."""
 
     # Resource slots required
-    requested_slots: ResourceSlot
+    requested_slots: ResourceRequest
     # Architecture required
     required_architecture: str
     # Kernel IDs that these requirements are for
@@ -42,5 +44,5 @@ class RemediationHint:
 
     available_archs: list[str] | None = None
     available_agent_ids: list[AgentId] | None = None
-    required_reduction: ResourceSlot | None = None
+    required_reduction: Mapping[SlotName, Decimal] | None = None
     required_container_reduction: int | None = None

@@ -37,6 +37,7 @@ from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.types import ClusterMode, ResourceSlot, ResourceSlotEntry
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.creation import ImageInfo
+from ai.backend.manager.data.session.options import SessionStoredOptions
 from ai.backend.manager.data.session.spec import KernelSpec, SessionSpec
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.models.kernel import KernelRow
@@ -219,6 +220,13 @@ class SessionRowFromSpec(CreatorSpec[SessionRow]):
             network_type=spec.resource_spec.network.network_type,
             network_id=spec.resource_spec.network.network_id,
             designated_agent_ids=designated_agent_ids,
+            options=SessionStoredOptions(
+                kernel_groups=spec.resource_spec.options.kernel_groups,
+                handler_options=spec.resource_spec.options.handler_options,
+                agent_selection_policy=(
+                    spec.resource_spec.options.scheduling_target.agent_selection_policy
+                ),
+            ),
             bootstrap_script=session_bootstrap,
             use_host_network=spec.resource_spec.network.use_host_network,
             timeout=None,

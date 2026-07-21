@@ -19,11 +19,18 @@ from ai.backend.common.exception import (
     ErrorOperation,
 )
 from ai.backend.common.identifier.resource_group import ResourceGroupID
-from ai.backend.common.types import AgentId, ResourceSlot
+from ai.backend.common.types import AgentId, BinarySize, SlotName
 from ai.backend.manager.data.sokovan import SchedulingPredicate
 from ai.backend.manager.sokovan.scheduler.exceptions import SchedulingError
 
 from .types import RemediationHint, ResourceRequirements
+
+
+def _humanize_slot(slot_name: SlotName, value: Decimal) -> str:
+    # Format mem as human readable (e.g., "2 GiB" instead of raw bytes)
+    if slot_name == "mem":
+        return str(BinarySize(value))
+    return str(value)
 
 
 class AgentSelectionError(SchedulingError):
@@ -182,9 +189,8 @@ class NoAvailableAgentError(RequirementSelectionError):
     def _format_header(self) -> str:
         req = self._resource_requirement
         kernel_id_list = ", ".join(str(k) for k in req.kernel_ids)
-        humanized_slots = req.requested_slots.to_humanized({})
         slot_str = " ".join(
-            f"{k}={humanized_slots[k]}" for k, v in req.requested_slots.items() if v
+            f"{k}={_humanize_slot(k, v)}" for k, v in req.requested_slots.slots.items() if v
         )
         return f"kernels [{kernel_id_list}] (arch={req.required_architecture}, slots={slot_str})"
 
@@ -321,23 +327,20 @@ class InsufficientResourcesError(TrackerCompatibilityError):
     error_title = "Agent has insufficient resources."
 
     _agent_id: AgentId
-    _requested_slots: ResourceSlot
-    _available_slots: ResourceSlot
-    _occupied_slots: ResourceSlot
-    _insufficient_resources: dict[str, tuple[str, str]]
+    _requested_slots: Mapping[SlotName, Decimal]
+    _available_slots: Mapping[SlotName, Decimal]
+    _insufficient_resources: dict[SlotName, tuple[str, str]]
 
     def __init__(
         self,
         agent_id: AgentId,
-        requested_slots: ResourceSlot,
-        available_slots: ResourceSlot,
-        occupied_slots: ResourceSlot,
-        insufficient_resources: dict[str, tuple[str, str]],
+        requested_slots: Mapping[SlotName, Decimal],
+        available_slots: Mapping[SlotName, Decimal],
+        insufficient_resources: dict[SlotName, tuple[str, str]],
     ) -> None:
         self._agent_id = agent_id
         self._requested_slots = requested_slots
         self._available_slots = available_slots
-        self._occupied_slots = occupied_slots
         self._insufficient_resources = insufficient_resources
 
         # Build detailed message: one resource shortfall per indented line so that
@@ -361,10 +364,12 @@ class InsufficientResourcesError(TrackerCompatibilityError):
     @override
     def remediation_hint_contribution(self) -> RemediationHint:
         # Per-slot shortage on this agent: max(0, requested - available).
-        diff = self._requested_slots - self._available_slots
-        reduction = ResourceSlot({
-            slot_name: amount for slot_name, amount in diff.items() if amount > Decimal(0)
-        })
+        reduction = {
+            slot_name: shortage
+            for slot_name, requested in self._requested_slots.items()
+            if (shortage := requested - self._available_slots.get(slot_name, Decimal(0)))
+            > Decimal(0)
+        }
         return RemediationHint(required_reduction=reduction)
 
 

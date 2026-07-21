@@ -15,7 +15,7 @@ from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
-from ai.backend.common.types import KernelId, ResourceSlot, ResourceSlotEntry, SessionId
+from ai.backend.common.types import KernelId, ResourceSlot, ResourceSlotEntry, SessionId, SlotName
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -35,6 +35,7 @@ from ai.backend.manager.data.session.spec import (
     SessionSpec,
 )
 from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.data.sokovan.workload import ResourceRequest
 from ai.backend.manager.errors.common import InternalServerError, RejectedByHook
 from ai.backend.manager.errors.image import ImageNotFound
 from ai.backend.manager.metrics.scheduler import (
@@ -54,6 +55,7 @@ from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import 
     AgentSelectionConfig,
     AgentSelectionCriteria,
     AgentSelector,
+    AgentStateTracker,
     KernelResourceSpec,
     SessionMetadata,
 )
@@ -363,8 +365,13 @@ class SchedulingController:
                         architecture=image_info.architecture,
                     ),
                     spec=KernelResourceSpec(
-                        requested_slots=ResourceSlotEntry.inputs_to_resource_slot(
-                            resource_input.resources
+                        requested_slots=ResourceRequest(
+                            slots={
+                                SlotName(k): v
+                                for k, v in ResourceSlotEntry.inputs_to_resource_slot(
+                                    resource_input.resources
+                                ).items()
+                            }
                         ),
                         required_architecture=image_info.architecture,
                     ),
@@ -380,7 +387,7 @@ class SchedulingController:
         resource_group_id: ResourceGroupID,
         kernel_data: dict[KernelId, _KernelComputeScheduleData],
     ) -> ComputeScheduleResult:
-        kernel_requirements: dict[UUID, KernelResourceSpec] = {
+        kernel_requirements: dict[KernelId, KernelResourceSpec] = {
             kernel_id: data.resource_spec.spec for kernel_id, data in kernel_data.items()
         }
 
@@ -393,6 +400,7 @@ class SchedulingController:
                     cluster_mode=spec.options.cluster_mode,
                 ),
                 kernel_requirements=kernel_requirements,
+                agent_selection_policy=(spec.options.scheduling_target.agent_selection_policy),
             )
             # Container-limit remediation is intentionally out of scope, so the
             # per-agent container limit is not enforced for the fitting check.
@@ -403,21 +411,30 @@ class SchedulingController:
             # An unknown resource group (ScalingGroupNotFound) is a request error,
             # not a per-kernel fitting outcome, so let it propagate to the caller.
             scheduling_data = await self._repository.get_scheduling_data(resource_group_id)
-            # The selector mutates the agents list on full success; feed clones so
-            # the live snapshot is never altered.
-            mutable_agents = [agent.to_agent_info() for agent in scheduling_data.agents]
+            # Trackers are throwaway here: the fitting check only needs the
+            # immutable observations, never the committed batch state.
+            agent_trackers = [
+                AgentStateTracker(original_agent=agent.to_agent_info())
+                for agent in scheduling_data.agents
+            ]
             # A resource group with no candidate agents (NoAgentsInResourceGroupError)
             # is likewise a whole-request error, so it propagates too.
             try:
                 await self._agent_selector.select_agents_for_batch_requirements(
-                    mutable_agents, criteria, config, None
+                    agent_trackers, criteria, config
                 )
             except BatchAgentSelectionFailedError as e:
                 for err in e.errors:
                     hint = err.build_remediation_hint()
                     reason = UnschedulableReasonHint(
                         required_reduction=(
-                            tuple(ResourceSlotEntry.from_resource_slot(hint.required_reduction))
+                            tuple(
+                                ResourceSlotEntry(
+                                    resource_type=str(k),
+                                    quantity=format(v, "f"),
+                                )
+                                for k, v in hint.required_reduction.items()
+                            )
                             if hint.required_reduction is not None
                             else None
                         ),

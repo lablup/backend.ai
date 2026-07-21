@@ -12,13 +12,13 @@ from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import (
     AgentId,
     AgentSelectionStrategy,
+    ResourceSlot,
     SessionId,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.sokovan import (
     AgentAllocation,
-    AgentInfo,
     AllocationBatch,
     KernelAllocation,
     SchedulingFailure,
@@ -52,6 +52,7 @@ from .selectors.selector import (
     AgentSelectionConfig,
     AgentSelectionCriteria,
     AgentSelector,
+    AgentStateTracker,
     KernelResourceSpec,
     SessionMetadata,
 )
@@ -213,8 +214,12 @@ class SessionProvisioner:
                 resource_group_id, system_snapshot, workloads
             )
 
-        # Build mutable agents from the fetched agent metadata
-        mutable_agents = [agent.to_agent_info() for agent in scheduling_data.agents]
+        # Batch-scoped agent state: observations stay immutable, in-batch
+        # allocations accumulate in the trackers across sessions of this pass
+        agent_trackers = [
+            AgentStateTracker(original_agent=agent.to_agent_info())
+            for agent in scheduling_data.agents
+        ]
         session_allocations: list[SessionAllocation] = []
         scheduling_failures: list[SchedulingFailure] = []
         # Get agent selection strategy from scheduler opts config
@@ -230,7 +235,7 @@ class SessionProvisioner:
                 session_allocation = await self._schedule_workload(
                     resource_group_id,
                     system_snapshot,
-                    mutable_agents,
+                    agent_trackers,
                     selection_config,
                     agent_selector,
                     session_workload,
@@ -288,7 +293,7 @@ class SessionProvisioner:
         self,
         resource_group_id: ResourceGroupID,
         mutable_snapshot: SystemSnapshot,
-        mutable_agents: Sequence[AgentInfo],
+        agent_trackers: Sequence[AgentStateTracker],
         selection_config: AgentSelectionConfig,
         agent_selector: AgentSelector,
         session_workload: SessionWorkload,
@@ -312,7 +317,7 @@ class SessionProvisioner:
                 ):
                     session_allocation = await self._allocate_workload(
                         session_workload,
-                        mutable_agents,
+                        agent_trackers,
                         selection_config,
                         agent_selector,
                     )
@@ -323,7 +328,7 @@ class SessionProvisioner:
                 self._allocator.name(), success_detail=self._allocator.success_message()
             ):
                 # Update the snapshot to reflect this allocation
-                # Note: agent state changes are already applied to mutable_agents
+                # Note: agent state changes are already committed into the trackers
                 self._update_system_snapshot(
                     mutable_snapshot,
                     session_workload,
@@ -356,7 +361,7 @@ class SessionProvisioner:
     async def _allocate_workload(
         self,
         session_workload: SessionWorkload,
-        agents_info: Sequence[AgentInfo],
+        agent_trackers: Sequence[AgentStateTracker],
         selection_config: AgentSelectionConfig,
         agent_selector: AgentSelector,
     ) -> SessionAllocation:
@@ -364,7 +369,7 @@ class SessionProvisioner:
         Allocate resources for a single session workload.
 
         :param session_workload: The workload to allocate
-        :param agents_info: Available agents (will be modified with updated states)
+        :param agent_trackers: Batch-scoped agent state trackers
         :param selection_config: Agent selection configuration
         :return: SessionAllocation
         :raises AgentSelectionError: If agent selection fails
@@ -390,15 +395,16 @@ class SessionProvisioner:
             kernel_requirements=kernel_requirements,
             kernel_counts_at_endpoint=session_workload.kernel_counts_at_endpoint,
             failed_agent_ids=session_workload.failed_agent_ids,
+            designated_agent_ids=session_workload.designated_agent_ids,
+            agent_selection_policy=session_workload.agent_selection_policy,
         )
 
         # Use batch selection method - it will get resource requirements internally
-        # and apply state changes to agents_info
+        # and commit state changes into the trackers
         selections = await agent_selector.select_agents_for_batch_requirements(
-            agents_info,
+            agent_trackers,
             criteria,
             selection_config,
-            session_workload.designated_agent_ids,
         )
 
         # Build session allocation from selections
@@ -423,8 +429,10 @@ class SessionProvisioner:
                     agent_id=selected_agent.agent_id,
                     allocated_slots=[],
                 )
+            # The allocation write path still speaks ResourceSlot; convert at
+            # this boundary only.
             agent_allocation_map[selected_agent.agent_id].allocated_slots.append(
-                resource_req.requested_slots
+                ResourceSlot({str(k): v for k, v in resource_req.requested_slots.slots.items()})
             )
 
             # Create kernel allocations

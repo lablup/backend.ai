@@ -78,7 +78,7 @@ class ConcentratedAgentSelector(AbstractAgentSelector):
         # Choose the tracker with minimum resources (to concentrate workloads)
         def tracker_sort_key(tracker: AgentStateTracker) -> tuple[int | Decimal, ...]:
             agent = tracker.original_agent
-            occupied_slots = tracker.get_current_occupied_slots()
+            remaining_slots = tracker.remaining_slots()
             sort_key: list[int | Decimal] = []
 
             # First, consider kernel counts at endpoint for replica spreading
@@ -93,9 +93,9 @@ class ConcentratedAgentSelector(AbstractAgentSelector):
             # Then, prefer agents with fewer unutilized capabilities
             sort_key.append(count_unutilized_capabilities(agent, resource_req.requested_slots))
 
-            # Finally, prefer agents with less available resources (using current state)
+            # Finally, prefer agents with less remaining resources (using current state)
             for key in resource_priorities:
-                sort_key.append((agent.available_slots - occupied_slots).get(key, sys.maxsize))
+                sort_key.append(remaining_slots.get(key, sys.maxsize))
 
             return tuple(sort_key)
 

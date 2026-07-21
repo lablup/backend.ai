@@ -66,15 +66,12 @@ class LegacyAgentSelector(AbstractAgentSelector):
 
         # Choose the best tracker
         def tracker_sort_key(tracker: AgentStateTracker) -> list[int | Decimal]:
-            occupied_slots = tracker.get_current_occupied_slots()
+            remaining_slots = tracker.remaining_slots()
             return [
                 -count_unutilized_capabilities(
                     tracker.original_agent, resource_req.requested_slots
                 ),
-                *[
-                    (tracker.original_agent.available_slots - occupied_slots).get(key, -sys.maxsize)
-                    for key in resource_priorities
-                ],
+                *[remaining_slots.get(key, -sys.maxsize) for key in resource_priorities],
             ]
 
         return max(trackers, key=tracker_sort_key)

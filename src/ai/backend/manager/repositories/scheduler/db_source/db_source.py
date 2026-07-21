@@ -383,6 +383,7 @@ class ScheduleDBSource:
                     SessionRow.cluster_mode,
                     SessionRow.designated_agent_ids,
                     SessionRow.starts_at,
+                    SessionRow.options,
                 )
             )
             .where(
@@ -480,6 +481,7 @@ class ScheduleDBSource:
                     designated_agent_ids=[AgentId(a) for a in row.designated_agent_ids]
                     if row.designated_agent_ids is not None
                     else None,
+                    agent_selection_policy=row.options.agent_selection_policy,
                     kernels=kernels,
                 )
             )

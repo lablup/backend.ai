@@ -70,19 +70,16 @@ class DispersedAgentSelector(AbstractAgentSelector):
             resource_req.requested_slots, self.agent_selection_resource_priority
         )
 
-        # Choose the tracker with maximum available resources (to disperse workloads)
+        # Choose the tracker with maximum remaining resources (to disperse workloads)
         def tracker_sort_key(tracker: AgentStateTracker) -> list[int | Decimal]:
-            occupied_slots = tracker.get_current_occupied_slots()
+            remaining_slots = tracker.remaining_slots()
             return [
                 # First, prefer agents with fewer unutilized capabilities
                 -count_unutilized_capabilities(
                     tracker.original_agent, resource_req.requested_slots
                 ),
-                # Then, prefer agents with more available resources (using current state)
-                *[
-                    (tracker.original_agent.available_slots - occupied_slots).get(key, -sys.maxsize)
-                    for key in resource_priorities
-                ],
+                # Then, prefer agents with more remaining resources (using current state)
+                *[remaining_slots.get(key, -sys.maxsize) for key in resource_priorities],
             ]
 
         return max(trackers, key=tracker_sort_key)

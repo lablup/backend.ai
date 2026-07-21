@@ -4,11 +4,12 @@ Utility functions for agent selectors.
 
 from decimal import Decimal
 
-from ai.backend.common.types import ResourceSlot
+from ai.backend.common.types import SlotName
 from ai.backend.manager.data.sokovan import AgentInfo
+from ai.backend.manager.data.sokovan.workload import ResourceRequest
 
 
-def count_unutilized_capabilities(agent_info: AgentInfo, requested_slots: ResourceSlot) -> int:
+def count_unutilized_capabilities(agent_info: AgentInfo, request: ResourceRequest) -> int:
     """
     Count the number of capabilities (resource types) that the agent has available
     but are not being utilized by the request.
@@ -18,49 +19,52 @@ def count_unutilized_capabilities(agent_info: AgentInfo, requested_slots: Resour
 
     Args:
         agent_info: Information about the agent
-        requested_slots: Resource slots requested by the session/kernel
+        request: Resource request of the session/kernel
 
     Returns:
         Number of unutilized capabilities (resource types with zero request but available on agent)
     """
     # Find slots that are requested as zero (not needed)
-    zero_requested_slots: set[str] = set()
-    for slot_name, amount in requested_slots.items():
-        if amount == Decimal(0):
-            zero_requested_slots.add(slot_name)
+    zero_requested_slots = {
+        slot_name for slot_name, amount in request.slots.items() if amount == Decimal(0)
+    }
 
     # Count how many of these zero-requested slots the agent has available
     unutilized_count = 0
-    available_slots = agent_info.available_slots - agent_info.occupied_slots
-    for slot_name, amount in available_slots.items():
-        if slot_name in zero_requested_slots and amount > Decimal(0):
+    for slot_name, resource in agent_info.resources.slots.items():
+        if (
+            slot_name in zero_requested_slots
+            and resource.capacity - resource.reserved - resource.used > Decimal(0)
+        ):
             unutilized_count += 1
 
     return unutilized_count
 
 
 def order_slots_by_priority(
-    requested_slots: ResourceSlot,
+    request: ResourceRequest,
     priority_order: list[str],
-) -> list[str]:
+) -> list[SlotName]:
     """
-    Order resource slot names according to the given priority list.
+    Order the requested slot names according to the given priority list.
 
     Slots in the priority list come first in order, followed by
     any remaining slots in alphabetical order.
 
     Args:
-        requested_slots: Resource slots to order
+        request: Resource request whose slot names are ordered
         priority_order: List of slot names in priority order
 
     Returns:
         Ordered list of slot names
     """
-    requested_slot_names = set(requested_slots.keys())
+    requested_slot_names = set(request.slots.keys())
 
     # First, include slots that are in the priority list
     prioritized_slots = [
-        slot_name for slot_name in priority_order if slot_name in requested_slot_names
+        SlotName(slot_name)
+        for slot_name in priority_order
+        if SlotName(slot_name) in requested_slot_names
     ]
 
     # Then, add remaining slots in sorted order

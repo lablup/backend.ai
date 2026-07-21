@@ -21,6 +21,7 @@ from ai.backend.common.types import (
     SessionTypes,
     SlotName,
 )
+from ai.backend.manager.data.session.options import AgentSelectionPolicy
 from ai.backend.manager.data.session.types import SessionStatus
 
 
@@ -84,6 +85,8 @@ class SessionWorkload:
     project_id: ProjectID
     # Domain ID for domain resource limit checks
     domain_id: DomainID
+    # How designated agents are enforced (STRICT fails, PREFERRED falls back)
+    agent_selection_policy: AgentSelectionPolicy
     # Scaling group name
     scaling_group: str
     # Scaling group id

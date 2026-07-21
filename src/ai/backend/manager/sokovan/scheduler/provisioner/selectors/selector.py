@@ -11,7 +11,7 @@ import logging
 from abc import ABC, abstractmethod
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from uuid import UUID
+from decimal import Decimal
 
 from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import (
@@ -19,12 +19,14 @@ from ai.backend.common.types import (
     BinarySize,
     ClusterMode,
     KernelId,
-    ResourceSlot,
     SessionId,
     SessionTypes,
+    SlotName,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.data.session.options import AgentSelectionPolicy
 from ai.backend.manager.data.sokovan import AgentInfo
+from ai.backend.manager.data.sokovan.workload import ResourceRequest
 
 from .exceptions import (
     BatchAgentSelectionFailedError,
@@ -43,24 +45,60 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 @dataclass
 class AgentStateTracker:
-    """Tracks agent state changes during batch selection."""
+    """Tracks in-batch allocations for one agent during a scheduling pass.
+
+    The agent observation (``AgentInfo``) is immutable; every in-batch state
+    change lives here. ``committed`` holds allocations from earlier sessions
+    of this pass, ``pending`` holds the session currently being placed —
+    the all-or-nothing per-session semantics come from commit()/rollback().
+    """
 
     original_agent: AgentInfo
-    additional_slots: ResourceSlot = field(default_factory=ResourceSlot)
-    additional_containers: int = 0
+    committed_slots: dict[SlotName, Decimal] = field(default_factory=dict)
+    committed_containers: int = 0
+    pending_slots: dict[SlotName, Decimal] = field(default_factory=dict)
+    pending_containers: int = 0
 
-    def get_current_occupied_slots(self) -> ResourceSlot:
-        """Get current occupied slots (original + additional)."""
-        return self.original_agent.occupied_slots + self.additional_slots
+    def remaining_slots(self) -> dict[SlotName, Decimal]:
+        """Per-slot remaining = capacity - reserved - used - in-batch allocations."""
+        remaining: dict[SlotName, Decimal] = {}
+        for slot_name, resource in self.original_agent.resources.slots.items():
+            remaining[slot_name] = (
+                resource.capacity
+                - resource.reserved
+                - resource.used
+                - self.committed_slots.get(slot_name, Decimal(0))
+                - self.pending_slots.get(slot_name, Decimal(0))
+            )
+        return remaining
 
-    def get_current_container_count(self) -> int:
-        """Get current container count (original + additional)."""
-        return self.original_agent.container_count + self.additional_containers
+    def current_container_count(self) -> int:
+        """Get current container count including in-batch allocations."""
+        return (
+            self.original_agent.container_count
+            + self.committed_containers
+            + self.pending_containers
+        )
 
-    def apply_diff(self, slots: ResourceSlot, containers: int) -> None:
-        """Apply additional resource allocation."""
-        self.additional_slots = self.additional_slots + slots
-        self.additional_containers += containers
+    def apply_diff(self, request: ResourceRequest, containers: int) -> None:
+        """Apply an in-flight allocation of the session being placed."""
+        for slot_name, amount in request.slots.items():
+            self.pending_slots[slot_name] = self.pending_slots.get(slot_name, Decimal(0)) + amount
+        self.pending_containers += containers
+
+    def commit(self) -> None:
+        """Fold the in-flight allocation into the batch state (session placed)."""
+        for slot_name, amount in self.pending_slots.items():
+            self.committed_slots[slot_name] = (
+                self.committed_slots.get(slot_name, Decimal(0)) + amount
+            )
+        self.committed_containers += self.pending_containers
+        self.rollback()
+
+    def rollback(self) -> None:
+        """Discard the in-flight allocation (session placement failed)."""
+        self.pending_slots = {}
+        self.pending_containers = 0
 
 
 @dataclass
@@ -92,7 +130,7 @@ class KernelResourceSpec:
     """Resource specification for a single kernel."""
 
     # Resource slots required
-    requested_slots: ResourceSlot
+    requested_slots: ResourceRequest
     # Architecture required
     required_architecture: str
 
@@ -113,11 +151,15 @@ class AgentSelectionCriteria:
     session_metadata: SessionMetadata
     # Kernel requirements for the session
     # Mapping of kernel IDs to their resource specifications
-    kernel_requirements: Mapping[UUID, KernelResourceSpec]
+    kernel_requirements: Mapping[KernelId, KernelResourceSpec]
+    # How designated agents are enforced (STRICT fails, PREFERRED falls back)
+    agent_selection_policy: AgentSelectionPolicy
     # Kernel counts at endpoint for each agent (for concentrated selector spreading)
     kernel_counts_at_endpoint: Mapping[AgentId, int] | None = None
     # Agents that previously failed for this session (for deprioritization on retry)
     failed_agent_ids: frozenset[AgentId] = frozenset()
+    # Manually designated agents (user's explicit choice takes precedence)
+    designated_agent_ids: list[AgentId] | None = None
 
     def get_resource_requirements(self) -> Sequence[ResourceRequirements]:
         """
@@ -149,19 +191,19 @@ class AgentSelectionCriteria:
                 )
 
             # Sum all requested slots for single-node sessions
-            total_slots = ResourceSlot({})
+            total_slots: dict[SlotName, Decimal] = {}
             for kernel_req in self.kernel_requirements.values():
-                total_slots = total_slots + kernel_req.requested_slots
+                for slot_name, amount in kernel_req.requested_slots.slots.items():
+                    total_slots[slot_name] = total_slots.get(slot_name, Decimal(0)) + amount
 
             # Use the common architecture
             architecture = list(architectures)[0]
             # Include all kernel IDs in the aggregated requirement
-            kernel_ids = [KernelId(k) for k in self.kernel_requirements.keys()]
             return [
                 ResourceRequirements(
-                    requested_slots=total_slots,
+                    requested_slots=ResourceRequest(slots=total_slots),
                     required_architecture=architecture,
-                    kernel_ids=kernel_ids,
+                    kernel_ids=list(self.kernel_requirements.keys()),
                 )
             ]
         # Return individual kernel resources for multi-node sessions
@@ -169,7 +211,7 @@ class AgentSelectionCriteria:
             ResourceRequirements(
                 requested_slots=req.requested_slots,
                 required_architecture=req.required_architecture,
-                kernel_ids=[KernelId(kernel_id)],
+                kernel_ids=[kernel_id],
             )
             for kernel_id, req in self.kernel_requirements.items()
         ]
@@ -249,10 +291,9 @@ class AgentSelector:
 
     async def select_agents_for_batch_requirements(
         self,
-        agents: Sequence[AgentInfo],
+        trackers: Sequence[AgentStateTracker],
         criteria: AgentSelectionCriteria,
         config: AgentSelectionConfig,
-        designated_agent_ids: list[AgentId] | None = None,
     ) -> list[AgentSelection]:
         """
         Select agents for every resource requirement in the criteria.
@@ -261,13 +302,13 @@ class AgentSelector:
         batch early); if any requirement could not be placed, the whole batch
         fails and a :class:`BatchAgentSelectionFailedError` carrying every
         per-requirement failure (with its remediation hint) is raised. On full
-        success the diffs are applied to the mutable agents list.
+        success the in-flight allocations are committed into the trackers so
+        later sessions of the same scheduling pass observe them.
 
         Args:
-            agents: Available agents to choose from (will be modified with diff updates)
+            trackers: Batch-scoped agent state (created once per scheduling pass)
             criteria: Selection criteria including kernel requirements
             config: Configuration for agent selection
-            designated_agent_ids: Optional list of designated agents for the session
 
         Returns:
             The list of AgentSelection objects pairing requirements with agents.
@@ -281,11 +322,8 @@ class AgentSelector:
         if not resource_requirements:
             # Empty list for sessions with no kernels
             return []
-        if not agents:
+        if not trackers:
             raise NoAgentsInResourceGroupError(criteria.session_metadata.resource_group_id)
-
-        # Track agent state changes as diffs using AgentStateTracker
-        state_trackers = [AgentStateTracker(original_agent=agent) for agent in agents]
 
         selections: list[AgentSelection] = []
         errors: list[RequirementSelectionError] = []
@@ -295,17 +333,16 @@ class AgentSelector:
             # requirements so every failure's remediation hint is collected.
             try:
                 selected_tracker = await self._select_agent_tracker_for_requirements(
-                    state_trackers,
+                    trackers,
                     resource_req,
                     criteria,
                     config,
-                    designated_agent_ids,
                 )
             except (NoAvailableAgentError, NoCompatibleAgentError) as e:
                 errors.append(e)
                 continue
 
-            # Update state tracker with diff for the selected agent
+            # Track the in-flight allocation for the selected agent
             selected_tracker.apply_diff(resource_req.requested_slots, len(resource_req.kernel_ids))
 
             # Store the selection with the original agent
@@ -318,14 +355,13 @@ class AgentSelector:
 
         if errors:
             # All-or-nothing per session: surface every requirement's failure.
+            for tracker in trackers:
+                tracker.rollback()
             raise BatchAgentSelectionFailedError(errors)
 
-        # Apply the diff changes to the mutable agents list (full success only)
-        for tracker in state_trackers:
-            agent = tracker.original_agent
-            if tracker.additional_slots or tracker.additional_containers > 0:
-                agent.occupied_slots = agent.occupied_slots + tracker.additional_slots
-                agent.container_count = agent.container_count + tracker.additional_containers
+        # Full success: fold the session's allocations into the batch state
+        for tracker in trackers:
+            tracker.commit()
 
         return selections
 
@@ -335,7 +371,6 @@ class AgentSelector:
         resource_req: ResourceRequirements,
         criteria: AgentSelectionCriteria,
         config: AgentSelectionConfig,
-        designated_agent_ids: list[AgentId] | None = None,
     ) -> AgentStateTracker:
         # First pass: filter by architecture (binary compatibility check)
         arch_compatible_trackers: list[AgentStateTracker] = []
@@ -372,20 +407,23 @@ class AgentSelector:
                 agent_errors=agent_errors,
             )
 
-        # Handle designated agent first (user's explicit choice takes precedence)
-        if designated_agent_ids:
+        # Handle designated agents first (user's explicit choice takes precedence)
+        if criteria.designated_agent_ids:
             for tracker in compatible_trackers:
-                if tracker.original_agent.agent_id in designated_agent_ids:
+                if tracker.original_agent.agent_id in criteria.designated_agent_ids:
                     return tracker
 
-            raise NoAvailableAgentError(
-                resource_requirement=resource_req,
-                agent_errors=agent_errors,
-                available_agent_ids=[
-                    tracker.original_agent.agent_id for tracker in compatible_trackers
-                ],
-                designated_agent_ids=designated_agent_ids,
-            )
+            if criteria.agent_selection_policy == AgentSelectionPolicy.STRICT:
+                raise NoAvailableAgentError(
+                    resource_requirement=resource_req,
+                    agent_errors=agent_errors,
+                    available_agent_ids=[
+                        tracker.original_agent.agent_id for tracker in compatible_trackers
+                    ],
+                    designated_agent_ids=criteria.designated_agent_ids,
+                )
+            # PREFERRED: designated agents have no capacity - fall back to
+            # the normal candidate path below
 
         # Third pass: deprioritize agents that previously failed for this session
         candidate_trackers = compatible_trackers
@@ -439,44 +477,32 @@ class AgentSelector:
         agent = tracker.original_agent
 
         # Get current state with tracked changes
-        occupied_slots = tracker.get_current_occupied_slots()
-        container_count = tracker.get_current_container_count()
+        remaining_slots = tracker.remaining_slots()
+        container_count = tracker.current_container_count()
 
-        # Check resource availability
-        available_slots = agent.available_slots - occupied_slots
-        if not (available_slots >= resource_req.requested_slots):
-            # Build detailed message showing which resources are insufficient
-            insufficient = []
-            for k in resource_req.requested_slots.keys():
-                requested_val = resource_req.requested_slots.get(k, 0)
-                available_val = available_slots.get(k, 0)
-                if requested_val > available_val:
-                    insufficient.append(k)
-
-            # Format values similar to group_resource_limit.py
-            insufficient_details = {}
-            for resource_name in insufficient:
-                requested = resource_req.requested_slots.get(resource_name, 0)
-                available = available_slots.get(resource_name, 0)
-
+        # Check resource availability on the requested slots (missing = 0)
+        insufficient_details: dict[SlotName, tuple[str, str]] = {}
+        for slot_name, requested in resource_req.requested_slots.slots.items():
+            available = remaining_slots.get(slot_name, Decimal(0))
+            if requested > available:
                 # Format mem as human readable (e.g., "2 GiB" instead of raw bytes)
-                if resource_name == "mem":
-                    insufficient_details[resource_name] = (
+                if slot_name == "mem":
+                    insufficient_details[slot_name] = (
                         str(BinarySize(requested)),
                         str(BinarySize(available)),
                     )
                 else:
                     # Store raw values for other resources
-                    insufficient_details[resource_name] = (
+                    insufficient_details[slot_name] = (
                         str(requested),
                         str(available),
                     )
 
+        if insufficient_details:
             raise InsufficientResourcesError(
                 agent_id=agent.agent_id,
-                requested_slots=resource_req.requested_slots,
-                available_slots=available_slots,
-                occupied_slots=occupied_slots,
+                requested_slots=resource_req.requested_slots.slots,
+                available_slots=remaining_slots,
                 insufficient_resources=insufficient_details,
             )
 
