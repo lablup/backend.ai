@@ -6,7 +6,10 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from uuid import UUID
 
+from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
@@ -20,8 +23,13 @@ from ai.backend.manager.data.session.types import SessionStatus
 
 
 @dataclass(frozen=True)
-class KeyPairResourcePolicy:
-    """Resource policy for a keypair."""
+class UserResourcePolicy:
+    """Resource policy for a user, applied per user by the scheduler.
+
+    All limits are sourced from the user's main keypair policy (no
+    user-level DB columns yet). This is the single policy the scheduler
+    snapshot carries; per-keypair policies are no longer tracked.
+    """
 
     name: str
     total_resource_slots: ResourceSlot
@@ -29,14 +37,6 @@ class KeyPairResourcePolicy:
     max_concurrent_sftp_sessions: int | None
     max_pending_session_count: int | None
     max_pending_session_resource_slots: ResourceSlot | None
-
-
-@dataclass(frozen=True)
-class UserResourcePolicy:
-    """Resource policy for a user."""
-
-    name: str
-    total_resource_slots: ResourceSlot
 
 
 @dataclass(frozen=True)
@@ -82,12 +82,12 @@ class SessionWorkload:
     access_key: AccessKey
     # Resource requirements
     requested_slots: ResourceSlot
-    # User UUID for user resource limit checks
-    user_uuid: UUID
-    # Group ID for group resource limit checks
-    group_id: UUID
-    # Domain name for domain resource limit checks
-    domain_name: str
+    # User ID for user resource limit checks
+    user_uuid: UserID
+    # Project ID for project resource limit checks
+    project_id: ProjectID
+    # Domain ID for domain resource limit checks
+    domain_id: DomainID
     # Scaling group name
     scaling_group: str
     # Scaling group id

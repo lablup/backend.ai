@@ -4,8 +4,10 @@ from __future__ import annotations
 
 from collections.abc import Mapping, MutableMapping
 from dataclasses import dataclass, field
-from uuid import UUID
 
+from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.project import ProjectID
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
@@ -17,20 +19,10 @@ from ai.backend.common.types import (
 )
 
 from .workload import (
-    KeyPairResourcePolicy,
     PendingSessionInfo,
     SessionDependencyInfo,
     UserResourcePolicy,
 )
-
-
-@dataclass
-class KeypairOccupancy:
-    """Keypair occupancy information including resources and session counts."""
-
-    occupied_slots: list[SlotQuantity]
-    session_count: int
-    sftp_session_count: int
 
 
 @dataclass
@@ -43,31 +35,42 @@ class AgentOccupancy:
 
 @dataclass
 class ResourceOccupancySnapshot:
-    """Snapshot of current resource occupancy across different scopes."""
+    """Snapshot of current resource occupancy across different scopes.
 
-    by_keypair: MutableMapping[AccessKey, KeypairOccupancy]
-    by_user: MutableMapping[UUID, list[SlotQuantity]]
-    by_group: MutableMapping[UUID, list[SlotQuantity]]
-    by_domain: MutableMapping[str, list[SlotQuantity]]
+    Resource-quota occupancy is tracked per user/group/domain (and per
+    agent for selection); keypair-scoped occupancy was folded into the
+    user scope.
+    """
+
+    by_user: MutableMapping[UserID, list[SlotQuantity]]
+    by_project: MutableMapping[ProjectID, list[SlotQuantity]]
+    by_domain: MutableMapping[DomainID, list[SlotQuantity]]
     by_agent: MutableMapping[AgentId, AgentOccupancy]  # Agent-level occupancy from actual kernels
 
 
 @dataclass(frozen=True)
 class ResourcePolicySnapshot:
-    """Snapshot of resource policies and limits."""
+    """Snapshot of resource policies and limits (user-scoped)."""
 
-    keypair_policies: Mapping[AccessKey, KeyPairResourcePolicy]
-    user_policies: Mapping[UUID, UserResourcePolicy]
-    group_limits: Mapping[UUID, ResourceSlot]
-    domain_limits: Mapping[str, ResourceSlot]
+    user_policies: Mapping[UserID, UserResourcePolicy]
+    project_limits: Mapping[ProjectID, ResourceSlot]
+    domain_limits: Mapping[DomainID, ResourceSlot]
+
+
+@dataclass(frozen=True)
+class UserSessionCounts:
+    """Global active session counts for a single user."""
+
+    regular: int
+    sftp: int
 
 
 @dataclass
 class ConcurrencySnapshot:
-    """Snapshot of concurrent session counts."""
+    """Snapshot of concurrent session counts, scoped per user."""
 
-    sessions_by_keypair: MutableMapping[AccessKey, int]
-    sftp_sessions_by_keypair: MutableMapping[AccessKey, int]
+    sessions_by_user: MutableMapping[UserID, int]
+    sftp_sessions_by_user: MutableMapping[UserID, int]
 
 
 @dataclass

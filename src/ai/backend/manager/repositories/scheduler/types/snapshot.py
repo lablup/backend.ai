@@ -2,18 +2,20 @@
 
 from collections.abc import Mapping
 from dataclasses import dataclass
-from uuid import UUID
 
-from ai.backend.common.types import AccessKey, ResourceSlot, SlotName, SlotTypes
+from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.project import ProjectID
+from ai.backend.common.identifier.user import UserID
+from ai.backend.common.types import ResourceSlot, SlotName, SlotTypes
 from ai.backend.manager.data.sokovan import (
     ConcurrencySnapshot,
-    KeyPairResourcePolicy,
     PendingSessionSnapshot,
     ResourceOccupancySnapshot,
     ResourcePolicySnapshot,
     SessionDependencySnapshot,
     SystemSnapshot,
     UserResourcePolicy,
+    UserSessionCounts,
 )
 
 
@@ -21,10 +23,9 @@ from ai.backend.manager.data.sokovan import (
 class ResourcePolicies:
     """Resource policies for scheduling."""
 
-    keypair_policies: dict[AccessKey, KeyPairResourcePolicy]
-    user_policies: dict[UUID, UserResourcePolicy]
-    group_limits: dict[UUID, ResourceSlot]
-    domain_limits: dict[str, ResourceSlot]
+    user_policies: dict[UserID, UserResourcePolicy]
+    project_limits: dict[ProjectID, ResourceSlot]
+    domain_limits: dict[DomainID, ResourceSlot]
 
 
 @dataclass
@@ -34,6 +35,8 @@ class SnapshotData:
     resource_occupancy: ResourceOccupancySnapshot
     resource_policies: ResourcePolicies
     session_dependencies: SessionDependencySnapshot
+    user_session_counts: dict[UserID, UserSessionCounts]
+    """Global per-user active session counts."""
 
     def to_system_snapshot(
         self, known_slot_types: Mapping[SlotName, SlotTypes], total_capacity: ResourceSlot
@@ -41,22 +44,22 @@ class SnapshotData:
         """Convert to SystemSnapshot entity."""
         # Resource policies are already extracted in ResourcePolicies
         resource_policy = ResourcePolicySnapshot(
-            keypair_policies=self.resource_policies.keypair_policies,
             user_policies=self.resource_policies.user_policies,
-            group_limits=self.resource_policies.group_limits,
+            project_limits=self.resource_policies.project_limits,
             domain_limits=self.resource_policies.domain_limits,
         )
 
-        # Extract concurrency from resource occupancy snapshot
-        sessions_by_keypair = {}
-        sftp_sessions_by_keypair = {}
-        for access_key, occupancy in self.resource_occupancy.by_keypair.items():
-            sessions_by_keypair[access_key] = occupancy.session_count
-            sftp_sessions_by_keypair[access_key] = occupancy.sftp_session_count
+        # Concurrency counts come from the global per-user session source,
+        # not from RG-scoped occupancy.
+        sessions_by_user: dict[UserID, int] = {}
+        sftp_sessions_by_user: dict[UserID, int] = {}
+        for user_id, counts in self.user_session_counts.items():
+            sessions_by_user[user_id] = counts.regular
+            sftp_sessions_by_user[user_id] = counts.sftp
 
         concurrency = ConcurrencySnapshot(
-            sessions_by_keypair=sessions_by_keypair,
-            sftp_sessions_by_keypair=sftp_sessions_by_keypair,
+            sessions_by_user=sessions_by_user,
+            sftp_sessions_by_user=sftp_sessions_by_user,
         )
 
         # Pending sessions should be fetched from cache or calculated separately if needed

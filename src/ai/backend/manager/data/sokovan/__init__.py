@@ -39,16 +39,15 @@ from .result import (
 from .snapshot import (
     AgentOccupancy,
     ConcurrencySnapshot,
-    KeypairOccupancy,
     PendingSessionSnapshot,
     ResourceOccupancySnapshot,
     ResourcePolicySnapshot,
     SessionDependencySnapshot,
     SystemSnapshot,
+    UserSessionCounts,
 )
 from .workload import (
     KernelWorkload,
-    KeyPairResourcePolicy,
     PendingSessionInfo,
     SessionDependencyInfo,
     SessionWorkload,
@@ -100,15 +99,14 @@ __all__ = [
     # snapshot
     "AgentOccupancy",
     "ConcurrencySnapshot",
-    "KeypairOccupancy",
     "PendingSessionSnapshot",
     "ResourceOccupancySnapshot",
     "ResourcePolicySnapshot",
     "SessionDependencySnapshot",
     "SystemSnapshot",
+    "UserSessionCounts",
     # workload
     "KernelWorkload",
-    "KeyPairResourcePolicy",
     "PendingSessionInfo",
     "SessionDependencyInfo",
     "SessionWorkload",
