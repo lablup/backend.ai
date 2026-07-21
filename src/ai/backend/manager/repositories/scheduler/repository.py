@@ -28,8 +28,6 @@ from ai.backend.common.types import (
     AccessKey,
     AgentId,
     SessionId,
-    SlotName,
-    SlotTypes,
     VFolderMount,
     VFolderMountRequest,
 )
@@ -56,7 +54,6 @@ from ai.backend.manager.types import UserScope
 
 from .cache_source.cache_source import ScheduleCacheSource
 from .db_source.db_source import ScheduleDBSource
-from .types.base import SchedulingSpec
 from .types.scheduling import SchedulingData
 from .types.search import (
     SessionWithKernelsAndUserSearchResult,
@@ -114,14 +111,8 @@ class SchedulerRepository:
         Get scheduling data from database.
         Raises ScalingGroupNotFound if scaling group doesn't exist.
         """
-        known_slot_types = await self._get_known_slot_types()
         max_container_count = await self._get_max_container_count()
-        spec = SchedulingSpec(
-            known_slot_types=known_slot_types,
-            max_container_count=max_container_count,
-        )
-
-        return await self._db_source.get_scheduling_data(resource_group_id, spec)
+        return await self._db_source.get_scheduling_data(resource_group_id, max_container_count)
 
     @scheduler_repository_resilience.apply()
     async def allocate_sessions(self, allocation_batch: AllocationBatch) -> list[SessionId]:
@@ -196,12 +187,6 @@ class SchedulerRepository:
         Used by SweepLostAgentKernelsLifecycleHandler for scaling group based processing.
         """
         return await self._db_source.get_terminating_kernels_with_lost_agents_by_ids(session_ids)
-
-    async def _get_known_slot_types(self) -> Mapping[SlotName, SlotTypes]:
-        """
-        Get known slot types from configuration.
-        """
-        return await self._config_provider.legacy_etcd_config_loader.get_resource_slots()
 
     async def _get_max_container_count(self) -> int | None:
         """

@@ -35,17 +35,6 @@ class UserResourcePolicy:
     total_resource_slots: ResourceSlot
     max_concurrent_sessions: int | None
     max_concurrent_sftp_sessions: int | None
-    max_pending_session_count: int | None
-    max_pending_session_resource_slots: ResourceSlot | None
-
-
-@dataclass(frozen=True)
-class PendingSessionInfo:
-    """Information about a pending session."""
-
-    session_id: SessionId
-    requested_slots: ResourceSlot
-    creation_time: datetime
 
 
 @dataclass(frozen=True)

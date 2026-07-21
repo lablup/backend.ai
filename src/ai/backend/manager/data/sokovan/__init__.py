@@ -9,7 +9,7 @@ from .allocation import (
     SchedulingPredicate,
     SessionAllocation,
 )
-from .config import NetworkSetup, ScalingGroupInfo, SchedulingConfig
+from .config import NetworkSetup
 from .handler import HandlerKernelData, HandlerSessionData
 from .image import ImageConfigData, ImageIdentifier
 from .lifecycle import (
@@ -37,9 +37,6 @@ from .result import (
     SweepStaleKernelsResult,
 )
 from .snapshot import (
-    AgentOccupancy,
-    ConcurrencySnapshot,
-    PendingSessionSnapshot,
     ResourceOccupancySnapshot,
     ResourcePolicySnapshot,
     SessionDependencySnapshot,
@@ -48,7 +45,6 @@ from .snapshot import (
 )
 from .workload import (
     KernelWorkload,
-    PendingSessionInfo,
     SessionDependencyInfo,
     SessionWorkload,
     UserResourcePolicy,
@@ -66,8 +62,6 @@ __all__ = [
     "SessionAllocation",
     # config
     "NetworkSetup",
-    "ScalingGroupInfo",
-    "SchedulingConfig",
     # handler
     "HandlerKernelData",
     "HandlerSessionData",
@@ -97,9 +91,6 @@ __all__ = [
     "SessionStartResult",
     "SweepStaleKernelsResult",
     # snapshot
-    "AgentOccupancy",
-    "ConcurrencySnapshot",
-    "PendingSessionSnapshot",
     "ResourceOccupancySnapshot",
     "ResourcePolicySnapshot",
     "SessionDependencySnapshot",
@@ -107,7 +98,6 @@ __all__ = [
     "UserSessionCounts",
     # workload
     "KernelWorkload",
-    "PendingSessionInfo",
     "SessionDependencyInfo",
     "SessionWorkload",
     "UserResourcePolicy",

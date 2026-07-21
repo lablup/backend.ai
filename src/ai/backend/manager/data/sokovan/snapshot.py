@@ -3,49 +3,61 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, MutableMapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+from decimal import Decimal
 
 from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import (
-    AccessKey,
-    AgentId,
     ResourceSlot,
     SessionId,
     SlotName,
-    SlotQuantity,
-    SlotTypes,
 )
 
 from .workload import (
-    PendingSessionInfo,
     SessionDependencyInfo,
     UserResourcePolicy,
 )
 
 
-@dataclass
-class AgentOccupancy:
-    """Agent occupancy information including resources and container count."""
+@dataclass(frozen=True)
+class SlotAllocation:
+    """Aggregated live allocations for one slot within an owner scope.
 
-    occupied_slots: list[SlotQuantity]
-    container_count: int
+    Each allocation row contributes to exactly one field: ``used`` when its
+    usage has been reported (running), else ``requested`` (still a
+    reservation). ``occupied`` is therefore the exact sum of per-row
+    used-or-requested amounts.
+    """
+
+    requested: Decimal
+    used: Decimal
+
+    @property
+    def occupied(self) -> Decimal:
+        return self.requested + self.used
+
+
+@dataclass(frozen=True)
+class ResourceAllocation:
+    """Per-scope aggregated slot allocations (value of the by-user/project/domain maps)."""
+
+    slots: Mapping[SlotName, SlotAllocation]
 
 
 @dataclass
 class ResourceOccupancySnapshot:
-    """Snapshot of current resource occupancy across different scopes.
+    """Snapshot of resource-quota occupancy per owner scope.
 
-    Resource-quota occupancy is tracked per user/group/domain (and per
-    agent for selection); keypair-scoped occupancy was folded into the
-    user scope.
+    Keypair-scoped occupancy was folded into the user scope; agent-level
+    state (slot resources, container counts) lives on ``AgentMeta``/
+    ``AgentInfo``, not here.
     """
 
-    by_user: MutableMapping[UserID, list[SlotQuantity]]
-    by_project: MutableMapping[ProjectID, list[SlotQuantity]]
-    by_domain: MutableMapping[DomainID, list[SlotQuantity]]
-    by_agent: MutableMapping[AgentId, AgentOccupancy]  # Agent-level occupancy from actual kernels
+    by_user: MutableMapping[UserID, ResourceAllocation]
+    by_project: MutableMapping[ProjectID, ResourceAllocation]
+    by_domain: MutableMapping[DomainID, ResourceAllocation]
 
 
 @dataclass(frozen=True)
@@ -66,21 +78,6 @@ class UserSessionCounts:
 
 
 @dataclass
-class ConcurrencySnapshot:
-    """Snapshot of concurrent session counts, scoped per user."""
-
-    sessions_by_user: MutableMapping[UserID, int]
-    sftp_sessions_by_user: MutableMapping[UserID, int]
-
-
-@dataclass
-class PendingSessionSnapshot:
-    """Snapshot of pending sessions."""
-
-    by_keypair: MutableMapping[AccessKey, list[PendingSessionInfo]]
-
-
-@dataclass
 class SessionDependencySnapshot:
     """Snapshot of session dependencies."""
 
@@ -88,26 +85,38 @@ class SessionDependencySnapshot:
 
 
 @dataclass
-class SystemSnapshot:
-    """Represents a complete snapshot of the system's state for scheduling decisions."""
+class ResourceGroupScopeSnapshot:
+    """State scoped to the resource group being scheduled.
 
-    # Total resource capacity
+    Every value here is derived only from agents/kernels/sessions that
+    belong to this resource group.
+    """
+
+    # Total capacity of this resource group's agents
     total_capacity: ResourceSlot
-
-    # Resource occupancy state
-    resource_occupancy: ResourceOccupancySnapshot
-
-    # Resource policies and limits
-    resource_policy: ResourcePolicySnapshot
-
-    # Concurrent session state
-    concurrency: ConcurrencySnapshot
-
-    # Pending session state
-    pending_sessions: PendingSessionSnapshot
-
-    # Session dependency state
+    # Quota occupancy aggregated from this resource group's kernels
+    occupancy: ResourceOccupancySnapshot
+    # Dependency status for this resource group's pending sessions
     session_dependencies: SessionDependencySnapshot
 
-    # Known slot types from etcd config
-    known_slot_types: Mapping[SlotName, SlotTypes] = field(default_factory=dict)
+
+@dataclass
+class GlobalScopeSnapshot:
+    """Cluster-wide state, independent of the resource group being scheduled."""
+
+    # Global per-user active session counts (concurrency limits are global)
+    active_session_counts: MutableMapping[UserID, UserSessionCounts]
+    # Resource policies and limits (global entities)
+    resource_policy: ResourcePolicySnapshot
+
+
+@dataclass
+class SystemSnapshot:
+    """Complete snapshot of system state for scheduling decisions.
+
+    Split by data scope: ``resource_group`` holds state of the resource
+    group being scheduled, ``global_scope`` holds cluster-wide state.
+    """
+
+    resource_group: ResourceGroupScopeSnapshot
+    global_scope: GlobalScopeSnapshot

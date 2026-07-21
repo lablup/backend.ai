@@ -5,7 +5,10 @@ from datetime import datetime
 from functools import cached_property
 from uuid import UUID
 
+from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
@@ -47,8 +50,11 @@ class PendingSessionData:
     id: SessionId
     access_key: AccessKey
     requested_slots: ResourceSlot
-    user_uuid: UUID
-    group_id: UUID
+    user_uuid: UserID
+    project_id: ProjectID
+    domain_id: DomainID
+    # Domain name kept alongside the ID; some lookups (e.g. domain limits)
+    # still filter by name.
     domain_name: str
     scaling_group_name: str
     resource_group_id: ResourceGroupID
@@ -70,8 +76,8 @@ class PendingSessionData:
             access_key=self.access_key,
             requested_slots=self.requested_slots,
             user_uuid=self.user_uuid,
-            group_id=self.group_id,
-            domain_name=self.domain_name,
+            project_id=self.project_id,
+            domain_id=self.domain_id,
             scaling_group=self.scaling_group_name,
             resource_group_id=self.resource_group_id,
             priority=self.priority,
@@ -98,14 +104,14 @@ class PendingSessions:
         return {s.access_key for s in self.sessions}
 
     @cached_property
-    def user_uuids(self) -> set[UUID]:
-        """Extract unique user UUIDs from pending sessions."""
+    def user_uuids(self) -> set[UserID]:
+        """Extract unique user IDs from pending sessions."""
         return {s.user_uuid for s in self.sessions}
 
     @cached_property
-    def group_ids(self) -> set[UUID]:
-        """Extract unique group IDs from pending sessions."""
-        return {s.group_id for s in self.sessions}
+    def project_ids(self) -> set[ProjectID]:
+        """Extract unique project IDs from pending sessions."""
+        return {s.project_id for s in self.sessions}
 
     @cached_property
     def domain_names(self) -> set[str]:
