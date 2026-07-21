@@ -5,7 +5,6 @@ Regression tests for BA-4694: Ensure scheduling history records are created
 for enqueue (initial creation to PENDING) and RUNNING to TERMINATING transitions.
 """
 
-import json
 import uuid
 from collections.abc import AsyncGenerator
 from datetime import datetime, timedelta
@@ -17,8 +16,8 @@ import sqlalchemy as sa
 from dateutil.tz import tzutc
 
 from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.identifier.domain import DomainID
-from ai.backend.common.identifier.idle_checker import IdleCheckerID
 from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import (
     AccessKey,
@@ -61,9 +60,6 @@ from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.scheduler import SchedulerRepository
 from ai.backend.manager.repositories.scheduler.db_source.db_source import ScheduleDBSource
-from ai.backend.manager.repositories.scheduler.types.session import (
-    IdleCheckTerminationData,
-)
 from ai.backend.testutils.db import with_tables
 
 
@@ -697,62 +693,6 @@ class TestMarkTerminatingSchedulingHistory:
             agent_id=test_agent_id,
         )
 
-    @pytest.fixture
-    async def pending_session_id(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
-        test_domain_id: DomainID,
-        test_scaling_group_name: str,
-        test_scaling_group_id: ResourceGroupID,
-        test_group_id: uuid.UUID,
-        test_user_uuid: uuid.UUID,
-        test_access_key: AccessKey,
-        test_agent_id: str,
-    ) -> SessionId:
-        return await self._create_session_with_kernel(
-            db_with_cleanup,
-            session_status=SessionStatus.PENDING,
-            kernel_status=KernelStatus.PENDING,
-            domain_name=test_domain_name,
-            domain_id=test_domain_id,
-            scaling_group_name=test_scaling_group_name,
-            resource_group_id=test_scaling_group_id,
-            group_id=test_group_id,
-            user_uuid=test_user_uuid,
-            access_key=test_access_key,
-            agent_id=test_agent_id,
-        )
-
-    @pytest.fixture
-    async def two_running_session_ids(
-        self,
-        running_session_id: SessionId,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        test_domain_name: str,
-        test_domain_id: DomainID,
-        test_scaling_group_name: str,
-        test_scaling_group_id: ResourceGroupID,
-        test_group_id: uuid.UUID,
-        test_user_uuid: uuid.UUID,
-        test_access_key: AccessKey,
-        test_agent_id: str,
-    ) -> tuple[SessionId, SessionId]:
-        second_session_id = await self._create_session_with_kernel(
-            db_with_cleanup,
-            session_status=SessionStatus.RUNNING,
-            kernel_status=KernelStatus.RUNNING,
-            domain_name=test_domain_name,
-            domain_id=test_domain_id,
-            scaling_group_name=test_scaling_group_name,
-            resource_group_id=test_scaling_group_id,
-            group_id=test_group_id,
-            user_uuid=test_user_uuid,
-            access_key=test_access_key,
-            agent_id=test_agent_id,
-        )
-        return running_session_id, second_session_id
-
     async def test_mark_sessions_as_terminating_creates_scheduling_history(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -777,104 +717,27 @@ class TestMarkTerminatingSchedulingHistory:
             assert history_record.to_status == str(SessionStatus.TERMINATING)
             assert history_record.message == "mark_terminating success"
 
-    async def test_idle_check_termination_skips_non_running_session(
+    async def test_mark_sessions_as_terminating_records_custom_history_message(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        pending_session_id: SessionId,
+        running_session_id: SessionId,
         scheduler_repository: SchedulerRepository,
     ) -> None:
-        result = await scheduler_repository.mark_idle_check_sessions_terminating(
-            [IdleCheckTerminationData(session_id=pending_session_id, history_message="")],
+        result = await scheduler_repository.mark_sessions_terminating(
+            [running_session_id],
+            reason=KernelLifecycleEventReason.IDLE_TIMEOUT.value,
+            message="idle check timeout",
         )
 
-        assert result.skipped_sessions == [pending_session_id]
+        assert result.terminating_sessions == [running_session_id]
         async with db_with_cleanup.begin_readonly_session() as db_sess:
-            status = await db_sess.scalar(
-                sa.select(SessionRow.status).where(SessionRow.id == pending_session_id)
-            )
             history = await db_sess.scalar(
                 sa.select(SessionSchedulingHistoryRow).where(
-                    SessionSchedulingHistoryRow.session_id == pending_session_id
+                    SessionSchedulingHistoryRow.session_id == running_session_id
                 )
             )
-        assert status == SessionStatus.PENDING
-        assert history is None
-
-    async def test_idle_check_termination_records_per_session_checker_reasons(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        two_running_session_ids: tuple[SessionId, SessionId],
-        scheduler_repository: SchedulerRepository,
-    ) -> None:
-        first_session_id, second_session_id = two_running_session_ids
-        first_checker_id = IdleCheckerID(uuid.UUID(int=1))
-        second_checker_id = IdleCheckerID(uuid.UUID(int=2))
-        result = await scheduler_repository.mark_idle_check_sessions_terminating([
-            IdleCheckTerminationData(
-                session_id=first_session_id,
-                history_message=json.dumps({
-                    "idle_checks": [
-                        {
-                            "checker_id": str(first_checker_id),
-                            "last_message": "maximum lifetime exceeded",
-                        },
-                        {
-                            "checker_id": str(second_checker_id),
-                            "last_message": "network timeout",
-                        },
-                    ]
-                }),
-            ),
-            IdleCheckTerminationData(
-                session_id=second_session_id,
-                history_message=json.dumps({
-                    "idle_checks": [
-                        {
-                            "checker_id": str(first_checker_id),
-                            "last_message": "second session lifetime exceeded",
-                        },
-                    ]
-                }),
-            ),
-        ])
-
-        assert set(result.terminating_sessions) == {first_session_id, second_session_id}
-        async with db_with_cleanup.begin_readonly_session() as db_sess:
-            history_rows = (
-                (
-                    await db_sess.scalars(
-                        sa.select(SessionSchedulingHistoryRow).where(
-                            SessionSchedulingHistoryRow.session_id.in_([
-                                first_session_id,
-                                second_session_id,
-                            ])
-                        )
-                    )
-                )
-                .unique()
-                .all()
-            )
-        messages = {row.session_id: json.loads(row.message) for row in history_rows}
-        assert messages[first_session_id] == {
-            "idle_checks": [
-                {
-                    "checker_id": str(first_checker_id),
-                    "last_message": "maximum lifetime exceeded",
-                },
-                {
-                    "checker_id": str(second_checker_id),
-                    "last_message": "network timeout",
-                },
-            ]
-        }
-        assert messages[second_session_id] == {
-            "idle_checks": [
-                {
-                    "checker_id": str(first_checker_id),
-                    "last_message": "second session lifetime exceeded",
-                },
-            ]
-        }
+        assert history is not None
+        assert history.message == "idle check timeout"
 
     async def test_cancel_pending_creates_scheduling_history(
         self,

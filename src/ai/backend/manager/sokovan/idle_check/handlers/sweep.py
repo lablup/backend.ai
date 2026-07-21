@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-import json
 from collections import defaultdict
 from typing import override
 
+from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.types import SessionId
-from ai.backend.manager.repositories.scheduler.types.session import IdleCheckTerminationData
 from ai.backend.manager.sokovan.idle_check.sweep.types import (
     IdleCheckSweepReason,
     IdleCheckSweepReconcileInfo,
@@ -45,29 +44,11 @@ class IdleCheckSweepHandler(ReconcilerHandler[IdleCheckSweepReconcileInfo, IdleC
             for session_id, reasons in reasons_by_session.items()
         ]
         if reports:
-            data = [
-                IdleCheckTerminationData(
-                    session_id=report.session_id,
-                    history_message=json.dumps(
-                        {
-                            "idle_checks": [
-                                {
-                                    "checker_id": str(reason.checker_id),
-                                    "last_message": reason.last_message,
-                                }
-                                for reason in sorted(
-                                    report.reasons,
-                                    key=lambda item: str(item.checker_id),
-                                )
-                            ]
-                        },
-                        ensure_ascii=False,
-                        separators=(",", ":"),
-                    ),
-                )
-                for report in reports
-            ]
-            await self._scheduling_controller.mark_idle_check_sessions_for_termination(data)
+            await self._scheduling_controller.mark_sessions_for_termination(
+                [report.session_id for report in reports],
+                reason=KernelLifecycleEventReason.IDLE_TIMEOUT.value,
+                message="idle check timeout",
+            )
         return IdleCheckSweepResult(reports=reports)
 
     @override

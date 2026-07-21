@@ -29,7 +29,7 @@ This proposal re-homes idle checking onto a sokovan reconciler stage and promote
 - Drive utilization decisions from agent-emitted Prometheus metrics.
 - Keep checker I/O and judgment behind one batched per-type contract and keep reporting outside the checker; persist each check's projected cleanup time and latest judgment to the database (not Valkey) as the single source for both the sweep decision and client-facing reporting.
 - Expose when a session is scheduled to be cleaned up — per checker and as a session-level aggregate — replacing the Valkey remaining-time report.
-- Copy the checker status and message associated with an elapsed deadline into session scheduling history so operators can explain why the session was terminated.
+- Record a generic idle-check timeout message in session scheduling history; expose checker-specific status and messages through the idle-check reporting API.
 
 ### Non-Goals
 
@@ -96,7 +96,7 @@ A dedicated association table (rather than reusing the RBAC `association_scopes_
 
 #### `session_idle_checks` — per-session projected cleanup time and latest judgment
 
-The deadline-refresh stage records, for each running session and each checker applied to it, **when that checker would next clean the session up** and the latest completed judgment. The sweep stage acts on this row, clients read it, and the stored judgment is copied to scheduling history when the session is swept.
+The deadline-refresh stage records, for each running session and each checker applied to it, **when that checker would next clean the session up** and the latest completed judgment. The sweep stage acts on this row, clients read it through the idle-check reporting API, and scheduling history records that an idle-check timeout triggered termination without duplicating the checker-specific report.
 
 | Column | Type | Description |
 |---|---|---|
@@ -196,7 +196,7 @@ Idle checking is split into **two reconciler stages** so that computing and repo
 **2. Expiry-sweep stage** — terminates sessions whose deadline has already passed.
 
 - **Source** — reads `session_idle_checks` rows with non-null `expire_at <= now`, joined to `RUNNING` sessions. No per-resource-group iteration is required. Multiple due rows for one session remain available as separate reasons, while the session itself is transitioned at most once.
-- **Handler** — groups the due rows by session without running the checker again, then passes the grouped per-session reasons to the scheduling controller's termination operation. That operation conditionally marks each still-`RUNNING` session `TERMINATING` and records the stored checker results in scheduling history in the same transaction. A session whose status changed after the Source read is skipped.
+- **Handler** — groups the due rows by session without running the checker again, then passes the session IDs to the scheduling controller's common termination operation with the idle-timeout lifecycle reason and a generic idle-check timeout history message. The operation follows the existing scheduler termination lifecycle; sessions already terminating or terminal are skipped, while checker-specific reasons remain available from the idle-check reporting API.
 - **Applier** — no-op. The Handler delegates the state-changing operation to the session scheduling domain instead of applying an idle-check-owned persistence result.
 
 The refresh stage is the only stage that runs checkers. It may update or remove a future deadline when activity, bindings, or checker definitions change. Once a stored deadline elapses, ownership passes to the sweep stage and refresh no longer changes that row. A change affects the deadline only if refresh persists it before the stored deadline elapses; the sweep does not re-evaluate runtime signals or checker applicability. Refresh cadence therefore determines how quickly such changes are reflected, while sweep cadence determines how long termination may occur after the deadline.
@@ -271,7 +271,7 @@ Utilization is evaluated from agent-emitted Prometheus metrics aggregated over a
 
 The **sweep** stage's Handler does not kill containers or perform the final `TERMINATED` transition. It asks the scheduling controller to mark sessions with elapsed deadlines as `TERMINATING` through the existing scheduler termination lifecycle, which is idempotent for sessions already terminating or terminal. The sweep Applier is a no-op. The existing session scheduler coordinator then reads `TERMINATING` sessions per resource group and drives agent termination as it does today.
 
-The termination operation accepts per-session idle reasons rather than one batch-wide generic message. For every session actually transitioned, the session status update, kernel status updates, and scheduling-history write happen atomically. The history entry records `RUNNING → TERMINATING` and identifies every checker whose deadline elapsed together with its stored `last_status` and `last_message`, in deterministic checker order. This preserves why the session was swept even after the live result row changes or is removed.
+The common termination operation accepts an optional scheduling-history message and defaults to `mark_terminating success`. The sweep supplies a generic idle-check timeout message. For every session actually transitioned, the session status update, kernel status updates, and scheduling-history write happen atomically. Checker-specific `last_status` and `last_message` remain in `session_idle_checks` and are exposed through the idle-check reporting API instead of being duplicated in scheduling history.
 
 The generic reconciler's per-entity retry classification (`decisions()`) is intentionally unused in both stages: neither a set of result upserts nor a list of due sessions is a set of retryable per-entity outcomes. Both stages leave the classification path empty.
 

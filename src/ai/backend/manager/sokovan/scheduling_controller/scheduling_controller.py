@@ -46,9 +46,6 @@ from ai.backend.manager.repositories.scheduler import (
     MarkTerminatingResult,
     SchedulerRepository,
 )
-from ai.backend.manager.repositories.scheduler.types.session import (
-    IdleCheckTerminationData,
-)
 from ai.backend.manager.repositories.scheduler.types.session_creation import SessionSpecContextFetch
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.exceptions import (
     BatchAgentSelectionFailedError,
@@ -506,6 +503,7 @@ class SchedulingController:
         reason: str = "USER_REQUESTED",
         *,
         forced: bool = False,
+        message: str = "mark_terminating success",
     ) -> MarkTerminatingResult:
         """
         Mark multiple sessions and their kernels for termination by updating their status to TERMINATING.
@@ -517,23 +515,18 @@ class SchedulingController:
             session_ids: List of session IDs to terminate
             reason: Reason for termination
             forced: If True, skip TERMINATING and set directly to TERMINATED
+            message: Optional scheduling-history message for a TERMINATING transition
 
         Returns:
             MarkTerminatingResult with categorized session statuses
         """
         result = await self._repository.mark_sessions_terminating(
-            session_ids, reason, forced=forced
+            session_ids,
+            reason,
+            forced=forced,
+            message=message,
         )
         await self._post_mark_sessions_for_termination(result, reason)
-        return result
-
-    async def mark_idle_check_sessions_for_termination(
-        self,
-        data: Sequence[IdleCheckTerminationData],
-    ) -> MarkTerminatingResult:
-        """Conditionally terminate still-RUNNING sessions from idle-check sweep data."""
-        result = await self._repository.mark_idle_check_sessions_terminating(data)
-        await self._post_mark_sessions_for_termination(result, "IDLE_TIMEOUT")
         return result
 
     async def _post_mark_sessions_for_termination(

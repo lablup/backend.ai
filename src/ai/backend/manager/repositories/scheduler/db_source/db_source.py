@@ -28,7 +28,6 @@ from ai.backend.common import msgpack
 from ai.backend.common.data.permission.types import (
     RBACElementType,
 )
-from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.identifier.domain import DomainID, DomainName
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.project import ProjectID
@@ -153,7 +152,6 @@ from ai.backend.manager.repositories.scheduler.types.search import (
     SessionWithKernelsSearchResult,
 )
 from ai.backend.manager.repositories.scheduler.types.session import (
-    IdleCheckTerminationData,
     KernelData,
     MarkTerminatingResult,
     PendingSessionData,
@@ -870,6 +868,7 @@ class ScheduleDBSource:
         reason: str = "USER_REQUESTED",
         *,
         forced: bool = False,
+        message: str = "mark_terminating success",
     ) -> MarkTerminatingResult:
         """
         Mark sessions and their kernels as TERMINATING (or directly TERMINATED when forced).
@@ -893,7 +892,11 @@ class ScheduleDBSource:
                 # 2b. Normal: mark sessions as TERMINATING
                 force_terminated_sessions = []
                 terminating_sessions = await self._mark_sessions_as_terminating(
-                    db_sess, session_ids, reason, now
+                    db_sess,
+                    session_ids,
+                    reason,
+                    now,
+                    message=message,
                 )
 
             # 3. Mark unprocessed sessions as skipped
@@ -907,36 +910,6 @@ class ScheduleDBSource:
                 terminating_sessions=terminating_sessions,
                 force_terminated_sessions=force_terminated_sessions,
                 skipped_sessions=skipped_sessions,
-            )
-
-    async def mark_idle_check_sessions_terminating(
-        self,
-        data: Sequence[IdleCheckTerminationData],
-    ) -> MarkTerminatingResult:
-        """Atomically mark still-RUNNING sessions and record their idle reasons."""
-        session_ids = [item.session_id for item in data]
-        history_messages = {item.session_id: item.history_message for item in data}
-        async with self._begin_session_read_committed() as db_sess:
-            now = await self._get_db_now_in_session(db_sess)
-            terminating_sessions, from_statuses = await self._transition_sessions_to_terminating(
-                db_sess,
-                session_ids,
-                str(KernelLifecycleEventReason.IDLE_TIMEOUT),
-                now,
-                source_statuses=frozenset({SessionStatus.RUNNING}),
-            )
-            await self._record_sessions_terminating_history(
-                db_sess,
-                terminating_sessions,
-                from_statuses,
-                history_messages,
-            )
-            terminating_ids = set(terminating_sessions)
-            return MarkTerminatingResult(
-                cancelled_sessions=[],
-                terminating_sessions=terminating_sessions,
-                force_terminated_sessions=[],
-                skipped_sessions=[sid for sid in session_ids if sid not in terminating_ids],
             )
 
     async def _free_kernel_allocations(
@@ -1038,6 +1011,7 @@ class ScheduleDBSource:
         session_ids: list[SessionId],
         reason: str,
         now: datetime,
+        message: str,
     ) -> list[SessionId]:
         """Mark terminatable sessions and their kernels as terminating."""
         terminating_sessions, from_statuses = await self._transition_sessions_to_terminating(
@@ -1051,7 +1025,7 @@ class ScheduleDBSource:
             db_sess,
             terminating_sessions,
             from_statuses,
-            dict.fromkeys(terminating_sessions, "mark_terminating success"),
+            message,
         )
         return terminating_sessions
 
@@ -1128,7 +1102,7 @@ class ScheduleDBSource:
         db_sess: SASession,
         session_ids: Sequence[SessionId],
         from_statuses: Mapping[SessionId, SessionStatus],
-        messages: Mapping[SessionId, str],
+        message: str,
     ) -> None:
         if not session_ids:
             return
@@ -1137,7 +1111,7 @@ class ScheduleDBSource:
                 session_id=session_id,
                 phase="mark_terminating",
                 result=SchedulingResult.SUCCESS,
-                message=messages.get(session_id, "mark_terminating success"),
+                message=message,
                 from_status=from_statuses.get(session_id),
                 to_status=SessionStatus.TERMINATING,
             )

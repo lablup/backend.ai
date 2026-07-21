@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from datetime import UTC, datetime, timedelta
 from typing import cast
 from unittest.mock import AsyncMock
@@ -8,13 +7,13 @@ from uuid import UUID, uuid4
 
 import pytest
 
+from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.identifier.idle_checker import IdleCheckerID
 from ai.backend.common.types import SessionId
 from ai.backend.manager.repositories.idle_checker.types import (
     ExpiredIdleCheckBatchData,
     ExpiredIdleCheckData,
 )
-from ai.backend.manager.repositories.scheduler.types.session import IdleCheckTerminationData
 from ai.backend.manager.sokovan.idle_check.handlers.sweep import IdleCheckSweepHandler
 from ai.backend.manager.sokovan.idle_check.sweep.types import (
     IdleCheckSweepReason,
@@ -54,7 +53,7 @@ class TestIdleCheckSweepHandler:
     ) -> tuple[
         IdleCheckSweepReconcileInfo,
         list[IdleCheckSweepReport],
-        list[IdleCheckTerminationData],
+        list[SessionId],
     ]:
         first_session_id = SessionId(uuid4())
         second_session_id = SessionId(uuid4())
@@ -114,43 +113,7 @@ class TestIdleCheckSweepHandler:
                 now=_NOW,
             )
         )
-        expected_data = [
-            IdleCheckTerminationData(
-                session_id=first_session_id,
-                history_message=json.dumps(
-                    {
-                        "idle_checks": [
-                            {
-                                "checker_id": str(first_checker_id),
-                                "last_message": second_check.last_message,
-                            },
-                            {
-                                "checker_id": str(second_checker_id),
-                                "last_message": first_check.last_message,
-                            },
-                        ]
-                    },
-                    ensure_ascii=False,
-                    separators=(",", ":"),
-                ),
-            ),
-            IdleCheckTerminationData(
-                session_id=second_session_id,
-                history_message=json.dumps(
-                    {
-                        "idle_checks": [
-                            {
-                                "checker_id": str(first_checker_id),
-                                "last_message": third_check.last_message,
-                            }
-                        ]
-                    },
-                    ensure_ascii=False,
-                    separators=(",", ":"),
-                ),
-            ),
-        ]
-        return reconcile_info, expected_reports, expected_data
+        return reconcile_info, expected_reports, [first_session_id, second_session_id]
 
     async def test_groups_due_rows_by_session_and_keeps_each_reason(
         self,
@@ -158,10 +121,10 @@ class TestIdleCheckSweepHandler:
         grouped_due_rows_case: tuple[
             IdleCheckSweepReconcileInfo,
             list[IdleCheckSweepReport],
-            list[IdleCheckTerminationData],
+            list[SessionId],
         ],
     ) -> None:
-        reconcile_info, expected_reports, expected_data = grouped_due_rows_case
+        reconcile_info, expected_reports, expected_session_ids = grouped_due_rows_case
         handler = IdleCheckSweepHandler(cast(SchedulingController, scheduling_controller))
 
         result = await handler.execute(reconcile_info)
@@ -169,8 +132,10 @@ class TestIdleCheckSweepHandler:
         assert result.reports == expected_reports
         assert result.processed_count() == 2
         assert result.decisions() == ()
-        scheduling_controller.mark_idle_check_sessions_for_termination.assert_awaited_once_with(
-            expected_data
+        scheduling_controller.mark_sessions_for_termination.assert_awaited_once_with(
+            expected_session_ids,
+            reason=KernelLifecycleEventReason.IDLE_TIMEOUT.value,
+            message="idle check timeout",
         )
 
     async def test_empty_batch_returns_empty_result(
@@ -186,4 +151,4 @@ class TestIdleCheckSweepHandler:
 
         assert result.reports == []
         assert result.processed_count() == 0
-        scheduling_controller.mark_idle_check_sessions_for_termination.assert_not_awaited()
+        scheduling_controller.mark_sessions_for_termination.assert_not_awaited()
