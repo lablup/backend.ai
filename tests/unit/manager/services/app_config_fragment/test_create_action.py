@@ -7,6 +7,7 @@ public fragment is global-scoped (no RBAC scope element) and thus superadmin-onl
 
 from __future__ import annotations
 
+import uuid
 from dataclasses import dataclass
 
 import pytest
@@ -21,11 +22,14 @@ from ai.backend.manager.services.app_config_fragment.actions.create import (
     CreateAppConfigFragmentAction,
 )
 
+_VICTIM_USER_ID = uuid.uuid4()
+_DOMAIN_ID = uuid.uuid4()
+
 
 def _make_action(
     *,
     scope_type: AppConfigScopeType,
-    scope_id: str,
+    scope_id: uuid.UUID | None,
 ) -> CreateAppConfigFragmentAction:
     return CreateAppConfigFragmentAction(
         creator_spec=AppConfigFragmentCreatorSpec(
@@ -42,7 +46,7 @@ class _ScopeTarget:
     """A fragment scope, and the RBAC scope a create at it must authorize against."""
 
     scope_type: AppConfigScopeType
-    scope_id: str
+    scope_id: uuid.UUID | None
     expected_element: RBACElementRef
     expected_scope_type: ScopeType
 
@@ -55,19 +59,19 @@ class TestCreateTargetElement:
         [
             _ScopeTarget(
                 scope_type=AppConfigScopeType.USER,
-                scope_id="victim-user",
-                expected_element=RBACElementRef(RBACElementType.USER, "victim-user"),
+                scope_id=_VICTIM_USER_ID,
+                expected_element=RBACElementRef(RBACElementType.USER, str(_VICTIM_USER_ID)),
                 expected_scope_type=ScopeType.USER,
             ),
             _ScopeTarget(
                 scope_type=AppConfigScopeType.DOMAIN,
-                scope_id="default",
-                expected_element=RBACElementRef(RBACElementType.DOMAIN, "default"),
+                scope_id=_DOMAIN_ID,
+                expected_element=RBACElementRef(RBACElementType.DOMAIN, str(_DOMAIN_ID)),
                 expected_scope_type=ScopeType.DOMAIN,
             ),
             _ScopeTarget(
                 scope_type=AppConfigScopeType.PUBLIC,
-                scope_id="",
+                scope_id=None,
                 expected_element=RBACElementRef(RBACElementType.APP_CONFIG_FRAGMENT, ""),
                 expected_scope_type=ScopeType.GLOBAL,
             ),

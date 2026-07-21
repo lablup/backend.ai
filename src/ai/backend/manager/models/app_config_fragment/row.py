@@ -33,16 +33,17 @@ class AppConfigFragmentRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc
             "scope_id",
             name="uq_app_config_fragments_config_name_scope_type_scope_id",
         ),
-        # The constraint above only covers domain and user fragments: Postgres counts NULLs
-        # as distinct, so it would let a config take any number of public fragments. This
-        # partial index restores that guarantee for the NULL (public) rows. It replaces the
-        # NULLS NOT DISTINCT the constraint would otherwise want, which needs Postgres 15+.
+        # NULLs are distinct to a unique constraint, so public rows need their own index.
         sa.Index(
             "uq_app_config_fragments_public_config_name",
             "config_name",
             "scope_type",
             unique=True,
             postgresql_where=sa.text("scope_id IS NULL"),
+        ),
+        sa.CheckConstraint(
+            "(scope_type = 'public') = (scope_id IS NULL)",
+            name="scope_id_matches_scope_type",
         ),
         sa.ForeignKeyConstraint(
             ["config_name", "scope_type"],
@@ -68,8 +69,7 @@ class AppConfigFragmentRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc
         StrEnumType(AppConfigScopeType),
         nullable=False,
     )
-    # NULL is the public scope: it has no owner. Domain and user fragments carry the id of
-    # the domain or user that owns them.
+    # NULL is public, which has no owner; domain and user carry their owner's id.
     scope_id: Mapped[uuid.UUID | None] = mapped_column(
         "scope_id",
         GUID,

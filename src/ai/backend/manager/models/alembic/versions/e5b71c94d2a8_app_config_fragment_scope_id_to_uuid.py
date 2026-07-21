@@ -1,23 +1,16 @@
 """convert app_config_fragments.scope_id to a nullable UUID
 
-``scope_id`` held a ``VARCHAR(255)`` that was never really a string: a domain
-fragment stores a domain id and a user fragment a user id, both UUIDs, while a
-public fragment has no owner at all and stored ``''`` only because the column
-was ``NOT NULL``. Store the real type instead — ``UUID NULL``, with ``NULL``
-meaning "public, no owner".
+``scope_id`` was a ``VARCHAR`` holding a domain or user UUID, with ``''`` for
+public only because the column was ``NOT NULL``. It becomes ``UUID NULL``, where
+``NULL`` is public.
 
-The uniqueness of ``(config_name, scope_type, scope_id)`` needs help: Postgres
-treats ``NULL``s as distinct in a unique constraint, so the existing constraint
-stops rejecting a second public fragment for the same config name once public
-rows hold ``NULL``. A partial unique index over the ``NULL`` rows restores the
-guarantee the ``''`` sentinel used to provide. (``UNIQUE NULLS NOT DISTINCT``
-would say the same thing in one constraint, but it needs Postgres 15+ and the
-test fixture runs 13.)
+Public rows are forced to ``NULL``; a domain or user id that is not a UUID aborts
+the migration rather than being nulled, since that binding decides who can see
+the fragment.
 
-Public rows are forced to ``NULL`` regardless of what they stored, since public
-has no owner by definition. Domain and user rows are cast, and a value that is
-not a UUID fails the migration on purpose — nulling it would silently drop the
-scope binding that decides who can see the fragment.
+``NULL``s are distinct to a unique constraint, so public rows get a partial
+unique index (``UNIQUE NULLS NOT DISTINCT`` needs Postgres 15+; the test fixture
+runs 13), and a check constraint keeps ``NULL`` and public in step.
 
 Revision ID: e5b71c94d2a8
 Revises: 577c7a215934
@@ -36,6 +29,8 @@ branch_labels = None
 depends_on = None
 
 _PUBLIC_INDEX = "uq_app_config_fragments_public_config_name"
+# Bare name — the naming convention prefixes it with ck_<table>_.
+_SCOPE_ID_CHECK = "scope_id_matches_scope_type"
 _TABLE = "app_config_fragments"
 
 
@@ -48,10 +43,15 @@ def upgrade() -> None:
             USING (
                 CASE
                     WHEN scope_type = 'public' THEN NULL
-                    ELSE NULLIF(scope_id, '')::uuid
+                    ELSE scope_id::uuid
                 END
             )
         """)
+    )
+    op.create_check_constraint(
+        _SCOPE_ID_CHECK,
+        _TABLE,
+        "(scope_type = 'public') = (scope_id IS NULL)",
     )
     op.create_index(
         _PUBLIC_INDEX,
@@ -64,8 +64,8 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.drop_index(_PUBLIC_INDEX, table_name=_TABLE)
-    # Public rows go back to the empty sentinel the NOT NULL column used to require, which
-    # the plain constraint can compare like any other value.
+    op.drop_constraint(_SCOPE_ID_CHECK, _TABLE, type_="check")
+    # Public rows go back to the empty sentinel the NOT NULL column required.
     op.execute(
         sa.text("""
             ALTER TABLE app_config_fragments

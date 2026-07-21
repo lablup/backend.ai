@@ -51,11 +51,9 @@ class AppConfigScopeType(enum.StrEnum):
                 return RBACElementType.USER
 
     def to_rbac_scope_id(self, scope_id: uuid.UUID | None) -> str:
-        """The RBAC scope id for a write at this fragment scope.
+        """The RBAC scope id for a write at this fragment scope, in RBAC's string form.
 
-        ``public`` is system-wide (no per-entity scope id); ``domain`` / ``user`` carry
-        their own ``scope_id``. RBAC identifies scopes by string, so the owner id is
-        rendered as text here even though it is stored as a UUID.
+        ``public`` is system-wide and names no owner.
         """
         return "" if self is AppConfigScopeType.PUBLIC else str(scope_id)
 

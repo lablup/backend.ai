@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
 
@@ -66,8 +67,22 @@ from ai.backend.manager.services.app_config_fragment.service import AppConfigFra
 from ai.backend.manager.types import OptionalState
 
 _USER_UUID = uuid.uuid4()
-_USER_ID = str(_USER_UUID)
+_DOMAIN_UUID = uuid.uuid4()
 _DOMAIN_ID = str(uuid.uuid4())
+
+
+@dataclass(frozen=True)
+class _RBACScopeCase:
+    """A fragment scope, and the RBAC scope a create at it authorizes against.
+
+    RBAC identifies scopes by string, so the expected id is the rendered form — empty for
+    public, which is global and names no owner.
+    """
+
+    scope_type: AppConfigScopeType
+    scope_id: uuid.UUID | None
+    expected_scope_type: ScopeType
+    expected_scope_id: str
 
 
 class TestAppConfigFragmentService:
@@ -90,7 +105,7 @@ class TestAppConfigFragmentService:
             id=AppConfigFragmentID(uuid.uuid4()),
             config_name="theme",
             scope_type=AppConfigScopeType.USER,
-            scope_id=_USER_ID,
+            scope_id=_USER_UUID,
             config={"k": "v"},
             created_at=datetime.now(UTC),
             updated_at=datetime.now(UTC),
@@ -99,7 +114,7 @@ class TestAppConfigFragmentService:
         spec = AppConfigFragmentCreatorSpec(
             config_name="theme",
             scope_type=AppConfigScopeType.USER,
-            scope_id=_USER_ID,
+            scope_id=_USER_UUID,
             config={"k": "v"},
         )
 
@@ -115,7 +130,7 @@ class TestAppConfigFragmentService:
             id=AppConfigFragmentID(uuid.uuid4()),
             config_name="theme",
             scope_type=AppConfigScopeType.USER,
-            scope_id=_USER_ID,
+            scope_id=_USER_UUID,
             config={"k": "v"},
             created_at=datetime.now(UTC),
             updated_at=datetime.now(UTC),
@@ -145,7 +160,7 @@ class TestAppConfigFragmentService:
             id=AppConfigFragmentID(uuid.uuid4()),
             config_name="theme",
             scope_type=AppConfigScopeType.USER,
-            scope_id=_USER_ID,
+            scope_id=_USER_UUID,
             config={"k": "v"},
             created_at=datetime.now(UTC),
             updated_at=datetime.now(UTC),
@@ -173,7 +188,7 @@ class TestAppConfigFragmentService:
             id=AppConfigFragmentID(uuid.uuid4()),
             config_name="theme",
             scope_type=AppConfigScopeType.USER,
-            scope_id=_USER_ID,
+            scope_id=_USER_UUID,
             config={"k": "v"},
             created_at=datetime.now(UTC),
             updated_at=datetime.now(UTC),
@@ -201,7 +216,10 @@ class TestAppConfigFragmentService:
 
         assert result.data == [fragment]
         # queried_refs preserve the scoped principals (domain, then user).
-        assert [ref.element_id for ref in result.queried_refs] == [str(domain_id), _USER_ID]
+        assert [ref.element_id for ref in result.queried_refs] == [
+            str(domain_id),
+            str(_USER_UUID),
+        ]
         mock_repository.scoped_search.assert_called_once()
         called_querier, called_scopes = mock_repository.scoped_search.call_args.args
         assert called_querier is querier
@@ -217,7 +235,7 @@ class TestAppConfigFragmentService:
             id=AppConfigFragmentID(uuid.uuid4()),
             config_name="theme",
             scope_type=AppConfigScopeType.USER,
-            scope_id=_USER_ID,
+            scope_id=_USER_UUID,
             config={"k": "v"},
             created_at=datetime.now(UTC),
             updated_at=datetime.now(UTC),
@@ -242,7 +260,7 @@ class TestAppConfigFragmentService:
             id=AppConfigFragmentID(uuid.uuid4()),
             config_name="theme",
             scope_type=AppConfigScopeType.USER,
-            scope_id=_USER_ID,
+            scope_id=_USER_UUID,
             config={"k": "v"},
             created_at=datetime.now(UTC),
             updated_at=datetime.now(UTC),
@@ -265,7 +283,7 @@ class TestAppConfigFragmentService:
                 id=AppConfigFragmentID(uuid.uuid4()),
                 config_name="theme",
                 scope_type=AppConfigScopeType.USER,
-                scope_id=_USER_ID,
+                scope_id=_USER_UUID,
                 config={"k": "v"},
                 created_at=datetime.now(UTC),
                 updated_at=datetime.now(UTC),
@@ -296,7 +314,7 @@ class TestAppConfigFragmentService:
                 id=AppConfigFragmentID(uuid.uuid4()),
                 config_name="theme",
                 scope_type=AppConfigScopeType.USER,
-                scope_id=_USER_ID,
+                scope_id=_USER_UUID,
                 config={"k": "v"},
                 created_at=datetime.now(UTC),
                 updated_at=datetime.now(UTC),
@@ -324,27 +342,37 @@ class TestCreateActionScope:
     """The create action acts at the fragment's own scope — not admin-only/global."""
 
     @pytest.mark.parametrize(
-        ("scope_type", "scope_id", "expected_scope_type", "expected_scope_id"),
+        "case",
         [
-            (AppConfigScopeType.PUBLIC, "public", ScopeType.GLOBAL, ""),
-            (AppConfigScopeType.DOMAIN, "default", ScopeType.DOMAIN, "default"),
-            (AppConfigScopeType.USER, _USER_ID, ScopeType.USER, _USER_ID),
+            _RBACScopeCase(
+                scope_type=AppConfigScopeType.PUBLIC,
+                scope_id=None,
+                expected_scope_type=ScopeType.GLOBAL,
+                expected_scope_id="",
+            ),
+            _RBACScopeCase(
+                scope_type=AppConfigScopeType.DOMAIN,
+                scope_id=_DOMAIN_UUID,
+                expected_scope_type=ScopeType.DOMAIN,
+                expected_scope_id=str(_DOMAIN_UUID),
+            ),
+            _RBACScopeCase(
+                scope_type=AppConfigScopeType.USER,
+                scope_id=_USER_UUID,
+                expected_scope_type=ScopeType.USER,
+                expected_scope_id=str(_USER_UUID),
+            ),
         ],
+        ids=lambda case: case.scope_type.value,
     )
-    def test_scope_follows_fragment_scope(
-        self,
-        scope_type: AppConfigScopeType,
-        scope_id: str,
-        expected_scope_type: ScopeType,
-        expected_scope_id: str,
-    ) -> None:
+    def test_scope_follows_fragment_scope(self, case: _RBACScopeCase) -> None:
         action = CreateAppConfigFragmentAction(
             creator_spec=AppConfigFragmentCreatorSpec(
                 config_name="theme",
-                scope_type=scope_type,
-                scope_id=scope_id,
+                scope_type=case.scope_type,
+                scope_id=case.scope_id,
                 config={"k": "v"},
             ),
         )
-        assert action.scope_type() == expected_scope_type
-        assert action.scope_id() == expected_scope_id
+        assert action.scope_type() == case.expected_scope_type
+        assert action.scope_id() == case.expected_scope_id

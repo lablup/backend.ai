@@ -137,6 +137,33 @@ async def domain_scoped_fragment(database: ExtendedAsyncSAEngine) -> AppConfigFr
 
 
 @pytest.fixture
+async def fragment_at_every_scope(
+    database: ExtendedAsyncSAEngine, theme_registered: None
+) -> dict[AppConfigScopeType, uuid.UUID | None]:
+    """Situation: ``theme`` already holds one fragment at each scope.
+
+    Returns the owner each scope was written at, so a test can aim a duplicate at it.
+    """
+    scope_ids: dict[AppConfigScopeType, uuid.UUID | None] = {
+        AppConfigScopeType.PUBLIC: None,
+        AppConfigScopeType.DOMAIN: _DOMAIN_UUID,
+        AppConfigScopeType.USER: _USER_UUID,
+    }
+    async with database.begin_session() as db_sess:
+        db_sess.add_all([
+            AppConfigFragmentRow(
+                config_name="theme",
+                scope_type=scope_type,
+                scope_id=scope_id,
+                config={"k": "v"},
+            )
+            for scope_type, scope_id in scope_ids.items()
+        ])
+        await db_sess.flush()
+    return scope_ids
+
+
+@pytest.fixture
 async def fragments_across_scopes(database: ExtendedAsyncSAEngine) -> list[AppConfigFragmentData]:
     """Situation: fragments across every scope_type, two domains, two users, two config_names.
 
@@ -233,17 +260,24 @@ class TestCreateAndGet:
                 )
             )
 
-    async def test_unique_constraint_violation(
+    @pytest.mark.parametrize(
+        "scope_type",
+        [AppConfigScopeType.PUBLIC, AppConfigScopeType.DOMAIN, AppConfigScopeType.USER],
+        ids=lambda scope_type: scope_type.value,
+    )
+    async def test_a_second_fragment_at_the_same_scope_is_rejected(
         self,
         repository: AppConfigFragmentRepository,
-        domain_scoped_fragment: AppConfigFragmentData,
+        fragment_at_every_scope: dict[AppConfigScopeType, uuid.UUID | None],
+        scope_type: AppConfigScopeType,
     ) -> None:
+        # public is carried by the partial index, domain and user by the unique constraint.
         with pytest.raises(UniqueConstraintViolationError):
             await repository.create(
                 AppConfigFragmentCreatorSpec(
-                    config_name=domain_scoped_fragment.config_name,
-                    scope_type=domain_scoped_fragment.scope_type,
-                    scope_id=domain_scoped_fragment.scope_id,
+                    config_name="theme",
+                    scope_type=scope_type,
+                    scope_id=fragment_at_every_scope[scope_type],
                     config={"k": "v"},
                 )
             )

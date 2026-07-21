@@ -31,7 +31,9 @@ _DOMAIN_ID = DomainID(uuid.uuid4())
 _NOW = datetime.now(UTC)
 _SCOPE_ARGS = AppConfigScopeArguments(domain_id=_DOMAIN_ID)
 
-FragmentFactory = Callable[[str, dict[str, Any], AppConfigScopeType, str], AppConfigFragmentData]
+FragmentFactory = Callable[
+    [str, dict[str, Any], AppConfigScopeType, uuid.UUID | None], AppConfigFragmentData
+]
 
 
 @pytest.fixture
@@ -45,7 +47,7 @@ def make_fragment() -> FragmentFactory:
         config_name: str,
         config: dict[str, Any],
         scope_type: AppConfigScopeType,
-        scope_id: str,
+        scope_id: uuid.UUID | None,
     ) -> AppConfigFragmentData:
         return AppConfigFragmentData(
             id=AppConfigFragmentID(uuid.uuid4()),
@@ -77,8 +79,10 @@ class TestAppConfigService:
     ) -> list[AppConfigFragmentData]:
         # Rank-ordered (low -> high), so the user fragment overrides on merge.
         fragments = [
-            make_fragment("theme", {"theme": "light", "lang": "en"}, AppConfigScopeType.PUBLIC, ""),
-            make_fragment("theme", {"theme": "dark"}, AppConfigScopeType.USER, str(_USER_ID)),
+            make_fragment(
+                "theme", {"theme": "light", "lang": "en"}, AppConfigScopeType.PUBLIC, None
+            ),
+            make_fragment("theme", {"theme": "dark"}, AppConfigScopeType.USER, _USER_ID),
         ]
         mock_fragment_repository.list_visible_fragments_bulk = AsyncMock(return_value=fragments)
         return fragments
@@ -95,13 +99,13 @@ class TestAppConfigService:
                 "ui",
                 {"nav": ["home", "about", "contact"], "theme": {"light": True}},
                 AppConfigScopeType.PUBLIC,
-                "",
+                None,
             ),
             make_fragment(
                 "ui",
                 {"nav": ["dashboard"], "theme": {"dark": True}},
                 AppConfigScopeType.USER,
-                str(_USER_ID),
+                _USER_ID,
             ),
         ]
         mock_fragment_repository.list_visible_fragments_bulk = AsyncMock(return_value=fragments)
@@ -124,9 +128,11 @@ class TestAppConfigService:
     ) -> list[AppConfigFragmentData]:
         # Visible fragments for both names, (config_name, rank)-ordered.
         fragments = [
-            make_fragment("theme", {"theme": "light", "lang": "en"}, AppConfigScopeType.PUBLIC, ""),
-            make_fragment("theme", {"theme": "dark"}, AppConfigScopeType.USER, str(_USER_ID)),
-            make_fragment("menu", {"items": ["a"]}, AppConfigScopeType.PUBLIC, ""),
+            make_fragment(
+                "theme", {"theme": "light", "lang": "en"}, AppConfigScopeType.PUBLIC, None
+            ),
+            make_fragment("theme", {"theme": "dark"}, AppConfigScopeType.USER, _USER_ID),
+            make_fragment("menu", {"items": ["a"]}, AppConfigScopeType.PUBLIC, None),
         ]
         mock_fragment_repository.list_visible_fragments_bulk = AsyncMock(return_value=fragments)
         return fragments
@@ -137,7 +143,7 @@ class TestAppConfigService:
         make_fragment: FragmentFactory,
         mock_fragment_repository: MagicMock,
     ) -> list[AppConfigFragmentData]:
-        fragments = [make_fragment("theme", {"theme": "dark"}, AppConfigScopeType.PUBLIC, "")]
+        fragments = [make_fragment("theme", {"theme": "dark"}, AppConfigScopeType.PUBLIC, None)]
         mock_fragment_repository.list_visible_fragments_bulk = AsyncMock(return_value=fragments)
         return fragments
 
@@ -149,7 +155,7 @@ class TestAppConfigService:
     ) -> list[AppConfigFragmentData]:
         fragments = [
             make_fragment(
-                "theme", {"theme": "light", "lang": "en"}, AppConfigScopeType.PUBLIC, "public"
+                "theme", {"theme": "light", "lang": "en"}, AppConfigScopeType.PUBLIC, None
             )
         ]
         mock_fragment_repository.list_visible_fragments_bulk = AsyncMock(return_value=fragments)
