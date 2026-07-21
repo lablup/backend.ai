@@ -17,6 +17,7 @@ __all__ = (
     "DeploymentHistoryOrderField",
     "DeploymentHistoryScopeDTO",
     "KernelHistoryOrderField",
+    "KernelHistoryScopeDTO",
     "OrderDirection",
     "RouteHistoryOrderField",
     "RouteHistoryScopeDTO",
@@ -82,6 +83,12 @@ class SessionHistoryScopeDTO(BaseRequestModel):
     """Scope for session scheduling history queries."""
 
     session_id: UUID = Field(description="Session ID to get history for.")
+
+
+class KernelHistoryScopeDTO(BaseRequestModel):
+    """Scope for kernel scheduling history queries."""
+
+    kernel_id: UUID = Field(description="Kernel ID to get history for.")
 
 
 class DeploymentHistoryScopeDTO(BaseRequestModel):

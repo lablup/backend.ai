@@ -12,6 +12,7 @@ from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UU
 from .types import (
     DeploymentHistoryOrderField,
     KernelHistoryOrderField,
+    KernelHistoryScopeDTO,
     OrderDirection,
     RouteHistoryOrderField,
     SchedulingResultType,
@@ -20,7 +21,6 @@ from .types import (
 
 __all__ = (
     "AdminSearchDeploymentHistoriesInput",
-    "AdminSearchKernelHistoriesInput",
     "AdminSearchRouteHistoriesInput",
     "AdminSearchSessionHistoriesInput",
     "DeploymentHistoryFilter",
@@ -30,7 +30,9 @@ __all__ = (
     "RouteHistoryFilter",
     "RouteHistoryOrder",
     "SchedulingResultFilter",
+    "ScopedSearchKernelHistoriesInput",
     "SearchDeploymentHistoryInput",
+    "AdminSearchKernelHistoriesInput",
     "SearchRouteHistoryInput",
     "SearchSessionHistoryInput",
     "SessionHistoryFilter",
@@ -220,6 +222,20 @@ class AdminSearchSessionHistoriesInput(BaseRequestModel):
 class AdminSearchKernelHistoriesInput(BaseRequestModel):
     """Input for admin search of kernel scheduling histories."""
 
+    filter: KernelHistoryFilter | None = Field(default=None, description="Filter conditions")
+    order: list[KernelHistoryOrder] | None = Field(default=None, description="Order specifications")
+    first: int | None = Field(default=None, description="Cursor pagination: number of items")
+    after: str | None = Field(default=None, description="Cursor pagination: after cursor")
+    last: int | None = Field(default=None, description="Cursor pagination: last N items")
+    before: str | None = Field(default=None, description="Cursor pagination: before cursor")
+    limit: int | None = Field(default=None, description="Offset pagination: maximum items")
+    offset: int | None = Field(default=None, description="Offset pagination: number to skip")
+
+
+class ScopedSearchKernelHistoriesInput(BaseRequestModel):
+    """Input for searching kernel scheduling histories under a non-admin scope."""
+
+    scope: KernelHistoryScopeDTO = Field(description="Scope restricting the rows returned")
     filter: KernelHistoryFilter | None = Field(default=None, description="Filter conditions")
     order: list[KernelHistoryOrder] | None = Field(default=None, description="Order specifications")
     first: int | None = Field(default=None, description="Cursor pagination: number of items")
