@@ -4,7 +4,6 @@ import asyncio
 import functools
 import logging
 import os
-import shutil
 import signal
 import ssl
 import sys
@@ -38,7 +37,6 @@ import aiohttp_cors
 import aiomonitor
 import aiotools
 import click
-import tomlkit
 from aiohttp import web
 from aiohttp.typedefs import Handler
 from aiotools import aclosing
@@ -49,10 +47,8 @@ from etcd_client import WatchEventType
 from setproctitle import setproctitle
 from zmq.auth.certs import load_certificate
 
-from ai.backend.agent.agent import AbstractAgent
 from ai.backend.agent.errors import (
     AgentInitializationError,
-    InvalidAgentConfigError,
     ResourceError,
 )
 from ai.backend.agent.health.docker import DockerHealthChecker
@@ -624,47 +620,6 @@ class AgentRPCServer(aobject):
     @collect_error
     async def update_status(self, status: str, agent_id: AgentId) -> None:
         await self.runtime.update_status(status, agent_id)
-
-    @rpc_function
-    @collect_error
-    async def update_scaling_group(
-        self, scaling_group: str, agent_id: AgentId | None = None
-    ) -> None:
-        cfg_src_path = config.find_config_file("agent")
-        with cfg_src_path.open() as f:
-            data = tomlkit.load(f)
-        agent = self.runtime.get_agent(agent_id)
-        if "agents" in data:
-            self._update_scaling_group_override(data, scaling_group, agent)
-        else:
-            self._update_scaling_group_default(data, scaling_group)
-        shutil.copy(cfg_src_path, f"{cfg_src_path}.bak")
-        with cfg_src_path.open("w") as f:
-            tomlkit.dump(data, f)
-
-        agent.update_scaling_group(scaling_group)
-        log.info("rpc::update_scaling_group()")
-
-    def _update_scaling_group_default(
-        self,
-        config_data: tomlkit.TOMLDocument,
-        scaling_group: str,
-    ) -> None:
-        config_data["agent"]["scaling-group"] = scaling_group  # type: ignore[index]
-
-    def _update_scaling_group_override(
-        self,
-        config_data: tomlkit.TOMLDocument,
-        scaling_group: str,
-        agent: AbstractAgent[Any, Any],
-    ) -> None:
-        if "agents" not in config_data:
-            raise InvalidAgentConfigError("Missing 'agents' section in configuration data.")
-
-        for agent_config in config_data["agents"]:  # type: ignore[union-attr]
-            if agent_config["agent"]["id"] == str(agent.id):  # type: ignore[index]
-                agent_config["agent"]["scaling-group"] = scaling_group  # type: ignore[index]
-                break
 
     @rpc_function
     @collect_error
