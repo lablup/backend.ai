@@ -12,9 +12,12 @@ from strawberry.relay import Connection, Edge
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.dto.manager.v2.scheduling_history.request import (
     AdminSearchDeploymentHistoriesInput,
+    AdminSearchKernelHistoriesInput,
     AdminSearchRouteHistoriesInput,
     AdminSearchSessionHistoriesInput,
+    ScopedSearchKernelHistoriesInput,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -29,6 +32,10 @@ from .types import (
     DeploymentHistoryFilter,
     DeploymentHistoryOrderBy,
     DeploymentScope,
+    KernelSchedulingHistoryFilterGQL,
+    KernelSchedulingHistoryGQL,
+    KernelSchedulingHistoryOrderByGQL,
+    KernelScopeGQL,
     RouteHistory,
     RouteHistoryFilter,
     RouteHistoryOrderBy,
@@ -49,6 +56,24 @@ SessionSchedulingHistoryEdge = Edge[SessionSchedulingHistory]
     BackendAIGQLMeta(added_version="26.3.0", description="Session scheduling history connection.")
 )
 class SessionSchedulingHistoryConnection(Connection[SessionSchedulingHistory]):
+    count: int
+
+    def __init__(self, *args: Any, count: int, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.count = count
+
+
+KernelSchedulingHistoryEdgeGQL = Edge[KernelSchedulingHistoryGQL]
+
+
+@gql_connection_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Kernel scheduling history connection.",
+    ),
+    name="KernelSchedulingHistoryConnection",
+)
+class KernelSchedulingHistoryConnectionGQL(Connection[KernelSchedulingHistoryGQL]):
     count: int
 
     def __init__(self, *args: Any, count: int, **kwargs: Any) -> None:
@@ -173,6 +198,53 @@ async def session_scheduling_histories(
         for node in nodes
     ]
     return SessionSchedulingHistoryConnection(
+        edges=edges,
+        page_info=strawberry.relay.PageInfo(
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+            start_cursor=edges[0].cursor if edges else None,
+            end_cursor=edges[-1].cursor if edges else None,
+        ),
+        count=result.total_count,
+    )
+
+
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="List kernel scheduling history (superadmin only)",
+    )
+)  # type: ignore[misc]
+async def admin_kernel_scheduling_histories(
+    info: Info[StrawberryGQLContext],
+    filter: KernelSchedulingHistoryFilterGQL | None = None,
+    order_by: list[KernelSchedulingHistoryOrderByGQL] | None = None,
+    before: str | None = None,
+    after: str | None = None,
+    first: int | None = None,
+    last: int | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
+) -> KernelSchedulingHistoryConnectionGQL | None:
+    check_admin_only()
+    result = await info.context.adapters.scheduling_history.admin_search_kernel_history(
+        AdminSearchKernelHistoriesInput(
+            filter=filter.to_pydantic() if filter else None,
+            order=[o.to_pydantic() for o in order_by] if order_by else None,
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        )
+    )
+    nodes = [KernelSchedulingHistoryGQL.from_pydantic(item) for item in result.items]
+    edges = [
+        KernelSchedulingHistoryEdgeGQL(node=node, cursor=encode_cursor(str(node.id)))
+        for node in nodes
+    ]
+    return KernelSchedulingHistoryConnectionGQL(
         edges=edges,
         page_info=strawberry.relay.PageInfo(
             has_next_page=result.has_next_page,
@@ -486,6 +558,55 @@ async def route_scoped_scheduling_histories(
     nodes = [RouteHistory.from_pydantic(item) for item in result.items]
     edges = [RouteHistoryEdge(node=node, cursor=encode_cursor(str(node.id))) for node in nodes]
     return RouteHistoryConnection(
+        edges=edges,
+        page_info=strawberry.relay.PageInfo(
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+            start_cursor=edges[0].cursor if edges else None,
+            end_cursor=edges[-1].cursor if edges else None,
+        ),
+        count=result.total_count,
+    )
+
+
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Get scheduling history for a specific kernel.",
+    )
+)  # type: ignore[misc]
+async def scoped_kernel_scheduling_histories(
+    info: Info[StrawberryGQLContext],
+    scope: KernelScopeGQL,
+    filter: KernelSchedulingHistoryFilterGQL | None = None,
+    order_by: list[KernelSchedulingHistoryOrderByGQL] | None = None,
+    before: str | None = None,
+    after: str | None = None,
+    first: int | None = None,
+    last: int | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
+) -> KernelSchedulingHistoryConnectionGQL | None:
+    """Get scheduling history for a specific kernel."""
+    result = await info.context.adapters.scheduling_history.scoped_search_kernel_history(
+        ScopedSearchKernelHistoriesInput(
+            scope=scope.to_pydantic(),
+            filter=filter.to_pydantic() if filter else None,
+            order=[o.to_pydantic() for o in order_by] if order_by else None,
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        )
+    )
+    nodes = [KernelSchedulingHistoryGQL.from_pydantic(item) for item in result.items]
+    edges = [
+        KernelSchedulingHistoryEdgeGQL(node=node, cursor=encode_cursor(str(node.id)))
+        for node in nodes
+    ]
+    return KernelSchedulingHistoryConnectionGQL(
         edges=edges,
         page_info=strawberry.relay.PageInfo(
             has_next_page=result.has_next_page,

@@ -425,12 +425,14 @@ from .scheduler import (
 from .scheduling_handler import scheduling_handlers
 from .scheduling_history import (
     admin_deployment_histories,
+    admin_kernel_scheduling_histories,
     admin_route_histories,
     admin_session_scheduling_histories,
     deployment_histories,
     deployment_scoped_scheduling_histories,
     route_histories,
     route_scoped_scheduling_histories,
+    scoped_kernel_scheduling_histories,
     session_scheduling_histories,
     session_scoped_scheduling_histories,
 )
@@ -542,6 +544,7 @@ class Query:
     admin_allowed_projects_for_resource_group_v2 = admin_allowed_projects_for_resource_group_v2
     admin_service_catalogs = admin_service_catalogs
     admin_session_scheduling_histories = admin_session_scheduling_histories
+    admin_kernel_scheduling_histories = admin_kernel_scheduling_histories
     admin_deployments = admin_deployments
     admin_deployment_histories = admin_deployment_histories
     admin_route_histories = admin_route_histories
@@ -626,6 +629,7 @@ class Query:
     image_scoped_aliases = image_scoped_aliases
     # Entity Scoped APIs (added in 26.2.0)
     session_scoped_scheduling_histories = session_scoped_scheduling_histories
+    scoped_kernel_scheduling_histories = scoped_kernel_scheduling_histories
     deployment_scoped_scheduling_histories = deployment_scoped_scheduling_histories
     route_scoped_scheduling_histories = route_scoped_scheduling_histories
     # Legacy APIs (deprecated)

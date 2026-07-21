@@ -25127,7 +25127,12 @@
         "description": "Fields available for ordering kernel scheduling history.",
         "enum": [
           "created_at",
-          "updated_at"
+          "updated_at",
+          "phase",
+          "from_status",
+          "to_status",
+          "result",
+          "attempts"
         ],
         "title": "KernelHistoryOrderField",
         "type": "string"
