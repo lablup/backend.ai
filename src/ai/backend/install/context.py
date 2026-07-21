@@ -6,11 +6,9 @@ import hashlib
 import importlib.resources
 import json
 import os
-import random
 import re
 import secrets
 import shutil
-import sys
 import tempfile
 import uuid
 from abc import ABCMeta, abstractmethod
@@ -74,12 +72,6 @@ from .types import (
 from .widgets import ProgressItem, SetupLog
 
 current_log: ContextVar[SetupLog] = ContextVar("current_log")
-PASSPHRASE_CHARACTER_POOL: Final[list[str]] = (
-    [chr(x) for x in range(ord("a"), ord("z") + 1)]
-    + [chr(x) for x in range(ord("A"), ord("Z") + 1)]
-    + [chr(x) for x in range(ord("0"), ord("9") + 1)]
-    + ["*$./"]
-)
 
 # Must match the entrypoints in configs/traefik/traefik.halfstack.yml.
 TRAEFIK_API_PORT: Final[int] = 8080
@@ -237,9 +229,6 @@ class Context(metaclass=ABCMeta):
     def mangle_pkgname(self, name: str, fat: bool = False) -> str:
         return f"backendai-{name}-{self.os_info.platform}"
 
-    def generate_passphrase(self, len: int = 16) -> str:
-        return "".join(random.sample(PASSPHRASE_CHARACTER_POOL, len))
-
     @staticmethod
     @contextmanager
     def resource_path(pkg: str, filename: str) -> Iterator[Path]:
@@ -376,14 +365,42 @@ class Context(metaclass=ABCMeta):
         if self.install_info.type == InstallType.SOURCE:
             # Develop mode: use ./backend.ai from current directory
             cmd_str = " ".join(cmdargs)
-            await self.run_shell(f"./backend.ai {cmd_str}")
+            exit_code = await self.run_shell(f"./backend.ai {cmd_str}")
 
         elif self.install_info.type == InstallType.PACKAGE:
             # Package mode: use backendai-manager from base_path
             executable = Path(self.install_info.base_path) / "backendai-manager"
-            await self.run_exec(
+            exit_code = await self.run_exec(
                 [str(executable), *cmdargs],
                 cwd=self.install_info.base_path,
+            )
+        else:
+            raise RuntimeError(f"Unsupported install type: {self.install_info.type}")
+
+        if exit_code != 0:
+            raise RuntimeError(
+                f"Manager CLI command failed (exit {exit_code}): {' '.join(cmdargs)}"
+            )
+
+    async def run_appproxy_coordinator_cli(self, cmdargs: Sequence[str]) -> None:
+        if self.install_info.type == InstallType.SOURCE:
+            # Develop mode: use ./backend.ai from current directory
+            cmd_str = " ".join(cmdargs)
+            exit_code = await self.run_shell(f"./backend.ai app-proxy-coordinator {cmd_str}")
+
+        elif self.install_info.type == InstallType.PACKAGE:
+            # Package mode: use backendai-appproxy-coordinator from base_path
+            executable = Path(self.install_info.base_path) / "backendai-appproxy-coordinator"
+            exit_code = await self.run_exec(
+                [str(executable), "app-proxy-coordinator", *cmdargs],
+                cwd=self.install_info.base_path,
+            )
+        else:
+            raise RuntimeError(f"Unsupported install type: {self.install_info.type}")
+
+        if exit_code != 0:
+            raise RuntimeError(
+                f"App-proxy coordinator CLI command failed (exit {exit_code}): {' '.join(cmdargs)}"
             )
 
     @actxmgr
@@ -681,7 +698,7 @@ class Context(metaclass=ABCMeta):
     async def check_prerequisites(self) -> None:
         self.os_info = await detect_os()
         text = Text()
-        text.append("Detetced OS info: ")
+        text.append("Detected OS info: ")
         text.append(self.os_info.__rich__())  # type: ignore
         self.log.write(text)
         if "LiveCD" in self.os_info.distro_variants:
@@ -1165,7 +1182,6 @@ class Context(metaclass=ABCMeta):
 
     async def install_appproxy_db(self) -> None:
         halfstack = self.install_info.halfstack_config
-        service = self.install_info.service_config
 
         self.log_header("Setting up databases... (app-proxy)")
 
@@ -1209,33 +1225,16 @@ class Context(metaclass=ABCMeta):
         await app_conn.execute("GRANT ALL ON SCHEMA public TO appproxy;")
         await app_conn.close()
 
-        # 4. Run Alembic migration for app-proxy
+        # 4. Run the schema migration for app-proxy. The alembic scripts live
+        # inside the ai.backend.appproxy package (script_location is a package
+        # resource path), so this must run through the coordinator CLI -- the
+        # installer's own interpreter cannot import them in PACKAGE mode.
         alembic_ini = self.copy_config("alembic-appproxy.ini")
-        await self.run_exec(
-            [sys.executable, "-m", "alembic", "-c", str(alembic_ini), "upgrade", "head"],
-            cwd=self.install_info.base_path,
-        )
-
-        # 5. Update scaling_groups in core DB
-        # TODO: Still using wsproxy_* columns for backward compatibility (same with install-dev.sh logic)
-        core_conn = await asyncpg.connect(
-            host=halfstack.postgres_addr.face.host,
-            port=halfstack.postgres_addr.face.port,
-            user=halfstack.postgres_user,
-            password=halfstack.postgres_password,
-            database="backend",
-        )
-        await core_conn.execute(
-            """
-            UPDATE scaling_groups
-            SET wsproxy_api_token = $1,
-                wsproxy_addr = $2
-            WHERE name = 'default'
-            """,
-            service.appproxy_api_secret,
-            f"http://{service.appproxy_coordinator_addr.face.host}:{service.appproxy_coordinator_addr.face.port}",
-        )
-        await core_conn.close()
+        await self.run_appproxy_coordinator_cli(["schema", "oneshot", "-f", str(alembic_ini)])
+        # NOTE: The "default" scaling_group's wsproxy_addr/token are set by
+        # configure_appproxy_fixture(), which runs after load_fixtures() seeds
+        # the row. Do not update scaling_groups here -- the row does not exist
+        # yet at this point in the install flow.
 
     async def configure_appproxy(self) -> None:
         halfstack = self.install_info.halfstack_config
@@ -1540,7 +1539,6 @@ class Context(metaclass=ABCMeta):
         with self.resource_path(
             "ai.backend.install.fixtures", "example-keypairs.json"
         ) as keypair_path:
-            current_shell = os.environ.get("SHELL", "sh")
             keypair_data = json.loads(Path(keypair_path).read_bytes())
         for keypair in keypair_data["keypairs"]:
             email = keypair["user_id"]
@@ -2338,6 +2336,10 @@ class PackageContext(Context):
         await self.configure_client()
         self.log_header("Loading fixtures...")
         await self.load_fixtures()
+        # load_fixtures() seeds the "default" scaling_group with placeholder
+        # wsproxy_addr/token from the example fixture, so this must run *after*
+        # it to overwrite them with the real coordinator address and secret.
+        await self.configure_appproxy_fixture()
         self.log_header("Preparing vfolder volumes...")
         await self.prepare_local_vfolder_host()
         # TODO: install as systemd services?

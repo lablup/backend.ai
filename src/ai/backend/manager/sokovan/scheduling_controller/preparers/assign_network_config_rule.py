@@ -24,7 +24,7 @@ from __future__ import annotations
 
 from typing import override
 
-from ai.backend.manager.data.session.draft import SessionSpecDraft
+from ai.backend.manager.data.session.draft import SessionResourceSpecDraft
 from ai.backend.manager.models.network import NetworkType
 from ai.backend.manager.sokovan.scheduling_controller.preparers.draft_rule import (
     SessionSpecDraftRule,
@@ -42,9 +42,9 @@ class AssignNetworkConfigRule(SessionSpecDraftRule):
     @override
     async def prepare(
         self,
-        draft: SessionSpecDraft,
+        draft: SessionResourceSpecDraft,
         context: SessionSpecPreparationContext,
-    ) -> SessionSpecDraft:
+    ) -> SessionResourceSpecDraft:
         net = draft.network
         if net.network_type is not None:
             return draft

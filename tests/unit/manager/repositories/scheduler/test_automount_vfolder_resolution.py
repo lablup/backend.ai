@@ -41,6 +41,7 @@ from ai.backend.manager.data.session.draft import (
     KernelGroupDraft,
     SessionIdentityDraft,
     SessionOptionsDraft,
+    SessionResourceSpecDraft,
     SessionScopeDraft,
     SessionSpecDraft,
 )
@@ -315,18 +316,20 @@ class TestAutoMountVFolderResolution:
         # A session with a single kernel group and NO explicit mounts —
         # exactly the case the regression dropped auto-mounts for.
         draft = SessionSpecDraft(
-            identity=SessionIdentityDraft(
-                creation_id="automount-regression",
-                session_name="automount-regression",
-                user_uuid=test_user,
+            resource_spec=SessionResourceSpecDraft(
+                identity=SessionIdentityDraft(
+                    creation_id="automount-regression",
+                    session_name="automount-regression",
+                    user_uuid=test_user,
+                ),
+                options=SessionOptionsDraft(
+                    kernel_groups=(KernelGroupDraft(role="main", replica_count=1),),
+                ),
             ),
             scope=SessionScopeDraft(
                 domain_name=DomainName(test_domain_name),
                 project_id=ProjectID(test_group),
                 resource_group_name=None,
-            ),
-            options=SessionOptionsDraft(
-                kernel_groups=(KernelGroupDraft(role="main", replica_count=1),),
             ),
         )
 

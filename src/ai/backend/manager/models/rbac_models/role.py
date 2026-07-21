@@ -27,6 +27,7 @@ from ai.backend.manager.models.base import (
     Base,
     StrEnumType,
 )
+from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
 
 if TYPE_CHECKING:
     from .permission.object_permission import ObjectPermissionRow
@@ -45,7 +46,7 @@ def _get_object_permission_rows_join_condition() -> sa.ColumnElement[bool]:
     return RoleRow.id == foreign(ObjectPermissionRow.role_id)
 
 
-class RoleRow(Base):  # type: ignore[misc]
+class RoleRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
     __tablename__ = "roles"
     __table_args__ = (sa.Index("ix_id_status", "id", "status"),)
 
@@ -74,16 +75,6 @@ class RoleRow(Base):  # type: ignore[misc]
         nullable=False,
         default=False,
         server_default=sa.false(),
-    )
-    created_at: Mapped[datetime] = mapped_column(
-        "created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        "updated_at",
-        sa.DateTime(timezone=True),
-        server_default=sa.func.now(),
-        onupdate=sa.func.now(),
-        nullable=False,
     )
     deleted_at: Mapped[datetime | None] = mapped_column(
         "deleted_at", sa.DateTime(timezone=True), nullable=True

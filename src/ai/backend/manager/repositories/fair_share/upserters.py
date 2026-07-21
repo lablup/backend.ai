@@ -8,6 +8,7 @@ from datetime import date
 from decimal import Decimal
 from typing import Any, override
 
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.models.fair_share import (
     DomainFairShareRow,
@@ -31,6 +32,7 @@ class DomainFairShareUpserterSpec(UpserterSpec[DomainFairShareRow]):
 
     # Identity (required)
     resource_group: str
+    resource_group_id: ResourceGroupID
     domain_name: str
 
     # Spec (uses Row defaults on INSERT if NOP)
@@ -57,6 +59,7 @@ class DomainFairShareUpserterSpec(UpserterSpec[DomainFairShareRow]):
     def build_insert_values(self) -> dict[str, Any]:
         values: dict[str, Any] = {
             "resource_group": self.resource_group,
+            "resource_group_id": self.resource_group_id,
             "domain_name": self.domain_name,
         }
         # Spec fields
@@ -75,7 +78,7 @@ class DomainFairShareUpserterSpec(UpserterSpec[DomainFairShareRow]):
 
     @override
     def build_update_values(self) -> dict[str, Any]:
-        values: dict[str, Any] = {}
+        values: dict[str, Any] = {"resource_group_id": self.resource_group_id}
         # Spec fields (weight can be updated via mutation)
         self.weight.update_dict(values, "weight")
         # Calculation fields
@@ -97,6 +100,7 @@ class DomainFairShareBulkWeightUpserterSpec(UpserterSpec[DomainFairShareRow]):
     """
 
     resource_group: str
+    resource_group_id: ResourceGroupID
     domain_name: str
     weight: Decimal | None  # None means use resource group's default_weight
 
@@ -109,13 +113,14 @@ class DomainFairShareBulkWeightUpserterSpec(UpserterSpec[DomainFairShareRow]):
     def build_insert_values(self) -> dict[str, Any]:
         return {
             "resource_group": self.resource_group,
+            "resource_group_id": self.resource_group_id,
             "domain_name": self.domain_name,
             "weight": self.weight,
         }
 
     @override
     def build_update_values(self) -> dict[str, Any]:
-        return {"weight": self.weight}
+        return {"resource_group_id": self.resource_group_id, "weight": self.weight}
 
 
 @dataclass
@@ -131,6 +136,7 @@ class ProjectFairShareUpserterSpec(UpserterSpec[ProjectFairShareRow]):
 
     # Identity (required)
     resource_group: str
+    resource_group_id: ResourceGroupID
     project_id: uuid.UUID
     domain_name: str
 
@@ -158,6 +164,7 @@ class ProjectFairShareUpserterSpec(UpserterSpec[ProjectFairShareRow]):
     def build_insert_values(self) -> dict[str, Any]:
         values: dict[str, Any] = {
             "resource_group": self.resource_group,
+            "resource_group_id": self.resource_group_id,
             "project_id": self.project_id,
             "domain_name": self.domain_name,
         }
@@ -177,7 +184,7 @@ class ProjectFairShareUpserterSpec(UpserterSpec[ProjectFairShareRow]):
 
     @override
     def build_update_values(self) -> dict[str, Any]:
-        values: dict[str, Any] = {}
+        values: dict[str, Any] = {"resource_group_id": self.resource_group_id}
         # Spec fields (weight can be updated via mutation)
         self.weight.update_dict(values, "weight")
         # Calculation fields
@@ -199,6 +206,7 @@ class ProjectFairShareBulkWeightUpserterSpec(UpserterSpec[ProjectFairShareRow]):
     """
 
     resource_group: str
+    resource_group_id: ResourceGroupID
     project_id: uuid.UUID
     domain_name: str
     weight: Decimal | None  # None means use resource group's default_weight
@@ -212,6 +220,7 @@ class ProjectFairShareBulkWeightUpserterSpec(UpserterSpec[ProjectFairShareRow]):
     def build_insert_values(self) -> dict[str, Any]:
         return {
             "resource_group": self.resource_group,
+            "resource_group_id": self.resource_group_id,
             "project_id": self.project_id,
             "domain_name": self.domain_name,
             "weight": self.weight,
@@ -219,7 +228,7 @@ class ProjectFairShareBulkWeightUpserterSpec(UpserterSpec[ProjectFairShareRow]):
 
     @override
     def build_update_values(self) -> dict[str, Any]:
-        return {"weight": self.weight}
+        return {"resource_group_id": self.resource_group_id, "weight": self.weight}
 
 
 @dataclass
@@ -235,6 +244,7 @@ class UserFairShareUpserterSpec(UpserterSpec[UserFairShareRow]):
 
     # Identity (required)
     resource_group: str
+    resource_group_id: ResourceGroupID
     user_uuid: uuid.UUID
     project_id: uuid.UUID
     domain_name: str
@@ -263,6 +273,7 @@ class UserFairShareUpserterSpec(UpserterSpec[UserFairShareRow]):
     def build_insert_values(self) -> dict[str, Any]:
         values: dict[str, Any] = {
             "resource_group": self.resource_group,
+            "resource_group_id": self.resource_group_id,
             "user_uuid": self.user_uuid,
             "project_id": self.project_id,
             "domain_name": self.domain_name,
@@ -283,7 +294,7 @@ class UserFairShareUpserterSpec(UpserterSpec[UserFairShareRow]):
 
     @override
     def build_update_values(self) -> dict[str, Any]:
-        values: dict[str, Any] = {}
+        values: dict[str, Any] = {"resource_group_id": self.resource_group_id}
         # Spec fields (weight can be updated via mutation)
         self.weight.update_dict(values, "weight")
         # Calculation fields
@@ -305,6 +316,7 @@ class UserFairShareBulkWeightUpserterSpec(UpserterSpec[UserFairShareRow]):
     """
 
     resource_group: str
+    resource_group_id: ResourceGroupID
     user_uuid: uuid.UUID
     project_id: uuid.UUID
     domain_name: str
@@ -319,6 +331,7 @@ class UserFairShareBulkWeightUpserterSpec(UpserterSpec[UserFairShareRow]):
     def build_insert_values(self) -> dict[str, Any]:
         return {
             "resource_group": self.resource_group,
+            "resource_group_id": self.resource_group_id,
             "user_uuid": self.user_uuid,
             "project_id": self.project_id,
             "domain_name": self.domain_name,
@@ -327,4 +340,4 @@ class UserFairShareBulkWeightUpserterSpec(UpserterSpec[UserFairShareRow]):
 
     @override
     def build_update_values(self) -> dict[str, Any]:
-        return {"weight": self.weight}
+        return {"resource_group_id": self.resource_group_id, "weight": self.weight}

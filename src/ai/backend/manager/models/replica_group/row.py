@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
 import sqlalchemy as sa
@@ -17,6 +16,7 @@ from ai.backend.manager.data.deployment.types import (
     ReplicaGroupScalingStatus,
 )
 from ai.backend.manager.models.base import GUID, Base, PydanticColumn, StrEnumType
+from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
 from ai.backend.manager.views.replica_group import (
     ReplicaGroupDeploySchedulingView,
     ReplicaGroupScalingSchedulingView,
@@ -56,7 +56,7 @@ def _get_target_revision_join_condition() -> sa.sql.elements.ColumnElement[Any]:
     return foreign(ReplicaGroupRow.target_revision_id) == DeploymentRevisionRow.id
 
 
-class ReplicaGroupRow(Base):  # type: ignore[misc]
+class ReplicaGroupRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
     """
     A group of replicas (routes) within a single deployment.
 
@@ -137,20 +137,6 @@ class ReplicaGroupRow(Base):  # type: ignore[misc]
     rollout: Mapped[ReplicaGroupRolloutSpec] = mapped_column(
         "rollout",
         PydanticColumn(ReplicaGroupRolloutSpec),
-        nullable=False,
-    )
-
-    created_at: Mapped[datetime] = mapped_column(
-        "created_at",
-        sa.DateTime(timezone=True),
-        server_default=sa.func.now(),
-        nullable=False,
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        "updated_at",
-        sa.DateTime(timezone=True),
-        server_default=sa.func.now(),
-        onupdate=sa.func.now(),
         nullable=False,
     )
 

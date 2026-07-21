@@ -39,7 +39,6 @@ from ai.backend.manager.api.gql.decorators import (
 )
 from ai.backend.manager.api.gql.session.types import SessionClusterModeGQL
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
-from ai.backend.manager.errors.common import ServiceUnavailable
 from ai.backend.manager.errors.kernel import InvalidSessionId
 
 from .session_federation import Session
@@ -199,7 +198,6 @@ class ComputeScheduleInputGQL(PydanticInputMixin[ComputeScheduleInput]):
 )
 class UnschedulableReasonHintGQL:
     required_reduction: list[ResourceSlotEntryGQL] | None
-    available_archs: list[str] | None
 
 
 @gql_pydantic_type(
@@ -247,5 +245,6 @@ async def compute_schedule(
     input: ComputeScheduleInputGQL,
     info: Info[StrawberryGQLContext],
 ) -> ComputeSchedulePayloadGQL | None:
-    # Schema-only surface: the adapter wiring lands in a follow-up.
-    raise ServiceUnavailable("Compute schedule is not yet available.")
+    payload = await info.context.adapters.session.compute_schedule(input.to_pydantic())
+    result: ComputeSchedulePayloadGQL = ComputeSchedulePayloadGQL.from_pydantic(payload)  # type: ignore[attr-defined]
+    return result

@@ -1918,7 +1918,7 @@ class TestEnqueueSession:
         await configured_session_service.enqueue_session(enqueue_action_without_rg)
 
         draft = mock_scheduling_controller.enqueue_session_from_draft.await_args.args[0]
-        assert draft.options.handler_options is None
+        assert draft.resource_spec.options.handler_options is None
 
     async def test_leaves_resource_opts_unset_when_shmem_omitted(
         self,
@@ -1932,8 +1932,11 @@ class TestEnqueueSession:
         await configured_session_service.enqueue_session(enqueue_action_without_rg)
 
         draft = mock_scheduling_controller.enqueue_session_from_draft.await_args.args[0]
-        assert draft.options.kernel_groups is not None
-        assert draft.options.kernel_groups[0].execution_spec.resource_input.resource_opts is None
+        assert draft.resource_spec.options.kernel_groups is not None
+        assert (
+            draft.resource_spec.options.kernel_groups[0].execution_spec.resource_input.resource_opts
+            is None
+        )
 
     async def test_keeps_resource_opts_when_shmem_supplied(
         self,
@@ -1962,7 +1965,9 @@ class TestEnqueueSession:
         await configured_session_service.enqueue_session(action)
 
         draft = mock_scheduling_controller.enqueue_session_from_draft.await_args.args[0]
-        assert draft.options.kernel_groups is not None
-        resource_opts = draft.options.kernel_groups[0].execution_spec.resource_input.resource_opts
+        assert draft.resource_spec.options.kernel_groups is not None
+        resource_opts = draft.resource_spec.options.kernel_groups[
+            0
+        ].execution_spec.resource_input.resource_opts
         assert resource_opts is not None
         assert resource_opts.shmem == BinarySize.from_str("256m")

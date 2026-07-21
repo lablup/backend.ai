@@ -45,7 +45,7 @@ from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyIm
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.config import ModelHealthCheck
-from ai.backend.common.defs.session import SESSION_PRIORITY_DEFAULT
+from ai.backend.common.defs.session import JOB_PRIORITY_DEFAULT, SESSION_PRIORITY_DEFAULT
 from ai.backend.common.docker import ImageRef, LabelName
 from ai.backend.common.dto.agent.response import (
     CodeCompletionResp,
@@ -116,6 +116,7 @@ from ai.backend.manager.data.session.draft import (
     SessionIdentityDraft,
     SessionNetworkDraft,
     SessionOptionsDraft,
+    SessionResourceSpecDraft,
     SessionScopeDraft,
     SessionSpecDraft,
 )
@@ -441,6 +442,7 @@ class AgentRegistry:
         enqueue_only: bool = False,
         max_wait_seconds: int = 0,
         priority: int = SESSION_PRIORITY_DEFAULT,
+        job_priority: int = JOB_PRIORITY_DEFAULT,
         is_preemptible: bool = True,
         bootstrap_script: str | None = None,
         dependencies: list[uuid.UUID] | None = None,
@@ -647,6 +649,7 @@ class AgentRegistry:
                         resource_policy,
                         user_scope=user_scope,
                         priority=priority,
+                        job_priority=job_priority,
                         is_preemptible=is_preemptible,
                         cluster_mode=cluster_mode,
                         cluster_size=cluster_size,
@@ -981,6 +984,7 @@ class AgentRegistry:
         *,
         user_scope: UserScope,
         priority: int,
+        job_priority: int,
         public_sgroup_only: bool,
         cluster_mode: ClusterMode,
         cluster_size: int,
@@ -1142,12 +1146,36 @@ class AgentRegistry:
             )
 
         draft = SessionSpecDraft(
-            identity=SessionIdentityDraft(
-                session_id=SessionID(uuid.uuid4()),
-                creation_id=session_creation_id,
-                session_name=session_name,
-                access_key=access_key,
-                user_uuid=user_scope.user_uuid,
+            resource_spec=SessionResourceSpecDraft(
+                identity=SessionIdentityDraft(
+                    session_id=SessionID(uuid.uuid4()),
+                    creation_id=session_creation_id,
+                    session_name=session_name,
+                    access_key=access_key,
+                    user_uuid=user_scope.user_uuid,
+                ),
+                classification=SessionClassificationDraft(
+                    session_type=session_type,
+                    tag=session_tag,
+                ),
+                network=SessionNetworkDraft(network_id=network_id),
+                callback_url=callback_url,
+                dependencies=dependencies,
+                options=SessionOptionsDraft(
+                    priority=priority,
+                    job_priority=job_priority,
+                    is_preemptible=is_preemptible,
+                    cluster_mode=cluster_mode,
+                    cluster_size=cluster_size,
+                    scheduling_target=SchedulingTargetDraft(
+                        designated_agents=tuple(AgentId(a) for a in (agent_list or ())),
+                    ),
+                    kernel_groups=tuple(groups_by_role.values()),
+                    handler_options=None,
+                ),
+                internal_data_extras=InternalDataExtras(
+                    sudo_session_enabled=sudo_session_enabled,
+                ),
             ),
             scope=SessionScopeDraft(
                 domain_id=domain_id,
@@ -1155,27 +1183,6 @@ class AgentRegistry:
                 project_id=ProjectID(user_scope.group_id),
                 resource_group_id=resource_group_id,
                 resource_group_name=resource_group_name,
-            ),
-            classification=SessionClassificationDraft(
-                session_type=session_type,
-                tag=session_tag,
-            ),
-            network=SessionNetworkDraft(network_id=network_id),
-            callback_url=callback_url,
-            dependencies=dependencies,
-            options=SessionOptionsDraft(
-                priority=priority,
-                is_preemptible=is_preemptible,
-                cluster_mode=cluster_mode,
-                cluster_size=cluster_size,
-                scheduling_target=SchedulingTargetDraft(
-                    designated_agents=tuple(AgentId(a) for a in (agent_list or ())),
-                ),
-                kernel_groups=tuple(groups_by_role.values()),
-                handler_options=None,
-            ),
-            internal_data_extras=InternalDataExtras(
-                sudo_session_enabled=sudo_session_enabled,
             ),
         )
 
@@ -1193,6 +1200,7 @@ class AgentRegistry:
         *,
         user_scope: UserScope,
         priority: int = SESSION_PRIORITY_DEFAULT,
+        job_priority: int = JOB_PRIORITY_DEFAULT,
         is_preemptible: bool = True,
         public_sgroup_only: bool = True,
         cluster_mode: ClusterMode = ClusterMode.SINGLE_NODE,
@@ -1219,6 +1227,7 @@ class AgentRegistry:
             resource_policy=resource_policy,
             user_scope=user_scope,
             priority=priority,
+            job_priority=job_priority,
             is_preemptible=is_preemptible,
             public_sgroup_only=public_sgroup_only,
             cluster_mode=cluster_mode,

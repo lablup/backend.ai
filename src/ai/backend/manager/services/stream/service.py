@@ -12,7 +12,6 @@ from ai.backend.common.types import AgentId, KernelId, SessionId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.errors.api import NotImplementedAPI
 from ai.backend.manager.errors.resource import AgentNotAllocated
-from ai.backend.manager.idle import AppStreamingStatus, IdleCheckerHost
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.stream.repository import StreamRepository
 from ai.backend.manager.services.stream.actions.execute_in_stream import (
@@ -55,7 +54,6 @@ class StreamService:
     _repository: StreamRepository
     _registry: AgentRegistry
     _valkey_live: ValkeyLiveClient
-    _idle_checker_host: IdleCheckerHost
     _etcd: AsyncEtcd
 
     def __init__(
@@ -63,13 +61,11 @@ class StreamService:
         repository: StreamRepository,
         registry: AgentRegistry,
         valkey_live: ValkeyLiveClient,
-        idle_checker_host: IdleCheckerHost,
         etcd: AsyncEtcd,
     ) -> None:
         self._repository = repository
         self._registry = registry
         self._valkey_live = valkey_live
-        self._idle_checker_host = idle_checker_host
         self._etcd = etcd
 
     async def get_streaming_session(
@@ -152,10 +148,7 @@ class StreamService:
         await self._valkey_live.update_connection_tracker(
             str(action.kernel_id), action.service, action.stream_id
         )
-        await self._idle_checker_host.update_app_streaming_status(
-            action.session_id,
-            AppStreamingStatus.HAS_ACTIVE_CONNECTIONS,
-        )
+        await self._valkey_live.mark_session_active(action.session_id)
         return TrackConnectionActionResult(kernel_id=str(action.kernel_id))
 
     async def untrack_connection(
@@ -166,10 +159,7 @@ class StreamService:
         )
         remaining_count = await self._valkey_live.count_active_connections(str(action.kernel_id))
         if remaining_count == 0:
-            await self._idle_checker_host.update_app_streaming_status(
-                action.session_id,
-                AppStreamingStatus.NO_ACTIVE_CONNECTIONS,
-            )
+            await self._valkey_live.update_session_last_access(action.session_id)
         return UntrackConnectionActionResult(
             kernel_id=str(action.kernel_id),
             remaining_count=remaining_count,
@@ -197,9 +187,6 @@ class StreamService:
                 remaining,
             )
             if prev_remaining > 0 and remaining == 0:
-                await self._idle_checker_host.update_app_streaming_status(
-                    SessionId(session_id),
-                    AppStreamingStatus.NO_ACTIVE_CONNECTIONS,
-                )
+                await self._valkey_live.update_session_last_access(SessionId(session_id))
                 removed_sessions.append(str(session_id))
         return GCStaleConnectionsActionResult(removed_sessions=removed_sessions)

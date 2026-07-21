@@ -36,7 +36,7 @@ from sqlalchemy.orm import (
 )
 from sqlalchemy.orm.strategy_options import _AbstractLoad
 
-from ai.backend.common.defs.session import SESSION_PRIORITY_DEFAULT
+from ai.backend.common.defs.session import JOB_PRIORITY_DEFAULT, SESSION_PRIORITY_DEFAULT
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.resource_group import ResourceGroupID
@@ -423,6 +423,15 @@ class SessionRow(Base):  # type: ignore[misc]
         nullable=False,
         default=True,
         server_default=sa.text("true"),
+    )
+    # Scope-local preemption priority among the owner's own sessions,
+    # decoupled from the global scheduler ``priority``.
+    job_priority: Mapped[int] = mapped_column(
+        "job_priority",
+        sa.Integer(),
+        nullable=False,
+        default=JOB_PRIORITY_DEFAULT,
+        server_default=sa.text(str(JOB_PRIORITY_DEFAULT)),
     )
 
     cluster_mode: Mapped[str] = mapped_column(

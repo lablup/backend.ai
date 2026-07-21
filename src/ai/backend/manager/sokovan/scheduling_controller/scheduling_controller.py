@@ -3,6 +3,7 @@
 import logging
 from collections.abc import Sequence
 from dataclasses import dataclass
+from uuid import UUID, uuid4
 
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.contexts.user import current_user
@@ -11,14 +12,31 @@ from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.event_types.session.broadcast import SchedulingBroadcastEvent
 from ai.backend.common.events.types import AbstractBroadcastEvent
 from ai.backend.common.exception import InvalidAPIParameters
+from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
-from ai.backend.common.types import ResourceSlot, SessionId
+from ai.backend.common.types import KernelId, ResourceSlot, ResourceSlotEntry, SessionId
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.data.session.draft import SessionSpecDraft
+from ai.backend.manager.data.session.compute_schedule import (
+    ComputeScheduleKernelResult,
+    ComputeScheduleResult,
+    UnschedulableReasonHint,
+)
+from ai.backend.manager.data.session.draft import (
+    SessionResourceSpecDraft,
+    SessionScopeDraft,
+    SessionSpecDraft,
+)
+from ai.backend.manager.data.session.spec import (
+    SessionResourceSpec,
+    SessionScope,
+    SessionSpec,
+)
 from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.errors.common import RejectedByHook
+from ai.backend.manager.errors.common import InternalServerError, RejectedByHook
+from ai.backend.manager.errors.image import ImageNotFound
 from ai.backend.manager.metrics.scheduler import (
     SchedulerOperationMetricObserver,
     SchedulerPhaseMetricObserver,
@@ -27,6 +45,17 @@ from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.scheduler import (
     MarkTerminatingResult,
     SchedulerRepository,
+)
+from ai.backend.manager.repositories.scheduler.types.session_creation import SessionSpecContextFetch
+from ai.backend.manager.sokovan.scheduler.provisioner.selectors.exceptions import (
+    BatchAgentSelectionFailedError,
+)
+from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import (
+    AgentSelectionConfig,
+    AgentSelectionCriteria,
+    AgentSelector,
+    KernelResourceSpec,
+    SessionMetadata,
 )
 from ai.backend.manager.sokovan.scheduler.types import ScheduleType
 from ai.backend.manager.sokovan.scheduling_controller.types import SessionValidationSpec
@@ -73,6 +102,28 @@ class SchedulingControllerArgs:
     valkey_schedule: ValkeyScheduleClient
     network_plugin_ctx: NetworkPluginContext
     hook_plugin_ctx: HookPluginContext
+    agent_selector: AgentSelector
+
+
+@dataclass
+class _Image:
+    id: ImageID
+    architecture: str
+
+
+@dataclass
+class _KernelComputeScheduleResourceSpec:
+    spec: KernelResourceSpec
+    image: _Image
+
+
+@dataclass
+class _KernelComputeScheduleData:
+    resource_spec: _KernelComputeScheduleResourceSpec
+
+    requested_slots: tuple[ResourceSlotEntry, ...]
+    reason_hint: UnschedulableReasonHint | None
+    success: bool = True
 
 
 class SchedulingController:
@@ -88,6 +139,7 @@ class SchedulingController:
     # Services
     _spec_preparer: SessionSpecPreparer
     _spec_validator: SessionSpecValidator
+    _agent_selector: AgentSelector
     _metric_observer: SchedulerPhaseMetricObserver
     _operation_metrics: SchedulerOperationMetricObserver
     _hook_plugin_ctx: HookPluginContext
@@ -137,6 +189,33 @@ class SchedulingController:
             InferenceModelFolderRule(),
             DotfileVFolderConflictRule(),
         ])
+        self._agent_selector = args.agent_selector
+
+    async def _verify_resource_group_accessible(self, draft: SessionSpecDraft) -> None:
+        """Reject the draft when its target resource group is outside the
+        requester's single-project allowlist.
+
+        The scope decision and rejection live in the caller; the repository only
+        performs DB reads.
+        """
+        resource_group_id = draft.scope.resource_group_id
+        if resource_group_id is None:
+            return
+        domain_name = str(draft.scope.domain_name) if draft.scope.domain_name else None
+        project_id = draft.scope.project_id
+        access_key = draft.resource_spec.identity.access_key
+        if access_key is None or domain_name is None or project_id is None:
+            raise InternalServerError(
+                "Unreachable: resource_group_id supplied without identity context",
+            )
+        accessible_rg_ids = await self._repository.query_accessible_resource_group_ids(
+            domain_name=domain_name,
+            project_id=project_id,
+            access_key=access_key,
+        )
+        if resource_group_id not in accessible_rg_ids:
+            rg_label = draft.scope.resource_group_name or resource_group_id
+            raise InvalidAPIParameters(f"Resource group '{rg_label}' is not accessible")
 
     async def enqueue_session_from_draft(
         self,
@@ -146,7 +225,7 @@ class SchedulingController:
 
         Only input is the :class:`SessionSpecDraft` — request-envelope
         extras (sudo, model-definition overlay) ride on
-        ``draft.internal_data_extras``. Validation-adjacent DB reads (image
+        ``draft.resource_spec.internal_data_extras``. Validation-adjacent DB reads (image
         metadata, keypair policy, resource-group network, container uid/gid,
         dotfiles, active session count) flow through
         :meth:`SchedulerRepository.fetch_session_spec_contexts`; vfolder mounts
@@ -164,6 +243,8 @@ class SchedulingController:
         6. ``POST_ENQUEUE_SESSION`` hook notification.
         """
         rg_id = draft.scope.resource_group_id
+
+        await self._verify_resource_group_accessible(draft)
 
         allowed_vfolder_types = list(
             await self._config_provider.legacy_etcd_config_loader.get_vfolder_types()
@@ -206,14 +287,16 @@ class SchedulingController:
         with self._metric_observer.measure_phase(
             "scheduling_controller", rg_id, "spec_preparation"
         ):
-            spec = await self._spec_preparer.prepare(draft, prep_ctx)
+            resource_spec = await self._spec_preparer.prepare(draft.resource_spec, prep_ctx)
+            scope = SessionScope.model_validate(draft.scope.model_dump(exclude_none=True))
+            spec = SessionSpec(resource_spec=resource_spec, scope=scope)
 
         hook_result = await self._hook_plugin_ctx.dispatch(
             "PRE_ENQUEUE_SESSION",
             (
-                spec.identity.session_id,
-                spec.identity.session_name,
-                spec.identity.access_key,
+                spec.resource_spec.identity.session_id,
+                spec.resource_spec.identity.session_name,
+                spec.resource_spec.identity.access_key,
             ),
             return_when=ALL_COMPLETED,
         )
@@ -228,14 +311,14 @@ class SchedulingController:
 
         log.info(
             "Session {} ({}) enqueued successfully via draft path",
-            spec.identity.session_name,
+            spec.resource_spec.identity.session_name,
             session_id,
         )
 
         await self._event_producer.broadcast_events_batch([
             SchedulingBroadcastEvent(
                 session_id=session_id,
-                creation_id=spec.identity.creation_id,
+                creation_id=spec.resource_spec.identity.creation_id,
                 status_transition=str(SessionStatus.PENDING),
                 reason="Session enqueued",
             )
@@ -251,9 +334,150 @@ class SchedulingController:
             )
         await self._hook_plugin_ctx.notify(
             "POST_ENQUEUE_SESSION",
-            (session_id, spec.identity.session_name, spec.identity.access_key),
+            (
+                session_id,
+                spec.resource_spec.identity.session_name,
+                spec.resource_spec.identity.access_key,
+            ),
         )
         return session_id
+
+    def _prepare_kernel_data(
+        self, spec: SessionResourceSpec, fetched: SessionSpecContextFetch
+    ) -> dict[KernelId, _KernelComputeScheduleData]:
+        prepared_data: dict[KernelId, _KernelComputeScheduleData] = {}
+        for kernel_spec in spec.kernel_specs:
+            kernel_id = KernelId(uuid4())
+            resource_input = kernel_spec.execution_spec.resource_input
+            image_info = (
+                fetched.image_infos.get(resource_input.image_id)
+                if resource_input.image_id is not None
+                else None
+            )
+            if image_info is None:
+                raise ImageNotFound(f"Image '{resource_input.image_id}' not found")
+            prepared_data[kernel_id] = _KernelComputeScheduleData(
+                resource_spec=_KernelComputeScheduleResourceSpec(
+                    image=_Image(
+                        id=resource_input.image_id,
+                        architecture=image_info.architecture,
+                    ),
+                    spec=KernelResourceSpec(
+                        requested_slots=ResourceSlotEntry.inputs_to_resource_slot(
+                            resource_input.resources
+                        ),
+                        required_architecture=image_info.architecture,
+                    ),
+                ),
+                requested_slots=tuple(resource_input.resources),
+                reason_hint=None,
+            )
+        return prepared_data
+
+    async def _compute_schedule(
+        self,
+        spec: SessionResourceSpec,
+        resource_group_id: ResourceGroupID,
+        kernel_data: dict[KernelId, _KernelComputeScheduleData],
+    ) -> ComputeScheduleResult:
+        kernel_requirements: dict[UUID, KernelResourceSpec] = {
+            kernel_id: data.resource_spec.spec for kernel_id, data in kernel_data.items()
+        }
+
+        if kernel_requirements:
+            criteria = AgentSelectionCriteria(
+                session_metadata=SessionMetadata(
+                    session_id=SessionId(UUID(str(spec.identity.session_id))),
+                    session_type=spec.classification.session_type,
+                    resource_group_id=resource_group_id,
+                    cluster_mode=spec.options.cluster_mode,
+                ),
+                kernel_requirements=kernel_requirements,
+            )
+            # Container-limit remediation is intentionally out of scope, so the
+            # per-agent container limit is not enforced for the fitting check.
+            config = AgentSelectionConfig(
+                max_container_count=None,
+                enforce_spreading_endpoint_replica=False,
+            )
+            # An unknown resource group (ScalingGroupNotFound) is a request error,
+            # not a per-kernel fitting outcome, so let it propagate to the caller.
+            scheduling_data = await self._repository.get_scheduling_data(resource_group_id)
+            agent_occupancy = (
+                scheduling_data.snapshot_data.resource_occupancy.by_agent
+                if scheduling_data.snapshot_data
+                else {}
+            )
+            # The selector mutates the agents list on full success; feed clones so
+            # the live snapshot is never altered.
+            mutable_agents = [
+                agent.to_agent_info(agent_occupancy) for agent in scheduling_data.agents
+            ]
+            # A resource group with no candidate agents (NoAgentsInResourceGroupError)
+            # is likewise a whole-request error, so it propagates too.
+            try:
+                await self._agent_selector.select_agents_for_batch_requirements(
+                    mutable_agents, criteria, config, None
+                )
+            except BatchAgentSelectionFailedError as e:
+                for err in e.errors:
+                    hint = err.build_remediation_hint()
+                    reason = UnschedulableReasonHint(
+                        required_reduction=(
+                            tuple(ResourceSlotEntry.from_resource_slot(hint.required_reduction))
+                            if hint.required_reduction is not None
+                            else None
+                        ),
+                    )
+                    for kernel_id in err.resource_requirement.kernel_ids:
+                        failed_draft = kernel_data.get(kernel_id)
+                        if failed_draft is not None:
+                            failed_draft.success = False
+                            failed_draft.reason_hint = reason
+
+        kernel_result = [
+            ComputeScheduleKernelResult(
+                requested_slots=kernel_data.requested_slots,
+                requested_architecture=kernel_data.resource_spec.image.architecture,
+                success=kernel_data.success,
+                reason_hint=kernel_data.reason_hint,
+            )
+            for kernel_data in kernel_data.values()
+        ]
+        return ComputeScheduleResult(kernel_results=kernel_result)
+
+    async def compute_schedule(
+        self,
+        resource_group_id: ResourceGroupID,
+        draft: SessionResourceSpecDraft,
+    ) -> ComputeScheduleResult:
+        """Compute whether each kernel of a would-be session fits the target
+        resource group's nodes, without provisioning.
+
+        Reuses the enqueue prep chain (vfolder resolution skipped), then drives
+        the real agent selector against a live snapshot of the group's agents.
+        Results correspond positionally to ``draft.resource_spec.options.kernel_groups``.
+        """
+        # SessionScopeDraft is used only to fetch dotfile data and container user info.
+        fetched = await self._repository.fetch_session_spec_contexts(
+            SessionSpecDraft(scope=SessionScopeDraft(), resource_spec=draft)
+        )
+        prep_ctx = SessionSpecPreparationContext(
+            resource_group_defaults=fetched.resource_group_defaults,
+            resource_group_network=fetched.resource_group_network,
+            container_user_info=fetched.container_user_info,
+            image_infos=fetched.image_infos,
+            resource_group_allow_fractional=fetched.resource_group_allow_fractional,
+            dotfile_data=fetched.dotfile_data,
+            # Node fitting does not depend on vfolder mounts; skip the
+            # storage-RPC resolution by leaving the per-role mount map empty.
+            vfolder_mounts_by_role={},
+        )
+        resource_spec = await self._spec_preparer.prepare(draft, prep_ctx)
+        compute_schedule_kernel_data = self._prepare_kernel_data(resource_spec, fetched)
+        return await self._compute_schedule(
+            resource_spec, resource_group_id, compute_schedule_kernel_data
+        )
 
     async def mark_scheduling_needed(self, schedule_types: Sequence[ScheduleType]) -> None:
         """

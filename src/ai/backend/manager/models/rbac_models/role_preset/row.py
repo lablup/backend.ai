@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from datetime import datetime
-
 import sqlalchemy as sa
 from sqlalchemy.orm import (
     Mapped,
@@ -16,9 +14,10 @@ from ai.backend.manager.models.base import (
     Base,
     StrEnumType,
 )
+from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
 
 
-class RolePresetRow(Base):  # type: ignore[misc]
+class RolePresetRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
     __tablename__ = "role_presets"
     __table_args__ = (
         sa.Index(
@@ -43,16 +42,6 @@ class RolePresetRow(Base):  # type: ignore[misc]
     # the Update API never mutates this column directly.
     deleted: Mapped[bool] = mapped_column(
         "deleted", sa.Boolean, nullable=False, server_default=sa.false()
-    )
-    created_at: Mapped[datetime] = mapped_column(
-        "created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        "updated_at",
-        sa.DateTime(timezone=True),
-        server_default=sa.func.now(),
-        onupdate=sa.func.now(),
-        nullable=False,
     )
 
     def to_data(self) -> RolePresetData:

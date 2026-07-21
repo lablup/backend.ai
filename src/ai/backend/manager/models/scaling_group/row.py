@@ -28,7 +28,7 @@ from sqlalchemy.orm import (
     relationship,
     selectinload,
 )
-from sqlalchemy.sql.expression import true
+from sqlalchemy.sql.expression import false, true
 
 from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.identifier.resource_group import ResourceGroupID
@@ -277,6 +277,15 @@ def _get_resource_preset_join_condition() -> Any:
 
 class ScalingGroupRow(Base):  # type: ignore[misc]
     __tablename__ = "scaling_groups"
+    __table_args__ = (
+        # Partial unique index: at most one row may have is_default = true.
+        sa.Index(
+            "uq_scaling_groups_is_default",
+            "is_default",
+            unique=True,
+            postgresql_where=sa.text("is_default"),
+        ),
+    )
     name: Mapped[str] = mapped_column("name", sa.String(length=64), primary_key=True)
     id: Mapped[ResourceGroupID] = mapped_column(
         "id",
@@ -291,6 +300,13 @@ class ScalingGroupRow(Base):  # type: ignore[misc]
     )
     is_public: Mapped[bool] = mapped_column(
         "is_public", sa.Boolean, index=True, default=True, server_default=true(), nullable=False
+    )
+    # At most one scaling group may be the default at a time. This is enforced by
+    # the partial unique index in ``__table_args__`` (a minimum of one is NOT
+    # guaranteed). To switch the default, clear the previous default before
+    # setting the new one within the same transaction.
+    is_default: Mapped[bool] = mapped_column(
+        "is_default", sa.Boolean, default=False, server_default=false(), nullable=False
     )
     created_at: Mapped[datetime | None] = mapped_column(
         "created_at", sa.DateTime(timezone=True), server_default=sa.func.now()

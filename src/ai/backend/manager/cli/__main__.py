@@ -235,7 +235,11 @@ def generate_rpc_keypair(_cli_ctx: CLIContext, dst_dir: pathlib.Path, name: str)
     "--retention",
     type=str,
     default="1yr",
-    help="The retention limit. e.g., 20d, 1mo, 6mo, 1yr",
+    help=(
+        "Age boundary for the Redis kernel-statistics cleanup this command still "
+        "owns. e.g., 20d, 1mo, 6mo, 1yr. DB records are purged by the retention "
+        "policy sweep (BEP-1063), not this option."
+    ),
 )
 @click.option(
     "-v",
@@ -253,24 +257,25 @@ def generate_rpc_keypair(_cli_ctx: CLIContext, dst_dir: pathlib.Path, name: str)
 @click.pass_obj
 def clear_history(cli_ctx: CLIContext, retention: str, vacuum_full: bool) -> None:
     """
-    Delete old records from the kernels, error_logs tables and
-    invoke the PostgreSQL's vaccuum operation to clear up the actual disk space.
+    Manual escape hatch over the automated DB record retention policy layer
+    (BEP-1063). It triggers an immediate retention sweep (deleting records past
+    each enabled policy's age boundary), cleans up terminated-kernel Redis
+    statistics (a non-DB store the sweep does not touch), then runs PostgreSQL
+    VACUUM / VACUUM FULL to reclaim disk space the sweep never reclaims.
     """
     import asyncio
-    import uuid
     from datetime import UTC, datetime
-    from typing import cast
 
     import sqlalchemy as sa
     from more_itertools import chunked
 
     from ai.backend.common.validators import TimeDuration
-    from ai.backend.manager.models.error_logs import error_logs
     from ai.backend.manager.models.kernel import kernels
-    from ai.backend.manager.models.session import SessionRow
     from ai.backend.manager.repositories.db.engine import connect_database, vacuum_db
+    from ai.backend.manager.repositories.ops import DBOpsProvider
+    from ai.backend.manager.repositories.retention.repository import RetentionRepository
 
-    from .context import redis_ctx
+    from .context import config_provider_ctx, redis_ctx
 
     log = _get_logger()
     today = datetime.now(UTC)
@@ -317,53 +322,23 @@ def clear_history(cli_ctx: CLIContext, retention: str, vacuum_full: bool) -> Non
         except Exception:
             log.exception("Unexpected error while cleaning up redis history")
 
-    async def _clear_terminated_sessions() -> None:
-        async with connect_database(bootstrap_config.db, isolation_level="AUTOCOMMIT") as db:
-            async with db.begin() as conn:
-                log.info("Deleting old records...")
-                result = (
-                    await conn.scalars(
-                        sa.select(SessionRow.id).where(SessionRow.terminated_at < expiration_date)
-                    )
-                ).all()
-                session_ids = cast(list[uuid.UUID], result)
-                if session_ids:
-                    await conn.execute(
-                        sa.delete(kernels).where(kernels.c.session_id.in_(session_ids))
-                    )
-                    await conn.execute(sa.delete(SessionRow).where(SessionRow.id.in_(session_ids)))
-
-                curs = await conn.execute(sa.select(sa.func.count()).select_from(SessionRow))
-                if ret := curs.fetchone():
-                    table_size = ret[0]
-                    log.info(
-                        "The number of rows of the `sessions` tables after cleanup: {}",
-                        table_size,
-                    )
+    async def _force_retention_sweep() -> None:
+        log.info("Triggering an immediate DB record retention sweep...")
+        async with (
+            connect_database(bootstrap_config.db) as db,
+            config_provider_ctx(cli_ctx) as config_provider,
+        ):
+            repository = RetentionRepository(DBOpsProvider(db), config_provider)
+            results = await repository.sweep()
+        total_deleted = sum(result.deleted_count for result in results)
         log.info(
-            "Cleaned up {:,} database records older than {}.",
-            len(session_ids),
-            expiration_date,
-        )
-
-    async def _clear_old_error_logs() -> None:
-        async with connect_database(bootstrap_config.db, isolation_level="AUTOCOMMIT") as db:
-            async with db.begin() as conn:
-                log.info("Deleting old error logs...")
-                result = await conn.execute(
-                    sa.delete(error_logs).where(error_logs.c.created_at < expiration_date),
-                )
-                deleted_count = result.rowcount
-
-        log.info(
-            "Cleaned up {:,} error log records older than {}.",
-            deleted_count,
-            expiration_date,
+            "Retention sweep deleted {:,} record(s) across {} categor(ies).",
+            total_deleted,
+            len(results),
         )
 
     asyncio.run(_clear_redis_history())
-    asyncio.run(_clear_terminated_sessions())
-    asyncio.run(_clear_old_error_logs())
+    asyncio.run(_force_retention_sweep())
     asyncio.run(vacuum_db(bootstrap_config, vacuum_full))
 
 

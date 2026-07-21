@@ -47,6 +47,7 @@ from ai.backend.manager.sokovan.scheduler.fair_share import (
     FairShareAggregator,
     FairShareFactorCalculator,
 )
+from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import AgentSelector
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 from ai.backend.manager.sokovan.sokovan import SokovanOrchestrator
 from ai.backend.manager.sokovan.stages.factory import build_reconciler_coordinator
@@ -73,6 +74,7 @@ class SokovanOrchestratorInput:
     event_producer: EventProducer
     valkey_schedule: ValkeyScheduleClient
     valkey_stat: ValkeyStatClient
+    agent_selector: AgentSelector
     # Controller dependencies
     scheduling_controller: SchedulingController
     deployment_controller: DeploymentController
@@ -125,6 +127,7 @@ class SokovanOrchestratorDependency(
             setup_input.agent_client_pool,
             setup_input.network_plugin_ctx,
             setup_input.valkey_schedule,
+            setup_input.agent_selector,
         )
 
         # Create HTTP client pool for deployment operations

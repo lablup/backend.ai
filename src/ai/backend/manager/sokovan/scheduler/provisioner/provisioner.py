@@ -12,7 +12,6 @@ from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import (
     AgentId,
     AgentSelectionStrategy,
-    ResourceSlot,
     SessionId,
     SlotQuantity,
 )
@@ -21,7 +20,6 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.sokovan import (
     AgentAllocation,
     AgentInfo,
-    AgentOccupancy,
     AllocationBatch,
     KernelAllocation,
     KeypairOccupancy,
@@ -43,7 +41,6 @@ from ai.backend.manager.repositories.scheduler import (
     SchedulerRepository,
     SchedulingData,
 )
-from ai.backend.manager.repositories.scheduler.types.agent import AgentMeta
 from ai.backend.manager.sokovan.recorder import (
     ExecutionRecord,
     RecorderContext,
@@ -233,9 +230,7 @@ class SessionProvisioner:
             if scheduling_data.snapshot_data
             else {}
         )
-        mutable_agents = [
-            self._build_agent_info(agent, agent_occupancy) for agent in scheduling_data.agents
-        ]
+        mutable_agents = [agent.to_agent_info(agent_occupancy) for agent in scheduling_data.agents]
         session_allocations: list[SessionAllocation] = []
         scheduling_failures: list[SchedulingFailure] = []
         # Get agent selection strategy from scheduler opts config
@@ -443,7 +438,7 @@ class SessionProvisioner:
         session_metadata = SessionMetadata(
             session_id=session_workload.session_id,
             session_type=session_workload.session_type,
-            scaling_group=session_workload.scaling_group,
+            resource_group_id=session_workload.resource_group_id,
             cluster_mode=session_workload.cluster_mode,
         )
 
@@ -473,27 +468,6 @@ class SessionProvisioner:
 
         # Build session allocation from selections
         return self._build_session_allocation(session_workload, selections)
-
-    @staticmethod
-    def _build_agent_info(
-        meta: AgentMeta,
-        occupancy_map: Mapping[AgentId, AgentOccupancy],
-    ) -> AgentInfo:
-        """Create an AgentInfo from agent metadata and occupancy mapping."""
-        occupancy = occupancy_map.get(meta.id)
-        if occupancy:
-            occupied = ResourceSlot({sq.slot_name: sq.quantity for sq in occupancy.occupied_slots})
-        else:
-            occupied = ResourceSlot()
-        return AgentInfo(
-            agent_id=meta.id,
-            agent_addr=meta.addr,
-            architecture=meta.architecture,
-            scaling_group=meta.scaling_group,
-            available_slots=meta.available_slots,
-            occupied_slots=occupied,
-            container_count=occupancy.container_count if occupancy else 0,
-        )
 
     @staticmethod
     def _build_session_allocation(

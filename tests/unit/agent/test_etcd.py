@@ -98,17 +98,14 @@ class TestPutOperations:
         """Test that put works with different scopes."""
         key = "test/put/scoped"
         global_val = "global-value"
-        sgroup_val = "sgroup-value"
         node_val = "node-value"
 
         # Put in different scopes
         await agent_etcd_view.put(key, global_val, scope=ConfigScopes.GLOBAL)
-        await agent_etcd_view.put(key, sgroup_val, scope=ConfigScopes.SGROUP)
         await agent_etcd_view.put(key, node_val, scope=ConfigScopes.NODE)
 
         # Verify each scope has its own value
         assert await agent_etcd_view.get(key, scope=ConfigScopes.GLOBAL) == global_val
-        assert await agent_etcd_view.get(key, scope=ConfigScopes.SGROUP) == sgroup_val
         assert await agent_etcd_view.get(key, scope=ConfigScopes.NODE) == node_val
 
     async def test_put_prefix(
@@ -118,7 +115,7 @@ class TestPutOperations:
         """Test that put_prefix works correctly."""
         key = "test/putprefix"
         dict_obj: dict[str, Any] = {"nested": {"key": "value"}, "another": "data"}
-        scope = ConfigScopes.SGROUP
+        scope = ConfigScopes.NODE
 
         await agent_etcd_view.put_prefix(key, dict_obj, scope=scope)
 
@@ -163,32 +160,32 @@ class TestGetOperations:
         self,
         agent_etcd_view: AgentEtcdClientView,
     ) -> None:
-        """Test that get respects scope hierarchy (NODE scope inherits from SGROUP and GLOBAL)."""
+        """Test that get respects scope hierarchy (NODE scope inherits from GLOBAL)."""
         key = "test/get/scoped"
-        sgroup_value = "sgroup-value"
+        global_value = "global-value"
         node_value = "node-value"
 
-        # Put value in SGROUP scope
-        await agent_etcd_view.put(key, sgroup_value, scope=ConfigScopes.SGROUP)
+        # Put value in GLOBAL scope
+        await agent_etcd_view.put(key, global_value, scope=ConfigScopes.GLOBAL)
 
-        # Reading from SGROUP should get SGROUP value
-        result_sgroup = await agent_etcd_view.get(key, scope=ConfigScopes.SGROUP)
-        assert result_sgroup == sgroup_value
+        # Reading from GLOBAL should get GLOBAL value
+        result_global = await agent_etcd_view.get(key, scope=ConfigScopes.GLOBAL)
+        assert result_global == global_value
 
-        # Reading from NODE should inherit from SGROUP (NODE inherits SGROUP + GLOBAL)
+        # Reading from NODE should inherit from GLOBAL (NODE inherits GLOBAL)
         result_node_inherited = await agent_etcd_view.get(key, scope=ConfigScopes.NODE)
-        assert result_node_inherited == sgroup_value
+        assert result_node_inherited == global_value
 
-        # Put a value in NODE scope - it should override the SGROUP value
+        # Put a value in NODE scope - it should override the GLOBAL value
         await agent_etcd_view.put(key, node_value, scope=ConfigScopes.NODE)
 
         # Reading from NODE should now get NODE value (higher priority)
         result_node = await agent_etcd_view.get(key, scope=ConfigScopes.NODE)
         assert result_node == node_value
 
-        # Reading from SGROUP should still get SGROUP value (unaffected by NODE)
-        result_sgroup_after = await agent_etcd_view.get(key, scope=ConfigScopes.SGROUP)
-        assert result_sgroup_after == sgroup_value
+        # Reading from GLOBAL should still get GLOBAL value (unaffected by NODE)
+        result_global_after = await agent_etcd_view.get(key, scope=ConfigScopes.GLOBAL)
+        assert result_global_after == global_value
 
     async def test_get_prefix(
         self,
@@ -282,7 +279,7 @@ class TestDeleteOperations:
     ) -> None:
         """Test that delete respects scope."""
         key = "test/delete/scoped"
-        scope = ConfigScopes.SGROUP
+        scope = ConfigScopes.NODE
         value = "scoped-value"
 
         await agent_etcd_view.put(key, value, scope=scope)
@@ -326,34 +323,3 @@ class TestDeleteOperations:
         # Verify other key is kept
         kept = await agent_etcd_view.get("test/keep")
         assert kept == "keep-value"
-
-
-class TestConfigContainerUpdates:
-    async def test_config_container_updates_reflect_in_scope_prefix_map(
-        self,
-        etcd: AsyncEtcd,
-        agent_config: AgentUnifiedConfig,
-    ) -> None:
-        """Test that changes to config container are reflected in scope prefix map."""
-        # Create initial config container
-        agent_config.update(agent_update={"id": "agent-1", "scaling_group": "sgroup-1"})
-        view = AgentEtcdClientView(etcd, agent_config)
-
-        # First call
-        key1 = "test/config/key1"
-        await view.put(key1, "value1", scope=ConfigScopes.SGROUP)
-        result1 = await view.get(key1, scope=ConfigScopes.SGROUP)
-        assert result1 == "value1"
-
-        # Update config container (simulating config reload with new config object)
-        agent_config.update(agent_update={"scaling_group": "sgroup-2"})
-
-        # Second call should use new scope prefix
-        key2 = "test/config/key2"
-        await view.put(key2, "value2", scope=ConfigScopes.SGROUP)
-        result2 = await view.get(key2, scope=ConfigScopes.SGROUP)
-        assert result2 == "value2"
-
-        # The first key should not be accessible under the new scope
-        result1_new_scope = await view.get(key1, scope=ConfigScopes.SGROUP)
-        assert result1_new_scope is None

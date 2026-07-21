@@ -109,12 +109,9 @@ class SchedulerRepository:
         self._config_provider = config_provider
 
     @scheduler_repository_resilience.apply()
-    async def get_scheduling_data(
-        self, resource_group_id: ResourceGroupID
-    ) -> SchedulingData | None:
+    async def get_scheduling_data(self, resource_group_id: ResourceGroupID) -> SchedulingData:
         """
         Get scheduling data from database.
-        Returns None if no pending sessions exist.
         Raises ScalingGroupNotFound if scaling group doesn't exist.
         """
         known_slot_types = await self._get_known_slot_types()
@@ -124,11 +121,7 @@ class SchedulerRepository:
             max_container_count=max_container_count,
         )
 
-        scheduling_data = await self._db_source.get_scheduling_data(resource_group_id, spec)
-        if not scheduling_data.pending_sessions.sessions:
-            return None
-
-        return scheduling_data
+        return await self._db_source.get_scheduling_data(resource_group_id, spec)
 
     @scheduler_repository_resilience.apply()
     async def allocate_sessions(self, allocation_batch: AllocationBatch) -> list[SessionId]:
@@ -276,6 +269,26 @@ class SchedulerRepository:
             access_key=access_key,
             domain_name=domain_name,
             project_id=project_id,
+        )
+
+    @scheduler_repository_resilience.apply()
+    async def query_accessible_resource_group_ids(
+        self,
+        *,
+        domain_name: str,
+        project_id: ProjectID,
+        access_key: AccessKey,
+    ) -> frozenset[ResourceGroupID]:
+        """Return the resource-group ids accessible to the given single-project scope.
+
+        Thin passthrough to
+        :meth:`ScheduleDBSource.query_accessible_resource_group_ids`; the caller
+        performs the accessibility rejection.
+        """
+        return await self._db_source.query_accessible_resource_group_ids(
+            domain_name=domain_name,
+            project_id=project_id,
+            access_key=access_key,
         )
 
     @scheduler_repository_resilience.apply()

@@ -9,6 +9,7 @@ from decimal import Decimal
 import pytest
 from sqlalchemy.exc import IntegrityError
 
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.models.resource_usage_history import (
     DomainUsageBucketRow,
@@ -55,11 +56,13 @@ class TestDomainUsageBucketRow:
         domain_usage_bucket_id: uuid.UUID,
         domain_name: str,
         scaling_group: str,
+        resource_group_id: ResourceGroupID,
     ) -> None:
         """Duplicate (domain_name, scaling_group, period_start) should raise IntegrityError."""
         duplicate = DomainUsageBucketRow(
             domain_name=domain_name,
             resource_group=scaling_group,
+            resource_group_id=resource_group_id,
             period_start=date(2024, 1, 1),
             period_end=date(2024, 1, 1),
             decay_unit_days=1,
@@ -95,12 +98,14 @@ class TestProjectUsageBucketRow:
         project_id: uuid.UUID,
         domain_name: str,
         scaling_group: str,
+        resource_group_id: ResourceGroupID,
     ) -> None:
         """Duplicate (project_id, scaling_group, period_start) should raise IntegrityError."""
         duplicate = ProjectUsageBucketRow(
             project_id=project_id,
             domain_name=domain_name,
             resource_group=scaling_group,
+            resource_group_id=resource_group_id,
             period_start=date(2024, 1, 1),
             period_end=date(2024, 1, 1),
             decay_unit_days=1,
@@ -139,6 +144,7 @@ class TestUserUsageBucketRow:
         project_id: uuid.UUID,
         domain_name: str,
         scaling_group: str,
+        resource_group_id: ResourceGroupID,
     ) -> None:
         """Duplicate (user_uuid, project_id, scaling_group, period_start) should raise IntegrityError."""
         duplicate = UserUsageBucketRow(
@@ -146,6 +152,7 @@ class TestUserUsageBucketRow:
             project_id=project_id,
             domain_name=domain_name,
             resource_group=scaling_group,
+            resource_group_id=resource_group_id,
             period_start=date(2024, 1, 1),
             period_end=date(2024, 1, 1),
             decay_unit_days=1,

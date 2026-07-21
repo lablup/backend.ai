@@ -24,12 +24,14 @@ from typing import TYPE_CHECKING
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
 
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.models.base import (
     GUID,
     Base,
     ResourceSlotColumn,
 )
+from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.domain import DomainRow
@@ -105,6 +107,11 @@ class KernelUsageRecordRow(Base):  # type: ignore[misc]
     resource_group: Mapped[str] = mapped_column(
         "resource_group", sa.String(length=64), nullable=False, index=True
     )
+    resource_group_id: Mapped[ResourceGroupID] = mapped_column(
+        "resource_group_id",
+        GUID(ResourceGroupID),
+        nullable=False,
+    )
 
     # Period slice information
     period_start: Mapped[datetime] = mapped_column(
@@ -168,7 +175,7 @@ def _get_domain_usage_bucket_domain_join_condition() -> sa.ColumnElement[bool]:
     return DomainUsageBucketRow.domain_name == foreign(DomainRow.name)
 
 
-class DomainUsageBucketRow(Base):  # type: ignore[misc]
+class DomainUsageBucketRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
     """Per-domain period-based resource usage aggregation.
 
     Cache summing all Project/User usage within the domain.
@@ -185,6 +192,11 @@ class DomainUsageBucketRow(Base):  # type: ignore[misc]
     )
     resource_group: Mapped[str] = mapped_column(
         "resource_group", sa.String(length=64), nullable=False
+    )
+    resource_group_id: Mapped[ResourceGroupID] = mapped_column(
+        "resource_group_id",
+        GUID(ResourceGroupID),
+        nullable=False,
     )
 
     # Bucket period information
@@ -207,21 +219,6 @@ class DomainUsageBucketRow(Base):  # type: ignore[misc]
         default=ResourceSlot,
         comment="Scaling group capacity at bucket period. "
         "Sum of agent.available_slots for calculating usage ratio.",
-    )
-
-    # Metadata
-    created_at: Mapped[datetime] = mapped_column(
-        "created_at",
-        sa.DateTime(timezone=True),
-        nullable=False,
-        server_default=sa.func.now(),
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        "updated_at",
-        sa.DateTime(timezone=True),
-        nullable=False,
-        server_default=sa.func.now(),
-        onupdate=sa.func.now(),
     )
 
     # Relationships
@@ -256,7 +253,7 @@ def _get_project_usage_bucket_domain_join_condition() -> sa.ColumnElement[bool]:
     return ProjectUsageBucketRow.domain_name == foreign(DomainRow.name)
 
 
-class ProjectUsageBucketRow(Base):  # type: ignore[misc]
+class ProjectUsageBucketRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
     """Per-project period-based resource usage aggregation.
 
     Cache summing all User usage within the project.
@@ -274,6 +271,11 @@ class ProjectUsageBucketRow(Base):  # type: ignore[misc]
     )
     resource_group: Mapped[str] = mapped_column(
         "resource_group", sa.String(length=64), nullable=False
+    )
+    resource_group_id: Mapped[ResourceGroupID] = mapped_column(
+        "resource_group_id",
+        GUID(ResourceGroupID),
+        nullable=False,
     )
 
     # Bucket period information
@@ -296,21 +298,6 @@ class ProjectUsageBucketRow(Base):  # type: ignore[misc]
         default=ResourceSlot,
         comment="Scaling group capacity at bucket period. "
         "Sum of agent.available_slots for calculating usage ratio.",
-    )
-
-    # Metadata
-    created_at: Mapped[datetime] = mapped_column(
-        "created_at",
-        sa.DateTime(timezone=True),
-        nullable=False,
-        server_default=sa.func.now(),
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        "updated_at",
-        sa.DateTime(timezone=True),
-        nullable=False,
-        server_default=sa.func.now(),
-        onupdate=sa.func.now(),
     )
 
     # Relationships
@@ -358,7 +345,7 @@ def _get_user_usage_bucket_domain_join_condition() -> sa.ColumnElement[bool]:
     return UserUsageBucketRow.domain_name == foreign(DomainRow.name)
 
 
-class UserUsageBucketRow(Base):  # type: ignore[misc]
+class UserUsageBucketRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
     """Per-user period-based resource usage aggregation (computation cache).
 
     Cache aggregating raw data from kernel_usage_records per decay_unit period.
@@ -383,6 +370,11 @@ class UserUsageBucketRow(Base):  # type: ignore[misc]
     resource_group: Mapped[str] = mapped_column(
         "resource_group", sa.String(length=64), nullable=False
     )
+    resource_group_id: Mapped[ResourceGroupID] = mapped_column(
+        "resource_group_id",
+        GUID(ResourceGroupID),
+        nullable=False,
+    )
 
     # Bucket period information
     period_start: Mapped[date] = mapped_column("period_start", sa.Date, nullable=False)
@@ -404,21 +396,6 @@ class UserUsageBucketRow(Base):  # type: ignore[misc]
         default=ResourceSlot,
         comment="Scaling group capacity at bucket period. "
         "Sum of agent.available_slots for calculating usage ratio.",
-    )
-
-    # Metadata
-    created_at: Mapped[datetime] = mapped_column(
-        "created_at",
-        sa.DateTime(timezone=True),
-        nullable=False,
-        server_default=sa.func.now(),
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        "updated_at",
-        sa.DateTime(timezone=True),
-        nullable=False,
-        server_default=sa.func.now(),
-        onupdate=sa.func.now(),
     )
 
     # Relationships

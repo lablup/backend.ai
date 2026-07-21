@@ -171,7 +171,7 @@ class PortProxyConfig(BaseSchema):
                 "enough for your expected concurrent sessions and firewall rules allow access."
             ),
             added_version="25.9.0",
-            example=ConfigExample(local="10205,10300", prod="10205,10300"),
+            example=ConfigExample(local="[10205, 10300]", prod="[10205, 10300]"),
         ),
     ]
     advertised_port_range: Annotated[
@@ -184,7 +184,7 @@ class PortProxyConfig(BaseSchema):
                 "Must be the same size as bind_port_range for correct port mapping."
             ),
             added_version="25.9.0",
-            example=ConfigExample(local="", prod="10205,10300"),
+            example=ConfigExample(local="", prod="[10205, 10300]"),
         ),
     ]
 
@@ -213,7 +213,7 @@ class H2Config(BaseSchema):
                 "Should not overlap with other service ports on the same host."
             ),
             added_version="25.9.0",
-            example=ConfigExample(local="50000,60000", prod="50000,60000"),
+            example=ConfigExample(local="[50000, 60000]", prod="[50000, 60000]"),
         ),
     ]
 
@@ -242,7 +242,7 @@ class TraefikPortProxyConfig(BaseSchema):
                 "Configure corresponding Traefik entrypoints for each port in this range."
             ),
             added_version="25.9.0",
-            example=ConfigExample(local="10205,10300", prod="10205,10300"),
+            example=ConfigExample(local="[10205, 10300]", prod="[10205, 10300]"),
         ),
     ]
 

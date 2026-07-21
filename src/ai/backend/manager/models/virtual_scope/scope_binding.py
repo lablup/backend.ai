@@ -1,13 +1,11 @@
 from __future__ import annotations
 
-from datetime import datetime
-
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
+from ai.backend.common.data.entity.types import ScopeType
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.data.permission.virtual_scope import ScopeBindingData
-from ai.backend.common.entity.types import ScopeType
 from ai.backend.common.identifier.scope import ScopeID
 from ai.backend.common.identifier.virtual_scope import VirtualScopeID
 from ai.backend.manager.models.base import (
@@ -15,11 +13,19 @@ from ai.backend.manager.models.base import (
     Base,
     IntFlagType,
 )
+from ai.backend.manager.models.mixins.timestamp import CreatedAtMixin
 
 
-class ScopeBindingRow(Base):  # type: ignore[misc]
+class ScopeBindingRow(CreatedAtMixin, Base):  # type: ignore[misc]
     __tablename__ = "scope_bindings"
-    __table_args__ = (sa.Index("ix_scope_bindings_scope", "scope_type", "scope_id"),)
+    __table_args__ = (
+        sa.Index("ix_scope_bindings_scope", "scope_type", "scope_id"),
+        sa.Index(
+            "ix_scope_bindings_virtual_scope",
+            "virtual_scope_id",
+            postgresql_include=["scope_type", "scope_id", "permission_cap"],
+        ),
+    )
 
     virtual_scope_id: Mapped[VirtualScopeID] = mapped_column(
         "virtual_scope_id",
@@ -33,9 +39,6 @@ class ScopeBindingRow(Base):  # type: ignore[misc]
     scope_id: Mapped[ScopeID] = mapped_column("scope_id", GUID(), primary_key=True)
     permission_cap: Mapped[Permission | None] = mapped_column(
         "permission_cap", IntFlagType(Permission), nullable=True
-    )
-    created_at: Mapped[datetime] = mapped_column(
-        "created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
     )
 
     def to_data(self) -> ScopeBindingData:

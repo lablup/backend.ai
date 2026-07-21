@@ -5,6 +5,7 @@ import pytest
 import tomli
 
 from ai.backend.common.config import (
+    DEFAULT_SHELL,
     ModelConfig,
     ModelConfigDraft,
     ModelDefinition,
@@ -500,6 +501,47 @@ class TestModelConfigs:
         service = resolved.models[0].service
         assert service is not None
         assert service.shell is None
+
+    def test_merge_keeps_unset_shell_unset_and_resolves_default(self) -> None:
+        base = ModelDefinitionDraft.model_validate({
+            "models": [{"name": "demo", "service": {"port": 8080}}]
+        })
+        override = ModelDefinitionDraft.model_validate({
+            "models": [
+                {
+                    "model_path": "/models/demo",
+                    "service": {"start_command": "echo setup\npython service.py"},
+                }
+            ]
+        })
+
+        merged = base.merge(override)
+
+        merged_service = merged.models[0].service if merged.models else None
+        assert merged_service is not None
+        assert "shell" not in merged_service.model_fields_set
+        resolved_service = merged.to_resolved().models[0].service
+        assert resolved_service is not None
+        assert resolved_service.shell == DEFAULT_SHELL
+
+    def test_merge_preserves_explicit_null_shell(self) -> None:
+        base = ModelDefinitionDraft.model_validate({
+            "models": [{"name": "demo", "service": {"port": 8080}}]
+        })
+        override = ModelDefinitionDraft.model_validate({
+            "models": [
+                {
+                    "model_path": "/models/demo",
+                    "service": {"start_command": "python service.py", "shell": None},
+                }
+            ]
+        })
+
+        merged = base.merge(override)
+
+        resolved_service = merged.to_resolved().models[0].service
+        assert resolved_service is not None
+        assert resolved_service.shell is None
 
     def test_to_resolved_substitutes_model_path_placeholder(self) -> None:
         # The variant baseline keeps ``{model_path}`` so a single fixture

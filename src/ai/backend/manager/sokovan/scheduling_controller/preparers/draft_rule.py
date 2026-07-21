@@ -28,7 +28,7 @@ from ai.backend.manager.data.session.creation import (
     ImageInfo,
     ScalingGroupNetworkInfo,
 )
-from ai.backend.manager.data.session.draft import SessionSpecDraft
+from ai.backend.manager.data.session.draft import SessionResourceSpecDraft
 from ai.backend.manager.data.session.options import DefaultSessionOptions
 
 
@@ -76,8 +76,8 @@ class SessionSpecDraftRule(ABC):
     @abstractmethod
     async def prepare(
         self,
-        draft: SessionSpecDraft,
+        draft: SessionResourceSpecDraft,
         context: SessionSpecPreparationContext,
-    ) -> SessionSpecDraft:
+    ) -> SessionResourceSpecDraft:
         """Return a new draft with this rule's fields resolved."""
         raise NotImplementedError

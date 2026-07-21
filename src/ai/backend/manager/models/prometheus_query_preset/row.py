@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
 
 import sqlalchemy as sa
 from pydantic import ConfigDict
@@ -14,6 +13,7 @@ from ai.backend.manager.models.base import (
     Base,
     PydanticColumn,
 )
+from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
 
 __all__ = ("PrometheusQueryPresetRow",)
 
@@ -25,7 +25,7 @@ class PresetOptions(BackendAISchema):
     model_config = ConfigDict(frozen=True)
 
 
-class PrometheusQueryPresetRow(Base):  # type: ignore[misc]
+class PrometheusQueryPresetRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
     __tablename__ = "prometheus_query_presets"
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -52,19 +52,6 @@ class PrometheusQueryPresetRow(Base):  # type: ignore[misc]
         PydanticColumn(PresetOptions),
         nullable=False,
         server_default=sa.text('\'{"filter_labels":[],"group_labels":[]}\'::jsonb'),
-    )
-    created_at: Mapped[datetime] = mapped_column(
-        "created_at",
-        sa.DateTime(timezone=True),
-        nullable=False,
-        server_default=sa.func.now(),
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        "updated_at",
-        sa.DateTime(timezone=True),
-        nullable=False,
-        server_default=sa.func.now(),
-        onupdate=sa.func.now(),
     )
 
     def to_data(self) -> PrometheusQueryPresetData:

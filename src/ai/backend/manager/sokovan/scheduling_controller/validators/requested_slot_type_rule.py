@@ -49,7 +49,7 @@ class RequestedSlotTypeRule(SessionSpecValidatorRule):
                 ),
             )
         errors: list[str] = []
-        for idx, kernel in enumerate(spec.kernel_specs):
+        for idx, kernel in enumerate(spec.resource_spec.kernel_specs):
             unknown = sorted({
                 entry.resource_type
                 for entry in kernel.execution_spec.resource_input.resources

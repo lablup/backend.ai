@@ -76,6 +76,7 @@ from ai.backend.manager.data.session.draft import (
     SessionIdentityDraft,
     SessionNetworkDraft,
     SessionOptionsDraft,
+    SessionResourceSpecDraft,
     SessionScopeDraft,
     SessionSpecDraft,
 )
@@ -475,12 +476,33 @@ class ModelServingService:
             )
 
         draft = SessionSpecDraft(
-            identity=SessionIdentityDraft(
-                session_id=SessionID(uuid.uuid4()),
-                creation_id=session_creation_id,
-                session_name=session_name,
-                access_key=AccessKey(service_prepare_ctx.owner_access_key),
-                user_uuid=created_user.uuid,
+            resource_spec=SessionResourceSpecDraft(
+                identity=SessionIdentityDraft(
+                    session_id=SessionID(uuid.uuid4()),
+                    creation_id=session_creation_id,
+                    session_name=session_name,
+                    access_key=AccessKey(service_prepare_ctx.owner_access_key),
+                    user_uuid=created_user.uuid,
+                ),
+                classification=SessionClassificationDraft(
+                    session_type=SessionTypes.INFERENCE,
+                    tag=action.tag,
+                ),
+                network=SessionNetworkDraft(),
+                callback_url=callback_url,
+                options=SessionOptionsDraft(
+                    priority=SESSION_PRIORITY_DEFAULT,
+                    is_preemptible=False,
+                    cluster_mode=action.cluster_mode,
+                    cluster_size=action.cluster_size,
+                    scheduling_target=SchedulingTargetDraft(),
+                    kernel_groups=kernel_groups,
+                    handler_options=None,
+                ),
+                internal_data_extras=InternalDataExtras(
+                    sudo_session_enabled=sudo_session_enabled,
+                    model_definition_path=service_prepare_ctx.model_definition_path,
+                ),
             ),
             scope=SessionScopeDraft(
                 domain_id=domain_id,
@@ -488,25 +510,6 @@ class ModelServingService:
                 project_id=ProjectID(service_prepare_ctx.group_id),
                 resource_group_id=resource_group_id,
                 resource_group_name=resource_group_name,
-            ),
-            classification=SessionClassificationDraft(
-                session_type=SessionTypes.INFERENCE,
-                tag=action.tag,
-            ),
-            network=SessionNetworkDraft(),
-            callback_url=callback_url,
-            options=SessionOptionsDraft(
-                priority=SESSION_PRIORITY_DEFAULT,
-                is_preemptible=False,
-                cluster_mode=action.cluster_mode,
-                cluster_size=action.cluster_size,
-                scheduling_target=SchedulingTargetDraft(),
-                kernel_groups=kernel_groups,
-                handler_options=None,
-            ),
-            internal_data_extras=InternalDataExtras(
-                sudo_session_enabled=sudo_session_enabled,
-                model_definition_path=service_prepare_ctx.model_definition_path,
             ),
         )
 

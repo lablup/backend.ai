@@ -1,3 +1,3 @@
-from .row import IdleCheckerBindingRow, IdleCheckerRow
+from .row import IdleCheckerBindingRow, IdleCheckerRow, SessionIdleCheckRow
 
-__all__ = ("IdleCheckerRow", "IdleCheckerBindingRow")
+__all__ = ("IdleCheckerRow", "IdleCheckerBindingRow", "SessionIdleCheckRow")

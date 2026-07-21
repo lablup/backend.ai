@@ -281,14 +281,16 @@ class TestScheduleSessionsLifecycleHandler:
         mock_repository: AsyncMock,
         pending_sessions_multiple: list[SessionWithKernels],
     ) -> None:
-        """SC-SS-005: No scheduling data available skips all sessions.
+        """SC-SS-005: No pending sessions in scheduling data skips all sessions.
 
-        Given: Repository returns None for scheduling data
+        Given: Repository returns scheduling data with no pending sessions
         When: Handler is invoked
         Then: All sessions marked as skipped with appropriate reason
         """
         # Arrange
-        mock_repository.get_scheduling_data.return_value = None
+        mock_scheduling_data = MagicMock()
+        mock_scheduling_data.pending_sessions.sessions = []
+        mock_repository.get_scheduling_data.return_value = mock_scheduling_data
 
         # Act
         result = await handler.execute(ResourceGroupID(uuid.uuid4()), pending_sessions_multiple)

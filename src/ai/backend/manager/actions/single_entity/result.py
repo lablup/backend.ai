@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 from ai.backend.common.exception import ErrorCode
+from ai.backend.common.identifier.entity import EntityID
 from ai.backend.manager.actions.types import OperationStatus
 
 __all__ = (
@@ -20,7 +21,7 @@ class SingleEntityActionResultMeta:
     """
 
     action_id: uuid.UUID
-    entity_id: str
+    entity_id: EntityID
     status: OperationStatus
     description: str
     started_at: datetime

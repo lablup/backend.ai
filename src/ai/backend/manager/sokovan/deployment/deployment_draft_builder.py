@@ -37,6 +37,7 @@ from ai.backend.manager.data.session.draft import (
     SessionIdentityDraft,
     SessionNetworkDraft,
     SessionOptionsDraft,
+    SessionResourceSpecDraft,
     SessionScopeDraft,
     SessionSpecDraft,
 )
@@ -97,12 +98,34 @@ class DeploymentSessionDraftBuilder:
         )
 
         return SessionSpecDraft(
-            identity=SessionIdentityDraft(
-                session_id=SessionID(uuid4()),
-                creation_id=secrets.token_urlsafe(16),
-                session_name=f"{deployment_info.metadata.name}-{route_id!s}",
-                access_key=context.session_owner.access_key,
-                user_uuid=context.session_owner.uuid,
+            resource_spec=SessionResourceSpecDraft(
+                identity=SessionIdentityDraft(
+                    session_id=SessionID(uuid4()),
+                    creation_id=secrets.token_urlsafe(16),
+                    session_name=f"{deployment_info.metadata.name}-{route_id!s}",
+                    access_key=context.session_owner.access_key,
+                    user_uuid=context.session_owner.uuid,
+                ),
+                classification=SessionClassificationDraft(
+                    session_type=SessionTypes.INFERENCE,
+                    tag=deployment_info.metadata.tag,
+                ),
+                network=SessionNetworkDraft(),
+                callback_url=target_revision.execution.callback_url,
+                options=SessionOptionsDraft(
+                    priority=SESSION_PRIORITY_DEFAULT,
+                    is_preemptible=False,
+                    cluster_mode=target_revision.cluster_config.mode,
+                    cluster_size=target_revision.cluster_config.size,
+                    scheduling_target=SchedulingTargetDraft(),
+                    kernel_groups=kernel_groups,
+                    handler_options=None,
+                ),
+                internal_data_extras=InternalDataExtras(
+                    sudo_session_enabled=context.session_owner.sudo_session_enabled,
+                    model_definition_path=target_revision.model_mount_config.definition_path,
+                    model_definition=model_definition_payload,
+                ),
             ),
             scope=SessionScopeDraft(
                 domain_id=context.domain_id,
@@ -110,26 +133,6 @@ class DeploymentSessionDraftBuilder:
                 project_id=ProjectID(context.group_id),
                 resource_group_id=context.resource_group_id,
                 resource_group_name=ResourceGroupName(deployment_info.metadata.resource_group),
-            ),
-            classification=SessionClassificationDraft(
-                session_type=SessionTypes.INFERENCE,
-                tag=deployment_info.metadata.tag,
-            ),
-            network=SessionNetworkDraft(),
-            callback_url=target_revision.execution.callback_url,
-            options=SessionOptionsDraft(
-                priority=SESSION_PRIORITY_DEFAULT,
-                is_preemptible=False,
-                cluster_mode=target_revision.cluster_config.mode,
-                cluster_size=target_revision.cluster_config.size,
-                scheduling_target=SchedulingTargetDraft(),
-                kernel_groups=kernel_groups,
-                handler_options=None,
-            ),
-            internal_data_extras=InternalDataExtras(
-                sudo_session_enabled=context.session_owner.sudo_session_enabled,
-                model_definition_path=target_revision.model_mount_config.definition_path,
-                model_definition=model_definition_payload,
             ),
         )
 

@@ -8,14 +8,42 @@ python_sources(
     ],
 )
 
-visibility_private_component(
-    allowed_dependents=[
-        "//src/ai/backend/**",
-    ],
-    allowed_dependencies=[
+# Dependency direction within common: dto may depend on schema, not the reverse.
+# Paths starting with "/" are relative to this (common) directory.
+__dependencies_rules__(
+    # schema: must not depend on dto.
+    (
+        "/schema/**",
+        "!/dto/**",
+        "/**",
         "//src/ai/backend/logging/**",
         "//src/ai/backend/plugin/**",
-    ],
+        "//reqs#*",
+        "//stubs/**",
+        "!*",
+    ),
+    # default: every other file in the component.
+    (
+        "*",
+        "/**",
+        "//src/ai/backend/logging/**",
+        "//src/ai/backend/plugin/**",
+        "//reqs#*",
+        "//stubs/**",
+        "!*",
+    ),
+)
+
+# Who may import the common component (equivalent to visibility_private_component).
+__dependents_rules__(
+    (
+        {"type": "*"},
+        "/**",  # code within this component may import itself
+        "//src/ai/backend/**",  # allowed extra dependents (all backend components)
+        "//tests/**",  # tests may import the source files
+        "//plugins/**",  # external plugins may import the source files
+        "!*",  # no one else may import the source files
+    )
 )
 
 python_distribution(

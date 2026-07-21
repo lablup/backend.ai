@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
 
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import ResourceSlot, SlotQuantity
 from ai.backend.manager.data.fair_share import (
     DomainFairShareData,
@@ -31,6 +32,7 @@ from ai.backend.manager.models.base import (
     Base,
     ResourceSlotColumn,
 )
+from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.domain import DomainRow
@@ -94,7 +96,7 @@ def _get_domain_fair_share_domain_join_condition() -> sa.ColumnElement[bool]:
     return DomainFairShareRow.domain_name == foreign(DomainRow.name)
 
 
-class DomainFairShareRow(Base):  # type: ignore[misc]
+class DomainFairShareRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
     """Per-domain Fair Share state.
 
     Stores weight (configured value) and calculated values together for current state.
@@ -108,6 +110,11 @@ class DomainFairShareRow(Base):  # type: ignore[misc]
     )
     resource_group: Mapped[str] = mapped_column(
         "resource_group", sa.String(length=64), nullable=False, index=True
+    )
+    resource_group_id: Mapped[ResourceGroupID] = mapped_column(
+        "resource_group_id",
+        GUID(ResourceGroupID),
+        nullable=False,
     )
     domain_name: Mapped[str] = mapped_column(
         "domain_name", sa.String(length=64), nullable=False, index=True
@@ -219,20 +226,6 @@ class DomainFairShareRow(Base):  # type: ignore[misc]
         "Example: 1 means daily aggregation, 7 means weekly aggregation.",
     )
 
-    created_at: Mapped[datetime] = mapped_column(
-        "created_at",
-        sa.DateTime(timezone=True),
-        nullable=False,
-        server_default=sa.func.now(),
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        "updated_at",
-        sa.DateTime(timezone=True),
-        nullable=False,
-        server_default=sa.func.now(),
-        onupdate=sa.func.now(),
-    )
-
     domain: Mapped[DomainRow | None] = relationship(
         "DomainRow",
         primaryjoin=_get_domain_fair_share_domain_join_condition,
@@ -318,7 +311,7 @@ def _get_project_fair_share_domain_join_condition() -> sa.ColumnElement[bool]:
     return ProjectFairShareRow.domain_name == foreign(DomainRow.name)
 
 
-class ProjectFairShareRow(Base):  # type: ignore[misc]
+class ProjectFairShareRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
     """Per-project Fair Share state.
 
     One row per (resource_group, project_id) combination.
@@ -331,6 +324,11 @@ class ProjectFairShareRow(Base):  # type: ignore[misc]
     )
     resource_group: Mapped[str] = mapped_column(
         "resource_group", sa.String(length=64), nullable=False, index=True
+    )
+    resource_group_id: Mapped[ResourceGroupID] = mapped_column(
+        "resource_group_id",
+        GUID(ResourceGroupID),
+        nullable=False,
     )
     project_id: Mapped[uuid.UUID] = mapped_column("project_id", GUID, nullable=False, index=True)
     domain_name: Mapped[str] = mapped_column(
@@ -426,20 +424,6 @@ class ProjectFairShareRow(Base):  # type: ignore[misc]
         nullable=False,
         default=DEFAULT_DECAY_UNIT_DAYS,
         comment="Aggregation period for usage buckets in days.",
-    )
-
-    created_at: Mapped[datetime] = mapped_column(
-        "created_at",
-        sa.DateTime(timezone=True),
-        nullable=False,
-        server_default=sa.func.now(),
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        "updated_at",
-        sa.DateTime(timezone=True),
-        nullable=False,
-        server_default=sa.func.now(),
-        onupdate=sa.func.now(),
     )
 
     project: Mapped[GroupRow | None] = relationship(
@@ -541,7 +525,7 @@ def _get_user_fair_share_domain_join_condition() -> sa.ColumnElement[bool]:
     return UserFairShareRow.domain_name == foreign(DomainRow.name)
 
 
-class UserFairShareRow(Base):  # type: ignore[misc]
+class UserFairShareRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
     """Per-user Fair Share state.
 
     Since a User can belong to multiple Projects, distinguished by
@@ -557,6 +541,11 @@ class UserFairShareRow(Base):  # type: ignore[misc]
     )
     resource_group: Mapped[str] = mapped_column(
         "resource_group", sa.String(length=64), nullable=False, index=True
+    )
+    resource_group_id: Mapped[ResourceGroupID] = mapped_column(
+        "resource_group_id",
+        GUID(ResourceGroupID),
+        nullable=False,
     )
     user_uuid: Mapped[uuid.UUID] = mapped_column("user_uuid", GUID, nullable=False, index=True)
     project_id: Mapped[uuid.UUID] = mapped_column("project_id", GUID, nullable=False, index=True)
@@ -661,20 +650,6 @@ class UserFairShareRow(Base):  # type: ignore[misc]
         nullable=False,
         default=DEFAULT_DECAY_UNIT_DAYS,
         comment="Aggregation period for usage buckets in days.",
-    )
-
-    created_at: Mapped[datetime] = mapped_column(
-        "created_at",
-        sa.DateTime(timezone=True),
-        nullable=False,
-        server_default=sa.func.now(),
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        "updated_at",
-        sa.DateTime(timezone=True),
-        nullable=False,
-        server_default=sa.func.now(),
-        onupdate=sa.func.now(),
     )
 
     user: Mapped[UserRow | None] = relationship(

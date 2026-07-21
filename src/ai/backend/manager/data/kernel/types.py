@@ -8,6 +8,7 @@ from functools import lru_cache
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
+from ai.backend.common.identifier.kernel_scheduling_history import KernelSchedulingHistoryID
 from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import (
     CIStrEnum,
@@ -332,7 +333,7 @@ class KernelSchedulingPhase(StrEnum):
 class KernelSchedulingHistoryData:
     """Domain model for kernel scheduling history."""
 
-    id: UUID
+    id: KernelSchedulingHistoryID
     kernel_id: KernelId
     session_id: SessionId
 

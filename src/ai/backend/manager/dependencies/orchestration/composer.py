@@ -29,10 +29,12 @@ from ai.backend.manager.repositories.replica_group.repository import ReplicaGrou
 from ai.backend.manager.repositories.resource_usage_history import (
     ResourceUsageHistoryRepository,
 )
+from ai.backend.manager.repositories.retention.repository import RetentionRepository
 from ai.backend.manager.repositories.runtime_variant.repository import RuntimeVariantRepository
 from ai.backend.manager.repositories.scheduler import SchedulerRepository
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
 from ai.backend.manager.sokovan.deployment.route.route_controller import RouteController
+from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import AgentSelector
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 from ai.backend.manager.sokovan.sokovan import SokovanOrchestrator
 from ai.backend.manager.types import DistributedLockFactory
@@ -66,9 +68,11 @@ class OrchestrationInput:
     idle_checker_repository: IdleCheckerRepository
     fair_share_repository: FairShareRepository
     resource_usage_repository: ResourceUsageHistoryRepository
+    retention_repository: RetentionRepository
     agent_client_pool: AgentClientPool
     appproxy_client_pool: AppProxyClientPool
     network_plugin_ctx: NetworkPluginContext
+    agent_selector: AgentSelector
     scheduling_controller: SchedulingController
     deployment_controller: DeploymentController
     route_controller: RouteController
@@ -152,6 +156,7 @@ class OrchestrationComposer(DependencyComposer[OrchestrationInput, Orchestration
             event_producer=setup_input.event_producer,
             valkey_schedule=setup_input.valkey_schedule,
             valkey_stat=setup_input.valkey_stat,
+            agent_selector=setup_input.agent_selector,
             scheduling_controller=setup_input.scheduling_controller,
             deployment_controller=setup_input.deployment_controller,
             route_controller=setup_input.route_controller,
@@ -174,6 +179,7 @@ class OrchestrationComposer(DependencyComposer[OrchestrationInput, Orchestration
             config_provider=setup_input.config_provider,
             event_producer=setup_input.event_producer,
             sokovan_orchestrator=sokovan_orchestrator,
+            retention_repository=setup_input.retention_repository,
         )
         leader_election = await stack.enter_dependency(
             leader_dep,

@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
-from ai.backend.common.data.permission.types import EntityType
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.actions.types import ActionOperationType, OperationStatus
 
 
@@ -16,6 +16,7 @@ class StartedActionMessage:
     entity_id: str | uuid.UUID | None
     request_id: str | None
     triggered_by: str | None
+    acted_as: uuid.UUID | None
     entity_type: EntityType
     operation_type: ActionOperationType
     created_at: datetime
@@ -30,6 +31,7 @@ class FinishedActionMessage:
     entity_id: str | uuid.UUID | None  # TODO: Make this required?
     request_id: str | None
     triggered_by: str | None
+    acted_as: uuid.UUID | None
     entity_type: EntityType
     operation_type: ActionOperationType
     status: OperationStatus

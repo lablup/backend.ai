@@ -30,7 +30,7 @@ from ai.backend.common.types import BinarySize, ResourceSlotEntry
 from ai.backend.manager.data.session.creation import ImageInfo
 from ai.backend.manager.data.session.draft import (
     KernelExecutionSpecDraft,
-    SessionSpecDraft,
+    SessionResourceSpecDraft,
 )
 from ai.backend.manager.data.session.options import ResourceOpts
 from ai.backend.manager.defs import DEFAULT_SHARED_MEMORY_SIZE, INTRINSIC_SLOTS
@@ -56,9 +56,9 @@ class ComputeKernelResourcesRule(SessionSpecDraftRule):
     @override
     async def prepare(
         self,
-        draft: SessionSpecDraft,
+        draft: SessionResourceSpecDraft,
         context: SessionSpecPreparationContext,
-    ) -> SessionSpecDraft:
+    ) -> SessionResourceSpecDraft:
         if draft.options.kernel_groups is None:
             return draft
 

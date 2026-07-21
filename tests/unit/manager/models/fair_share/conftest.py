@@ -6,6 +6,7 @@ from decimal import Decimal
 
 import pytest
 
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import BinarySize, ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.models.agent import AgentRow
@@ -70,14 +71,21 @@ async def domain_name(
 
 
 @pytest.fixture
+def resource_group_id() -> ResourceGroupID:
+    return ResourceGroupID(uuid.uuid4())
+
+
+@pytest.fixture
 async def scaling_group(
     database_with_fair_share_tables: ExtendedAsyncSAEngine,
+    resource_group_id: ResourceGroupID,
 ) -> AsyncGenerator[str, None]:
     """Create ScalingGroupRow and return its name."""
     name = "default"
     async with database_with_fair_share_tables.begin_session() as db_sess:
         db_sess.add(
             ScalingGroupRow(
+                id=resource_group_id,
                 name=name,
                 description="Test scaling group",
                 is_active=True,
@@ -182,11 +190,13 @@ async def domain_fair_share_id(
     database_with_fair_share_tables: ExtendedAsyncSAEngine,
     domain_name: str,
     scaling_group: str,
+    resource_group_id: ResourceGroupID,
 ) -> AsyncGenerator[uuid.UUID, None]:
     """Create DomainFairShareRow and return its ID."""
     row = DomainFairShareRow(
         domain_name=domain_name,
         resource_group=scaling_group,
+        resource_group_id=resource_group_id,
         weight=Decimal("1.0"),
         total_decayed_usage=ResourceSlot(),
         normalized_usage=Decimal("0"),
@@ -205,11 +215,13 @@ async def domain_fair_share_with_usage_id(
     database_with_fair_share_tables: ExtendedAsyncSAEngine,
     domain_name: str,
     scaling_group: str,
+    resource_group_id: ResourceGroupID,
 ) -> AsyncGenerator[uuid.UUID, None]:
     """Create DomainFairShareRow with calculated usage values and return its ID."""
     row = DomainFairShareRow(
         domain_name=domain_name,
         resource_group=scaling_group,
+        resource_group_id=resource_group_id,
         weight=Decimal("2.0"),
         total_decayed_usage=ResourceSlot({"cpu": Decimal("3600"), "mem": Decimal("7200")}),
         normalized_usage=Decimal("0.15"),
@@ -229,12 +241,14 @@ async def project_fair_share_id(
     project_id: uuid.UUID,
     domain_name: str,
     scaling_group: str,
+    resource_group_id: ResourceGroupID,
 ) -> AsyncGenerator[uuid.UUID, None]:
     """Create ProjectFairShareRow and return its ID."""
     row = ProjectFairShareRow(
         project_id=project_id,
         domain_name=domain_name,
         resource_group=scaling_group,
+        resource_group_id=resource_group_id,
         weight=Decimal("1.0"),
         total_decayed_usage=ResourceSlot(),
         normalized_usage=Decimal("0"),
@@ -255,6 +269,7 @@ async def user_fair_share_id(
     project_id: uuid.UUID,
     domain_name: str,
     scaling_group: str,
+    resource_group_id: ResourceGroupID,
 ) -> AsyncGenerator[uuid.UUID, None]:
     """Create UserFairShareRow and return its ID."""
     row = UserFairShareRow(
@@ -262,6 +277,7 @@ async def user_fair_share_id(
         project_id=project_id,
         domain_name=domain_name,
         resource_group=scaling_group,
+        resource_group_id=resource_group_id,
         weight=Decimal("1.0"),
         total_decayed_usage=ResourceSlot(),
         normalized_usage=Decimal("0"),
@@ -282,6 +298,7 @@ async def user_fair_share_with_large_usage_id(
     project_id: uuid.UUID,
     domain_name: str,
     scaling_group: str,
+    resource_group_id: ResourceGroupID,
 ) -> AsyncGenerator[uuid.UUID, None]:
     """Create UserFairShareRow with large resource-seconds values and return its ID."""
     row = UserFairShareRow(
@@ -289,6 +306,7 @@ async def user_fair_share_with_large_usage_id(
         project_id=project_id,
         domain_name=domain_name,
         resource_group=scaling_group,
+        resource_group_id=resource_group_id,
         weight=Decimal("1.0"),
         total_decayed_usage=ResourceSlot({
             "cpu": Decimal("241920000"),

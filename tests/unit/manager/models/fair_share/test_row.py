@@ -8,6 +8,7 @@ from decimal import Decimal
 import pytest
 from sqlalchemy.exc import IntegrityError
 
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.models.fair_share import (
     DomainFairShareRow,
@@ -53,11 +54,13 @@ class TestDomainFairShareRow:
         domain_fair_share_id: uuid.UUID,
         domain_name: str,
         scaling_group: str,
+        resource_group_id: ResourceGroupID,
     ) -> None:
         """Duplicate (scaling_group, domain_name) should raise IntegrityError."""
         duplicate = DomainFairShareRow(
             domain_name=domain_name,
             resource_group=scaling_group,
+            resource_group_id=resource_group_id,
             weight=Decimal("1.0"),
             total_decayed_usage=ResourceSlot(),
             normalized_usage=Decimal("0"),
@@ -74,11 +77,13 @@ class TestDomainFairShareRow:
         database_with_fair_share_tables: ExtendedAsyncSAEngine,
         domain_name: str,
         scaling_group: str,
+        resource_group_id: ResourceGroupID,
     ) -> None:
         """Weight field should preserve Numeric(10, 4) precision."""
         row = DomainFairShareRow(
             domain_name=domain_name,
             resource_group=scaling_group,
+            resource_group_id=resource_group_id,
             weight=Decimal("1234.5678"),
             total_decayed_usage=ResourceSlot(),
             normalized_usage=Decimal("0"),
@@ -119,12 +124,14 @@ class TestProjectFairShareRow:
         project_id: uuid.UUID,
         domain_name: str,
         scaling_group: str,
+        resource_group_id: ResourceGroupID,
     ) -> None:
         """Duplicate (scaling_group, project_id) should raise IntegrityError."""
         duplicate = ProjectFairShareRow(
             project_id=project_id,
             domain_name=domain_name,
             resource_group=scaling_group,
+            resource_group_id=resource_group_id,
             weight=Decimal("1.0"),
             total_decayed_usage=ResourceSlot(),
             normalized_usage=Decimal("0"),
@@ -163,6 +170,7 @@ class TestUserFairShareRow:
         project_id: uuid.UUID,
         domain_name: str,
         scaling_group: str,
+        resource_group_id: ResourceGroupID,
     ) -> None:
         """Duplicate (scaling_group, user_uuid, project_id) should raise IntegrityError."""
         duplicate = UserFairShareRow(
@@ -170,6 +178,7 @@ class TestUserFairShareRow:
             project_id=project_id,
             domain_name=domain_name,
             resource_group=scaling_group,
+            resource_group_id=resource_group_id,
             weight=Decimal("1.0"),
             total_decayed_usage=ResourceSlot(),
             normalized_usage=Decimal("0"),

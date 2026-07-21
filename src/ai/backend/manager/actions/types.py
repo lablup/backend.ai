@@ -3,8 +3,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Final
 
+from ai.backend.common.data.entity.types import ScopeType
 from ai.backend.common.data.permission.types import EntityType, OperationType
-from ai.backend.common.entity.types import ScopeType
 
 # Placeholder substituted when an id (request_id, entity_id, ...) is absent while
 # materializing action metadata into audit/report records.

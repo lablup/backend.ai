@@ -12,6 +12,7 @@ from ai.backend.manager.repositories.base import BatchQuerier, NoPagination
 from ai.backend.manager.repositories.idle_checker.db_source.db_source import IdleCheckerDBSource
 from ai.backend.manager.repositories.idle_checker.types import (
     BoundCheckerData,
+    ExpiredIdleCheckBatchData,
     IdleCheckBatchData,
     IdleCheckTargetData,
 )
@@ -59,6 +60,7 @@ class IdleCheckerRepository:
             pagination=NoPagination(),
             conditions=[
                 SessionConditions.by_statuses(session_statuses),
+                SessionConditions.by_started_at(),
                 SessionConditions.by_idle_check_candidates(idle_check_candidates),
             ],
         )
@@ -84,3 +86,8 @@ class IdleCheckerRepository:
             )
 
         return IdleCheckBatchData(targets=tuple(targets))
+
+    async def fetch_expired_idle_checks(
+        self, session_statuses: Collection[SessionStatus]
+    ) -> ExpiredIdleCheckBatchData:
+        return await self._db_source.fetch_expired_idle_checks(session_statuses)

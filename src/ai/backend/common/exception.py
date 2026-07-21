@@ -193,6 +193,7 @@ class ErrorDomain(enum.StrEnum):
     PROMETHEUS_QUERY_PRESET_CATEGORY = "prometheus-query-preset-category"
     RUNTIME_VARIANT = "runtime-variant"
     ROLE_INVITATION = "role-invitation"
+    RETENTION_POLICY = "retention-policy"
 
     EXTERNAL_SYSTEM = "external-system"  # Errors from external systems
 

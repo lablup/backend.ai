@@ -46,8 +46,27 @@ class TestEnqueueSessionInput:
         assert result.cluster_size == 1
         assert result.cluster_mode == ClusterModeEnum.SINGLE_NODE
         assert result.priority == 10
+        assert result.job_priority == 0
         assert result.is_preemptible is True
         assert result.batch is None
+
+    def test_custom_job_priority(self) -> None:
+        """job_priority is user-settable and, unlike priority, has no range cap."""
+
+        def _make(job_priority: int) -> EnqueueSessionInput:
+            return EnqueueSessionInput(
+                session_name="jp-session",
+                session_type=CreateSessionTypeEnum.INTERACTIVE,
+                image_id=uuid4(),
+                resource_entries=[ResourceSlotEntryInput(resource_type="cpu", quantity="1")],
+                project_id=uuid4(),
+                job_priority=job_priority,
+            )
+
+        assert _make(50).job_priority == 50
+        # Neutral-baseline design: values may go above 100 and below 0.
+        assert _make(500).job_priority == 500
+        assert _make(-5).job_priority == -5
 
     def test_valid_batch_session(self) -> None:
         """Valid batch session with batch config."""

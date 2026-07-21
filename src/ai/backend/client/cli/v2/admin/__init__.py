@@ -230,3 +230,12 @@ def invitation() -> None:
 )
 def role_preset() -> None:
     """Admin role preset commands."""
+
+
+@admin.group(
+    cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.admin.retention_policy:retention_policy",
+    name="retention-policy",
+)
+def retention_policy() -> None:
+    """Admin retention policy commands."""

@@ -81,7 +81,7 @@ class OperationType(enum.StrEnum):
 class EntityType(enum.StrEnum):
     """
     Deprecated for RBAC: use ``RBACElementType`` instead
-    or use ai.backend.common.entity.types.EntityType for non-RBAC-specific contexts.
+    or use ai.backend.common.data.entity.types.EntityType for non-RBAC-specific contexts.
     """
 
     # === RBAC scope/resource types (original 12) ===
@@ -136,6 +136,7 @@ class EntityType(enum.StrEnum):
     PROMETHEUS_QUERY_PRESET = "prometheus_query_preset"
     PROMETHEUS_QUERY_PRESET_CATEGORY = "prometheus_query_preset_category"
     RESOURCE_PRESET = "resource_preset"
+    RETENTION_POLICY = "retention_policy"
     MODEL_CARD = "model_card"
     ROLE = "role"
     RUNTIME_VARIANT = "runtime_variant"
@@ -173,6 +174,9 @@ class EntityType(enum.StrEnum):
     SESSION_DIRECT_ACCESS = "session:direct_access"
     SESSION_HISTORY = "session:history"
     SESSION_SCOPED_HISTORY = "session:scoped_history"
+    # Kernel sub
+    KERNEL_HISTORY = "kernel:history"
+    KERNEL_SCOPED_HISTORY = "kernel:scoped_history"
     # Deployment sub
     DEPLOYMENT_REPLICA = "deployment:replica"
     DEPLOYMENT_ROUTE = "deployment:route"
@@ -269,7 +273,7 @@ class EntityType(enum.StrEnum):
             cls.SESSION,
             cls.ARTIFACT,
             cls.ARTIFACT_REGISTRY,
-            cls.APP_CONFIG,
+            cls.APP_CONFIG_FRAGMENT,
             cls.NOTIFICATION_CHANNEL,
             cls.NOTIFICATION_RULE,
             cls.MODEL_DEPLOYMENT,
@@ -358,6 +362,7 @@ class ScopeType(enum.StrEnum):
     ROLE = "role"
     ROLE_ASSIGNMENT = "role:assignment"
     NOTIFICATION_CHANNEL = "notification_channel"
+    APP_CONFIG_FRAGMENT = "app_config_fragment"
     KEYPAIR = "keypair"
     KEYPAIR_RESOURCE_POLICY = "keypair_resource_policy"
 

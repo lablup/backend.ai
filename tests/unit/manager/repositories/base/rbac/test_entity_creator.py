@@ -523,6 +523,37 @@ class TestRBACEntityCreatorBasic:
             assert assoc_row.scope_type == ScopeType.PROJECT
             assert assoc_row.scope_id == project_scope_id
 
+    async def test_create_entity_without_scope_inserts_row_only(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        create_tables: None,
+        user_scope_id: str,
+    ) -> None:
+        """A GLOBAL entity (``scope_ref=None``) is inserted with no association at all.
+
+        ``additional_scope_refs`` does not apply to it and is ignored, so a stray one must not
+        resurrect an association.
+        """
+        creator = RBACEntityCreator(
+            spec=SimpleCreatorSpec(
+                name="global-entity",
+                scope_type=ScopeType.USER,
+                scope_id=user_scope_id,
+            ),
+            element_type=RBACElementType.VFOLDER,
+            scope_ref=None,
+            additional_scope_refs=[RBACElementRef(RBACElementType.USER, user_scope_id)],
+        )
+        async with database_connection.begin_session() as db_sess:
+            result = await execute_rbac_entity_creator(db_sess, creator)
+
+            assert result.row.name == "global-entity"
+            assert result.row.id is not None
+            assoc_count = await db_sess.scalar(
+                sa.select(sa.func.count()).select_from(AssociationScopesEntitiesRow)
+            )
+            assert assoc_count == 0
+
     async def test_create_multiple_entities_sequentially(
         self,
         database_connection: ExtendedAsyncSAEngine,

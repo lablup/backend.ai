@@ -3333,6 +3333,75 @@ class ExportConfig(BaseConfigSchema):
     ]
 
 
+class RetentionConfig(BaseConfigSchema):
+    """DB record retention sweep configuration (BEP-1063).
+
+    Drives the single leader-cron ``PeriodicTask`` that deletes accumulated DB
+    records past each enabled ``retention_policies`` row's age boundary. Not
+    user-facing; operators tune the sweep cadence and delete granularity here.
+    """
+
+    sweep_interval: Annotated[
+        float,
+        Field(
+            default=3600.0,
+            ge=60.0,
+            le=86400.0,
+            validation_alias=AliasChoices("sweep-interval", "sweep_interval"),
+            serialization_alias="sweep-interval",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Interval in seconds between retention sweep ticks. A single tick loads all "
+                "enabled retention policies and purges records older than each policy's "
+                "boundary. The sweep runs only on the leader manager."
+            ),
+            added_version="26.7.0",
+            example=ConfigExample(local="3600", prod="3600"),
+        ),
+    ]
+
+    batch_size: Annotated[
+        int,
+        Field(
+            default=1000,
+            ge=100,
+            le=100_000,
+            validation_alias=AliasChoices("batch-size", "batch_size"),
+            serialization_alias="batch-size",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Number of rows deleted per chunk during a sweep. Each category's tables are "
+                "drained in delete-and-advance chunks of this size so a large backlog never "
+                "becomes a single huge DELETE."
+            ),
+            added_version="26.7.0",
+            example=ConfigExample(local="1000", prod="1000"),
+        ),
+    ]
+
+    per_tick_budget: Annotated[
+        int | None,
+        Field(
+            default=None,
+            ge=1,
+            validation_alias=AliasChoices("per-tick-budget", "per_tick_budget"),
+            serialization_alias="per-tick-budget",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Optional upper bound on the total rows deleted in one tick, enforced across "
+                "categories at category boundaries: once a tick's cumulative deletions reach "
+                "this budget the remaining categories are deferred to the next tick. Null means "
+                "no budget (every enabled category is fully drained each tick)."
+            ),
+            added_version="26.7.0",
+            example=ConfigExample(local="null", prod="100000"),
+        ),
+    ]
+
+
 class ManagerUnifiedConfig(BaseConfigSchema):
     # From legacy local config
     db: Annotated[
@@ -3716,6 +3785,19 @@ class ManagerUnifiedConfig(BaseConfigSchema):
                 "resource exhaustion from large export operations."
             ),
             added_version="26.1.0",
+            composite=CompositeType.FIELD,
+        ),
+    ]
+    retention: Annotated[
+        RetentionConfig,
+        Field(default_factory=RetentionConfig),
+        BackendAIConfigMeta(
+            description=(
+                "DB record retention sweep configuration. Controls the leader-cron sweep that "
+                "deletes accumulated records past each enabled retention policy's age boundary, "
+                "including tick cadence, delete chunk size, and an optional per-tick budget."
+            ),
+            added_version="26.7.0",
             composite=CompositeType.FIELD,
         ),
     ]

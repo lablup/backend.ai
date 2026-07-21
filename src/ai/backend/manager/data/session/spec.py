@@ -44,6 +44,16 @@ from ai.backend.manager.data.session.options import (
 from ai.backend.manager.errors.kernel import IncompleteSessionSpec
 
 
+def _format_loc(loc: tuple[object, ...]) -> str:
+    parts: list[str] = []
+    for item in loc:
+        if isinstance(item, int):
+            parts.append(f"[{item}]")
+        else:
+            parts.append(f".{item}" if parts else str(item))
+    return "".join(parts)
+
+
 class _SpecBaseModel(BackendAISchema):
     """Base for resolved session-spec sub-models.
 
@@ -130,17 +140,14 @@ class KernelSpec(_SpecBaseModel):
     vfolder_mounts: tuple[VFolderMount, ...] = ()
 
 
-class SessionSpec(_SpecBaseModel):
-    """Full spec to create one ``SessionRow`` and its owned kernels.
+class SessionResourceSpec(_SpecBaseModel):
+    """Scope-free resolved spec — the output of the preparer chain.
 
-    Vfolder mounts live on :attr:`KernelSpec.vfolder_mounts` —
-    per-kernel at the spec level. The ``SessionRow.vfolder_mounts``
-    JSONB column (session-level snapshot) is filled by the repository
-    from the main kernel's resolved mount list at enqueue time.
+    Carries everything the draft-based preparer actually resolves
+    (identity, network, options, kernel specs, ...).
     """
 
     identity: SessionIdentity
-    scope: SessionScope
     classification: SessionClassification
     network: SessionNetwork
     callback_url: yarl.URL | None = None
@@ -152,18 +159,21 @@ class SessionSpec(_SpecBaseModel):
     @override
     @classmethod
     def build_validation_error(cls, info: SchemaValidationFailureInfo) -> BackendAIError:
-        missing_paths = [cls._format_loc(tuple(err["loc"])) for err in info.errors]
+        missing_paths = [_format_loc(tuple(err["loc"])) for err in info.errors]
         return IncompleteSessionSpec(
-            extra_msg="SessionSpec fields not resolved: " + ", ".join(missing_paths),
+            extra_msg="SessionResourceSpec fields not resolved: " + ", ".join(missing_paths),
             extra_data={"missing": missing_paths},
         )
 
-    @staticmethod
-    def _format_loc(loc: tuple[object, ...]) -> str:
-        parts: list[str] = []
-        for item in loc:
-            if isinstance(item, int):
-                parts.append(f"[{item}]")
-            else:
-                parts.append(f".{item}" if parts else str(item))
-        return "".join(parts)
+
+class SessionSpec(_SpecBaseModel):
+    """Full spec to create one ``SessionRow`` and its owned kernels.
+
+    Vfolder mounts live on :attr:`KernelSpec.vfolder_mounts` —
+    per-kernel at the spec level. The ``SessionRow.vfolder_mounts``
+    JSONB column (session-level snapshot) is filled by the repository
+    from the main kernel's resolved mount list at enqueue time.
+    """
+
+    resource_spec: SessionResourceSpec
+    scope: SessionScope

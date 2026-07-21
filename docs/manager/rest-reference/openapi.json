@@ -1729,6 +1729,18 @@
             "default": null,
             "description": "Triggered-by filter"
           },
+          "acted_as": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Acted-as (effective/acting user UUID) filter"
+          },
           "created_at": {
             "anyOf": [
               {
@@ -1893,6 +1905,75 @@
           }
         },
         "title": "AuditLogStatusFilter",
+        "type": "object"
+      },
+      "UUIDFilter": {
+        "description": "Filter for UUID fields supporting equality and set operations.\n\nProvides UUID matching with equals/not_equals and in/not_in operations.",
+        "properties": {
+          "equals": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exact UUID match",
+            "title": "Equals"
+          },
+          "in": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "UUID is in list",
+            "title": "In"
+          },
+          "not_equals": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Not equals UUID",
+            "title": "Not Equals"
+          },
+          "not_in": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "UUID is not in list",
+            "title": "Not In"
+          }
+        },
+        "title": "UUIDFilter",
         "type": "object"
       },
       "AdminSearchAuditLogsInput": {
@@ -4001,10 +4082,10 @@
         "title": "NullableDateTimeFilter",
         "type": "object"
       },
-      "UUIDFilter": {
-        "description": "Filter for UUID fields supporting equality and set operations.\n\nProvides UUID matching with equals/not_equals and in/not_in operations.",
+      "ReplicaFilter": {
+        "description": "Filter for deployment replicas.",
         "properties": {
-          "equals": {
+          "deployment_id": {
             "anyOf": [
               {
                 "format": "uuid",
@@ -4015,15 +4096,117 @@
               }
             ],
             "default": null,
-            "description": "Exact UUID match",
-            "title": "Equals"
+            "description": "Filter by deployment ID",
+            "title": "Deployment Id"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReplicaStatusFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Replica status filter"
+          },
+          "health_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReplicaHealthStatusFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Replica health status filter"
+          },
+          "traffic_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReplicaTrafficStatusFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Replica traffic status filter"
+          },
+          "AND": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ReplicaFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "AND conjunction",
+            "title": "And"
+          },
+          "OR": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ReplicaFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "OR conjunction",
+            "title": "Or"
+          },
+          "NOT": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ReplicaFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "NOT negation",
+            "title": "Not"
+          }
+        },
+        "title": "ReplicaFilter",
+        "type": "object"
+      },
+      "ReplicaHealthStatusFilter": {
+        "description": "Filter for replica health status.",
+        "properties": {
+          "equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RouteHealthStatus"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exact health status match"
           },
           "in": {
             "anyOf": [
               {
                 "items": {
-                  "format": "uuid",
-                  "type": "string"
+                  "$ref": "#/components/schemas/RouteHealthStatus"
                 },
                 "type": "array"
               },
@@ -4032,29 +4215,26 @@
               }
             ],
             "default": null,
-            "description": "UUID is in list",
+            "description": "Health status is in list",
             "title": "In"
           },
           "not_equals": {
             "anyOf": [
               {
-                "format": "uuid",
-                "type": "string"
+                "$ref": "#/components/schemas/RouteHealthStatus"
               },
               {
                 "type": "null"
               }
             ],
             "default": null,
-            "description": "Not equals UUID",
-            "title": "Not Equals"
+            "description": "Excludes exact health status match"
           },
           "not_in": {
             "anyOf": [
               {
                 "items": {
-                  "format": "uuid",
-                  "type": "string"
+                  "$ref": "#/components/schemas/RouteHealthStatus"
                 },
                 "type": "array"
               },
@@ -4063,12 +4243,213 @@
               }
             ],
             "default": null,
-            "description": "UUID is not in list",
+            "description": "Health status is not in list",
             "title": "Not In"
           }
         },
-        "title": "UUIDFilter",
+        "title": "ReplicaHealthStatusFilter",
         "type": "object"
+      },
+      "ReplicaNestedFilter": {
+        "description": "Filter deployments by conditions on their replicas.",
+        "properties": {
+          "some": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReplicaFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Matches parents with at least one replica satisfying all conditions."
+          },
+          "every": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReplicaFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Matches parents where every replica satisfies all conditions (also true when the parent has no replica)."
+          },
+          "none": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReplicaFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Matches parents with no replica satisfying all conditions."
+          }
+        },
+        "title": "ReplicaNestedFilter",
+        "type": "object"
+      },
+      "ReplicaStatusFilter": {
+        "description": "Filter for replica (route) status.",
+        "properties": {
+          "equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RouteStatus"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exact status match"
+          },
+          "in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/RouteStatus"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Status is in list",
+            "title": "In"
+          },
+          "not_equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RouteStatus"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Excludes exact status match"
+          },
+          "not_in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/RouteStatus"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Status is not in list",
+            "title": "Not In"
+          }
+        },
+        "title": "ReplicaStatusFilter",
+        "type": "object"
+      },
+      "ReplicaTrafficStatusFilter": {
+        "description": "Filter for replica traffic status.",
+        "properties": {
+          "equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RouteTrafficStatus"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exact traffic status match"
+          },
+          "in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/RouteTrafficStatus"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Traffic status is in list",
+            "title": "In"
+          },
+          "not_equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RouteTrafficStatus"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Excludes exact traffic status match"
+          },
+          "not_in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/RouteTrafficStatus"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Traffic status is not in list",
+            "title": "Not In"
+          }
+        },
+        "title": "ReplicaTrafficStatusFilter",
+        "type": "object"
+      },
+      "RouteHealthStatus": {
+        "description": "Health check status of a route.",
+        "enum": [
+          "not_checked",
+          "healthy",
+          "unhealthy",
+          "degraded"
+        ],
+        "title": "RouteHealthStatus",
+        "type": "string"
+      },
+      "RouteStatus": {
+        "description": "Lifecycle status of a route in the deployment.",
+        "enum": [
+          "provisioning",
+          "running",
+          "terminating",
+          "terminated",
+          "failed_to_start"
+        ],
+        "title": "RouteStatus",
+        "type": "string"
+      },
+      "RouteTrafficStatus": {
+        "description": "Traffic routing status for a route.\n\nControls whether traffic should be sent to this route.\nActual traffic delivery depends on health being HEALTHY.\n\n- ACTIVE: Traffic enabled (will receive traffic when health is HEALTHY)\n- INACTIVE: Traffic disabled (will not receive traffic regardless of health)",
+        "enum": [
+          "active",
+          "inactive"
+        ],
+        "title": "RouteTrafficStatus",
+        "type": "string"
       },
       "AdminSearchDeploymentsInput": {
         "description": "Input for searching deployments (admin, no scope).",
@@ -5058,99 +5439,6 @@
         "title": "SearchAllocatedResourceSlotsInput",
         "type": "object"
       },
-      "ReplicaFilter": {
-        "description": "Filter for deployment replicas.",
-        "properties": {
-          "deployment_id": {
-            "anyOf": [
-              {
-                "format": "uuid",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Filter by deployment ID",
-            "title": "Deployment Id"
-          },
-          "status": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/ReplicaStatusFilter"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Replica status filter"
-          },
-          "traffic_status": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/ReplicaTrafficStatusFilter"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Replica traffic status filter"
-          },
-          "AND": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/ReplicaFilter"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "AND conjunction",
-            "title": "And"
-          },
-          "OR": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/ReplicaFilter"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "OR conjunction",
-            "title": "Or"
-          },
-          "NOT": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/ReplicaFilter"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "NOT negation",
-            "title": "Not"
-          }
-        },
-        "title": "ReplicaFilter",
-        "type": "object"
-      },
       "ReplicaOrder": {
         "description": "Ordering specification for deployment replicas.",
         "properties": {
@@ -5175,153 +5463,6 @@
           "id"
         ],
         "title": "ReplicaOrderField",
-        "type": "string"
-      },
-      "ReplicaStatusFilter": {
-        "description": "Filter for replica (route) status.",
-        "properties": {
-          "equals": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/RouteStatus"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Exact status match"
-          },
-          "in": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/RouteStatus"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Status is in list",
-            "title": "In"
-          },
-          "not_equals": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/RouteStatus"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Excludes exact status match"
-          },
-          "not_in": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/RouteStatus"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Status is not in list",
-            "title": "Not In"
-          }
-        },
-        "title": "ReplicaStatusFilter",
-        "type": "object"
-      },
-      "ReplicaTrafficStatusFilter": {
-        "description": "Filter for replica traffic status.",
-        "properties": {
-          "equals": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/RouteTrafficStatus"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Exact traffic status match"
-          },
-          "in": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/RouteTrafficStatus"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Traffic status is in list",
-            "title": "In"
-          },
-          "not_equals": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/RouteTrafficStatus"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Excludes exact traffic status match"
-          },
-          "not_in": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/RouteTrafficStatus"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Traffic status is not in list",
-            "title": "Not In"
-          }
-        },
-        "title": "ReplicaTrafficStatusFilter",
-        "type": "object"
-      },
-      "RouteStatus": {
-        "description": "Lifecycle status of a route in the deployment.",
-        "enum": [
-          "provisioning",
-          "running",
-          "terminating",
-          "terminated",
-          "failed_to_start"
-        ],
-        "title": "RouteStatus",
-        "type": "string"
-      },
-      "RouteTrafficStatus": {
-        "description": "Traffic routing status for a route.\n\nControls whether traffic should be sent to this route.\nActual traffic delivery depends on health being HEALTHY.\n\n- ACTIVE: Traffic enabled (will receive traffic when health is HEALTHY)\n- INACTIVE: Traffic disabled (will not receive traffic regardless of health)",
-        "enum": [
-          "active",
-          "inactive"
-        ],
-        "title": "RouteTrafficStatus",
         "type": "string"
       },
       "SearchReplicasInput": {
@@ -5509,17 +5650,6 @@
         },
         "title": "RouteFilter",
         "type": "object"
-      },
-      "RouteHealthStatus": {
-        "description": "Health check status of a route.",
-        "enum": [
-          "not_checked",
-          "healthy",
-          "unhealthy",
-          "degraded"
-        ],
-        "title": "RouteHealthStatus",
-        "type": "string"
       },
       "RouteOrder": {
         "description": "Order specification for routes.",
@@ -22210,6 +22340,265 @@
         "title": "AdminSearchResourceAllocationsInput",
         "type": "object"
       },
+      "RetentionCategory": {
+        "description": "Identifier linking a ``retention_policies`` row to its code-side cleanup\nprocedure. A pure identifier carrying no table references.\n\nThe single definition shared across the data, DTO, GraphQL, and API layers.",
+        "enum": [
+          "logs",
+          "login",
+          "reconcile_history",
+          "roles_invitations",
+          "deployments",
+          "sessions",
+          "usage_records",
+          "usage_buckets"
+        ],
+        "title": "RetentionCategory",
+        "type": "string"
+      },
+      "CreateRetentionPolicyInput": {
+        "properties": {
+          "category": {
+            "$ref": "#/components/schemas/RetentionCategory",
+            "description": "Retention category, validated against the fixed catalog."
+          },
+          "retention_period_days": {
+            "description": "Retention period in days; records older than now - period are purged.",
+            "minimum": 1,
+            "title": "Retention Period Days",
+            "type": "integer"
+          },
+          "enabled": {
+            "default": true,
+            "description": "Whether this policy is active.",
+            "title": "Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "category",
+          "retention_period_days"
+        ],
+        "title": "CreateRetentionPolicyInput",
+        "type": "object"
+      },
+      "RetentionPolicyFilter": {
+        "properties": {
+          "category": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RetentionCategory"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by category."
+          },
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by enabled flag.",
+            "title": "Enabled"
+          }
+        },
+        "title": "RetentionPolicyFilter",
+        "type": "object"
+      },
+      "RetentionPolicyOrder": {
+        "properties": {
+          "field": {
+            "$ref": "#/components/schemas/RetentionPolicyOrderField"
+          },
+          "direction": {
+            "$ref": "#/components/schemas/OrderDirection",
+            "default": "ASC"
+          }
+        },
+        "required": [
+          "field"
+        ],
+        "title": "RetentionPolicyOrder",
+        "type": "object"
+      },
+      "RetentionPolicyOrderField": {
+        "enum": [
+          "category",
+          "created_at",
+          "last_swept_at"
+        ],
+        "title": "RetentionPolicyOrderField",
+        "type": "string"
+      },
+      "SearchRetentionPoliciesInput": {
+        "properties": {
+          "filter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RetentionPolicyFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "order": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/RetentionPolicyOrder"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Order"
+          },
+          "first": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "First"
+          },
+          "after": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "After"
+          },
+          "last": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Last"
+          },
+          "before": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Before"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Limit"
+          },
+          "offset": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Offset"
+          }
+        },
+        "title": "SearchRetentionPoliciesInput",
+        "type": "object"
+      },
+      "UpdateRetentionPolicyInput": {
+        "properties": {
+          "id": {
+            "description": "Retention policy ID.",
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RetentionCategory"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "New category, validated against the catalog; None = no change."
+          },
+          "retention_period_days": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "New retention period in days; None = no change.",
+            "title": "Retention Period Days"
+          },
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Toggle enabled; None = no change.",
+            "title": "Enabled"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "UpdateRetentionPolicyInput",
+        "type": "object"
+      },
       "RuntimeVariantFilter": {
         "properties": {
           "name": {
@@ -25510,6 +25899,12 @@
             "maximum": 100,
             "minimum": 0,
             "title": "Priority",
+            "type": "integer"
+          },
+          "job_priority": {
+            "default": 0,
+            "description": "Scope-local preemption priority among the requester's own sessions (higher preempts lower; decoupled from `priority`).",
+            "title": "Job Priority",
             "type": "integer"
           },
           "is_preemptible": {
@@ -29163,6 +29558,18 @@
             ],
             "default": null,
             "description": "Filter audit logs by the user or system that triggered the action. Use this to export audit logs initiated by a specific actor."
+          },
+          "acted_as": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter audit logs by the effective/acting user UUID the action ran as (differs from triggered_by only during super-admin impersonation)."
           },
           "request_id": {
             "anyOf": [
@@ -34460,6 +34867,12 @@
             "title": "Priority",
             "type": "integer"
           },
+          "job_priority": {
+            "default": 0,
+            "description": "Scope-local preemption priority among the requester's own sessions (higher preempts lower; decoupled from `priority`).",
+            "title": "Job Priority",
+            "type": "integer"
+          },
           "is_preemptible": {
             "default": true,
             "title": "Is Preemptible",
@@ -34673,6 +35086,12 @@
             "maximum": 100,
             "minimum": 0,
             "title": "Priority",
+            "type": "integer"
+          },
+          "job_priority": {
+            "default": 0,
+            "description": "Scope-local preemption priority among the requester's own sessions (higher preempts lower; decoupled from `priority`).",
+            "title": "Job Priority",
             "type": "integer"
           },
           "is_preemptible": {
@@ -46330,6 +46749,185 @@
         },
         "parameters": [],
         "description": "Search resource allocations with filters, orders, and pagination.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/retention-policies": {
+      "post": {
+        "operationId": "v2/retention-policies.admin_create",
+        "tags": [
+          "v2/retention-policies"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRetentionPolicyInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/retention-policies/search": {
+      "post": {
+        "operationId": "v2/retention-policies.admin_search",
+        "tags": [
+          "v2/retention-policies"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchRetentionPoliciesInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/retention-policies/{policy_id}": {
+      "get": {
+        "operationId": "v2/retention-policies.admin_get",
+        "tags": [
+          "v2/retention-policies"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "policy_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n"
+      },
+      "patch": {
+        "operationId": "v2/retention-policies.admin_update",
+        "tags": [
+          "v2/retention-policies"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateRetentionPolicyInput"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "policy_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n"
+      },
+      "delete": {
+        "operationId": "v2/retention-policies.admin_delete",
+        "tags": [
+          "v2/retention-policies"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "policy_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/retention-policies/{policy_id}/purge": {
+      "post": {
+        "operationId": "v2/retention-policies.admin_purge",
+        "tags": [
+          "v2/retention-policies"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "policy_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/v2/runtime-variants/search": {

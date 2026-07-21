@@ -23,6 +23,7 @@ from ai.backend.common.types import (
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.kernel.types import KernelStatus
+from ai.backend.manager.data.permission.types import EntityType, ScopeType
 from ai.backend.manager.data.resource_preset.types import (
     ResourcePresetData,
     ResourcePresetSearchResult,
@@ -36,8 +37,11 @@ from ai.backend.manager.errors.resource import (
 )
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.domain import domains
-from ai.backend.manager.models.group import association_groups_users, groups
+from ai.backend.manager.models.group import groups
 from ai.backend.manager.models.kernel import KernelRow
+from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+    AssociationScopesEntitiesRow,
+)
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.resource_slot import (
     AgentResourceRow,
@@ -251,14 +255,18 @@ class ResourcePresetDBSource:
         """
         j = sa.join(
             groups,
-            association_groups_users,
-            association_groups_users.c.group_id == groups.c.id,
+            AssociationScopesEntitiesRow,
+            sa.and_(
+                AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
+                AssociationScopesEntitiesRow.entity_type == EntityType.USER,
+                AssociationScopesEntitiesRow.scope_id == sa.cast(groups.c.id, sa.String),
+            ),
         )
         query = (
             sa.select(groups.c.id, groups.c.total_resource_slots)
             .select_from(j)
             .where(
-                (association_groups_users.c.user_id == user_id)
+                (AssociationScopesEntitiesRow.entity_id == str(user_id))
                 & (groups.c.name == group_name)
                 & (groups.c.domain_name == domain_name),
             )

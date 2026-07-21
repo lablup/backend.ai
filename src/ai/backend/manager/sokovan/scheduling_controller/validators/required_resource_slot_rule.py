@@ -37,7 +37,7 @@ class RequiredResourceSlotRule(SessionSpecValidatorRule):
         if not required:
             return
 
-        for idx, kernel in enumerate(spec.kernel_specs):
+        for idx, kernel in enumerate(spec.resource_spec.kernel_specs):
             requested = {
                 entry.resource_type: parse_quantity(entry.quantity)
                 for entry in kernel.execution_spec.resource_input.resources

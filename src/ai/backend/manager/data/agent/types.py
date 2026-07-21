@@ -52,7 +52,6 @@ class AgentStatus(enum.Enum):
 class AgentDataForHeartbeatUpdate:
     status: AgentStatus
     status_changed: datetime | None
-    scaling_group: str
     available_slots: ResourceSlot
     addr: str
     public_host: str | None
@@ -124,7 +123,6 @@ class AgentHeartbeatUpsert:
             "id": self.metadata.id,
             "status": AgentStatus.ALIVE,
             "region": self.metadata.region,
-            "scaling_group": self.metadata.scaling_group,
             "available_slots": self.resource_info.available_slots,
             "addr": self.network_info.addr,
             "public_host": self.network_info.public_host,
@@ -144,7 +142,6 @@ class AgentHeartbeatUpsert:
             "id": self.metadata.id,
             "status": AgentStatus.ALIVE,
             "region": self.metadata.region,
-            "scaling_group": self.metadata.scaling_group,
             "available_slots": self.resource_info.available_slots,
             "addr": self.network_info.addr,
             "public_host": self.network_info.public_host,
@@ -203,7 +200,6 @@ class UpsertResult:
         was_revived = existing_data.status in (AgentStatus.LOST, AgentStatus.TERMINATED)
         need_resource_slot_update = (
             existing_data.available_slots != upsert_data.resource_info.available_slots
-            or existing_data.scaling_group != upsert_data.metadata.scaling_group
             or existing_data.addr != upsert_data.network_info.addr
             or existing_data.public_host != upsert_data.network_info.public_host
             or existing_data.public_key != upsert_data.network_info.public_key

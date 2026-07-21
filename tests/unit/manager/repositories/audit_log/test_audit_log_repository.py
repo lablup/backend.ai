@@ -13,10 +13,12 @@ from typing import TYPE_CHECKING
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec
 from ai.backend.manager.actions.types import OperationStatus
 from ai.backend.manager.data.audit_log.types import AuditLogData
 from ai.backend.manager.models.audit_log import AuditLogRow
 from ai.backend.manager.repositories.audit_log import AuditLogCreatorSpec, AuditLogRepository
+from ai.backend.manager.repositories.audit_log.options import AuditLogConditions
 from ai.backend.manager.repositories.base import BatchQuerier, Creator, OffsetPagination
 from ai.backend.testutils.db import with_tables
 
@@ -243,6 +245,59 @@ class TestAuditLogRepository:
 
         assert len(result.items) == 1
         assert result.items[0].operation == "alpha-op"
+
+    @pytest.fixture
+    async def sample_audit_logs_by_acted_as(
+        self,
+        audit_log_repository: AuditLogRepository,
+    ) -> AsyncGenerator[dict[uuid.UUID, uuid.UUID], None]:
+        """Seed audit logs with two distinct acted_as UUIDs; returns {acted_as: row_id}."""
+        now = datetime.now(UTC)
+        ids: dict[uuid.UUID, uuid.UUID] = {}
+        for _ in range(2):
+            acted_as = uuid.uuid4()
+            creator = Creator(
+                spec=AuditLogCreatorSpec(
+                    action_id=uuid.uuid4(),
+                    entity_type="session",
+                    operation="update",
+                    created_at=now,
+                    description=f"acted by {acted_as}",
+                    status=OperationStatus.SUCCESS,
+                    entity_id=None,
+                    request_id=None,
+                    triggered_by="super-admin",
+                    acted_as=acted_as,
+                    duration=None,
+                )
+            )
+            result = await audit_log_repository.create(creator)
+            ids[acted_as] = result.id
+        yield ids
+
+    async def test_search_filter_by_acted_as_equals(
+        self,
+        audit_log_repository: AuditLogRepository,
+        sample_audit_logs_by_acted_as: dict[uuid.UUID, uuid.UUID],
+    ) -> None:
+        """Filtering by acted_as returns only rows that ran as that effective user UUID."""
+        target_acted_as, other_acted_as = sample_audit_logs_by_acted_as.keys()
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=10, offset=0),
+            conditions=[
+                AuditLogConditions.by_acted_as_equals(
+                    UUIDEqualMatchSpec(value=target_acted_as, negated=False)
+                ),
+            ],
+            orders=[],
+        )
+
+        result = await audit_log_repository.search(querier=querier)
+
+        result_ids = [log.id for log in result.items]
+        assert sample_audit_logs_by_acted_as[target_acted_as] in result_ids
+        assert sample_audit_logs_by_acted_as[other_acted_as] not in result_ids
+        assert all(log.acted_as == target_acted_as for log in result.items)
 
     # =========================================================================
     # Tests - Search with ordering

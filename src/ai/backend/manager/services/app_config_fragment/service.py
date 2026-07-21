@@ -3,14 +3,9 @@ from __future__ import annotations
 from ai.backend.manager.repositories.app_config_fragment.repository import (
     AppConfigFragmentRepository,
 )
-from ai.backend.manager.repositories.base import BulkCreator, Creator
 from ai.backend.manager.services.app_config_fragment.actions.admin_search import (
     AdminSearchAppConfigFragmentAction,
     AdminSearchAppConfigFragmentActionResult,
-)
-from ai.backend.manager.services.app_config_fragment.actions.bulk_create import (
-    BulkCreateAppConfigFragmentAction,
-    BulkCreateAppConfigFragmentActionResult,
 )
 from ai.backend.manager.services.app_config_fragment.actions.bulk_purge import (
     BulkPurgeAppConfigFragmentAction,
@@ -62,7 +57,7 @@ class AppConfigFragmentService:
     async def create(
         self, action: CreateAppConfigFragmentAction
     ) -> CreateAppConfigFragmentActionResult:
-        data = await self._repository.create(Creator(spec=action.creator_spec))
+        data = await self._repository.create(action.creator_spec)
         return CreateAppConfigFragmentActionResult(fragment=data)
 
     async def get(self, action: GetAppConfigFragmentAction) -> GetAppConfigFragmentActionResult:
@@ -103,16 +98,8 @@ class AppConfigFragmentService:
     async def purge(
         self, action: PurgeAppConfigFragmentAction
     ) -> PurgeAppConfigFragmentActionResult:
-        data = await self._repository.purge(action.purger)
+        data = await self._repository.purge(action.purger_spec)
         return PurgeAppConfigFragmentActionResult(fragment=data)
-
-    async def bulk_create(
-        self, action: BulkCreateAppConfigFragmentAction
-    ) -> BulkCreateAppConfigFragmentActionResult:
-        result = await self._repository.bulk_create(BulkCreator(specs=action.creator_specs))
-        return BulkCreateAppConfigFragmentActionResult(
-            succeeded=result.succeeded, failed=result.failed
-        )
 
     async def bulk_update(
         self, action: BulkUpdateAppConfigFragmentAction
@@ -125,7 +112,7 @@ class AppConfigFragmentService:
     async def bulk_purge(
         self, action: BulkPurgeAppConfigFragmentAction
     ) -> BulkPurgeAppConfigFragmentActionResult:
-        result = await self._repository.bulk_purge(action.purgers)
+        result = await self._repository.bulk_purge(action.purger_specs)
         return BulkPurgeAppConfigFragmentActionResult(
             succeeded=result.succeeded, failed=result.failed
         )
