@@ -8,8 +8,9 @@ from ai.backend.common.types import SessionId
 
 
 class IdleCheckPhase(StrEnum):
+    NOT_CHECKED = "not_checked"
     ACTIVE = "active"
-    IDLE_GRACE_PERIOD = "idle_grace_period"
+    IDLE = "idle"
     IDLE_EXPIRED = "idle_expired"
 
 

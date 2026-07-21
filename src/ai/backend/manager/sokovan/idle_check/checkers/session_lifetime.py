@@ -56,11 +56,7 @@ class SessionLifetimeChecker(IdleChecker):
                         checker_id=assignment.definition.checker_id,
                         session_id=session.session_id,
                         expire_at=expires_at,
-                        status=(
-                            IdleCheckPhase.IDLE_EXPIRED
-                            if is_expired
-                            else IdleCheckPhase.IDLE_GRACE_PERIOD
-                        ),
+                        status=(IdleCheckPhase.IDLE_EXPIRED if is_expired else IdleCheckPhase.IDLE),
                         message=(
                             "Session lifetime check: "
                             f"max_lifetime_seconds={max_lifetime_seconds:f}, "

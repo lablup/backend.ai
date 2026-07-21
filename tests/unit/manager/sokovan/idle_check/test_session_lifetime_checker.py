@@ -102,7 +102,7 @@ class TestSessionLifetimeChecker:
 
         return create_assignment
 
-    async def test_session_before_deadline_is_in_grace_period(
+    async def test_session_before_deadline_is_idle(
         self,
         checker: SessionLifetimeChecker,
         session_factory: SessionFactory,
@@ -121,7 +121,7 @@ class TestSessionLifetimeChecker:
         assert len(judgments) == 1
         assert judgments[0].session_id == session.session_id
         assert judgments[0].expire_at == _BASE_TIME + timedelta(seconds=30)
-        assert judgments[0].status is IdleCheckPhase.IDLE_GRACE_PERIOD
+        assert judgments[0].status is IdleCheckPhase.IDLE
         assert judgments[0].message == (
             "Session lifetime check: max_lifetime_seconds=30, running_seconds=29"
         )
@@ -231,7 +231,7 @@ class TestSessionLifetimeChecker:
         ]
         assert [judgment.status for judgment in judgments] == [
             IdleCheckPhase.IDLE_EXPIRED,
-            IdleCheckPhase.IDLE_GRACE_PERIOD,
+            IdleCheckPhase.IDLE,
         ]
 
     async def test_evaluates_every_session_in_assignment(
@@ -257,7 +257,7 @@ class TestSessionLifetimeChecker:
         ]
         assert [judgment.status for judgment in judgments] == [
             IdleCheckPhase.IDLE_EXPIRED,
-            IdleCheckPhase.IDLE_GRACE_PERIOD,
+            IdleCheckPhase.IDLE,
         ]
 
     async def test_skips_mismatched_spec_and_evaluates_remaining_assignments(
