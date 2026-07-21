@@ -8,7 +8,6 @@ from datetime import datetime
 from typing import override
 from uuid import UUID
 
-from ai.backend.common.identifier.idle_checker import IdleCheckerID
 from ai.backend.common.types import SessionId
 from ai.backend.manager.repositories.idle_checker.types import ExpiredIdleCheckBatchData
 from ai.backend.manager.sokovan.reconciler.base import (
@@ -32,30 +31,13 @@ class IdleCheckSweepReconcileInfo(BaseReconcilerInfo):
         return self.batch.now
 
 
-@dataclass(frozen=True)
-class IdleCheckSweepReason:
-    """One elapsed checker result retained for the termination history."""
-
-    checker_id: IdleCheckerID
-    expire_at: datetime
-    last_message: str
-
-
-@dataclass(frozen=True)
-class IdleCheckSweepReport:
-    """All elapsed checker results for one session."""
-
-    session_id: SessionId
-    reasons: Sequence[IdleCheckSweepReason]
-
-
 @dataclass
 class IdleCheckSweepResult(BaseReconcilerResult):
-    reports: list[IdleCheckSweepReport] = field(default_factory=list)
+    session_ids: list[SessionId] = field(default_factory=list)
 
     @override
     def processed_count(self) -> int:
-        return len(self.reports)
+        return len(self.session_ids)
 
     @override
     def failed_count(self) -> int:

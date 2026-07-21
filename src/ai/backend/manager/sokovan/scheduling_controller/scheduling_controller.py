@@ -526,14 +526,6 @@ class SchedulingController:
             forced=forced,
             message=message,
         )
-        await self._post_mark_sessions_for_termination(result, reason)
-        return result
-
-    async def _post_mark_sessions_for_termination(
-        self,
-        result: MarkTerminatingResult,
-        reason: str,
-    ) -> None:
         if result.has_processed():
             log.info(
                 "Marked {} sessions for termination"
@@ -590,6 +582,8 @@ class SchedulingController:
                 schedule_types.append(ScheduleType.CLEANUP_FORCE_TERMINATED)
 
             await self.mark_scheduling_needed(schedule_types)
+
+        return result
 
     async def validate_session_spec(self, spec: SessionValidationSpec) -> None:
         # TODO: Refactor to use ValidationRule

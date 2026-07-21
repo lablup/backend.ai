@@ -15,11 +15,7 @@ from ai.backend.manager.repositories.idle_checker.types import (
     ExpiredIdleCheckData,
 )
 from ai.backend.manager.sokovan.idle_check.handlers.sweep import IdleCheckSweepHandler
-from ai.backend.manager.sokovan.idle_check.sweep.types import (
-    IdleCheckSweepReason,
-    IdleCheckSweepReconcileInfo,
-    IdleCheckSweepReport,
-)
+from ai.backend.manager.sokovan.idle_check.sweep.types import IdleCheckSweepReconcileInfo
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 
 _NOW = datetime(2026, 7, 20, tzinfo=UTC)
@@ -50,11 +46,7 @@ class TestIdleCheckSweepHandler:
     @pytest.fixture
     def grouped_due_rows_case(
         self,
-    ) -> tuple[
-        IdleCheckSweepReconcileInfo,
-        list[IdleCheckSweepReport],
-        list[SessionId],
-    ]:
+    ) -> tuple[IdleCheckSweepReconcileInfo, list[SessionId]]:
         first_session_id = SessionId(uuid4())
         second_session_id = SessionId(uuid4())
         first_checker_id = IdleCheckerID(UUID(int=1))
@@ -80,56 +72,25 @@ class TestIdleCheckSweepHandler:
             status="expired",
             message="maximum lifetime exceeded",
         )
-        expected_reports = [
-            IdleCheckSweepReport(
-                session_id=first_session_id,
-                reasons=[
-                    IdleCheckSweepReason(
-                        checker_id=second_checker_id,
-                        expire_at=first_check.expire_at,
-                        last_message=first_check.last_message,
-                    ),
-                    IdleCheckSweepReason(
-                        checker_id=first_checker_id,
-                        expire_at=second_check.expire_at,
-                        last_message=second_check.last_message,
-                    ),
-                ],
-            ),
-            IdleCheckSweepReport(
-                session_id=second_session_id,
-                reasons=[
-                    IdleCheckSweepReason(
-                        checker_id=first_checker_id,
-                        expire_at=third_check.expire_at,
-                        last_message=third_check.last_message,
-                    ),
-                ],
-            ),
-        ]
         reconcile_info = IdleCheckSweepReconcileInfo(
             batch=ExpiredIdleCheckBatchData(
                 checks=(first_check, second_check, third_check),
                 now=_NOW,
             )
         )
-        return reconcile_info, expected_reports, [first_session_id, second_session_id]
+        return reconcile_info, [first_session_id, second_session_id]
 
-    async def test_groups_due_rows_by_session_and_keeps_each_reason(
+    async def test_deduplicates_due_session_ids(
         self,
         scheduling_controller: AsyncMock,
-        grouped_due_rows_case: tuple[
-            IdleCheckSweepReconcileInfo,
-            list[IdleCheckSweepReport],
-            list[SessionId],
-        ],
+        grouped_due_rows_case: tuple[IdleCheckSweepReconcileInfo, list[SessionId]],
     ) -> None:
-        reconcile_info, expected_reports, expected_session_ids = grouped_due_rows_case
+        reconcile_info, expected_session_ids = grouped_due_rows_case
         handler = IdleCheckSweepHandler(cast(SchedulingController, scheduling_controller))
 
         result = await handler.execute(reconcile_info)
 
-        assert result.reports == expected_reports
+        assert result.session_ids == expected_session_ids
         assert result.processed_count() == 2
         assert result.decisions() == ()
         scheduling_controller.mark_sessions_for_termination.assert_awaited_once_with(
@@ -149,6 +110,6 @@ class TestIdleCheckSweepHandler:
 
         result = await handler.execute(reconcile_info)
 
-        assert result.reports == []
+        assert result.session_ids == []
         assert result.processed_count() == 0
         scheduling_controller.mark_sessions_for_termination.assert_not_awaited()

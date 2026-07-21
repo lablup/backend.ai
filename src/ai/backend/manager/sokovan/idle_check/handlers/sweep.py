@@ -2,15 +2,11 @@
 
 from __future__ import annotations
 
-from collections import defaultdict
 from typing import override
 
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
-from ai.backend.common.types import SessionId
 from ai.backend.manager.sokovan.idle_check.sweep.types import (
-    IdleCheckSweepReason,
     IdleCheckSweepReconcileInfo,
-    IdleCheckSweepReport,
     IdleCheckSweepResult,
 )
 from ai.backend.manager.sokovan.reconciler.base import ReconcilerHandler
@@ -27,29 +23,14 @@ class IdleCheckSweepHandler(ReconcilerHandler[IdleCheckSweepReconcileInfo, IdleC
 
     @override
     async def execute(self, reconcile_info: IdleCheckSweepReconcileInfo) -> IdleCheckSweepResult:
-        reasons_by_session: defaultdict[SessionId, list[IdleCheckSweepReason]] = defaultdict(list)
-        for check in reconcile_info.batch.checks:
-            reasons_by_session[check.session_id].append(
-                IdleCheckSweepReason(
-                    checker_id=check.checker_id,
-                    expire_at=check.expire_at,
-                    last_message=check.last_message,
-                )
-            )
-        reports = [
-            IdleCheckSweepReport(
-                session_id=session_id,
-                reasons=reasons,
-            )
-            for session_id, reasons in reasons_by_session.items()
-        ]
-        if reports:
+        session_ids = list(dict.fromkeys(check.session_id for check in reconcile_info.batch.checks))
+        if session_ids:
             await self._scheduling_controller.mark_sessions_for_termination(
-                [report.session_id for report in reports],
+                session_ids,
                 reason=KernelLifecycleEventReason.IDLE_TIMEOUT.value,
                 message="idle check timeout",
             )
-        return IdleCheckSweepResult(reports=reports)
+        return IdleCheckSweepResult(session_ids=session_ids)
 
     @override
     async def post_process(self, result: IdleCheckSweepResult) -> None:
