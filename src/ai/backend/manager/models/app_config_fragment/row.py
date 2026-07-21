@@ -1,13 +1,15 @@
 from __future__ import annotations
 
-import uuid
 from typing import Any
 
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
-from ai.backend.common.data.app_config.types import AppConfigScopeType
+from ai.backend.common.data.app_config.types import (
+    AppConfigScopeIdentifier,
+    AppConfigScopeType,
+)
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
 from ai.backend.manager.data.app_config_fragment.types import (
     AppConfigFragmentData,
@@ -70,7 +72,7 @@ class AppConfigFragmentRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc
         nullable=False,
     )
     # NULL is public, which has no owner; domain and user carry their owner's id.
-    scope_id: Mapped[uuid.UUID | None] = mapped_column(
+    scope_id: Mapped[AppConfigScopeIdentifier] = mapped_column(
         "scope_id",
         GUID,
         nullable=True,

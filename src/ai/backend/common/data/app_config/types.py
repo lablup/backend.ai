@@ -3,11 +3,16 @@
 from __future__ import annotations
 
 import enum
-import uuid
 
 from ai.backend.common.data.permission.types import RBACElementType, ScopeType
+from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.user import UserID
 
-__all__ = ("AppConfigScopeType",)
+__all__ = ("AppConfigScopeIdentifier", "AppConfigScopeType")
+
+# Who a fragment belongs to, paired with its ``AppConfigScopeType``: a domain, a user, or
+# nobody for ``public``.
+type AppConfigScopeIdentifier = DomainID | UserID | None
 
 
 class AppConfigScopeType(enum.StrEnum):
@@ -50,7 +55,7 @@ class AppConfigScopeType(enum.StrEnum):
             case AppConfigScopeType.USER:
                 return RBACElementType.USER
 
-    def to_rbac_scope_id(self, scope_id: uuid.UUID | None) -> str:
+    def to_rbac_scope_id(self, scope_id: AppConfigScopeIdentifier) -> str:
         """The RBAC scope id for a write at this fragment scope, in RBAC's string form.
 
         ``public`` is system-wide and names no owner.

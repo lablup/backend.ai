@@ -1,11 +1,13 @@
 from __future__ import annotations
 
-import uuid
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
-from ai.backend.common.data.app_config.types import AppConfigScopeType
+from ai.backend.common.data.app_config.types import (
+    AppConfigScopeIdentifier,
+    AppConfigScopeType,
+)
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
 
 
@@ -16,7 +18,7 @@ class AppConfigFragmentData:
     id: AppConfigFragmentID
     config_name: str
     scope_type: AppConfigScopeType
-    scope_id: uuid.UUID | None
+    scope_id: AppConfigScopeIdentifier
     config: dict[str, Any]
     created_at: datetime
     updated_at: datetime

@@ -10,7 +10,10 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from ai.backend.common.data.app_config.types import AppConfigScopeType
+from ai.backend.common.data.app_config.types import (
+    AppConfigScopeIdentifier,
+    AppConfigScopeType,
+)
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
 from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.user import UserID
@@ -32,7 +35,7 @@ _NOW = datetime.now(UTC)
 _SCOPE_ARGS = AppConfigScopeArguments(domain_id=_DOMAIN_ID)
 
 FragmentFactory = Callable[
-    [str, dict[str, Any], AppConfigScopeType, uuid.UUID | None], AppConfigFragmentData
+    [str, dict[str, Any], AppConfigScopeType, AppConfigScopeIdentifier], AppConfigFragmentData
 ]
 
 
@@ -47,7 +50,7 @@ def make_fragment() -> FragmentFactory:
         config_name: str,
         config: dict[str, Any],
         scope_type: AppConfigScopeType,
-        scope_id: uuid.UUID | None,
+        scope_id: AppConfigScopeIdentifier,
     ) -> AppConfigFragmentData:
         return AppConfigFragmentData(
             id=AppConfigFragmentID(uuid.uuid4()),

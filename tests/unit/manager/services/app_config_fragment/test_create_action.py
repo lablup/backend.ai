@@ -12,8 +12,13 @@ from dataclasses import dataclass
 
 import pytest
 
-from ai.backend.common.data.app_config.types import AppConfigScopeType
+from ai.backend.common.data.app_config.types import (
+    AppConfigScopeIdentifier,
+    AppConfigScopeType,
+)
 from ai.backend.common.data.permission.types import RBACElementType, ScopeType
+from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.user import UserID
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.repositories.app_config_fragment.creators import (
     AppConfigFragmentCreatorSpec,
@@ -22,14 +27,14 @@ from ai.backend.manager.services.app_config_fragment.actions.create import (
     CreateAppConfigFragmentAction,
 )
 
-_VICTIM_USER_ID = uuid.uuid4()
-_DOMAIN_ID = uuid.uuid4()
+_VICTIM_USER_ID = UserID(uuid.uuid4())
+_DOMAIN_ID = DomainID(uuid.uuid4())
 
 
 def _make_action(
     *,
     scope_type: AppConfigScopeType,
-    scope_id: uuid.UUID | None,
+    scope_id: AppConfigScopeIdentifier,
 ) -> CreateAppConfigFragmentAction:
     return CreateAppConfigFragmentAction(
         creator_spec=AppConfigFragmentCreatorSpec(
@@ -46,7 +51,7 @@ class _ScopeTarget:
     """A fragment scope, and the RBAC scope a create at it must authorize against."""
 
     scope_type: AppConfigScopeType
-    scope_id: uuid.UUID | None
+    scope_id: AppConfigScopeIdentifier
     expected_element: RBACElementRef
     expected_scope_type: ScopeType
 
