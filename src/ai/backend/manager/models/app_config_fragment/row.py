@@ -6,10 +6,8 @@ import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
-from ai.backend.common.data.app_config.types import (
-    AppConfigScopeIdentifier,
-    AppConfigScopeType,
-)
+from ai.backend.common.data.app_config.types import AppConfigScopeType
+from ai.backend.common.identifier.app_config import AppConfigScopeIdentifier
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
 from ai.backend.manager.data.app_config_fragment.types import (
     AppConfigFragmentData,

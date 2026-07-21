@@ -4,10 +4,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
-from ai.backend.common.data.app_config.types import (
-    AppConfigScopeIdentifier,
-    AppConfigScopeType,
-)
+from ai.backend.common.data.app_config.types import AppConfigScopeType
+from ai.backend.common.identifier.app_config import AppConfigScopeIdentifier
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
 
 

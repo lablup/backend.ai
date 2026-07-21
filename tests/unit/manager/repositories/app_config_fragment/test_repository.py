@@ -9,12 +9,10 @@ from dataclasses import dataclass, field
 import pytest
 import sqlalchemy as sa
 
-from ai.backend.common.data.app_config.types import (
-    AppConfigScopeIdentifier,
-    AppConfigScopeType,
-)
+from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec
 from ai.backend.common.data.permission.types import EntityType, ScopeType
+from ai.backend.common.identifier.app_config import AppConfigScopeIdentifier
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
 from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.user import UserID

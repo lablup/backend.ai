@@ -5,14 +5,9 @@ from __future__ import annotations
 import enum
 
 from ai.backend.common.data.permission.types import RBACElementType, ScopeType
-from ai.backend.common.identifier.domain import DomainID
-from ai.backend.common.identifier.user import UserID
+from ai.backend.common.identifier.app_config import AppConfigScopeIdentifier
 
-__all__ = ("AppConfigScopeIdentifier", "AppConfigScopeType")
-
-# Who a fragment belongs to, paired with its ``AppConfigScopeType``: a domain, a user, or
-# nobody for ``public``.
-type AppConfigScopeIdentifier = DomainID | UserID | None
+__all__ = ("AppConfigScopeType",)
 
 
 class AppConfigScopeType(enum.StrEnum):

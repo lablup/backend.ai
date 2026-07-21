@@ -12,11 +12,9 @@ from dataclasses import dataclass
 
 import pytest
 
-from ai.backend.common.data.app_config.types import (
-    AppConfigScopeIdentifier,
-    AppConfigScopeType,
-)
+from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.common.data.permission.types import RBACElementType, ScopeType
+from ai.backend.common.identifier.app_config import AppConfigScopeIdentifier
 from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.user import UserID
 from ai.backend.manager.data.permission.types import RBACElementRef
