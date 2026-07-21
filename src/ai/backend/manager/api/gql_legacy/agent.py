@@ -18,6 +18,7 @@ from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 
 from ai.backend.common.identifier.project import ProjectID
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
@@ -49,6 +50,10 @@ from ai.backend.manager.models.resource_slot import AgentResourceRow
 from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.user import UserRole, users
 from ai.backend.manager.repositories.agent.query import QueryConditions, QueryOrders
+from ai.backend.manager.services.agent.actions.update_resource_group import (
+    UpdateAgentResourceGroupAction,
+)
+from ai.backend.manager.services.agent.types import ConflictingSessionCleanupPolicy
 
 from .base import (
     FilterExprArg,
@@ -914,8 +919,7 @@ class ModifyAgent(graphene.Mutation):  # type: ignore[misc]
         data: dict[str, Any] = {}
         set_if_set(props, data, "schedulable")
         set_if_set(props, data, "scaling_group")
-        # TODO: Need to skip the following RPC call if the agent is not alive, or timeout.
-        scaling_group = data.get("scaling_group")
+        scaling_group = data.pop("scaling_group", None)
         if scaling_group is not None:
             async with graph_ctx.db.begin_readonly_read_committed() as conn:
                 resource_group_id = await conn.scalar(
@@ -923,8 +927,18 @@ class ModifyAgent(graphene.Mutation):  # type: ignore[misc]
                 )
             if resource_group_id is None:
                 return cls(False, f"no such scaling group: {scaling_group}")
-            data["resource_group_id"] = resource_group_id
-            await graph_ctx.registry.update_scaling_group(AgentId(id), scaling_group)
+            # The v1 mutation refuses to move an agent that still has sessions
+            # under the old group; drain them first.
+            await graph_ctx.processors.agent.update_resource_group.wait_for_complete(
+                UpdateAgentResourceGroupAction(
+                    agent_id=AgentId(id),
+                    resource_group_id=ResourceGroupID(resource_group_id),
+                    policy=ConflictingSessionCleanupPolicy.TERMINATE,
+                    force=False,
+                )
+            )
+            if not data:
+                return cls(True, "success")
 
         update_query = sa.update(agents).values(data).where(agents.c.id == id)
         return await simple_db_mutate(cls, graph_ctx, update_query)
