@@ -29,11 +29,16 @@ from ai.backend.manager.services.app_config.service import AppConfigService
 
 _USER_ID = UserID(uuid.uuid4())
 _DOMAIN_ID = DomainID(uuid.uuid4())
+
+# The same owners seen as a fragment's scope_id, which is polymorphic over scope kinds.
+_USER_SCOPE_ID = AppConfigScopeIdentifier(_USER_ID)
+_DOMAIN_SCOPE_ID = AppConfigScopeIdentifier(_DOMAIN_ID)
 _NOW = datetime.now(UTC)
 _SCOPE_ARGS = AppConfigScopeArguments(domain_id=_DOMAIN_ID)
 
 FragmentFactory = Callable[
-    [str, dict[str, Any], AppConfigScopeType, AppConfigScopeIdentifier], AppConfigFragmentData
+    [str, dict[str, Any], AppConfigScopeType, AppConfigScopeIdentifier | None],
+    AppConfigFragmentData,
 ]
 
 
@@ -48,7 +53,7 @@ def make_fragment() -> FragmentFactory:
         config_name: str,
         config: dict[str, Any],
         scope_type: AppConfigScopeType,
-        scope_id: AppConfigScopeIdentifier,
+        scope_id: AppConfigScopeIdentifier | None,
     ) -> AppConfigFragmentData:
         return AppConfigFragmentData(
             id=AppConfigFragmentID(uuid.uuid4()),
@@ -83,7 +88,7 @@ class TestAppConfigService:
             make_fragment(
                 "theme", {"theme": "light", "lang": "en"}, AppConfigScopeType.PUBLIC, None
             ),
-            make_fragment("theme", {"theme": "dark"}, AppConfigScopeType.USER, _USER_ID),
+            make_fragment("theme", {"theme": "dark"}, AppConfigScopeType.USER, _USER_SCOPE_ID),
         ]
         mock_fragment_repository.list_visible_fragments_bulk = AsyncMock(return_value=fragments)
         return fragments
@@ -106,7 +111,7 @@ class TestAppConfigService:
                 "ui",
                 {"nav": ["dashboard"], "theme": {"dark": True}},
                 AppConfigScopeType.USER,
-                _USER_ID,
+                _USER_SCOPE_ID,
             ),
         ]
         mock_fragment_repository.list_visible_fragments_bulk = AsyncMock(return_value=fragments)
@@ -132,7 +137,7 @@ class TestAppConfigService:
             make_fragment(
                 "theme", {"theme": "light", "lang": "en"}, AppConfigScopeType.PUBLIC, None
             ),
-            make_fragment("theme", {"theme": "dark"}, AppConfigScopeType.USER, _USER_ID),
+            make_fragment("theme", {"theme": "dark"}, AppConfigScopeType.USER, _USER_SCOPE_ID),
             make_fragment("menu", {"items": ["a"]}, AppConfigScopeType.PUBLIC, None),
         ]
         mock_fragment_repository.list_visible_fragments_bulk = AsyncMock(return_value=fragments)

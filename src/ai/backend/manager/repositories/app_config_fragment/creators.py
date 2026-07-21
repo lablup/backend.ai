@@ -24,7 +24,7 @@ class AppConfigFragmentCreatorSpec(CreatorSpec[AppConfigFragmentRow]):
 
     config_name: str
     scope_type: AppConfigScopeType
-    scope_id: AppConfigScopeIdentifier
+    scope_id: AppConfigScopeIdentifier | None
     config: dict[str, Any]
 
     @property

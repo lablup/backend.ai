@@ -27,12 +27,14 @@ from ai.backend.manager.services.app_config_fragment.actions.create import (
 
 _VICTIM_USER_ID = UserID(uuid.uuid4())
 _DOMAIN_ID = DomainID(uuid.uuid4())
+_VICTIM_USER_SCOPE_ID = AppConfigScopeIdentifier(_VICTIM_USER_ID)
+_DOMAIN_SCOPE_ID = AppConfigScopeIdentifier(_DOMAIN_ID)
 
 
 def _make_action(
     *,
     scope_type: AppConfigScopeType,
-    scope_id: AppConfigScopeIdentifier,
+    scope_id: AppConfigScopeIdentifier | None,
 ) -> CreateAppConfigFragmentAction:
     return CreateAppConfigFragmentAction(
         creator_spec=AppConfigFragmentCreatorSpec(
@@ -49,7 +51,7 @@ class _ScopeTarget:
     """A fragment scope, and the RBAC scope a create at it must authorize against."""
 
     scope_type: AppConfigScopeType
-    scope_id: AppConfigScopeIdentifier
+    scope_id: AppConfigScopeIdentifier | None
     expected_element: RBACElementRef
     expected_scope_type: ScopeType
 
@@ -62,13 +64,13 @@ class TestCreateTargetElement:
         [
             _ScopeTarget(
                 scope_type=AppConfigScopeType.USER,
-                scope_id=_VICTIM_USER_ID,
+                scope_id=_VICTIM_USER_SCOPE_ID,
                 expected_element=RBACElementRef(RBACElementType.USER, str(_VICTIM_USER_ID)),
                 expected_scope_type=ScopeType.USER,
             ),
             _ScopeTarget(
                 scope_type=AppConfigScopeType.DOMAIN,
-                scope_id=_DOMAIN_ID,
+                scope_id=_DOMAIN_SCOPE_ID,
                 expected_element=RBACElementRef(RBACElementType.DOMAIN, str(_DOMAIN_ID)),
                 expected_scope_type=ScopeType.DOMAIN,
             ),

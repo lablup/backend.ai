@@ -70,6 +70,10 @@ from ai.backend.manager.types import OptionalState
 _USER_ID = UserID(uuid.uuid4())
 _DOMAIN_ID = DomainID(uuid.uuid4())
 
+# The same owners seen as a fragment's scope_id, which is polymorphic over scope kinds.
+_USER_SCOPE_ID = AppConfigScopeIdentifier(_USER_ID)
+_DOMAIN_SCOPE_ID = AppConfigScopeIdentifier(_DOMAIN_ID)
+
 
 @dataclass(frozen=True)
 class _RBACScopeCase:
@@ -80,7 +84,7 @@ class _RBACScopeCase:
     """
 
     scope_type: AppConfigScopeType
-    scope_id: AppConfigScopeIdentifier
+    scope_id: AppConfigScopeIdentifier | None
     expected_scope_type: ScopeType
     expected_scope_id: str
 
@@ -105,7 +109,7 @@ class TestAppConfigFragmentService:
             id=AppConfigFragmentID(uuid.uuid4()),
             config_name="theme",
             scope_type=AppConfigScopeType.USER,
-            scope_id=_USER_ID,
+            scope_id=_USER_SCOPE_ID,
             config={"k": "v"},
             created_at=datetime.now(UTC),
             updated_at=datetime.now(UTC),
@@ -114,7 +118,7 @@ class TestAppConfigFragmentService:
         spec = AppConfigFragmentCreatorSpec(
             config_name="theme",
             scope_type=AppConfigScopeType.USER,
-            scope_id=_USER_ID,
+            scope_id=_USER_SCOPE_ID,
             config={"k": "v"},
         )
 
@@ -130,7 +134,7 @@ class TestAppConfigFragmentService:
             id=AppConfigFragmentID(uuid.uuid4()),
             config_name="theme",
             scope_type=AppConfigScopeType.USER,
-            scope_id=_USER_ID,
+            scope_id=_USER_SCOPE_ID,
             config={"k": "v"},
             created_at=datetime.now(UTC),
             updated_at=datetime.now(UTC),
@@ -160,7 +164,7 @@ class TestAppConfigFragmentService:
             id=AppConfigFragmentID(uuid.uuid4()),
             config_name="theme",
             scope_type=AppConfigScopeType.USER,
-            scope_id=_USER_ID,
+            scope_id=_USER_SCOPE_ID,
             config={"k": "v"},
             created_at=datetime.now(UTC),
             updated_at=datetime.now(UTC),
@@ -188,7 +192,7 @@ class TestAppConfigFragmentService:
             id=AppConfigFragmentID(uuid.uuid4()),
             config_name="theme",
             scope_type=AppConfigScopeType.USER,
-            scope_id=_USER_ID,
+            scope_id=_USER_SCOPE_ID,
             config={"k": "v"},
             created_at=datetime.now(UTC),
             updated_at=datetime.now(UTC),
@@ -235,7 +239,7 @@ class TestAppConfigFragmentService:
             id=AppConfigFragmentID(uuid.uuid4()),
             config_name="theme",
             scope_type=AppConfigScopeType.USER,
-            scope_id=_USER_ID,
+            scope_id=_USER_SCOPE_ID,
             config={"k": "v"},
             created_at=datetime.now(UTC),
             updated_at=datetime.now(UTC),
@@ -260,7 +264,7 @@ class TestAppConfigFragmentService:
             id=AppConfigFragmentID(uuid.uuid4()),
             config_name="theme",
             scope_type=AppConfigScopeType.USER,
-            scope_id=_USER_ID,
+            scope_id=_USER_SCOPE_ID,
             config={"k": "v"},
             created_at=datetime.now(UTC),
             updated_at=datetime.now(UTC),
@@ -283,7 +287,7 @@ class TestAppConfigFragmentService:
                 id=AppConfigFragmentID(uuid.uuid4()),
                 config_name="theme",
                 scope_type=AppConfigScopeType.USER,
-                scope_id=_USER_ID,
+                scope_id=_USER_SCOPE_ID,
                 config={"k": "v"},
                 created_at=datetime.now(UTC),
                 updated_at=datetime.now(UTC),
@@ -314,7 +318,7 @@ class TestAppConfigFragmentService:
                 id=AppConfigFragmentID(uuid.uuid4()),
                 config_name="theme",
                 scope_type=AppConfigScopeType.USER,
-                scope_id=_USER_ID,
+                scope_id=_USER_SCOPE_ID,
                 config={"k": "v"},
                 created_at=datetime.now(UTC),
                 updated_at=datetime.now(UTC),
@@ -352,13 +356,13 @@ class TestCreateActionScope:
             ),
             _RBACScopeCase(
                 scope_type=AppConfigScopeType.DOMAIN,
-                scope_id=_DOMAIN_ID,
+                scope_id=_DOMAIN_SCOPE_ID,
                 expected_scope_type=ScopeType.DOMAIN,
                 expected_scope_id=str(_DOMAIN_ID),
             ),
             _RBACScopeCase(
                 scope_type=AppConfigScopeType.USER,
-                scope_id=_USER_ID,
+                scope_id=_USER_SCOPE_ID,
                 expected_scope_type=ScopeType.USER,
                 expected_scope_id=str(_USER_ID),
             ),

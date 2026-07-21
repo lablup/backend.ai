@@ -70,9 +70,9 @@ class AppConfigFragmentRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc
         nullable=False,
     )
     # NULL is public, which has no owner; domain and user carry their owner's id.
-    scope_id: Mapped[AppConfigScopeIdentifier] = mapped_column(
+    scope_id: Mapped[AppConfigScopeIdentifier | None] = mapped_column(
         "scope_id",
-        GUID,
+        GUID(AppConfigScopeIdentifier),
         nullable=True,
     )
     config: Mapped[dict[str, Any]] = mapped_column(

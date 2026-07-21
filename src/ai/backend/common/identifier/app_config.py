@@ -1,9 +1,10 @@
-from ai.backend.common.identifier.domain import DomainID
-from ai.backend.common.identifier.user import UserID
+from typing import NewType
+from uuid import UUID
 
 __all__ = ("AppConfigScopeIdentifier",)
 
 
-# Who an app config fragment belongs to, paired with its ``AppConfigScopeType``: a domain,
-# a user, or nobody for ``public``.
-type AppConfigScopeIdentifier = DomainID | UserID | None
+# Who an app config fragment belongs to. Polymorphic across scope kinds (domain/user); the
+# concrete kind is discriminated by the accompanying ``AppConfigScopeType``, and ``public``
+# has no owner at all, so its absence is spelled ``| None`` at each use.
+AppConfigScopeIdentifier = NewType("AppConfigScopeIdentifier", UUID)
