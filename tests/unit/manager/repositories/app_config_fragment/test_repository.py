@@ -10,6 +10,7 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.data.app_config.types import AppConfigScopeType
+from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec
 from ai.backend.common.data.permission.types import EntityType, ScopeType
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
 from ai.backend.common.identifier.domain import DomainID
@@ -361,18 +362,30 @@ class TestSearch:
         }
         assert {item.id for item in result.items} == expected
 
+    @pytest.mark.parametrize("negated", [False, True], ids=["equals", "not-equals"])
     async def test_filter_by_scope_id(
         self,
         repository: AppConfigFragmentRepository,
         fragments_across_scopes: list[AppConfigFragmentData],
+        negated: bool,
     ) -> None:
         result = await repository.admin_search(
             BatchQuerier(
                 pagination=OffsetPagination(limit=10, offset=0),
-                conditions=[AppConfigFragmentConditions.by_scope_id_equals(_USER_UUID)],
+                conditions=[
+                    AppConfigFragmentConditions.by_scope_id_equals(
+                        UUIDEqualMatchSpec(value=_USER_UUID, negated=negated)
+                    )
+                ],
             )
         )
-        expected = {f.id for f in fragments_across_scopes if f.scope_id == _USER_UUID}
+        # Public rows hold NULL, and neither `= x` nor `NOT (= x)` is true of NULL, so they
+        # fall out of both directions of the filter.
+        expected = {
+            f.id
+            for f in fragments_across_scopes
+            if f.scope_id is not None and (f.scope_id == _USER_UUID) is not negated
+        }
         assert {item.id for item in result.items} == expected
 
 
