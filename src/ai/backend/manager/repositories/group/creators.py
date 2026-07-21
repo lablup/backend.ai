@@ -2,17 +2,24 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 from uuid import UUID
 
 from ai.backend.common.data.permission.types import EntityType, RelationType, ScopeType
+from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
+from ai.backend.manager.errors.repository import (
+    ForeignKeyViolationError,
+    UniqueConstraintViolationError,
+)
 from ai.backend.manager.models.group import GroupRow, ProjectType
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
 from ai.backend.manager.repositories.base import CreatorSpec
+from ai.backend.manager.repositories.base.types import IntegrityErrorCheck
 
 
 @dataclass
@@ -30,6 +37,33 @@ class GroupCreatorSpec(CreatorSpec[GroupRow]):
     resource_policy: str | None = None
     container_registry: dict[str, str] | None = None
     dotfiles: bytes | None = None
+
+    @property
+    @override
+    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
+        return (
+            IntegrityErrorCheck(
+                violation_type=UniqueConstraintViolationError,
+                error=InvalidAPIParameters(
+                    f"Group with name '{self.name}' already exists in domain '{self.domain_name}'"
+                ),
+                constraint_name="uq_groups_name_domain_name",
+            ),
+            IntegrityErrorCheck(
+                violation_type=ForeignKeyViolationError,
+                error=InvalidAPIParameters(
+                    f"Cannot create group: Domain '{self.domain_name}' does not exist"
+                ),
+                constraint_name="fk_groups_domain_name_domains",
+            ),
+            IntegrityErrorCheck(
+                violation_type=ForeignKeyViolationError,
+                error=InvalidAPIParameters(
+                    f"Cannot create group: Resource policy '{self.resource_policy}' does not exist"
+                ),
+                constraint_name="fk_groups_resource_policy_project_resource_policies",
+            ),
+        )
 
     @override
     def build_row(self) -> GroupRow:

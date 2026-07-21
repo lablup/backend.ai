@@ -3,10 +3,11 @@ from __future__ import annotations
 import copy
 import logging
 import uuid
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
+from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
-from typing import Any, cast
+from typing import Any, cast, override
 from uuid import UUID
 
 import aiotools
@@ -16,8 +17,7 @@ from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
-from ai.backend.common.data.entity.types import ScopeRef
-from ai.backend.common.data.entity.types import ScopeType as VScopeType
+from ai.backend.common.data.entity.types import ScopeRef, ScopeType
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.identifier.project import ProjectID
@@ -33,7 +33,13 @@ from ai.backend.manager.data.group.types import (
     UnassignUsersResult,
 )
 from ai.backend.manager.data.permission.id import ScopeId
-from ai.backend.manager.data.permission.types import EntityType, RBACElementRef, ScopeType
+from ai.backend.manager.data.permission.types import (
+    EntityType,
+    RBACElementRef,
+)
+from ai.backend.manager.data.permission.types import (
+    ScopeType as LegacyScopeType,
+)
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.resource import (
     ProjectHasActiveEndpointsError,
@@ -41,7 +47,6 @@ from ai.backend.manager.errors.resource import (
     ProjectHasVFoldersMountedError,
     ProjectNotFound,
 )
-from ai.backend.manager.models.domain import domains
 from ai.backend.manager.models.endpoint import EndpointLifecycle, EndpointRow
 from ai.backend.manager.models.group import groups
 from ai.backend.manager.models.group.row import (
@@ -59,7 +64,6 @@ from ai.backend.manager.models.rbac_models.association_scopes_entities import (
 )
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
-from ai.backend.manager.models.resource_policy import project_resource_policies
 from ai.backend.manager.models.resource_usage import fetch_resource_usage
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.user import UserRow, users
@@ -76,7 +80,6 @@ from ai.backend.manager.repositories.base.purger import BatchPurger, execute_bat
 from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.base.rbac.entity_creator import (
     RBACEntityCreator,
-    execute_rbac_entity_creator,
 )
 from ai.backend.manager.repositories.base.rbac.entity_purger import (
     RBACEntityBatchPurger,
@@ -108,12 +111,49 @@ from ai.backend.manager.repositories.group.types import (
     GroupSearchResult,
     UserProjectSearchScope,
 )
-from ai.backend.manager.repositories.ops.rbac.provider import RBACOpsProvider
+from ai.backend.manager.repositories.ops.rbac.provider import (
+    RBACOpsProvider,
+    ScopeCreation,
+)
 from ai.backend.manager.repositories.permission_controller.creators import UserRoleCreatorSpec
-from ai.backend.manager.repositories.permission_controller.role_manager import RoleManager
+from ai.backend.manager.repositories.permission_controller.role_manager import (
+    RoleManager,
+    ScopeSystemRoleData,
+)
 from ai.backend.manager.repositories.vfolder.deletion import initiate_vfolder_deletion
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+
+@dataclass
+class ProjectScopeCreation(ScopeCreation[GroupRow]):
+    """Creates a project row under its domain, and the scope the project becomes."""
+
+    spec: GroupCreatorSpec
+
+    @override
+    def creator(self) -> RBACEntityCreator[GroupRow]:
+        return RBACEntityCreator(
+            spec=self.spec,
+            element_type=RBACElementType.PROJECT,
+            scope_ref=RBACElementRef(
+                element_type=RBACElementType.DOMAIN, element_id=self.spec.domain_name
+            ),
+        )
+
+    @override
+    def scope_of(self, row: GroupRow) -> ScopeRef:
+        return ScopeRef(
+            scope_type=ScopeType(RBACElementType.PROJECT.value),
+            scope_id=row.id,
+        )
+
+    @override
+    def system_roles_of(self, row: GroupRow) -> Collection[ScopeSystemRoleData]:
+        """A project starts with an admin role (via GroupData) and a member role
+        (read-only access for project members)."""
+        data = row.to_data()
+        return (data, ProjectMemberRoleSpec(project_id=data.id))
 
 
 class GroupDBSource:
@@ -127,72 +167,15 @@ class GroupDBSource:
         self._rbac_ops_provider = RBACOpsProvider(db)
 
     async def create(self, creator: Creator[GroupRow]) -> GroupData:
-        """Create a new group."""
-        spec = cast(GroupCreatorSpec, creator.spec)
-        async with self._db.begin_session() as db_session:
-            # Validate domain exists
-            domain_exists = await db_session.scalar(
-                sa.select(sa.exists().where(domains.c.name == spec.domain_name))
-            )
-            if not domain_exists:
-                raise InvalidAPIParameters(
-                    f"Cannot create group: Domain '{spec.domain_name}' does not exist"
-                )
+        """Create a new group.
 
-            # Validate resource policy exists
-            policy_exists = await db_session.scalar(
-                sa.select(
-                    sa.exists().where(project_resource_policies.c.name == spec.resource_policy)
-                )
-            )
-            if not policy_exists:
-                raise InvalidAPIParameters(
-                    f"Cannot create group: Resource policy '{spec.resource_policy}' does not exist"
-                )
-
-            # Check if group already exists
-            check_stmt = sa.select(GroupRow).where(
-                sa.and_(
-                    GroupRow.name == spec.name,
-                    GroupRow.domain_name == spec.domain_name,
-                )
-            )
-            existing_group = await db_session.scalar(check_stmt)
-            if existing_group is not None:
-                raise InvalidAPIParameters(
-                    f"Group with name '{spec.name}' already exists in domain '{spec.domain_name}'"
-                )
-
-            # Create the group with RBAC scope association
-            rbac_creator = RBACEntityCreator(
-                spec=creator.spec,
-                element_type=RBACElementType.PROJECT,
-                scope_ref=RBACElementRef(
-                    element_type=RBACElementType.DOMAIN, element_id=spec.domain_name
-                ),
-                additional_scope_refs=[],
-            )
-            result = await execute_rbac_entity_creator(db_session, rbac_creator)
-            row: GroupRow = result.row
-            data = row.to_data()
-            # Create RBAC roles and permissions for the group.
-            # Each project gets two SYSTEM-sourced roles at its scope: an admin role
-            # (via GroupData) and a member role (read-only access for project members).
-            await self._role_manager.create_system_role(db_session, data)
-            await self._role_manager.create_system_role(
-                db_session, ProjectMemberRoleSpec(project_id=data.id)
-            )
-            # Provision roles from active presets matching the project scope.
-            await self._role_manager.create_preset_roles(db_session, data.scope_id())
-
+        Domain/resource-policy existence and name-uniqueness are enforced by the group
+        row's DB constraints, mapped to domain errors via the spec's
+        integrity_error_checks.
+        """
+        creation = ProjectScopeCreation(spec=cast(GroupCreatorSpec, creator.spec))
         async with self._rbac_ops_provider.write_ops() as w:
-            await w.ensure_scope(
-                ScopeRef(
-                    scope_type=VScopeType(RBACElementType.PROJECT.value),
-                    scope_id=data.id,
-                )
-            )
-        return data
+            return (await w.create_scope(creation)).row.to_data()
 
     async def modify_validated(
         self,
@@ -249,7 +232,7 @@ class GroupDBSource:
                     AssociationScopesEntitiesRow,
                     sa.and_(
                         sa.cast(UserRow.uuid, sa.String) == AssociationScopesEntitiesRow.entity_id,
-                        AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
+                        AssociationScopesEntitiesRow.scope_type == LegacyScopeType.PROJECT,
                         AssociationScopesEntitiesRow.scope_id == str(project_id),
                         AssociationScopesEntitiesRow.entity_type == EntityType.USER,
                     ),
@@ -278,7 +261,7 @@ class GroupDBSource:
         await self._role_manager.assign_auto_assign_roles(
             session,
             [row.uuid for row in new_user_rows],
-            ScopeId(scope_type=ScopeType.PROJECT, scope_id=str(project_id)),
+            ScopeId(scope_type=LegacyScopeType.PROJECT, scope_id=str(project_id)),
         )
 
     async def _remove_users_from_project_in_session(
@@ -297,7 +280,7 @@ class GroupDBSource:
         assigned_entity_ids = (
             await session.scalars(
                 sa.select(AssociationScopesEntitiesRow.entity_id).where(
-                    AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
+                    AssociationScopesEntitiesRow.scope_type == LegacyScopeType.PROJECT,
                     AssociationScopesEntitiesRow.scope_id == str(project_id),
                     AssociationScopesEntitiesRow.entity_type == EntityType.USER,
                     AssociationScopesEntitiesRow.entity_id.in_(target_entity_ids),
@@ -317,7 +300,7 @@ class GroupDBSource:
         project_role_ids_subq = sa.select(
             AssociationScopesEntitiesRow.entity_id,
         ).where(
-            AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
+            AssociationScopesEntitiesRow.scope_type == LegacyScopeType.PROJECT,
             AssociationScopesEntitiesRow.scope_id == str(project_id),
             AssociationScopesEntitiesRow.entity_type == EntityType.ROLE,
         )
@@ -756,7 +739,7 @@ class GroupDBSource:
                         sa.and_(
                             sa.cast(UserRow.uuid, sa.String)
                             == AssociationScopesEntitiesRow.entity_id,
-                            AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
+                            AssociationScopesEntitiesRow.scope_type == LegacyScopeType.PROJECT,
                             AssociationScopesEntitiesRow.scope_id == str(project_id),
                             AssociationScopesEntitiesRow.entity_type == EntityType.USER,
                         ),
@@ -816,7 +799,7 @@ class GroupDBSource:
             actual_assoc_query = sa.select(UserRow).where(
                 sa.cast(UserRow.uuid, sa.String).in_(
                     sa.select(AssociationScopesEntitiesRow.entity_id).where(
-                        AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
+                        AssociationScopesEntitiesRow.scope_type == LegacyScopeType.PROJECT,
                         AssociationScopesEntitiesRow.scope_id == str(unbinder.project_id),
                         AssociationScopesEntitiesRow.entity_type == EntityType.USER,
                         AssociationScopesEntitiesRow.entity_id.in_(target_entity_ids),
@@ -853,7 +836,7 @@ class GroupDBSource:
         async with self._db.begin_session() as session:
             already_bound = await session.scalar(
                 sa.select(AssociationScopesEntitiesRow.id).where(
-                    AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
+                    AssociationScopesEntitiesRow.scope_type == LegacyScopeType.PROJECT,
                     AssociationScopesEntitiesRow.scope_id == str(project_id),
                     AssociationScopesEntitiesRow.entity_type == EntityType.USER,
                     AssociationScopesEntitiesRow.entity_id == str(user_id),
@@ -875,7 +858,7 @@ class GroupDBSource:
         async with self._db.begin_session() as session:
             await session.execute(
                 sa.delete(AssociationScopesEntitiesRow).where(
-                    AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
+                    AssociationScopesEntitiesRow.scope_type == LegacyScopeType.PROJECT,
                     AssociationScopesEntitiesRow.scope_id == str(project_id),
                     AssociationScopesEntitiesRow.entity_type == EntityType.USER,
                     AssociationScopesEntitiesRow.entity_id == str(user_id),
@@ -1005,7 +988,7 @@ class GroupDBSource:
                     AssociationScopesEntitiesRow,
                     sa.and_(
                         sa.cast(GroupRow.id, sa.String) == AssociationScopesEntitiesRow.scope_id,
-                        AssociationScopesEntitiesRow.scope_type == ScopeType.PROJECT,
+                        AssociationScopesEntitiesRow.scope_type == LegacyScopeType.PROJECT,
                         AssociationScopesEntitiesRow.entity_type == EntityType.USER,
                     ),
                 )
