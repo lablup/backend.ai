@@ -28,7 +28,7 @@ class AppConfigFragmentNode(BaseResponseModel):
     id: UUID = Field(description="App config fragment UUID.")
     config_name: str = Field(description="Config name the fragment belongs to.")
     scope_type: AppConfigScopeType = Field(description="Scope the fragment is written at.")
-    scope_id: str | None = Field(
+    scope_id: UUID | None = Field(
         description="Scope identifier: the domain id or user id; null for public scope."
     )
     config: dict[str, Any] = Field(description="The fragment's JSON config document.")

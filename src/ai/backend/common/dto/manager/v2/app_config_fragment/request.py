@@ -30,7 +30,7 @@ class CreateAppConfigFragmentInput(BaseRequestModel):
     scope_type: AppConfigScopeType = Field(
         description="Scope the fragment is written at (public | domain | user)."
     )
-    scope_id: str | None = Field(
+    scope_id: UUID | None = Field(
         default=None,
         description="Scope identifier: the domain id (domain scope) or the user id (user scope). "
         "Null for public scope, which has no owner.",
@@ -42,7 +42,7 @@ class CreateAppConfigFragmentInput(BaseRequestModel):
         if self.scope_type is AppConfigScopeType.PUBLIC:
             if self.scope_id is not None:
                 raise ValueError("scope_id must be null for public scope.")
-        elif not self.scope_id:
+        elif self.scope_id is None:
             raise ValueError("scope_id is required for domain and user scopes.")
         return self
 

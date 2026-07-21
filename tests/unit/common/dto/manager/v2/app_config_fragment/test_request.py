@@ -19,13 +19,13 @@ from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
 )
 from ai.backend.common.exception import BackendAISchemaValidationFailed
 
-_SCOPE_ID = "11111111-1111-1111-1111-111111111111"
+_SCOPE_ID = uuid.UUID("11111111-1111-1111-1111-111111111111")
 
 
 @dataclass(frozen=True)
 class _ScopeCase:
     scope_type: AppConfigScopeType
-    scope_id: str | None
+    scope_id: uuid.UUID | None
 
 
 @pytest.fixture
@@ -63,13 +63,11 @@ class TestCreateAppConfigFragmentInput:
         [
             # public has no owner, so naming one is a contradiction.
             _ScopeCase(scope_type=AppConfigScopeType.PUBLIC, scope_id=_SCOPE_ID),
-            # domain and user both require an owner; absent and blank are equally unusable.
+            # domain and user both require an owner.
             _ScopeCase(scope_type=AppConfigScopeType.DOMAIN, scope_id=None),
-            _ScopeCase(scope_type=AppConfigScopeType.DOMAIN, scope_id=""),
             _ScopeCase(scope_type=AppConfigScopeType.USER, scope_id=None),
-            _ScopeCase(scope_type=AppConfigScopeType.USER, scope_id=""),
         ],
-        ids=lambda case: f"{case.scope_type.value}-{case.scope_id!r}",
+        ids=lambda case: f"{case.scope_type.value}-{case.scope_id}",
     )
     def test_scope_id_disagreeing_with_its_scope_type_is_rejected(
         self, case: _ScopeCase, config_document: dict[str, Any]
@@ -81,6 +79,25 @@ class TestCreateAppConfigFragmentInput:
                 scope_id=case.scope_id,
                 config=config_document,
             )
+
+    @pytest.mark.parametrize(
+        "scope_type",
+        [AppConfigScopeType.DOMAIN, AppConfigScopeType.USER],
+        ids=lambda scope_type: scope_type.value,
+    )
+    @pytest.mark.parametrize("scope_id", ["", "not-a-uuid"], ids=["empty", "malformed"])
+    def test_scope_id_that_is_not_a_uuid_is_rejected(
+        self, scope_type: AppConfigScopeType, scope_id: str, config_document: dict[str, Any]
+    ) -> None:
+        # Validated from a mapping because the field is typed UUID: a string only ever
+        # reaches it from a request payload, never from a type-checked call.
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
+            CreateAppConfigFragmentInput.model_validate({
+                "config_name": "theme",
+                "scope_type": scope_type,
+                "scope_id": scope_id,
+                "config": config_document,
+            })
 
     def test_scope_id_defaults_to_none(self, config_document: dict[str, Any]) -> None:
         req = CreateAppConfigFragmentInput(

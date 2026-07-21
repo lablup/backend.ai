@@ -56,10 +56,6 @@ from ai.backend.manager.services.app_config_fragment.actions.update import (
 )
 from ai.backend.manager.types import OptionalState
 
-# Public fragments have no scope owner; the non-null scope_id column stores this empty
-# sentinel. Public is identified by scope_type, never by this value.
-_PUBLIC_SCOPE_ID = ""
-
 
 class AppConfigFragmentAdapter(BaseAdapter):
     """Adapter for raw app config fragment write operations."""
@@ -67,12 +63,12 @@ class AppConfigFragmentAdapter(BaseAdapter):
     # --- fragment CRUD (RBAC-gated at the processor) ---
 
     async def create(self, input: CreateAppConfigFragmentInput) -> CreateAppConfigFragmentPayload:
-        # scope_id is None only for public (enforced by the DTO validator); persist the empty
-        # sentinel since the column is non-null. Domain/user carry the id.
+        # scope_id is None exactly for public (enforced by the DTO validator), which is what
+        # the column stores for an ownerless fragment.
         spec = AppConfigFragmentCreatorSpec(
             config_name=input.config_name,
             scope_type=AppConfigScopeType(input.scope_type.value),
-            scope_id=input.scope_id or _PUBLIC_SCOPE_ID,
+            scope_id=input.scope_id,
             config=input.config,
         )
         action_result = await self._processors.app_config_fragment.create.wait_for_complete(
@@ -159,8 +155,7 @@ class AppConfigFragmentAdapter(BaseAdapter):
             id=data.id,
             config_name=data.config_name,
             scope_type=AppConfigScopeTypeDTO(data.scope_type.value),
-            # public has no owner — expose null rather than the stored empty sentinel.
-            scope_id=None if data.scope_type is AppConfigScopeType.PUBLIC else data.scope_id,
+            scope_id=data.scope_id,
             config=data.config,
             created_at=data.created_at,
             updated_at=data.updated_at,

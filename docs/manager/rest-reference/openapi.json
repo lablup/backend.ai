@@ -574,6 +574,7 @@
           "scope_id": {
             "anyOf": [
               {
+                "format": "uuid",
                 "type": "string"
               },
               {
