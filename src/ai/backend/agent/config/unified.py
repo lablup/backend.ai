@@ -1206,20 +1206,23 @@ class OverridableAgentConfig(BaseConfigSchema):
             example=ConfigExample(local="6007", prod="6007"),
         ),
     ]
-    scaling_group: Annotated[
-        str,
+    initial_resource_group_name: Annotated[
+        str | None,
         Field(
-            default="default",
-            validation_alias=AliasChoices("scaling-group", "scaling_group"),
-            serialization_alias="scaling-group",
+            default=None,
+            validation_alias=AliasChoices(
+                "initial-resource-group-name", "initial_resource_group_name"
+            ),
+            serialization_alias="initial-resource-group-name",
         ),
         BackendAIConfigMeta(
             description=(
-                "Name of the scaling group this agent belongs to. "
-                "Scaling groups organize agents into logical clusters for resource allocation. "
-                "Users can target specific scaling groups when creating sessions."
+                "Name of the resource group used as the seed only at the agent's first "
+                "registration. The manager DB is the source of truth afterwards, so changing "
+                "this value has no effect on an already-registered agent. "
+                "When unset, the manager assigns the default resource group."
             ),
-            added_version="25.12.0",
+            added_version="26.8.0",
             example=ConfigExample(local="default", prod="gpu-cluster"),
         ),
     ]
@@ -1317,6 +1320,21 @@ class OverridableAgentConfig(BaseConfigSchema):
     model_config = ConfigDict(
         extra="allow",
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def _reject_removed_scaling_group_key(cls, data: Any) -> Any:
+        if isinstance(data, Mapping):
+            for removed_key in ("scaling-group", "scaling_group"):
+                if removed_key in data:
+                    raise ValueError(
+                        f"The '{removed_key}' agent config key has been removed. "
+                        "The manager DB is now the source of truth for an agent's "
+                        "resource group. Use 'initial-resource-group-name' to seed "
+                        "the group at first registration, or remove the key to use "
+                        "the default resource group."
+                    )
+        return data
 
     @property
     def defaulted_id(self) -> str:

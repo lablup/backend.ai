@@ -676,6 +676,53 @@ class TestAgentRepositoryDB:
             )
         assert resource_group_id == default_scaling_group.id
 
+    async def test_upsert_new_agent_null_name_uses_default(
+        self,
+        agent_db_source: AgentDBSource,
+        default_scaling_group: ScalingGroupFixtureData,
+        sample_agent_info: AgentInfo,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> None:
+        """A new agent reporting no group name (null) is registered into the default group."""
+        agent_id = AgentId("upsert-new-null")
+        info = sample_agent_info.model_copy(update={"scaling_group": None})
+        upsert_data = AgentHeartbeatUpsert.from_agent_info(
+            agent_id=agent_id,
+            agent_info=info,
+            heartbeat_received=datetime.now(tzutc()),
+        )
+
+        await agent_db_source.upsert_agent_with_state(upsert_data)
+
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            resource_group_id = await db_sess.scalar(
+                sa.select(AgentRow.resource_group_id).where(AgentRow.id == agent_id)
+            )
+        assert resource_group_id == default_scaling_group.id
+
+    async def test_upsert_new_agent_null_name_no_default_raises(
+        self,
+        agent_db_source: AgentDBSource,
+        scaling_group: ScalingGroupFixtureData,
+        sample_agent_info: AgentInfo,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> None:
+        """Registration fails when no group name is configured and no default group exists."""
+        agent_id = AgentId("upsert-new-null-noresolve")
+        info = sample_agent_info.model_copy(update={"scaling_group": None})
+        upsert_data = AgentHeartbeatUpsert.from_agent_info(
+            agent_id=agent_id,
+            agent_info=info,
+            heartbeat_received=datetime.now(tzutc()),
+        )
+
+        with pytest.raises(UnresolvableResourceGroup):
+            await agent_db_source.upsert_agent_with_state(upsert_data)
+
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            exists = await db_sess.scalar(sa.select(AgentRow.id).where(AgentRow.id == agent_id))
+        assert exists is None
+
     async def test_upsert_new_agent_unresolvable_name_no_default_raises(
         self,
         agent_db_source: AgentDBSource,

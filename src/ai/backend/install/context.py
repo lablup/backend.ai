@@ -885,7 +885,7 @@ class Context(metaclass=ABCMeta):
         ``configure_agent``) so that etcd, mount-path, plugin, and other
         environment-specific settings are automatically shared.  Then
         applies SFTP-specific overrides (distinct ports, pid-file,
-        scaling-group, ipc/var paths) so the two agents can coexist on
+        initial-resource-group-name, ipc/var paths) so the two agents can coexist on
         the same node without resource collisions.
         """
         service = self.install_info.service_config
@@ -924,8 +924,8 @@ class Context(metaclass=ABCMeta):
                 ),
                 (re.compile(r'^id = "i-.*"', flags=re.MULTILINE), 'id = "i-local-sftp"'),
                 (
-                    f'scaling-group = "{service.scaling_group}"',
-                    f'scaling-group = "{sftp.scaling_group}"',
+                    f'initial-resource-group-name = "{service.scaling_group}"',
+                    f'initial-resource-group-name = "{sftp.scaling_group}"',
                 ),
                 # --- path isolation ---
                 ('pid-file = "./agent.pid"', 'pid-file = "./agent-sftp.pid"'),

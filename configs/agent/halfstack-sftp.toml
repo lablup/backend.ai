@@ -21,7 +21,7 @@ agent-sock-port = 6017
 # from the primary agent.
 id = "i-local-sftp"
 # Dedicated scaling group for SFTP upload sessions.
-scaling-group = "upload"
+initial-resource-group-name = "upload"
 pid-file = "./agent-sftp.pid"
 event-loop = "uvloop"
 ipc-base-path = "ipc/agent-sftp"
