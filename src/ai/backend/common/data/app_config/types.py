@@ -5,6 +5,7 @@ from __future__ import annotations
 import enum
 
 from ai.backend.common.data.permission.types import RBACElementType, ScopeType
+from ai.backend.common.identifier.app_config import AppConfigScopeIdentifier
 
 __all__ = ("AppConfigScopeType",)
 
@@ -49,13 +50,12 @@ class AppConfigScopeType(enum.StrEnum):
             case AppConfigScopeType.USER:
                 return RBACElementType.USER
 
-    def to_rbac_scope_id(self, scope_id: str) -> str:
-        """The RBAC scope id for a write at this fragment scope.
+    def to_rbac_scope_id(self, scope_id: AppConfigScopeIdentifier | None) -> str:
+        """The RBAC scope id for a write at this fragment scope, in RBAC's string form.
 
-        ``public`` is system-wide (no per-entity scope id); ``domain`` / ``user`` carry
-        their own ``scope_id``.
+        ``public`` is system-wide and names no owner.
         """
-        return "" if self is AppConfigScopeType.PUBLIC else scope_id
+        return "" if self is AppConfigScopeType.PUBLIC else str(scope_id)
 
     def default_rank(self) -> int:
         """Default merge rank for an allow-list entry at this scope type (BEP-1052).

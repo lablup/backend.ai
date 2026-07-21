@@ -47,7 +47,8 @@ class CreateAppConfigFragmentAction(AppConfigFragmentScopeAction):
         element = self.creator_spec.scope_type.to_rbac_element_type()
         if element is None:
             return RBACElementRef(RBACElementType.APP_CONFIG_FRAGMENT, "")
-        return RBACElementRef(element, self.creator_spec.scope_id)
+        # A non-null element type means domain or user scope, which always carries an owner.
+        return RBACElementRef(element, str(self.creator_spec.scope_id))
 
 
 @dataclass

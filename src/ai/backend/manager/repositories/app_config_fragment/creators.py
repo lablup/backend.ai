@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import Any, override
 
 from ai.backend.common.data.app_config.types import AppConfigScopeType
+from ai.backend.common.identifier.app_config import AppConfigScopeIdentifier
 from ai.backend.manager.errors.app_config import AppConfigFragmentWriteNotAllowed
 from ai.backend.manager.errors.repository import ForeignKeyViolationError
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
@@ -23,7 +24,7 @@ class AppConfigFragmentCreatorSpec(CreatorSpec[AppConfigFragmentRow]):
 
     config_name: str
     scope_type: AppConfigScopeType
-    scope_id: str
+    scope_id: AppConfigScopeIdentifier | None
     config: dict[str, Any]
 
     @property
