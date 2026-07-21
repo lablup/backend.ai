@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Any
 
 from ai.backend.common.data.app_config.types import AppConfigScopeType
-from ai.backend.common.identifier.app_config import AppConfigScopeIdentifier
+from ai.backend.common.identifier.app_config import AppConfigScopeID
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
 
 
@@ -16,7 +16,7 @@ class AppConfigFragmentData:
     id: AppConfigFragmentID
     config_name: str
     scope_type: AppConfigScopeType
-    scope_id: AppConfigScopeIdentifier | None
+    scope_id: AppConfigScopeID | None
     config: dict[str, Any]
     created_at: datetime
     updated_at: datetime

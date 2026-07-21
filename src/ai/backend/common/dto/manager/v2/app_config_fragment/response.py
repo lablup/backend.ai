@@ -4,12 +4,13 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import Any
-from uuid import UUID
 
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.data.app_config.types import AppConfigScopeType
+from ai.backend.common.identifier.app_config import AppConfigScopeID
+from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
 
 __all__ = (
     "AppConfigFragmentBulkErrorInfo",
@@ -25,10 +26,10 @@ __all__ = (
 class AppConfigFragmentNode(BaseResponseModel):
     """Node model representing one app config fragment."""
 
-    id: UUID = Field(description="App config fragment UUID.")
+    id: AppConfigFragmentID = Field(description="App config fragment id.")
     config_name: str = Field(description="Config name the fragment belongs to.")
     scope_type: AppConfigScopeType = Field(description="Scope the fragment is written at.")
-    scope_id: UUID | None = Field(
+    scope_id: AppConfigScopeID | None = Field(
         description="Scope identifier: the domain id or user id; null for public scope."
     )
     config: dict[str, Any] = Field(description="The fragment's JSON config document.")
@@ -51,20 +52,20 @@ class UpdateAppConfigFragmentPayload(BaseResponseModel):
 class PurgeAppConfigFragmentPayload(BaseResponseModel):
     """Payload for app config fragment purge."""
 
-    id: UUID = Field(description="UUID of the purged app config fragment.")
+    id: AppConfigFragmentID = Field(description="Id of the purged app config fragment.")
 
 
 class AppConfigFragmentBulkErrorInfo(BaseResponseModel):
     """One failed item of a partial-success bulk mutation."""
 
-    id: UUID = Field(description="Id of the fragment the failed item targeted.")
+    id: AppConfigFragmentID = Field(description="Id of the fragment the failed item targeted.")
     message: str = Field(description="Reason the item failed.")
 
 
 class BulkUpdateAppConfigFragmentPayload(BaseResponseModel):
     """Partial-success payload for a bulk fragment update."""
 
-    succeeded: list[AppConfigFragmentNode] = Field(description="Successfully updated fragments.")
+    items: list[AppConfigFragmentNode] = Field(description="Successfully updated fragments.")
     failed: list[AppConfigFragmentBulkErrorInfo] = Field(
         description="Per-item failures, each naming the fragment it targeted."
     )
@@ -73,7 +74,7 @@ class BulkUpdateAppConfigFragmentPayload(BaseResponseModel):
 class BulkPurgeAppConfigFragmentPayload(BaseResponseModel):
     """Partial-success payload for a bulk fragment purge."""
 
-    purged_ids: list[UUID] = Field(description="Ids of successfully purged fragments.")
+    items: list[AppConfigFragmentID] = Field(description="Ids of successfully purged fragments.")
     failed: list[AppConfigFragmentBulkErrorInfo] = Field(
         description="Per-item failures, each naming the fragment it targeted."
     )

@@ -11,7 +11,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from ai.backend.common.data.app_config.types import AppConfigScopeType
-from ai.backend.common.identifier.app_config import AppConfigScopeIdentifier
+from ai.backend.common.identifier.app_config import AppConfigScopeID
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
 from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.user import UserID
@@ -31,13 +31,13 @@ _USER_ID = UserID(uuid.uuid4())
 _DOMAIN_ID = DomainID(uuid.uuid4())
 
 # The same owners seen as a fragment's scope_id, which is polymorphic over scope kinds.
-_USER_SCOPE_ID = AppConfigScopeIdentifier(_USER_ID)
-_DOMAIN_SCOPE_ID = AppConfigScopeIdentifier(_DOMAIN_ID)
+_USER_SCOPE_ID = AppConfigScopeID(_USER_ID)
+_DOMAIN_SCOPE_ID = AppConfigScopeID(_DOMAIN_ID)
 _NOW = datetime.now(UTC)
 _SCOPE_ARGS = AppConfigScopeArguments(domain_id=_DOMAIN_ID)
 
 FragmentFactory = Callable[
-    [str, dict[str, Any], AppConfigScopeType, AppConfigScopeIdentifier | None],
+    [str, dict[str, Any], AppConfigScopeType, AppConfigScopeID | None],
     AppConfigFragmentData,
 ]
 
@@ -53,7 +53,7 @@ def make_fragment() -> FragmentFactory:
         config_name: str,
         config: dict[str, Any],
         scope_type: AppConfigScopeType,
-        scope_id: AppConfigScopeIdentifier | None,
+        scope_id: AppConfigScopeID | None,
     ) -> AppConfigFragmentData:
         return AppConfigFragmentData(
             id=AppConfigFragmentID(uuid.uuid4()),

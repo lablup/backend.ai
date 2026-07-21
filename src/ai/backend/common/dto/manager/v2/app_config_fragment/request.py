@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 from typing import Any, Self
-from uuid import UUID
 
 from pydantic import Field, model_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.data.app_config.types import AppConfigScopeType
+from ai.backend.common.identifier.app_config import AppConfigScopeID
+from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
 
 __all__ = (
     "AppConfigFragmentUpdateItem",
@@ -30,7 +31,7 @@ class CreateAppConfigFragmentInput(BaseRequestModel):
     scope_type: AppConfigScopeType = Field(
         description="Scope the fragment is written at (public | domain | user)."
     )
-    scope_id: UUID | None = Field(
+    scope_id: AppConfigScopeID | None = Field(
         default=None,
         description="Scope identifier: the domain id (domain scope) or the user id (user scope). "
         "Null for public scope, which has no owner.",
@@ -63,7 +64,7 @@ class AppConfigFragmentUpdateItem(BaseRequestModel):
     here — unlike the single-fragment :class:`UpdateAppConfigFragmentInput`.
     """
 
-    id: UUID = Field(description="App config fragment id to update.")
+    id: AppConfigFragmentID = Field(description="App config fragment id to update.")
     config: dict[str, Any] = Field(description="The replacement JSON config document.")
 
 
@@ -78,4 +79,4 @@ class BulkUpdateAppConfigFragmentInput(BaseRequestModel):
 class BulkPurgeAppConfigFragmentInput(BaseRequestModel):
     """Input for purging many fragments (per-item partial success)."""
 
-    ids: list[UUID] = Field(min_length=1, description="Fragment ids to purge.")
+    ids: list[AppConfigFragmentID] = Field(min_length=1, description="Fragment ids to purge.")

@@ -7,7 +7,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common.data.app_config.types import AppConfigScopeType
-from ai.backend.common.identifier.app_config import AppConfigScopeIdentifier
+from ai.backend.common.identifier.app_config import AppConfigScopeID
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
 from ai.backend.manager.data.app_config_fragment.types import (
     AppConfigFragmentData,
@@ -70,9 +70,9 @@ class AppConfigFragmentRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc
         nullable=False,
     )
     # NULL is public, which has no owner; domain and user carry their owner's id.
-    scope_id: Mapped[AppConfigScopeIdentifier | None] = mapped_column(
+    scope_id: Mapped[AppConfigScopeID | None] = mapped_column(
         "scope_id",
-        GUID(AppConfigScopeIdentifier),
+        GUID(AppConfigScopeID),
         nullable=True,
     )
     config: Mapped[dict[str, Any]] = mapped_column(
