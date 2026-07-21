@@ -59,7 +59,12 @@ from ai.backend.common.message_queue.queue import AbstractMessageQueue
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
 from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.common.metrics.multiprocess_setup import cleanup_prometheus_multiprocess_dir
-from ai.backend.common.metrics.profiler import Profiler, PyroscopeArgs
+from ai.backend.common.metrics.profiler import (
+    Profiler,
+    PyroscopeArgs,
+    close_memray_tracker_in_worker,
+    start_memray_tracker,
+)
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.plugin import AbstractPlugin, BasePluginContext
 from ai.backend.common.runner.types import Runner
@@ -155,6 +160,11 @@ async def server_main_logwrapper(
                 yield
     except Exception:
         traceback.print_exc(file=sys.stderr)
+    finally:
+        # Close this forked worker's own memray capture while it is still running
+        # Python: aiotools ends the child with a bare os._exit(), which runs no
+        # atexit handlers and no interpreter finalization.
+        close_memray_tracker_in_worker()
 
 
 @asynccontextmanager
@@ -836,6 +846,11 @@ def main(
     multiprocessing.set_start_method("spawn")
 
     if cli_ctx.invoked_subcommand is None:
+        # Started before `aiotools.start_server()` forks the service worker, so that
+        # `follow_fork` captures the process that does the actual work. The worker
+        # closes its own capture (see server_main_logwrapper).
+        memray_tracker = start_memray_tracker(local_config.memray)
+
         local_config.storage_proxy.pid_file.write_text(str(os.getpid()))
         ipc_base_path = local_config.storage_proxy.ipc_base_path
         log_sockpath = Path(
@@ -916,6 +931,8 @@ def main(
                     cleanup_prometheus_multiprocess_dir()
                 log.info("exit.")
         finally:
+            if memray_tracker is not None:
+                memray_tracker.__exit__(None, None, None)
             if local_config.storage_proxy.pid_file.is_file():
                 # check is_file() to prevent deleting /dev/null!
                 local_config.storage_proxy.pid_file.unlink()

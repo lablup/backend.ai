@@ -45,6 +45,10 @@ from ai.backend.common.json import dump_json_str
 from ai.backend.common.metrics.http import build_prometheus_metrics_handler
 from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.common.metrics.multiprocess_setup import cleanup_prometheus_multiprocess_dir
+from ai.backend.common.metrics.profiler import (
+    close_memray_tracker_in_worker,
+    start_memray_tracker,
+)
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
@@ -467,6 +471,11 @@ async def server_main_logwrapper(
                 yield
     except Exception:
         traceback.print_exc(file=sys.stderr)
+    finally:
+        # Close this forked worker's own capture while it is still running Python:
+        # aiotools ends the child with a bare os._exit(), which runs no atexit
+        # handlers and no interpreter finalization.
+        close_memray_tracker_in_worker()
 
 
 @click.group(invoke_without_command=True)
@@ -509,6 +518,11 @@ def main(
     bootstrap_cfg = asyncio.run(BootstrapConfig.load_from_file(discovered_cfg_path, log_level))
 
     if ctx.invoked_subcommand is None:
+        # Started here, before `aiotools.start_server()` forks the service workers,
+        # so that `follow_fork` captures the processes that do the actual work.
+        # Each worker closes its own capture (see server_main_logwrapper).
+        memray_tracker = start_memray_tracker(bootstrap_cfg.memray)
+
         bootstrap_cfg.manager.pid_file.write_text(str(os.getpid()))
         ipc_base_path = bootstrap_cfg.manager.ipc_base_path
         log_sockpath = ipc_base_path / f"manager-logger-{os.getpid()}.sock"
@@ -549,6 +563,8 @@ def main(
                     cleanup_prometheus_multiprocess_dir()
                     log.info("terminated.")
         finally:
+            if memray_tracker is not None:
+                memray_tracker.__exit__(None, None, None)
             if bootstrap_cfg.manager.pid_file.is_file():
                 # check is_file() to prevent deleting /dev/null!
                 bootstrap_cfg.manager.pid_file.unlink()

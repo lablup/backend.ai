@@ -30,7 +30,6 @@ import aiomonitor
 import aiotools
 import click
 import jinja2
-import memray
 import pyroscope
 import uvloop
 from aiohttp import web
@@ -98,6 +97,10 @@ from ai.backend.common.message_queue.queue import AbstractMessageQueue
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
 from ai.backend.common.metrics.http import build_api_metric_middleware
 from ai.backend.common.metrics.multiprocess_setup import cleanup_prometheus_multiprocess_dir
+from ai.backend.common.metrics.profiler import (
+    close_memray_tracker_in_worker,
+    start_memray_tracker,
+)
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.service_discovery.event_publisher import ServiceDiscoveryEventPublisher
 from ai.backend.common.service_discovery.redis_discovery.service_discovery import (
@@ -1143,6 +1146,11 @@ async def server_main_logwrapper(
                 yield
     except Exception:
         traceback.print_exc(file=sys.stderr)
+    finally:
+        # Close this forked worker's own capture while it is still running Python:
+        # aiotools ends the child with a bare os._exit(), which runs no atexit
+        # handlers and no interpreter finalization.
+        close_memray_tracker_in_worker()
 
 
 @click.group(invoke_without_command=True)
@@ -1177,19 +1185,16 @@ def main(ctx: click.Context, config_path: Path | None, debug: bool, log_level: L
     server_config = load_config(config_path, log_level)
 
     if ctx.invoked_subcommand is None:
-        tracker: memray.Tracker | None = None
         if server_config.profiling.enable_pyroscope:
             if not server_config.profiling.pyroscope_config:
                 raise MissingProfilingConfigError(
                     "Pyroscope configuration is required when enable_pyroscope is True"
                 )
             pyroscope.configure(**server_config.profiling.pyroscope_config.model_dump())
-        if server_config.profiling.enable_memray:
-            tracker = memray.Tracker(
-                server_config.profiling.memray_output_destination,
-                follow_fork=True,
-            )
-            tracker.__enter__()
+        # Started before `aiotools.start_server()` forks the service worker, so that
+        # `follow_fork` captures the process that does the actual work. The worker
+        # closes its own capture (see server_main_logwrapper).
+        tracker = start_memray_tracker(server_config.profiling.memray)
         server_config.proxy_coordinator.pid_file.touch(exist_ok=True)
         server_config.proxy_coordinator.pid_file.write_text(str(os.getpid()))
         ipc_base_path = server_config.proxy_coordinator.ipc_base_path
@@ -1212,7 +1217,7 @@ def main(ctx: click.Context, config_path: Path | None, debug: bool, log_level: L
                 log.info("runtime: {0}", env_info())
                 if server_config.profiling.enable_pyroscope:
                     log.info("Pyroscope tracing enabled")
-                if server_config.profiling.enable_memray:
+                if server_config.profiling.memray.enabled:
                     log.info("Memray tracing enabled")
                 log_config = logging.getLogger("ai.backend.appproxy.coordinator.config")
                 log_config.debug("debug mode enabled.")

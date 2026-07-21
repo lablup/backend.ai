@@ -3,7 +3,7 @@ import pwd
 import types
 import typing
 from pathlib import Path
-from typing import Annotated, Any, override
+from typing import Annotated, Any, Self, override
 
 from pydantic import (
     BaseModel,
@@ -12,11 +12,18 @@ from pydantic import (
     Field,
     GetCoreSchemaHandler,
     GetJsonSchemaHandler,
+    model_validator,
 )
 from pydantic.json_schema import JsonSchemaValue
 from pydantic_core import PydanticUndefined, core_schema
 
-from ai.backend.common.meta import BackendAIConfigMeta, CompositeType, ConfigExample
+from ai.backend.common.configs.memray import MemrayConfig
+from ai.backend.common.meta import (
+    NEXT_RELEASE_VERSION,
+    BackendAIConfigMeta,
+    CompositeType,
+    ConfigExample,
+)
 from ai.backend.common.types import BackendAISchema
 
 from .errors import (
@@ -676,12 +683,27 @@ class PyroscopeConfig(BaseSchema):
 
 
 class ProfilingConfig(BaseSchema):
+    memray: Annotated[
+        MemrayConfig,
+        Field(default_factory=MemrayConfig),
+        BackendAIConfigMeta(
+            description=(
+                "Memray allocation-tracking configuration. "
+                "Enable it only while diagnosing memory growth: the capture file keeps growing "
+                "for as long as the process runs."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+            composite=CompositeType.FIELD,
+        ),
+    ]
     enable_memray: Annotated[
         bool,
         Field(default=False),
         BackendAIConfigMeta(
             description="Starts a memray live server.",
             added_version="25.13.0",
+            deprecated_version=NEXT_RELEASE_VERSION,
+            deprecation_hint="Use [profiling.memray] with `enabled` instead.",
             example=ConfigExample(local="true", prod="false"),
         ),
     ]
@@ -691,12 +713,30 @@ class ProfilingConfig(BaseSchema):
         BackendAIConfigMeta(
             description="Path to store memray allocation captures.",
             added_version="25.13.0",
+            deprecated_version=NEXT_RELEASE_VERSION,
+            deprecation_hint="Use [profiling.memray] with `output-destination` instead.",
             example=ConfigExample(
                 local="./memray-output.bin",
                 prod="/var/log/backend.ai/memray/proxy-worker.bin",
             ),
         ),
     ]
+
+    @model_validator(mode="after")
+    def _reconcile_deprecated_memray(self) -> Self:
+        # Back-compat: when only the deprecated flat fields are provided, fold them
+        # into the shared `memray` config so consumers can read a single source.
+        # An explicit [profiling.memray] table always wins.
+        fields_set = self.model_fields_set
+        if "memray" not in fields_set and (
+            "enable_memray" in fields_set or "memray_output_destination" in fields_set
+        ):
+            self.memray = MemrayConfig.model_validate({
+                "enabled": self.enable_memray,
+                "output_destination": self.memray_output_destination,
+            })
+        return self
+
     enable_pyroscope: Annotated[
         bool,
         Field(default=False),

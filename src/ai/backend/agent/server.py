@@ -102,7 +102,12 @@ from ai.backend.common.metrics.http import (
     build_api_metric_middleware,
 )
 from ai.backend.common.metrics.metric import CommonMetricRegistry
-from ai.backend.common.metrics.profiler import Profiler, PyroscopeArgs
+from ai.backend.common.metrics.profiler import (
+    Profiler,
+    PyroscopeArgs,
+    close_memray_tracker_in_worker,
+    start_memray_tracker,
+)
 from ai.backend.common.service_discovery.etcd_discovery.service_discovery import (
     ETCDServiceDiscovery,
     ETCDServiceDiscoveryArgs,
@@ -1306,6 +1311,11 @@ async def server_main_logwrapper(
                 yield
     except Exception:
         traceback.print_exc(file=sys.stderr)
+    finally:
+        # Close this forked worker's own capture while it is still running Python:
+        # aiotools ends the child with a bare os._exit(), which runs no atexit
+        # handlers and no interpreter finalization.
+        close_memray_tracker_in_worker()
 
 
 def _build_agent_health_response(connectivity: ConnectivityCheckResponse) -> web.Response:
@@ -1778,6 +1788,11 @@ def main(
         raise click.Abort() from e
 
     if not is_invoked_subcommand:
+        # Started here, before `aiotools.start_server()` forks the service worker,
+        # so that `follow_fork` captures the process that does the actual work.
+        # The worker closes its own capture (see server_main_logwrapper).
+        memray_tracker = start_memray_tracker(server_config.memray)
+
         server_config.agent_common.pid_file.write_text(str(os.getpid()))
         image_commit_path = server_config.agent_common.image_commit_path
         image_commit_path.mkdir(parents=True, exist_ok=True)
@@ -1822,6 +1837,8 @@ def main(
                 )
                 log.info("exit.")
         finally:
+            if memray_tracker is not None:
+                memray_tracker.__exit__(None, None, None)
             if server_config.agent_common.pid_file.is_file():
                 # check is_file() to prevent deleting /dev/null!
                 server_config.agent_common.pid_file.unlink()
