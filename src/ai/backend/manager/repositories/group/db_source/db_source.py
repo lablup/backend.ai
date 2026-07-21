@@ -16,6 +16,8 @@ from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+from ai.backend.common.data.entity.types import ScopeRef
+from ai.backend.common.data.entity.types import ScopeType as VScopeType
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.identifier.project import ProjectID
@@ -106,6 +108,7 @@ from ai.backend.manager.repositories.group.types import (
     GroupSearchResult,
     UserProjectSearchScope,
 )
+from ai.backend.manager.repositories.ops.rbac.provider import RBACOpsProvider
 from ai.backend.manager.repositories.permission_controller.creators import UserRoleCreatorSpec
 from ai.backend.manager.repositories.permission_controller.role_manager import RoleManager
 from ai.backend.manager.repositories.vfolder.deletion import initiate_vfolder_deletion
@@ -116,10 +119,12 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 class GroupDBSource:
     _db: ExtendedAsyncSAEngine
     _role_manager: RoleManager
+    _rbac_ops_provider: RBACOpsProvider
 
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
         self._role_manager = RoleManager()
+        self._rbac_ops_provider = RBACOpsProvider(db)
 
     async def create(self, creator: Creator[GroupRow]) -> GroupData:
         """Create a new group."""
@@ -180,7 +185,14 @@ class GroupDBSource:
             # Provision roles from active presets matching the project scope.
             await self._role_manager.create_preset_roles(db_session, data.scope_id())
 
-            return data
+        async with self._rbac_ops_provider.write_ops() as w:
+            await w.ensure_scope(
+                ScopeRef(
+                    scope_type=VScopeType(RBACElementType.PROJECT.value),
+                    scope_id=data.id,
+                )
+            )
+        return data
 
     async def modify_validated(
         self,
