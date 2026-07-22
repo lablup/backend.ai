@@ -493,6 +493,11 @@ class ScheduleDBSource:
 
         return PendingSessions(sessions=workloads)
 
+    async def get_schedulable_agents(self, resource_group_id: ResourceGroupID) -> list[AgentMeta]:
+        """Targeted read of the group's schedulable agents (for fitting checks)."""
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
+            return await self._fetch_agents(db_sess, resource_group_id)
+
     async def _fetch_agents(
         self, db_sess: SASession, resource_group_id: ResourceGroupID
     ) -> list[AgentMeta]:

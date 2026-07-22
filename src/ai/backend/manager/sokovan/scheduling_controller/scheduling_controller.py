@@ -47,6 +47,7 @@ from ai.backend.manager.repositories.scheduler import (
     MarkTerminatingResult,
     SchedulerRepository,
 )
+from ai.backend.manager.repositories.scheduler.types.agent import AgentMeta
 from ai.backend.manager.repositories.scheduler.types.session_creation import SessionSpecContext
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.exceptions import (
     BatchAgentSelectionFailedError,
@@ -366,6 +367,7 @@ class SchedulingController:
         self,
         spec: SessionResourceSpec,
         resource_group_id: ResourceGroupID,
+        agents: list[AgentMeta],
         kernel_data: dict[KernelId, _KernelComputeScheduleData],
     ) -> ComputeScheduleResult:
         kernel_requirements: dict[KernelId, KernelResourceSpec] = {
@@ -388,14 +390,10 @@ class SchedulingController:
             config = AgentSelectionConfig(
                 max_container_count=None,
             )
-            # An unknown resource group (ScalingGroupNotFound) is a request error,
-            # not a per-kernel fitting outcome, so let it propagate to the caller.
-            scheduling_data = await self._repository.get_scheduling_data(resource_group_id)
             # Trackers are throwaway here: the fitting check only needs the
             # immutable observations, never the committed batch state.
             agent_trackers = [
-                AgentStateTracker(original_agent=agent.to_agent_info())
-                for agent in scheduling_data.agents
+                AgentStateTracker(original_agent=agent.to_agent_info()) for agent in agents
             ]
             # A resource group with no candidate agents (NoAgentsInResourceGroupError)
             # is likewise a whole-request error, so it propagates too.
@@ -457,8 +455,11 @@ class SchedulingController:
         )
         resource_spec = await self._spec_preparer.prepare(draft, fetched)
         compute_schedule_kernel_data = self._prepare_kernel_data(resource_spec, fetched)
+        # An unknown resource group (ScalingGroupNotFound) is a request error,
+        # not a per-kernel fitting outcome, so let it propagate to the caller.
+        agents = await self._repository.get_schedulable_agents(resource_group_id)
         return await self._compute_schedule(
-            resource_spec, resource_group_id, compute_schedule_kernel_data
+            resource_spec, resource_group_id, agents, compute_schedule_kernel_data
         )
 
     async def mark_scheduling_needed(self, schedule_types: Sequence[ScheduleType]) -> None:

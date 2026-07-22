@@ -57,6 +57,7 @@ from ai.backend.manager.types import UserScope
 
 from .cache_source.cache_source import ScheduleCacheSource
 from .db_source.db_source import ScheduleDBSource
+from .types.agent import AgentMeta
 from .types.scheduling import SchedulingData
 from .types.search import (
     SessionWithKernelsAndUserSearchResult,
@@ -112,6 +113,11 @@ class SchedulerRepository:
         self._cache_source = ScheduleCacheSource(valkey_stat)
         self._config_provider = config_provider
         self._storage_manager = storage_manager
+
+    @scheduler_repository_resilience.apply()
+    async def get_schedulable_agents(self, resource_group_id: ResourceGroupID) -> list[AgentMeta]:
+        """Targeted read of the group's schedulable agents (for fitting checks)."""
+        return await self._db_source.get_schedulable_agents(resource_group_id)
 
     @scheduler_repository_resilience.apply()
     async def get_scheduling_data(self, resource_group_id: ResourceGroupID) -> SchedulingData:
