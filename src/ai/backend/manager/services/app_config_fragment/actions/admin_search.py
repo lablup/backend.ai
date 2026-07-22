@@ -23,10 +23,6 @@ class AdminSearchAppConfigFragmentAction(AppConfigFragmentGlobalAction):
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.SEARCH
 
-    @override
-    def entity_id(self) -> str | None:
-        return None
-
 
 @dataclass
 class AdminSearchAppConfigFragmentActionResult(BaseActionResult):
