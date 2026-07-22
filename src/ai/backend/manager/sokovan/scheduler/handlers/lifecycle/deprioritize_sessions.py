@@ -122,7 +122,7 @@ class DeprioritizeSessionsLifecycleHandler(SessionLifecycleHandler):
         )
 
         log.info(
-            "Lowered priority by {} for {} sessions in scaling group {}",
+            "Lowered priority by {} for {} sessions in resource group {}",
             DEPRIORITIZE_AMOUNT,
             len(sessions),
             resource_group_id,

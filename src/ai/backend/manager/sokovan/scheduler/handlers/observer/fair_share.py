@@ -90,10 +90,10 @@ class FairShareObserver(KernelObserver):
         1. Running kernels (terminated_at IS NULL) with starts_at set
         2. Recently terminated kernels with unobserved periods
 
-        The lookback_days is fetched from scaling_group's fair_share_spec via subquery.
+        The lookback_days is fetched from the resource group's fair_share_spec via subquery.
 
         Args:
-            resource_group_id: The id of the scaling group being processed
+            resource_group_id: The id of the resource group being processed
 
         Returns:
             QueryCondition for fair share observation targets
@@ -122,14 +122,14 @@ class FairShareObserver(KernelObserver):
         - DB write: factors + ranks (batched)
 
         Args:
-            resource_group_id: The id of the scaling group being processed
+            resource_group_id: The id of the resource group being processed
             kernels: Kernels to observe (running + recently terminated with unobserved periods)
 
         Returns:
             ObservationResult containing observed count
         """
         log.debug(
-            "[FairShareObserver] observe() called: scaling_group={}, kernel_count={}",
+            "[FairShareObserver] observe() called: resource_group={}, kernel_count={}",
             resource_group_id,
             len(kernels),
         )
@@ -194,14 +194,14 @@ class FairShareObserver(KernelObserver):
 
     async def _calculate_and_update_factors_and_ranks(
         self,
-        scaling_group: str,
+        resource_group: str,
         resource_group_id: ResourceGroupID,
         today: date,
     ) -> None:
         """Calculate fair share factors and scheduling ranks, then update tables.
 
         This method batches DB operations:
-        1. READ: scaling group config + fair shares + decayed usages (single session)
+        1. READ: resource group config + fair shares + decayed usages (single session)
         2. PURE: calculate factors from usage with config
         3. PURE: calculate ranks from factors (no DB read needed)
         4. WRITE: update factors + ranks together
@@ -264,7 +264,7 @@ class FairShareObserver(KernelObserver):
 
             # ===== Batched DB write: factors + ranks =====
             await self._fair_share_repository.bulk_update_fair_share_factors(
-                scaling_group,
+                resource_group,
                 resource_group_id,
                 calculation_result,
                 lookback_start,

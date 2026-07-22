@@ -158,13 +158,13 @@ class SessionProvisioner:
         )
         return pool
 
-    async def schedule_scaling_group(
+    async def schedule_resource_group(
         self,
         scheduling_data: SchedulingData,
         provision_time: datetime,
     ) -> ScheduleResult:
         """
-        Schedule sessions for a specific scaling group.
+        Schedule sessions for a specific resource group.
 
         This method orchestrates the full provisioning pipeline using pre-fetched data:
         1. Sequencing: Order workloads using configured sequencer (FIFO/LIFO/DRF)
@@ -278,7 +278,7 @@ class SessionProvisioner:
                 allocation.failed_phases = failed
 
         log.info(
-            "Processing {} allocations and {} failures in scaling group {}",
+            "Processing {} allocations and {} failures in resource group {}",
             len(session_allocations),
             len(scheduling_failures),
             resource_group_id,

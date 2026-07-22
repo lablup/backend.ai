@@ -123,7 +123,7 @@ class SchedulerRepository:
     async def get_scheduling_data(self, resource_group_id: ResourceGroupID) -> SchedulingData:
         """
         Get scheduling data from database.
-        Raises ScalingGroupNotFound if scaling group doesn't exist.
+        Raises ScalingGroupNotFound if the resource group doesn't exist.
         """
         max_container_count = await self._get_max_container_count()
         return await self._db_source.get_scheduling_data(resource_group_id, max_container_count)
@@ -145,7 +145,7 @@ class SchedulerRepository:
     ) -> list[SweptSessionInfo]:
         """
         Get sessions that have exceeded their pending timeout from given session IDs.
-        Used by SweepSessionsLifecycleHandler for scaling group based processing.
+        Used by SweepSessionsLifecycleHandler for resource group based processing.
         """
         return await self._db_source.get_pending_timeout_sessions_by_ids(session_ids)
 
@@ -170,9 +170,9 @@ class SchedulerRepository:
         )
 
     @scheduler_repository_resilience.apply()
-    async def get_all_scaling_groups(self) -> list[ResourceGroupID]:
-        """Get ids of all defined scaling groups."""
-        return await self._db_source.get_all_scaling_groups()
+    async def get_all_resource_groups(self) -> list[ResourceGroupID]:
+        """Get ids of all defined resource groups."""
+        return await self._db_source.get_all_resource_groups()
 
     @scheduler_repository_resilience.apply()
     async def get_terminating_sessions_by_ids(
@@ -198,7 +198,7 @@ class SchedulerRepository:
         """
         Get kernels in TERMINATING sessions that have lost or missing agents
         from given session IDs.
-        Used by SweepLostAgentKernelsLifecycleHandler for scaling group based processing.
+        Used by SweepLostAgentKernelsLifecycleHandler for resource group based processing.
         """
         return await self._db_source.get_terminating_kernels_with_lost_agents_by_ids(session_ids)
 
@@ -710,7 +710,7 @@ class SchedulerRepository:
         Uses SessionInfo and KernelInfo types for unified data representation.
 
         Args:
-            resource_group_id: The scaling group id to filter by (first parameter for consistency)
+            resource_group_id: The resource group id to filter by (first parameter for consistency)
             session_statuses: Session statuses to include
             kernel_statuses: Kernel statuses to filter by. If non-None, includes sessions
                            that have at least one kernel in these statuses (simple filtering).

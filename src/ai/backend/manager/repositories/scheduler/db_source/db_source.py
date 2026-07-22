@@ -213,10 +213,10 @@ def _to_slot_quota(slots: ResourceSlot) -> dict[SlotName, Decimal]:
 
 @dataclass(frozen=True)
 class _ScalingGroupWithSlotInventory:
-    """Scaling group bundled with the slot inventory served by its agents.
+    """Resource group bundled with the slot inventory served by its agents.
 
     ``active_slot_types`` maps each slot name served by a non-terminated
-    agent in this scaling group to its registered :class:`SlotTypes`
+    agent in this resource group to its registered :class:`SlotTypes`
     unit. The validator chain consults this map both for membership
     (reject requests for slots the RG does not provide) and for unit
     metadata (humanize values during error formatting).
@@ -245,7 +245,7 @@ class ScheduleDBSource:
     ) -> SchedulingData:
         """
         Fetch all scheduling data from database in a single session.
-        Raises ScalingGroupNotFound if scaling group doesn't exist.
+        Raises ScalingGroupNotFound if the resource group doesn't exist.
         """
         async with self._db.begin_readonly_session_read_committed() as db_sess:
             # 1. Get resource group
@@ -273,19 +273,19 @@ class ScheduleDBSource:
                 max_container_count=max_container_count,
             )
 
-    async def _fetch_scaling_group_with_slot_inventory(
+    async def _fetch_resource_group_with_slot_inventory(
         self,
         db_sess: SASession,
         resource_group_id: ResourceGroupID,
     ) -> _ScalingGroupWithSlotInventory:
-        """Load a scaling group together with its per-RG slot inventory.
+        """Load a resource group together with its per-RG slot inventory.
 
         The inventory is an aggregate (which slot kinds the group's
         non-terminated agents serve), so it comes from a single DISTINCT
         scan instead of eager-loading the agent fleet.
 
         Raises:
-            ScalingGroupNotFound: when the scaling group does not exist.
+            ScalingGroupNotFound: when the resource group does not exist.
         """
         rg_row = (
             await db_sess.scalars(
@@ -549,7 +549,7 @@ class ScheduleDBSource:
     async def _fetch_agent_container_counts(
         self, db_sess: SASession, resource_group_id: ResourceGroupID
     ) -> dict[AgentId, int]:
-        """Count live kernels (containers) per agent in the scaling group."""
+        """Count live kernels (containers) per agent in the resource group."""
         k = KernelRow.__table__
         all_resource_statuses = (
             KernelStatus.resource_occupied_statuses() | KernelStatus.resource_requested_statuses()
@@ -1225,8 +1225,8 @@ class ScheduleDBSource:
 
         return force_terminated_sessions
 
-    async def get_all_scaling_groups(self) -> list[ResourceGroupID]:
-        """Get ids of all defined scaling groups."""
+    async def get_all_resource_groups(self) -> list[ResourceGroupID]:
+        """Get ids of all defined resource groups."""
         async with self._db.begin_readonly_session_read_committed() as session:
             query = sa.select(ScalingGroupRow.id)
             result = await session.execute(query)
@@ -1580,7 +1580,7 @@ class ScheduleDBSource:
             known_slot_types: Mapping[SlotName, SlotTypes] = {}
             slot_type_info = await self._fetch_slot_type_info(db_sess)
             if resource_group_id:
-                rg_bundle = await self._fetch_scaling_group_with_slot_inventory(
+                rg_bundle = await self._fetch_resource_group_with_slot_inventory(
                     db_sess, resource_group_id
                 )
                 rg_row = rg_bundle.rg_row
@@ -1717,7 +1717,7 @@ class ScheduleDBSource:
                 db_sess, domain_name, project_id, access_key
             )
         if not allowed_rgs:
-            raise InvalidAPIParameters("No accessible scaling group available")
+            raise InvalidAPIParameters("No accessible resource group available")
         return allowed_rgs[0].id
 
     async def query_accessible_resource_group_ids(
@@ -1864,7 +1864,7 @@ class ScheduleDBSource:
         access_key: str,
     ) -> list[AllowedScalingGroup]:
         """
-        Query allowed scaling groups for the given user/group.
+        Query allowed resource groups for the given user/group.
 
         Args:
             db_sess: Database session
@@ -3568,7 +3568,7 @@ class ScheduleDBSource:
         unified data representation across all handlers.
 
         Args:
-            resource_group_id: The scaling group id to filter by
+            resource_group_id: The resource group id to filter by
             session_statuses: Session statuses to include
             kernel_statuses: If non-None, include sessions that have at least one
                            kernel in these statuses (simple filtering).

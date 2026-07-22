@@ -284,7 +284,7 @@ class FairShareAggregator:
         self,
         kernel: KernelInfo,
         resource_group_id: ResourceGroupID,
-        scaling_group: str,
+        resource_group: str,
         now: datetime,
     ) -> tuple[list[KernelUsageRecordCreatorSpec], datetime]:
         """Prepare usage record specs for a single kernel.
@@ -358,7 +358,7 @@ class FairShareAggregator:
         specs = self._generate_slice_specs(
             kernel=kernel,
             resource_group_id=resource_group_id,
-            scaling_group=scaling_group,
+            resource_group=resource_group,
             start_time=start_time,
             end_time=end_time,
         )
@@ -378,7 +378,7 @@ class FairShareAggregator:
         self,
         kernel: KernelInfo,
         resource_group_id: ResourceGroupID,
-        scaling_group: str,
+        resource_group: str,
         start_time: datetime,
         end_time: datetime,
     ) -> list[KernelUsageRecordCreatorSpec]:
@@ -428,7 +428,7 @@ class FairShareAggregator:
                 user_uuid=kernel.user_permission.user_uuid,
                 project_id=kernel.user_permission.group_id,
                 domain_name=kernel.user_permission.domain_name,
-                resource_group=scaling_group,
+                resource_group=resource_group,
                 resource_group_id=resource_group_id,
                 period_start=current_start,
                 period_end=current_end,

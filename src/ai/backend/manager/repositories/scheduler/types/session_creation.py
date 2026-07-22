@@ -29,7 +29,7 @@ class SessionDependencyData:
 
 @dataclass
 class AllowedScalingGroup:
-    """Allowed scaling group for a user."""
+    """Allowed resource group for a user (service/REST contract type)."""
 
     id: ResourceGroupID
     name: ResourceGroupName

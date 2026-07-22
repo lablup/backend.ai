@@ -33,7 +33,7 @@ class WorkloadSequencer(ABC):
         """
         Sequence the workloads based on the system snapshot.
 
-        :param resource_group_id: The resource group (scaling group) ID.
+        :param resource_group_id: The resource group ID.
         :param system_snapshot: The current system snapshot containing resource state.
         :param workloads: A sequence of SessionWorkload objects to order.
         :return: A sequence of SessionWorkload objects ordered by the sequencer's logic.
@@ -76,7 +76,7 @@ class SchedulingSequencer:
         ordering only decides ties within the same priority.
 
         :param scheduler: The scheduler name selecting the strategy.
-        :param resource_group_id: The resource group (scaling group) ID.
+        :param resource_group_id: The resource group ID.
         :param system_snapshot: The current system snapshot containing resource state.
         :param workloads: A sequence of SessionWorkload objects to order.
         :return: A sequence of SessionWorkload objects ordered by priority and the strategy's logic.

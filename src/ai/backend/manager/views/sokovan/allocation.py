@@ -44,7 +44,7 @@ class KernelAllocation:
     agent_addr: str
     # Resource group name recorded on the kernel row (DB column: scaling_group)
     resource_group_name: ResourceGroupName
-    # Scaling group id
+    # Resource group id
     resource_group_id: ResourceGroupID
     # Host ports allocated for this kernel (empty set if none)
     allocated_host_ports: set[int] = field(default_factory=set)
@@ -72,7 +72,7 @@ class SessionAllocation:
     cluster_mode: ClusterMode
     # Resource group name recorded on the session row (DB column: scaling_group_name)
     resource_group_name: ResourceGroupName
-    # Scaling group id
+    # Resource group id
     resource_group_id: ResourceGroupID
     # List of kernel allocations for this session
     kernel_allocations: list[KernelAllocation]
