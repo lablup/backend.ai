@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
 
+from ai.backend.common.types import KernelId, SessionId
 from ai.backend.manager.data.deployment.types import (
     DeploymentHistoryListResult,
     RouteHistoryListResult,
@@ -16,6 +17,8 @@ from ai.backend.manager.data.kernel.types import (
 from ai.backend.manager.data.session.types import (
     SessionSchedulingHistoryListResult,
 )
+from ai.backend.manager.errors.kernel import KernelNotFound
+from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.scheduling_history import (
     DeploymentHistoryRow,
     KernelSchedulingHistoryRow,
@@ -121,6 +124,19 @@ class SchedulingHistoryDBSource:
             )
 
     # ========== Kernel History (Scoped) ==========
+
+    async def resolve_session_id(self, kernel_id: KernelId) -> SessionId:
+        """Return the id of the session owning ``kernel_id``.
+
+        Raises ``KernelNotFound`` when no such kernel exists.
+        """
+        async with self._db.begin_readonly_session() as db_sess:
+            session_id = await db_sess.scalar(
+                sa.select(KernelRow.session_id).where(KernelRow.id == kernel_id)
+            )
+            if session_id is None:
+                raise KernelNotFound(str(kernel_id))
+            return SessionId(session_id)
 
     async def search_kernel_scoped_history(
         self,

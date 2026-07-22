@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.permission.types import EntityType, RBACElementType, ScopeType
-from ai.backend.common.types import KernelId
+from ai.backend.common.types import KernelId, SessionId
 from ai.backend.manager.actions.action.scope import BaseScopeAction, BaseScopeActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.kernel.types import KernelSchedulingHistoryData
@@ -16,19 +16,21 @@ from ai.backend.manager.repositories.base import BatchQuerier
 class SearchKernelScopedHistoryAction(BaseScopeAction):
     """Action to search the scheduling history of one kernel.
 
-    The history is the entity being read and the kernel is the scope containing it,
-    mirroring the other scoped searches (a role assignment within a role, a vfolder
-    within a user). Authorization therefore needs a ``kernel:history`` read
-    permission on the role preset; without one, only super admins pass.
+    The owning session is the authorization subject, scope, and target: kernel
+    permission records are intentionally kept empty, so whoever may read the
+    session may read its kernels' scheduling history. The caller resolves
+    ``kernel_id -> session_id`` first (``ResolveKernelSessionAction``) and
+    passes both in; ``kernel_id`` bounds the repository query.
     """
 
     kernel_id: KernelId
+    session_id: SessionId
     querier: BatchQuerier
 
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return EntityType.KERNEL_HISTORY
+        return EntityType.SESSION
 
     @override
     @classmethod
@@ -37,17 +39,17 @@ class SearchKernelScopedHistoryAction(BaseScopeAction):
 
     @override
     def scope_type(self) -> ScopeType:
-        return ScopeType.KERNEL
+        return ScopeType.SESSION
 
     @override
     def scope_id(self) -> str:
-        return str(self.kernel_id)
+        return str(self.session_id)
 
     @override
     def target_element(self) -> RBACElementRef:
         return RBACElementRef(
-            element_type=RBACElementType.KERNEL,
-            element_id=str(self.kernel_id),
+            element_type=RBACElementType.SESSION,
+            element_id=str(self.session_id),
         )
 
 
@@ -60,11 +62,12 @@ class SearchKernelScopedHistoryActionResult(BaseScopeActionResult):
     has_next_page: bool
     has_previous_page: bool
     kernel_id: KernelId
+    session_id: SessionId
 
     @override
     def scope_type(self) -> ScopeType:
-        return ScopeType.KERNEL
+        return ScopeType.SESSION
 
     @override
     def scope_id(self) -> str:
-        return str(self.kernel_id)
+        return str(self.session_id)
