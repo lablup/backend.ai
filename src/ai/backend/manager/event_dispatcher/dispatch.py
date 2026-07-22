@@ -50,6 +50,7 @@ from ai.backend.common.events.event_types.kernel.anycast import (
     KernelPreparingAnycastEvent,
     KernelPullingAnycastEvent,
     KernelStartedAnycastEvent,
+    KernelStatusTransitionAnycastEvent,
     KernelTerminatedAnycastEvent,
     KernelTerminatingAnycastEvent,
 )
@@ -349,6 +350,12 @@ class Dispatchers:
         )
 
         evd = event_dispatcher.with_reporters([EventLogger(self._db)])
+        evd.consume(
+            KernelStatusTransitionAnycastEvent,
+            None,
+            self._kernel_event_handler.handle_kernel_status_transition,
+            name="api.session.ktransit",
+        )
         evd.consume(
             KernelPreparingAnycastEvent,
             None,

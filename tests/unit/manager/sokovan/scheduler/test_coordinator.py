@@ -12,6 +12,7 @@ Test Scenarios:
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
@@ -20,6 +21,10 @@ from uuid import uuid4
 import pytest
 from dateutil.tz import tzutc
 
+from ai.backend.common.events.event_types.kernel.anycast import (
+    KernelStatusTransitionAnycastEvent,
+)
+from ai.backend.common.events.event_types.kernel.types import KernelTransitionResult
 from ai.backend.common.types import AccessKey, KernelId, SessionId
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.options import HandlerOptions
@@ -43,6 +48,7 @@ from ai.backend.manager.sokovan.scheduler.results import (
     SessionExecutionResult,
     SessionTransitionInfo,
 )
+from ai.backend.manager.sokovan.scheduler.types import ScheduleType
 
 # =============================================================================
 # Test Fixtures
@@ -1224,3 +1230,177 @@ class TestScheduleCoordinatorPromotionRecordOrdering:
         (finalize,) = records[session_id].phases
         assert finalize.name == "finalize_start"
         assert [step.name for step in finalize.steps] == ["trigger_batch_execution"]
+
+
+# =============================================================================
+# TestHandleKernelStatusTransition (BEP-1061 unified transition event)
+# =============================================================================
+
+
+class TestHandleKernelStatusTransition:
+    """Tests for the unified Agent kernel transition handler."""
+
+    @pytest.fixture
+    def mock_coordinator(self) -> MagicMock:
+        coordinator = MagicMock(spec=ScheduleCoordinator)
+        coordinator._kernel_state_engine = AsyncMock()
+        coordinator._kernel_state_engine.apply_kernel_status_transition.return_value = True
+        coordinator._scheduling_controller = AsyncMock()
+        return coordinator
+
+    @dataclass(frozen=True)
+    class _AppliedCase:
+        from_status: KernelStatus
+        to_status: KernelStatus
+        # Expected mark_scheduling_needed awaits; empty means no follow-up mark.
+        expected_marks: list[list[ScheduleType]] = field(default_factory=list)
+
+    @pytest.mark.parametrize(
+        "case",
+        [
+            # Full domain of Agent-reportable target phases (BEP-1061 handler table).
+            _AppliedCase(
+                from_status=KernelStatus.SCHEDULED,
+                to_status=KernelStatus.PREPARING,
+                expected_marks=[[ScheduleType.CHECK_PRECONDITION]],
+            ),
+            _AppliedCase(
+                from_status=KernelStatus.PREPARING,
+                to_status=KernelStatus.PULLING,
+                expected_marks=[[ScheduleType.CHECK_PULLING_PROGRESS]],
+            ),
+            _AppliedCase(
+                from_status=KernelStatus.PULLING,
+                to_status=KernelStatus.PREPARED,
+                expected_marks=[[ScheduleType.CHECK_PULLING_PROGRESS]],
+            ),
+            _AppliedCase(
+                from_status=KernelStatus.PREPARED,
+                to_status=KernelStatus.CREATING,
+            ),
+            _AppliedCase(
+                from_status=KernelStatus.CREATING,
+                to_status=KernelStatus.RUNNING,
+                expected_marks=[[ScheduleType.CHECK_CREATING_PROGRESS]],
+            ),
+            _AppliedCase(
+                from_status=KernelStatus.RUNNING,
+                to_status=KernelStatus.TERMINATING,
+            ),
+            _AppliedCase(
+                from_status=KernelStatus.TERMINATING,
+                to_status=KernelStatus.TERMINATED,
+                expected_marks=[
+                    [
+                        ScheduleType.DETECT_KERNEL_TERMINATION,
+                        ScheduleType.CHECK_TERMINATING_PROGRESS,
+                    ]
+                ],
+            ),
+        ],
+        ids=lambda case: f"{case.from_status.name}-to-{case.to_status.name}",
+    )
+    async def test_applied_transition_marks_followup_schedules(
+        self,
+        mock_coordinator: MagicMock,
+        case: _AppliedCase,
+    ) -> None:
+        event = KernelStatusTransitionAnycastEvent(
+            kernel_id=KernelId(uuid4()),
+            from_status=case.from_status.value,
+            to_status=case.to_status.value,
+            reason="test",
+        )
+
+        applied = await ScheduleCoordinator.handle_kernel_status_transition(mock_coordinator, event)
+
+        assert applied is True
+        engine_call = mock_coordinator._kernel_state_engine.apply_kernel_status_transition
+        engine_call.assert_awaited_once_with(
+            event.kernel_id,
+            case.from_status,
+            case.to_status,
+            "test",
+            SchedulingResult.SUCCESS,
+            None,
+            "",
+        )
+        mark = mock_coordinator._scheduling_controller.mark_scheduling_needed
+        assert [c.args[0] for c in mark.await_args_list] == case.expected_marks
+
+    async def test_failed_report_records_without_followup(
+        self,
+        mock_coordinator: MagicMock,
+    ) -> None:
+        event = KernelStatusTransitionAnycastEvent(
+            kernel_id=KernelId(uuid4()),
+            from_status=KernelStatus.PULLING.value,
+            to_status=KernelStatus.PREPARED.value,
+            reason="pull-failed",
+            result=KernelTransitionResult.FAILED,
+            error_code="PULL_TIMEOUT",
+            message="registry timeout",
+        )
+
+        applied = await ScheduleCoordinator.handle_kernel_status_transition(mock_coordinator, event)
+
+        assert applied is True
+        engine_call = mock_coordinator._kernel_state_engine.apply_kernel_status_transition
+        engine_call.assert_awaited_once_with(
+            event.kernel_id,
+            KernelStatus.PULLING,
+            KernelStatus.PREPARED,
+            "pull-failed",
+            SchedulingResult.FAILURE,
+            "PULL_TIMEOUT",
+            "registry timeout",
+        )
+        mock_coordinator._scheduling_controller.mark_scheduling_needed.assert_not_awaited()
+
+    async def test_stale_transition_marks_nothing(
+        self,
+        mock_coordinator: MagicMock,
+    ) -> None:
+        mock_coordinator._kernel_state_engine.apply_kernel_status_transition.return_value = False
+        event = KernelStatusTransitionAnycastEvent(
+            kernel_id=KernelId(uuid4()),
+            from_status=KernelStatus.PULLING.value,
+            to_status=KernelStatus.PREPARED.value,
+        )
+
+        applied = await ScheduleCoordinator.handle_kernel_status_transition(mock_coordinator, event)
+
+        assert applied is False
+        mock_coordinator._scheduling_controller.mark_scheduling_needed.assert_not_awaited()
+
+    @dataclass(frozen=True)
+    class _IgnoredCase:
+        from_status: str
+        to_status: str
+
+    @pytest.mark.parametrize(
+        "case",
+        [
+            _IgnoredCase(from_status="PULLING", to_status="NOT_A_STATUS"),
+            _IgnoredCase(from_status="NOT_A_STATUS", to_status="PREPARED"),
+            # Statuses outside the Agent-reportable phase set.
+            _IgnoredCase(from_status="PENDING", to_status="SCHEDULED"),
+            _IgnoredCase(from_status="RUNNING", to_status="CANCELLED"),
+        ],
+        ids=lambda case: f"{case.from_status}-to-{case.to_status}",
+    )
+    async def test_invalid_transition_ignored(
+        self,
+        mock_coordinator: MagicMock,
+        case: _IgnoredCase,
+    ) -> None:
+        event = KernelStatusTransitionAnycastEvent(
+            kernel_id=KernelId(uuid4()),
+            from_status=case.from_status,
+            to_status=case.to_status,
+        )
+
+        applied = await ScheduleCoordinator.handle_kernel_status_transition(mock_coordinator, event)
+
+        assert applied is False
+        mock_coordinator._kernel_state_engine.apply_kernel_status_transition.assert_not_awaited()

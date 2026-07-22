@@ -9,7 +9,7 @@ from ai.backend.common.events.types import AbstractAnycastEvent, EventDomain
 from ai.backend.common.events.user_event.user_event import UserEvent
 from ai.backend.common.types import KernelId, SessionId
 
-from .types import KernelLifecycleEventReason
+from .types import KernelLifecycleEventReason, KernelTransitionResult
 
 
 @dataclass
@@ -165,6 +165,58 @@ class KernelTerminatedAnycastEvent(KernelTerminationEvent):
     @override
     def event_name(cls) -> str:
         return "kernel_terminated"
+
+
+@dataclass
+class KernelStatusTransitionAnycastEvent(BaseKernelEvent):
+    """Unified kernel status transition report from the Agent (BEP-1061).
+
+    Carries only the transition and its processing result — no phase/step
+    payload. ``from_status``/``to_status`` are sokovan ``KernelStatus`` values;
+    ``from_status`` lets the Manager reject a duplicate/stale transition
+    idempotently.
+    """
+
+    from_status: str
+    to_status: str
+    reason: str = ""
+    result: KernelTransitionResult = KernelTransitionResult.SUCCESS
+    error_code: str | None = None
+    message: str = ""
+
+    @override
+    def serialize(self) -> tuple[Any, ...]:
+        return (
+            str(self.kernel_id),
+            self.from_status,
+            self.to_status,
+            self.reason,
+            str(self.result),
+            self.error_code,
+            self.message,
+        )
+
+    @classmethod
+    @override
+    def deserialize(cls, value: tuple[Any, ...]) -> Self:
+        return cls(
+            kernel_id=KernelId(uuid.UUID(value[0])),
+            from_status=value[1],
+            to_status=value[2],
+            reason=value[3],
+            result=KernelTransitionResult(value[4]),
+            error_code=value[5],
+            message=value[6],
+        )
+
+    @override
+    def user_event(self) -> UserEvent | None:
+        return None
+
+    @classmethod
+    @override
+    def event_name(cls) -> str:
+        return "kernel_status_transition"
 
 
 @dataclass

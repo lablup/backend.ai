@@ -53,7 +53,11 @@ from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.dotfile.types import DotfileBundle, DotfileEntry, SSHKeypair
 from ai.backend.manager.data.image.types import ImageIdentifier
-from ai.backend.manager.data.kernel.types import KernelListResult, KernelStatus
+from ai.backend.manager.data.kernel.types import (
+    KernelListResult,
+    KernelSchedulingPhase,
+    KernelStatus,
+)
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.resource.types import SlotTypePolicy
 from ai.backend.manager.data.session.creation import (
@@ -108,7 +112,10 @@ from ai.backend.manager.models.resource_slot import (
     ResourceSlotTypeRow,
 )
 from ai.backend.manager.models.scaling_group import ScalingGroupRow, query_allowed_sgroups
-from ai.backend.manager.models.scheduling_history.row import SessionSchedulingHistoryRow
+from ai.backend.manager.models.scheduling_history.row import (
+    KernelSchedulingHistoryRow,
+    SessionSchedulingHistoryRow,
+)
 from ai.backend.manager.models.session import (
     PRIVATE_SESSION_TYPES,
     SessionDependencyRow,
@@ -167,6 +174,7 @@ from ai.backend.manager.repositories.scheduler.types.session_creation import (
 )
 from ai.backend.manager.repositories.scheduler.types.snapshot import ResourcePolicies, SnapshotData
 from ai.backend.manager.repositories.scheduling_history import (
+    KernelSchedulingHistoryCreatorSpec,
     SessionSchedulingHistoryCreatorSpec,
 )
 from ai.backend.manager.repositories.vfolder.mount import prepare_vfolder_mounts
@@ -2512,6 +2520,120 @@ class ScheduleDBSource:
             # Free allocations and release the kernel's reserved/used hold.
             await self._free_allocations_and_release(db_sess, [kernel_id], now)
         return True
+
+    async def update_kernel_status_transition(
+        self,
+        kernel_id: KernelId,
+        from_status: KernelStatus,
+        to_status: KernelStatus,
+        reason: str,
+        result: SchedulingResult,
+        error_code: str | None,
+        message: str,
+    ) -> bool:
+        """Apply an Agent-reported kernel transition and record it into history.
+
+        ``from -> to`` is applied atomically (UPDATE WHERE status = from), so a
+        duplicate/stale transition matches nothing and is rejected idempotently.
+        On a failure report the status is left untouched and only history is
+        recorded, still gated on the current status matching ``from_status``.
+        Both the apply and the history record happen in one transaction.
+        """
+        to_phase = KernelSchedulingPhase.from_kernel_status(to_status)
+        if to_phase is None:
+            # Not an Agent-reportable phase; the coordinator validates upstream.
+            return False
+
+        async with self._begin_session_read_committed() as db_sess:
+            now = await self._get_db_now_in_session(db_sess)
+            if result == SchedulingResult.SUCCESS:
+                values: dict[str, Any] = {
+                    "status": to_status,
+                    "status_info": reason,
+                    "status_changed": now,
+                    "status_history": sql_json_merge(
+                        KernelRow.__table__.c.status_history,
+                        (),
+                        {to_status.name: now.isoformat()},
+                    ),
+                }
+                if to_status == KernelStatus.TERMINATED:
+                    values["terminated_at"] = now
+                stmt = (
+                    sa.update(KernelRow)
+                    .where(
+                        sa.and_(
+                            KernelRow.id == kernel_id,
+                            KernelRow.status == from_status,
+                        )
+                    )
+                    .values(**values)
+                    .returning(KernelRow.session_id)
+                )
+                row = (await db_sess.execute(stmt)).first()
+                if row is None:
+                    return False
+                session_id = SessionId(row[0])
+                if to_status == KernelStatus.TERMINATED:
+                    await self._free_allocations_and_release(db_sess, [kernel_id], now)
+            else:
+                sel = sa.select(KernelRow.session_id).where(
+                    sa.and_(
+                        KernelRow.id == kernel_id,
+                        KernelRow.status == from_status,
+                    )
+                )
+                row = (await db_sess.execute(sel)).first()
+                if row is None:
+                    return False
+                session_id = SessionId(row[0])
+
+            history_spec = KernelSchedulingHistoryCreatorSpec(
+                kernel_id=kernel_id,
+                session_id=session_id,
+                phase=to_phase.agent_stage(),
+                result=result,
+                message=message,
+                from_status=KernelSchedulingPhase.from_kernel_status(from_status),
+                to_status=to_phase,
+                error_code=error_code,
+            )
+            await self._record_kernel_transition_history(db_sess, history_spec)
+        return True
+
+    async def _record_kernel_transition_history(
+        self,
+        db_sess: SASession,
+        spec: KernelSchedulingHistoryCreatorSpec,
+    ) -> None:
+        """Record a kernel history row, merging with the last identical one.
+
+        Mirrors the session history merge logic: a redelivered transition
+        (at-least-once transport, sweep re-emission) increments ``attempts``
+        instead of duplicating the row.
+        """
+        new_row = spec.build_row()
+        last_row = (
+            (
+                await db_sess.execute(
+                    sa.select(KernelSchedulingHistoryRow)
+                    .where(KernelSchedulingHistoryRow.kernel_id == spec.kernel_id)
+                    .order_by(KernelSchedulingHistoryRow.created_at.desc())
+                    .limit(1)
+                )
+            )
+            .scalars()
+            .first()
+        )
+        if last_row is not None and last_row.should_merge_with(new_row):
+            await db_sess.execute(
+                sa.update(KernelSchedulingHistoryRow)
+                .where(KernelSchedulingHistoryRow.id == last_row.id)
+                .values(attempts=KernelSchedulingHistoryRow.attempts + 1)
+            )
+        else:
+            db_sess.add(new_row)
+            await db_sess.flush()
 
     async def reset_kernels_to_pending_for_sessions(
         self, session_ids: list[SessionId], reason: str

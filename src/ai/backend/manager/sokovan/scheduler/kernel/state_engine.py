@@ -10,6 +10,8 @@ from uuid import UUID
 
 from ai.backend.common.types import AgentId, KernelId, SessionId
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.data.kernel.types import KernelStatus
+from ai.backend.manager.data.session.types import SchedulingResult
 from ai.backend.manager.data.sokovan import KernelCreationInfo
 from ai.backend.manager.repositories.scheduler import SchedulerRepository
 
@@ -37,6 +39,35 @@ class KernelStateEngine:
         :param repository: SchedulerRepository for database operations
         """
         self._repository = repository
+
+    async def apply_kernel_status_transition(
+        self,
+        kernel_id: KernelId,
+        from_status: KernelStatus,
+        to_status: KernelStatus,
+        reason: str,
+        result: SchedulingResult,
+        error_code: str | None,
+        message: str,
+    ) -> bool:
+        """Apply an Agent-reported ``from -> to`` transition and record history.
+
+        The repository pins the current status to ``from_status``, so a
+        duplicate/stale transition is rejected idempotently. A failure report
+        records history without touching the status.
+
+        :return: True if the transition was applied (or the failure recorded)
+        """
+        log.debug(
+            "Applying kernel {} transition {} -> {} ({})",
+            kernel_id,
+            from_status,
+            to_status,
+            result,
+        )
+        return await self._repository.update_kernel_status_transition(
+            kernel_id, from_status, to_status, reason, result, error_code, message
+        )
 
     async def mark_kernel_pulling(
         self,

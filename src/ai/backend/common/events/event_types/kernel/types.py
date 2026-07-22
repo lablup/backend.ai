@@ -2,6 +2,17 @@ import enum
 from typing import Self
 
 
+class KernelTransitionResult(enum.StrEnum):
+    """Agent processing result carried by the unified kernel transition event.
+
+    The Agent reports only success/failure; classifying a failure into
+    retry/timeout/give-up is sokovan's decision (BEP-1061).
+    """
+
+    SUCCESS = "SUCCESS"
+    FAILED = "FAILED"
+
+
 class KernelLifecycleEventReason(enum.StrEnum):
     AGENT_TERMINATION = "agent-termination"
     ALREADY_TERMINATED = "already-terminated"

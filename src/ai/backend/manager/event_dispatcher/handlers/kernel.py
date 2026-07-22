@@ -15,6 +15,7 @@ from ai.backend.common.events.event_types.kernel.anycast import (
     KernelPreparingAnycastEvent,
     KernelPullingAnycastEvent,
     KernelStartedAnycastEvent,
+    KernelStatusTransitionAnycastEvent,
     KernelTerminatedAnycastEvent,
     KernelTerminatingAnycastEvent,
 )
@@ -102,6 +103,23 @@ class KernelEventHandler:
             pass
         finally:
             log_buffer.close()
+
+    async def handle_kernel_status_transition(
+        self,
+        _context: None,
+        _source: AgentId,
+        event: KernelStatusTransitionAnycastEvent,
+    ) -> None:
+        log.info(
+            "handle_kernel_status_transition: ev:{} k:{} {} -> {} ({})",
+            event.event_name(),
+            event.kernel_id,
+            event.from_status,
+            event.to_status,
+            event.result,
+        )
+
+        await self._schedule_coordinator.handle_kernel_status_transition(event)
 
     async def handle_kernel_preparing(
         self,

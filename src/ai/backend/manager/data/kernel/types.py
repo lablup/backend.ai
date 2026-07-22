@@ -328,6 +328,32 @@ class KernelSchedulingPhase(StrEnum):
     TERMINATING = "TERMINATING"
     TERMINATED = "TERMINATED"
 
+    @classmethod
+    def from_kernel_status(cls, status: KernelStatus) -> KernelSchedulingPhase | None:
+        """Map a sokovan status onto the recordable phase set, None if outside it.
+
+        Entry transitions start from a status outside this set (e.g. SCHEDULED),
+        which is recorded as an empty ``from_status``.
+        """
+        try:
+            return cls(status.name)
+        except ValueError:
+            return None
+
+    def agent_stage(self) -> str:
+        """The Agent execution stage that reports transitions into this phase (BEP-1061)."""
+        match self:
+            case (
+                KernelSchedulingPhase.PREPARING
+                | KernelSchedulingPhase.PULLING
+                | KernelSchedulingPhase.PREPARED
+            ):
+                return "prepare"
+            case KernelSchedulingPhase.CREATING | KernelSchedulingPhase.RUNNING:
+                return "create"
+            case KernelSchedulingPhase.TERMINATING | KernelSchedulingPhase.TERMINATED:
+                return "terminate"
+
 
 @dataclass
 class KernelSchedulingHistoryData:

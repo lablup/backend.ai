@@ -15,8 +15,10 @@ from ai.backend.common.events.event_types.kernel.anycast import (
     KernelPreparingAnycastEvent,
     KernelPullingAnycastEvent,
     KernelStartedAnycastEvent,
+    KernelStatusTransitionAnycastEvent,
     KernelTerminatedAnycastEvent,
 )
+from ai.backend.common.events.event_types.kernel.types import KernelTransitionResult
 from ai.backend.common.events.event_types.schedule.anycast import (
     DoSokovanProcessIfNeededEvent,
     DoSokovanProcessScheduleEvent,
@@ -30,7 +32,7 @@ from ai.backend.common.leader.tasks import EventTaskSpec
 from ai.backend.common.types import AccessKey, AgentId, SessionId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.data.kernel.types import KernelStatus
+from ai.backend.manager.data.kernel.types import KernelSchedulingPhase, KernelStatus
 from ai.backend.manager.data.session.types import (
     SchedulingResult,
     SessionStatus,
@@ -155,6 +157,20 @@ class FailureClassificationResult:
 
     need_retry: list[SessionTransitionInfo]
     """Sessions that can be retried - should transition to need_retry status."""
+
+
+# Follow-up scheduling requested after an applied Agent kernel transition,
+# matching the granular event handlers below.
+_FOLLOWUP_SCHEDULES_BY_KERNEL_STATUS: Mapping[KernelStatus, list[ScheduleType]] = {
+    KernelStatus.PREPARING: [ScheduleType.CHECK_PRECONDITION],
+    KernelStatus.PULLING: [ScheduleType.CHECK_PULLING_PROGRESS],
+    KernelStatus.PREPARED: [ScheduleType.CHECK_PULLING_PROGRESS],
+    KernelStatus.RUNNING: [ScheduleType.CHECK_CREATING_PROGRESS],
+    KernelStatus.TERMINATED: [
+        ScheduleType.DETECT_KERNEL_TERMINATION,
+        ScheduleType.CHECK_TERMINATING_PROGRESS,
+    ],
+}
 
 
 class ScheduleCoordinator:
@@ -1568,6 +1584,54 @@ class ScheduleCoordinator:
         return await self.process_schedule(schedule_type)
 
     # Kernel event handling methods using the coordinator's kernel state engine
+
+    async def handle_kernel_status_transition(
+        self, event: KernelStatusTransitionAnycastEvent
+    ) -> bool:
+        """Handle the unified Agent kernel transition event (BEP-1061).
+
+        Records the transition into kernel scheduling history and applies
+        ``from -> to`` through the kernel state engine; a duplicate/stale
+        transition is rejected idempotently by the ``from_status`` pin.
+        """
+        try:
+            from_status = KernelStatus(event.from_status)
+            to_status = KernelStatus(event.to_status)
+        except ValueError:
+            log.warning(
+                "Ignoring kernel transition with unknown status: k:{} {} -> {}",
+                event.kernel_id,
+                event.from_status,
+                event.to_status,
+            )
+            return False
+        if KernelSchedulingPhase.from_kernel_status(to_status) is None:
+            log.warning(
+                "Ignoring kernel transition to a non-agent-reportable status: k:{} -> {}",
+                event.kernel_id,
+                to_status,
+            )
+            return False
+
+        scheduling_result = (
+            SchedulingResult.SUCCESS
+            if event.result == KernelTransitionResult.SUCCESS
+            else SchedulingResult.FAILURE
+        )
+        applied = await self._kernel_state_engine.apply_kernel_status_transition(
+            event.kernel_id,
+            from_status,
+            to_status,
+            event.reason,
+            scheduling_result,
+            event.error_code,
+            event.message,
+        )
+        if applied and scheduling_result == SchedulingResult.SUCCESS:
+            schedule_types = _FOLLOWUP_SCHEDULES_BY_KERNEL_STATUS.get(to_status)
+            if schedule_types:
+                await self._scheduling_controller.mark_scheduling_needed(schedule_types)
+        return applied
 
     async def handle_kernel_pulling(self, event: KernelPullingAnycastEvent) -> bool:
         """Handle kernel pulling event through the kernel state engine."""

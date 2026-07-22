@@ -27,6 +27,7 @@ from ai.backend.common.resource.types import TotalResourceData
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
+    KernelId,
     SessionId,
     SlotName,
     SlotTypes,
@@ -36,7 +37,7 @@ from ai.backend.common.types import (
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.kernel.types import KernelListResult, KernelStatus
-from ai.backend.manager.data.session.types import SessionInfo, SessionStatus
+from ai.backend.manager.data.session.types import SchedulingResult, SessionInfo, SessionStatus
 from ai.backend.manager.data.sokovan import (
     AllocationBatch,
     KernelCreationInfo,
@@ -455,6 +456,22 @@ class SchedulerRepository:
     async def update_kernel_status_cancelled(self, kernel_id: UUID, reason: str) -> bool:
         """Update kernel status to CANCELLED."""
         return await self._db_source.update_kernel_status_cancelled(kernel_id, reason)
+
+    @scheduler_repository_resilience.apply()
+    async def update_kernel_status_transition(
+        self,
+        kernel_id: KernelId,
+        from_status: KernelStatus,
+        to_status: KernelStatus,
+        reason: str,
+        result: SchedulingResult,
+        error_code: str | None,
+        message: str,
+    ) -> bool:
+        """Apply an Agent-reported kernel transition and record it into history."""
+        return await self._db_source.update_kernel_status_transition(
+            kernel_id, from_status, to_status, reason, result, error_code, message
+        )
 
     @scheduler_repository_resilience.apply()
     async def update_kernel_status_terminated(
