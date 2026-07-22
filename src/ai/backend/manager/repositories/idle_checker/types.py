@@ -44,8 +44,9 @@ class SessionIdleCheckPair:
 
 
 @dataclass(frozen=True)
-class SessionIdleCheckPairBatchData:
-    pairs: Sequence[SessionIdleCheckPair]
+class SessionIdleCheckAssignmentData:
+    desired_pairs: Sequence[SessionIdleCheckPair]
+    current_pairs: Sequence[SessionIdleCheckPair]
     now: datetime
 
 

@@ -32,8 +32,8 @@ from ai.backend.manager.repositories.idle_checker.types import (
     IdleCheckAssignmentData,
     IdleCheckBatchData,
     IdleCheckerDefinitionData,
+    SessionIdleCheckAssignmentData,
     SessionIdleCheckPair,
-    SessionIdleCheckPairBatchData,
 )
 from ai.backend.manager.repositories.ops import DBOpsProvider
 
@@ -121,10 +121,10 @@ class IdleCheckerDBSource:
             )
         return ExpiredIdleCheckBatchData(checks=tuple(checks), now=now)
 
-    async def fetch_desired_session_idle_check_pairs(
+    async def fetch_session_idle_check_assignments(
         self,
         session_statuses: Collection[SessionStatus],
-    ) -> list[SessionIdleCheckPair]:
+    ) -> SessionIdleCheckAssignmentData:
         scope_matches = sa.or_(
             sa.and_(
                 IdleCheckerBindingRow.scope_type == ScopeType.RESOURCE_GROUP.value,
@@ -139,7 +139,7 @@ class IdleCheckerDBSource:
                 IdleCheckerBindingRow.scope_id == SessionRow.domain_id,
             ),
         )
-        query = (
+        desired_query = (
             sa.select(
                 SessionRow.id,
                 IdleCheckerBindingRow.idle_checker_id,
@@ -160,22 +160,7 @@ class IdleCheckerDBSource:
             )
             .distinct()
         )
-        querier = BatchQuerier(pagination=NoPagination())
-        async with self._ops.read_ops() as r:
-            rows = (await r.batch_query_in_global(query, querier)).rows
-        return [
-            SessionIdleCheckPair(
-                session_id=SessionId(row.id),
-                checker_id=cast(IdleCheckerID, row.idle_checker_id),
-            )
-            for row in rows
-        ]
-
-    async def fetch_current_session_idle_checks(
-        self,
-        session_statuses: Collection[SessionStatus],
-    ) -> SessionIdleCheckPairBatchData:
-        query = (
+        current_query = (
             sa.select(
                 SessionIdleCheckRow.session_id,
                 SessionIdleCheckRow.idle_checker_id,
@@ -186,14 +171,22 @@ class IdleCheckerDBSource:
         querier = BatchQuerier(pagination=NoPagination())
         async with self._ops.read_ops() as r:
             now = await r.current_time()
-            rows = (await r.batch_query_in_global(query, querier)).rows
-        return SessionIdleCheckPairBatchData(
-            pairs=tuple(
+            desired_rows = (await r.batch_query_in_global(desired_query, querier)).rows
+            current_rows = (await r.batch_query_in_global(current_query, querier)).rows
+        return SessionIdleCheckAssignmentData(
+            desired_pairs=tuple(
+                SessionIdleCheckPair(
+                    session_id=SessionId(row.id),
+                    checker_id=cast(IdleCheckerID, row.idle_checker_id),
+                )
+                for row in desired_rows
+            ),
+            current_pairs=tuple(
                 SessionIdleCheckPair(
                     session_id=SessionId(row.session_id),
                     checker_id=cast(IdleCheckerID, row.idle_checker_id),
                 )
-                for row in rows
+                for row in current_rows
             ),
             now=now,
         )

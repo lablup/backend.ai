@@ -13,6 +13,7 @@ from ai.backend.common.data.idle_checker.types import (
     IdleCheckPhase,
     SessionLifetimeSpec,
 )
+from ai.backend.common.data.permission.types import ScopeType
 from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.idle_checker import IdleCheckerID
 from ai.backend.common.identifier.resource_group import ResourceGroupID
@@ -27,6 +28,7 @@ from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.idle_checker.row import (
+    IdleCheckerBindingRow,
     IdleCheckerRow,
     SessionIdleCheckRow,
 )
@@ -185,6 +187,7 @@ class TestFetchJudgmentBatch:
                 ScalingGroupRow,
                 SessionRow,
                 IdleCheckerRow,
+                IdleCheckerBindingRow,
                 SessionIdleCheckRow,
             ],
         ):
@@ -229,6 +232,14 @@ class TestFetchJudgmentBatch:
                 db_sess.add(_expired_check_session_row(scope, session_id, status))
             db_sess.add(_expired_check_checker_row(checker_id))
             await db_sess.flush()
+            db_sess.add(
+                IdleCheckerBindingRow(
+                    scope_type=ScopeType.DOMAIN.value,
+                    scope_id=scope.domain_id,
+                    idle_checker_id=checker_id,
+                    enabled=True,
+                )
+            )
             for session_id, phase in check_specs:
                 db_sess.add(
                     SessionIdleCheckRow(
@@ -295,6 +306,34 @@ class TestFetchJudgmentBatch:
 
         session_ids = {assignment.session.session_id for assignment in batch.assignments}
         assert judgment_rows.terminated_session_id not in session_ids
+
+    async def test_fetches_desired_and_current_assignment_pairs(
+        self,
+        repository: IdleCheckerRepository,
+        judgment_rows: JudgmentRows,
+    ) -> None:
+        assignments = await repository.fetch_session_idle_check_assignments([SessionStatus.RUNNING])
+
+        assert set(assignments.desired_pairs) == {
+            SessionIdleCheckPair(session_id, judgment_rows.checker_id)
+            for session_id in (
+                judgment_rows.active_session_id,
+                judgment_rows.idle_session_id,
+                judgment_rows.not_checked_session_id,
+                judgment_rows.idle_expired_session_id,
+                judgment_rows.session_without_row_id,
+            )
+        }
+        assert set(assignments.current_pairs) == {
+            SessionIdleCheckPair(session_id, judgment_rows.checker_id)
+            for session_id in (
+                judgment_rows.active_session_id,
+                judgment_rows.idle_session_id,
+                judgment_rows.not_checked_session_id,
+                judgment_rows.idle_expired_session_id,
+            )
+        }
+        assert assignments.now.tzinfo is not None
 
 
 class TestFetchExpiredIdleChecks:
@@ -468,26 +507,3 @@ class TestFetchExpiredIdleChecks:
         assert check_session_ids == {expired_check_session.session_id}
         for check in batch.checks:
             assert check.expire_at <= batch.now
-
-    async def test_fetches_current_pairs_only_for_target_session_statuses(
-        self,
-        repository: IdleCheckerRepository,
-        expired_check_session: ExpiredCheckSessionData,
-        terminated_session_with_expired_check: SessionId,
-    ) -> None:
-        batch = await repository.fetch_current_session_idle_checks([SessionStatus.RUNNING])
-
-        assert set(batch.pairs) == {
-            SessionIdleCheckPair(
-                expired_check_session.session_id,
-                expired_check_session.first_checker_id,
-            ),
-            SessionIdleCheckPair(
-                expired_check_session.session_id,
-                expired_check_session.second_checker_id,
-            ),
-        }
-        assert terminated_session_with_expired_check not in {
-            pair.session_id for pair in batch.pairs
-        }
-        assert batch.now.tzinfo is not None

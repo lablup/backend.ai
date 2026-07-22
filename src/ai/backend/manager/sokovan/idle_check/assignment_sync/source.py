@@ -31,14 +31,11 @@ class IdleCheckAssignmentSyncSource(
         category: IdleCheckCategory,
         target_statuses: IdleCheckTargetStatuses,
     ) -> IdleCheckAssignmentSyncReconcileInfo:
-        desired_pairs = await self._repository.fetch_desired_session_idle_check_pairs(
-            target_statuses.session_statuses
-        )
-        current_batch = await self._repository.fetch_current_session_idle_checks(
+        assignments = await self._repository.fetch_session_idle_check_assignments(
             target_statuses.session_statuses
         )
         return IdleCheckAssignmentSyncReconcileInfo(
-            desired_pairs=desired_pairs,
-            current_pairs=current_batch.pairs,
-            current_time=current_batch.now,
+            desired_pairs=assignments.desired_pairs,
+            current_pairs=assignments.current_pairs,
+            current_time=assignments.now,
         )

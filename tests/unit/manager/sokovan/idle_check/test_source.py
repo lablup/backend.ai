@@ -11,8 +11,8 @@ from ai.backend.common.identifier.idle_checker import IdleCheckerID
 from ai.backend.common.types import SessionId
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.repositories.idle_checker.types import (
+    SessionIdleCheckAssignmentData,
     SessionIdleCheckPair,
-    SessionIdleCheckPairBatchData,
 )
 from ai.backend.manager.sokovan.idle_check.assignment_sync.source import (
     IdleCheckAssignmentSyncSource,
@@ -63,13 +63,13 @@ class TestIdleCheckAssignmentSyncSource:
             SessionIdleCheckPair(session_id, second_checker_id),
         ]
         now = datetime(2026, 7, 22, tzinfo=UTC)
-        current_batch = SessionIdleCheckPairBatchData(
-            pairs=(existing_pair,),
+        assignments = SessionIdleCheckAssignmentData(
+            desired_pairs=desired_pairs,
+            current_pairs=(existing_pair,),
             now=now,
         )
         repository = MagicMock()
-        repository.fetch_desired_session_idle_check_pairs = AsyncMock(return_value=desired_pairs)
-        repository.fetch_current_session_idle_checks = AsyncMock(return_value=current_batch)
+        repository.fetch_session_idle_check_assignments = AsyncMock(return_value=assignments)
         target_statuses = IdleCheckTargetStatuses(
             session_statuses=frozenset({SessionStatus.RUNNING})
         )
@@ -101,9 +101,6 @@ class TestIdleCheckAssignmentSyncSource:
         ]
         assert reconcile_info.current_pairs == (case.existing_pair,)
         assert reconcile_info.now() == case.now
-        case.repository.fetch_desired_session_idle_check_pairs.assert_awaited_once_with(
-            case.target_statuses.session_statuses
-        )
-        case.repository.fetch_current_session_idle_checks.assert_awaited_once_with(
+        case.repository.fetch_session_idle_check_assignments.assert_awaited_once_with(
             case.target_statuses.session_statuses
         )
