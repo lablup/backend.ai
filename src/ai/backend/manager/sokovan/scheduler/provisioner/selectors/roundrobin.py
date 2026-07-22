@@ -15,8 +15,6 @@ from typing import override
 
 from .selector import (
     AbstractAgentSelector,
-    AgentSelectionConfig,
-    AgentSelectionCriteria,
     AgentStateTracker,
 )
 from .types import ResourceRequirements
@@ -51,8 +49,6 @@ class RoundRobinAgentSelector(AbstractAgentSelector):
         self,
         trackers: Sequence[AgentStateTracker],
         _resource_req: ResourceRequirements,
-        _criteria: AgentSelectionCriteria,
-        _config: AgentSelectionConfig,
     ) -> AgentStateTracker:
         """
         Select an agent tracker using round-robin.

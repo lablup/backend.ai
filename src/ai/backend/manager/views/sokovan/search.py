@@ -5,9 +5,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from uuid import UUID
 
-from ai.backend.manager.data.sokovan import (
-    HandlerSessionData,
-    ImageConfigData,
+from ai.backend.manager.views.sokovan.handler import HandlerSessionData
+from ai.backend.manager.views.sokovan.image import ImageConfigData
+from ai.backend.manager.views.sokovan.lifecycle import (
     SessionDataForPull,
     SessionDataForStart,
 )

@@ -3,7 +3,8 @@ from collections import defaultdict
 from collections.abc import Mapping, Sequence
 
 from ai.backend.common.identifier.resource_group import ResourceGroupID
-from ai.backend.manager.data.sokovan import SessionWorkload, SystemSnapshot
+from ai.backend.manager.views.sokovan.snapshot import SystemSnapshot
+from ai.backend.manager.views.sokovan.workload import SessionWorkload
 
 
 class WorkloadSequencer(ABC):

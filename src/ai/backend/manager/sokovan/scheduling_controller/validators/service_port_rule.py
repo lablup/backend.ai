@@ -7,11 +7,11 @@ from typing import Any, override
 
 from ai.backend.manager.data.session.spec import SessionSpec
 from ai.backend.manager.errors.api import InvalidAPIParameters
-from ai.backend.manager.repositories.scheduler.types.session_creation import (
-    SessionSpecContext,
-)
 from ai.backend.manager.sokovan.scheduling_controller.validators.session_spec_base import (
     SessionSpecValidatorRule,
+)
+from ai.backend.manager.views.sokovan.session_creation import (
+    SessionSpecContext,
 )
 
 _RESERVED_PORTS: frozenset[int] = frozenset({2000, 2001, 2200, 7681})

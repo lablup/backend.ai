@@ -17,8 +17,8 @@ from ai.backend.common.exception import (
     ErrorOperation,
 )
 from ai.backend.common.types import SlotName
-from ai.backend.manager.data.sokovan import SchedulingPredicate
 from ai.backend.manager.sokovan.scheduler.exceptions import SchedulingError
+from ai.backend.manager.views.sokovan.allocation import SchedulingPredicate
 
 
 class SchedulingValidationError(SchedulingError, web.HTTPPreconditionFailed):

@@ -2,11 +2,12 @@
 
 from typing import override
 
-from ai.backend.manager.data.sokovan import SessionWorkload, SystemSnapshot
-from ai.backend.manager.data.sokovan.snapshot import (
+from ai.backend.manager.views.sokovan.snapshot import (
     ResourceAllocation,
+    SystemSnapshot,
     UserResourceAllocation,
 )
+from ai.backend.manager.views.sokovan.workload import SessionWorkload
 
 from .exceptions import (
     ConcurrencyLimitExceeded,

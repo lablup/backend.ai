@@ -37,11 +37,6 @@ from ai.backend.manager.data.session.types import (
     StatusTransitions,
     TransitionStatus,
 )
-from ai.backend.manager.data.sokovan import (
-    KernelCreationInfo,
-    PromotionSpec,
-    SessionWithKernels,
-)
 from ai.backend.manager.metrics.scheduler import SchedulerOperationMetricObserver
 from ai.backend.manager.models.kernel.conditions import KernelConditions
 from ai.backend.manager.models.session.conditions import SessionConditions
@@ -61,6 +56,11 @@ from ai.backend.manager.sokovan.scheduler.scheduler import SchedulerComponents
 from ai.backend.manager.sokovan.scheduler.types import ScheduleType
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 from ai.backend.manager.types import DistributedLockFactory
+from ai.backend.manager.views.sokovan.lifecycle import (
+    KernelCreationInfo,
+    SessionWithKernels,
+)
+from ai.backend.manager.views.sokovan.result import PromotionSpec
 
 from .factory import CoordinatorHandlers
 from .handlers import SessionLifecycleHandler

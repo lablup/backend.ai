@@ -1,16 +1,14 @@
-"""Resource group related types."""
+"""Repository-internal resource group fetch types."""
 
 from dataclasses import dataclass
 
-from ai.backend.common.identifier.resource_group import ResourceGroupID, ResourceGroupName
-from ai.backend.manager.models.scaling_group import ScalingGroupOpts
+from ai.backend.manager.views.sokovan.resource_group import ResourceGroupMeta
+from ai.backend.manager.views.sokovan.snapshot import ResourceGroupSchedulingPolicy
 
 
-@dataclass
-class ResourceGroupMeta:
-    """Resource group metadata without ORM dependencies."""
+@dataclass(frozen=True)
+class ResourceGroupFetch:
+    """DB-derived resource group data: identity plus scheduling policy."""
 
-    id: ResourceGroupID
-    name: ResourceGroupName
-    scheduler: str
-    scheduler_opts: ScalingGroupOpts
+    meta: ResourceGroupMeta
+    policy: ResourceGroupSchedulingPolicy

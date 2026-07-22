@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
 
+from ai.backend.common.identifier.architecture import ArchName
 from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.identifier.resource_group import ResourceGroupID
@@ -64,7 +65,7 @@ class KernelWorkload:
     # Image name for the kernel
     image: str
     # Architecture required for the kernel
-    architecture: str
+    architecture: ArchName
     # Resource requirements for this kernel
     requested_slots: ResourceRequest
 
@@ -87,9 +88,7 @@ class SessionWorkload:
     domain_id: DomainID
     # How designated agents are enforced (STRICT fails, PREFERRED falls back)
     agent_selection_policy: AgentSelectionPolicy
-    # Scaling group name
-    scaling_group: str
-    # Scaling group id
+    # Resource group id
     resource_group_id: ResourceGroupID
     # Priority level (higher value = higher priority)
     priority: int = 0

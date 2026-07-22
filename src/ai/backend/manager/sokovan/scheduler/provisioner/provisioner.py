@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
-from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.identifier.resource_group import ResourceGroupName
 from ai.backend.common.types import (
     AgentId,
     AgentSelectionStrategy,
@@ -16,30 +16,29 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.data.sokovan import (
-    AgentAllocation,
-    AllocationBatch,
-    KernelAllocation,
-    SchedulingFailure,
-    SchedulingPredicate,
-    SessionAllocation,
-    SessionWorkload,
-    SystemSnapshot,
-)
 from ai.backend.manager.metrics.scheduler import (
     SchedulerPhaseMetricObserver,
 )
 from ai.backend.manager.repositories.fair_share import FairShareRepository
-from ai.backend.manager.repositories.scheduler import (
-    SchedulerRepository,
-    SchedulingData,
-)
+from ai.backend.manager.repositories.scheduler import SchedulerRepository
 from ai.backend.manager.sokovan.recorder import (
     ExecutionRecord,
     RecorderContext,
     StepStatus,
 )
 from ai.backend.manager.sokovan.scheduler.results import ScheduleResult
+from ai.backend.manager.views.sokovan.allocation import (
+    AgentAllocation,
+    AllocationBatch,
+    KernelAllocation,
+    SchedulingFailure,
+    SchedulingPredicate,
+    SessionAllocation,
+)
+from ai.backend.manager.views.sokovan.resource_group import ResourceGroupMeta
+from ai.backend.manager.views.sokovan.scheduling import SchedulingData
+from ai.backend.manager.views.sokovan.snapshot import SystemSnapshot
+from ai.backend.manager.views.sokovan.workload import SessionWorkload
 
 from .allocators.allocator import SchedulingAllocator
 from .selectors.concentrated import ConcentratedAgentSelector
@@ -47,8 +46,8 @@ from .selectors.dispersed import DispersedAgentSelector
 from .selectors.legacy import LegacyAgentSelector
 from .selectors.roundrobin import RoundRobinAgentSelector
 from .selectors.selector import (
+    AgentLimit,
     AgentSelection,
-    AgentSelectionConfig,
     AgentSelectionCriteria,
     AgentSelector,
     AgentStateTracker,
@@ -63,6 +62,21 @@ from .sequencers.sequencer import SchedulingSequencer, WorkloadSequencer
 from .validators.validator import SchedulingValidator
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+
+@dataclass
+class SchedulingState:
+    """Prepared state of one scheduling run, consumed by every later stage.
+
+    ``snapshot`` captures the observed state plus the applicable policies
+    (including the resource group's sequencer/selector pool keys);
+    ``trackers`` and ``limit`` feed agent selection.
+    """
+
+    snapshot: SystemSnapshot
+    trackers: Sequence[AgentStateTracker]
+    limit: AgentLimit
+    resource_group: ResourceGroupMeta
 
 
 @dataclass
@@ -166,8 +180,8 @@ class SessionProvisioner:
         """
         # Use data from scheduling_data instead of making DB calls
         base_workloads = scheduling_data.workloads
-        sg_info = scheduling_data.resource_group
-        resource_group_id = sg_info.id
+        resource_group = scheduling_data.resource_group
+        resource_group_id = resource_group.id
 
         system_snapshot = scheduling_data.system_snapshot
         if system_snapshot is None:
@@ -185,13 +199,28 @@ class SessionProvisioner:
             for agent_id in failed_agents:
                 failed_sessions_by_agent[agent_id].add(workload.session_id)
 
-        # Create agent selection config directly from scheduling data
-        selection_config = AgentSelectionConfig(
-            max_container_count=scheduling_data.max_container_count,
+        # Prepared run state, built once up front and consumed by every
+        # later stage (sequencing, validation, agent selection, snapshot
+        # updates). Observations stay immutable; in-batch allocations and
+        # retry-failure hints live in the trackers.
+        state = SchedulingState(
+            snapshot=system_snapshot,
+            resource_group=resource_group,
+            trackers=[
+                AgentStateTracker(
+                    original_agent=agent.to_agent_info(),
+                    failed_session_ids=frozenset(failed_sessions_by_agent.get(agent.id, ())),
+                )
+                for agent in system_snapshot.resource_group.resources.agents
+            ],
+            limit=AgentLimit(
+                max_container_count=scheduling_data.max_container_count,
+            ),
         )
+
         # Perform sequencing (batch operation for all workloads)
         # Record as shared phase so all entity records include it
-        scheduler = sg_info.scheduler
+        scheduler = state.snapshot.resource_group.policy.scheduler
         with (
             self._phase_metrics.measure_phase(
                 "scheduler", resource_group_id, f"sequencing_{scheduler}"
@@ -205,23 +234,10 @@ class SessionProvisioner:
             ),
         ):
             sequenced_workloads = await self._sequencer.sequence(
-                scheduler, resource_group_id, system_snapshot, base_workloads
+                scheduler, resource_group_id, state.snapshot, base_workloads
             )
-
-        # Batch-scoped agent state: observations stay immutable, in-batch
-        # allocations and retry-failure hints live in the trackers
-        agent_trackers = [
-            AgentStateTracker(
-                original_agent=agent.to_agent_info(),
-                failed_session_ids=frozenset(failed_sessions_by_agent.get(agent.id, ())),
-            )
-            for agent in scheduling_data.agents
-        ]
         session_allocations: list[SessionAllocation] = []
         scheduling_failures: list[SchedulingFailure] = []
-        # Get agent selection strategy from scheduler opts config
-        agent_selection_strategy = sg_info.scheduler_opts.agent_selection_strategy
-        agent_selector = self._agent_selector_pool[agent_selection_strategy]
 
         # Get current pool from RecorderContext (scope opened by coordinator)
         pool = RecorderContext[SessionId].current_pool()
@@ -230,11 +246,7 @@ class SessionProvisioner:
             try:
                 # Sequencing phase is automatically included via shared phases
                 session_allocation = await self._schedule_workload(
-                    resource_group_id,
-                    system_snapshot,
-                    agent_trackers,
-                    selection_config,
-                    agent_selector,
+                    state,
                     session_workload,
                 )
                 session_allocations.append(session_allocation)
@@ -280,7 +292,7 @@ class SessionProvisioner:
             scheduled_session_ids = await self._allocator.allocate(batch)
 
         failure_ids = [f.session_id for f in scheduling_failures]
-        await self._valkey_schedule.set_pending_queue(sg_info.name, failure_ids)
+        await self._valkey_schedule.set_pending_queue(resource_group.name, failure_ids)
         return ScheduleResult(
             scheduled_session_ids=scheduled_session_ids,
             scheduling_failures=scheduling_failures,
@@ -288,20 +300,20 @@ class SessionProvisioner:
 
     async def _schedule_workload(
         self,
-        resource_group_id: ResourceGroupID,
-        mutable_snapshot: SystemSnapshot,
-        agent_trackers: Sequence[AgentStateTracker],
-        selection_config: AgentSelectionConfig,
-        agent_selector: AgentSelector,
+        state: SchedulingState,
         session_workload: SessionWorkload,
     ) -> SessionAllocation:
+        resource_group_id = session_workload.resource_group_id
+        agent_selector = self._agent_selector_pool[
+            state.snapshot.resource_group.policy.agent_selection_strategy
+        ]
         pool = RecorderContext[SessionId].current_pool()
         recorder = pool.recorder(session_workload.session_id)
 
         # Phase 1: Validation
         with self._phase_metrics.measure_phase("scheduler", resource_group_id, "validation"):
             with recorder.phase("validation"):
-                self._validator.validate(mutable_snapshot, session_workload)
+                self._validator.validate(state.snapshot, session_workload)
 
         # Phase 2: Agent Selection
         with self._phase_metrics.measure_phase("scheduler", resource_group_id, "agent_selection"):
@@ -312,11 +324,9 @@ class SessionProvisioner:
                     agent_selector.strategy_name(),
                     success_detail=agent_selector.strategy_success_message(),
                 ):
-                    session_allocation = await self._allocate_workload(
+                    session_allocation = await self._plan_workload(
+                        state,
                         session_workload,
-                        agent_trackers,
-                        selection_config,
-                        agent_selector,
                     )
 
         # Phase 3: Allocation (prepare)
@@ -327,7 +337,7 @@ class SessionProvisioner:
                 # Update the snapshot to reflect this allocation
                 # Note: agent state changes are already committed into the trackers
                 self._update_system_snapshot(
-                    mutable_snapshot,
+                    state.snapshot,
                     session_workload,
                 )
 
@@ -355,35 +365,34 @@ class SessionProvisioner:
             workload.requested_slots,
         )
 
-    async def _allocate_workload(
+    async def _plan_workload(
         self,
+        state: SchedulingState,
         session_workload: SessionWorkload,
-        agent_trackers: Sequence[AgentStateTracker],
-        selection_config: AgentSelectionConfig,
-        agent_selector: AgentSelector,
     ) -> SessionAllocation:
         """
-        Allocate resources for a single session workload.
+        Plan the agent placement of a single session workload.
 
-        :param session_workload: The workload to allocate
-        :param agent_trackers: Batch-scoped agent state trackers
-        :param selection_config: Agent selection configuration
+        :param state: Prepared state of the scheduling run
+        :param session_workload: The workload to place
         :return: SessionAllocation
         :raises AgentSelectionError: If agent selection fails
         """
         # Convert session workload to agent selection criteria
         criteria = self._build_selection_criteria(session_workload)
 
-        # Use batch selection method - it will get resource requirements internally
-        # and commit state changes into the trackers
-        selections = await agent_selector.select_agents_for_batch_requirements(
-            agent_trackers,
-            criteria,
-            selection_config,
+        # Selection commits state changes into the trackers on full success
+        selector = self._agent_selector_pool[
+            state.snapshot.resource_group.policy.agent_selection_strategy
+        ]
+        selections = await selector.select_agents_for_batch_requirements(
+            state.trackers, criteria, state.limit
         )
 
         # Build session allocation from selections
-        return self._build_session_allocation(session_workload, selections)
+        return self._build_session_allocation(
+            session_workload, selections, state.resource_group.name
+        )
 
     @staticmethod
     def _build_selection_criteria(workload: SessionWorkload) -> AgentSelectionCriteria:
@@ -410,6 +419,7 @@ class SessionProvisioner:
     def _build_session_allocation(
         session_workload: SessionWorkload,
         selections: list[AgentSelection],
+        resource_group_name: ResourceGroupName,
     ) -> SessionAllocation:
         """Build a SessionAllocation from agent selection results."""
         kernel_allocations: list[KernelAllocation] = []
@@ -438,7 +448,7 @@ class SessionProvisioner:
                         kernel_id=kernel_id,
                         agent_id=selected_agent.agent_id,
                         agent_addr=selected_agent.agent_addr,
-                        scaling_group=selected_agent.scaling_group,
+                        resource_group_name=resource_group_name,
                         resource_group_id=session_workload.resource_group_id,
                     )
                 )
@@ -449,7 +459,7 @@ class SessionProvisioner:
             session_id=session_workload.session_id,
             session_type=session_workload.session_type,
             cluster_mode=session_workload.cluster_mode,
-            scaling_group=session_workload.scaling_group,
+            resource_group_name=resource_group_name,
             resource_group_id=session_workload.resource_group_id,
             kernel_allocations=kernel_allocations,
             agent_allocations=agent_allocations,

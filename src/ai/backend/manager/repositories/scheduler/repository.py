@@ -37,14 +37,6 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.kernel.types import KernelListResult, KernelStatus
 from ai.backend.manager.data.resource.types import UserEnqueuePolicy
 from ai.backend.manager.data.session.types import SessionInfo, SessionStatus
-from ai.backend.manager.data.sokovan import (
-    AllocationBatch,
-    KernelCreationInfo,
-    SessionRunningData,
-    SessionsForPullWithImages,
-    SessionsForStartWithImages,
-    SessionWithKernels,
-)
 from ai.backend.manager.exceptions import ErrorStatusInfo
 from ai.backend.manager.models.scheduling_history.row import SessionSchedulingHistoryRow
 from ai.backend.manager.models.session import SessionRow
@@ -54,22 +46,30 @@ from ai.backend.manager.repositories.base.creator import BulkCreator
 from ai.backend.manager.repositories.base.updater import BatchUpdater
 from ai.backend.manager.repositories.vfolder.mount import prepare_vfolder_mounts
 from ai.backend.manager.types import UserScope
-
-from .cache_source.cache_source import ScheduleCacheSource
-from .db_source.db_source import ScheduleDBSource
-from .types.agent import AgentMeta
-from .types.scheduling import SchedulingData
-from .types.search import (
+from ai.backend.manager.views.sokovan.agent import AgentMeta
+from ai.backend.manager.views.sokovan.allocation import AllocationBatch
+from ai.backend.manager.views.sokovan.lifecycle import (
+    KernelCreationInfo,
+    SessionRunningData,
+    SessionsForPullWithImages,
+    SessionsForStartWithImages,
+    SessionWithKernels,
+)
+from ai.backend.manager.views.sokovan.scheduling import SchedulingData
+from ai.backend.manager.views.sokovan.search import (
     SessionWithKernelsAndUserSearchResult,
     SessionWithKernelsSearchResult,
 )
-from .types.session import (
+from ai.backend.manager.views.sokovan.session import (
     MarkTerminatingResult,
     SweptSessionInfo,
     TerminatingKernelWithAgentData,
     TerminatingSessionData,
 )
-from .types.session_creation import SessionSpecContext, UserEnqueueInfo
+from ai.backend.manager.views.sokovan.session_creation import SessionSpecContext
+
+from .cache_source.cache_source import ScheduleCacheSource
+from .db_source.db_source import ScheduleDBSource
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -247,7 +247,7 @@ class SchedulerRepository:
             )
         return SessionSpecContext(
             resource_group=fetch.resource_group,
-            user=UserEnqueueInfo.from_fetch(fetch.user, vfolder_mounts_by_role),
+            user=fetch.user.to_info(vfolder_mounts_by_role),
             global_info=fetch.global_info,
         )
 

@@ -8,7 +8,8 @@ from uuid import UUID
 
 from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.manager.data.fair_share import ProjectUserIds, UserFairShareFactors
-from ai.backend.manager.data.sokovan import SessionWorkload, SystemSnapshot
+from ai.backend.manager.views.sokovan.snapshot import SystemSnapshot
+from ai.backend.manager.views.sokovan.workload import SessionWorkload
 
 from .sequencer import WorkloadSequencer
 

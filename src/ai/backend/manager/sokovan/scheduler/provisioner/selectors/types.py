@@ -11,8 +11,9 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 
+from ai.backend.common.identifier.architecture import ArchName
 from ai.backend.common.types import AgentId, KernelId, SlotName
-from ai.backend.manager.data.sokovan.workload import ResourceRequest
+from ai.backend.manager.views.sokovan.workload import ResourceRequest
 
 
 @dataclass
@@ -22,7 +23,7 @@ class ResourceRequirements:
     # Resource slots required
     requested_slots: ResourceRequest
     # Architecture required
-    required_architecture: str
+    required_architecture: ArchName
     # Kernel IDs that these requirements are for
     # For single-node, this includes all kernel IDs
     # For multi-node, this includes only one kernel ID

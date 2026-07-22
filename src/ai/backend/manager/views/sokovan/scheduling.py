@@ -2,10 +2,9 @@
 
 from dataclasses import dataclass
 
-from ai.backend.manager.data.sokovan.snapshot import SystemSnapshot
-from ai.backend.manager.data.sokovan.workload import SessionWorkload
+from ai.backend.manager.views.sokovan.snapshot import SystemSnapshot
+from ai.backend.manager.views.sokovan.workload import SessionWorkload
 
-from .agent import AgentMeta
 from .resource_group import ResourceGroupMeta
 
 
@@ -16,7 +15,6 @@ class SchedulingData:
     resource_group: ResourceGroupMeta
     # Pending sessions converted to schedulable workloads (oldest first)
     workloads: list[SessionWorkload]
-    agents: list[AgentMeta]
     # None when there is nothing to schedule (no pending sessions)
     system_snapshot: SystemSnapshot | None
     # Per-agent container limit from configuration (None = unlimited)

@@ -5,9 +5,9 @@ from typing import override
 
 from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.identifier.user import UserID
-from ai.backend.common.types import ResourceSlot
-from ai.backend.manager.data.sokovan import SessionWorkload, SystemSnapshot
-from ai.backend.manager.data.sokovan.snapshot import ResourceAllocation
+from ai.backend.manager.views.sokovan.agent import ResourceGroupResource
+from ai.backend.manager.views.sokovan.snapshot import ResourceAllocation, SystemSnapshot
+from ai.backend.manager.views.sokovan.workload import SessionWorkload
 
 from .sequencer import WorkloadSequencer
 
@@ -57,7 +57,7 @@ class DRFSequencer(WorkloadSequencer):
         # Calculate dominant shares from existing allocations
         for user_id, allocation in system_snapshot.global_scope.occupancy.by_user.items():
             user_dominant_shares[user_id] = self._calculate_dominant_share(
-                allocation, system_snapshot.resource_group.total_capacity
+                allocation, system_snapshot.resource_group.resources
             )
 
         # Sort workloads by dominant share (ascending order - lower share gets higher priority)
@@ -65,7 +65,7 @@ class DRFSequencer(WorkloadSequencer):
         return sorted(workloads, key=lambda w: user_dominant_shares[w.user_uuid])
 
     def _calculate_dominant_share(
-        self, allocation: ResourceAllocation, total_capacity: ResourceSlot
+        self, allocation: ResourceAllocation, resources: ResourceGroupResource
     ) -> Decimal:
         """
         Calculate the dominant share for the given allocation.
@@ -74,12 +74,10 @@ class DRFSequencer(WorkloadSequencer):
         dominant_share = Decimal(0)
 
         for slot_name, slot_allocation in allocation.slots.items():
-            if slot_name not in total_capacity:
+            slot_resource = resources.slots.get(slot_name)
+            if slot_resource is None or slot_resource.capacity == 0:
                 continue
-            capacity = total_capacity[slot_name]
-            if capacity == 0:
-                continue
-            share = slot_allocation.allocated / capacity
+            share = slot_allocation.allocated / slot_resource.capacity
             if share > dominant_share:
                 dominant_share = share
 

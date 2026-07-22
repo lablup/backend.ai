@@ -25,6 +25,7 @@ from ai.backend.common import msgpack
 from ai.backend.common.data.permission.types import (
     RBACElementType,
 )
+from ai.backend.common.identifier.architecture import ArchName
 from ai.backend.common.identifier.domain import DomainID, DomainName
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.project import ProjectID
@@ -59,40 +60,6 @@ from ai.backend.manager.data.session.creation import (
 )
 from ai.backend.manager.data.session.options import DefaultSessionOptions
 from ai.backend.manager.data.session.types import SchedulingResult, SessionInfo, SessionStatus
-from ai.backend.manager.data.sokovan import (
-    AllocationBatch,
-    ImageConfigData,
-    KernelBindingData,
-    KernelCreationInfo,
-    ResourceOccupancySnapshot,
-    ResourcePolicySnapshot,
-    SessionAllocation,
-    SessionDataForPull,
-    SessionDataForStart,
-    SessionDependencyInfo,
-    SessionDependencySnapshot,
-    SessionRunningData,
-    SessionsForPullWithImages,
-    SessionsForStartWithImages,
-    SessionWithKernels,
-)
-from ai.backend.manager.data.sokovan.agent import AgentResource, SlotResource
-from ai.backend.manager.data.sokovan.snapshot import (
-    GlobalScopeSnapshot,
-    ResourceAllocation,
-    ResourceGroupScopeSnapshot,
-    ResourceLimit,
-    SlotAllocation,
-    SystemSnapshot,
-    UserResourceAllocation,
-    UserResourceLimit,
-)
-from ai.backend.manager.data.sokovan.workload import (
-    KernelWorkload,
-    ResourceRequest,
-    SessionResourceRequest,
-    SessionWorkload,
-)
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.image import ImageNotFound
 from ai.backend.manager.errors.resource import DomainNotFound, ScalingGroupNotFound
@@ -149,28 +116,10 @@ from ai.backend.manager.repositories.scheduler.creators import (
     SessionRowFromSpec,
 )
 from ai.backend.manager.repositories.scheduler.options import ImageConditions
-from ai.backend.manager.repositories.scheduler.types.agent import AgentMeta
-from ai.backend.manager.repositories.scheduler.types.resource_group import ResourceGroupMeta
-from ai.backend.manager.repositories.scheduler.types.results import (
-    ScheduledSessionData,
-)
-from ai.backend.manager.repositories.scheduler.types.scheduling import SchedulingData
-from ai.backend.manager.repositories.scheduler.types.search import (
-    SessionWithKernelsAndUserSearchResult,
-    SessionWithKernelsSearchResult,
-)
-from ai.backend.manager.repositories.scheduler.types.session import (
-    MarkTerminatingResult,
-    PendingSessions,
-    SweptSessionInfo,
-    TerminatingKernelData,
-    TerminatingKernelWithAgentData,
-    TerminatingSessionData,
-)
+from ai.backend.manager.repositories.scheduler.types.resource_group import ResourceGroupFetch
+from ai.backend.manager.repositories.scheduler.types.session import PendingSessions
 from ai.backend.manager.repositories.scheduler.types.session_creation import (
     AllowedScalingGroup,
-    GlobalEnqueueInfo,
-    ResourceGroupEnqueueInfo,
     SessionSpecFetch,
     UserEnqueueFetch,
 )
@@ -178,6 +127,66 @@ from ai.backend.manager.repositories.scheduling_history import (
     SessionSchedulingHistoryCreatorSpec,
 )
 from ai.backend.manager.types import UserScope
+from ai.backend.manager.views.sokovan.agent import (
+    AgentMeta,
+    AgentResource,
+    ResourceGroupResource,
+    SlotResource,
+)
+from ai.backend.manager.views.sokovan.allocation import (
+    AllocationBatch,
+    SessionAllocation,
+)
+from ai.backend.manager.views.sokovan.image import ImageConfigData
+from ai.backend.manager.views.sokovan.lifecycle import (
+    KernelBindingData,
+    KernelCreationInfo,
+    SessionDataForPull,
+    SessionDataForStart,
+    SessionRunningData,
+    SessionsForPullWithImages,
+    SessionsForStartWithImages,
+    SessionWithKernels,
+)
+from ai.backend.manager.views.sokovan.resource_group import ResourceGroupMeta
+from ai.backend.manager.views.sokovan.results import ScheduledSessionData
+from ai.backend.manager.views.sokovan.scheduling import SchedulingData
+from ai.backend.manager.views.sokovan.search import (
+    SessionWithKernelsAndUserSearchResult,
+    SessionWithKernelsSearchResult,
+)
+from ai.backend.manager.views.sokovan.session import (
+    MarkTerminatingResult,
+    SweptSessionInfo,
+    TerminatingKernelData,
+    TerminatingKernelWithAgentData,
+    TerminatingSessionData,
+)
+from ai.backend.manager.views.sokovan.session_creation import (
+    GlobalEnqueueInfo,
+    ResourceGroupEnqueueInfo,
+)
+from ai.backend.manager.views.sokovan.snapshot import (
+    GlobalScopeSnapshot,
+    ResourceAllocation,
+    ResourceGroupSchedulingPolicy,
+    ResourceGroupScopeSnapshot,
+    ResourceLimit,
+    ResourceOccupancySnapshot,
+    ResourcePolicySnapshot,
+    SessionDependencySnapshot,
+    SlotAllocation,
+    SystemSnapshot,
+    UserResourceAllocation,
+    UserResourceLimit,
+)
+from ai.backend.manager.views.sokovan.workload import (
+    KernelWorkload,
+    ResourceRequest,
+    SessionDependencyInfo,
+    SessionResourceRequest,
+    SessionWorkload,
+)
 
 from .types import KeypairConcurrencyData
 
@@ -213,7 +222,7 @@ class _ScalingGroupWithSlotInventory:
     metadata (humanize values during error formatting).
     """
 
-    sg_row: ScalingGroupRow
+    rg_row: ScalingGroupRow
     active_slot_types: Mapping[SlotName, SlotTypes]
 
 
@@ -240,31 +249,26 @@ class ScheduleDBSource:
         """
         async with self._db.begin_readonly_session_read_committed() as db_sess:
             # 1. Get resource group
-            resource_group_meta = await self._fetch_resource_group(db_sess, resource_group_id)
+            resource_group = await self._fetch_resource_group(db_sess, resource_group_id)
 
-            # 2. Get agents
-            agents = await self._fetch_agents(db_sess, resource_group_meta.id)
-
-            # 3. Get pending sessions
-            pending_sessions = await self._fetch_pending_sessions(db_sess, resource_group_meta.id)
+            # 2. Get pending sessions
+            pending_sessions = await self._fetch_pending_sessions(db_sess, resource_group.meta.id)
             if not pending_sessions.sessions:
                 return SchedulingData(
-                    resource_group=resource_group_meta,
+                    resource_group=resource_group.meta,
                     workloads=[],
-                    agents=agents,
                     system_snapshot=None,
                     max_container_count=max_container_count,
                 )
 
-            # 4. Assemble the system snapshot
+            # 3. Assemble the system snapshot (fetches its own agent observations)
             system_snapshot = await self._fetch_system_snapshot(
-                db_sess, resource_group_meta.id, pending_sessions, agents
+                db_sess, resource_group.meta.id, pending_sessions, resource_group.policy
             )
 
             return SchedulingData(
-                resource_group=resource_group_meta,
+                resource_group=resource_group.meta,
                 workloads=pending_sessions.sessions,
-                agents=agents,
                 system_snapshot=system_snapshot,
                 max_container_count=max_container_count,
             )
@@ -283,12 +287,12 @@ class ScheduleDBSource:
         Raises:
             ScalingGroupNotFound: when the scaling group does not exist.
         """
-        sg_row = (
+        rg_row = (
             await db_sess.scalars(
                 sa.select(ScalingGroupRow).where(ScalingGroupRow.id == resource_group_id)
             )
         ).one_or_none()
-        if sg_row is None:
+        if rg_row is None:
             raise ScalingGroupNotFound(f"Resource group {resource_group_id} not found")
 
         ar = AgentResourceRow.__table__
@@ -312,7 +316,7 @@ class ScheduleDBSource:
             SlotName(row.slot_name): SlotTypes(row.slot_type) for row in inventory_rows
         }
         return _ScalingGroupWithSlotInventory(
-            sg_row=sg_row,
+            rg_row=rg_row,
             active_slot_types=active_slot_types,
         )
 
@@ -335,12 +339,12 @@ class ScheduleDBSource:
 
     async def _fetch_resource_group(
         self, db_sess: SASession, resource_group_id: ResourceGroupID
-    ) -> ResourceGroupMeta:
+    ) -> ResourceGroupFetch:
         """
-        Fetch resource group metadata.
+        Fetch resource group identity and its scheduling policy.
         Raises ScalingGroupNotFound if the resource group doesn't exist.
         """
-        sg_result = await db_sess.execute(
+        rg_result = await db_sess.execute(
             sa.select(
                 ScalingGroupRow.id,
                 ScalingGroupRow.name,
@@ -348,15 +352,19 @@ class ScheduleDBSource:
                 ScalingGroupRow.scheduler_opts,
             ).where(ScalingGroupRow.id == resource_group_id)
         )
-        sg_row = sg_result.one_or_none()
-        if not sg_row:
+        rg_row = rg_result.one_or_none()
+        if not rg_row:
             raise ScalingGroupNotFound(str(resource_group_id))
 
-        return ResourceGroupMeta(
-            id=sg_row.id,
-            name=ResourceGroupName(sg_row.name),
-            scheduler=sg_row.scheduler,
-            scheduler_opts=sg_row.scheduler_opts,
+        return ResourceGroupFetch(
+            meta=ResourceGroupMeta(
+                id=rg_row.id,
+                name=ResourceGroupName(rg_row.name),
+            ),
+            policy=ResourceGroupSchedulingPolicy(
+                scheduler=rg_row.scheduler,
+                agent_selection_strategy=rg_row.scheduler_opts.agent_selection_strategy,
+            ),
         )
 
     async def _fetch_pending_sessions(
@@ -379,7 +387,6 @@ class ScheduleDBSource:
                     SessionRow.user_uuid,
                     SessionRow.group_id,
                     SessionRow.domain_id,
-                    SessionRow.scaling_group_name,
                     SessionRow.resource_group_id,
                     SessionRow.priority,
                     SessionRow.job_priority,
@@ -445,7 +452,7 @@ class ScheduleDBSource:
                     # Nullable at the column level only for legacy rows;
                     # enqueue always populates them.
                     image=kernel_row.image or "",
-                    architecture=kernel_row.architecture or "",
+                    architecture=ArchName(kernel_row.architecture or ""),
                     requested_slots=ResourceRequest(
                         slots=kernel_slots.get(KernelId(kernel_row.id), {})
                     ),
@@ -474,7 +481,6 @@ class ScheduleDBSource:
                     user_uuid=UserID(row.user_uuid),
                     project_id=ProjectID(row.group_id),
                     domain_id=DomainID(row.domain_id),
-                    scaling_group=row.scaling_group_name,
                     resource_group_id=row.resource_group_id,
                     priority=row.priority,
                     job_priority=row.job_priority,
@@ -533,11 +539,9 @@ class ScheduleDBSource:
                 AgentMeta(
                     id=agent_id,
                     addr=agent_row.addr,
-                    architecture=agent_row.architecture,
+                    architecture=ArchName(agent_row.architecture),
                     resources=AgentResource(slots=slots),
                     container_count=container_counts.get(agent_id, 0),
-                    resource_group_id=agent_row.resource_group_id,
-                    scaling_group=agent_row.scaling_group,
                 )
             )
         return agents
@@ -570,9 +574,15 @@ class ScheduleDBSource:
         db_sess: SASession,
         resource_group_id: ResourceGroupID,
         pending_sessions: PendingSessions,
-        agents: list[AgentMeta],
+        scheduling_policy: ResourceGroupSchedulingPolicy,
     ) -> SystemSnapshot:
-        """Assemble the scheduling snapshot, split by data scope."""
+        """Assemble the scheduling snapshot, split by data scope.
+
+        Owns every observation it captures: the resource group's agents are
+        fetched here, while ``pending_sessions`` only bounds the occupancy
+        and limit scans to the owners being scheduled.
+        """
+        agents = await self._fetch_agents(db_sess, resource_group_id)
         occupancy = await self._fetch_global_occupancy(db_sess, pending_sessions)
 
         # Fetch resource limits for entities in pending sessions
@@ -587,16 +597,11 @@ class ScheduleDBSource:
         session_ids = [s.session_id for s in pending_sessions.sessions]
         session_dependencies = await self._fetch_session_dependencies(db_sess, session_ids)
 
-        total_capacity = ResourceSlot()
-        for agent in agents:
-            total_capacity = total_capacity + ResourceSlot({
-                slot: r.capacity for slot, r in agent.resources.slots.items()
-            })
-
         return SystemSnapshot(
             resource_group=ResourceGroupScopeSnapshot(
-                total_capacity=total_capacity,
+                resources=ResourceGroupResource.from_agents(agents),
                 session_dependencies=SessionDependencySnapshot(by_session=session_dependencies),
+                policy=scheduling_policy,
             ),
             global_scope=GlobalScopeSnapshot(
                 occupancy=occupancy,
@@ -1578,14 +1583,14 @@ class ScheduleDBSource:
                 rg_bundle = await self._fetch_scaling_group_with_slot_inventory(
                     db_sess, resource_group_id
                 )
-                sg_row = rg_bundle.sg_row
+                rg_row = rg_bundle.rg_row
                 known_slot_types = rg_bundle.active_slot_types
                 network_info = ScalingGroupNetworkInfo(
-                    use_host_network=sg_row.use_host_network,
-                    wsproxy_addr=sg_row.wsproxy_addr,
+                    use_host_network=rg_row.use_host_network,
+                    wsproxy_addr=rg_row.wsproxy_addr,
                 )
-                rg_defaults = sg_row.default_session_options
-                scheduler_opts = sg_row.scheduler_opts
+                rg_defaults = rg_row.default_session_options
+                scheduler_opts = rg_row.scheduler_opts
                 resource_group_allow_fractional = bool(
                     getattr(scheduler_opts, "allow_fractional_resource_fragmentation", False)
                 )
@@ -1960,7 +1965,7 @@ class ScheduleDBSource:
                     ),
                     agent=kernel_alloc.agent_id,
                     agent_addr=kernel_alloc.agent_addr,
-                    scaling_group=kernel_alloc.scaling_group,
+                    scaling_group=kernel_alloc.resource_group_name,
                     resource_group_id=kernel_alloc.resource_group_id,
                 )
             )
@@ -1975,7 +1980,7 @@ class ScheduleDBSource:
             sa.update(SessionRow)
             .where(SessionRow.id == allocation.session_id)
             .values(
-                scaling_group_name=allocation.scaling_group,
+                scaling_group_name=allocation.resource_group_name,
                 resource_group_id=allocation.resource_group_id,
                 agent_ids=allocation.unique_agent_ids(),
             )
@@ -2874,7 +2879,7 @@ class ScheduleDBSource:
                 image_config = ImageConfigData(
                     id=image_row.id,
                     canonical=img_ref.canonical,
-                    architecture=image_row.architecture,
+                    architecture=ArchName(image_row.architecture),
                     project=image_row.project,
                     is_local=image_row.is_local,
                     digest=image_row.trimmed_digest,
@@ -2936,7 +2941,7 @@ class ScheduleDBSource:
                     scaling_group=kernel.scaling_group or "",
                     image=kernel.image or "",
                     image_id=kernel.image_id,
-                    architecture=kernel.architecture or "",
+                    architecture=ArchName(kernel.architecture or ""),
                     status=kernel.status,
                     status_changed=kernel.status_changed.timestamp()
                     if kernel.status_changed

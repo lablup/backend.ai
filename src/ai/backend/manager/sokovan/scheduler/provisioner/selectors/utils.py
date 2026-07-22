@@ -5,8 +5,8 @@ Utility functions for agent selectors.
 from decimal import Decimal
 
 from ai.backend.common.types import SlotName
-from ai.backend.manager.data.sokovan import AgentInfo
-from ai.backend.manager.data.sokovan.workload import ResourceRequest
+from ai.backend.manager.views.sokovan.agent import AgentInfo
+from ai.backend.manager.views.sokovan.workload import ResourceRequest
 
 
 def count_unutilized_capabilities(agent_info: AgentInfo, request: ResourceRequest) -> int:

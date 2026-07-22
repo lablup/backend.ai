@@ -16,7 +16,7 @@ from collections.abc import Iterable
 
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.session.spec import SessionSpec
-from ai.backend.manager.repositories.scheduler.types.session_creation import SessionSpecContext
+from ai.backend.manager.views.sokovan.session_creation import SessionSpecContext
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

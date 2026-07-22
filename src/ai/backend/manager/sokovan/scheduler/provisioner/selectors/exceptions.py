@@ -20,8 +20,8 @@ from ai.backend.common.exception import (
 )
 from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import AgentId, BinarySize, SlotName
-from ai.backend.manager.data.sokovan import SchedulingPredicate
 from ai.backend.manager.sokovan.scheduler.exceptions import SchedulingError
+from ai.backend.manager.views.sokovan.allocation import SchedulingPredicate
 
 from .types import RemediationHint, ResourceRequirements
 

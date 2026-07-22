@@ -19,7 +19,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 
 from ai.backend.manager.data.session.draft import SessionResourceSpecDraft
-from ai.backend.manager.repositories.scheduler.types.session_creation import SessionSpecContext
+from ai.backend.manager.views.sokovan.session_creation import SessionSpecContext
 
 
 class SessionSpecDraftRule(ABC):

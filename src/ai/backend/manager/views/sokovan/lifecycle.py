@@ -8,6 +8,7 @@ from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
+from ai.backend.common.identifier.architecture import ArchName
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
@@ -37,7 +38,7 @@ class KernelBindingData:
     scaling_group: str
     image: str
     image_id: UUID | None
-    architecture: str
+    architecture: ArchName
     status: KernelStatus | None = None
     status_changed: float | None = None
     cluster_role: str = DEFAULT_ROLE
@@ -140,7 +141,7 @@ class KernelStartData:
     scaling_group: str
     image: str
     image_id: UUID | None
-    architecture: str
+    architecture: ArchName
     cluster_role: str
     cluster_idx: int
     requested_slots: ResourceSlot

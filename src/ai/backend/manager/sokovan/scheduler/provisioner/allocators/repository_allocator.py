@@ -8,8 +8,8 @@ to ensure transactional consistency.
 from typing import override
 
 from ai.backend.common.types import SessionId
-from ai.backend.manager.data.sokovan import AllocationBatch
 from ai.backend.manager.repositories.scheduler import SchedulerRepository
+from ai.backend.manager.views.sokovan.allocation import AllocationBatch
 
 from .allocator import SchedulingAllocator
 

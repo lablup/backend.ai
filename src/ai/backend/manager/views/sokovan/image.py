@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from uuid import UUID
 
+from ai.backend.common.identifier.architecture import ArchName
 from ai.backend.common.types import AutoPullBehavior, ImageConfig
 
 
@@ -13,7 +14,7 @@ class ImageIdentifier:
     """Identifier for an image with architecture."""
 
     image: str
-    architecture: str
+    architecture: ArchName
 
 
 @dataclass
@@ -22,7 +23,7 @@ class ImageConfigData:
 
     id: UUID
     canonical: str
-    architecture: str
+    architecture: ArchName
     project: str | None
     is_local: bool
     digest: str

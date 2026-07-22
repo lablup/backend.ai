@@ -12,6 +12,7 @@ from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.event_types.session.broadcast import SchedulingBroadcastEvent
 from ai.backend.common.events.types import AbstractBroadcastEvent
 from ai.backend.common.exception import InvalidAPIParameters
+from ai.backend.common.identifier.architecture import ArchName
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
@@ -35,7 +36,6 @@ from ai.backend.manager.data.session.spec import (
     SessionSpec,
 )
 from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.data.sokovan.workload import ResourceRequest
 from ai.backend.manager.errors.common import InternalServerError, RejectedByHook
 from ai.backend.manager.errors.image import ImageNotFound
 from ai.backend.manager.metrics.scheduler import (
@@ -43,17 +43,12 @@ from ai.backend.manager.metrics.scheduler import (
     SchedulerPhaseMetricObserver,
 )
 from ai.backend.manager.plugin.network import NetworkPluginContext
-from ai.backend.manager.repositories.scheduler import (
-    MarkTerminatingResult,
-    SchedulerRepository,
-)
-from ai.backend.manager.repositories.scheduler.types.agent import AgentMeta
-from ai.backend.manager.repositories.scheduler.types.session_creation import SessionSpecContext
+from ai.backend.manager.repositories.scheduler import SchedulerRepository
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.exceptions import (
     BatchAgentSelectionFailedError,
 )
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import (
-    AgentSelectionConfig,
+    AgentLimit,
     AgentSelectionCriteria,
     AgentSelector,
     AgentStateTracker,
@@ -62,6 +57,10 @@ from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import 
 )
 from ai.backend.manager.sokovan.scheduler.types import ScheduleType
 from ai.backend.manager.sokovan.scheduling_controller.types import SessionValidationSpec
+from ai.backend.manager.views.sokovan.agent import AgentMeta
+from ai.backend.manager.views.sokovan.session import MarkTerminatingResult
+from ai.backend.manager.views.sokovan.session_creation import SessionSpecContext
+from ai.backend.manager.views.sokovan.workload import ResourceRequest
 
 from .preparers import (
     AssignContainerUserMappingRule,
@@ -355,7 +354,7 @@ class SchedulingController:
                                 ).items()
                             }
                         ),
-                        required_architecture=image_info.architecture,
+                        required_architecture=ArchName(image_info.architecture),
                     ),
                 ),
                 requested_slots=tuple(resource_input.resources),
@@ -385,21 +384,16 @@ class SchedulingController:
                 kernel_requirements=kernel_requirements,
                 agent_selection_policy=(spec.options.scheduling_target.agent_selection_policy),
             )
-            # Container-limit remediation is intentionally out of scope, so the
-            # per-agent container limit is not enforced for the fitting check.
-            config = AgentSelectionConfig(
-                max_container_count=None,
-            )
             # Trackers are throwaway here: the fitting check only needs the
             # immutable observations, never the committed batch state.
-            agent_trackers = [
-                AgentStateTracker(original_agent=agent.to_agent_info()) for agent in agents
-            ]
+            # Container-limit remediation is intentionally out of scope, so the
+            # per-agent container limit is not enforced for the fitting check.
+            trackers = [AgentStateTracker(original_agent=agent.to_agent_info()) for agent in agents]
             # A resource group with no candidate agents (NoAgentsInResourceGroupError)
             # is likewise a whole-request error, so it propagates too.
             try:
                 await self._agent_selector.select_agents_for_batch_requirements(
-                    agent_trackers, criteria, config
+                    trackers, criteria, AgentLimit(max_container_count=None)
                 )
             except BatchAgentSelectionFailedError as e:
                 for err in e.errors:

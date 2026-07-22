@@ -11,11 +11,12 @@ from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import (
-    ResourceSlot,
+    AgentSelectionStrategy,
     SessionId,
     SlotName,
 )
 
+from .agent import ResourceGroupResource
 from .workload import (
     ResourceRequest,
     SessionDependencyInfo,
@@ -197,13 +198,25 @@ class SessionDependencySnapshot:
 
 
 @dataclass
+class ResourceGroupSchedulingPolicy:
+    """How the resource group schedules: pool keys for sequencer/selector."""
+
+    # Sequencing strategy name (sequencer pool key)
+    scheduler: str
+    # Agent selection strategy (selector pool key)
+    agent_selection_strategy: AgentSelectionStrategy
+
+
+@dataclass
 class ResourceGroupScopeSnapshot:
     """Scheduling execution context of the resource group being scheduled."""
 
-    # Total capacity of this resource group's agents
-    total_capacity: ResourceSlot
+    # The group's schedulable agents and their aggregate capacity
+    resources: ResourceGroupResource
     # Dependency status for this resource group's pending sessions
     session_dependencies: SessionDependencySnapshot
+    # Scheduling policy configured on the resource group
+    policy: ResourceGroupSchedulingPolicy
 
 
 @dataclass

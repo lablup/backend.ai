@@ -14,11 +14,11 @@ from typing import override
 
 from ai.backend.manager.data.session.spec import SessionSpec
 from ai.backend.manager.errors.storage import DotfileVFolderPathConflict
-from ai.backend.manager.repositories.scheduler.types.session_creation import (
-    SessionSpecContext,
-)
 from ai.backend.manager.sokovan.scheduling_controller.validators.session_spec_base import (
     SessionSpecValidatorRule,
+)
+from ai.backend.manager.views.sokovan.session_creation import (
+    SessionSpecContext,
 )
 
 

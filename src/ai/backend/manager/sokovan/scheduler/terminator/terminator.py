@@ -14,13 +14,13 @@ from ai.backend.common.types import AgentId, KernelId, ResourceSlot, SessionId
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.agent import AgentClientPool
 from ai.backend.manager.data.kernel.types import KernelInfo
-from ai.backend.manager.repositories.scheduler import (
-    KernelTerminationResult,
-    SchedulerRepository,
-    TerminatingSessionData,
-)
+from ai.backend.manager.repositories.scheduler import SchedulerRepository
 from ai.backend.manager.sokovan.recorder.context import RecorderContext
 from ai.backend.manager.sokovan.scheduler.results import ScheduleResult
+from ai.backend.manager.views.sokovan.session import (
+    KernelTerminationResult,
+    TerminatingSessionData,
+)
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.identifier.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
@@ -42,8 +42,8 @@ class KernelAllocation:
     agent_id: AgentId
     # Network address of the agent
     agent_addr: str
-    # Scaling group that the agent belongs to
-    scaling_group: str
+    # Resource group name recorded on the kernel row (DB column: scaling_group)
+    resource_group_name: ResourceGroupName
     # Scaling group id
     resource_group_id: ResourceGroupID
     # Host ports allocated for this kernel (empty set if none)
@@ -70,8 +70,8 @@ class SessionAllocation:
     session_type: SessionTypes
     # Cluster mode of the session (SINGLE_NODE or MULTI_NODE)
     cluster_mode: ClusterMode
-    # Scaling group that the session belongs to
-    scaling_group: str
+    # Resource group name recorded on the session row (DB column: scaling_group_name)
+    resource_group_name: ResourceGroupName
     # Scaling group id
     resource_group_id: ResourceGroupID
     # List of kernel allocations for this session

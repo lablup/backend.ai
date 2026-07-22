@@ -13,6 +13,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from decimal import Decimal
 
+from ai.backend.common.identifier.architecture import ArchName
 from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import (
     AgentId,
@@ -25,8 +26,8 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.session.options import AgentSelectionPolicy
-from ai.backend.manager.data.sokovan import AgentInfo
-from ai.backend.manager.data.sokovan.workload import ResourceRequest
+from ai.backend.manager.views.sokovan.agent import AgentInfo
+from ai.backend.manager.views.sokovan.workload import ResourceRequest
 
 from .exceptions import (
     BatchAgentSelectionFailedError,
@@ -117,9 +118,9 @@ class SessionMetadata:
     cluster_mode: ClusterMode
 
 
-@dataclass
-class AgentSelectionConfig:
-    """Configuration for agent selection."""
+@dataclass(frozen=True)
+class AgentLimit:
+    """Per-agent cap enforced during selection."""
 
     # Maximum number of containers allowed per agent
     max_container_count: int | None
@@ -132,7 +133,7 @@ class KernelResourceSpec:
     # Resource slots required
     requested_slots: ResourceRequest
     # Architecture required
-    required_architecture: str
+    required_architecture: ArchName
 
 
 @dataclass
@@ -239,8 +240,6 @@ class AbstractAgentSelector(ABC):
         self,
         trackers: Sequence[AgentStateTracker],
         resource_req: ResourceRequirements,
-        criteria: AgentSelectionCriteria,
-        config: AgentSelectionConfig,
     ) -> AgentStateTracker:
         """
         Select an agent tracker using the strategy with specific resource requirements.
@@ -251,8 +250,6 @@ class AbstractAgentSelector(ABC):
         Args:
             trackers: Pre-filtered compatible trackers (guaranteed non-empty)
             resource_req: Resource requirements to satisfy
-            criteria: Selection criteria including session metadata
-            config: Configuration for agent selection
 
         Returns:
             The selected tracker
@@ -289,7 +286,7 @@ class AgentSelector:
         self,
         trackers: Sequence[AgentStateTracker],
         criteria: AgentSelectionCriteria,
-        config: AgentSelectionConfig,
+        limit: AgentLimit,
     ) -> list[AgentSelection]:
         """
         Select agents for every resource requirement in the criteria.
@@ -304,7 +301,7 @@ class AgentSelector:
         Args:
             trackers: Batch-scoped agent state (created once per scheduling pass)
             criteria: Selection criteria including kernel requirements
-            config: Configuration for agent selection
+            limit: Per-agent cap enforced during selection
 
         Returns:
             The list of AgentSelection objects pairing requirements with agents.
@@ -332,7 +329,7 @@ class AgentSelector:
                     trackers,
                     resource_req,
                     criteria,
-                    config,
+                    limit,
                 )
             except (NoAvailableAgentError, NoCompatibleAgentError) as e:
                 errors.append(e)
@@ -366,7 +363,7 @@ class AgentSelector:
         state_trackers: Sequence[AgentStateTracker],
         resource_req: ResourceRequirements,
         criteria: AgentSelectionCriteria,
-        config: AgentSelectionConfig,
+        limit: AgentLimit,
     ) -> AgentStateTracker:
         # First pass: filter by architecture (binary compatibility check)
         arch_compatible_trackers: list[AgentStateTracker] = []
@@ -391,7 +388,7 @@ class AgentSelector:
                 self._check_tracker_compatibility(
                     tracker,
                     resource_req,
-                    config,
+                    limit,
                 )
                 compatible_trackers.append(tracker)
             except TrackerCompatibilityError as e:
@@ -453,15 +450,13 @@ class AgentSelector:
                 )
 
         # Use strategy to select from candidates
-        return self._strategy.select_tracker_by_strategy(
-            candidate_trackers, resource_req, criteria, config
-        )
+        return self._strategy.select_tracker_by_strategy(candidate_trackers, resource_req)
 
     def _check_tracker_compatibility(
         self,
         tracker: AgentStateTracker,
         resource_req: ResourceRequirements,
-        config: AgentSelectionConfig,
+        limit: AgentLimit,
     ) -> None:
         """Check if an agent tracker is compatible with the resource requirements.
 
@@ -504,10 +499,10 @@ class AgentSelector:
             )
 
         # Check container limit if specified
-        if config.max_container_count is not None:
-            if container_count >= config.max_container_count:
+        if limit.max_container_count is not None:
+            if container_count >= limit.max_container_count:
                 raise ContainerLimitExceededError(
                     agent_id=agent.agent_id,
                     current_count=container_count,
-                    max_count=config.max_container_count,
+                    max_count=limit.max_container_count,
                 )
