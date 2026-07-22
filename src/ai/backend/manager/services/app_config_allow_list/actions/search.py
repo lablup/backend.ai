@@ -23,6 +23,10 @@ class SearchAppConfigAllowListAction(AppConfigAllowListGlobalAction):
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.SEARCH
 
+    @override
+    def entity_id(self) -> str | None:
+        return None
+
 
 @dataclass
 class SearchAppConfigAllowListActionResult(BaseActionResult):
