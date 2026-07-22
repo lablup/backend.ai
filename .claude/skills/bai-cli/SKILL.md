@@ -44,7 +44,7 @@ Check options with `--help`.
 - **project**: user(get, assign-users, unassign-users · sub role: search) · admin(search, create, update, delete, purge)
 - **agent**: user(empty group) · admin(search, total-resources)
 - **image**: user(empty group) · admin(search, forget, purge, update · sub alias: create, remove, search)
-- **session**: user(enqueue, get, logs, project-search, start-service, shutdown-service, terminate, update) · admin(search · sub kernel: search) · my(search)
+- **session**: user(compute-schedule, enqueue, get, logs, project-search, start-service, shutdown-service, terminate, update) · admin(search · sub kernel: search) · my(search)
 
 ### Compute & Serving
 

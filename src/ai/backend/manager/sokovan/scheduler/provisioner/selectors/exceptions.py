@@ -9,6 +9,8 @@ from collections.abc import Iterable, Mapping, Sequence
 from decimal import Decimal
 from typing import override
 
+from aiohttp import web
+
 from ai.backend.common.exception import (
     BackendAIError,
     ErrorCode,
@@ -67,7 +69,7 @@ class RequirementSelectionError(AgentSelectionError):
         raise NotImplementedError
 
 
-class NoAgentsInResourceGroupError(AgentSelectionError):
+class NoAgentsInResourceGroupError(AgentSelectionError, web.HTTPServiceUnavailable):
     """Raised when the resource group has no candidate agents at all.
 
     Distinct from :class:`NoAvailableAgentError`, which aggregates *per-kernel*
