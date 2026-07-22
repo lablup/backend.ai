@@ -46,6 +46,7 @@ from ai.backend.common.metrics.http import build_prometheus_metrics_handler
 from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.common.metrics.multiprocess_setup import cleanup_prometheus_multiprocess_dir
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
+from ai.backend.common.networking import force_threaded_dns_resolver
 from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 from ai.backend.logging.otel import (
@@ -499,6 +500,7 @@ def main(
     """
     Start the manager service as a foreground process.
     """
+    force_threaded_dns_resolver()
     log_level = LogLevel.DEBUG if debug else log_level
 
     if config_path is None:

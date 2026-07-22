@@ -17,6 +17,7 @@ __all__ = (
     "DeploymentHistoryOrderField",
     "DeploymentHistoryScopeDTO",
     "KernelHistoryOrderField",
+    "KernelHistoryScopeDTO",
     "OrderDirection",
     "RouteHistoryOrderField",
     "RouteHistoryScopeDTO",
@@ -51,6 +52,11 @@ class KernelHistoryOrderField(StrEnum):
 
     CREATED_AT = "created_at"
     UPDATED_AT = "updated_at"
+    PHASE = "phase"
+    FROM_STATUS = "from_status"
+    TO_STATUS = "to_status"
+    RESULT = "result"
+    ATTEMPTS = "attempts"
 
 
 class DeploymentHistoryOrderField(StrEnum):
@@ -82,6 +88,12 @@ class SessionHistoryScopeDTO(BaseRequestModel):
     """Scope for session scheduling history queries."""
 
     session_id: UUID = Field(description="Session ID to get history for.")
+
+
+class KernelHistoryScopeDTO(BaseRequestModel):
+    """Scope for kernel scheduling history queries."""
+
+    kernel_id: UUID = Field(description="Kernel ID to get history for.")
 
 
 class DeploymentHistoryScopeDTO(BaseRequestModel):

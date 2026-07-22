@@ -13,6 +13,7 @@ from ai.backend.common.dto.manager.v2.scheduling_history.request import (
     KernelHistoryOrder,
     RouteHistoryFilter,
     RouteHistoryOrder,
+    ScopedSearchKernelHistoriesInput,
     SearchDeploymentHistoryInput,
     SearchRouteHistoryInput,
     SearchSessionHistoryInput,
@@ -21,7 +22,6 @@ from ai.backend.common.dto.manager.v2.scheduling_history.request import (
 )
 from ai.backend.common.dto.manager.v2.scheduling_history.response import (
     AdminSearchDeploymentHistoriesPayload,
-    AdminSearchKernelHistoriesPayload,
     AdminSearchRouteHistoriesPayload,
     AdminSearchSessionHistoriesPayload,
     DeploymentHistoryNode,
@@ -30,12 +30,14 @@ from ai.backend.common.dto.manager.v2.scheduling_history.response import (
     ListRouteHistoryPayload,
     ListSessionHistoryPayload,
     RouteHistoryNode,
+    SearchKernelHistoriesPayload,
     SessionHistoryNode,
 )
 from ai.backend.common.dto.manager.v2.scheduling_history.types import (
     DeploymentHistoryOrderField,
     DeploymentHistoryScopeDTO,
     KernelHistoryOrderField,
+    KernelHistoryScopeDTO,
     OrderDirection,
     RouteHistoryOrderField,
     RouteHistoryScopeDTO,
@@ -50,6 +52,7 @@ __all__ = (
     "DeploymentHistoryOrderField",
     "DeploymentHistoryScopeDTO",
     "KernelHistoryOrderField",
+    "KernelHistoryScopeDTO",
     "OrderDirection",
     "RouteHistoryOrderField",
     "RouteHistoryScopeDTO",
@@ -59,7 +62,6 @@ __all__ = (
     "SubStepResultInfo",
     # Input models (request)
     "AdminSearchDeploymentHistoriesInput",
-    "AdminSearchKernelHistoriesInput",
     "AdminSearchRouteHistoriesInput",
     "AdminSearchSessionHistoriesInput",
     "DeploymentHistoryFilter",
@@ -68,14 +70,15 @@ __all__ = (
     "KernelHistoryOrder",
     "RouteHistoryFilter",
     "RouteHistoryOrder",
+    "ScopedSearchKernelHistoriesInput",
     "SearchDeploymentHistoryInput",
+    "AdminSearchKernelHistoriesInput",
     "SearchRouteHistoryInput",
     "SearchSessionHistoryInput",
     "SessionHistoryFilter",
     "SessionHistoryOrder",
     # Response models
     "AdminSearchDeploymentHistoriesPayload",
-    "AdminSearchKernelHistoriesPayload",
     "AdminSearchRouteHistoriesPayload",
     "AdminSearchSessionHistoriesPayload",
     "DeploymentHistoryNode",
@@ -84,5 +87,6 @@ __all__ = (
     "ListRouteHistoryPayload",
     "ListSessionHistoryPayload",
     "RouteHistoryNode",
+    "SearchKernelHistoriesPayload",
     "SessionHistoryNode",
 )

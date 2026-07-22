@@ -10,7 +10,9 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.data.app_config.types import AppConfigScopeType
+from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec
 from ai.backend.common.data.permission.types import EntityType, ScopeType
+from ai.backend.common.identifier.app_config import AppConfigScopeIdentifier
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
 from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.user import UserID
@@ -58,11 +60,16 @@ from ai.backend.manager.repositories.ops.rbac.provider import RBACOpsProvider
 from ai.backend.manager.types import OptionalState
 from ai.backend.testutils.db import with_tables
 
-_DOMAIN_UUID = uuid.uuid4()
-_USER_UUID = uuid.uuid4()
-_DOMAIN_ID = str(_DOMAIN_UUID)
-_USER_ID = str(_USER_UUID)
-_OTHER_USER_ID = str(uuid.uuid4())
+_DOMAIN_ID = DomainID(uuid.uuid4())
+_USER_ID = UserID(uuid.uuid4())
+_OTHER_DOMAIN_ID = DomainID(uuid.uuid4())
+_OTHER_USER_ID = UserID(uuid.uuid4())
+
+# The same owners seen as a fragment's scope_id, which is polymorphic over scope kinds.
+_DOMAIN_SCOPE_ID = AppConfigScopeIdentifier(_DOMAIN_ID)
+_USER_SCOPE_ID = AppConfigScopeIdentifier(_USER_ID)
+_OTHER_DOMAIN_SCOPE_ID = AppConfigScopeIdentifier(_OTHER_DOMAIN_ID)
+_OTHER_USER_SCOPE_ID = AppConfigScopeIdentifier(_OTHER_USER_ID)
 
 
 @pytest.fixture
@@ -129,12 +136,37 @@ async def domain_scoped_fragment(database: ExtendedAsyncSAEngine) -> AppConfigFr
         row = AppConfigFragmentRow(
             config_name="theme",
             scope_type=AppConfigScopeType.DOMAIN,
-            scope_id=_DOMAIN_ID,
+            scope_id=_DOMAIN_SCOPE_ID,
             config={"k": "v"},
         )
         db_sess.add(row)
         await db_sess.flush()
         return row.to_data()
+
+
+@pytest.fixture
+async def fragment_at_every_scope(
+    database: ExtendedAsyncSAEngine, theme_registered: None
+) -> dict[AppConfigScopeType, AppConfigFragmentData]:
+    """Situation: ``theme`` already holds one fragment at each scope, keyed by that scope."""
+    owners: dict[AppConfigScopeType, AppConfigScopeIdentifier | None] = {
+        AppConfigScopeType.PUBLIC: None,
+        AppConfigScopeType.DOMAIN: _DOMAIN_SCOPE_ID,
+        AppConfigScopeType.USER: _USER_SCOPE_ID,
+    }
+    async with database.begin_session() as db_sess:
+        rows = [
+            AppConfigFragmentRow(
+                config_name="theme",
+                scope_type=scope_type,
+                scope_id=scope_id,
+                config={"k": "v"},
+            )
+            for scope_type, scope_id in owners.items()
+        ]
+        db_sess.add_all(rows)
+        await db_sess.flush()
+        return {row.scope_type: row.to_data() for row in rows}
 
 
 @pytest.fixture
@@ -160,37 +192,37 @@ async def fragments_across_scopes(database: ExtendedAsyncSAEngine) -> list[AppCo
             AppConfigFragmentRow(
                 config_name="theme",
                 scope_type=AppConfigScopeType.PUBLIC,
-                scope_id="public",
+                scope_id=None,
                 config={"k": "v"},
             ),
             AppConfigFragmentRow(
                 config_name="theme",
                 scope_type=AppConfigScopeType.DOMAIN,
-                scope_id=_DOMAIN_ID,
+                scope_id=_DOMAIN_SCOPE_ID,
                 config={"k": "v"},
             ),
             AppConfigFragmentRow(
                 config_name="theme",
                 scope_type=AppConfigScopeType.DOMAIN,
-                scope_id="other",
+                scope_id=_OTHER_DOMAIN_SCOPE_ID,
                 config={"k": "v"},
             ),
             AppConfigFragmentRow(
                 config_name="theme",
                 scope_type=AppConfigScopeType.USER,
-                scope_id=_USER_ID,
+                scope_id=_USER_SCOPE_ID,
                 config={"k": "v"},
             ),
             AppConfigFragmentRow(
                 config_name="theme",
                 scope_type=AppConfigScopeType.USER,
-                scope_id=_OTHER_USER_ID,
+                scope_id=_OTHER_USER_SCOPE_ID,
                 config={"k": "v"},
             ),
             AppConfigFragmentRow(
                 config_name="menu",
                 scope_type=AppConfigScopeType.PUBLIC,
-                scope_id="public",
+                scope_id=None,
                 config={"k": "v"},
             ),
         ]
@@ -207,7 +239,7 @@ class TestCreateAndGet:
             AppConfigFragmentCreatorSpec(
                 config_name="theme",
                 scope_type=AppConfigScopeType.PUBLIC,
-                scope_id="public",
+                scope_id=None,
                 config={"theme": "dark"},
             )
         )
@@ -229,22 +261,30 @@ class TestCreateAndGet:
                 AppConfigFragmentCreatorSpec(
                     config_name="theme",
                     scope_type=AppConfigScopeType.PUBLIC,
-                    scope_id="public",
+                    scope_id=None,
                     config={"theme": "dark"},
                 )
             )
 
-    async def test_unique_constraint_violation(
+    @pytest.mark.parametrize(
+        "scope_type",
+        [AppConfigScopeType.PUBLIC, AppConfigScopeType.DOMAIN, AppConfigScopeType.USER],
+        ids=lambda scope_type: scope_type.value,
+    )
+    async def test_a_second_fragment_at_the_same_scope_is_rejected(
         self,
         repository: AppConfigFragmentRepository,
-        domain_scoped_fragment: AppConfigFragmentData,
+        fragment_at_every_scope: dict[AppConfigScopeType, AppConfigFragmentData],
+        scope_type: AppConfigScopeType,
     ) -> None:
+        # public is carried by the partial index, domain and user by the unique constraint.
+        existing = fragment_at_every_scope[scope_type]
         with pytest.raises(UniqueConstraintViolationError):
             await repository.create(
                 AppConfigFragmentCreatorSpec(
-                    config_name=domain_scoped_fragment.config_name,
-                    scope_type=domain_scoped_fragment.scope_type,
-                    scope_id=domain_scoped_fragment.scope_id,
+                    config_name=existing.config_name,
+                    scope_type=existing.scope_type,
+                    scope_id=existing.scope_id,
                     config={"k": "v"},
                 )
             )
@@ -328,18 +368,30 @@ class TestSearch:
         }
         assert {item.id for item in result.items} == expected
 
+    @pytest.mark.parametrize("negated", [False, True], ids=["equals", "not-equals"])
     async def test_filter_by_scope_id(
         self,
         repository: AppConfigFragmentRepository,
         fragments_across_scopes: list[AppConfigFragmentData],
+        negated: bool,
     ) -> None:
         result = await repository.admin_search(
             BatchQuerier(
                 pagination=OffsetPagination(limit=10, offset=0),
-                conditions=[AppConfigFragmentConditions.by_scope_id_equals(_USER_ID)],
+                conditions=[
+                    AppConfigFragmentConditions.by_scope_id_equals(
+                        UUIDEqualMatchSpec(value=_USER_SCOPE_ID, negated=negated)
+                    )
+                ],
             )
         )
-        expected = {f.id for f in fragments_across_scopes if f.scope_id == _USER_ID}
+        # Public rows hold NULL, and neither `= x` nor `NOT (= x)` is true of NULL, so they
+        # fall out of both directions of the filter.
+        expected = {
+            f.id
+            for f in fragments_across_scopes
+            if f.scope_id is not None and (f.scope_id == _USER_SCOPE_ID) is not negated
+        }
         assert {item.id for item in result.items} == expected
 
 
@@ -351,13 +403,13 @@ class TestScopedSearch:
     ) -> None:
         result = await repository.scoped_search(
             BatchQuerier(pagination=OffsetPagination(limit=10, offset=0)),
-            [DomainAppConfigFragmentSearchScope(domain_id=DomainID(_DOMAIN_UUID))],
+            [DomainAppConfigFragmentSearchScope(domain_id=_DOMAIN_ID)],
         )
         # Only domain-scoped fragments of that domain — not the other domain, public, or users.
         expected = {
             f.id
             for f in fragments_across_scopes
-            if f.scope_type is AppConfigScopeType.DOMAIN and f.scope_id == _DOMAIN_ID
+            if f.scope_type is AppConfigScopeType.DOMAIN and f.scope_id == _DOMAIN_SCOPE_ID
         }
         assert {item.id for item in result.items} == expected
         assert result.total_count == len(expected)
@@ -369,12 +421,12 @@ class TestScopedSearch:
     ) -> None:
         result = await repository.scoped_search(
             BatchQuerier(pagination=OffsetPagination(limit=10, offset=0)),
-            [UserAppConfigFragmentSearchScope(user_id=UserID(_USER_UUID))],
+            [UserAppConfigFragmentSearchScope(user_id=_USER_ID)],
         )
         expected = {
             f.id
             for f in fragments_across_scopes
-            if f.scope_type is AppConfigScopeType.USER and f.scope_id == _USER_ID
+            if f.scope_type is AppConfigScopeType.USER and f.scope_id == _USER_SCOPE_ID
         }
         assert {item.id for item in result.items} == expected
 
@@ -386,15 +438,15 @@ class TestScopedSearch:
         result = await repository.scoped_search(
             BatchQuerier(pagination=OffsetPagination(limit=10, offset=0)),
             [
-                DomainAppConfigFragmentSearchScope(domain_id=DomainID(_DOMAIN_UUID)),
-                UserAppConfigFragmentSearchScope(user_id=UserID(_USER_UUID)),
+                DomainAppConfigFragmentSearchScope(domain_id=_DOMAIN_ID),
+                UserAppConfigFragmentSearchScope(user_id=_USER_ID),
             ],
         )
         expected = {
             f.id
             for f in fragments_across_scopes
-            if (f.scope_type is AppConfigScopeType.DOMAIN and f.scope_id == _DOMAIN_ID)
-            or (f.scope_type is AppConfigScopeType.USER and f.scope_id == _USER_ID)
+            if (f.scope_type is AppConfigScopeType.DOMAIN and f.scope_id == _DOMAIN_SCOPE_ID)
+            or (f.scope_type is AppConfigScopeType.USER and f.scope_id == _USER_SCOPE_ID)
         }
         assert {item.id for item in result.items} == expected
 
@@ -432,13 +484,13 @@ async def two_fragments(database: ExtendedAsyncSAEngine) -> list[AppConfigFragme
             AppConfigFragmentRow(
                 config_name="theme",
                 scope_type=AppConfigScopeType.DOMAIN,
-                scope_id=_DOMAIN_ID,
+                scope_id=_DOMAIN_SCOPE_ID,
                 config={"a": 1},
             ),
             AppConfigFragmentRow(
                 config_name="theme",
                 scope_type=AppConfigScopeType.USER,
-                scope_id=_USER_ID,
+                scope_id=_USER_SCOPE_ID,
                 config={"b": 2},
             ),
         ]
@@ -553,7 +605,7 @@ class TestVisibilityConditions:
         expected = {
             f.id
             for f in fragments_across_scopes
-            if f.scope_type is AppConfigScopeType.DOMAIN and f.scope_id == _DOMAIN_ID
+            if f.scope_type is AppConfigScopeType.DOMAIN and f.scope_id == _DOMAIN_SCOPE_ID
         }
         assert {item.id for item in result.items} == expected
 
@@ -571,7 +623,7 @@ class TestVisibilityConditions:
         expected = {
             f.id
             for f in fragments_across_scopes
-            if f.scope_type is AppConfigScopeType.USER and f.scope_id == _USER_ID
+            if f.scope_type is AppConfigScopeType.USER and f.scope_id == _USER_SCOPE_ID
         }
         assert {item.id for item in result.items} == expected
 
@@ -584,7 +636,7 @@ class TestApplicableFragments:
     ) -> None:
         applicable = await repository.list_visible_fragments_bulk(
             ["theme"],
-            ResolvedAppConfigScope(domain_id=DomainID(_DOMAIN_UUID), user_id=UserID(_USER_UUID)),
+            ResolvedAppConfigScope(domain_id=_DOMAIN_ID, user_id=_USER_ID),
         )
         # public + the caller's domain + the caller's own user fragment, ordered by the
         # allow-list entries' ranks (scope-type defaults: public < domain < user).
@@ -594,8 +646,8 @@ class TestApplicableFragments:
             if f.config_name == "theme"
             and (
                 f.scope_type is AppConfigScopeType.PUBLIC
-                or (f.scope_type is AppConfigScopeType.DOMAIN and f.scope_id == _DOMAIN_ID)
-                or (f.scope_type is AppConfigScopeType.USER and f.scope_id == _USER_ID)
+                or (f.scope_type is AppConfigScopeType.DOMAIN and f.scope_id == _DOMAIN_SCOPE_ID)
+                or (f.scope_type is AppConfigScopeType.USER and f.scope_id == _USER_SCOPE_ID)
             )
         ]
         assert [f.id for f in applicable] == [f.id for f in expected]
@@ -612,7 +664,7 @@ class TestApplicableFragments:
     ) -> None:
         applicable = await repository.list_visible_fragments_bulk(
             ["unregistered"],
-            ResolvedAppConfigScope(domain_id=DomainID(_DOMAIN_UUID), user_id=UserID(_USER_UUID)),
+            ResolvedAppConfigScope(domain_id=_DOMAIN_ID, user_id=_USER_ID),
         )
         assert applicable == []
 
@@ -623,7 +675,7 @@ class TestApplicableFragments:
     ) -> None:
         applicable = await repository.list_visible_fragments_bulk(
             ["theme", "menu"],
-            ResolvedAppConfigScope(domain_id=DomainID(_DOMAIN_UUID), user_id=UserID(_USER_UUID)),
+            ResolvedAppConfigScope(domain_id=_DOMAIN_ID, user_id=_USER_ID),
         )
         # public + the caller's domain + the caller's own user fragment, for both names.
         expected = {
@@ -632,8 +684,8 @@ class TestApplicableFragments:
             if f.config_name in ("theme", "menu")
             and (
                 f.scope_type is AppConfigScopeType.PUBLIC
-                or (f.scope_type is AppConfigScopeType.DOMAIN and f.scope_id == _DOMAIN_ID)
-                or (f.scope_type is AppConfigScopeType.USER and f.scope_id == _USER_ID)
+                or (f.scope_type is AppConfigScopeType.DOMAIN and f.scope_id == _DOMAIN_SCOPE_ID)
+                or (f.scope_type is AppConfigScopeType.USER and f.scope_id == _USER_SCOPE_ID)
             )
         }
         assert {f.id for f in applicable} == expected
@@ -650,7 +702,7 @@ class TestApplicableFragments:
     ) -> None:
         applicable = await repository.list_visible_fragments_bulk(
             [],
-            ResolvedAppConfigScope(domain_id=DomainID(_DOMAIN_UUID), user_id=UserID(_USER_UUID)),
+            ResolvedAppConfigScope(domain_id=_DOMAIN_ID, user_id=_USER_ID),
         )
         assert applicable == []
 
@@ -672,7 +724,7 @@ class _FragmentScopeCase:
     """
 
     scope_type: AppConfigScopeType
-    scope_id: str
+    scope_id: AppConfigScopeIdentifier | None
     expected_bindings: list[_ScopeBinding] = field(default_factory=list)
 
 
@@ -699,15 +751,19 @@ class TestRBACScopeAssociation:
         [
             _FragmentScopeCase(
                 scope_type=AppConfigScopeType.USER,
-                scope_id=_USER_ID,
-                expected_bindings=[_ScopeBinding(scope_type=ScopeType.USER, scope_id=_USER_ID)],
+                scope_id=_USER_SCOPE_ID,
+                expected_bindings=[
+                    _ScopeBinding(scope_type=ScopeType.USER, scope_id=str(_USER_ID))
+                ],
             ),
             _FragmentScopeCase(
                 scope_type=AppConfigScopeType.DOMAIN,
-                scope_id=_DOMAIN_ID,
-                expected_bindings=[_ScopeBinding(scope_type=ScopeType.DOMAIN, scope_id=_DOMAIN_ID)],
+                scope_id=_DOMAIN_SCOPE_ID,
+                expected_bindings=[
+                    _ScopeBinding(scope_type=ScopeType.DOMAIN, scope_id=str(_DOMAIN_ID))
+                ],
             ),
-            _FragmentScopeCase(scope_type=AppConfigScopeType.PUBLIC, scope_id="public"),
+            _FragmentScopeCase(scope_type=AppConfigScopeType.PUBLIC, scope_id=None),
         ],
         ids=lambda case: case.scope_type.value,
     )
@@ -733,15 +789,19 @@ class TestRBACScopeAssociation:
         [
             _FragmentScopeCase(
                 scope_type=AppConfigScopeType.USER,
-                scope_id=_USER_ID,
-                expected_bindings=[_ScopeBinding(scope_type=ScopeType.USER, scope_id=_USER_ID)],
+                scope_id=_USER_SCOPE_ID,
+                expected_bindings=[
+                    _ScopeBinding(scope_type=ScopeType.USER, scope_id=str(_USER_ID))
+                ],
             ),
             _FragmentScopeCase(
                 scope_type=AppConfigScopeType.DOMAIN,
-                scope_id=_DOMAIN_ID,
-                expected_bindings=[_ScopeBinding(scope_type=ScopeType.DOMAIN, scope_id=_DOMAIN_ID)],
+                scope_id=_DOMAIN_SCOPE_ID,
+                expected_bindings=[
+                    _ScopeBinding(scope_type=ScopeType.DOMAIN, scope_id=str(_DOMAIN_ID))
+                ],
             ),
-            _FragmentScopeCase(scope_type=AppConfigScopeType.PUBLIC, scope_id="public"),
+            _FragmentScopeCase(scope_type=AppConfigScopeType.PUBLIC, scope_id=None),
         ],
         ids=lambda case: case.scope_type.value,
     )
@@ -780,12 +840,12 @@ class TestRBACScopeAssociation:
             AppConfigFragmentCreatorSpec(
                 config_name="theme",
                 scope_type=AppConfigScopeType.USER,
-                scope_id=_USER_ID,
+                scope_id=_USER_SCOPE_ID,
                 config={"k": "v"},
             )
         )
         assert await self._scope_bindings(database, str(created.id)) == [
-            _ScopeBinding(scope_type=ScopeType.USER, scope_id=_USER_ID)
+            _ScopeBinding(scope_type=ScopeType.USER, scope_id=str(_USER_ID))
         ]
         result = await repository.bulk_purge([AppConfigFragmentPurgerSpec(fragment_id=created.id)])
         assert [p.id for p in result.succeeded] == [created.id]

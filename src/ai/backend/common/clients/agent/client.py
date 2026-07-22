@@ -473,12 +473,6 @@ class AgentClient(BackendAIClient):
             await self._peer.call.push_image(image_ref, registry, agent_id=self.agent_id),
         )
 
-    # Scaling group management
-    @agent_client_resilience.apply()
-    async def update_scaling_group(self, scaling_group: str) -> None:
-        """Update scaling group on the agent."""
-        await self._peer.call.update_scaling_group(scaling_group, self.agent_id)
-
     # Local configuration management
     @agent_client_resilience.apply()
     async def get_local_config(self) -> Mapping[str, str]:

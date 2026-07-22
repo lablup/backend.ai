@@ -7,6 +7,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common.data.app_config.types import AppConfigScopeType
+from ai.backend.common.identifier.app_config import AppConfigScopeIdentifier
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
 from ai.backend.manager.data.app_config_fragment.types import (
     AppConfigFragmentData,
@@ -32,6 +33,18 @@ class AppConfigFragmentRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc
             "scope_id",
             name="uq_app_config_fragments_config_name_scope_type_scope_id",
         ),
+        # NULLs are distinct to a unique constraint, so public rows need their own index.
+        sa.Index(
+            "uq_app_config_fragments_public_config_name",
+            "config_name",
+            "scope_type",
+            unique=True,
+            postgresql_where=sa.text("scope_id IS NULL"),
+        ),
+        sa.CheckConstraint(
+            "(scope_type = 'public') = (scope_id IS NULL)",
+            name="scope_id_matches_scope_type",
+        ),
         sa.ForeignKeyConstraint(
             ["config_name", "scope_type"],
             ["app_config_allow_list.config_name", "app_config_allow_list.scope_type"],
@@ -56,10 +69,11 @@ class AppConfigFragmentRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc
         StrEnumType(AppConfigScopeType),
         nullable=False,
     )
-    scope_id: Mapped[str] = mapped_column(
+    # NULL is public, which has no owner; domain and user carry their owner's id.
+    scope_id: Mapped[AppConfigScopeIdentifier | None] = mapped_column(
         "scope_id",
-        sa.String(length=255),
-        nullable=False,
+        GUID(AppConfigScopeIdentifier),
+        nullable=True,
     )
     config: Mapped[dict[str, Any]] = mapped_column(
         "config",

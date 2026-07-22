@@ -61,6 +61,7 @@ from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.common.metrics.multiprocess_setup import cleanup_prometheus_multiprocess_dir
 from ai.backend.common.metrics.profiler import Profiler, PyroscopeArgs
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
+from ai.backend.common.networking import force_threaded_dns_resolver
 from ai.backend.common.plugin import AbstractPlugin, BasePluginContext
 from ai.backend.common.runner.types import Runner
 from ai.backend.common.service_discovery.etcd_discovery.service_discovery import (
@@ -820,6 +821,7 @@ def main(
     debug: bool = False,
 ) -> int:
     """Start the storage-proxy service as a foreground process."""
+    force_threaded_dns_resolver()
     log_level = LogLevel.DEBUG if debug else log_level
     try:
         local_config = load_local_config(config_path, log_level=log_level)

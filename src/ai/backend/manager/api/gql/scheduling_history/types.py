@@ -19,6 +19,12 @@ from ai.backend.common.dto.manager.v2.scheduling_history.request import (
     DeploymentHistoryOrder as DeploymentHistoryOrderDTO,
 )
 from ai.backend.common.dto.manager.v2.scheduling_history.request import (
+    KernelHistoryFilter as KernelHistoryFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.scheduling_history.request import (
+    KernelHistoryOrder as KernelHistoryOrderDTO,
+)
+from ai.backend.common.dto.manager.v2.scheduling_history.request import (
     RouteHistoryFilter as RouteHistoryFilterDTO,
 )
 from ai.backend.common.dto.manager.v2.scheduling_history.request import (
@@ -35,15 +41,19 @@ from ai.backend.common.dto.manager.v2.scheduling_history.request import (
 )
 from ai.backend.common.dto.manager.v2.scheduling_history.response import (
     DeploymentHistoryNode,
+    KernelHistoryNode,
     RouteHistoryNode,
     SessionHistoryNode,
 )
 from ai.backend.common.dto.manager.v2.scheduling_history.types import (
     DeploymentHistoryScopeDTO,
+    KernelHistoryScopeDTO,
     RouteHistoryScopeDTO,
     SessionHistoryScopeDTO,
     SubStepResultInfo,
 )
+from ai.backend.common.identifier.kernel_scheduling_history import KernelSchedulingHistoryID
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
     OrderDirection,
@@ -77,22 +87,27 @@ __all__ = (
     # Filter wrappers
     "SchedulingResultFilterGQL",
     "SessionSchedulingHistoryOrderField",
+    "KernelSchedulingHistoryOrderFieldGQL",
     "DeploymentHistoryOrderField",
     "RouteHistoryOrderField",
     # Types
     "SubStepResultGQL",
     "SessionSchedulingHistory",
+    "KernelSchedulingHistoryGQL",
     "DeploymentHistory",
     "RouteHistory",
     # Filters
     "SessionSchedulingHistoryFilter",
     "SessionSchedulingHistoryOrderBy",
+    "KernelSchedulingHistoryFilterGQL",
+    "KernelSchedulingHistoryOrderByGQL",
     "DeploymentHistoryFilter",
     "DeploymentHistoryOrderBy",
     "RouteHistoryFilter",
     "RouteHistoryOrderBy",
     # Scope types (added in 26.2.0)
     "SessionScope",
+    "KernelScopeGQL",
     "DeploymentScope",
     "RouteScope",
 )
@@ -124,6 +139,23 @@ class SchedulingResultGQL(StrEnum):
 class SessionSchedulingHistoryOrderField(StrEnum):
     CREATED_AT = "created_at"
     UPDATED_AT = "updated_at"
+
+
+@gql_enum(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Fields available for ordering kernel scheduling history",
+    ),
+    name="KernelSchedulingHistoryOrderField",
+)
+class KernelSchedulingHistoryOrderFieldGQL(StrEnum):
+    CREATED_AT = "created_at"
+    UPDATED_AT = "updated_at"
+    PHASE = "phase"
+    FROM_STATUS = "from_status"
+    TO_STATUS = "to_status"
+    RESULT = "result"
+    ATTEMPTS = "attempts"
 
 
 @gql_enum(
@@ -221,6 +253,42 @@ class SessionSchedulingHistory(PydanticNodeMixin[SessionHistoryNode]):
         # DataLoader returns GQL type instances directly via from_pydantic adapter.
         results = await info.context.data_loaders.session_history_loader.load_many([
             UUID(nid) for nid in node_ids
+        ])
+        return cast(list[Self | None], results)
+
+
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION, description="Kernel scheduling history record."
+    ),
+    name="KernelSchedulingHistory",
+)
+class KernelSchedulingHistoryGQL(PydanticNodeMixin[KernelHistoryNode]):
+    id: NodeID[str]
+    kernel_id: ID
+    session_id: ID
+    phase: str
+    from_status: str | None
+    to_status: str | None
+    result: SchedulingResultGQL
+    error_code: str | None
+    message: str | None
+    attempts: int
+    created_at: datetime
+    updated_at: datetime
+
+    @classmethod
+    @override
+    async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
+        cls,
+        *,
+        info: Info[StrawberryGQLContext],
+        node_ids: Iterable[str],
+        required: bool = False,
+    ) -> Iterable[Self | None]:
+        # DataLoader returns GQL type instances directly via from_pydantic adapter.
+        results = await info.context.data_loaders.kernel_history_loader.load_many([
+            KernelSchedulingHistoryID(UUID(nid)) for nid in node_ids
         ])
         return cast(list[Self | None], results)
 
@@ -370,6 +438,19 @@ class SessionScope(PydanticInputMixin[SessionHistoryScopeDTO]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
+        description="Scope for kernel scheduling history query",
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="KernelScope",
+)
+class KernelScopeGQL(PydanticInputMixin[KernelHistoryScopeDTO]):
+    """Scope for kernel-level scheduling history queries."""
+
+    kernel_id: UUID = gql_field(description="Kernel ID to get history for")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
         description="Scope for deployment scheduling history query", added_version="24.09.0"
     ),
     name="DeploymentScope",
@@ -439,6 +520,41 @@ class SessionSchedulingHistoryFilter(PydanticInputMixin[SessionHistoryFilterDTO]
 )
 class SessionSchedulingHistoryOrderBy(PydanticInputMixin[SessionHistoryOrderDTO]):
     field: SessionSchedulingHistoryOrderField
+    direction: OrderDirection = OrderDirection.DESC
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter for kernel scheduling history", added_version=NEXT_RELEASE_VERSION
+    ),
+    name="KernelSchedulingHistoryFilter",
+)
+class KernelSchedulingHistoryFilterGQL(PydanticInputMixin[KernelHistoryFilterDTO]):
+    id: UUIDFilter | None = None
+    kernel_id: UUIDFilter | None = None
+    session_id: UUIDFilter | None = None
+    phase: StringFilter | None = None
+    from_status: list[str] | None = None
+    to_status: list[str] | None = None
+    result: SchedulingResultFilterGQL | None = None
+    error_code: StringFilter | None = None
+    message: StringFilter | None = None
+    created_at: DateTimeFilter | None = None
+    updated_at: DateTimeFilter | None = None
+    AND: list[Self] | None = None
+    OR: list[Self] | None = None
+    NOT: list[Self] | None = None
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Order by specification for kernel scheduling history",
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="KernelSchedulingHistoryOrderBy",
+)
+class KernelSchedulingHistoryOrderByGQL(PydanticInputMixin[KernelHistoryOrderDTO]):
+    field: KernelSchedulingHistoryOrderFieldGQL
     direction: OrderDirection = OrderDirection.DESC
 
 

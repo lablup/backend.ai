@@ -1566,9 +1566,6 @@ class AbstractAgent[
         # existing containers still hold ports from the old range.
         self.port_pool.release_many(host_ports)
 
-    def update_scaling_group(self, scaling_group: str) -> None:
-        self.local_config.update(agent_update={"scaling_group": scaling_group})
-
     async def _clean_kernel_registry_loop(self) -> None:
         # TODO: After reducing `kernel_registry` dependencies and roles, this kind of tasks should be deprecated
         cleanup_tasks: set[asyncio.Task[None]] = set()

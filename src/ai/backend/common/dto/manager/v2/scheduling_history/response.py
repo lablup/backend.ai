@@ -16,7 +16,6 @@ from .types import SubStepResultInfo
 
 __all__ = (
     "AdminSearchDeploymentHistoriesPayload",
-    "AdminSearchKernelHistoriesPayload",
     "AdminSearchRouteHistoriesPayload",
     "AdminSearchSessionHistoriesPayload",
     "DeploymentHistoryNode",
@@ -25,6 +24,7 @@ __all__ = (
     "ListRouteHistoryPayload",
     "ListSessionHistoryPayload",
     "RouteHistoryNode",
+    "SearchKernelHistoriesPayload",
     "SessionHistoryNode",
 )
 
@@ -149,7 +149,7 @@ class AdminSearchSessionHistoriesPayload(BaseResponseModel):
     has_previous_page: bool = Field(description="Whether there is a previous page.")
 
 
-class AdminSearchKernelHistoriesPayload(BaseResponseModel):
+class SearchKernelHistoriesPayload(BaseResponseModel):
     """Payload for admin and scoped search of kernel scheduling histories."""
 
     items: list[KernelHistoryNode] = Field(description="List of kernel history nodes.")

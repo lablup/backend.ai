@@ -129,6 +129,7 @@ def agent_processors(
         config_provider=config_provider,
         agent_repository=agent_repo,
         scheduler_repository=scheduler_repo,
+        scheduling_controller=AsyncMock(),
         hook_plugin_ctx=hook_plugin_ctx,
         event_producer=event_producer,
         agent_cache=AsyncMock(),

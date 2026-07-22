@@ -9,11 +9,13 @@ from ai.backend.manager.repositories.replica_group.repository import ReplicaGrou
 from ai.backend.manager.sokovan.reconciler.base import ReconcilerStageRunner, ReconcilerTaskSpec
 from ai.backend.manager.sokovan.reconciler.coordinator import ReconcilerCoordinator
 from ai.backend.manager.sokovan.reconciler.flag import ValkeyReconcilerFlag
+from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 from ai.backend.manager.sokovan.stages.group_autoscale import build_group_autoscale_stage
 from ai.backend.manager.sokovan.stages.group_draining import build_group_draining_stage
 from ai.backend.manager.sokovan.stages.group_rolling import build_group_rolling_stage
 from ai.backend.manager.sokovan.stages.group_scaling import build_group_scaling_stage
 from ai.backend.manager.sokovan.stages.idle_check import build_idle_check_stage
+from ai.backend.manager.sokovan.stages.idle_check_sweep import build_idle_check_sweep_stage
 from ai.backend.manager.types import DistributedLockFactory
 
 
@@ -21,6 +23,7 @@ def build_reconciler_coordinator(
     *,
     replica_group_repository: ReplicaGroupRepository,
     idle_checker_repository: IdleCheckerRepository,
+    scheduling_controller: SchedulingController,
     valkey_schedule: ValkeyScheduleClient,
     lock_factory: DistributedLockFactory,
     config_provider: ManagerConfigProvider,
@@ -31,6 +34,7 @@ def build_reconciler_coordinator(
         build_group_draining_stage(replica_group_repository),
         build_group_autoscale_stage(replica_group_repository),
         build_idle_check_stage(idle_checker_repository),
+        build_idle_check_sweep_stage(idle_checker_repository, scheduling_controller),
     ]
     stages: dict[str, ReconcilerStageRunner] = {}
     task_specs: list[ReconcilerTaskSpec] = []

@@ -49,6 +49,10 @@ from ai.backend.manager.services.agent.actions.sync_agent_registry import (
     SyncAgentRegistryAction,
     SyncAgentRegistryActionResult,
 )
+from ai.backend.manager.services.agent.actions.update_resource_group import (
+    UpdateAgentResourceGroupAction,
+    UpdateAgentResourceGroupActionResult,
+)
 from ai.backend.manager.services.agent.actions.watcher_agent_restart import (
     WatcherAgentRestartAction,
     WatcherAgentRestartActionResult,
@@ -87,6 +91,9 @@ class AgentProcessors(AbstractProcessorPackage):
     load_container_counts: ActionProcessor[
         LoadContainerCountsAction, LoadContainerCountsActionResult
     ]
+    update_resource_group: ActionProcessor[
+        UpdateAgentResourceGroupAction, UpdateAgentResourceGroupActionResult
+    ]
 
     def __init__(
         self,
@@ -118,6 +125,7 @@ class AgentProcessors(AbstractProcessorPackage):
         )
         self.search_agents = ActionProcessor(service.search_agents, action_monitors)
         self.load_container_counts = ActionProcessor(service.load_container_counts, action_monitors)
+        self.update_resource_group = ActionProcessor(service.update_resource_group, action_monitors)
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -134,4 +142,5 @@ class AgentProcessors(AbstractProcessorPackage):
             RemoveAgentFromImagesByCanonicalsAction.spec(),
             SearchAgentsAction.spec(),
             LoadContainerCountsAction.spec(),
+            UpdateAgentResourceGroupAction.spec(),
         ]

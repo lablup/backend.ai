@@ -4,6 +4,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
+from ai.backend.common.config import ModelDefinitionDraft
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.errors.resource import RuntimeVariantConflict
 from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
@@ -31,4 +32,5 @@ class RuntimeVariantCreatorSpec(CreatorSpec[RuntimeVariantRow]):
         row = RuntimeVariantRow()
         row.name = self.name
         row.description = self.description
+        row.default_model_definition = ModelDefinitionDraft()
         return row

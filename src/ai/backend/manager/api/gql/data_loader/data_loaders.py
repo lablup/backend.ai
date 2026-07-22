@@ -9,6 +9,7 @@ from strawberry.dataloader import DataLoader
 from ai.backend.common.identifier.app_config_allow_list import AppConfigAllowListID
 from ai.backend.common.identifier.app_config_definition import AppConfigDefinitionID
 from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.kernel_scheduling_history import KernelSchedulingHistoryID
 from ai.backend.common.types import AgentId, ImageID, KernelId, SessionId
 from ai.backend.manager.data.permission.id import ObjectId
 
@@ -102,6 +103,7 @@ if TYPE_CHECKING:
     )
     from ai.backend.manager.api.gql.scheduling_history.types import (  # pants: no-infer-dep
         DeploymentHistory,
+        KernelSchedulingHistoryGQL,
         RouteHistory,
         SessionSchedulingHistory,
     )
@@ -715,6 +717,24 @@ class DataLoaders:
 
             dtos = await adapter.batch_load_session_histories_by_ids(ids)
             return [SSH.from_pydantic(dto) if dto is not None else None for dto in dtos]
+
+        return DataLoader(load_fn=load_fn)
+
+    @cached_property
+    def kernel_history_loader(
+        self,
+    ) -> DataLoader[KernelSchedulingHistoryID, KernelSchedulingHistoryGQL | None]:
+        adapter = self._adapters.scheduling_history
+
+        async def load_fn(
+            ids: list[KernelSchedulingHistoryID],
+        ) -> list[KernelSchedulingHistoryGQL | None]:
+            from ai.backend.manager.api.gql.scheduling_history.types import (  # pants: no-infer-dep
+                KernelSchedulingHistoryGQL as KSH,
+            )
+
+            dtos = await adapter.batch_load_kernel_histories_by_ids(ids)
+            return [KSH.from_pydantic(dto) if dto is not None else None for dto in dtos]
 
         return DataLoader(load_fn=load_fn)
 

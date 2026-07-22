@@ -252,7 +252,7 @@ class TestPurge:
                 AppConfigFragmentRow(
                     config_name=existing_entry.config_name,
                     scope_type=existing_entry.scope_type,
-                    scope_id="public",
+                    scope_id=None,
                     config={"k": "v"},
                 )
             )
@@ -282,7 +282,7 @@ class TestPurge:
                 AppConfigFragmentRow(
                     config_name=entry.config_name,
                     scope_type=entry.scope_type,
-                    scope_id="public",
+                    scope_id=None,
                     config={"k": "v"},
                 )
             )

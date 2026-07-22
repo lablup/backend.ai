@@ -868,6 +868,7 @@ class ScheduleDBSource:
         reason: str = "USER_REQUESTED",
         *,
         forced: bool = False,
+        message: str = "mark_terminating success",
     ) -> MarkTerminatingResult:
         """
         Mark sessions and their kernels as TERMINATING (or directly TERMINATED when forced).
@@ -891,7 +892,11 @@ class ScheduleDBSource:
                 # 2b. Normal: mark sessions as TERMINATING
                 force_terminated_sessions = []
                 terminating_sessions = await self._mark_sessions_as_terminating(
-                    db_sess, session_ids, reason, now
+                    db_sess,
+                    session_ids,
+                    reason,
+                    now,
+                    message=message,
                 )
 
             # 3. Mark unprocessed sessions as skipped
@@ -1001,7 +1006,12 @@ class ScheduleDBSource:
         return cancelled_sessions
 
     async def _mark_sessions_as_terminating(
-        self, db_sess: SASession, session_ids: list[SessionId], reason: str, now: datetime
+        self,
+        db_sess: SASession,
+        session_ids: list[SessionId],
+        reason: str,
+        now: datetime,
+        message: str,
     ) -> list[SessionId]:
         """Mark terminatable sessions and their kernels as terminating."""
         # Capture from_statuses before update
@@ -1063,14 +1073,14 @@ class ScheduleDBSource:
             # Record scheduling history for terminating transition
             history_specs = [
                 SessionSchedulingHistoryCreatorSpec(
-                    session_id=sid,
+                    session_id=session_id,
                     phase="mark_terminating",
                     result=SchedulingResult.SUCCESS,
-                    message="mark_terminating success",
-                    from_status=from_statuses.get(sid),
+                    message=message,
+                    from_status=from_statuses.get(session_id),
                     to_status=SessionStatus.TERMINATING,
                 )
-                for sid in terminating_sessions
+                for session_id in terminating_sessions
             ]
             await self._record_scheduling_history(db_sess, BulkCreator(specs=history_specs))
 
