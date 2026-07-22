@@ -85,7 +85,8 @@ class AppConfigFragmentProcessors(AbstractProcessorPackage):
             service.get, action_monitors, validators=[validators.rbac.single_entity]
         )
         # admin_search is system-wide (all scopes), so it belongs to no RBAC scope: the
-        # global processor gates it on the SUPERADMIN role instead of a scope chain.
+        # global processor's SUPERADMIN gate authorizes it. Non-admins use scoped_search,
+        # which is validated at the scope it names.
         self.admin_search = GlobalActionProcessor(service.admin_search, action_monitors)
         self.scoped_search = ScopeActionProcessor(
             service.scoped_search, action_monitors, validators=[validators.rbac.scope]
