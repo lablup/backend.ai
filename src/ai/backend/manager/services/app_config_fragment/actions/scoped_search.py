@@ -53,7 +53,8 @@ class ScopedSearchAppConfigFragmentAction(AppConfigFragmentScopeAction):
 
 @dataclass
 class ScopedSearchAppConfigFragmentActionResult(AppConfigFragmentScopeActionResult):
-    scope: AppConfigFragmentSearchScope
+    #: The searched scope, carried only to report the RBAC scope — not part of the result data.
+    _scope: AppConfigFragmentSearchScope
     data: list[AppConfigFragmentData]
     total_count: int
     has_next_page: bool
@@ -61,8 +62,8 @@ class ScopedSearchAppConfigFragmentActionResult(AppConfigFragmentScopeActionResu
 
     @override
     def scope_type(self) -> ScopeType:
-        return self.scope.scope_type.to_rbac_scope_type()
+        return self._scope.scope_type.to_rbac_scope_type()
 
     @override
     def scope_id(self) -> str:
-        return self.scope.scope_type.to_rbac_scope_id(self.scope.scope_id)
+        return self._scope.scope_type.to_rbac_scope_id(self._scope.scope_id)
