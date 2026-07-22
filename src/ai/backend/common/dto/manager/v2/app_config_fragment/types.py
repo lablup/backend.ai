@@ -3,31 +3,43 @@
 from __future__ import annotations
 
 from enum import StrEnum
-from uuid import UUID
 
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.data.app_config.types import AppConfigScopeType
+from ai.backend.common.identifier.app_config import AppConfigScopeID
 
 __all__ = (
-    "AppConfigFragmentDomainScope",
     "AppConfigFragmentOrderField",
-    "AppConfigFragmentUserScope",
+    "AppConfigFragmentScope",
+    "AppConfigFragmentSearchScopeType",
     "AppConfigScopeTypeFilter",
 )
 
 
-class AppConfigFragmentDomainScope(BaseRequestModel):
-    """Scope for a domain-scoped app config fragment search."""
+class AppConfigFragmentSearchScopeType(StrEnum):
+    """The scope a scoped fragment search may act at.
 
-    domain_id: UUID = Field(description="Domain whose fragments to search.")
+    A subset of :class:`AppConfigScopeType`: a scoped search is authorized against one
+    owned RBAC scope, and ``public`` maps to the global scope, which has no scope element
+    to check. Whether public fragments should be reachable from a scoped search is still
+    open — until it is decided, the type says they are not.
+    """
+
+    DOMAIN = "domain"
+    USER = "user"
 
 
-class AppConfigFragmentUserScope(BaseRequestModel):
-    """Scope for a user-scoped app config fragment search."""
+class AppConfigFragmentScope(BaseRequestModel):
+    """The scope a scoped app config fragment search acts at."""
 
-    user_id: UUID = Field(description="User whose fragments to search.")
+    scope_type: AppConfigFragmentSearchScopeType = Field(
+        description="Scope the search acts at (domain | user)."
+    )
+    scope_id: AppConfigScopeID = Field(
+        description="Scope identifier: the domain id (domain scope) or the user id (user scope)."
+    )
 
 
 class AppConfigScopeTypeFilter(BaseRequestModel):

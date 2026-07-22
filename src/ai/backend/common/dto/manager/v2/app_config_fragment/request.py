@@ -10,9 +10,8 @@ from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter
 from ai.backend.common.dto.manager.v2.app_config_fragment.types import (
-    AppConfigFragmentDomainScope,
     AppConfigFragmentOrderField,
-    AppConfigFragmentUserScope,
+    AppConfigFragmentScope,
     AppConfigScopeTypeFilter,
 )
 from ai.backend.common.dto.manager.v2.common import OrderDirection
@@ -27,9 +26,8 @@ __all__ = (
     "BulkPurgeAppConfigFragmentInput",
     "BulkUpdateAppConfigFragmentInput",
     "CreateAppConfigFragmentInput",
-    "DomainScopedSearchAppConfigFragmentInput",
+    "ScopedSearchAppConfigFragmentInput",
     "UpdateAppConfigFragmentInput",
-    "UserScopedSearchAppConfigFragmentInput",
 )
 
 
@@ -142,29 +140,10 @@ class AdminSearchAppConfigFragmentInput(BaseRequestModel):
     )
 
 
-class DomainScopedSearchAppConfigFragmentInput(BaseRequestModel):
-    """Input for a fragment search scoped to one domain."""
+class ScopedSearchAppConfigFragmentInput(BaseRequestModel):
+    """Input for a fragment search scoped to one domain or user."""
 
-    scope: AppConfigFragmentDomainScope = Field(description="Domain the search acts at.")
-    order: list[AppConfigFragmentOrder] | None = Field(
-        default=None, description="Order specifiers, applied in sequence."
-    )
-    first: int | None = Field(default=None, ge=1, description="Cursor-forward page size.")
-    after: str | None = Field(default=None, description="Cursor-forward start cursor.")
-    last: int | None = Field(default=None, ge=1, description="Cursor-backward page size.")
-    before: str | None = Field(default=None, description="Cursor-backward end cursor.")
-    limit: int | None = Field(
-        default=None, ge=1, description="Offset-based: maximum number of results."
-    )
-    offset: int | None = Field(
-        default=None, ge=0, description="Offset-based: number of results to skip."
-    )
-
-
-class UserScopedSearchAppConfigFragmentInput(BaseRequestModel):
-    """Input for a fragment search scoped to one user."""
-
-    scope: AppConfigFragmentUserScope = Field(description="User the search acts at.")
+    scope: AppConfigFragmentScope = Field(description="Scope the search acts at.")
     order: list[AppConfigFragmentOrder] | None = Field(
         default=None, description="Order specifiers, applied in sequence."
     )

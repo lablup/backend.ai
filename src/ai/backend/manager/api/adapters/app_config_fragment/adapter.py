@@ -13,9 +13,8 @@ from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
     BulkPurgeAppConfigFragmentInput,
     BulkUpdateAppConfigFragmentInput,
     CreateAppConfigFragmentInput,
-    DomainScopedSearchAppConfigFragmentInput,
+    ScopedSearchAppConfigFragmentInput,
     UpdateAppConfigFragmentInput,
-    UserScopedSearchAppConfigFragmentInput,
 )
 from ai.backend.common.dto.manager.v2.app_config_fragment.response import (
     AppConfigFragmentBulkErrorInfo,
@@ -29,6 +28,7 @@ from ai.backend.common.dto.manager.v2.app_config_fragment.response import (
 )
 from ai.backend.common.dto.manager.v2.app_config_fragment.types import (
     AppConfigFragmentOrderField,
+    AppConfigFragmentSearchScopeType,
     AppConfigScopeTypeFilter,
 )
 from ai.backend.common.dto.manager.v2.common import OrderDirection
@@ -75,6 +75,7 @@ from ai.backend.manager.services.app_config_fragment.actions.create import (
 )
 from ai.backend.manager.services.app_config_fragment.actions.domain_scoped_search import (
     DomainScopedSearchAppConfigFragmentAction,
+    DomainScopedSearchAppConfigFragmentActionResult,
 )
 from ai.backend.manager.services.app_config_fragment.actions.get import (
     GetAppConfigFragmentAction,
@@ -87,6 +88,7 @@ from ai.backend.manager.services.app_config_fragment.actions.update import (
 )
 from ai.backend.manager.services.app_config_fragment.actions.user_scoped_search import (
     UserScopedSearchAppConfigFragmentAction,
+    UserScopedSearchAppConfigFragmentActionResult,
 )
 from ai.backend.manager.types import OptionalState
 
@@ -217,41 +219,14 @@ class AppConfigFragmentAdapter(BaseAdapter):
 
     # --- scoped fragment search (principal-visibility) ---
 
-    async def domain_scoped_search(
-        self, input: DomainScopedSearchAppConfigFragmentInput
+    async def scoped_search(
+        self, input: ScopedSearchAppConfigFragmentInput
     ) -> SearchAppConfigFragmentPayload:
-        orders = self._convert_orders(input.order) if input.order else []
-        querier = self._build_querier(
-            conditions=[],
-            orders=orders,
-            pagination_spec=_get_app_config_fragment_pagination_spec(),
-            first=input.first,
-            after=input.after,
-            last=input.last,
-            before=input.before,
-            limit=input.limit,
-            offset=input.offset,
-        )
-        action_result = (
-            await self._processors.app_config_fragment.domain_scoped_search.wait_for_complete(
-                DomainScopedSearchAppConfigFragmentAction(
-                    scope=DomainAppConfigFragmentSearchScope(
-                        domain_id=DomainID(input.scope.domain_id)
-                    ),
-                    querier=querier,
-                )
-            )
-        )
-        return SearchAppConfigFragmentPayload(
-            items=[self._fragment_to_node(item) for item in action_result.data],
-            total_count=action_result.total_count,
-            has_next_page=action_result.has_next_page,
-            has_previous_page=action_result.has_previous_page,
-        )
+        """Search the fragments written at one domain / user scope.
 
-    async def user_scoped_search(
-        self, input: UserScopedSearchAppConfigFragmentInput
-    ) -> SearchAppConfigFragmentPayload:
+        Each scope is its own RBAC-validated scope action, so the scope type selects the
+        action rather than being carried into a single one as data.
+        """
         orders = self._convert_orders(input.order) if input.order else []
         querier = self._build_querier(
             conditions=[],
@@ -264,14 +239,30 @@ class AppConfigFragmentAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        action_result = (
-            await self._processors.app_config_fragment.user_scoped_search.wait_for_complete(
-                UserScopedSearchAppConfigFragmentAction(
-                    scope=UserAppConfigFragmentSearchScope(user_id=UserID(input.scope.user_id)),
-                    querier=querier,
-                )
-            )
+        processors = self._processors.app_config_fragment
+        action_result: (
+            DomainScopedSearchAppConfigFragmentActionResult
+            | UserScopedSearchAppConfigFragmentActionResult
         )
+        match input.scope.scope_type:
+            case AppConfigFragmentSearchScopeType.DOMAIN:
+                action_result = await processors.domain_scoped_search.wait_for_complete(
+                    DomainScopedSearchAppConfigFragmentAction(
+                        scope=DomainAppConfigFragmentSearchScope(
+                            domain_id=DomainID(input.scope.scope_id)
+                        ),
+                        querier=querier,
+                    )
+                )
+            case AppConfigFragmentSearchScopeType.USER:
+                action_result = await processors.user_scoped_search.wait_for_complete(
+                    UserScopedSearchAppConfigFragmentAction(
+                        scope=UserAppConfigFragmentSearchScope(
+                            user_id=UserID(input.scope.scope_id)
+                        ),
+                        querier=querier,
+                    )
+                )
         return SearchAppConfigFragmentPayload(
             items=[self._fragment_to_node(item) for item in action_result.data],
             total_count=action_result.total_count,
