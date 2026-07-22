@@ -72,7 +72,7 @@ class TestAdminCreate:
 
         call_args = mock_session.request.call_args
         assert call_args[0][0] == "POST"
-        assert str(call_args[0][1]).endswith("/v2/app-config-allow-list/")
+        assert str(call_args[0][1]).endswith("/v2/app-config-allow-lists/")
         assert isinstance(result, CreateAppConfigAllowListPayload)
         assert result.app_config_allow_list.config_name == "theme"
         assert result.app_config_allow_list.scope_type == AppConfigScopeType.DOMAIN
@@ -98,7 +98,7 @@ class TestAdminSearch:
 
         call_args = mock_session.request.call_args
         assert call_args[0][0] == "POST"
-        assert "/v2/app-config-allow-list/search" in str(call_args[0][1])
+        assert "/v2/app-config-allow-lists/search" in str(call_args[0][1])
         assert isinstance(result, SearchAppConfigAllowListPayload)
         assert [item.config_name for item in result.items] == ["menu"]
         assert result.total_count == 1
@@ -117,7 +117,7 @@ class TestAdminGet:
 
         call_args = mock_session.request.call_args
         assert call_args[0][0] == "GET"
-        assert str(call_args[0][1]).endswith(f"/v2/app-config-allow-list/{entry_id}")
+        assert str(call_args[0][1]).endswith(f"/v2/app-config-allow-lists/{entry_id}")
         assert isinstance(result, AppConfigAllowListNode)
         assert result.config_name == "preferences"
 
@@ -140,7 +140,7 @@ class TestAdminUpdate:
 
         call_args = mock_session.request.call_args
         assert call_args[0][0] == "PATCH"
-        assert str(call_args[0][1]).endswith(f"/v2/app-config-allow-list/{entry_id}")
+        assert str(call_args[0][1]).endswith(f"/v2/app-config-allow-lists/{entry_id}")
         assert isinstance(result, UpdateAppConfigAllowListPayload)
         assert result.app_config_allow_list.rank == 250
 
@@ -158,6 +158,6 @@ class TestAdminPurge:
 
         call_args = mock_session.request.call_args
         assert call_args[0][0] == "DELETE"
-        assert str(call_args[0][1]).endswith(f"/v2/app-config-allow-list/{entry_id}")
+        assert str(call_args[0][1]).endswith(f"/v2/app-config-allow-lists/{entry_id}")
         assert isinstance(result, PurgeAppConfigAllowListPayload)
         assert result.id == entry_id

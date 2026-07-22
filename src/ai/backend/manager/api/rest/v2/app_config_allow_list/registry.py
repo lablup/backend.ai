@@ -19,6 +19,10 @@ def register_v2_app_config_allow_list_routes(
 ) -> RouteRegistry:
     """Register all REST v2 app config allow-list routes (superadmin only).
 
+    The allow-list is an admin-only entity — every route is ``superadmin_required`` — so
+    it carries no scoped search counterpart to ``/search``. A non-admin never queries the
+    allow-list directly; it is read through the app config resolve path.
+
     Layout:
         POST   /                            register an allow-list entry
         POST   /search                      paginated search
@@ -26,7 +30,7 @@ def register_v2_app_config_allow_list_routes(
         PATCH  /{app_config_allow_list_id}  update (rank) by id
         DELETE /{app_config_allow_list_id}  purge by id
     """
-    registry = RouteRegistry.create("app-config-allow-list", route_deps.cors_options)
+    registry = RouteRegistry.create("app-config-allow-lists", route_deps.cors_options)
 
     registry.add("POST", "/", handler.admin_create, middlewares=[superadmin_required])
     registry.add("POST", "/search", handler.admin_search, middlewares=[superadmin_required])

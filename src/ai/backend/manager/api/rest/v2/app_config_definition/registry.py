@@ -19,6 +19,10 @@ def register_v2_app_config_definition_routes(
 ) -> RouteRegistry:
     """Register all REST v2 app config definition routes (superadmin only).
 
+    A config definition is an admin-only entity — every route is ``superadmin_required`` —
+    so it carries no scoped search counterpart to ``/search``. A non-admin never queries
+    definitions directly; they are read through the app config resolve path.
+
     Layout:
         POST   /                              register a config definition
         POST   /search                        paginated search

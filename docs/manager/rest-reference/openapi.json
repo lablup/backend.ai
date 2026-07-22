@@ -39942,11 +39942,11 @@
         "description": "Purge a fragment by id (auth required, RBAC-gated).\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
-    "/v2/app-config-allow-list/": {
+    "/v2/app-config-allow-lists/": {
       "post": {
-        "operationId": "v2/app-config-allow-list.admin_create",
+        "operationId": "v2/app-config-allow-lists.admin_create",
         "tags": [
-          "v2/app-config-allow-list"
+          "v2/app-config-allow-lists"
         ],
         "responses": {
           "200": {
@@ -39971,11 +39971,11 @@
         "description": "Register a new app config allow-list entry (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
-    "/v2/app-config-allow-list/search": {
+    "/v2/app-config-allow-lists/search": {
       "post": {
-        "operationId": "v2/app-config-allow-list.admin_search",
+        "operationId": "v2/app-config-allow-lists.admin_search",
         "tags": [
-          "v2/app-config-allow-list"
+          "v2/app-config-allow-lists"
         ],
         "responses": {
           "200": {
@@ -40000,11 +40000,11 @@
         "description": "Search app config allow-list entries with pagination (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
-    "/v2/app-config-allow-list/{app_config_allow_list_id}": {
+    "/v2/app-config-allow-lists/{app_config_allow_list_id}": {
       "get": {
-        "operationId": "v2/app-config-allow-list.admin_get",
+        "operationId": "v2/app-config-allow-lists.admin_get",
         "tags": [
-          "v2/app-config-allow-list"
+          "v2/app-config-allow-lists"
         ],
         "responses": {
           "200": {
@@ -40029,9 +40029,9 @@
         "description": "Get an app config allow-list entry by id (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       },
       "patch": {
-        "operationId": "v2/app-config-allow-list.admin_update",
+        "operationId": "v2/app-config-allow-lists.admin_update",
         "tags": [
-          "v2/app-config-allow-list"
+          "v2/app-config-allow-lists"
         ],
         "responses": {
           "200": {
@@ -40065,9 +40065,9 @@
         "description": "Update an app config allow-list entry's rank by id (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       },
       "delete": {
-        "operationId": "v2/app-config-allow-list.admin_purge",
+        "operationId": "v2/app-config-allow-lists.admin_purge",
         "tags": [
-          "v2/app-config-allow-list"
+          "v2/app-config-allow-lists"
         ],
         "responses": {
           "200": {

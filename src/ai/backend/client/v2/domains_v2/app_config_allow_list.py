@@ -19,7 +19,7 @@ from ai.backend.common.dto.manager.v2.app_config_allow_list.response import (
     UpdateAppConfigAllowListPayload,
 )
 
-_PATH: Final = "/v2/app-config-allow-list"
+_PATH: Final = "/v2/app-config-allow-lists"
 
 
 class V2AppConfigAllowListClient(BaseDomainClient):
