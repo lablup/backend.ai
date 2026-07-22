@@ -9,12 +9,16 @@ from typing import Any, override
 import sqlalchemy as sa
 
 from ai.backend.common.data.app_config.types import AppConfigScopeType
+from ai.backend.common.exception import UserNotFound
 from ai.backend.common.identifier.app_config import AppConfigScopeID
 from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.user import UserID
+from ai.backend.manager.errors.resource import DomainNotFound
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
 from ai.backend.manager.models.clauses import QueryCondition
+from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.scopes import ExistenceCheck, SearchScope
+from ai.backend.manager.models.user import UserRow
 
 __all__ = (
     "AppConfigFragmentSearchScope",
@@ -49,8 +53,9 @@ class ResolvedAppConfigScope:
 class AppConfigFragmentSearchScope(SearchScope):
     """The fragments written at one scope, matching the row's ``(scope_type, scope_id)``.
 
-    ``existence_checks`` is empty: RBAC already gates whether the caller can reach the
-    scope, so a missing owner is indistinguishable from an unreachable one.
+    The owner named by ``scope_id`` is existence-checked so a search at a scope that does
+    not exist is a 404 rather than an empty page. RBAC cannot stand in for that: the scope
+    validator returns early for superadmins and when RBAC enforcement is disabled.
     """
 
     scope_type: AppConfigScopeType
@@ -75,4 +80,23 @@ class AppConfigFragmentSearchScope(SearchScope):
     @property
     @override
     def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
-        return ()
+        match self.scope_type:
+            case AppConfigScopeType.PUBLIC:
+                # Global scope — no owner row to check.
+                return ()
+            case AppConfigScopeType.DOMAIN:
+                return [
+                    ExistenceCheck(
+                        column=DomainRow.id,
+                        value=self.scope_id,
+                        error=DomainNotFound(extra_data={"domain_id": str(self.scope_id)}),
+                    ),
+                ]
+            case AppConfigScopeType.USER:
+                return [
+                    ExistenceCheck(
+                        column=UserRow.uuid,
+                        value=self.scope_id,
+                        error=UserNotFound(extra_data={"user_id": str(self.scope_id)}),
+                    ),
+                ]
