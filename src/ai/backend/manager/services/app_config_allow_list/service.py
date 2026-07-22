@@ -4,8 +4,8 @@ from ai.backend.manager.repositories.app_config_allow_list.repository import (
     AppConfigAllowListRepository,
 )
 from ai.backend.manager.services.app_config_allow_list.actions.admin_search import (
-    AdminAdminSearchAppConfigAllowListActionResult,
     AdminSearchAppConfigAllowListAction,
+    SearchAppConfigAllowListActionResult,
 )
 from ai.backend.manager.services.app_config_allow_list.actions.create import (
     CreateAppConfigAllowListAction,
@@ -45,9 +45,9 @@ class AppConfigAllowListService:
 
     async def admin_search(
         self, action: AdminSearchAppConfigAllowListAction
-    ) -> AdminAdminSearchAppConfigAllowListActionResult:
+    ) -> SearchAppConfigAllowListActionResult:
         result = await self._repository.admin_search(action.querier)
-        return AdminAdminSearchAppConfigAllowListActionResult(
+        return SearchAppConfigAllowListActionResult(
             data=result.items,
             total_count=result.total_count,
             has_next_page=result.has_next_page,

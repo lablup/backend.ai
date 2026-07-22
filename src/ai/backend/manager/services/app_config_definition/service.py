@@ -4,8 +4,8 @@ from ai.backend.manager.repositories.app_config_definition.repository import (
     AppConfigDefinitionRepository,
 )
 from ai.backend.manager.services.app_config_definition.actions.admin_search import (
-    AdminAdminSearchAppConfigDefinitionsActionResult,
     AdminSearchAppConfigDefinitionsAction,
+    SearchAppConfigDefinitionsActionResult,
 )
 from ai.backend.manager.services.app_config_definition.actions.create import (
     CreateAppConfigDefinitionAction,
@@ -41,9 +41,9 @@ class AppConfigDefinitionService:
 
     async def admin_search(
         self, action: AdminSearchAppConfigDefinitionsAction
-    ) -> AdminAdminSearchAppConfigDefinitionsActionResult:
+    ) -> SearchAppConfigDefinitionsActionResult:
         result = await self._repository.admin_search(action.querier)
-        return AdminAdminSearchAppConfigDefinitionsActionResult(
+        return SearchAppConfigDefinitionsActionResult(
             data=result.items,
             total_count=result.total_count,
             has_next_page=result.has_next_page,

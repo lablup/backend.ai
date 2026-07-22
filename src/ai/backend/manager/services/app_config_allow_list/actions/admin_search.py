@@ -29,7 +29,7 @@ class AdminSearchAppConfigAllowListAction(AppConfigAllowListGlobalAction):
 
 
 @dataclass
-class AdminAdminSearchAppConfigAllowListActionResult(BaseActionResult):
+class SearchAppConfigAllowListActionResult(BaseActionResult):
     data: list[AppConfigAllowListData]
     total_count: int
     has_next_page: bool

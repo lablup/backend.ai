@@ -8,8 +8,8 @@ from ai.backend.manager.actions.processor.scope import ScopeActionProcessor
 from ai.backend.manager.actions.processor.single_entity import SingleEntityActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.services.app_config_allow_list.actions.admin_search import (
-    AdminAdminSearchAppConfigAllowListActionResult,
     AdminSearchAppConfigAllowListAction,
+    SearchAppConfigAllowListActionResult,
 )
 from ai.backend.manager.services.app_config_allow_list.actions.create import (
     CreateAppConfigAllowListAction,
@@ -38,7 +38,7 @@ class AppConfigAllowListProcessors(AbstractProcessorPackage):
     ]
     get: SingleEntityActionProcessor[GetAppConfigAllowListAction, GetAppConfigAllowListActionResult]
     admin_search: GlobalActionProcessor[
-        AdminSearchAppConfigAllowListAction, AdminAdminSearchAppConfigAllowListActionResult
+        AdminSearchAppConfigAllowListAction, SearchAppConfigAllowListActionResult
     ]
     update: SingleEntityActionProcessor[
         UpdateAppConfigAllowListAction, UpdateAppConfigAllowListActionResult

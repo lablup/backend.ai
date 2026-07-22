@@ -8,8 +8,8 @@ from ai.backend.manager.actions.processor.scope import ScopeActionProcessor
 from ai.backend.manager.actions.processor.single_entity import SingleEntityActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
 from ai.backend.manager.services.app_config_definition.actions.admin_search import (
-    AdminAdminSearchAppConfigDefinitionsActionResult,
     AdminSearchAppConfigDefinitionsAction,
+    SearchAppConfigDefinitionsActionResult,
 )
 from ai.backend.manager.services.app_config_definition.actions.create import (
     CreateAppConfigDefinitionAction,
@@ -36,7 +36,7 @@ class AppConfigDefinitionProcessors(AbstractProcessorPackage):
         GetAppConfigDefinitionAction, GetAppConfigDefinitionActionResult
     ]
     admin_search: GlobalActionProcessor[
-        AdminSearchAppConfigDefinitionsAction, AdminAdminSearchAppConfigDefinitionsActionResult
+        AdminSearchAppConfigDefinitionsAction, SearchAppConfigDefinitionsActionResult
     ]
     purge: SingleEntityActionProcessor[
         PurgeAppConfigDefinitionAction, PurgeAppConfigDefinitionActionResult

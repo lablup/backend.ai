@@ -29,7 +29,7 @@ class AdminSearchAppConfigDefinitionsAction(AppConfigDefinitionGlobalAction):
 
 
 @dataclass
-class AdminAdminSearchAppConfigDefinitionsActionResult(BaseActionResult):
+class SearchAppConfigDefinitionsActionResult(BaseActionResult):
     data: list[AppConfigDefinitionData]
     total_count: int
     has_next_page: bool
