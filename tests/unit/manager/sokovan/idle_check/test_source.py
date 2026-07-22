@@ -1,11 +1,36 @@
 from __future__ import annotations
 
-from datetime import UTC
+from dataclasses import dataclass
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
+from uuid import uuid4
 
+import pytest
+
+from ai.backend.common.identifier.idle_checker import IdleCheckerID
+from ai.backend.common.types import SessionId
 from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.repositories.idle_checker.types import (
+    SessionIdleCheckPair,
+    SessionIdleCheckPairBatchData,
+)
+from ai.backend.manager.sokovan.idle_check.assignment_sync.source import (
+    IdleCheckAssignmentSyncSource,
+)
 from ai.backend.manager.sokovan.idle_check.source import IdleCheckSource
 from ai.backend.manager.sokovan.idle_check.types import IdleCheckCategory, IdleCheckTargetStatuses
+
+
+@dataclass(frozen=True)
+class AssignmentSyncSourceCase:
+    source: IdleCheckAssignmentSyncSource
+    repository: MagicMock
+    target_statuses: IdleCheckTargetStatuses
+    session_id: SessionId
+    first_checker_id: IdleCheckerID
+    second_checker_id: IdleCheckerID
+    existing_pair: SessionIdleCheckPair
+    now: datetime
 
 
 class TestIdleCheckSource:
@@ -24,3 +49,59 @@ class TestIdleCheckSource:
         assert reconcile_info.batch is batch
         repository.fetch_judgment_batch.assert_awaited_once_with(target_statuses.session_statuses)
         assert reconcile_info.current_time.tzinfo == UTC
+
+
+class TestIdleCheckAssignmentSyncSource:
+    @pytest.fixture
+    def assignment_sync_source_case(self) -> AssignmentSyncSourceCase:
+        session_id = SessionId(uuid4())
+        first_checker_id = IdleCheckerID(uuid4())
+        second_checker_id = IdleCheckerID(uuid4())
+        existing_pair = SessionIdleCheckPair(SessionId(uuid4()), IdleCheckerID(uuid4()))
+        desired_pairs = [
+            SessionIdleCheckPair(session_id, first_checker_id),
+            SessionIdleCheckPair(session_id, second_checker_id),
+        ]
+        now = datetime(2026, 7, 22, tzinfo=UTC)
+        current_batch = SessionIdleCheckPairBatchData(
+            pairs=(existing_pair,),
+            now=now,
+        )
+        repository = MagicMock()
+        repository.fetch_desired_session_idle_check_pairs = AsyncMock(return_value=desired_pairs)
+        repository.fetch_current_session_idle_checks = AsyncMock(return_value=current_batch)
+        target_statuses = IdleCheckTargetStatuses(
+            session_statuses=frozenset({SessionStatus.RUNNING})
+        )
+        return AssignmentSyncSourceCase(
+            source=IdleCheckAssignmentSyncSource(repository),
+            repository=repository,
+            target_statuses=target_statuses,
+            session_id=session_id,
+            first_checker_id=first_checker_id,
+            second_checker_id=second_checker_id,
+            existing_pair=existing_pair,
+            now=now,
+        )
+
+    async def test_returns_desired_and_current_pairs(
+        self,
+        assignment_sync_source_case: AssignmentSyncSourceCase,
+    ) -> None:
+        case = assignment_sync_source_case
+
+        reconcile_info = await case.source.fetch_reconcile_info(
+            IdleCheckCategory.IDLE,
+            case.target_statuses,
+        )
+
+        assert reconcile_info.desired_pairs == [
+            SessionIdleCheckPair(case.session_id, case.first_checker_id),
+            SessionIdleCheckPair(case.session_id, case.second_checker_id),
+        ]
+        assert reconcile_info.current_pairs == (case.existing_pair,)
+        assert reconcile_info.now() == case.now
+        case.repository.fetch_desired_session_idle_check_pairs.assert_awaited_once_with(
+            case.target_statuses.session_statuses
+        )
+        case.repository.fetch_current_session_idle_checks.assert_awaited_once_with()
