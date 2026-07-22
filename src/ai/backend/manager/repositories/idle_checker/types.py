@@ -45,7 +45,9 @@ class SessionIdleCheckPair:
 
 @dataclass(frozen=True)
 class SessionIdleCheckAssignmentData:
+    # Pairs that should exist, derived from enabled checker scope bindings.
     desired_pairs: Sequence[SessionIdleCheckPair]
+    # Existing pairs for sessions in the target statuses, excluding terminal sessions.
     current_pairs: Sequence[SessionIdleCheckPair]
     now: datetime
 
