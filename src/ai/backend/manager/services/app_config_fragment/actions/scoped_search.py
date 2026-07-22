@@ -44,11 +44,16 @@ class ScopedSearchAppConfigFragmentAction(AppConfigFragmentScopeAction):
 
     @override
     def target_element(self) -> RBACElementRef:
-        element = self.scope.scope_type.to_rbac_element_type()
-        if element is None:
+        """The element RBAC enters the permission chain at — the scope owner, not the fragment.
+
+        A domain / user scope resolves from its owner element. ``public`` is global and owns
+        no element, so it names the fragment element with an empty id, which only a
+        superadmin passes.
+        """
+        owner_element = self.scope.scope_type.to_rbac_element_type()
+        if owner_element is None:
             return RBACElementRef(RBACElementType.APP_CONFIG_FRAGMENT, "")
-        # A non-null element type means domain or user scope, which always carries an owner.
-        return RBACElementRef(element, str(self.scope.scope_id))
+        return RBACElementRef(owner_element, str(self.scope.scope_id))
 
 
 @dataclass
