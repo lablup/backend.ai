@@ -4,14 +4,10 @@ import logging
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from datetime import datetime
 
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
-from ai.backend.common.identifier.resource_group import ResourceGroupName
 from ai.backend.common.types import (
-    AgentId,
     AgentSelectionStrategy,
-    ResourceSlot,
     SessionId,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
@@ -22,17 +18,12 @@ from ai.backend.manager.metrics.scheduler import (
 from ai.backend.manager.repositories.fair_share import FairShareRepository
 from ai.backend.manager.repositories.scheduler import SchedulerRepository
 from ai.backend.manager.sokovan.recorder import (
-    ExecutionRecord,
     RecorderContext,
-    StepStatus,
 )
 from ai.backend.manager.sokovan.scheduler.results import ScheduleResult
 from ai.backend.manager.views.sokovan.allocation import (
-    AgentAllocation,
-    AllocationBatch,
     KernelAllocation,
     SchedulingFailure,
-    SchedulingPredicate,
     SessionAllocation,
 )
 from ai.backend.manager.views.sokovan.resource_group import ResourceGroupMeta
@@ -40,7 +31,6 @@ from ai.backend.manager.views.sokovan.scheduling import SchedulingData
 from ai.backend.manager.views.sokovan.snapshot import SystemSnapshot
 from ai.backend.manager.views.sokovan.workload import SessionWorkload
 
-from .allocators.allocator import SchedulingAllocator
 from .selectors.concentrated import ConcentratedAgentSelector
 from .selectors.dispersed import DispersedAgentSelector
 from .selectors.legacy import LegacyAgentSelector
@@ -90,7 +80,6 @@ class SessionProvisionerArgs:
     validator: SchedulingValidator
     default_sequencer: WorkloadSequencer
     default_agent_selector: AgentSelector
-    allocator: SchedulingAllocator
     repository: SchedulerRepository
     fair_share_repository: FairShareRepository
     config_provider: ManagerConfigProvider
@@ -105,13 +94,12 @@ class SessionProvisioner:
     1. Validation (via validators)
     2. Sequencing (via sequencers)
     3. Agent selection (via selectors)
-    4. Resource allocation (via allocators)
+    4. Resource allocation (via the repository; a sokovan reconciler applier will take this over)
     """
 
     _validator: SchedulingValidator
     _default_sequencer: WorkloadSequencer
     _default_agent_selector: AgentSelector
-    _allocator: SchedulingAllocator
     _repository: SchedulerRepository
     _fair_share_repository: FairShareRepository
     _config_provider: ManagerConfigProvider
@@ -124,7 +112,6 @@ class SessionProvisioner:
         self._validator = args.validator
         self._default_sequencer = args.default_sequencer
         self._default_agent_selector = args.default_agent_selector
-        self._allocator = args.allocator
         self._repository = args.repository
         self._fair_share_repository = args.fair_share_repository
         self._config_provider = args.config_provider
@@ -167,7 +154,6 @@ class SessionProvisioner:
     async def schedule_resource_group(
         self,
         scheduling_data: SchedulingData,
-        provision_time: datetime,
     ) -> ScheduleResult:
         """
         Schedule sessions for a specific resource group.
@@ -213,9 +199,6 @@ class SessionProvisioner:
         session_allocations: list[SessionAllocation] = []
         scheduling_failures: list[SchedulingFailure] = []
 
-        # Get current pool from RecorderContext (scope opened by coordinator)
-        pool = RecorderContext[SessionId].current_pool()
-
         for session_workload in sequenced_workloads:
             try:
                 # Sequencing phase is automatically included via shared phases
@@ -230,26 +213,13 @@ class SessionProvisioner:
                     session_workload.meta.session_id,
                     e,
                 )
-                # Get execution record from pool and convert to SchedulingFailure
-                record = pool.get_record(session_workload.meta.session_id)
-                passed, failed = self._convert_record_to_predicates(record)
-                failure = SchedulingFailure(
-                    session_id=session_workload.meta.session_id,
-                    passed_phases=passed,
-                    failed_phases=failed,
-                    last_try=provision_time,
-                    msg=str(e),
+                scheduling_failures.append(
+                    SchedulingFailure(
+                        session_id=session_workload.meta.session_id,
+                        msg=str(e),
+                    )
                 )
-                scheduling_failures.append(failure)
                 continue
-
-        # Convert execution records to passed_phases/failed_phases for allocations
-        for allocation in session_allocations:
-            record = pool.get_record(allocation.session_id)
-            if record:
-                passed, failed = self._convert_record_to_predicates(record)
-                allocation.passed_phases = passed
-                allocation.failed_phases = failed
 
         log.info(
             "Processing {} allocations and {} failures in resource group {}",
@@ -257,13 +227,8 @@ class SessionProvisioner:
             len(scheduling_failures),
             resource_group_id,
         )
-        # Create batch with allocations and failures
-        batch = AllocationBatch(
-            allocations=session_allocations,
-            failures=scheduling_failures,
-        )
         with self._phase_metrics.measure_phase("scheduler", resource_group_id, "allocation"):
-            scheduled_session_ids = await self._allocator.allocate(batch)
+            scheduled_session_ids = await self._repository.allocate_sessions(session_allocations)
 
         failure_ids = [f.session_id for f in scheduling_failures]
         await self._valkey_schedule.set_pending_queue(state.resource_group.name, failure_ids)
@@ -304,10 +269,8 @@ class SessionProvisioner:
                     )
 
         # Phase 3: Allocation (prepare)
-        with recorder.phase("allocation", success_detail=self._allocator.success_message()):
-            with recorder.step(
-                self._allocator.name(), success_detail=self._allocator.success_message()
-            ):
+        with recorder.phase("allocation", success_detail="Session allocation prepared"):
+            with recorder.step("allocation", success_detail="Session allocation prepared"):
                 # Update the snapshot to reflect this allocation
                 # Note: agent state changes are already committed into the trackers
                 self._update_system_snapshot(
@@ -372,107 +335,33 @@ class SessionProvisioner:
         )
 
         # Build session allocation from selections
-        return self._build_session_allocation(
-            session_workload, selections, plan, state.resource_group.name
-        )
+        return self._build_session_allocation(session_workload, selections, plan)
 
     @staticmethod
     def _build_session_allocation(
         session_workload: SessionWorkload,
         selections: list[AgentSelection],
         plan: PlacementPlan,
-        resource_group_name: ResourceGroupName,
     ) -> SessionAllocation:
-        """Build a SessionAllocation from agent selection results.
+        """Build the write-boundary allocation from agent selection results.
 
-        ``selections`` are order-aligned with the criteria requirements
-        (the selection is all-or-nothing), so each entry pairs with the
-        kernel group its requirement was built from.
+        ``selections`` are order-aligned with the plan groups (the selection
+        is all-or-nothing), so each entry pairs with the kernels its
+        requirement was built from.
         """
         kernel_allocations: list[KernelAllocation] = []
-        agent_allocation_map: dict[AgentId, AgentAllocation] = {}
-
         for group, selection in zip(plan.groups, selections, strict=True):
-            resource_req = selection.resource_requirements
             selected_agent = selection.selected_agent
-
-            # Track resource allocation for this agent
-            if selected_agent.agent_id not in agent_allocation_map:
-                agent_allocation_map[selected_agent.agent_id] = AgentAllocation(
-                    agent_id=selected_agent.agent_id,
-                    allocated_slots=[],
-                )
-            # The allocation write path still speaks ResourceSlot; convert at
-            # this boundary only.
-            agent_allocation_map[selected_agent.agent_id].allocated_slots.append(
-                ResourceSlot({str(k): v for k, v in resource_req.requested_slots.slots.items()})
-            )
-
-            # Create kernel allocations (indices resolve to this workload's kernels)
             for index in group.indices:
-                kernel_id = session_workload.placement.kernels[index].kernel_id
                 kernel_allocations.append(
                     KernelAllocation(
-                        kernel_id=kernel_id,
+                        kernel_id=session_workload.placement.kernels[index].kernel_id,
                         agent_id=selected_agent.agent_id,
                         agent_addr=selected_agent.agent_addr,
-                        resource_group_name=resource_group_name,
-                        resource_group_id=session_workload.meta.resource_group_id,
                     )
                 )
 
-        agent_allocations = list(agent_allocation_map.values())
-
         return SessionAllocation(
             session_id=session_workload.meta.session_id,
-            session_type=session_workload.session_type,
-            cluster_mode=session_workload.placement.cluster_mode,
-            resource_group_name=resource_group_name,
-            resource_group_id=session_workload.meta.resource_group_id,
             kernel_allocations=kernel_allocations,
-            agent_allocations=agent_allocations,
-            access_key=session_workload.meta.owner.access_key,
         )
-
-    @staticmethod
-    def _convert_record_to_predicates(
-        record: ExecutionRecord | None,
-    ) -> tuple[list[SchedulingPredicate], list[SchedulingPredicate]]:
-        """
-        Convert an ExecutionRecord to passed/failed SchedulingPredicate lists.
-
-        Args:
-            record: The execution record to convert (may be None if entity context failed early)
-
-        Returns:
-            Tuple of (passed_predicates, failed_predicates)
-        """
-        passed: list[SchedulingPredicate] = []
-        failed: list[SchedulingPredicate] = []
-
-        if record is None:
-            return passed, failed
-
-        for phase in record.phases:
-            # Add phase-level predicate
-            phase_predicate = SchedulingPredicate(
-                name=phase.name,
-                msg=phase.detail or "",
-            )
-            if phase.status == StepStatus.SUCCESS:
-                passed.append(phase_predicate)
-            else:
-                failed.append(phase_predicate)
-
-            # Add step-level predicates
-            for step in phase.steps:
-                step_predicate = SchedulingPredicate(
-                    name=step.name,
-                    msg=step.detail or "",
-                )
-                if step.status == StepStatus.SUCCESS:
-                    passed.append(step_predicate)
-                else:
-                    failed.append(step_predicate)
-
-        return passed, failed

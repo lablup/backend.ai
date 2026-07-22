@@ -132,10 +132,7 @@ class ScheduleSessionsLifecycleHandler(SessionLifecycleHandler):
             return result
 
         # Delegate to Provisioner with pre-fetched data
-        provision_time = await self._repository.get_db_now()
-        schedule_result = await self._provisioner.schedule_resource_group(
-            scheduling_data, provision_time
-        )
+        schedule_result = await self._provisioner.schedule_resource_group(scheduling_data)
         scheduled_ids = set(schedule_result.scheduled_session_ids)
         failure_map = {
             failure.session_id: failure for failure in schedule_result.scheduling_failures

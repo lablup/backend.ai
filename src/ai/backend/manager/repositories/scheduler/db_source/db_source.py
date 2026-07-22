@@ -135,7 +135,6 @@ from ai.backend.manager.views.sokovan.agent import (
     SlotResource,
 )
 from ai.backend.manager.views.sokovan.allocation import (
-    AllocationBatch,
     SessionAllocation,
 )
 from ai.backend.manager.views.sokovan.image import ImageConfigData
@@ -1896,7 +1895,7 @@ class ScheduleDBSource:
             for sg in allowed_sgroups
         ]
 
-    async def allocate_sessions(self, allocation_batch: AllocationBatch) -> list[SessionId]:
+    async def allocate_sessions(self, allocations: list[SessionAllocation]) -> list[SessionId]:
         """Reserve and assign sessions in the batch to their agents.
 
         Reserves each session's kernels on their chosen agents and assigns the
@@ -1914,7 +1913,7 @@ class ScheduleDBSource:
         try:
             async with self._db.begin_session_read_committed() as db_sess:
                 now = await self._get_db_now_in_session(db_sess)
-                for allocation in allocation_batch.allocations:
+                for allocation in allocations:
                     await self._allocate_single_session(db_sess, allocation, now)
                     scheduled_session_ids.append(allocation.session_id)
         except AgentResourceCapacityExceeded as e:
@@ -1940,8 +1939,7 @@ class ScheduleDBSource:
         back the kernel update along with everything else.
 
         Session status is NOT changed here: the coordinator owns session status
-        transitions. Only resource-assignment metadata (scaling_group_name,
-        resource_group_id, agent_ids) is written on the session.
+        transitions. Only ``agent_ids`` is written on the session.
 
         Raises AgentResourceCapacityExceeded if any kernel cannot be reserved;
         the caller rolls back the whole batch transaction and retries next tick.
@@ -1967,8 +1965,6 @@ class ScheduleDBSource:
                     ),
                     agent=kernel_alloc.agent_id,
                     agent_addr=kernel_alloc.agent_addr,
-                    scaling_group=kernel_alloc.resource_group_name,
-                    resource_group_id=kernel_alloc.resource_group_id,
                 )
             )
             if cast(CursorResult[Any], promoted).rowcount == 0:
@@ -1977,15 +1973,12 @@ class ScheduleDBSource:
                 db_sess, KernelId(kernel_alloc.kernel_id), kernel_alloc.agent_id
             )
 
-        # Resource-assignment metadata on the session (not status).
+        # Resource-assignment metadata on the session (not status); the
+        # resource group columns are already written at enqueue.
         await db_sess.execute(
             sa.update(SessionRow)
             .where(SessionRow.id == allocation.session_id)
-            .values(
-                scaling_group_name=allocation.resource_group_name,
-                resource_group_id=allocation.resource_group_id,
-                agent_ids=allocation.unique_agent_ids(),
-            )
+            .values(agent_ids=allocation.unique_agent_ids())
         )
 
     async def update_kernel_status_pulling(self, kernel_id: UUID, reason: str) -> bool:

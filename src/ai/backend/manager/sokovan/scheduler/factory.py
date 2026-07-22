@@ -51,9 +51,6 @@ from ai.backend.manager.sokovan.scheduler.launcher.launcher import (
     SessionLauncher,
     SessionLauncherArgs,
 )
-from ai.backend.manager.sokovan.scheduler.provisioner.allocators.repository_allocator import (
-    RepositoryAllocator,
-)
 from ai.backend.manager.sokovan.scheduler.provisioner.provisioner import (
     SessionProvisioner,
     SessionProvisionerArgs,
@@ -114,7 +111,6 @@ def create_default_scheduler_components(
         ReservedBatchSessionValidator(),
         ResourcePolicyValidator(),
     ])
-    allocator = RepositoryAllocator(repository)
 
     # Create provisioner
     provisioner = SessionProvisioner(
@@ -122,7 +118,6 @@ def create_default_scheduler_components(
             validator=validator,
             default_sequencer=sequencer,
             default_agent_selector=agent_selector,
-            allocator=allocator,
             repository=repository,
             fair_share_repository=fair_share_repository,
             config_provider=config_provider,

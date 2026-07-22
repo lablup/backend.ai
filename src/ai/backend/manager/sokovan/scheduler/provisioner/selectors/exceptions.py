@@ -21,7 +21,6 @@ from ai.backend.common.exception import (
 from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import AgentId, BinarySize, SlotName
 from ai.backend.manager.sokovan.scheduler.exceptions import SchedulingError
-from ai.backend.manager.views.sokovan.allocation import SchedulingPredicate
 
 from .types import RemediationHint, ResourceRequirements
 
@@ -46,11 +45,6 @@ class AgentSelectionError(SchedulingError):
             operation=ErrorOperation.SCHEDULE,
             error_detail=ErrorDetail.INTERNAL_ERROR,
         )
-
-    @override
-    def failed_predicates(self) -> list[SchedulingPredicate]:
-        """Return list of failed predicates for this error."""
-        return [SchedulingPredicate(name=type(self).__name__, msg=str(self))]
 
     @abstractmethod
     def build_remediation_hint(self) -> RemediationHint:
@@ -311,13 +305,6 @@ class BatchAgentSelectionFailedError(SchedulingError):
             operation=ErrorOperation.SCHEDULE,
             error_detail=ErrorDetail.UNAVAILABLE,
         )
-
-    @override
-    def failed_predicates(self) -> list[SchedulingPredicate]:
-        predicates: list[SchedulingPredicate] = []
-        for err in self.errors:
-            predicates.extend(err.failed_predicates())
-        return predicates
 
     def _build_message(self) -> str:
         header = f"{len(self.errors)} requirement(s) could not be placed"

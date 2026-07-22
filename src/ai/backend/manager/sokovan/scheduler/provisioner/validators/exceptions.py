@@ -18,7 +18,6 @@ from ai.backend.common.exception import (
 )
 from ai.backend.common.types import SlotName
 from ai.backend.manager.sokovan.scheduler.exceptions import SchedulingError
-from ai.backend.manager.views.sokovan.allocation import SchedulingPredicate
 
 
 class SchedulingValidationError(SchedulingError, web.HTTPPreconditionFailed):
@@ -48,11 +47,6 @@ class SchedulingValidationError(SchedulingError, web.HTTPPreconditionFailed):
         Used by aggregators to format the error inside a bullet list.
         """
         raise NotImplementedError
-
-    @override
-    def failed_predicates(self) -> list[SchedulingPredicate]:
-        """Return list of failed predicates for this error."""
-        return [SchedulingPredicate(name=type(self).__name__, msg=str(self))]
 
 
 def _format_slots(slots: Mapping[SlotName, Decimal]) -> str:
@@ -231,14 +225,6 @@ class MultipleValidationErrors(SchedulingValidationError):
     def summary(self) -> str:
         lines = [f"- {type(e).__name__}: {e.summary()}" for e in self._errors]
         return "Multiple validation errors occurred:\n" + "\n".join(lines)
-
-    @override
-    def failed_predicates(self) -> list[SchedulingPredicate]:
-        """Return list of all failed predicates from all errors."""
-        predicates: list[SchedulingPredicate] = []
-        for error in self._errors:
-            predicates.extend(error.failed_predicates())
-        return predicates
 
     @override
     def error_code(self) -> ErrorCode:

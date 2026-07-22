@@ -49,7 +49,7 @@ from ai.backend.manager.repositories.base.updater import BatchUpdater
 from ai.backend.manager.repositories.vfolder.mount import prepare_vfolder_mounts
 from ai.backend.manager.types import UserScope
 from ai.backend.manager.views.sokovan.agent import AgentLimit, ResourceGroupResource
-from ai.backend.manager.views.sokovan.allocation import AllocationBatch
+from ai.backend.manager.views.sokovan.allocation import SessionAllocation
 from ai.backend.manager.views.sokovan.lifecycle import (
     KernelCreationInfo,
     SessionRunningData,
@@ -204,14 +204,14 @@ class SchedulerRepository:
         )
 
     @scheduler_repository_resilience.apply()
-    async def allocate_sessions(self, allocation_batch: AllocationBatch) -> list[SessionId]:
+    async def allocate_sessions(self, allocations: list[SessionAllocation]) -> list[SessionId]:
         """
         Allocate sessions by reserving and assigning their kernels to agents.
 
         Returns:
             The ids of the sessions that were actually allocated.
         """
-        return await self._db_source.allocate_sessions(allocation_batch)
+        return await self._db_source.allocate_sessions(allocations)
 
     @scheduler_repository_resilience.apply()
     async def get_pending_timeout_sessions_by_ids(
