@@ -16,18 +16,14 @@ from ai.backend.manager.sokovan.idle_check.checkers.base import (
     CheckerAssignment,
     IdleChecker,
     IdleCheckerContext,
+    IdleJudgment,
 )
-from ai.backend.manager.sokovan.idle_check.types import (
-    IdleCheckReconcileInfo,
-    IdleCheckReport,
-    IdleCheckResult,
-    IdleReason,
-)
+from ai.backend.manager.sokovan.idle_check.types import IdleCheckReconcileInfo, IdleCheckResult
 from ai.backend.manager.sokovan.reconciler.base import ReconcilerHandler
 
 
 class IdleCheckReconcileHandler(ReconcilerHandler[IdleCheckReconcileInfo, IdleCheckResult]):
-    """Drive checker-axis judgments and merge idle reasons into session reports."""
+    """Drive checker-axis judgments for persistence by the applier."""
 
     _checkers: Mapping[CheckerType, IdleChecker]
 
@@ -38,7 +34,7 @@ class IdleCheckReconcileHandler(ReconcilerHandler[IdleCheckReconcileInfo, IdleCh
     async def execute(self, reconcile_info: IdleCheckReconcileInfo) -> IdleCheckResult:
         assignments_by_type = self._assignments_by_type(reconcile_info.batch)
         context = IdleCheckerContext(current_time=reconcile_info.current_time)
-        reasons_by_session: defaultdict[SessionId, list[IdleReason]] = defaultdict(list)
+        all_judgments: list[IdleJudgment] = []
         for checker_type, assignments in assignments_by_type.items():
             checker = self._checkers.get(checker_type)
             if checker is None:
@@ -47,16 +43,8 @@ class IdleCheckReconcileHandler(ReconcilerHandler[IdleCheckReconcileInfo, IdleCh
                 assignments,
                 context=context,
             )
-            for judgment in judgments:
-                if not judgment.is_idle:
-                    continue
-                reasons_by_session[judgment.session_id].append(
-                    IdleReason(checker_id=judgment.checker_id, message=judgment.message)
-                )
-        reports: list[IdleCheckReport] = []
-        for session_id, reasons in reasons_by_session.items():
-            reports.append(IdleCheckReport(session_id=session_id, reasons=reasons))
-        return IdleCheckResult(reports=reports)
+            all_judgments.extend(judgments)
+        return IdleCheckResult(judgments=all_judgments)
 
     def _assignments_by_type(
         self, batch: IdleCheckBatchData
