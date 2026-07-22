@@ -62,7 +62,7 @@ class DRFSequencer(WorkloadSequencer):
 
         # Sort workloads by dominant share (ascending order - lower share gets higher priority)
         # For users with the same dominant share, maintain original order
-        return sorted(workloads, key=lambda w: user_dominant_shares[w.user_uuid])
+        return sorted(workloads, key=lambda w: user_dominant_shares[w.meta.owner.user_uuid])
 
     def _calculate_dominant_share(
         self, allocation: ResourceAllocation, resources: ResourceGroupResource

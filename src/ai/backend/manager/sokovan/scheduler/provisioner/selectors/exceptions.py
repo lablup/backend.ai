@@ -66,13 +66,19 @@ class AgentSelectionError(SchedulingError):
 class RequirementSelectionError(AgentSelectionError):
     """A per-requirement selection failure that knows its requirement.
 
-    Exposing the whole requirement (slots, architecture, kernel ids) lets a
-    dry-run report rich per-kernel feedback by catching the aggregated error.
+    ``requirement_index`` is the position of the failed requirement in the
+    criteria, so callers can map the failure back to their own bookkeeping
+    (e.g. the kernel group a requirement was built from).
     """
 
     @property
     @abstractmethod
     def resource_requirement(self) -> ResourceRequirements:
+        raise NotImplementedError
+
+    @property
+    @abstractmethod
+    def requirement_index(self) -> int:
         raise NotImplementedError
 
 
@@ -119,6 +125,7 @@ class NoAvailableAgentError(RequirementSelectionError):
     error_title = "Unavailable : No agents can be allocated at this time."
 
     _resource_requirement: ResourceRequirements
+    _requirement_index: int
     _agent_errors: Mapping[AgentId, TrackerCompatibilityError]
     _available_agent_ids: Sequence[AgentId]
     _designated_agent_ids: Sequence[AgentId] | None
@@ -127,11 +134,13 @@ class NoAvailableAgentError(RequirementSelectionError):
         self,
         *,
         resource_requirement: ResourceRequirements,
+        requirement_index: int,
         agent_errors: Mapping[AgentId, TrackerCompatibilityError],
         available_agent_ids: Sequence[AgentId] = (),
         designated_agent_ids: Sequence[AgentId] | None = None,
     ) -> None:
         self._resource_requirement = resource_requirement
+        self._requirement_index = requirement_index
         self._agent_errors = agent_errors
         self._available_agent_ids = available_agent_ids
         self._designated_agent_ids = designated_agent_ids
@@ -141,6 +150,11 @@ class NoAvailableAgentError(RequirementSelectionError):
     @override
     def resource_requirement(self) -> ResourceRequirements:
         return self._resource_requirement
+
+    @property
+    @override
+    def requirement_index(self) -> int:
+        return self._requirement_index
 
     @override
     def error_code(self) -> ErrorCode:
@@ -188,11 +202,13 @@ class NoAvailableAgentError(RequirementSelectionError):
 
     def _format_header(self) -> str:
         req = self._resource_requirement
-        kernel_id_list = ", ".join(str(k) for k in req.kernel_ids)
         slot_str = " ".join(
             f"{k}={_humanize_slot(k, v)}" for k, v in req.requested_slots.slots.items() if v
         )
-        return f"kernels [{kernel_id_list}] (arch={req.required_architecture}, slots={slot_str})"
+        return (
+            f"the request (containers={req.container_count}, "
+            f"arch={req.required_architecture}, slots={slot_str})"
+        )
 
     def _designated_reasons(self) -> list[str]:
         reasons: list[str] = []
@@ -229,15 +245,18 @@ class NoCompatibleAgentError(RequirementSelectionError):
     error_title = "No agents meet the resource requirements."
 
     _resource_requirement: ResourceRequirements
+    _requirement_index: int
     _available_architectures: Sequence[str]
 
     def __init__(
         self,
         *,
         resource_requirement: ResourceRequirements,
+        requirement_index: int,
         available_architectures: Sequence[str],
     ) -> None:
         self._resource_requirement = resource_requirement
+        self._requirement_index = requirement_index
         self._available_architectures = available_architectures
         super().__init__(
             f"No agents with required architecture "
@@ -249,6 +268,11 @@ class NoCompatibleAgentError(RequirementSelectionError):
     @override
     def resource_requirement(self) -> ResourceRequirements:
         return self._resource_requirement
+
+    @property
+    @override
+    def requirement_index(self) -> int:
+        return self._requirement_index
 
     @override
     def error_code(self) -> ErrorCode:
@@ -266,9 +290,9 @@ class NoCompatibleAgentError(RequirementSelectionError):
 class BatchAgentSelectionFailedError(SchedulingError):
     """Aggregates per-requirement placement failures of a single batch selection.
 
-    Carries the structured ``errors`` so a dry-run can read each kernel group's
-    kernels + remediation hint by catching this error, instead of inspecting
-    selections.
+    Carries the structured ``errors`` so a dry-run can map each failed
+    requirement (via ``requirement_index``) to its remediation hint by
+    catching this error, instead of inspecting selections.
     """
 
     error_type = "https://api.backend.ai/probs/batch-agent-selection-failed"

@@ -49,10 +49,10 @@ class ResourcePolicyValidator(ValidatorRule):
         errors: list[SchedulingValidationError] = []
 
         # A missing limit means the scope imposes no quota
-        user_limit = policy.by_user.get(workload.user_uuid)
+        user_limit = policy.by_user.get(workload.meta.owner.user_uuid)
         if user_limit is not None:
             user_allocation = occupancy.by_user.get(
-                workload.user_uuid, UserResourceAllocation.empty()
+                workload.meta.owner.user_uuid, UserResourceAllocation.empty()
             )
             if user_allocation.exceeds(request, user_limit):
                 errors.append(UserResourceQuotaExceeded(quota_slots=user_limit.slots))
@@ -68,18 +68,18 @@ class ResourcePolicyValidator(ValidatorRule):
                     )
                 )
 
-        project_limit = policy.by_project.get(workload.project_id)
+        project_limit = policy.by_project.get(workload.meta.owner.project_id)
         if project_limit is not None:
             project_allocation = occupancy.by_project.get(
-                workload.project_id, ResourceAllocation.empty()
+                workload.meta.owner.project_id, ResourceAllocation.empty()
             )
             if project_allocation.exceeds(request, project_limit):
                 errors.append(ProjectResourceQuotaExceeded(quota_slots=project_limit.slots))
 
-        domain_limit = policy.by_domain.get(workload.domain_id)
+        domain_limit = policy.by_domain.get(workload.meta.owner.domain_id)
         if domain_limit is not None:
             domain_allocation = occupancy.by_domain.get(
-                workload.domain_id, ResourceAllocation.empty()
+                workload.meta.owner.domain_id, ResourceAllocation.empty()
             )
             if domain_allocation.exceeds(request, domain_limit):
                 errors.append(DomainResourceQuotaExceeded(quota_slots=domain_limit.slots))

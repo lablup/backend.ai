@@ -9,25 +9,22 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 
-from ai.backend.common.identifier.architecture import ArchName
 from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import (
     AgentId,
     BinarySize,
     ClusterMode,
-    KernelId,
     SessionId,
-    SessionTypes,
     SlotName,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.session.options import AgentSelectionPolicy
 from ai.backend.manager.views.sokovan.agent import AgentInfo, AgentLimit
-from ai.backend.manager.views.sokovan.workload import ResourceRequest
+from ai.backend.manager.views.sokovan.workload import ResourceRequest, SessionPlacement
 
 from .exceptions import (
     BatchAgentSelectionFailedError,
@@ -46,30 +43,6 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 @dataclass
-class SessionMetadata:
-    """Metadata for the session being scheduled."""
-
-    # Session ID
-    session_id: SessionId
-    # Type of the session (e.g., INTERACTIVE, BATCH, INFERENCE)
-    session_type: SessionTypes
-    # Resource group the session belongs to
-    resource_group_id: ResourceGroupID
-    # Cluster mode (e.g., SINGLE, MULTI)
-    cluster_mode: ClusterMode
-
-
-@dataclass
-class KernelResourceSpec:
-    """Resource specification for a single kernel."""
-
-    # Resource slots required
-    requested_slots: ResourceRequest
-    # Architecture required
-    required_architecture: ArchName
-
-
-@dataclass
 class AgentSelection:
     """Result of selecting an agent for specific resource requirements."""
 
@@ -79,72 +52,113 @@ class AgentSelection:
 
 @dataclass
 class AgentSelectionCriteria:
-    """Criteria for selecting an agent."""
+    """What one placement request asks of the agent pool.
 
-    # Session metadata for the selection
-    session_metadata: SessionMetadata
-    # Kernel requirements for the session
-    # Mapping of kernel IDs to their resource specifications
-    kernel_requirements: Mapping[KernelId, KernelResourceSpec]
+    Holds only what the selection itself consumes: the placement
+    requirements plus the session-scoped hints (retry filter, designated
+    agents). Kernel bookkeeping stays with the caller, which maps the
+    order-aligned selections (or ``requirement_index`` on failures) back
+    to its own kernel groups.
+    """
+
+    # Session the placement is for (failed-agent retry filter)
+    session_id: SessionId
+    # Resource group the candidates were drawn from (error context)
+    resource_group_id: ResourceGroupID
+    # Placement requirements, already grouped by cluster mode
+    requirements: Sequence[ResourceRequirements]
     # How designated agents are enforced (STRICT fails, PREFERRED falls back)
     agent_selection_policy: AgentSelectionPolicy
     # Manually designated agents (user's explicit choice takes precedence)
-    designated_agent_ids: list[AgentId] | None = None
+    designated_agent_ids: list[AgentId] | None
 
-    def get_resource_requirements(self) -> Sequence[ResourceRequirements]:
-        """
-        Get resource requirements based on cluster mode.
 
-        For single-node sessions, returns a sequence with one aggregated requirement
-        that includes all kernel IDs.
-        For multi-node sessions, returns individual kernel requirements, each with
-        its corresponding kernel ID.
+@dataclass
+class PlacementGroup:
+    """One placement requirement paired with the positions of the input
+    items it was built from.
 
-        Returns:
-            A sequence of ResourceRequirements.
+    The plan itself is kernel-agnostic; each caller resolves the indices
+    back to its own domain (kernel rows for the scheduling pass, request
+    entries for the fitting check).
+    """
+
+    requirement: ResourceRequirements
+    indices: list[int]
+
+
+@dataclass
+class PlacementPlan:
+    """The session's placement groups, order-aligned with the selections
+    (and with ``requirement_index`` on failures)."""
+
+    groups: list[PlacementGroup]
+
+    @classmethod
+    def from_items(
+        cls,
+        items: Sequence[ResourceRequirements],
+        cluster_mode: ClusterMode,
+    ) -> PlacementPlan:
+        """Group per-item requirements into placement groups by cluster mode.
+
+        Single-node sessions merge every item into one requirement (one
+        agent hosts all containers, slots summed, architectures must
+        agree); multi-node sessions keep one group per item.
 
         Raises:
-            ValueError: If single-node session has kernels with different architectures.
+            ValueError: If a single-node session mixes architectures.
         """
-        if not self.kernel_requirements:
-            # Return empty list for sessions with no kernels
-            return []
+        if not items:
+            return cls(groups=[])
 
-        if self.session_metadata.cluster_mode == ClusterMode.SINGLE_NODE:
-            # Check architecture consistency for single-node
-            architectures = {
-                kernel_req.required_architecture for kernel_req in self.kernel_requirements.values()
-            }
+        if cluster_mode == ClusterMode.SINGLE_NODE:
+            architectures = {item.required_architecture for item in items}
             if len(architectures) > 1:
                 raise ValueError(
                     f"Single-node session has kernels with different architectures: {architectures}"
                 )
 
-            # Sum all requested slots for single-node sessions
             total_slots: dict[SlotName, Decimal] = {}
-            for kernel_req in self.kernel_requirements.values():
-                for slot_name, amount in kernel_req.requested_slots.slots.items():
+            for item in items:
+                for slot_name, amount in item.requested_slots.slots.items():
                     total_slots[slot_name] = total_slots.get(slot_name, Decimal(0)) + amount
 
-            # Use the common architecture
-            architecture = list(architectures)[0]
-            # Include all kernel IDs in the aggregated requirement
-            return [
-                ResourceRequirements(
+            group = PlacementGroup(
+                requirement=ResourceRequirements(
                     requested_slots=ResourceRequest(slots=total_slots),
-                    required_architecture=architecture,
-                    kernel_ids=list(self.kernel_requirements.keys()),
-                )
-            ]
-        # Return individual kernel resources for multi-node sessions
-        return [
-            ResourceRequirements(
-                requested_slots=req.requested_slots,
-                required_architecture=req.required_architecture,
-                kernel_ids=[kernel_id],
+                    required_architecture=architectures.pop(),
+                    container_count=sum(item.container_count for item in items),
+                ),
+                indices=list(range(len(items))),
             )
-            for kernel_id, req in self.kernel_requirements.items()
-        ]
+            return cls(groups=[group])
+
+        return cls(
+            groups=[
+                PlacementGroup(requirement=item, indices=[index])
+                for index, item in enumerate(items)
+            ]
+        )
+
+    @classmethod
+    def from_placement(cls, placement: SessionPlacement) -> PlacementPlan:
+        """Project a session placement into the plan; indices refer to
+        positions in ``placement.kernels``."""
+        return cls.from_items(
+            [
+                ResourceRequirements(
+                    requested_slots=kernel.requested_slots,
+                    required_architecture=kernel.architecture,
+                    container_count=1,
+                )
+                for kernel in placement.kernels
+            ],
+            placement.cluster_mode,
+        )
+
+    def requirements(self) -> list[ResourceRequirements]:
+        return [group.requirement for group in self.groups]
 
 
 class AbstractAgentSelector(ABC):
@@ -244,23 +258,23 @@ class AgentSelector:
             BatchAgentSelectionFailedError: If any requirement could not be placed
             ValueError: If architecture mismatch in single-node session
         """
-        resource_requirements = criteria.get_resource_requirements()
-        if not resource_requirements:
+        if not criteria.requirements:
             # Empty list for sessions with no kernels
             return []
         if not trackers:
-            raise NoAgentsInResourceGroupError(criteria.session_metadata.resource_group_id)
+            raise NoAgentsInResourceGroupError(criteria.resource_group_id)
 
         selections: list[AgentSelection] = []
         errors: list[RequirementSelectionError] = []
 
-        for resource_req in resource_requirements:
+        for requirement_index, resource_req in enumerate(criteria.requirements):
             # Capture a placement failure and continue evaluating the remaining
             # requirements so every failure's remediation hint is collected.
             try:
                 selected_tracker = await self._select_agent_tracker_for_requirements(
                     trackers,
                     resource_req,
+                    requirement_index,
                     criteria,
                     limit,
                 )
@@ -269,7 +283,7 @@ class AgentSelector:
                 continue
 
             # Track the in-flight allocation for the selected agent
-            selected_tracker.apply_diff(resource_req.requested_slots, len(resource_req.kernel_ids))
+            selected_tracker.apply_diff(resource_req.requested_slots, resource_req.container_count)
 
             # Store the selection with the original agent
             selections.append(
@@ -295,6 +309,7 @@ class AgentSelector:
         self,
         state_trackers: Sequence[AgentStateTracker],
         resource_req: ResourceRequirements,
+        requirement_index: int,
         criteria: AgentSelectionCriteria,
         limit: AgentLimit,
     ) -> AgentStateTracker:
@@ -310,6 +325,7 @@ class AgentSelector:
             available_archs = {t.original_agent.architecture for t in state_trackers}
             raise NoCompatibleAgentError(
                 resource_requirement=resource_req,
+                requirement_index=requirement_index,
                 available_architectures=sorted(available_archs),
             )
 
@@ -330,6 +346,7 @@ class AgentSelector:
         if not compatible_trackers:
             raise NoAvailableAgentError(
                 resource_requirement=resource_req,
+                requirement_index=requirement_index,
                 agent_errors=agent_errors,
             )
 
@@ -342,6 +359,7 @@ class AgentSelector:
             if criteria.agent_selection_policy == AgentSelectionPolicy.STRICT:
                 raise NoAvailableAgentError(
                     resource_requirement=resource_req,
+                    requirement_index=requirement_index,
                     agent_errors=agent_errors,
                     available_agent_ids=[
                         tracker.original_agent.agent_id for tracker in compatible_trackers
@@ -352,7 +370,7 @@ class AgentSelector:
             # the normal candidate path below
 
         # Third pass: deprioritize agents where this session previously failed
-        session_id = criteria.session_metadata.session_id
+        session_id = criteria.session_id
         candidate_trackers = compatible_trackers
         non_failed = [
             tracker

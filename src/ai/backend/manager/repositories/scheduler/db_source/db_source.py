@@ -181,8 +181,10 @@ from ai.backend.manager.views.sokovan.workload import (
     KernelWorkload,
     ResourceRequest,
     SessionDependencyInfo,
-    SessionResourceRequest,
+    SessionPlacement,
     SessionWorkload,
+    WorkloadMeta,
+    WorkloadOwner,
 )
 
 from .types import KeypairConcurrencyData
@@ -265,7 +267,7 @@ class ScheduleDBSource:
                 pending_sessions,
                 known_slot_types,
             )
-            session_ids = [s.session_id for s in pending_sessions.sessions]
+            session_ids = [s.meta.session_id for s in pending_sessions.sessions]
             session_dependencies = await self._fetch_session_dependencies(db_sess, session_ids)
 
             return SchedulingFetch(
@@ -420,7 +422,6 @@ class ScheduleDBSource:
                 load_only(
                     KernelRow.id,
                     KernelRow.session_id,
-                    KernelRow.image,
                     KernelRow.architecture,
                 )
             )
@@ -455,8 +456,7 @@ class ScheduleDBSource:
                 KernelWorkload(
                     kernel_id=KernelId(kernel_row.id),
                     # Nullable at the column level only for legacy rows;
-                    # enqueue always populates them.
-                    image=kernel_row.image or "",
+                    # enqueue always populates it.
                     architecture=ArchName(kernel_row.architecture or ""),
                     requested_slots=ResourceRequest(
                         slots=kernel_slots.get(KernelId(kernel_row.id), {})
@@ -468,37 +468,31 @@ class ScheduleDBSource:
                 # Matches the previous join semantics: a pending session
                 # without pending kernels is not schedulable.
                 continue
-            session_slots: dict[SlotName, Decimal] = {}
-            for kernel in kernels:
-                for slot_name, amount in kernel.requested_slots.slots.items():
-                    session_slots[slot_name] = session_slots.get(slot_name, Decimal(0)) + amount
-
-            is_private = row.session_type in SessionTypes.private_types()
             workloads.append(
                 SessionWorkload(
-                    session_id=session_id,
-                    access_key=AccessKey(row.access_key or ""),
-                    requested_slots=SessionResourceRequest(
-                        slots=session_slots,
-                        session_count=0 if is_private else 1,
-                        sftp_session_count=1 if is_private else 0,
+                    meta=WorkloadMeta(
+                        session_id=session_id,
+                        resource_group_id=row.resource_group_id,
+                        owner=WorkloadOwner(
+                            access_key=AccessKey(row.access_key or ""),
+                            user_uuid=UserID(row.user_uuid),
+                            project_id=ProjectID(row.group_id),
+                            domain_id=DomainID(row.domain_id),
+                        ),
                     ),
-                    user_uuid=UserID(row.user_uuid),
-                    project_id=ProjectID(row.group_id),
-                    domain_id=DomainID(row.domain_id),
-                    resource_group_id=row.resource_group_id,
+                    placement=SessionPlacement(
+                        cluster_mode=ClusterMode(row.cluster_mode),
+                        kernels=kernels,
+                        agent_selection_policy=row.options.agent_selection_policy,
+                        designated_agent_ids=[AgentId(a) for a in row.designated_agent_ids]
+                        if row.designated_agent_ids is not None
+                        else None,
+                    ),
                     priority=row.priority,
                     job_priority=row.job_priority,
-                    is_preemptible=row.is_preemptible,
                     session_type=row.session_type,
-                    cluster_mode=ClusterMode(row.cluster_mode),
                     starts_at=row.starts_at,
-                    is_private=is_private,
-                    designated_agent_ids=[AgentId(a) for a in row.designated_agent_ids]
-                    if row.designated_agent_ids is not None
-                    else None,
-                    agent_selection_policy=row.options.agent_selection_policy,
-                    kernels=kernels,
+                    is_preemptible=row.is_preemptible,
                 )
             )
 

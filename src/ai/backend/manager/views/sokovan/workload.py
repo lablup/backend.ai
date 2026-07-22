@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
+from functools import cached_property
 
 from ai.backend.common.identifier.architecture import ArchName
 from ai.backend.common.identifier.domain import DomainID
@@ -62,8 +63,6 @@ class KernelWorkload:
 
     # Unique identifier of the kernel
     kernel_id: KernelId
-    # Image name for the kernel
-    image: str
     # Architecture required for the kernel
     architecture: ArchName
     # Resource requirements for this kernel
@@ -71,41 +70,71 @@ class KernelWorkload:
 
 
 @dataclass(frozen=True)
-class SessionWorkload:
-    """Represents a session workload for scheduling with minimal required fields."""
+class WorkloadOwner:
+    """Owner-scope keys: fairness ordering and quota validation."""
 
-    # Session identifier
-    session_id: SessionId
-    # User identification for fairness calculation
     access_key: AccessKey
-    # Resource requirements
-    requested_slots: SessionResourceRequest
-    # User ID for user resource limit checks
     user_uuid: UserID
-    # Project ID for project resource limit checks
     project_id: ProjectID
-    # Domain ID for domain resource limit checks
     domain_id: DomainID
+
+
+@dataclass(frozen=True)
+class WorkloadMeta:
+    """Identity of one schedulable workload."""
+
+    session_id: SessionId
+    resource_group_id: ResourceGroupID
+    owner: WorkloadOwner
+
+
+@dataclass(frozen=True)
+class SessionPlacement:
+    """Selection-facing part of the workload: what must land on agents."""
+
+    cluster_mode: ClusterMode
+    kernels: list[KernelWorkload]
     # How designated agents are enforced (STRICT fails, PREFERRED falls back)
     agent_selection_policy: AgentSelectionPolicy
-    # Resource group id
-    resource_group_id: ResourceGroupID
-    # Priority level (higher value = higher priority)
-    priority: int = 0
+    # Manually designated agents (user's explicit choice takes precedence)
+    designated_agent_ids: list[AgentId] | None
+
+
+@dataclass
+class SessionWorkload:
+    """Represents a session workload for scheduling."""
+
+    meta: WorkloadMeta
+    placement: SessionPlacement
+    # Priority level for sequencing (higher value = higher priority)
+    priority: int
     # Scope-local preemption priority among the owner's own sessions
     # (higher preempts lower; decoupled from the global scheduler ``priority``)
-    job_priority: int = 0
+    job_priority: int
     # Session type (INTERACTIVE, BATCH, INFERENCE)
-    session_type: SessionTypes = SessionTypes.INTERACTIVE
-    # Cluster mode (SINGLE_NODE or MULTI_NODE)
-    cluster_mode: ClusterMode = ClusterMode.SINGLE_NODE
-    # Scheduled start time for batch sessions
-    starts_at: datetime | None = None
-    # Whether this is a private session (SFTP)
-    is_private: bool = False
+    session_type: SessionTypes
+    # Reserved start time for batch sessions (the enqueue-time value; the
+    # column is overwritten with the actual start at the RUNNING transition)
+    starts_at: datetime | None
     # Whether this session can be preempted
-    is_preemptible: bool = True
-    # Kernels to be scheduled for this session
-    kernels: list[KernelWorkload] = field(default_factory=list)
-    # Manually designated agent (for superadmin)
-    designated_agent_ids: list[AgentId] | None = None
+    is_preemptible: bool
+
+    @property
+    def is_private(self) -> bool:
+        """Private (SFTP) sessions count against the sftp session quota."""
+        return self.session_type in SessionTypes.private_types()
+
+    @cached_property
+    def requested_slots(self) -> SessionResourceRequest:
+        """Session-level request: per-slot sums of the kernels plus the
+        session count of the requested kind."""
+        slots: dict[SlotName, Decimal] = {}
+        for kernel in self.placement.kernels:
+            for slot_name, amount in kernel.requested_slots.slots.items():
+                slots[slot_name] = slots.get(slot_name, Decimal(0)) + amount
+        is_private = self.is_private
+        return SessionResourceRequest(
+            slots=slots,
+            session_count=0 if is_private else 1,
+            sftp_session_count=1 if is_private else 0,
+        )

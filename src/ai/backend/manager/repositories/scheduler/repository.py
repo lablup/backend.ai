@@ -171,12 +171,12 @@ class SchedulerRepository:
         Uses a single pipelined batch request instead of N round-trips.
         """
         failed_agents_list = await self._valkey_schedule.get_multiple_session_failed_agents([
-            workload.session_id for workload in workloads
+            workload.meta.session_id for workload in workloads
         ])
         failed_sessions_by_agent: dict[AgentId, set[SessionId]] = defaultdict(set)
         for workload, failed_agents in zip(workloads, failed_agents_list, strict=True):
             for agent_id in failed_agents:
-                failed_sessions_by_agent[agent_id].add(workload.session_id)
+                failed_sessions_by_agent[agent_id].add(workload.meta.session_id)
         return {
             agent_id: frozenset(session_ids)
             for agent_id, session_ids in failed_sessions_by_agent.items()

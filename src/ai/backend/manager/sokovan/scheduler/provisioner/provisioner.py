@@ -49,8 +49,7 @@ from .selectors.selector import (
     AgentSelection,
     AgentSelectionCriteria,
     AgentSelector,
-    KernelResourceSpec,
-    SessionMetadata,
+    PlacementPlan,
 )
 from .selectors.tracker import AgentStateTracker, build_agent_trackers
 from .sequencers.drf import DRFSequencer
@@ -228,14 +227,14 @@ class SessionProvisioner:
             except Exception as e:
                 log.debug(
                     "Scheduling failed for workload {}: {}",
-                    session_workload.session_id,
+                    session_workload.meta.session_id,
                     e,
                 )
                 # Get execution record from pool and convert to SchedulingFailure
-                record = pool.get_record(session_workload.session_id)
+                record = pool.get_record(session_workload.meta.session_id)
                 passed, failed = self._convert_record_to_predicates(record)
                 failure = SchedulingFailure(
-                    session_id=session_workload.session_id,
+                    session_id=session_workload.meta.session_id,
                     passed_phases=passed,
                     failed_phases=failed,
                     last_try=provision_time,
@@ -278,12 +277,12 @@ class SessionProvisioner:
         state: SchedulingState,
         session_workload: SessionWorkload,
     ) -> SessionAllocation:
-        resource_group_id = session_workload.resource_group_id
+        resource_group_id = session_workload.meta.resource_group_id
         agent_selector = self._agent_selector_pool[
             state.snapshot.resource_group.policy.agent_selection_strategy
         ]
         pool = RecorderContext[SessionId].current_pool()
-        recorder = pool.recorder(session_workload.session_id)
+        recorder = pool.recorder(session_workload.meta.session_id)
 
         # Phase 1: Validation
         with self._phase_metrics.measure_phase("scheduler", resource_group_id, "validation"):
@@ -334,9 +333,9 @@ class SessionProvisioner:
         :param workload: The session workload that was allocated
         """
         snapshot.global_scope.occupancy.add_occupancy(
-            workload.user_uuid,
-            workload.project_id,
-            workload.domain_id,
+            workload.meta.owner.user_uuid,
+            workload.meta.owner.project_id,
+            workload.meta.owner.domain_id,
             workload.requested_slots,
         )
 
@@ -353,8 +352,16 @@ class SessionProvisioner:
         :return: SessionAllocation
         :raises AgentSelectionError: If agent selection fails
         """
-        # Convert session workload to agent selection criteria
-        criteria = self._build_selection_criteria(session_workload)
+        # Project the workload's placement into the plan (requirement +
+        # kernel pairs) and the agent selection criteria.
+        plan = PlacementPlan.from_placement(session_workload.placement)
+        criteria = AgentSelectionCriteria(
+            session_id=session_workload.meta.session_id,
+            resource_group_id=session_workload.meta.resource_group_id,
+            requirements=plan.requirements(),
+            agent_selection_policy=session_workload.placement.agent_selection_policy,
+            designated_agent_ids=session_workload.placement.designated_agent_ids,
+        )
 
         # Selection commits state changes into the trackers on full success
         selector = self._agent_selector_pool[
@@ -366,41 +373,26 @@ class SessionProvisioner:
 
         # Build session allocation from selections
         return self._build_session_allocation(
-            session_workload, selections, state.resource_group.name
-        )
-
-    @staticmethod
-    def _build_selection_criteria(workload: SessionWorkload) -> AgentSelectionCriteria:
-        """Project one session workload into agent selection criteria."""
-        return AgentSelectionCriteria(
-            session_metadata=SessionMetadata(
-                session_id=workload.session_id,
-                session_type=workload.session_type,
-                resource_group_id=workload.resource_group_id,
-                cluster_mode=workload.cluster_mode,
-            ),
-            kernel_requirements={
-                kernel.kernel_id: KernelResourceSpec(
-                    requested_slots=kernel.requested_slots,
-                    required_architecture=kernel.architecture,
-                )
-                for kernel in workload.kernels
-            },
-            agent_selection_policy=workload.agent_selection_policy,
-            designated_agent_ids=workload.designated_agent_ids,
+            session_workload, selections, plan, state.resource_group.name
         )
 
     @staticmethod
     def _build_session_allocation(
         session_workload: SessionWorkload,
         selections: list[AgentSelection],
+        plan: PlacementPlan,
         resource_group_name: ResourceGroupName,
     ) -> SessionAllocation:
-        """Build a SessionAllocation from agent selection results."""
+        """Build a SessionAllocation from agent selection results.
+
+        ``selections`` are order-aligned with the criteria requirements
+        (the selection is all-or-nothing), so each entry pairs with the
+        kernel group its requirement was built from.
+        """
         kernel_allocations: list[KernelAllocation] = []
         agent_allocation_map: dict[AgentId, AgentAllocation] = {}
 
-        for selection in selections:
+        for group, selection in zip(plan.groups, selections, strict=True):
             resource_req = selection.resource_requirements
             selected_agent = selection.selected_agent
 
@@ -416,29 +408,30 @@ class SessionProvisioner:
                 ResourceSlot({str(k): v for k, v in resource_req.requested_slots.slots.items()})
             )
 
-            # Create kernel allocations
-            for kernel_id in resource_req.kernel_ids:
+            # Create kernel allocations (indices resolve to this workload's kernels)
+            for index in group.indices:
+                kernel_id = session_workload.placement.kernels[index].kernel_id
                 kernel_allocations.append(
                     KernelAllocation(
                         kernel_id=kernel_id,
                         agent_id=selected_agent.agent_id,
                         agent_addr=selected_agent.agent_addr,
                         resource_group_name=resource_group_name,
-                        resource_group_id=session_workload.resource_group_id,
+                        resource_group_id=session_workload.meta.resource_group_id,
                     )
                 )
 
         agent_allocations = list(agent_allocation_map.values())
 
         return SessionAllocation(
-            session_id=session_workload.session_id,
+            session_id=session_workload.meta.session_id,
             session_type=session_workload.session_type,
-            cluster_mode=session_workload.cluster_mode,
+            cluster_mode=session_workload.placement.cluster_mode,
             resource_group_name=resource_group_name,
-            resource_group_id=session_workload.resource_group_id,
+            resource_group_id=session_workload.meta.resource_group_id,
             kernel_allocations=kernel_allocations,
             agent_allocations=agent_allocations,
-            access_key=session_workload.access_key,
+            access_key=session_workload.meta.owner.access_key,
         )
 
     @staticmethod

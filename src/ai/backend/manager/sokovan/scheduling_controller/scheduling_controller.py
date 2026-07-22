@@ -3,7 +3,7 @@
 import logging
 from collections.abc import Sequence
 from dataclasses import dataclass
-from uuid import UUID, uuid4
+from uuid import UUID
 
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.contexts.user import current_user
@@ -15,7 +15,7 @@ from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.identifier.architecture import ArchName
 from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
-from ai.backend.common.types import KernelId, ResourceSlot, ResourceSlotEntry, SessionId, SlotName
+from ai.backend.common.types import ResourceSlot, ResourceSlotEntry, SessionId, SlotName
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -49,18 +49,22 @@ from ai.backend.manager.sokovan.scheduler.provisioner.selectors.exceptions impor
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import (
     AgentSelectionCriteria,
     AgentSelector,
-    KernelResourceSpec,
-    SessionMetadata,
+    PlacementPlan,
 )
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.tracker import (
     build_agent_trackers,
+)
+from ai.backend.manager.sokovan.scheduler.provisioner.selectors.types import (
+    ResourceRequirements,
 )
 from ai.backend.manager.sokovan.scheduler.types import ScheduleType
 from ai.backend.manager.sokovan.scheduling_controller.types import SessionValidationSpec
 from ai.backend.manager.views.sokovan.scheduling import ComputeScheduleData
 from ai.backend.manager.views.sokovan.session import MarkTerminatingResult
 from ai.backend.manager.views.sokovan.session_creation import SessionSpecContext
-from ai.backend.manager.views.sokovan.workload import ResourceRequest
+from ai.backend.manager.views.sokovan.workload import (
+    ResourceRequest,
+)
 
 from .preparers import (
     AssignContainerUserMappingRule,
@@ -103,16 +107,6 @@ class SchedulingControllerArgs:
     network_plugin_ctx: NetworkPluginContext
     hook_plugin_ctx: HookPluginContext
     agent_selector: AgentSelector
-
-
-@dataclass
-class _KernelComputeScheduleData:
-    # Selector input (carries the required architecture)
-    spec: KernelResourceSpec
-    # Echo of the request for the per-kernel result
-    requested_slots: tuple[ResourceSlotEntry, ...]
-    reason_hint: UnschedulableReasonHint | None
-    success: bool = True
 
 
 class SchedulingController:
@@ -314,22 +308,32 @@ class SchedulingController:
             ),
         )
 
-    def _prepare_kernel_data(
-        self, spec: SessionResourceSpec, fetched: SessionSpecContext
-    ) -> dict[KernelId, _KernelComputeScheduleData]:
-        prepared_data: dict[KernelId, _KernelComputeScheduleData] = {}
+    @staticmethod
+    def _build_requirement_items(
+        spec: SessionResourceSpec,
+        context: SessionSpecContext,
+    ) -> list[ResourceRequirements]:
+        """Parse the prepared spec into per-item placement requirements,
+        order-aligned with ``spec.kernel_specs``.
+
+        The fitting check only reasons about resource amounts, so no
+        kernel-shaped values are materialized.
+
+        Raises:
+            ImageNotFound: If a kernel group references an unknown image.
+        """
+        items: list[ResourceRequirements] = []
         for kernel_spec in spec.kernel_specs:
-            kernel_id = KernelId(uuid4())
             resource_input = kernel_spec.execution_spec.resource_input
             image_info = (
-                fetched.global_info.image_infos.get(resource_input.image_id)
+                context.global_info.image_infos.get(resource_input.image_id)
                 if resource_input.image_id is not None
                 else None
             )
             if image_info is None:
                 raise ImageNotFound(f"Image '{resource_input.image_id}' not found")
-            prepared_data[kernel_id] = _KernelComputeScheduleData(
-                spec=KernelResourceSpec(
+            items.append(
+                ResourceRequirements(
                     requested_slots=ResourceRequest(
                         slots={
                             SlotName(k): v
@@ -339,33 +343,29 @@ class SchedulingController:
                         }
                     ),
                     required_architecture=ArchName(image_info.architecture),
-                ),
-                requested_slots=tuple(resource_input.resources),
-                reason_hint=None,
+                    container_count=1,
+                )
             )
-        return prepared_data
+        return items
 
     async def _compute_schedule(
         self,
         spec: SessionResourceSpec,
         resource_group_id: ResourceGroupID,
         data: ComputeScheduleData,
-        kernel_data: dict[KernelId, _KernelComputeScheduleData],
     ) -> ComputeScheduleResult:
-        kernel_requirements: dict[KernelId, KernelResourceSpec] = {
-            kernel_id: entry.spec for kernel_id, entry in kernel_data.items()
-        }
+        items = self._build_requirement_items(spec, data.spec_context)
+        failure_hints: dict[int, UnschedulableReasonHint] = {}
 
-        if kernel_requirements:
+        if items:
+            plan = PlacementPlan.from_items(items, spec.options.cluster_mode)
+            scheduling_target = spec.options.scheduling_target
             criteria = AgentSelectionCriteria(
-                session_metadata=SessionMetadata(
-                    session_id=SessionId(UUID(str(spec.identity.session_id))),
-                    session_type=spec.classification.session_type,
-                    resource_group_id=resource_group_id,
-                    cluster_mode=spec.options.cluster_mode,
-                ),
-                kernel_requirements=kernel_requirements,
-                agent_selection_policy=(spec.options.scheduling_target.agent_selection_policy),
+                session_id=SessionId(UUID(str(spec.identity.session_id))),
+                resource_group_id=resource_group_id,
+                requirements=plan.requirements(),
+                agent_selection_policy=scheduling_target.agent_selection_policy,
+                designated_agent_ids=list(scheduling_target.designated_agents) or None,
             )
             # Trackers are throwaway here: the fitting check only needs the
             # immutable observations, never the committed batch state. The
@@ -394,20 +394,17 @@ class SchedulingController:
                             else None
                         ),
                     )
-                    for kernel_id in err.resource_requirement.kernel_ids:
-                        failed_draft = kernel_data.get(kernel_id)
-                        if failed_draft is not None:
-                            failed_draft.success = False
-                            failed_draft.reason_hint = reason
+                    for index in plan.groups[err.requirement_index].indices:
+                        failure_hints[index] = reason
 
         kernel_result = [
             ComputeScheduleKernelResult(
-                requested_slots=entry.requested_slots,
-                requested_architecture=entry.spec.required_architecture,
-                success=entry.success,
-                reason_hint=entry.reason_hint,
+                requested_slots=tuple(kernel_spec.execution_spec.resource_input.resources),
+                requested_architecture=item.required_architecture,
+                success=index not in failure_hints,
+                reason_hint=failure_hints.get(index),
             )
-            for entry in kernel_data.values()
+            for index, (item, kernel_spec) in enumerate(zip(items, spec.kernel_specs, strict=True))
         ]
         return ComputeScheduleResult(kernel_results=kernel_result)
 
@@ -433,12 +430,7 @@ class SchedulingController:
             resource_group_id,
         )
         resource_spec = await self._spec_preparer.prepare(draft, fetched.spec_context)
-        compute_schedule_kernel_data = self._prepare_kernel_data(
-            resource_spec, fetched.spec_context
-        )
-        return await self._compute_schedule(
-            resource_spec, resource_group_id, fetched, compute_schedule_kernel_data
-        )
+        return await self._compute_schedule(resource_spec, resource_group_id, fetched)
 
     async def mark_scheduling_needed(self, schedule_types: Sequence[ScheduleType]) -> None:
         """

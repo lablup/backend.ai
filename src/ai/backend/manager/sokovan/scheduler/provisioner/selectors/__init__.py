@@ -13,8 +13,6 @@ from .selector import (
     AgentSelection,
     AgentSelectionCriteria,
     AgentSelector,
-    KernelResourceSpec,
-    SessionMetadata,
 )
 
 # Then import selector which depends on exceptions
@@ -32,7 +30,5 @@ __all__ = [
     "AgentLimit",
     "AgentSelectionCriteria",
     "AgentSelector",
-    "KernelResourceSpec",
     "ResourceRequirements",
-    "SessionMetadata",
 ]

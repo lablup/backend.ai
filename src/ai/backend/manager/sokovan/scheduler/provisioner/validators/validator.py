@@ -70,7 +70,7 @@ class SchedulingValidator:
             SchedulingValidationError: If any validation fails
         """
         pool = RecorderContext[SessionId].current_pool()
-        recorder = pool.recorder(workload.session_id)
+        recorder = pool.recorder(workload.meta.session_id)
         errors: list[SchedulingValidationError] = []
 
         for rule in self._rules:
