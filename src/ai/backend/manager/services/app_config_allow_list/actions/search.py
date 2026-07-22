@@ -3,19 +3,19 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.permission.types import RBACElementType, ScopeType
+from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.app_config_allow_list.types import AppConfigAllowListData
-from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.services.app_config_allow_list.actions.base import (
-    AppConfigAllowListScopeAction,
-    AppConfigAllowListScopeActionResult,
+    AppConfigAllowListGlobalAction,
 )
 
 
 @dataclass
-class SearchAppConfigAllowListAction(AppConfigAllowListScopeAction):
+class SearchAppConfigAllowListAction(AppConfigAllowListGlobalAction):
+    """Super-admin path: search every allow-list entry, across all scope types."""
+
     querier: BatchQuerier
 
     @override
@@ -24,29 +24,17 @@ class SearchAppConfigAllowListAction(AppConfigAllowListScopeAction):
         return ActionOperationType.SEARCH
 
     @override
-    def scope_type(self) -> ScopeType:
-        return ScopeType.GLOBAL
-
-    @override
-    def scope_id(self) -> str:
-        return ""
-
-    @override
-    def target_element(self) -> RBACElementRef:
-        return RBACElementRef(RBACElementType.APP_CONFIG_ALLOW_LIST, "")
+    def entity_id(self) -> str | None:
+        return None
 
 
 @dataclass
-class SearchAppConfigAllowListActionResult(AppConfigAllowListScopeActionResult):
+class SearchAppConfigAllowListActionResult(BaseActionResult):
     data: list[AppConfigAllowListData]
     total_count: int
     has_next_page: bool
     has_previous_page: bool
 
     @override
-    def scope_type(self) -> ScopeType:
-        return ScopeType.GLOBAL
-
-    @override
-    def scope_id(self) -> str:
-        return ""
+    def entity_id(self) -> str | None:
+        return None

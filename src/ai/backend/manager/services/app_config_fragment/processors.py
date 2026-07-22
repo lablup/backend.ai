@@ -4,6 +4,7 @@ from typing import override
 
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor.bulk import BulkActionProcessor
+from ai.backend.manager.actions.processor.global_action import GlobalActionProcessor
 from ai.backend.manager.actions.processor.scope import ScopeActionProcessor
 from ai.backend.manager.actions.processor.single_entity import SingleEntityActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
@@ -48,7 +49,7 @@ from ai.backend.manager.services.app_config_fragment.service import (
 class AppConfigFragmentProcessors(AbstractProcessorPackage):
     create: ScopeActionProcessor[CreateAppConfigFragmentAction, CreateAppConfigFragmentActionResult]
     get: SingleEntityActionProcessor[GetAppConfigFragmentAction, GetAppConfigFragmentActionResult]
-    admin_search: ScopeActionProcessor[
+    admin_search: GlobalActionProcessor[
         AdminSearchAppConfigFragmentAction, AdminSearchAppConfigFragmentActionResult
     ]
     scoped_search: BulkActionProcessor[
@@ -83,9 +84,9 @@ class AppConfigFragmentProcessors(AbstractProcessorPackage):
         self.get = SingleEntityActionProcessor(
             service.get, action_monitors, validators=[validators.rbac.single_entity]
         )
-        # admin_search is system-wide (all scopes) — gated by superadmin_required at the API
-        # layer, so it carries no per-scope RBAC validator. Non-admins use scoped_search.
-        self.admin_search = ScopeActionProcessor(service.admin_search, action_monitors)
+        # admin_search is system-wide (all scopes), so it belongs to no RBAC scope: the
+        # global processor gates it on the SUPERADMIN role instead of a scope chain.
+        self.admin_search = GlobalActionProcessor(service.admin_search, action_monitors)
         self.scoped_search = BulkActionProcessor(service.scoped_search, monitors=action_monitors)
         self.update = SingleEntityActionProcessor(
             service.update, action_monitors, validators=[validators.rbac.single_entity]

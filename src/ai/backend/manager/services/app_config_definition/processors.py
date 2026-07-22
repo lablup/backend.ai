@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import override
 
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
+from ai.backend.manager.actions.processor.global_action import GlobalActionProcessor
 from ai.backend.manager.actions.processor.scope import ScopeActionProcessor
 from ai.backend.manager.actions.processor.single_entity import SingleEntityActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
@@ -34,7 +35,7 @@ class AppConfigDefinitionProcessors(AbstractProcessorPackage):
     get: SingleEntityActionProcessor[
         GetAppConfigDefinitionAction, GetAppConfigDefinitionActionResult
     ]
-    search: ScopeActionProcessor[
+    search: GlobalActionProcessor[
         SearchAppConfigDefinitionsAction, SearchAppConfigDefinitionsActionResult
     ]
     purge: SingleEntityActionProcessor[
@@ -48,7 +49,7 @@ class AppConfigDefinitionProcessors(AbstractProcessorPackage):
     ) -> None:
         self.create = ScopeActionProcessor(service.create, action_monitors)
         self.get = SingleEntityActionProcessor(service.get, action_monitors)
-        self.search = ScopeActionProcessor(service.search, action_monitors)
+        self.search = GlobalActionProcessor(service.search, action_monitors)
         self.purge = SingleEntityActionProcessor(service.purge, action_monitors)
 
     @override

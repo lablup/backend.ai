@@ -6,6 +6,7 @@ from typing import override
 from ai.backend.common.data.permission.types import EntityType, RBACElementType
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
 from ai.backend.manager.actions.action.bulk import BaseBulkAction, BaseBulkActionResult
+from ai.backend.manager.actions.action.global_action import BaseGlobalAction
 from ai.backend.manager.actions.action.scope import BaseScopeAction, BaseScopeActionResult
 from ai.backend.manager.actions.action.single_entity import (
     BaseSingleEntityAction,
@@ -17,6 +18,20 @@ from ai.backend.manager.data.app_config_fragment.types import (
     AppConfigFragmentData,
 )
 from ai.backend.manager.data.permission.types import RBACElementRef
+
+
+@dataclass
+class AppConfigFragmentGlobalAction(BaseGlobalAction):
+    """Base for super-admin global actions on app config fragments (admin search).
+
+    A system-wide search belongs to no RBAC scope, so it is gated by the SUPERADMIN role
+    rather than resolved against a scope chain.
+    """
+
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return EntityType.APP_CONFIG_FRAGMENT
 
 
 class AppConfigFragmentScopeAction(BaseScopeAction):

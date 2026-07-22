@@ -3,20 +3,18 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.permission.types import RBACElementType, ScopeType
+from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.app_config_fragment.types import AppConfigFragmentData
-from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.services.app_config_fragment.actions.base import (
-    AppConfigFragmentScopeAction,
-    AppConfigFragmentScopeActionResult,
+    AppConfigFragmentGlobalAction,
 )
 
 
 @dataclass
-class AdminSearchAppConfigFragmentAction(AppConfigFragmentScopeAction):
-    """Superadmin/internal path: search across all fragments with no scope."""
+class AdminSearchAppConfigFragmentAction(AppConfigFragmentGlobalAction):
+    """Super-admin path: search every fragment, across all scopes."""
 
     querier: BatchQuerier
 
@@ -26,29 +24,17 @@ class AdminSearchAppConfigFragmentAction(AppConfigFragmentScopeAction):
         return ActionOperationType.SEARCH
 
     @override
-    def scope_type(self) -> ScopeType:
-        return ScopeType.GLOBAL
-
-    @override
-    def scope_id(self) -> str:
-        return ""
-
-    @override
-    def target_element(self) -> RBACElementRef:
-        return RBACElementRef(RBACElementType.APP_CONFIG_FRAGMENT, "")
+    def entity_id(self) -> str | None:
+        return None
 
 
 @dataclass
-class AdminSearchAppConfigFragmentActionResult(AppConfigFragmentScopeActionResult):
+class AdminSearchAppConfigFragmentActionResult(BaseActionResult):
     data: list[AppConfigFragmentData]
     total_count: int
     has_next_page: bool
     has_previous_page: bool
 
     @override
-    def scope_type(self) -> ScopeType:
-        return ScopeType.GLOBAL
-
-    @override
-    def scope_id(self) -> str:
-        return ""
+    def entity_id(self) -> str | None:
+        return None
