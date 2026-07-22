@@ -7,6 +7,10 @@ from ai.backend.manager.actions.processor.global_action import GlobalActionProce
 from ai.backend.manager.actions.processor.scope import ScopeActionProcessor
 from ai.backend.manager.actions.processor.single_entity import SingleEntityActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
+from ai.backend.manager.services.app_config_definition.actions.admin_search import (
+    AdminAdminSearchAppConfigDefinitionsActionResult,
+    AdminSearchAppConfigDefinitionsAction,
+)
 from ai.backend.manager.services.app_config_definition.actions.create import (
     CreateAppConfigDefinitionAction,
     CreateAppConfigDefinitionActionResult,
@@ -18,10 +22,6 @@ from ai.backend.manager.services.app_config_definition.actions.get import (
 from ai.backend.manager.services.app_config_definition.actions.purge import (
     PurgeAppConfigDefinitionAction,
     PurgeAppConfigDefinitionActionResult,
-)
-from ai.backend.manager.services.app_config_definition.actions.search import (
-    SearchAppConfigDefinitionsAction,
-    SearchAppConfigDefinitionsActionResult,
 )
 from ai.backend.manager.services.app_config_definition.service import (
     AppConfigDefinitionService,
@@ -35,8 +35,8 @@ class AppConfigDefinitionProcessors(AbstractProcessorPackage):
     get: SingleEntityActionProcessor[
         GetAppConfigDefinitionAction, GetAppConfigDefinitionActionResult
     ]
-    search: GlobalActionProcessor[
-        SearchAppConfigDefinitionsAction, SearchAppConfigDefinitionsActionResult
+    admin_search: GlobalActionProcessor[
+        AdminSearchAppConfigDefinitionsAction, AdminAdminSearchAppConfigDefinitionsActionResult
     ]
     purge: SingleEntityActionProcessor[
         PurgeAppConfigDefinitionAction, PurgeAppConfigDefinitionActionResult
@@ -49,7 +49,7 @@ class AppConfigDefinitionProcessors(AbstractProcessorPackage):
     ) -> None:
         self.create = ScopeActionProcessor(service.create, action_monitors)
         self.get = SingleEntityActionProcessor(service.get, action_monitors)
-        self.search = GlobalActionProcessor(service.search, action_monitors)
+        self.admin_search = GlobalActionProcessor(service.admin_search, action_monitors)
         self.purge = SingleEntityActionProcessor(service.purge, action_monitors)
 
     @override
@@ -57,6 +57,6 @@ class AppConfigDefinitionProcessors(AbstractProcessorPackage):
         return [
             CreateAppConfigDefinitionAction.spec(),
             GetAppConfigDefinitionAction.spec(),
-            SearchAppConfigDefinitionsAction.spec(),
+            AdminSearchAppConfigDefinitionsAction.spec(),
             PurgeAppConfigDefinitionAction.spec(),
         ]

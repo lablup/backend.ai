@@ -13,7 +13,7 @@ from ai.backend.manager.services.app_config_allow_list.actions.base import (
 
 
 @dataclass
-class SearchAppConfigAllowListAction(AppConfigAllowListGlobalAction):
+class AdminSearchAppConfigAllowListAction(AppConfigAllowListGlobalAction):
     """Super-admin path: search every allow-list entry, across all scope types."""
 
     querier: BatchQuerier
@@ -29,7 +29,7 @@ class SearchAppConfigAllowListAction(AppConfigAllowListGlobalAction):
 
 
 @dataclass
-class SearchAppConfigAllowListActionResult(BaseActionResult):
+class AdminAdminSearchAppConfigAllowListActionResult(BaseActionResult):
     data: list[AppConfigAllowListData]
     total_count: int
     has_next_page: bool

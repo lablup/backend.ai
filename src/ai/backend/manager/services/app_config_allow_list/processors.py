@@ -7,6 +7,10 @@ from ai.backend.manager.actions.processor.global_action import GlobalActionProce
 from ai.backend.manager.actions.processor.scope import ScopeActionProcessor
 from ai.backend.manager.actions.processor.single_entity import SingleEntityActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
+from ai.backend.manager.services.app_config_allow_list.actions.admin_search import (
+    AdminAdminSearchAppConfigAllowListActionResult,
+    AdminSearchAppConfigAllowListAction,
+)
 from ai.backend.manager.services.app_config_allow_list.actions.create import (
     CreateAppConfigAllowListAction,
     CreateAppConfigAllowListActionResult,
@@ -18,10 +22,6 @@ from ai.backend.manager.services.app_config_allow_list.actions.get import (
 from ai.backend.manager.services.app_config_allow_list.actions.purge import (
     PurgeAppConfigAllowListAction,
     PurgeAppConfigAllowListActionResult,
-)
-from ai.backend.manager.services.app_config_allow_list.actions.search import (
-    SearchAppConfigAllowListAction,
-    SearchAppConfigAllowListActionResult,
 )
 from ai.backend.manager.services.app_config_allow_list.actions.update import (
     UpdateAppConfigAllowListAction,
@@ -37,8 +37,8 @@ class AppConfigAllowListProcessors(AbstractProcessorPackage):
         CreateAppConfigAllowListAction, CreateAppConfigAllowListActionResult
     ]
     get: SingleEntityActionProcessor[GetAppConfigAllowListAction, GetAppConfigAllowListActionResult]
-    search: GlobalActionProcessor[
-        SearchAppConfigAllowListAction, SearchAppConfigAllowListActionResult
+    admin_search: GlobalActionProcessor[
+        AdminSearchAppConfigAllowListAction, AdminAdminSearchAppConfigAllowListActionResult
     ]
     update: SingleEntityActionProcessor[
         UpdateAppConfigAllowListAction, UpdateAppConfigAllowListActionResult
@@ -54,7 +54,7 @@ class AppConfigAllowListProcessors(AbstractProcessorPackage):
     ) -> None:
         self.create = ScopeActionProcessor(service.create, action_monitors)
         self.get = SingleEntityActionProcessor(service.get, action_monitors)
-        self.search = GlobalActionProcessor(service.search, action_monitors)
+        self.admin_search = GlobalActionProcessor(service.admin_search, action_monitors)
         self.update = SingleEntityActionProcessor(service.update, action_monitors)
         self.purge = SingleEntityActionProcessor(service.purge, action_monitors)
 
@@ -63,7 +63,7 @@ class AppConfigAllowListProcessors(AbstractProcessorPackage):
         return [
             CreateAppConfigAllowListAction.spec(),
             GetAppConfigAllowListAction.spec(),
-            SearchAppConfigAllowListAction.spec(),
+            AdminSearchAppConfigAllowListAction.spec(),
             UpdateAppConfigAllowListAction.spec(),
             PurgeAppConfigAllowListAction.spec(),
         ]

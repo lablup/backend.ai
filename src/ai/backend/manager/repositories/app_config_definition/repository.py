@@ -59,8 +59,8 @@ class AppConfigDefinitionRepository:
         return await self._db_source.get_by_id(definition_id)
 
     @app_config_definition_repository_resilience.apply()
-    async def search(self, querier: BatchQuerier) -> AppConfigDefinitionListResult:
-        return await self._db_source.search(querier)
+    async def admin_search(self, querier: BatchQuerier) -> AppConfigDefinitionListResult:
+        return await self._db_source.admin_search(querier)
 
     @app_config_definition_repository_resilience.apply()
     async def purge(self, purger: Purger[AppConfigDefinitionRow]) -> AppConfigDefinitionData:

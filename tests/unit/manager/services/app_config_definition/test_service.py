@@ -27,6 +27,9 @@ from ai.backend.manager.repositories.base import (
     OffsetPagination,
     Purger,
 )
+from ai.backend.manager.services.app_config_definition.actions.admin_search import (
+    AdminSearchAppConfigDefinitionsAction,
+)
 from ai.backend.manager.services.app_config_definition.actions.create import (
     CreateAppConfigDefinitionAction,
 )
@@ -35,9 +38,6 @@ from ai.backend.manager.services.app_config_definition.actions.get import (
 )
 from ai.backend.manager.services.app_config_definition.actions.purge import (
     PurgeAppConfigDefinitionAction,
-)
-from ai.backend.manager.services.app_config_definition.actions.search import (
-    SearchAppConfigDefinitionsAction,
 )
 from ai.backend.manager.services.app_config_definition.service import (
     AppConfigDefinitionService,
@@ -108,7 +108,7 @@ class TestAppConfigDefinitionService:
         mock_repository: MagicMock,
         definition_data: AppConfigDefinitionData,
     ) -> None:
-        mock_repository.search = AsyncMock(
+        mock_repository.admin_search = AsyncMock(
             return_value=AppConfigDefinitionListResult(
                 items=[definition_data],
                 total_count=1,
@@ -118,11 +118,11 @@ class TestAppConfigDefinitionService:
         )
         querier = BatchQuerier(pagination=OffsetPagination(limit=10, offset=0))
 
-        result = await service.search(SearchAppConfigDefinitionsAction(querier=querier))
+        result = await service.admin_search(AdminSearchAppConfigDefinitionsAction(querier=querier))
 
         assert result.data == [definition_data]
         assert result.total_count == 1
-        mock_repository.search.assert_called_once_with(querier)
+        mock_repository.admin_search.assert_called_once_with(querier)
 
     async def test_purge(
         self,

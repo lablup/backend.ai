@@ -3,6 +3,10 @@ from __future__ import annotations
 from ai.backend.manager.repositories.app_config_allow_list.repository import (
     AppConfigAllowListRepository,
 )
+from ai.backend.manager.services.app_config_allow_list.actions.admin_search import (
+    AdminAdminSearchAppConfigAllowListActionResult,
+    AdminSearchAppConfigAllowListAction,
+)
 from ai.backend.manager.services.app_config_allow_list.actions.create import (
     CreateAppConfigAllowListAction,
     CreateAppConfigAllowListActionResult,
@@ -14,10 +18,6 @@ from ai.backend.manager.services.app_config_allow_list.actions.get import (
 from ai.backend.manager.services.app_config_allow_list.actions.purge import (
     PurgeAppConfigAllowListAction,
     PurgeAppConfigAllowListActionResult,
-)
-from ai.backend.manager.services.app_config_allow_list.actions.search import (
-    SearchAppConfigAllowListAction,
-    SearchAppConfigAllowListActionResult,
 )
 from ai.backend.manager.services.app_config_allow_list.actions.update import (
     UpdateAppConfigAllowListAction,
@@ -43,11 +43,11 @@ class AppConfigAllowListService:
         data = await self._repository.get_by_id(action.allow_list_id)
         return GetAppConfigAllowListActionResult(allow_list=data)
 
-    async def search(
-        self, action: SearchAppConfigAllowListAction
-    ) -> SearchAppConfigAllowListActionResult:
-        result = await self._repository.search(action.querier)
-        return SearchAppConfigAllowListActionResult(
+    async def admin_search(
+        self, action: AdminSearchAppConfigAllowListAction
+    ) -> AdminAdminSearchAppConfigAllowListActionResult:
+        result = await self._repository.admin_search(action.querier)
+        return AdminAdminSearchAppConfigAllowListActionResult(
             data=result.items,
             total_count=result.total_count,
             has_next_page=result.has_next_page,

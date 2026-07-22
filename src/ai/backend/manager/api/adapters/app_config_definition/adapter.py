@@ -41,6 +41,9 @@ from ai.backend.manager.repositories.base import (
     negate_conditions,
 )
 from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.services.app_config_definition.actions.admin_search import (
+    AdminSearchAppConfigDefinitionsAction,
+)
 from ai.backend.manager.services.app_config_definition.actions.create import (
     CreateAppConfigDefinitionAction,
 )
@@ -49,9 +52,6 @@ from ai.backend.manager.services.app_config_definition.actions.get import (
 )
 from ai.backend.manager.services.app_config_definition.actions.purge import (
     PurgeAppConfigDefinitionAction,
-)
-from ai.backend.manager.services.app_config_definition.actions.search import (
-    SearchAppConfigDefinitionsAction,
 )
 
 
@@ -101,8 +101,8 @@ class AppConfigDefinitionAdapter(BaseAdapter):
             pagination_spec=_get_app_config_definition_pagination_spec(),
             limit=len(ids),
         )
-        action_result = await self._processors.app_config_definition.search.wait_for_complete(
-            SearchAppConfigDefinitionsAction(querier=querier)
+        action_result = await self._processors.app_config_definition.admin_search.wait_for_complete(
+            AdminSearchAppConfigDefinitionsAction(querier=querier)
         )
         node_map = {node.id: node for node in map(self._data_to_node, action_result.data)}
         return [node_map.get(definition_id) for definition_id in ids]
@@ -123,8 +123,8 @@ class AppConfigDefinitionAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        action_result = await self._processors.app_config_definition.search.wait_for_complete(
-            SearchAppConfigDefinitionsAction(querier=querier)
+        action_result = await self._processors.app_config_definition.admin_search.wait_for_complete(
+            AdminSearchAppConfigDefinitionsAction(querier=querier)
         )
         return SearchAppConfigDefinitionsPayload(
             items=[self._data_to_node(item) for item in action_result.data],

@@ -13,7 +13,7 @@ from ai.backend.manager.services.app_config_definition.actions.base import (
 
 
 @dataclass
-class SearchAppConfigDefinitionsAction(AppConfigDefinitionGlobalAction):
+class AdminSearchAppConfigDefinitionsAction(AppConfigDefinitionGlobalAction):
     """Super-admin path: search every registered config definition."""
 
     querier: BatchQuerier
@@ -29,7 +29,7 @@ class SearchAppConfigDefinitionsAction(AppConfigDefinitionGlobalAction):
 
 
 @dataclass
-class SearchAppConfigDefinitionsActionResult(BaseActionResult):
+class AdminAdminSearchAppConfigDefinitionsActionResult(BaseActionResult):
     data: list[AppConfigDefinitionData]
     total_count: int
     has_next_page: bool
