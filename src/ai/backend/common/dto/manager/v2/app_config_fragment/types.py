@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 from enum import StrEnum
+from typing import Self
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.data.app_config.types import AppConfigScopeType
@@ -13,33 +14,25 @@ from ai.backend.common.identifier.app_config import AppConfigScopeID
 __all__ = (
     "AppConfigFragmentOrderField",
     "AppConfigFragmentScope",
-    "AppConfigFragmentSearchScopeType",
     "AppConfigScopeTypeFilter",
 )
-
-
-class AppConfigFragmentSearchScopeType(StrEnum):
-    """The scope a scoped fragment search may act at.
-
-    A subset of :class:`AppConfigScopeType`: a scoped search is authorized against one
-    owned RBAC scope, and ``public`` maps to the global scope, which has no scope element
-    to check. Whether public fragments should be reachable from a scoped search is still
-    open — until it is decided, the type says they are not.
-    """
-
-    DOMAIN = "domain"
-    USER = "user"
 
 
 class AppConfigFragmentScope(BaseRequestModel):
     """The scope a scoped app config fragment search acts at."""
 
-    scope_type: AppConfigFragmentSearchScopeType = Field(
-        description="Scope the search acts at (domain | user)."
-    )
+    scope_type: AppConfigScopeType = Field(description="Scope the search acts at (domain | user).")
     scope_id: AppConfigScopeID = Field(
         description="Scope identifier: the domain id (domain scope) or the user id (user scope)."
     )
+
+    @model_validator(mode="after")
+    def _reject_public(self) -> Self:
+        # public maps to the global RBAC scope, which has no scope element to authorize
+        # against. Whether a scoped search should reach public fragments is still open.
+        if self.scope_type is AppConfigScopeType.PUBLIC:
+            raise ValueError("scope_type 'public' is not supported by a scoped search.")
+        return self
 
 
 class AppConfigScopeTypeFilter(BaseRequestModel):

@@ -9,6 +9,7 @@ from typing import Any, override
 import sqlalchemy as sa
 
 from ai.backend.common.data.app_config.types import AppConfigScopeType
+from ai.backend.common.identifier.app_config import AppConfigScopeID
 from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.user import UserID
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
@@ -16,10 +17,9 @@ from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.scopes import ExistenceCheck, SearchScope
 
 __all__ = (
+    "AppConfigFragmentSearchScope",
     "AppConfigScopeArguments",
     "ResolvedAppConfigScope",
-    "DomainAppConfigFragmentSearchScope",
-    "UserAppConfigFragmentSearchScope",
 )
 
 
@@ -46,47 +46,28 @@ class ResolvedAppConfigScope:
 
 
 @dataclass(frozen=True)
-class DomainAppConfigFragmentSearchScope(SearchScope):
-    """Fragments written at one domain scope (``scope_type == domain``, ``scope_id == domain_id``).
+class AppConfigFragmentSearchScope(SearchScope):
+    """The fragments written at one scope, matching the row's ``(scope_type, scope_id)``.
 
-    ``existence_checks`` is empty: RBAC already gates whether the caller can reach this
-    domain, so a missing domain is indistinguishable from an unreachable one.
+    ``existence_checks`` is empty: RBAC already gates whether the caller can reach the
+    scope, so a missing owner is indistinguishable from an unreachable one.
     """
 
-    domain_id: DomainID
+    scope_type: AppConfigScopeType
+    scope_id: AppConfigScopeID | None
+    """The scope owner — ``None`` only for ``public``, which has no owner."""
 
     @override
     def to_condition(self) -> QueryCondition:
-        domain_id = self.domain_id
+        scope_type = self.scope_type
+        scope_id = self.scope_id
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return sa.and_(
-                AppConfigFragmentRow.scope_type == AppConfigScopeType.DOMAIN,
-                AppConfigFragmentRow.scope_id == domain_id,
-            )
-
-        return inner
-
-    @property
-    @override
-    def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
-        return ()
-
-
-@dataclass(frozen=True)
-class UserAppConfigFragmentSearchScope(SearchScope):
-    """Fragments written at one user scope (``scope_type == user``, ``scope_id == user_id``)."""
-
-    user_id: UserID
-
-    @override
-    def to_condition(self) -> QueryCondition:
-        user_id = self.user_id
-
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return sa.and_(
-                AppConfigFragmentRow.scope_type == AppConfigScopeType.USER,
-                AppConfigFragmentRow.scope_id == user_id,
+                AppConfigFragmentRow.scope_type == scope_type,
+                AppConfigFragmentRow.scope_id.is_(None)
+                if scope_id is None
+                else AppConfigFragmentRow.scope_id == scope_id,
             )
 
         return inner

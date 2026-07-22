@@ -1041,7 +1041,7 @@
         "description": "The scope a scoped app config fragment search acts at.",
         "properties": {
           "scope_type": {
-            "$ref": "#/components/schemas/AppConfigFragmentSearchScopeType",
+            "$ref": "#/components/schemas/AppConfigScopeType",
             "description": "Scope the search acts at (domain | user)."
           },
           "scope_id": {
@@ -1057,15 +1057,6 @@
         ],
         "title": "AppConfigFragmentScope",
         "type": "object"
-      },
-      "AppConfigFragmentSearchScopeType": {
-        "description": "The scope a scoped fragment search may act at.\n\nA subset of :class:`AppConfigScopeType`: a scoped search is authorized against one\nowned RBAC scope, and ``public`` maps to the global scope, which has no scope element\nto check. Whether public fragments should be reachable from a scoped search is still\nopen — until it is decided, the type says they are not.",
-        "enum": [
-          "domain",
-          "user"
-        ],
-        "title": "AppConfigFragmentSearchScopeType",
-        "type": "string"
       },
       "ScopedSearchAppConfigFragmentInput": {
         "description": "Input for a fragment search scoped to one domain or user.",

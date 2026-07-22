@@ -44,9 +44,8 @@ from ai.backend.manager.repositories.app_config_fragment.repository import (
     AppConfigFragmentRepository,
 )
 from ai.backend.manager.repositories.app_config_fragment.types import (
-    DomainAppConfigFragmentSearchScope,
+    AppConfigFragmentSearchScope,
     ResolvedAppConfigScope,
-    UserAppConfigFragmentSearchScope,
 )
 from ai.backend.manager.repositories.app_config_fragment.updaters import (
     AppConfigFragmentUpdaterSpec,
@@ -395,70 +394,68 @@ class TestSearch:
         assert {item.id for item in result.items} == expected
 
 
+@dataclass(frozen=True)
+class _ScopedSearchCase:
+    """One scope a scoped search runs against, and the rows it must return."""
+
+    scope: AppConfigFragmentSearchScope
+    expected_scope_type: AppConfigScopeType | None = None
+    expected_scope_id: AppConfigScopeID | None = None
+    """``None`` expectations mean the scope matches nothing at all."""
+
+
 class TestScopedSearch:
-    async def test_domain_scope_returns_only_that_domain(
+    @pytest.mark.parametrize(
+        "case",
+        [
+            _ScopedSearchCase(
+                scope=AppConfigFragmentSearchScope(
+                    scope_type=AppConfigScopeType.DOMAIN, scope_id=_DOMAIN_SCOPE_ID
+                ),
+                expected_scope_type=AppConfigScopeType.DOMAIN,
+                expected_scope_id=_DOMAIN_SCOPE_ID,
+            ),
+            _ScopedSearchCase(
+                scope=AppConfigFragmentSearchScope(
+                    scope_type=AppConfigScopeType.USER, scope_id=_USER_SCOPE_ID
+                ),
+                expected_scope_type=AppConfigScopeType.USER,
+                expected_scope_id=_USER_SCOPE_ID,
+            ),
+            _ScopedSearchCase(
+                scope=AppConfigFragmentSearchScope(
+                    scope_type=AppConfigScopeType.PUBLIC, scope_id=None
+                ),
+                expected_scope_type=AppConfigScopeType.PUBLIC,
+                expected_scope_id=None,
+            ),
+            # An unknown owner is unconditional: no rows, not an error.
+            _ScopedSearchCase(
+                scope=AppConfigFragmentSearchScope(
+                    scope_type=AppConfigScopeType.DOMAIN,
+                    scope_id=AppConfigScopeID(uuid.uuid4()),
+                ),
+            ),
+        ],
+        ids=lambda case: f"{case.scope.scope_type.value}-{'match' if case.expected_scope_type else 'unknown'}",
+    )
+    async def test_scope_returns_only_the_fragments_written_at_it(
         self,
         repository: AppConfigFragmentRepository,
         fragments_across_scopes: list[AppConfigFragmentData],
+        case: _ScopedSearchCase,
     ) -> None:
         result = await repository.scoped_search(
             BatchQuerier(pagination=OffsetPagination(limit=10, offset=0)),
-            [DomainAppConfigFragmentSearchScope(domain_id=_DOMAIN_ID)],
+            case.scope,
         )
-        # Only domain-scoped fragments of that domain — not the other domain, public, or users.
         expected = {
             f.id
             for f in fragments_across_scopes
-            if f.scope_type is AppConfigScopeType.DOMAIN and f.scope_id == _DOMAIN_SCOPE_ID
+            if f.scope_type is case.expected_scope_type and f.scope_id == case.expected_scope_id
         }
         assert {item.id for item in result.items} == expected
         assert result.total_count == len(expected)
-
-    async def test_user_scope_returns_only_that_user(
-        self,
-        repository: AppConfigFragmentRepository,
-        fragments_across_scopes: list[AppConfigFragmentData],
-    ) -> None:
-        result = await repository.scoped_search(
-            BatchQuerier(pagination=OffsetPagination(limit=10, offset=0)),
-            [UserAppConfigFragmentSearchScope(user_id=_USER_ID)],
-        )
-        expected = {
-            f.id
-            for f in fragments_across_scopes
-            if f.scope_type is AppConfigScopeType.USER and f.scope_id == _USER_SCOPE_ID
-        }
-        assert {item.id for item in result.items} == expected
-
-    async def test_scopes_or_combined_across_domain_and_user(
-        self,
-        repository: AppConfigFragmentRepository,
-        fragments_across_scopes: list[AppConfigFragmentData],
-    ) -> None:
-        result = await repository.scoped_search(
-            BatchQuerier(pagination=OffsetPagination(limit=10, offset=0)),
-            [
-                DomainAppConfigFragmentSearchScope(domain_id=_DOMAIN_ID),
-                UserAppConfigFragmentSearchScope(user_id=_USER_ID),
-            ],
-        )
-        expected = {
-            f.id
-            for f in fragments_across_scopes
-            if (f.scope_type is AppConfigScopeType.DOMAIN and f.scope_id == _DOMAIN_SCOPE_ID)
-            or (f.scope_type is AppConfigScopeType.USER and f.scope_id == _USER_SCOPE_ID)
-        }
-        assert {item.id for item in result.items} == expected
-
-    async def test_scoped_search_unknown_scope_returns_empty(
-        self, repository: AppConfigFragmentRepository
-    ) -> None:
-        # Unconditional (no existence check): an unknown scope yields no rows, not an error.
-        result = await repository.scoped_search(
-            BatchQuerier(pagination=OffsetPagination(limit=10, offset=0)),
-            [DomainAppConfigFragmentSearchScope(domain_id=DomainID(uuid.uuid4()))],
-        )
-        assert result.items == []
 
 
 @pytest.fixture
