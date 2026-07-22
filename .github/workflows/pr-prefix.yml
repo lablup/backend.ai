@@ -4,6 +4,9 @@ on:
   pull_request:
     types: [opened, edited, reopened]
 
+permissions:
+  contents: read
+
 jobs:
   check-pr-prefix:
     runs-on: ubuntu-latest
