@@ -1090,14 +1090,8 @@
         "type": "object"
       },
       "UpdateAppConfigAllowListInput": {
-        "description": "Input for updating an app config allow-list entry.\n\nOnly ``rank`` is updatable — the identity pair (``config_name``, ``scope_type``)\nis immutable (purge and recreate to change it).",
+        "description": "Input for updating an app config allow-list entry.\n\nOnly ``rank`` is updatable — the identity pair (``config_name``, ``scope_type``)\nis immutable (purge and recreate to change it). The target entry is identified by the\nrequest path, not this body.",
         "properties": {
-          "id": {
-            "description": "App config allow-list entry id to update.",
-            "format": "uuid",
-            "title": "Id",
-            "type": "string"
-          },
           "rank": {
             "anyOf": [
               {
@@ -1112,9 +1106,6 @@
             "title": "Rank"
           }
         },
-        "required": [
-          "id"
-        ],
         "title": "UpdateAppConfigAllowListInput",
         "type": "object"
       },

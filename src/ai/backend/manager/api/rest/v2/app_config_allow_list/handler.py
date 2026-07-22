@@ -63,8 +63,9 @@ class V2AppConfigAllowListHandler:
         body: BodyParam[UpdateAppConfigAllowListInput],
     ) -> APIResponse:
         """Update an app config allow-list entry's rank by id (superadmin only)."""
-        merged = body.parsed.model_copy(update={"id": path.parsed.app_config_allow_list_id})
-        result = await self._adapter.admin_update(merged)
+        result = await self._adapter.admin_update(
+            AppConfigAllowListID(path.parsed.app_config_allow_list_id), body.parsed
+        )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def admin_purge(

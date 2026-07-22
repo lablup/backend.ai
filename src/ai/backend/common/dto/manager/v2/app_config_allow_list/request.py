@@ -50,10 +50,10 @@ class UpdateAppConfigAllowListInput(BaseRequestModel):
     """Input for updating an app config allow-list entry.
 
     Only ``rank`` is updatable — the identity pair (``config_name``, ``scope_type``)
-    is immutable (purge and recreate to change it).
+    is immutable (purge and recreate to change it). The target entry is identified by the
+    request path, not this body.
     """
 
-    id: UUID = Field(description="App config allow-list entry id to update.")
     rank: int | None = Field(
         default=None,
         description=(

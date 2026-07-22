@@ -155,7 +155,7 @@ class AppConfigAllowListAdapter(BaseAdapter):
         )
 
     async def admin_update(
-        self, input: UpdateAppConfigAllowListInput
+        self, entry_id: AppConfigAllowListID, input: UpdateAppConfigAllowListInput
     ) -> UpdateAppConfigAllowListPayload:
         updater = Updater(
             spec=AppConfigAllowListUpdaterSpec(
@@ -165,7 +165,7 @@ class AppConfigAllowListAdapter(BaseAdapter):
                     else OptionalState.nop()
                 ),
             ),
-            pk_value=AppConfigAllowListID(input.id),
+            pk_value=entry_id,
         )
         action_result = await self._processors.app_config_allow_list.update.wait_for_complete(
             UpdateAppConfigAllowListAction(updater=updater)

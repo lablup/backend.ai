@@ -135,7 +135,7 @@ class TestAdminUpdate:
 
         result = await client.admin_update(
             entry_id,
-            UpdateAppConfigAllowListInput(id=entry_id, rank=250),
+            UpdateAppConfigAllowListInput(rank=250),
         )
 
         call_args = mock_session.request.call_args

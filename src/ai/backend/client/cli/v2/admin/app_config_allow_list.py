@@ -175,7 +175,7 @@ def update(app_config_allow_list_id: uuid.UUID, rank: int) -> None:
         try:
             result = await registry.app_config_allow_list.admin_update(
                 app_config_allow_list_id,
-                UpdateAppConfigAllowListInput(id=app_config_allow_list_id, rank=rank),
+                UpdateAppConfigAllowListInput(rank=rank),
             )
             print_result(result)
         finally:
