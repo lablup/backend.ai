@@ -75,6 +75,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           COMMIT_MESSAGE: ${{ steps.commit.outputs.commit_message }}
+          COMMIT_AUTHOR: ${{ steps.commit.outputs.author }}
+          COMMIT_AUTHOR_EMAIL: ${{ steps.commit.outputs.author_email }}
+          COMMIT_LABELS: ${{ steps.commit.outputs.labels }}
         run: |
           target_milestone=$(gh pr view ${{ steps.commit.outputs.pr_number }} --json milestone --jq .milestone.title)
 
@@ -114,9 +117,9 @@ jobs:
                 --arg message "$COMMIT_MESSAGE" \
                 --arg pr "${{ steps.commit.outputs.pr_number }}" \
                 --arg release "${{ steps.commit.outputs.latest_release }}" \
-                --arg author "${{ steps.commit.outputs.author }}" \
-                --arg email "${{ steps.commit.outputs.author_email }}" \
-                --arg labels "${{ steps.commit.outputs.labels }}" \
+                --arg author "$COMMIT_AUTHOR" \
+                --arg email "$COMMIT_AUTHOR_EMAIL" \
+                --arg labels "$COMMIT_LABELS" \
                 '. += [{
                   commit: $commit,
                   target_branch: $branch,
@@ -132,9 +135,15 @@ jobs:
           echo "result=$result" >> $GITHUB_OUTPUT
       - name: Save result to file
         if: ${{ steps.commit.outputs.pr_number }}
+        env:
+          # Per-target backport entries (commit, target branch, commit
+          # message, author, ...). The embedded commit message and author may
+          # contain quotes -- inline ${{ }} interpolation into the shell
+          # breaks on them (e.g. an apostrophe in the PR title).
+          BACKPORT_TARGETS_JSON: ${{ steps.milestones.outputs.result }}
         run: |
           mkdir -p /tmp/backport-results
-          echo '${{ steps.milestones.outputs.result }}' > /tmp/backport-results/${{ matrix.commits }}.json
+          printf '%s' "$BACKPORT_TARGETS_JSON" > /tmp/backport-results/${{ matrix.commits }}.json
       - name: Upload result artifact
         if: ${{ steps.commit.outputs.pr_number }}
         uses: actions/upload-artifact@v4
@@ -185,9 +194,11 @@ jobs:
       - name: Cherry-pick
         env:
           COMMIT_MESSAGE: ${{ matrix.commit_message }}
+          COMMIT_AUTHOR: ${{ matrix.author }}
+          COMMIT_AUTHOR_EMAIL: ${{ matrix.author_email }}
         run: |
-          git config user.name "${{ matrix.author }}"
-          git config user.email "${{ matrix.author_email }}"
+          git config user.name "$COMMIT_AUTHOR"
+          git config user.email "$COMMIT_AUTHOR_EMAIL"
           target_commit="${{ matrix.commit }}"
           git fetch origin main "$target_commit"
           git cherry-pick --strategy=recursive --strategy-option=theirs "$target_commit"
