@@ -52,7 +52,7 @@ class AppConfigFragmentProcessors(AbstractProcessorPackage):
     admin_search: GlobalActionProcessor[
         AdminSearchAppConfigFragmentAction, AdminSearchAppConfigFragmentActionResult
     ]
-    scoped_search: BulkActionProcessor[
+    scoped_search: ScopeActionProcessor[
         ScopedSearchAppConfigFragmentAction, ScopedSearchAppConfigFragmentActionResult
     ]
     update: SingleEntityActionProcessor[
@@ -87,7 +87,9 @@ class AppConfigFragmentProcessors(AbstractProcessorPackage):
         # admin_search is system-wide (all scopes), so it belongs to no RBAC scope: the
         # global processor gates it on the SUPERADMIN role instead of a scope chain.
         self.admin_search = GlobalActionProcessor(service.admin_search, action_monitors)
-        self.scoped_search = BulkActionProcessor(service.scoped_search, monitors=action_monitors)
+        self.scoped_search = ScopeActionProcessor(
+            service.scoped_search, action_monitors, validators=[validators.rbac.scope]
+        )
         self.update = SingleEntityActionProcessor(
             service.update, action_monitors, validators=[validators.rbac.single_entity]
         )

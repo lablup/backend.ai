@@ -78,15 +78,13 @@ class AppConfigFragmentService:
     async def scoped_search(
         self, action: ScopedSearchAppConfigFragmentAction
     ) -> ScopedSearchAppConfigFragmentActionResult:
-        targets = list(action.targets())
-        scopes = [t.to_search_scope() for t in targets]
-        result = await self._repository.scoped_search(action.querier, scopes)
+        result = await self._repository.scoped_search(action.querier, action.scope)
         return ScopedSearchAppConfigFragmentActionResult(
-            items=result.items,
+            scope=action.scope,
+            data=result.items,
             total_count=result.total_count,
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,
-            queried_refs=[t.to_rbac_element_ref() for t in targets],
         )
 
     async def update(

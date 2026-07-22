@@ -1,72 +1,33 @@
-"""Scoped app config fragment search action and its searchable targets."""
-
 from __future__ import annotations
 
-from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.permission.types import EntityType, RBACElementType
-from ai.backend.common.identifier.domain import DomainID
-from ai.backend.common.identifier.user import UserID
-from ai.backend.manager.actions.action.bulk import BaseBulkAction, BaseBulkActionResult
-from ai.backend.manager.actions.action.types import SearchableActionTarget
+from ai.backend.common.data.permission.types import RBACElementType, ScopeType
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.app_config_fragment.types import AppConfigFragmentData
 from ai.backend.manager.data.permission.types import RBACElementRef
-from ai.backend.manager.models.scopes import SearchScope
 from ai.backend.manager.repositories.app_config_fragment.types import (
-    DomainAppConfigFragmentSearchScope,
-    UserAppConfigFragmentSearchScope,
+    AppConfigFragmentSearchScope,
 )
 from ai.backend.manager.repositories.base import BatchQuerier
-
-
-@dataclass(frozen=True)
-class DomainAppConfigFragmentTarget(SearchableActionTarget):
-    """Scope item keyed by a domain — the fragments written at that domain scope."""
-
-    domain_id: DomainID
-
-    @override
-    def to_rbac_element_ref(self) -> RBACElementRef:
-        return RBACElementRef(element_type=RBACElementType.DOMAIN, element_id=str(self.domain_id))
-
-    @override
-    def to_search_scope(self) -> SearchScope:
-        return DomainAppConfigFragmentSearchScope(domain_id=self.domain_id)
-
-
-@dataclass(frozen=True)
-class UserAppConfigFragmentTarget(SearchableActionTarget):
-    """Scope item keyed by a user — the fragments written at that user scope."""
-
-    user_id: UserID
-
-    @override
-    def to_rbac_element_ref(self) -> RBACElementRef:
-        return RBACElementRef(element_type=RBACElementType.USER, element_id=str(self.user_id))
-
-    @override
-    def to_search_scope(self) -> SearchScope:
-        return UserAppConfigFragmentSearchScope(user_id=self.user_id)
+from ai.backend.manager.services.app_config_fragment.actions.base import (
+    AppConfigFragmentScopeAction,
+    AppConfigFragmentScopeActionResult,
+)
 
 
 @dataclass
-class ScopedSearchAppConfigFragmentAction(BaseBulkAction[SearchableActionTarget]):
-    """Scoped path: search the fragments under the given domain/user scope targets."""
+class ScopedSearchAppConfigFragmentAction(AppConfigFragmentScopeAction):
+    """Search the fragments written at one scope.
 
-    items: list[SearchableActionTarget]
+    Acts at the RBAC scope named by ``scope``, so the scope RBAC validator authorizes the
+    read the same way it authorizes a write at that scope in
+    :class:`CreateAppConfigFragmentAction`.
+    """
+
+    scope: AppConfigFragmentSearchScope
     querier: BatchQuerier
-
-    @override
-    def entity_id(self) -> str | None:
-        return None
-
-    @override
-    @classmethod
-    def entity_type(cls) -> EntityType:
-        return EntityType.APP_CONFIG_FRAGMENT
 
     @override
     @classmethod
@@ -74,18 +35,34 @@ class ScopedSearchAppConfigFragmentAction(BaseBulkAction[SearchableActionTarget]
         return ActionOperationType.SEARCH
 
     @override
-    def targets(self) -> Sequence[SearchableActionTarget]:
-        return list(self.items)
+    def scope_type(self) -> ScopeType:
+        return self.scope.scope_type.to_rbac_scope_type()
+
+    @override
+    def scope_id(self) -> str:
+        return self.scope.scope_type.to_rbac_scope_id(self.scope.scope_id)
+
+    @override
+    def target_element(self) -> RBACElementRef:
+        element = self.scope.scope_type.to_rbac_element_type()
+        if element is None:
+            return RBACElementRef(RBACElementType.APP_CONFIG_FRAGMENT, "")
+        # A non-null element type means domain or user scope, which always carries an owner.
+        return RBACElementRef(element, str(self.scope.scope_id))
 
 
 @dataclass
-class ScopedSearchAppConfigFragmentActionResult(BaseBulkActionResult):
-    items: list[AppConfigFragmentData]
+class ScopedSearchAppConfigFragmentActionResult(AppConfigFragmentScopeActionResult):
+    scope: AppConfigFragmentSearchScope
+    data: list[AppConfigFragmentData]
     total_count: int
     has_next_page: bool
     has_previous_page: bool
-    queried_refs: list[RBACElementRef]
 
     @override
-    def element_refs(self) -> list[RBACElementRef]:
-        return list(self.queried_refs)
+    def scope_type(self) -> ScopeType:
+        return self.scope.scope_type.to_rbac_scope_type()
+
+    @override
+    def scope_id(self) -> str:
+        return self.scope.scope_type.to_rbac_scope_id(self.scope.scope_id)
