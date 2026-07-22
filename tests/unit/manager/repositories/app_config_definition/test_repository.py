@@ -100,13 +100,13 @@ class TestPurge:
             await repository.purge(Purger(row_class=AppConfigDefinitionRow, pk_value=_missing_id()))
 
 
-class TestSearch:
-    async def test_search_returns_all_with_total_count(
+class TestAdminSearch:
+    async def test_admin_search_returns_all_with_total_count(
         self,
         repository: AppConfigDefinitionRepository,
         seeded_definitions: list[AppConfigDefinitionData],
     ) -> None:
-        result = await repository.search(
+        result = await repository.admin_search(
             BatchQuerier(pagination=OffsetPagination(limit=10, offset=0))
         )
         assert result.total_count == len(seeded_definitions)
@@ -114,24 +114,24 @@ class TestSearch:
             definition.config_name for definition in seeded_definitions
         }
 
-    async def test_search_respects_pagination(
+    async def test_admin_search_respects_pagination(
         self,
         repository: AppConfigDefinitionRepository,
         seeded_definitions: list[AppConfigDefinitionData],
     ) -> None:
-        result = await repository.search(
+        result = await repository.admin_search(
             BatchQuerier(pagination=OffsetPagination(limit=2, offset=0))
         )
         assert result.total_count == len(seeded_definitions)
         assert len(result.items) == 2
         assert result.has_next_page is True
 
-    async def test_search_filters_by_config_name(
+    async def test_admin_search_filters_by_config_name(
         self,
         repository: AppConfigDefinitionRepository,
         seeded_definitions: list[AppConfigDefinitionData],
     ) -> None:
-        result = await repository.search(
+        result = await repository.admin_search(
             BatchQuerier(
                 pagination=OffsetPagination(limit=10, offset=0),
                 conditions=[
@@ -149,12 +149,12 @@ class TestSearch:
         assert result.total_count == len(expected)
         assert [item.config_name for item in result.items] == expected
 
-    async def test_search_orders_by_config_name_desc(
+    async def test_admin_search_orders_by_config_name_desc(
         self,
         repository: AppConfigDefinitionRepository,
         seeded_definitions: list[AppConfigDefinitionData],
     ) -> None:
-        result = await repository.search(
+        result = await repository.admin_search(
             BatchQuerier(
                 pagination=OffsetPagination(limit=10, offset=0),
                 orders=[AppConfigDefinitionOrders.config_name(ascending=False)],
@@ -165,13 +165,13 @@ class TestSearch:
         )
         assert [item.config_name for item in result.items] == expected
 
-    async def test_search_filters_by_created_at(
+    async def test_admin_search_filters_by_created_at(
         self,
         repository: AppConfigDefinitionRepository,
         seeded_definitions: list[AppConfigDefinitionData],
     ) -> None:
         target = seeded_definitions[1]
-        result = await repository.search(
+        result = await repository.admin_search(
             BatchQuerier(
                 pagination=OffsetPagination(limit=10, offset=0),
                 conditions=[AppConfigDefinitionConditions.by_created_at_equals(target.created_at)],
@@ -179,12 +179,12 @@ class TestSearch:
         )
         assert [item.id for item in result.items] == [target.id]
 
-    async def test_search_orders_by_created_at(
+    async def test_admin_search_orders_by_created_at(
         self,
         repository: AppConfigDefinitionRepository,
         seeded_definitions: list[AppConfigDefinitionData],
     ) -> None:
-        result = await repository.search(
+        result = await repository.admin_search(
             BatchQuerier(
                 pagination=OffsetPagination(limit=10, offset=0),
                 orders=[AppConfigDefinitionOrders.created_at(ascending=True)],
@@ -195,14 +195,14 @@ class TestSearch:
         ]
         assert [item.id for item in result.items] == expected
 
-    async def test_search_cursor_forward(
+    async def test_admin_search_cursor_forward(
         self,
         repository: AppConfigDefinitionRepository,
         seeded_definitions: list[AppConfigDefinitionData],
     ) -> None:
         by_created_desc = sorted(seeded_definitions, key=lambda d: d.created_at, reverse=True)
         cursor = by_created_desc[0].id
-        result = await repository.search(
+        result = await repository.admin_search(
             BatchQuerier(
                 pagination=CursorForwardPagination(
                     first=10,
