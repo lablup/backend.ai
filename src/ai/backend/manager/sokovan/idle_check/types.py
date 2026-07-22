@@ -47,7 +47,8 @@ class IdleCheckReconcileInfo(BaseReconcilerInfo):
 
     @override
     def entity_ids(self) -> Sequence[UUID]:
-        return [target.session.session_id for target in self.batch.targets]
+        session_ids = (assignment.session.session_id for assignment in self.batch.assignments)
+        return list(dict.fromkeys(session_ids))
 
     @override
     def now(self) -> datetime:
