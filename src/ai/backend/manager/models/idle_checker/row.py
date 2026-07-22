@@ -6,7 +6,7 @@ from datetime import datetime
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
-from ai.backend.common.data.idle_checker.types import CheckerType, IdleCheckerSpec
+from ai.backend.common.data.idle_checker.types import CheckerType, IdleCheckerSpec, IdleCheckPhase
 from ai.backend.common.identifier.idle_checker import IdleCheckerID
 from ai.backend.common.types import SessionId, SessionTypes
 from ai.backend.manager.models.base import GUID, Base, PydanticColumn, StrEnumType
@@ -99,5 +99,7 @@ class SessionIdleCheckRow(UpdatedAtMixin, Base):  # type: ignore[misc]
     expire_at: Mapped[datetime] = mapped_column(
         "expire_at", sa.DateTime(timezone=True), nullable=False
     )
-    last_status: Mapped[str] = mapped_column("last_status", sa.String(length=64), nullable=False)
+    last_status: Mapped[IdleCheckPhase] = mapped_column(
+        "last_status", StrEnumType(IdleCheckPhase), nullable=False
+    )
     last_message: Mapped[str] = mapped_column("last_message", sa.Text, nullable=False)

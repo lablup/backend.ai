@@ -16,6 +16,13 @@ class CheckerType(enum.StrEnum):
     UTILIZATION = "utilization"
 
 
+class IdleCheckPhase(enum.StrEnum):
+    NOT_CHECKED = "not_checked"
+    ACTIVE = "active"
+    IDLE = "idle"
+    IDLE_EXPIRED = "idle_expired"
+
+
 class SessionLifetimeSpec(BackendAISchema):
     """Config for ``CheckerType.SESSION_LIFETIME``."""
 
