@@ -53,7 +53,7 @@ class ScalingGroupProxyTarget:
 
 
 @dataclass(frozen=True)
-class SlotTypePolicy:
+class SlotTypeInfo:
     """Global slot-type admin policy from `resource_slot_types`.
 
     - enabled: slot names with enabled=true. Image-side validators

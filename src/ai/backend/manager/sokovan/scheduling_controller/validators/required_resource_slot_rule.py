@@ -35,7 +35,7 @@ class RequiredResourceSlotRule(SessionSpecValidatorRule):
         spec: SessionSpec,
         context: SessionSpecContext,
     ) -> None:
-        required = context.slot_type_policy.required
+        required = context.global_info.slot_type_info.required
         if not required:
             return
 

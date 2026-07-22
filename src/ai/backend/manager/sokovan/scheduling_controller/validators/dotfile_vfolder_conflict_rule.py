@@ -35,7 +35,7 @@ class DotfileVFolderConflictRule(SessionSpecValidatorRule):
         spec: SessionSpec,
         context: SessionSpecContext,
     ) -> None:
-        dotfiles = context.dotfile_data.dotfiles
+        dotfiles = context.user.dotfiles.dotfiles
         if not dotfiles:
             return
         kernel_paths: set[PurePosixPath] = set()

@@ -42,8 +42,8 @@ class ImageSlotTypeRule(SessionSpecValidatorRule):
         spec: SessionSpec,
         context: SessionSpecContext,
     ) -> None:
-        known_slot_types = context.known_slot_types
-        enabled = context.slot_type_policy.enabled
+        known_slot_types = context.resource_group.known_slot_types
+        enabled = context.global_info.slot_type_info.enabled
         if not known_slot_types:
             raise InvalidAPIParameters(
                 extra_msg=(
@@ -53,7 +53,9 @@ class ImageSlotTypeRule(SessionSpecValidatorRule):
             )
         errors: list[str] = []
         for idx, kernel in enumerate(spec.resource_spec.kernel_specs):
-            image_info = context.image_infos.get(kernel.execution_spec.resource_input.image_id)
+            image_info = context.global_info.image_infos.get(
+                kernel.execution_spec.resource_input.image_id
+            )
             if image_info is None:
                 continue
             min_slots = image_min_slots(image_info)

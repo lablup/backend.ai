@@ -56,7 +56,7 @@ class MergeResourceGroupDefaultsRule(SessionSpecDraftRule):
         draft: SessionResourceSpecDraft,
         context: SessionSpecContext,
     ) -> SessionResourceSpecDraft:
-        rg = context.resource_group_defaults
+        rg_defaults = context.resource_group.defaults
 
         # Option-level fill.
         opts = draft.options
@@ -66,32 +66,36 @@ class MergeResourceGroupDefaultsRule(SessionSpecDraftRule):
                 "agent_selection_policy": (
                     sched.agent_selection_policy
                     if sched.agent_selection_policy is not None
-                    else rg.agent_selection_policy
+                    else rg_defaults.agent_selection_policy
                 ),
             }
         )
         new_options = opts.model_copy(
             update={
-                "priority": opts.priority if opts.priority is not None else rg.priority,
+                "priority": opts.priority if opts.priority is not None else rg_defaults.priority,
                 "job_priority": (
-                    opts.job_priority if opts.job_priority is not None else rg.job_priority
+                    opts.job_priority if opts.job_priority is not None else rg_defaults.job_priority
                 ),
                 "is_preemptible": (
-                    opts.is_preemptible if opts.is_preemptible is not None else rg.is_preemptible
+                    opts.is_preemptible
+                    if opts.is_preemptible is not None
+                    else rg_defaults.is_preemptible
                 ),
                 "cluster_mode": (
-                    opts.cluster_mode if opts.cluster_mode is not None else rg.cluster_mode
+                    opts.cluster_mode if opts.cluster_mode is not None else rg_defaults.cluster_mode
                 ),
                 "handler_options": (
-                    opts.handler_options if opts.handler_options is not None else rg.handler_options
+                    opts.handler_options
+                    if opts.handler_options is not None
+                    else rg_defaults.handler_options
                 ),
                 "scheduling_target": new_sched,
             }
         )
 
         # Per-group execution-spec fill — only when RG carries a baseline.
-        if rg.default_kernel_execution_spec is not None and opts.kernel_groups is not None:
-            rg_exec = rg.default_kernel_execution_spec
+        if rg_defaults.default_kernel_execution_spec is not None and opts.kernel_groups is not None:
+            rg_exec = rg_defaults.default_kernel_execution_spec
             merged_groups = tuple(
                 group.model_copy(
                     update={

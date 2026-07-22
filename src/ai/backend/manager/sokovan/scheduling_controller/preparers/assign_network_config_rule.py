@@ -11,7 +11,7 @@ Priority (unchanged from legacy):
 
   1. ``draft.network.network_id`` populated (caller requested a
      persistent network) → :attr:`NetworkType.PERSISTENT`
-  2. ``context.resource_group_network.use_host_network`` is true →
+  2. ``context.resource_group.network.use_host_network`` is true →
      :attr:`NetworkType.HOST`
   3. otherwise → :attr:`NetworkType.VOLATILE` (bridge on single-node,
      overlay on multi-node; resolved at launcher time)
@@ -54,8 +54,8 @@ class AssignNetworkConfigRule(SessionSpecDraftRule):
         if net.network_id is not None:
             resolved = net.model_copy(update={"network_type": NetworkType.PERSISTENT})
         elif (
-            context.resource_group_network is not None
-            and context.resource_group_network.use_host_network
+            context.resource_group.network is not None
+            and context.resource_group.network.use_host_network
         ):
             resolved = net.model_copy(
                 update={

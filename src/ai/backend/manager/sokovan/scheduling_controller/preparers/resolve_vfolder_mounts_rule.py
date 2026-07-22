@@ -45,7 +45,7 @@ class ResolveVFolderMountsRule(SessionSpecDraftRule):
         draft: SessionResourceSpecDraft,
         context: SessionSpecContext,
     ) -> SessionResourceSpecDraft:
-        resolved = context.vfolder_mounts_by_role
+        resolved = context.user.vfolder_mounts_by_role
         if not resolved or not draft.kernel_specs:
             return draft
         updated = []

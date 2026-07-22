@@ -15,7 +15,7 @@ to a dedicated validator rule (``ResourceLimitRule`` in the validator
 chain) so this rule keeps a single responsibility — compute, don't
 check.
 
-No-op on groups whose image is not yet in ``context.image_infos``
+No-op on groups whose image is not yet in ``context.global_info.image_infos``
 (legacy also skipped those branches); the missing image is caught by
 finalize / validator downstream.
 """
@@ -67,7 +67,9 @@ class ComputeKernelResourcesRule(SessionSpecDraftRule):
         new_groups = []
         for group in draft.options.kernel_groups:
             image_id = group.execution_spec.resource_input.image_id
-            image_info = context.image_infos.get(image_id) if image_id is not None else None
+            image_info = (
+                context.global_info.image_infos.get(image_id) if image_id is not None else None
+            )
             if image_info is None:
                 new_groups.append(group)
                 continue

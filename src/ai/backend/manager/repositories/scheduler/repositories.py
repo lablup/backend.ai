@@ -15,6 +15,7 @@ class SchedulerRepositories:
             args.db,
             args.valkey_stat_client,
             args.config_provider,
+            args.storage_manager,
         )
 
         return cls(

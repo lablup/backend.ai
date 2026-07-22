@@ -19,7 +19,7 @@ from ai.backend.common.types import (
     SlotName,
     SlotTypes,
 )
-from ai.backend.manager.data.resource.types import SlotTypePolicy
+from ai.backend.manager.data.resource.types import SlotTypeInfo
 from ai.backend.manager.data.session.creation import ImageInfo
 from ai.backend.manager.data.session.spec import KernelSpec, SessionSpec
 from ai.backend.manager.errors.api import InvalidAPIParameters
@@ -49,15 +49,17 @@ class ResourceLimitRule(SessionSpecValidatorRule):
         context: SessionSpecContext,
     ) -> None:
         for idx, kernel in enumerate(spec.resource_spec.kernel_specs):
-            image_info = context.image_infos.get(kernel.execution_spec.resource_input.image_id)
+            image_info = context.global_info.image_infos.get(
+                kernel.execution_spec.resource_input.image_id
+            )
             if image_info is None:
                 continue
             self._validate_kernel(
                 idx,
                 kernel,
                 image_info,
-                context.known_slot_types,
-                context.slot_type_policy,
+                context.resource_group.known_slot_types,
+                context.global_info.slot_type_info,
             )
 
     @classmethod
@@ -67,7 +69,7 @@ class ResourceLimitRule(SessionSpecValidatorRule):
         kernel: KernelSpec,
         image_info: ImageInfo,
         known_slot_types: Mapping[SlotName, SlotTypes],
-        policy: SlotTypePolicy,
+        policy: SlotTypeInfo,
     ) -> None:
         min_slots = image_min_slots(image_info)
         shmem = kernel.execution_spec.resource_input.resource_opts.shmem

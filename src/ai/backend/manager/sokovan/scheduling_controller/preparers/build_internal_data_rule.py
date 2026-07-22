@@ -4,7 +4,7 @@ Ports the legacy :class:`.internal_data.InternalDataRule` into the
 draft-based chain. Two overlay sources are merged onto every kernel
 draft's ``internal_data`` mapping:
 
-  * the DB-sourced ``context.dotfile_data`` — dotfiles and
+  * the DB-sourced ``context.user.dotfiles`` — dotfiles and
     ``ssh_keypair`` the controller's batch fetch loaded from the
     keypair row and the group/domain dotfile tables.
   * the request-envelope ``draft.internal_data_extras`` — sudo toggle
@@ -52,7 +52,7 @@ class BuildInternalDataRule(SessionSpecDraftRule):
         context: SessionSpecContext,
     ) -> SessionResourceSpecDraft:
         extras = draft.internal_data_extras
-        overlay: dict[str, Any] = context.dotfile_data.to_internal_data()
+        overlay: dict[str, Any] = context.user.dotfiles.to_internal_data()
         if extras.model_definition_path is not None:
             overlay["model_definition_path"] = extras.model_definition_path
         if extras.model_definition is not None:

@@ -42,7 +42,7 @@ class RequestedSlotTypeRule(SessionSpecValidatorRule):
         spec: SessionSpec,
         context: SessionSpecContext,
     ) -> None:
-        rg_slot_types = context.known_slot_types
+        rg_slot_types = context.resource_group.known_slot_types
         if not rg_slot_types:
             raise InvalidAPIParameters(
                 extra_msg=(

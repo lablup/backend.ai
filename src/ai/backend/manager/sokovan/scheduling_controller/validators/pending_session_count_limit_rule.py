@@ -35,13 +35,13 @@ class PendingSessionCountLimitRule(SessionSpecValidatorRule):
         spec: SessionSpec,
         context: SessionSpecContext,
     ) -> None:
-        policy = context.user_enqueue_policy
+        policy = context.user.policy
         if policy is None:
             return
         limit = policy.max_pending_session_count
         if limit is None or limit <= 0:
             return
-        pending = context.pending_session_count
+        pending = context.user.pending_session_count
         if pending + 1 > limit:
             raise QuotaExceeded(
                 extra_msg=(

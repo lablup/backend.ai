@@ -1,6 +1,5 @@
 """Scheduling controller for managing session lifecycle and scheduling operations."""
 
-import dataclasses
 import logging
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -226,59 +225,60 @@ class SchedulingController:
 
         Only input is the :class:`SessionSpecDraft` — request-envelope
         extras (sudo, model-definition overlay) ride on
-        ``draft.resource_spec.internal_data_extras``. Validation-adjacent DB reads (image
-        metadata, keypair policy, resource-group network, container uid/gid,
-        dotfiles, active session count) flow through
-        :meth:`SchedulerRepository.fetch_session_spec_contexts`; vfolder mounts
-        are resolved separately via
-        :meth:`SchedulerRepository.resolve_vfolder_mounts_by_role`.
+        ``draft.resource_spec.internal_data_extras``.
 
         Flow:
 
-        1. Context fetch + vfolder-mount resolution + preparer chain →
-           finalized ``SessionSpec`` + validation context.
-        2. ``PRE_ENQUEUE_SESSION`` hook — rejected calls raise.
-        3. Validator chain — spec + context.
-        4. ``SchedulerRepository.enqueue_session_from_spec`` — writer tx.
-        5. Broadcast PENDING + ask the coordinator to schedule.
-        6. ``POST_ENQUEUE_SESSION`` hook notification.
+        1. Shared context assembly (DB fetch + vfolder-mount resolution).
+        2. Preparer chain → finalized ``SessionSpec``.
+        3. ``PRE_ENQUEUE_SESSION`` hook — rejected calls raise.
+        4. Validator chain — spec + context.
+        5. ``SchedulerRepository.enqueue_session_from_spec`` — writer tx.
+        6. Broadcast PENDING, request scheduling, ``POST_ENQUEUE_SESSION``.
         """
         rg_id = draft.scope.resource_group_id
 
         await self._verify_resource_group_accessible(draft)
 
-        allowed_vfolder_types = list(
-            await self._config_provider.legacy_etcd_config_loader.get_vfolder_types()
-        )
+        context = await self._build_session_spec_context(draft)
+        spec = await self._finalize_session_spec(draft, context)
 
-        with self._metric_observer.measure_phase(
-            "scheduling_controller", rg_id, "spec_fetch_contexts"
-        ):
-            fetched = await self._repository.fetch_session_spec_contexts(draft)
+        await self._dispatch_pre_enqueue_hook(spec)
 
-        # Vfolder mounts are resolved separately (storage-manager RPC / etcd),
-        # kept out of the context fetch so resource-only callers can skip them.
-        with self._metric_observer.measure_phase(
-            "scheduling_controller", rg_id, "vfolder_mount_resolution"
-        ):
-            vfolder_mounts_by_role = await self._repository.resolve_vfolder_mounts_by_role(
-                draft,
-                storage_manager=self._storage_manager,
-                allowed_vfolder_types=allowed_vfolder_types,
-                user_enqueue_policy=fetched.user_enqueue_policy,
-            )
+        with self._metric_observer.measure_phase("scheduling_controller", rg_id, "spec_validation"):
+            self._spec_validator.validate(spec, context)
 
-        # One shared context: the fetch result plus the separately
-        # resolved vfolder mounts.
-        context = dataclasses.replace(fetched, vfolder_mounts_by_role=vfolder_mounts_by_role)
+        with self._metric_observer.measure_phase("scheduling_controller", rg_id, "enqueue"):
+            session_id = await self._repository.enqueue_session_from_spec(spec)
 
+        await self._notify_session_enqueued(spec, session_id)
+        return session_id
+
+    async def _build_session_spec_context(self, draft: SessionSpecDraft) -> SessionSpecContext:
+        """Fetch the complete shared context of one enqueue request.
+
+        The repository assembles everything (DB reads plus the
+        storage-manager vfolder-mount resolution), so the context only
+        ever exists in a complete state.
+        """
+        rg_id = draft.scope.resource_group_id
+        with self._metric_observer.measure_phase("scheduling_controller", rg_id, "spec_context"):
+            return await self._repository.fetch_session_spec_context(draft, resolve_mounts=True)
+
+    async def _finalize_session_spec(
+        self, draft: SessionSpecDraft, context: SessionSpecContext
+    ) -> SessionSpec:
+        """Run the preparer chain and promote the draft into a ``SessionSpec``."""
+        rg_id = draft.scope.resource_group_id
         with self._metric_observer.measure_phase(
             "scheduling_controller", rg_id, "spec_preparation"
         ):
             resource_spec = await self._spec_preparer.prepare(draft.resource_spec, context)
             scope = SessionScope.model_validate(draft.scope.model_dump(exclude_none=True))
-            spec = SessionSpec(resource_spec=resource_spec, scope=scope)
+            return SessionSpec(resource_spec=resource_spec, scope=scope)
 
+    async def _dispatch_pre_enqueue_hook(self, spec: SessionSpec) -> None:
+        """Run the ``PRE_ENQUEUE_SESSION`` hook gate; a rejection raises."""
         hook_result = await self._hook_plugin_ctx.dispatch(
             "PRE_ENQUEUE_SESSION",
             (
@@ -291,12 +291,8 @@ class SchedulingController:
         if hook_result.status != PASSED:
             raise RejectedByHook.from_hook_result(hook_result)
 
-        with self._metric_observer.measure_phase("scheduling_controller", rg_id, "spec_validation"):
-            self._spec_validator.validate(spec, context)
-
-        with self._metric_observer.measure_phase("scheduling_controller", rg_id, "enqueue"):
-            session_id = await self._repository.enqueue_session_from_spec(spec)
-
+    async def _notify_session_enqueued(self, spec: SessionSpec, session_id: SessionId) -> None:
+        """Post-enqueue side effects: broadcast, scheduling request, POST hook."""
         log.info(
             "Session {} ({}) enqueued successfully via draft path",
             spec.resource_spec.identity.session_name,
@@ -328,7 +324,6 @@ class SchedulingController:
                 spec.resource_spec.identity.access_key,
             ),
         )
-        return session_id
 
     def _prepare_kernel_data(
         self, spec: SessionResourceSpec, fetched: SessionSpecContext
@@ -338,7 +333,7 @@ class SchedulingController:
             kernel_id = KernelId(uuid4())
             resource_input = kernel_spec.execution_spec.resource_input
             image_info = (
-                fetched.image_infos.get(resource_input.image_id)
+                fetched.global_info.image_infos.get(resource_input.image_id)
                 if resource_input.image_id is not None
                 else None
             )
@@ -454,11 +449,12 @@ class SchedulingController:
         Results correspond positionally to ``draft.resource_spec.options.kernel_groups``.
         """
         # SessionScopeDraft is used only to fetch dotfile data and container user info.
-        fetched = await self._repository.fetch_session_spec_contexts(
-            SessionSpecDraft(scope=SessionScopeDraft(), resource_spec=draft)
+        # Node fitting does not depend on vfolder mounts, so the storage-RPC
+        # resolution is skipped and the per-role mount map stays empty.
+        fetched = await self._repository.fetch_session_spec_context(
+            SessionSpecDraft(scope=SessionScopeDraft(), resource_spec=draft),
+            resolve_mounts=False,
         )
-        # Node fitting does not depend on vfolder mounts; the storage-RPC
-        # resolution is skipped so the per-role mount map stays empty.
         resource_spec = await self._spec_preparer.prepare(draft, fetched)
         compute_schedule_kernel_data = self._prepare_kernel_data(resource_spec, fetched)
         return await self._compute_schedule(

@@ -3,8 +3,8 @@
 Ports the legacy per-kernel fallback (``SessionPreparer._prepare_kernels``
 lines 286-289) into the draft chain. For each kernel draft:
 
-  * ``uid`` falls back to ``context.container_user_info.uid`` when unset
-  * ``main_gid`` falls back to ``context.container_user_info.main_gid``
+  * ``uid`` falls back to ``context.user.container_user.uid`` when unset
+  * ``main_gid`` falls back to ``context.user.container_user.main_gid``
   * ``supplementary_gids`` falls back to the context's list when empty
 
 Caller-specified values (e.g. a per-kernel override that the request
@@ -41,7 +41,7 @@ class AssignContainerUserMappingRule(SessionSpecDraftRule):
         draft: SessionResourceSpecDraft,
         context: SessionSpecContext,
     ) -> SessionResourceSpecDraft:
-        info = context.container_user_info
+        info = context.user.container_user
         new_kernels = tuple(
             k.model_copy(
                 update={

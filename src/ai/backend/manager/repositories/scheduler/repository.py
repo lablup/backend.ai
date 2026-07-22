@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping
 from datetime import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 if TYPE_CHECKING:
@@ -29,6 +29,7 @@ from ai.backend.common.types import (
     AgentId,
     SessionId,
     VFolderMount,
+    VFolderMountOptions,
     VFolderMountRequest,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
@@ -51,6 +52,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.base.creator import BulkCreator
 from ai.backend.manager.repositories.base.updater import BatchUpdater
+from ai.backend.manager.repositories.vfolder.mount import prepare_vfolder_mounts
 from ai.backend.manager.types import UserScope
 
 from .cache_source.cache_source import ScheduleCacheSource
@@ -66,7 +68,7 @@ from .types.session import (
     TerminatingKernelWithAgentData,
     TerminatingSessionData,
 )
-from .types.session_creation import SessionSpecContext
+from .types.session_creation import SessionSpecContext, UserEnqueueInfo
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -92,19 +94,24 @@ class SchedulerRepository:
     Repository that orchestrates between DB and cache sources for scheduling operations.
     """
 
+    _db: ExtendedAsyncSAEngine
     _db_source: ScheduleDBSource
     _cache_source: ScheduleCacheSource
     _config_provider: ManagerConfigProvider
+    _storage_manager: StorageSessionManager
 
     def __init__(
         self,
         db: ExtendedAsyncSAEngine,
         valkey_stat: ValkeyStatClient,
         config_provider: ManagerConfigProvider,
+        storage_manager: StorageSessionManager,
     ) -> None:
+        self._db = db
         self._db_source = ScheduleDBSource(db)
         self._cache_source = ScheduleCacheSource(valkey_stat)
         self._config_provider = config_provider
+        self._storage_manager = storage_manager
 
     @scheduler_repository_resilience.apply()
     async def get_scheduling_data(self, resource_group_id: ResourceGroupID) -> SchedulingData:
@@ -214,41 +221,96 @@ class SchedulerRepository:
         return await self._db_source.enqueue_session_from_spec(spec)
 
     @scheduler_repository_resilience.apply()
-    async def fetch_session_spec_contexts(
-        self,
-        draft: SessionSpecDraft,
-    ) -> SessionSpecContext:
-        """Batch-fetch raw data needed to assemble the draft-path
-        preparation / validation contexts.
-
-        Thin passthrough to :meth:`ScheduleDBSource.fetch_session_spec_contexts`.
-        The scheduling controller converts the returned bundle into the
-        typed ``SessionSpecPreparationContext`` /
-        ``SessionSpecValidationContext`` pair — this split keeps the
-        repository layer free of sokovan internals.
-        """
-        return await self._db_source.fetch_session_spec_contexts(draft)
-
-    @scheduler_repository_resilience.apply()
-    async def resolve_vfolder_mounts_by_role(
+    async def fetch_session_spec_context(
         self,
         draft: SessionSpecDraft,
         *,
-        storage_manager: StorageSessionManager,
-        allowed_vfolder_types: list[str],
+        resolve_mounts: bool = True,
+    ) -> SessionSpecContext:
+        """Assemble the complete enqueue context of one draft.
+
+        Composes the DB-side batch fetch with the storage-manager vfolder
+        mount resolution, so callers never observe a partially built
+        context. Resource-only callers pass ``resolve_mounts=False``.
+        """
+        fetch = await self._db_source.fetch_session_spec_fetch(draft)
+        vfolder_mounts_by_role: dict[str, tuple[VFolderMount, ...]] = {}
+        if resolve_mounts:
+            vfolder_mounts_by_role = await self._resolve_vfolder_mounts_by_role(
+                draft, fetch.user.policy
+            )
+        return SessionSpecContext(
+            resource_group=fetch.resource_group,
+            user=UserEnqueueInfo.from_fetch(fetch.user, vfolder_mounts_by_role),
+            global_info=fetch.global_info,
+        )
+
+    async def _resolve_vfolder_mounts_by_role(
+        self,
+        draft: SessionSpecDraft,
         user_enqueue_policy: UserEnqueuePolicy | None,
     ) -> dict[str, tuple[VFolderMount, ...]]:
         """Resolve each kernel group's vfolder mounts, keyed by ``role``.
 
-        Separated from :meth:`fetch_session_spec_contexts` so callers that only
-        need kernel resource resolution can skip the storage-manager RPC.
+        Lives at the repository level because it composes a DB read with
+        the storage-manager RPC. Each group's request list resolves to a
+        single ``VFolderMount`` tuple that every replica sharing the role
+        copies verbatim.
         """
-        return await self._db_source.resolve_vfolder_mounts_by_role(
-            draft,
-            storage_manager=storage_manager,
-            allowed_vfolder_types=allowed_vfolder_types,
-            user_enqueue_policy=user_enqueue_policy,
+        user_uuid = draft.resource_spec.identity.user_uuid
+        domain_name = str(draft.scope.domain_name) if draft.scope.domain_name else None
+        project_id = draft.scope.project_id
+        kernel_specs = tuple(draft.resource_spec.options.kernel_groups or ())
+
+        vfolder_mounts_by_role: dict[str, tuple[VFolderMount, ...]] = {}
+        if domain_name is None or user_uuid is None:
+            return vfolder_mounts_by_role
+
+        allowed_vfolder_types = list(
+            await self._config_provider.legacy_etcd_config_loader.get_vfolder_types()
         )
+        # Only the allowed vfolder hosts of the already-fetched policy matter here.
+        resource_policy_dict: dict[str, Any] = {}
+        if user_enqueue_policy is not None:
+            resource_policy_dict = {
+                "allowed_vfolder_hosts": user_enqueue_policy.allowed_vfolder_hosts,
+            }
+
+        user_scope_for_mounts = UserScope(
+            domain_name=domain_name,
+            group_id=project_id if project_id is not None else UUID(int=0),
+            user_uuid=user_uuid,
+            user_role="user",
+        )
+        async with self._db.begin_readonly_read_committed() as conn:
+            for group in kernel_specs:
+                per_group_requests: list[VFolderMountRequest] = []
+                for entry in group.execution_spec.mounts:
+                    per_group_requests.append(
+                        VFolderMountRequest(
+                            ref=UUID(str(entry.vfolder_id)),
+                            dst_path=entry.mount_destination,
+                            options=VFolderMountOptions(
+                                permission=entry.mount_perm,
+                                subpath=entry.subpath,
+                            ),
+                        )
+                    )
+                # Always resolve mounts even when the request list is empty:
+                # ``prepare_vfolder_mounts`` injects dot-prefixed auto-mount
+                # vfolders regardless of explicit requests, so skipping here
+                # would silently drop them.
+                vfolder_mounts_by_role[group.role] = tuple(
+                    await prepare_vfolder_mounts(
+                        conn,
+                        self._storage_manager,
+                        allowed_vfolder_types,
+                        user_scope_for_mounts,
+                        resource_policy_dict,
+                        per_group_requests,
+                    )
+                )
+        return vfolder_mounts_by_role
 
     @scheduler_repository_resilience.apply()
     async def pick_default_resource_group(
@@ -298,26 +360,6 @@ class SchedulerRepository:
     @scheduler_repository_resilience.apply()
     async def get_domain_id_by_name(self, name: DomainName) -> DomainID:
         return await self._db_source.get_domain_id_by_name(name)
-
-    @scheduler_repository_resilience.apply()
-    async def prepare_vfolder_mounts(
-        self,
-        storage_manager: StorageSessionManager,
-        allowed_vfolder_types: Sequence[str],
-        user_scope: UserScope,
-        resource_policy: Mapping[str, object],
-        mount_requests: Sequence[VFolderMountRequest],
-    ) -> Sequence[VFolderMount]:
-        """
-        Prepare vfolder mounts for the session.
-        """
-        return await self._db_source.prepare_vfolder_mounts(
-            storage_manager,
-            list(allowed_vfolder_types),
-            user_scope,
-            dict(resource_policy),
-            list(mount_requests),
-        )
 
     @scheduler_repository_resilience.apply()
     async def check_available_image(self, image_id: ImageID, domain: str, user_uuid: UUID) -> None:

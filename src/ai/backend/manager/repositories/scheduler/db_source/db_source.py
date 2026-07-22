@@ -12,7 +12,6 @@ from typing import TYPE_CHECKING, Any, cast
 from uuid import UUID
 
 if TYPE_CHECKING:
-    from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
     from ai.backend.manager.data.session.draft import SessionSpecDraft
     from ai.backend.manager.data.session.spec import SessionSpec
 
@@ -45,9 +44,6 @@ from ai.backend.common.types import (
     SessionTypes,
     SlotName,
     SlotTypes,
-    VFolderMount,
-    VFolderMountOptions,
-    VFolderMountRequest,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.agent.types import AgentStatus
@@ -55,7 +51,7 @@ from ai.backend.manager.data.dotfile.types import DotfileBundle, DotfileEntry, S
 from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.kernel.types import KernelListResult, KernelStatus
 from ai.backend.manager.data.permission.types import RBACElementRef
-from ai.backend.manager.data.resource.types import SlotTypePolicy, UserEnqueuePolicy
+from ai.backend.manager.data.resource.types import SlotTypeInfo, UserEnqueuePolicy
 from ai.backend.manager.data.session.creation import (
     ContainerUserInfo,
     ImageInfo,
@@ -173,12 +169,14 @@ from ai.backend.manager.repositories.scheduler.types.session import (
 )
 from ai.backend.manager.repositories.scheduler.types.session_creation import (
     AllowedScalingGroup,
-    SessionSpecContext,
+    GlobalEnqueueInfo,
+    ResourceGroupEnqueueInfo,
+    SessionSpecFetch,
+    UserEnqueueFetch,
 )
 from ai.backend.manager.repositories.scheduling_history import (
     SessionSchedulingHistoryCreatorSpec,
 )
-from ai.backend.manager.repositories.vfolder.mount import prepare_vfolder_mounts
 from ai.backend.manager.types import UserScope
 
 from .types import KeypairConcurrencyData
@@ -318,7 +316,7 @@ class ScheduleDBSource:
             active_slot_types=active_slot_types,
         )
 
-    async def _fetch_slot_type_policy(self, db_sess: SASession) -> SlotTypePolicy:
+    async def _fetch_slot_type_info(self, db_sess: SASession) -> SlotTypeInfo:
         stmt = sa.select(
             ResourceSlotTypeRow.slot_name,
             ResourceSlotTypeRow.enabled,
@@ -330,7 +328,7 @@ class ScheduleDBSource:
             )
         )
         rows = (await db_sess.execute(stmt)).all()
-        return SlotTypePolicy(
+        return SlotTypeInfo(
             enabled=frozenset(SlotName(row.slot_name) for row in rows if row.enabled),
             required=frozenset(SlotName(row.slot_name) for row in rows if row.required),
         )
@@ -1550,18 +1548,13 @@ class ScheduleDBSource:
 
         return SessionId(spec.resource_spec.identity.session_id)
 
-    async def fetch_session_spec_contexts(
+    async def fetch_session_spec_fetch(
         self,
         draft: SessionSpecDraft,
-    ) -> SessionSpecContext:
-        """Batch-fetch the DB reads the draft-based preparer and validator
-        rules depend on, inside a single readonly transaction.
-
-        Returns a :class:`SessionSpecContext` the preparer and validator
-        chains consume directly; the controller only fills in
-        ``vfolder_mounts_by_role`` after the separate storage-manager
-        resolution step.
-        """
+    ) -> SessionSpecFetch:
+        """Batch-fetch the DB-side sources of the enqueue context in a
+        single readonly transaction. The repository composes the result
+        with the storage-manager mount resolution."""
         resource_group_id = draft.scope.resource_group_id
         access_key = draft.resource_spec.identity.access_key
         user_uuid = draft.resource_spec.identity.user_uuid
@@ -1575,7 +1568,7 @@ class ScheduleDBSource:
             rg_defaults = None
             resource_group_allow_fractional = False
             known_slot_types: Mapping[SlotName, SlotTypes] = {}
-            slot_type_policy = await self._fetch_slot_type_policy(db_sess)
+            slot_type_info = await self._fetch_slot_type_info(db_sess)
             if resource_group_id:
                 rg_bundle = await self._fetch_scaling_group_with_slot_inventory(
                     db_sess, resource_group_id
@@ -1682,88 +1675,24 @@ class ScheduleDBSource:
                 )
                 pending_session_count = int(pending_count_result.scalar_one())
 
-        return SessionSpecContext(
-            resource_group_defaults=rg_defaults,
-            resource_group_network=network_info,
-            container_user_info=user_container,
-            image_infos=image_infos,
-            resource_group_allow_fractional=resource_group_allow_fractional,
-            dotfile_data=dotfile_bundle,
-            pending_session_count=pending_session_count,
-            user_enqueue_policy=user_enqueue_policy,
-            known_slot_types=known_slot_types,
-            slot_type_policy=slot_type_policy,
+        return SessionSpecFetch(
+            resource_group=ResourceGroupEnqueueInfo(
+                defaults=rg_defaults,
+                network=network_info,
+                allow_fractional=resource_group_allow_fractional,
+                known_slot_types=known_slot_types,
+            ),
+            global_info=GlobalEnqueueInfo(
+                image_infos=image_infos,
+                slot_type_info=slot_type_info,
+            ),
+            user=UserEnqueueFetch(
+                policy=user_enqueue_policy,
+                container_user=user_container,
+                dotfiles=dotfile_bundle,
+                pending_session_count=pending_session_count,
+            ),
         )
-
-    async def resolve_vfolder_mounts_by_role(
-        self,
-        draft: SessionSpecDraft,
-        *,
-        storage_manager: StorageSessionManager,
-        allowed_vfolder_types: list[str],
-        user_enqueue_policy: UserEnqueuePolicy | None,
-    ) -> dict[str, tuple[VFolderMount, ...]]:
-        """Resolve each kernel group's vfolder mounts, keyed by ``role``.
-
-        Split out of :meth:`fetch_session_spec_contexts` because it is the only
-        part that needs the storage-manager RPC (and the etcd-sourced
-        ``allowed_vfolder_types``); kernel resource resolution does not depend on
-        it, so callers that only need slots/arch can skip this. Each group's
-        request list resolves to a single ``VFolderMount`` tuple that every
-        replica sharing the role copies verbatim.
-        """
-        user_uuid = draft.resource_spec.identity.user_uuid
-        domain_name = str(draft.scope.domain_name) if draft.scope.domain_name else None
-        project_id = draft.scope.project_id
-        kernel_specs = tuple(draft.resource_spec.options.kernel_groups or ())
-
-        vfolder_mounts_by_role: dict[str, tuple[VFolderMount, ...]] = {}
-        if domain_name is None or user_uuid is None:
-            return vfolder_mounts_by_role
-
-        async with self._db.begin_readonly_session_read_committed() as db_sess:
-            # The policy was already fetched by fetch_session_spec_contexts;
-            # only the allowed vfolder hosts matter here.
-            resource_policy_dict: dict[str, Any] = {}
-            if user_enqueue_policy is not None:
-                resource_policy_dict = {
-                    "allowed_vfolder_hosts": user_enqueue_policy.allowed_vfolder_hosts,
-                }
-
-            user_scope_for_mounts = UserScope(
-                domain_name=domain_name,
-                group_id=project_id if project_id is not None else UUID(int=0),
-                user_uuid=user_uuid,
-                user_role="user",
-            )
-            for group in kernel_specs:
-                per_group_requests: list[VFolderMountRequest] = []
-                for entry in group.execution_spec.mounts:
-                    per_group_requests.append(
-                        VFolderMountRequest(
-                            ref=UUID(str(entry.vfolder_id)),
-                            dst_path=entry.mount_destination,
-                            options=VFolderMountOptions(
-                                permission=entry.mount_perm,
-                                subpath=entry.subpath,
-                            ),
-                        )
-                    )
-                # Always resolve mounts even when the request list is empty:
-                # ``prepare_vfolder_mounts`` injects dot-prefixed auto-mount
-                # vfolders regardless of explicit requests, so skipping here
-                # would silently drop them.
-                vfolder_mounts_by_role[group.role] = tuple(
-                    await self._fetch_vfolder_mounts(
-                        db_sess,
-                        storage_manager,
-                        allowed_vfolder_types,
-                        user_scope_for_mounts,
-                        resource_policy_dict,
-                        per_group_requests,
-                    )
-                )
-        return vfolder_mounts_by_role
 
     async def pick_default_resource_group(
         self,
@@ -1825,30 +1754,6 @@ class ScheduleDBSource:
         if domain_id is None:
             raise DomainNotFound(name)
         return DomainID(domain_id)
-
-    async def _fetch_vfolder_mounts(
-        self,
-        db_sess: SASession,
-        storage_manager: StorageSessionManager,
-        allowed_vfolder_types: list[str],
-        user_scope: UserScope,
-        resource_policy: dict[str, Any],
-        mount_requests: list[VFolderMountRequest],
-    ) -> list[VFolderMount]:
-        """
-        Fetch vfolder mounts for the session using existing DB session.
-        """
-        conn = cast(SAConnection, db_sess.bind)
-
-        vfolder_mounts = await prepare_vfolder_mounts(
-            conn,
-            storage_manager,
-            allowed_vfolder_types,
-            user_scope,
-            resource_policy,
-            mount_requests,
-        )
-        return list(vfolder_mounts)
 
     async def _fetch_dotfile_data(
         self,
@@ -1940,28 +1845,6 @@ class ScheduleDBSource:
             main_gid=user_row.container_main_gid,
             supplementary_gids=user_row.container_gids or [],
         )
-
-    async def prepare_vfolder_mounts(
-        self,
-        storage_manager: StorageSessionManager,
-        allowed_vfolder_types: list[str],
-        user_scope: UserScope,
-        resource_policy: dict[str, Any],
-        mount_requests: list[VFolderMountRequest],
-    ) -> list[VFolderMount]:
-        """
-        Prepare vfolder mounts for the session.
-        """
-        async with self._db.begin_readonly_read_committed() as conn:
-            vfolder_mounts = await prepare_vfolder_mounts(
-                conn,
-                storage_manager,
-                allowed_vfolder_types,
-                user_scope,
-                resource_policy,
-                mount_requests,
-            )
-        return list(vfolder_mounts)
 
     async def _query_allowed_scaling_groups(
         self,
