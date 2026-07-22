@@ -1376,3 +1376,69 @@ class TestCatalogCompleteness:
         # RetentionCategory must resolve to a purger spec set.
         catalog = RetentionDBSource._catalog(_THRESHOLD)
         assert set(catalog) == set(RetentionCategory)
+
+
+class TestSweepCategoryIsolation:
+    """A failing category is rolled back in isolation; healthy categories persist."""
+
+    @pytest.fixture
+    async def db(
+        self, database_connection: ExtendedAsyncSAEngine
+    ) -> AsyncIterator[ExtendedAsyncSAEngine]:
+        async with with_tables(
+            database_connection,
+            [
+                DomainRow,
+                UserResourcePolicyRow,
+                KeyPairResourcePolicyRow,
+                UserRow,
+                KeyPairRow,
+                EventLogRow,
+                AuditLogRow,
+                ErrorLogRow,
+                KernelUsageRecordRow,
+                RetentionPolicyRow,
+            ],
+        ):
+            yield database_connection
+
+    async def test_failing_category_does_not_abort_others(
+        self, db: ExtendedAsyncSAEngine, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # logs (never swept) is drained first and succeeds; usage_records (swept
+        # recently) is drained second and is forced to fail. Its savepoint rolls
+        # back without touching the already-drained logs work.
+        original_drain = RetentionDBSource._drain_specs
+
+        async def _flaky_drain(
+            self: RetentionDBSource,
+            w: object,
+            specs: object,
+            batch_size: int,
+        ) -> int:
+            if any(spec.row_class is KernelUsageRecordRow for spec in specs):  # type: ignore[attr-defined]
+                raise RuntimeError("injected category failure")
+            return await original_drain(self, w, specs, batch_size)  # type: ignore[arg-type]
+
+        monkeypatch.setattr(RetentionDBSource, "_drain_specs", _flaky_drain)
+
+        await _insert(
+            db,
+            [
+                EventLogRow(event_name="old", event_domain=EventDomain.SESSION, created_at=_OLD),
+                _usage_record(period_end=_OLD),
+                _policy_row(RetentionCategory.LOGS),
+                _policy_row(RetentionCategory.USAGE_RECORDS, last_swept_at=_NEW),
+            ],
+        )
+
+        results = await _make_db_source(db).sweep()
+
+        # Only the healthy category is reported; the sweep does not raise.
+        assert [r.category for r in results] == [RetentionCategory.LOGS]
+        # Healthy category committed even though a later category failed.
+        assert await _count(db, EventLogRow) == 0
+        assert await _swept_at(db, RetentionCategory.LOGS) is not None
+        # Failing category rolled back to its savepoint: row kept, not stamped.
+        assert await _count(db, KernelUsageRecordRow) == 1
+        assert await _swept_at(db, RetentionCategory.USAGE_RECORDS) == _NEW

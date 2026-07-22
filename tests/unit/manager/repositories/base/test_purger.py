@@ -10,7 +10,7 @@ from uuid import UUID
 import pytest
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ai.backend.manager.errors.repository import (
     ForeignKeyViolationError,
@@ -1214,3 +1214,98 @@ class TestBulkPurgerPartial:
             assert result.errors[0].purger.pk_value == 2
             assert result.errors[1].index == 3  # parent-4
             assert result.errors[1].purger.pk_value == 4
+
+
+# =============================================================================
+# Eager-join entity regression (BA-6952)
+# =============================================================================
+
+
+class EagerJoinPurgerParentRow(Base):  # type: ignore[misc]
+    """Parent referenced by an eagerly-joined child relationship."""
+
+    __tablename__ = "test_eager_join_purger_parent"
+    __table_args__ = {"extend_existing": True}
+
+    id: Mapped[int] = mapped_column(sa.Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(sa.String(50), nullable=False)
+
+
+class EagerJoinPurgerChildRow(Base):  # type: ignore[misc]
+    """Child whose ``select()`` compiles its FROM to an _ORMJoin via ``lazy="joined"``.
+
+    Regression guard for BA-6952: ``execute_batch_purger`` used to read the target
+    table from the query's FROM clause, which is an _ORMJoin (whose ``primary_key``
+    is a ColumnSet without ``.columns``) for an eagerly-joined entity, raising
+    ``AttributeError`` and aborting the retention sweep.
+    """
+
+    __tablename__ = "test_eager_join_purger_child"
+    __table_args__ = {"extend_existing": True}
+
+    id: Mapped[int] = mapped_column(sa.Integer, primary_key=True)
+    parent_id: Mapped[int] = mapped_column(
+        sa.Integer,
+        sa.ForeignKey("test_eager_join_purger_parent.id"),
+        nullable=False,
+    )
+    status: Mapped[str] = mapped_column(sa.String(20), nullable=False, default="pending")
+    parent: Mapped[EagerJoinPurgerParentRow] = relationship(lazy="joined")
+
+
+class TestBatchPurgerEagerJoin:
+    """Batch purge over an entity with an eager (``lazy="joined"``) relationship."""
+
+    @pytest.fixture
+    async def seeded_child(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[type[EagerJoinPurgerChildRow], None]:
+        """Create parent+child tables and seed 3 inactive + 2 active children."""
+        async with database_connection.begin() as conn:
+            await conn.run_sync(
+                lambda c: EagerJoinPurgerParentRow.__table__.create(c, checkfirst=True)
+            )
+            await conn.run_sync(
+                lambda c: EagerJoinPurgerChildRow.__table__.create(c, checkfirst=True)
+            )
+        async with database_connection.begin_session() as db_sess:
+            db_sess.add(EagerJoinPurgerParentRow(id=1, name="parent-1"))
+            await db_sess.flush()
+            for i in range(1, 6):
+                db_sess.add(
+                    EagerJoinPurgerChildRow(
+                        id=i,
+                        parent_id=1,
+                        status="inactive" if i <= 3 else "active",
+                    )
+                )
+
+        yield EagerJoinPurgerChildRow
+
+        async with database_connection.begin() as conn:
+            await conn.run_sync(
+                lambda c: EagerJoinPurgerChildRow.__table__.drop(c, checkfirst=True)
+            )
+            await conn.run_sync(
+                lambda c: EagerJoinPurgerParentRow.__table__.drop(c, checkfirst=True)
+            )
+
+    async def test_purge_resolves_table_from_mapped_entity(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        seeded_child: type[EagerJoinPurgerChildRow],
+    ) -> None:
+        """An eagerly-joined entity purges by its own table without raising."""
+        async with database_connection.begin_session() as db_sess:
+            spec = SimpleBatchPurgerSpec(
+                row_class=seeded_child,
+                conditions=[seeded_child.status == "inactive"],
+            )
+            result = await execute_batch_purger(db_sess, BatchPurger(spec=spec))
+
+            assert isinstance(result, BatchPurgerResult)
+            assert result.deleted_count == 3
+
+            remaining = await db_sess.execute(sa.select(sa.func.count()).select_from(seeded_child))
+            assert remaining.scalar() == 2
