@@ -11,6 +11,7 @@ import sqlalchemy as sa
 from ai.backend.common.data.idle_checker.types import (
     CheckerType,
     IdleCheckerSpec,
+    IdleCheckPhase,
     SessionLifetimeSpec,
 )
 from ai.backend.common.identifier.domain import DomainID
@@ -165,7 +166,7 @@ class TestSessionIdleCheckRow:
                     session_id=session_id,
                     idle_checker_id=checker_id,
                     expire_at=expire_at,
-                    last_status="active",
+                    last_status=IdleCheckPhase.ACTIVE,
                     last_message="The session is active.",
                 )
             )
@@ -184,7 +185,7 @@ class TestSessionIdleCheckRow:
 
         assert row is not None
         assert row.expire_at == datetime(2026, 1, 2, tzinfo=UTC)
-        assert row.last_status == "active"
+        assert row.last_status is IdleCheckPhase.ACTIVE
         assert row.updated_at is not None
 
     async def test_rejects_duplicate_session_checker_pair(
@@ -199,7 +200,7 @@ class TestSessionIdleCheckRow:
                         session_id=persisted_idle_check.session_id,
                         idle_checker_id=persisted_idle_check.checker_id,
                         expire_at=datetime(2026, 1, 2, tzinfo=UTC),
-                        last_status="active",
+                        last_status=IdleCheckPhase.ACTIVE,
                         last_message="The session is active.",
                     )
                 )

@@ -10,6 +10,7 @@ import pytest
 from ai.backend.common.data.idle_checker.types import (
     CheckerType,
     IdleCheckerSpec,
+    IdleCheckPhase,
     NetworkTimeoutSpec,
     SessionLifetimeSpec,
     UtilizationSpec,
@@ -939,7 +940,7 @@ class TestFetchExpiredIdleChecks:
                     session_id=session_id,
                     idle_checker_id=first_checker_id,
                     expire_at=first_expire_at,
-                    last_status="expired",
+                    last_status=IdleCheckPhase.IDLE_EXPIRED,
                     last_message="Judged expired.",
                 )
             )
@@ -948,7 +949,7 @@ class TestFetchExpiredIdleChecks:
                     session_id=session_id,
                     idle_checker_id=second_checker_id,
                     expire_at=second_expire_at,
-                    last_status="expired",
+                    last_status=IdleCheckPhase.IDLE_EXPIRED,
                     last_message="Judged expired.",
                 )
             )
@@ -979,7 +980,7 @@ class TestFetchExpiredIdleChecks:
                     session_id=session_id,
                     idle_checker_id=checker_id,
                     expire_at=datetime(2100, 1, 1, tzinfo=UTC),
-                    last_status="active",
+                    last_status=IdleCheckPhase.ACTIVE,
                     last_message="The session is active.",
                 )
             )
@@ -1004,7 +1005,7 @@ class TestFetchExpiredIdleChecks:
                     session_id=session_id,
                     idle_checker_id=checker_id,
                     expire_at=datetime(2026, 1, 1, tzinfo=UTC),
-                    last_status="expired",
+                    last_status=IdleCheckPhase.IDLE_EXPIRED,
                     last_message="Judged expired.",
                 )
             )
@@ -1026,7 +1027,7 @@ class TestFetchExpiredIdleChecks:
             (expired_check_session.session_id, expired_check_session.first_checker_id)
         ]
         assert check.expire_at == expired_check_session.first_expire_at
-        assert check.last_status == "expired"
+        assert check.last_status == IdleCheckPhase.IDLE_EXPIRED
         assert check.last_message == "Judged expired."
 
     async def test_excludes_checks_with_future_deadline(
