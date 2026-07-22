@@ -7,9 +7,10 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
 
+from ai.backend.common.data.idle_checker.types import IdleCheckPhase
 from ai.backend.common.identifier.idle_checker import IdleCheckerID
 from ai.backend.common.types import SessionId
-from ai.backend.manager.data.idle_checker.types import IdleCheckSession, IdleJudgmentStatus
+from ai.backend.manager.data.idle_checker.types import IdleCheckSession
 from ai.backend.manager.repositories.idle_checker.types import IdleCheckerDefinitionData
 
 
@@ -35,7 +36,7 @@ class IdleJudgment:
     checker_id: IdleCheckerID
     session_id: SessionId
     expire_at: datetime
-    status: IdleJudgmentStatus
+    status: IdleCheckPhase
     message: str
 
 

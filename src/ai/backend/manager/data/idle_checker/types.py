@@ -2,14 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from enum import StrEnum
 
 from ai.backend.common.types import SessionId
-
-
-class IdleJudgmentStatus(StrEnum):
-    ACTIVE = "active"
-    IDLE = "idle"
 
 
 @dataclass(frozen=True)

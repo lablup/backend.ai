@@ -10,12 +10,13 @@ import pytest
 from ai.backend.common.data.idle_checker.types import (
     CheckerType,
     IdleCheckerSpec,
+    IdleCheckPhase,
     NetworkTimeoutSpec,
     SessionLifetimeSpec,
 )
 from ai.backend.common.identifier.idle_checker import IdleCheckerID
 from ai.backend.common.types import SessionId, SessionTypes
-from ai.backend.manager.data.idle_checker.types import IdleCheckSession, IdleJudgmentStatus
+from ai.backend.manager.data.idle_checker.types import IdleCheckSession
 from ai.backend.manager.errors.common import InternalServerError
 from ai.backend.manager.repositories.idle_checker.types import (
     IdleCheckAssignmentData,
@@ -82,9 +83,9 @@ class FakeChecker(IdleChecker):
                 session_id=session.session_id,
                 expire_at=_NOW,
                 status=(
-                    IdleJudgmentStatus.IDLE
+                    IdleCheckPhase.IDLE
                     if session.session_id in self.idle_session_ids
-                    else IdleJudgmentStatus.ACTIVE
+                    else IdleCheckPhase.ACTIVE
                 ),
                 message=self._message,
             )
@@ -224,21 +225,21 @@ class TestIdleCheckReconcileHandler:
                 checker_id=lifetime_definition.checker_id,
                 session_id=first_session_id,
                 expire_at=_NOW,
-                status=IdleJudgmentStatus.IDLE,
+                status=IdleCheckPhase.IDLE,
                 message="max lifetime exceeded",
             ),
             IdleJudgment(
                 checker_id=lifetime_definition.checker_id,
                 session_id=second_session_id,
                 expire_at=_NOW,
-                status=IdleJudgmentStatus.IDLE,
+                status=IdleCheckPhase.IDLE,
                 message="max lifetime exceeded",
             ),
             IdleJudgment(
                 checker_id=network_definition.checker_id,
                 session_id=first_session_id,
                 expire_at=_NOW,
-                status=IdleJudgmentStatus.IDLE,
+                status=IdleCheckPhase.IDLE,
                 message="no network activity",
             ),
         ]
@@ -266,7 +267,7 @@ class TestIdleCheckReconcileHandler:
         result = await handler.execute(reconcile_info)
 
         assert len(result.judgments) == 2
-        assert all(judgment.status is IdleJudgmentStatus.ACTIVE for judgment in result.judgments)
+        assert all(judgment.status is IdleCheckPhase.ACTIVE for judgment in result.judgments)
         assert all(judgment.expire_at == _NOW for judgment in result.judgments)
         expected_call = [(lifetime_definition.checker_id, [first_session_id])]
         assert lifetime_checker.judge_calls == [expected_call]
