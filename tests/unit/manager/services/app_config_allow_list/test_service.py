@@ -135,7 +135,7 @@ class TestAppConfigAllowListService:
 
         result = await service.admin_search(AdminSearchAppConfigAllowListAction(querier=querier))
 
-        assert result.data == [allow_list_data]
+        assert result.items == [allow_list_data]
         assert result.total_count == 1
         mock_repository.admin_search.assert_called_once_with(querier)
 

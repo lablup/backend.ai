@@ -44,7 +44,7 @@ class AppConfigDefinitionService:
     ) -> SearchAppConfigDefinitionsActionResult:
         result = await self._repository.admin_search(action.querier)
         return SearchAppConfigDefinitionsActionResult(
-            data=result.items,
+            items=result.items,
             total_count=result.total_count,
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,

@@ -120,7 +120,7 @@ class TestAppConfigDefinitionService:
 
         result = await service.admin_search(AdminSearchAppConfigDefinitionsAction(querier=querier))
 
-        assert result.data == [definition_data]
+        assert result.items == [definition_data]
         assert result.total_count == 1
         mock_repository.admin_search.assert_called_once_with(querier)
 

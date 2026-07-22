@@ -69,7 +69,7 @@ class AppConfigFragmentService:
     ) -> AdminSearchAppConfigFragmentActionResult:
         result = await self._repository.admin_search(action.querier)
         return AdminSearchAppConfigFragmentActionResult(
-            data=result.items,
+            items=result.items,
             total_count=result.total_count,
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,
@@ -82,7 +82,7 @@ class AppConfigFragmentService:
         scopes = [t.to_search_scope() for t in targets]
         result = await self._repository.scoped_search(action.querier, scopes)
         return ScopedSearchAppConfigFragmentActionResult(
-            data=result.items,
+            items=result.items,
             total_count=result.total_count,
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,

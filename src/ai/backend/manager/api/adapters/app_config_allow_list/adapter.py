@@ -125,7 +125,7 @@ class AppConfigAllowListAdapter(BaseAdapter):
         action_result = await self._processors.app_config_allow_list.admin_search.wait_for_complete(
             AdminSearchAppConfigAllowListAction(querier=querier)
         )
-        node_map = {node.id: node for node in map(self._data_to_node, action_result.data)}
+        node_map = {node.id: node for node in map(self._data_to_node, action_result.items)}
         return [node_map.get(allow_list_id) for allow_list_id in ids]
 
     async def admin_search(
@@ -148,7 +148,7 @@ class AppConfigAllowListAdapter(BaseAdapter):
             AdminSearchAppConfigAllowListAction(querier=querier)
         )
         return SearchAppConfigAllowListPayload(
-            items=[self._data_to_node(item) for item in action_result.data],
+            items=[self._data_to_node(item) for item in action_result.items],
             total_count=action_result.total_count,
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,

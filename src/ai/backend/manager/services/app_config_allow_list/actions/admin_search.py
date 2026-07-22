@@ -30,7 +30,7 @@ class AdminSearchAppConfigAllowListAction(AppConfigAllowListGlobalAction):
 
 @dataclass
 class SearchAppConfigAllowListActionResult(BaseActionResult):
-    data: list[AppConfigAllowListData]
+    items: list[AppConfigAllowListData]
     total_count: int
     has_next_page: bool
     has_previous_page: bool

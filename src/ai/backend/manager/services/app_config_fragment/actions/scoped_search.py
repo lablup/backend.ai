@@ -80,7 +80,7 @@ class ScopedSearchAppConfigFragmentAction(BaseBulkAction[SearchableActionTarget]
 
 @dataclass
 class ScopedSearchAppConfigFragmentActionResult(BaseBulkActionResult):
-    data: list[AppConfigFragmentData]
+    items: list[AppConfigFragmentData]
     total_count: int
     has_next_page: bool
     has_previous_page: bool
