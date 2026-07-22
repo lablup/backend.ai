@@ -40281,7 +40281,7 @@
         "description": "Search fragments across all scopes with pagination (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
-    "/v2/app-config-fragments/scoped-search": {
+    "/v2/app-config-fragments/scoped/search": {
       "post": {
         "operationId": "v2/app-config-fragments.scoped_search",
         "tags": [
