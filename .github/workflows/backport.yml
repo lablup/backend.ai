@@ -136,13 +136,14 @@ jobs:
       - name: Save result to file
         if: ${{ steps.commit.outputs.pr_number }}
         env:
-          # The result JSON embeds the commit message and author, which may
+          # Per-target backport entries (commit, target branch, commit
+          # message, author, ...). The embedded commit message and author may
           # contain quotes -- inline ${{ }} interpolation into the shell
           # breaks on them (e.g. an apostrophe in the PR title).
-          MILESTONES_RESULT: ${{ steps.milestones.outputs.result }}
+          BACKPORT_TARGETS_JSON: ${{ steps.milestones.outputs.result }}
         run: |
           mkdir -p /tmp/backport-results
-          printf '%s' "$MILESTONES_RESULT" > /tmp/backport-results/${{ matrix.commits }}.json
+          printf '%s' "$BACKPORT_TARGETS_JSON" > /tmp/backport-results/${{ matrix.commits }}.json
       - name: Upload result artifact
         if: ${{ steps.commit.outputs.pr_number }}
         uses: actions/upload-artifact@v4
