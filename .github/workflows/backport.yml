@@ -44,7 +44,7 @@ jobs:
       fail-fast: false
     steps:
       - name: Checkout the revision
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           lfs: false
           ref: ${{ matrix.commits }}
@@ -188,7 +188,7 @@ jobs:
     permissions:
       pull-requests: write
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           ref: ${{ matrix.target_branch }}
       - name: Cherry-pick

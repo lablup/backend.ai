@@ -37,7 +37,7 @@ jobs:
       code: ${{ steps.filter.outputs.code }}
       release: ${{ steps.release.outputs.release }}
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
       with:
         lfs: false
     - name: Detect release PR
@@ -86,7 +86,7 @@ jobs:
           echo "IS_FORK_PR=false" >> "${GITHUB_ENV}"
         fi
     - name: Check out the revision with minimal required history
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
       with:
         # PR events check out the synthetic refs/pull/N/merge commit, so depth 2
         # covers HEAD plus both parents (base = HEAD^1, PR head = HEAD^2); push
@@ -187,7 +187,7 @@ jobs:
           echo "IS_FORK_PR=false" >> "${GITHUB_ENV}"
         fi
     - name: Check out the revision with minimal required history
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
       with:
         # PR events check out the synthetic refs/pull/N/merge commit, so depth 2
         # covers HEAD plus both parents (base = HEAD^1, PR head = HEAD^2); push
@@ -269,7 +269,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Check out the revision
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
       with:
         lfs: false
     - uses: dorny/paths-filter@v3
@@ -376,7 +376,7 @@ jobs:
         echo "detect-changes did not succeed: ${{ needs.detect-changes.result }}"
         exit 1
     - name: Check out the revision with minimal required history
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
       with:
         # PR events check out the synthetic refs/pull/N/merge commit, so depth 2
         # covers HEAD plus both parents (base = HEAD^1, PR head = HEAD^2); push
@@ -458,7 +458,7 @@ jobs:
         echo "detect-changes did not succeed: ${{ needs.detect-changes.result }}"
         exit 1
     - name: Check out the revision with minimal required history
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
       with:
         # PR events check out the synthetic refs/pull/N/merge commit, so depth 2
         # covers HEAD plus both parents (base = HEAD^1, PR head = HEAD^2); push
@@ -544,7 +544,7 @@ jobs:
         echo "detect-changes did not succeed: ${{ needs.detect-changes.result }}"
         exit 1
     - name: Check out the revision with minimal required history
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
       with:
         # PR events check out the synthetic refs/pull/N/merge commit, so depth 2
         # covers HEAD plus both parents (base = HEAD^1, PR head = HEAD^2); push
@@ -667,7 +667,7 @@ jobs:
       SCIENCE_AUTH_API_GITHUB_COM_BEARER: ${{ secrets.GITHUB_TOKEN }}
     steps:
     - name: Check out the revision
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
     - name: Fetch remote tags
       run: git fetch origin 'refs/tags/*:refs/tags/*' -f
     - name: Git LFS Pull
@@ -724,7 +724,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Check out the revision
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
     - name: Fetch remote tags
       run: git fetch origin 'refs/tags/*:refs/tags/*' -f
     - name: Git LFS Pull
@@ -777,7 +777,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Check out the revision
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
     - name: Fetch remote tags
       run: git fetch origin 'refs/tags/*:refs/tags/*' -f
     - name: Extract Python version from pants.toml
@@ -844,7 +844,7 @@ jobs:
       id-token: write
     environment: deploy-to-pypi
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
     - name: Fetch remote tags
       run: git fetch origin 'refs/tags/*:refs/tags/*' -f
     - name: Extract Python version from pants.toml
@@ -1031,7 +1031,7 @@ jobs:
 
     steps:
     - name: Check out the revision
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
     - name: Git LFS Pull
       run: git lfs pull
     - name: Extract Python version from pants.toml
