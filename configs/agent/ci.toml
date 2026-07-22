@@ -14,7 +14,7 @@ ssl-enabled = false
 #ssl-key = ""
 agent-sock-port = 6007
 id = "i-travis"
-scaling-group = "default"
+initial-resource-group-name = "default"
 pid-file = "./agent.pid"
 event-loop = "asyncio"
 

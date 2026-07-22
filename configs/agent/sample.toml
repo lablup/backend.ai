@@ -23,11 +23,10 @@
   # each agent must use a unique port.
   # Added in 25.12.0
   agent-sock-port = 6007
-  # Name of the scaling group this agent belongs to. Scaling groups organize
-  # agents into logical clusters for resource allocation. Users can target
-  # specific scaling groups when creating sessions.
-  # Added in 25.12.0
-  scaling-group = "gpu-cluster"
+  # Name of the resource group used as the seed only at the agent's first
+  # registration. When unset, the default resource group is used.
+  # Added in 26.8.0
+  ## initial-resource-group-name = "gpu-cluster"
   # Type of resource group this agent serves. 'compute' for general-purpose
   # computation nodes. 'storage' for storage-optimized nodes. Determines how the
   # agent is used in workload scheduling.

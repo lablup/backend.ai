@@ -15,7 +15,7 @@ class ImageOpts(BackendAISchema):
 class AgentInfo(BackendAISchema):
     ip: str
     region: str | None
-    scaling_group: str
+    scaling_group: str | None
     addr: str
     public_key: PublicKey | None
     public_host: str

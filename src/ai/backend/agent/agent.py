@@ -1277,7 +1277,7 @@ class AbstractAgent[
             agent_info = AgentInfo(
                 ip=str(self.rpc_addr.host),
                 region=self.local_config.agent.region,
-                scaling_group=self.local_config.agent.scaling_group,
+                scaling_group=self.local_config.agent.initial_resource_group_name,
                 addr=f"tcp://{self.rpc_addr}",
                 public_key=self.agent_public_key,
                 public_host=str(self._get_public_host()),

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -121,6 +121,17 @@ class AgentDBSource:
         self, session: AsyncSession, upsert_data: AgentHeartbeatUpsert
     ) -> None:
         resource_group_name = upsert_data.metadata.scaling_group
+        group_filter: sa.ColumnElement[bool]
+        group_order: sa.ColumnElement[Any]
+        if resource_group_name is not None:
+            group_filter = sa.or_(
+                ScalingGroupRow.name == resource_group_name,
+                ScalingGroupRow.is_default,
+            )
+            group_order = sa.case((ScalingGroupRow.name == resource_group_name, 0), else_=1)
+        else:
+            group_filter = ScalingGroupRow.is_default.is_(True)
+            group_order = sa.asc(ScalingGroupRow.name)
         group_select = (
             sa.select(
                 *[
@@ -131,13 +142,8 @@ class AgentDBSource:
                 ScalingGroupRow.id.label("resource_group_id"),
             )
             .select_from(ScalingGroupRow)
-            .where(
-                sa.or_(
-                    ScalingGroupRow.name == resource_group_name,
-                    ScalingGroupRow.is_default,
-                )
-            )
-            .order_by(sa.case((ScalingGroupRow.name == resource_group_name, 0), else_=1))
+            .where(group_filter)
+            .order_by(group_order)
             .limit(1)
         )
         stmt = (
@@ -155,9 +161,13 @@ class AgentDBSource:
         )
         affected = (await session.execute(stmt)).scalar_one_or_none()
         if affected is None:
+            if resource_group_name is not None:
+                raise UnresolvableResourceGroup(
+                    f"Scaling group '{resource_group_name}' not found "
+                    "and no default scaling group is set."
+                )
             raise UnresolvableResourceGroup(
-                f"Scaling group '{resource_group_name}' not found "
-                "and no default scaling group is set."
+                "No initial resource group name is configured and no default scaling group is set."
             )
 
     async def update_agent_status_exit(self, updater: Updater[AgentRow]) -> None:

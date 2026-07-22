@@ -15,7 +15,7 @@ def agent_config() -> AgentUnifiedConfig:
     raw_config = {
         "agent": {
             "id": "test-agent-id",
-            "scaling-group": "test-sgroup",
+            "initial-resource-group-name": "test-sgroup",
             "region": "test-region",
             "ipc-base-path": "/tmp/test-ipc",
             "var-base-path": "/tmp/test-var",
