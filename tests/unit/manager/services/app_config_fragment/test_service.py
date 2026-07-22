@@ -181,7 +181,7 @@ class TestAppConfigFragmentService:
 
         result = await service.admin_search(AdminSearchAppConfigFragmentAction(querier=querier))
 
-        assert result.data == [fragment]
+        assert result.items == [fragment]
         assert result.total_count == 1
         mock_repository.admin_search.assert_called_once_with(querier)
 
@@ -218,7 +218,7 @@ class TestAppConfigFragmentService:
             )
         )
 
-        assert result.data == [fragment]
+        assert result.items == [fragment]
         # queried_refs preserve the scoped principals (domain, then user).
         assert [ref.element_id for ref in result.queried_refs] == [
             str(domain_id),

@@ -32,6 +32,9 @@ from ai.backend.manager.repositories.base import (
     Purger,
     Updater,
 )
+from ai.backend.manager.services.app_config_allow_list.actions.admin_search import (
+    AdminSearchAppConfigAllowListAction,
+)
 from ai.backend.manager.services.app_config_allow_list.actions.create import (
     CreateAppConfigAllowListAction,
 )
@@ -40,9 +43,6 @@ from ai.backend.manager.services.app_config_allow_list.actions.get import (
 )
 from ai.backend.manager.services.app_config_allow_list.actions.purge import (
     PurgeAppConfigAllowListAction,
-)
-from ai.backend.manager.services.app_config_allow_list.actions.search import (
-    SearchAppConfigAllowListAction,
 )
 from ai.backend.manager.services.app_config_allow_list.actions.update import (
     UpdateAppConfigAllowListAction,
@@ -123,7 +123,7 @@ class TestAppConfigAllowListService:
         mock_repository: MagicMock,
         allow_list_data: AppConfigAllowListData,
     ) -> None:
-        mock_repository.search = AsyncMock(
+        mock_repository.admin_search = AsyncMock(
             return_value=AppConfigAllowListSearchResult(
                 items=[allow_list_data],
                 total_count=1,
@@ -133,11 +133,11 @@ class TestAppConfigAllowListService:
         )
         querier = BatchQuerier(pagination=OffsetPagination(limit=10, offset=0))
 
-        result = await service.search(SearchAppConfigAllowListAction(querier=querier))
+        result = await service.admin_search(AdminSearchAppConfigAllowListAction(querier=querier))
 
-        assert result.data == [allow_list_data]
+        assert result.items == [allow_list_data]
         assert result.total_count == 1
-        mock_repository.search.assert_called_once_with(querier)
+        mock_repository.admin_search.assert_called_once_with(querier)
 
     async def test_update(
         self,

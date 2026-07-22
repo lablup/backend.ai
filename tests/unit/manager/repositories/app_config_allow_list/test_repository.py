@@ -303,36 +303,36 @@ class TestPurge:
         assert remaining_fragments == 0
 
 
-class TestSearch:
-    async def test_search_returns_all_with_total_count(
+class TestAdminSearch:
+    async def test_admin_search_returns_all_with_total_count(
         self,
         repository: AppConfigAllowListRepository,
         seeded_entries: list[AppConfigAllowListData],
     ) -> None:
-        result = await repository.search(
+        result = await repository.admin_search(
             BatchQuerier(pagination=OffsetPagination(limit=10, offset=0))
         )
         assert result.total_count == len(seeded_entries)
         assert {item.id for item in result.items} == {entry.id for entry in seeded_entries}
 
-    async def test_search_respects_pagination(
+    async def test_admin_search_respects_pagination(
         self,
         repository: AppConfigAllowListRepository,
         seeded_entries: list[AppConfigAllowListData],
     ) -> None:
-        result = await repository.search(
+        result = await repository.admin_search(
             BatchQuerier(pagination=OffsetPagination(limit=2, offset=0))
         )
         assert result.total_count == len(seeded_entries)
         assert len(result.items) == 2
         assert result.has_next_page is True
 
-    async def test_search_filters_by_config_name(
+    async def test_admin_search_filters_by_config_name(
         self,
         repository: AppConfigAllowListRepository,
         seeded_entries: list[AppConfigAllowListData],
     ) -> None:
-        result = await repository.search(
+        result = await repository.admin_search(
             BatchQuerier(
                 pagination=OffsetPagination(limit=10, offset=0),
                 conditions=[
@@ -345,12 +345,12 @@ class TestSearch:
         expected = {entry.id for entry in seeded_entries if entry.config_name == "theme"}
         assert {item.id for item in result.items} == expected
 
-    async def test_search_filters_by_scope_type(
+    async def test_admin_search_filters_by_scope_type(
         self,
         repository: AppConfigAllowListRepository,
         seeded_entries: list[AppConfigAllowListData],
     ) -> None:
-        result = await repository.search(
+        result = await repository.admin_search(
             BatchQuerier(
                 pagination=OffsetPagination(limit=10, offset=0),
                 conditions=[
@@ -363,12 +363,12 @@ class TestSearch:
         }
         assert {item.id for item in result.items} == expected
 
-    async def test_search_filters_by_scope_type_not_equals(
+    async def test_admin_search_filters_by_scope_type_not_equals(
         self,
         repository: AppConfigAllowListRepository,
         seeded_entries: list[AppConfigAllowListData],
     ) -> None:
-        result = await repository.search(
+        result = await repository.admin_search(
             BatchQuerier(
                 pagination=OffsetPagination(limit=10, offset=0),
                 conditions=[
@@ -381,12 +381,12 @@ class TestSearch:
         }
         assert {item.id for item in result.items} == expected
 
-    async def test_search_orders_by_config_name_desc(
+    async def test_admin_search_orders_by_config_name_desc(
         self,
         repository: AppConfigAllowListRepository,
         seeded_entries: list[AppConfigAllowListData],
     ) -> None:
-        result = await repository.search(
+        result = await repository.admin_search(
             BatchQuerier(
                 pagination=OffsetPagination(limit=10, offset=0),
                 orders=[AppConfigAllowListOrders.config_name(ascending=False)],
@@ -395,13 +395,13 @@ class TestSearch:
         config_names = [item.config_name for item in result.items]
         assert config_names == sorted(config_names, reverse=True)
 
-    async def test_search_filters_by_created_at(
+    async def test_admin_search_filters_by_created_at(
         self,
         repository: AppConfigAllowListRepository,
         seeded_entries: list[AppConfigAllowListData],
     ) -> None:
         target = seeded_entries[1]
-        result = await repository.search(
+        result = await repository.admin_search(
             BatchQuerier(
                 pagination=OffsetPagination(limit=10, offset=0),
                 conditions=[AppConfigAllowListConditions.by_created_at_equals(target.created_at)],
@@ -409,13 +409,13 @@ class TestSearch:
         )
         assert [item.id for item in result.items] == [target.id]
 
-    async def test_search_filters_by_updated_at(
+    async def test_admin_search_filters_by_updated_at(
         self,
         repository: AppConfigAllowListRepository,
         seeded_entries: list[AppConfigAllowListData],
     ) -> None:
         target = seeded_entries[1]
-        result = await repository.search(
+        result = await repository.admin_search(
             BatchQuerier(
                 pagination=OffsetPagination(limit=10, offset=0),
                 conditions=[AppConfigAllowListConditions.by_updated_at_equals(target.updated_at)],
@@ -423,12 +423,12 @@ class TestSearch:
         )
         assert [item.id for item in result.items] == [target.id]
 
-    async def test_search_orders_by_rank_asc(
+    async def test_admin_search_orders_by_rank_asc(
         self,
         repository: AppConfigAllowListRepository,
         seeded_entries: list[AppConfigAllowListData],
     ) -> None:
-        result = await repository.search(
+        result = await repository.admin_search(
             BatchQuerier(
                 pagination=OffsetPagination(limit=10, offset=0),
                 orders=[AppConfigAllowListOrders.rank(ascending=True)],
@@ -437,12 +437,12 @@ class TestSearch:
         expected = [entry.id for entry in sorted(seeded_entries, key=lambda e: e.rank)]
         assert [item.id for item in result.items] == expected
 
-    async def test_search_orders_by_created_at(
+    async def test_admin_search_orders_by_created_at(
         self,
         repository: AppConfigAllowListRepository,
         seeded_entries: list[AppConfigAllowListData],
     ) -> None:
-        result = await repository.search(
+        result = await repository.admin_search(
             BatchQuerier(
                 pagination=OffsetPagination(limit=10, offset=0),
                 orders=[AppConfigAllowListOrders.created_at(ascending=True)],
@@ -451,14 +451,14 @@ class TestSearch:
         expected = [entry.id for entry in sorted(seeded_entries, key=lambda e: e.created_at)]
         assert [item.id for item in result.items] == expected
 
-    async def test_search_cursor_forward(
+    async def test_admin_search_cursor_forward(
         self,
         repository: AppConfigAllowListRepository,
         seeded_entries: list[AppConfigAllowListData],
     ) -> None:
         by_created_desc = sorted(seeded_entries, key=lambda e: e.created_at, reverse=True)
         cursor = by_created_desc[0].id
-        result = await repository.search(
+        result = await repository.admin_search(
             BatchQuerier(
                 pagination=CursorForwardPagination(
                     first=10,
@@ -469,14 +469,14 @@ class TestSearch:
         )
         assert [item.id for item in result.items] == [entry.id for entry in by_created_desc[1:]]
 
-    async def test_search_cursor_backward(
+    async def test_admin_search_cursor_backward(
         self,
         repository: AppConfigAllowListRepository,
         seeded_entries: list[AppConfigAllowListData],
     ) -> None:
         by_created_asc = sorted(seeded_entries, key=lambda e: e.created_at)
         cursor = by_created_asc[0].id
-        result = await repository.search(
+        result = await repository.admin_search(
             BatchQuerier(
                 pagination=CursorBackwardPagination(
                     last=10,

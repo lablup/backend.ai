@@ -5,16 +5,16 @@ from typing import override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.data.app_config_fragment.types import AppConfigFragmentData
+from ai.backend.manager.data.app_config_definition.types import AppConfigDefinitionData
 from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.services.app_config_fragment.actions.base import (
-    AppConfigFragmentGlobalAction,
+from ai.backend.manager.services.app_config_definition.actions.base import (
+    AppConfigDefinitionGlobalAction,
 )
 
 
 @dataclass
-class AdminSearchAppConfigFragmentAction(AppConfigFragmentGlobalAction):
-    """Super-admin path: search every fragment, across all scopes."""
+class AdminSearchAppConfigDefinitionsAction(AppConfigDefinitionGlobalAction):
+    """Super-admin path: search every registered config definition."""
 
     querier: BatchQuerier
 
@@ -29,8 +29,8 @@ class AdminSearchAppConfigFragmentAction(AppConfigFragmentGlobalAction):
 
 
 @dataclass
-class AdminSearchAppConfigFragmentActionResult(BaseActionResult):
-    items: list[AppConfigFragmentData]
+class SearchAppConfigDefinitionsActionResult(BaseActionResult):
+    items: list[AppConfigDefinitionData]
     total_count: int
     has_next_page: bool
     has_previous_page: bool
