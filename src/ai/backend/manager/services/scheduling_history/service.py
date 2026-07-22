@@ -5,6 +5,10 @@ from ai.backend.manager.repositories.scheduling_history.types import (
     KernelSchedulingHistorySearchScope,
 )
 
+from .actions.resolve_kernel_session import (
+    ResolveKernelSessionAction,
+    ResolveKernelSessionActionResult,
+)
 from .actions.search_deployment_history import (
     SearchDeploymentHistoryAction,
     SearchDeploymentHistoryActionResult,
@@ -132,6 +136,14 @@ class SchedulingHistoryService:
             has_previous_page=result.has_previous_page,
         )
 
+    async def resolve_kernel_session(
+        self,
+        action: ResolveKernelSessionAction,
+    ) -> ResolveKernelSessionActionResult:
+        """Resolves the session owning a kernel; raises KernelNotFound if absent."""
+        session_id = await self._repository.resolve_session_id(action.kernel_id)
+        return ResolveKernelSessionActionResult(session_id=session_id)
+
     async def search_kernel_scoped_history(
         self,
         action: SearchKernelScopedHistoryAction,
@@ -148,6 +160,7 @@ class SchedulingHistoryService:
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,
             kernel_id=action.kernel_id,
+            session_id=action.session_id,
         )
 
     async def search_deployment_scoped_history(

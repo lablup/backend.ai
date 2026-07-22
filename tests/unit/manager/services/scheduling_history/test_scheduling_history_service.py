@@ -44,6 +44,9 @@ from ai.backend.manager.repositories.scheduling_history.types import (
     RouteHistorySearchScope,
     SessionSchedulingHistorySearchScope,
 )
+from ai.backend.manager.services.scheduling_history.actions.resolve_kernel_session import (
+    ResolveKernelSessionAction,
+)
 from ai.backend.manager.services.scheduling_history.actions.search_deployment_history import (
     SearchDeploymentHistoryAction,
 )
@@ -359,8 +362,25 @@ class TestSearchKernelHistoryAction:
         mock_repository.search_kernel_history.assert_awaited_once_with(querier=querier)
 
 
+class TestResolveKernelSessionAction:
+    async def test_resolves_the_owning_session(
+        self,
+        service: SchedulingHistoryService,
+        mock_repository: MagicMock,
+    ) -> None:
+        kernel_id = KernelId(uuid4())
+        session_id = SessionId(uuid4())
+        mock_repository.resolve_session_id.return_value = session_id
+
+        action = ResolveKernelSessionAction(kernel_id=kernel_id)
+        result = await service.resolve_kernel_session(action)
+
+        assert result.session_id == session_id
+        mock_repository.resolve_session_id.assert_awaited_once_with(kernel_id)
+
+
 class TestSearchKernelScopedHistoryAction:
-    async def test_scopes_to_the_kernel_and_exposes_its_rbac_element(
+    async def test_scopes_to_the_owning_session_and_narrows_to_the_kernel(
         self,
         service: SchedulingHistoryService,
         mock_repository: MagicMock,
@@ -376,16 +396,23 @@ class TestSearchKernelScopedHistoryAction:
             )
         )
         kernel_id = KernelId(uuid4())
+        session_id = SessionId(uuid4())
 
-        action = SearchKernelScopedHistoryAction(kernel_id=kernel_id, querier=querier)
+        action = SearchKernelScopedHistoryAction(
+            kernel_id=kernel_id, session_id=session_id, querier=querier
+        )
         result = await service.search_kernel_scoped_history(action)
 
         assert result.items == [history_item]
+        # Authorized via session read: kernel permission records are intentionally
+        # empty, so the owning session is the subject, scope, and target of the
+        # RBAC check; kernel_id bounds the repository query.
         assert action.target_element() == RBACElementRef(
-            element_type=RBACElementType.KERNEL, element_id=str(kernel_id)
+            element_type=RBACElementType.SESSION, element_id=str(session_id)
         )
-        assert action.scope_type() is ScopeType.KERNEL
-        assert action.entity_type() is EntityType.KERNEL_HISTORY
+        assert action.scope_type() is ScopeType.SESSION
+        assert action.scope_id() == str(session_id)
+        assert action.entity_type() is EntityType.SESSION
         mock_repository.search_kernel_scoped_history.assert_awaited_once_with(
             querier=querier,
             scope=KernelSchedulingHistorySearchScope(kernel_id=kernel_id),

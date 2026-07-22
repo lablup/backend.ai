@@ -1,6 +1,10 @@
 from __future__ import annotations
 
 from .base import SchedulingHistoryAction
+from .resolve_kernel_session import (
+    ResolveKernelSessionAction,
+    ResolveKernelSessionActionResult,
+)
 from .search_deployment_history import (
     SearchDeploymentHistoryAction,
     SearchDeploymentHistoryActionResult,
@@ -35,6 +39,8 @@ from .search_session_scoped_history import (
 )
 
 __all__ = (
+    "ResolveKernelSessionAction",
+    "ResolveKernelSessionActionResult",
     "SchedulingHistoryAction",
     # Admin actions
     "SearchSessionHistoryAction",

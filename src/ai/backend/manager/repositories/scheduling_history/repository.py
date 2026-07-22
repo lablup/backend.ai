@@ -11,6 +11,7 @@ from ai.backend.common.resilience import (
     RetryPolicy,
 )
 from ai.backend.common.resilience.policies.retry import BackoffStrategy
+from ai.backend.common.types import KernelId, SessionId
 from ai.backend.manager.data.deployment.types import (
     DeploymentHistoryListResult,
     RouteHistoryListResult,
@@ -93,6 +94,14 @@ class SchedulingHistoryRepository:
         return await self._db_source.search_kernel_history(querier)
 
     # ========== Kernel History (Scoped) ==========
+
+    @scheduling_history_repository_resilience.apply()
+    async def resolve_session_id(self, kernel_id: KernelId) -> SessionId:
+        """Return the id of the session owning ``kernel_id``.
+
+        Raises ``KernelNotFound`` when no such kernel exists.
+        """
+        return await self._db_source.resolve_session_id(kernel_id)
 
     @scheduling_history_repository_resilience.apply()
     async def search_kernel_scoped_history(

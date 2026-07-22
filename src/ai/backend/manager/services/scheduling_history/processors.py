@@ -10,6 +10,8 @@ from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpe
 from ai.backend.manager.actions.validators import ActionValidators
 
 from .actions import (
+    ResolveKernelSessionAction,
+    ResolveKernelSessionActionResult,
     SearchDeploymentHistoryAction,
     SearchDeploymentHistoryActionResult,
     SearchDeploymentScopedHistoryAction,
@@ -49,6 +51,9 @@ class SchedulingHistoryProcessors(AbstractProcessorPackage):
     search_session_scoped_history: ActionProcessor[
         SearchSessionScopedHistoryAction, SearchSessionScopedHistoryActionResult
     ]
+    resolve_kernel_session: ActionProcessor[
+        ResolveKernelSessionAction, ResolveKernelSessionActionResult
+    ]
     search_kernel_scoped_history: ScopeActionProcessor[
         SearchKernelScopedHistoryAction, SearchKernelScopedHistoryActionResult
     ]
@@ -81,6 +86,9 @@ class SchedulingHistoryProcessors(AbstractProcessorPackage):
         self.search_session_scoped_history = ActionProcessor(
             service.search_session_scoped_history, action_monitors
         )
+        self.resolve_kernel_session = ActionProcessor(
+            service.resolve_kernel_session, action_monitors
+        )
         self.search_kernel_scoped_history = ScopeActionProcessor(
             service.search_kernel_scoped_history,
             monitors=action_monitors,
@@ -103,6 +111,7 @@ class SchedulingHistoryProcessors(AbstractProcessorPackage):
             SearchRouteHistoryAction.spec(),
             # Scoped actions (added in 26.2.0)
             SearchSessionScopedHistoryAction.spec(),
+            ResolveKernelSessionAction.spec(),
             SearchKernelScopedHistoryAction.spec(),
             SearchDeploymentScopedHistoryAction.spec(),
             SearchRouteScopedHistoryAction.spec(),

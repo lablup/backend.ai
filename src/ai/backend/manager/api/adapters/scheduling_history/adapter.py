@@ -79,6 +79,9 @@ from ai.backend.manager.repositories.scheduling_history.types import (
     RouteHistorySearchScope,
     SessionSchedulingHistorySearchScope,
 )
+from ai.backend.manager.services.scheduling_history.actions.resolve_kernel_session import (
+    ResolveKernelSessionAction,
+)
 from ai.backend.manager.services.scheduling_history.actions.search_deployment_history import (
     SearchDeploymentHistoryAction,
 )
@@ -447,9 +450,18 @@ class SchedulingHistoryAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
+        # The owning session is the authorization subject; resolve it before
+        # dispatching so the RBAC check targets the session directly.
+        resolve_result = (
+            await self._processors.scheduling_history.resolve_kernel_session.wait_for_complete(
+                ResolveKernelSessionAction(kernel_id=KernelId(input.scope.kernel_id))
+            )
+        )
         action_result = await self._processors.scheduling_history.search_kernel_scoped_history.wait_for_complete(
             SearchKernelScopedHistoryAction(
-                kernel_id=KernelId(input.scope.kernel_id), querier=querier
+                kernel_id=KernelId(input.scope.kernel_id),
+                session_id=resolve_result.session_id,
+                querier=querier,
             )
         )
         return SearchKernelHistoriesPayload(
