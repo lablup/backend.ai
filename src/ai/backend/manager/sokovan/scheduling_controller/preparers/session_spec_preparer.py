@@ -20,9 +20,11 @@ from collections.abc import Iterable
 
 from ai.backend.manager.data.session.draft import SessionResourceSpecDraft
 from ai.backend.manager.data.session.spec import SessionResourceSpec
+from ai.backend.manager.repositories.scheduler.types.session_creation import (
+    SessionSpecContext,
+)
 from ai.backend.manager.sokovan.scheduling_controller.preparers.draft_rule import (
     SessionSpecDraftRule,
-    SessionSpecPreparationContext,
 )
 
 
@@ -44,7 +46,7 @@ class SessionSpecPreparer:
     async def prepare(
         self,
         initial_draft: SessionResourceSpecDraft,
-        context: SessionSpecPreparationContext,
+        context: SessionSpecContext,
     ) -> SessionResourceSpec:
         """Run every rule in declaration order and finalize."""
         draft = initial_draft

@@ -35,9 +35,11 @@ from ai.backend.manager.data.session.draft import (
     SessionResourceSpecDraft,
 )
 from ai.backend.manager.data.session.options import KernelExecutionSpec
+from ai.backend.manager.repositories.scheduler.types.session_creation import (
+    SessionSpecContext,
+)
 from ai.backend.manager.sokovan.scheduling_controller.preparers.draft_rule import (
     SessionSpecDraftRule,
-    SessionSpecPreparationContext,
 )
 
 
@@ -52,7 +54,7 @@ class MergeResourceGroupDefaultsRule(SessionSpecDraftRule):
     async def prepare(
         self,
         draft: SessionResourceSpecDraft,
-        context: SessionSpecPreparationContext,
+        context: SessionSpecContext,
     ) -> SessionResourceSpecDraft:
         rg = context.resource_group_defaults
 

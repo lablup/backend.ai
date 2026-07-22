@@ -54,8 +54,6 @@ valkey_stat_resilience = Resilience(
 )
 
 _DEFAULT_EXPIRATION = 86400  # 24 hours default expiration
-_KEYPAIR_CONCURRENCY_PREFIX: Final[str] = "keypair.concurrency_used"
-_KEYPAIR_SFTP_CONCURRENCY_PREFIX: Final[str] = "keypair.sftp_concurrency_used"
 _KERNEL_COMMIT_PREFIX: Final[str] = "kernel"
 _KERNEL_COMMIT_SUFFIX: Final[str] = "commit"
 _ABUSE_REPORT_HASH: Final[str] = "abuse_report"
@@ -63,8 +61,6 @@ _CONTAINER_COUNT_PREFIX: Final[str] = "container_count"
 _MANAGER_STATUS_PREFIX: Final[str] = "manager.status"
 _INFERENCE_PREFIX: Final[str] = "inference"
 _COMPUTER_METADATA_KEY: Final[str] = "computer.metadata"
-_COMPUTE_CONCURRENCY_USED_KEY_PREFIX: Final[str] = "keypair.concurrency_used."
-_SYSTEM_CONCURRENCY_USED_KEY_PREFIX: Final[str] = "keypair.sftp_concurrency_used."
 _TOTAL_RESOURCE_SLOTS_KEY: Final[str] = "system.total_resource_slots"
 _RESOURCE_PRESET_CHECK_INDEX_KEY: Final[str] = "resource_preset:check:_index_"
 
@@ -144,27 +140,6 @@ class ValkeyStatClient:
             return int(result.decode("utf-8"))
         except (ValueError, UnicodeDecodeError):
             return 0
-
-    @valkey_stat_resilience.apply()
-    async def get_keypair_concurrency_used(
-        self, access_key: str, is_private: bool = False
-    ) -> int | None:
-        """
-        Get current concurrency usage for a keypair.
-
-        :param access_key: The keypair access key.
-        :param is_private: Whether to get SFTP concurrency (True) or regular concurrency (False).
-        :return: The concurrency usage count, or None if not found in cache.
-        """
-        key = self._get_keypair_concurrency_key(access_key, is_private)
-        async with self._client.client() as conn:
-            result = await conn.get(key)
-        if result is None:
-            return None
-        try:
-            return int(result.decode("utf-8"))
-        except (ValueError, UnicodeDecodeError):
-            return None
 
     @valkey_stat_resilience.apply()
     async def get_keypair_last_used_time(self, access_key: str) -> float | None:
@@ -870,17 +845,6 @@ class ValkeyStatClient:
         async with self._client.client() as conn:
             return await conn.incr(key)
 
-    def _get_keypair_concurrency_key(self, access_key: str, is_private: bool) -> str:
-        """
-        Generate keypair concurrency key.
-
-        :param access_key: The access key.
-        :param is_private: Whether this is for SFTP concurrency.
-        :return: The generated key.
-        """
-        prefix = _KEYPAIR_SFTP_CONCURRENCY_PREFIX if is_private else _KEYPAIR_CONCURRENCY_PREFIX
-        return f"{prefix}.{access_key}"
-
     @valkey_stat_resilience.apply()
     async def increment_keypair_query_count(
         self,
@@ -894,141 +858,6 @@ class ValkeyStatClient:
         last_call_time_key = self._get_keypair_last_call_time_key(access_key)
         batch.set(last_call_time_key, str(now).encode())
         batch.expire(last_call_time_key, 86400 * 30)  # retention: 1 month
-        async with self._client.client() as conn:
-            await conn.exec(batch, raise_on_error=True)
-
-    # DEPRECATED: These methods are being phased out in favor of cache mirroring approach
-    # Will be removed in future versions
-    @valkey_stat_resilience.apply()
-    async def increment_keypair_concurrencies(
-        self,
-        concurrency_to_increment: Mapping[str, int],
-        sftp_concurrency_to_increment: Mapping[str, int],
-    ) -> None:
-        """
-        DEPRECATED: Use update_compute_concurrency_by_map and update_system_concurrency_by_map instead.
-        This method will be removed in future versions.
-
-        Increment keypair concurrency counters.
-
-        :param concurrency_to_increment: Mapping of access keys to concurrency increments.
-        :param sftp_concurrency_to_increment: Mapping of access keys to SFTP concurrency increments.
-        """
-        log.warning(
-            "increment_keypair_concurrencies is deprecated. "
-            "Use update_compute_concurrency_by_map and update_system_concurrency_by_map instead."
-        )
-        if not concurrency_to_increment and not sftp_concurrency_to_increment:
-            return
-
-        batch = self._create_batch()
-        for access_key, delta in concurrency_to_increment.items():
-            key = self._get_keypair_concurrency_key(access_key, is_private=False)
-            batch.incrby(key, delta)
-
-        for access_key, delta in sftp_concurrency_to_increment.items():
-            key = self._get_keypair_concurrency_key(access_key, is_private=True)
-            batch.incrby(key, delta)
-
-        async with self._client.client() as conn:
-            await conn.exec(batch, raise_on_error=True)
-
-    @valkey_stat_resilience.apply()
-    async def decrement_keypair_concurrencies(
-        self,
-        concurrency_to_decrement: Mapping[str, int],
-        sftp_concurrency_to_decrement: Mapping[str, int],
-    ) -> None:
-        """
-        DEPRECATED: Use update_compute_concurrency_by_map and update_system_concurrency_by_map instead.
-        This method will be removed in future versions.
-
-        Decrement keypair concurrency counters.
-
-        :param concurrency_to_decrement: Mapping of access keys to concurrency decrements.
-        :param sftp_concurrency_to_decrement: Mapping of access keys to SFTP concurrency decrements.
-        """
-        log.warning(
-            "decrement_keypair_concurrencies is deprecated. "
-            "Use update_compute_concurrency_by_map and update_system_concurrency_by_map instead."
-        )
-        if not concurrency_to_decrement and not sftp_concurrency_to_decrement:
-            return
-
-        batch = self._create_batch()
-
-        for access_key, delta in concurrency_to_decrement.items():
-            key = self._get_keypair_concurrency_key(access_key, is_private=False)
-            batch.decrby(key, delta)
-
-        for access_key, delta in sftp_concurrency_to_decrement.items():
-            key = self._get_keypair_concurrency_key(access_key, is_private=True)
-            batch.decrby(key, delta)
-
-        async with self._client.client() as conn:
-            await conn.exec(batch, raise_on_error=True)
-
-    @valkey_stat_resilience.apply()
-    async def decrement_keypair_concurrency(self, access_key: str, is_private: bool = False) -> int:
-        """
-        Decrement keypair concurrency counter.
-
-        :param access_key: The access key to decrement concurrency for.
-        :param is_private: Whether this is for SFTP concurrency (True) or regular concurrency (False).
-        :return: The new value after decrement.
-        """
-        key = self._get_keypair_concurrency_key(access_key, is_private)
-        async with self._client.client() as conn:
-            return await conn.incrby(key, -1)
-
-    @valkey_stat_resilience.apply()
-    async def delete_keypair_concurrency(self, access_key: str, is_private: bool = False) -> bool:
-        """
-        Delete keypair concurrency counter.
-
-        :param access_key: The access key to delete concurrency counter for.
-        :param is_private: Whether this is for SFTP concurrency (True) or regular concurrency (False).
-        :return: True if the key was deleted, False if it didn't exist.
-        """
-        key = self._get_keypair_concurrency_key(access_key, is_private)
-        async with self._client.client() as conn:
-            result = await conn.delete([key])
-        return result > 0
-
-    @valkey_stat_resilience.apply()
-    async def set_keypair_concurrency(
-        self, access_key: str, concurrency_used: int, is_private: bool = False
-    ) -> None:
-        """
-        Set keypair concurrency counter.
-
-        :param access_key: The access key to set concurrency for.
-        :param concurrency_used: The concurrency value to set.
-        :param is_private: Whether this is for SFTP concurrency (True) or regular concurrency (False).
-        """
-        key = self._get_keypair_concurrency_key(access_key, is_private)
-        async with self._client.client() as conn:
-            await conn.set(key, str(concurrency_used))
-
-    @valkey_stat_resilience.apply()
-    async def set_keypair_concurrencies(
-        self, access_key: str, regular_concurrency: int, sftp_concurrency: int
-    ) -> None:
-        """
-        Set both regular and SFTP keypair concurrency counters in a batch.
-
-        :param access_key: The access key to set concurrency for.
-        :param regular_concurrency: The regular concurrency value to set.
-        :param sftp_concurrency: The SFTP concurrency value to set.
-        """
-        batch = self._create_batch()
-
-        regular_key = self._get_keypair_concurrency_key(access_key, is_private=False)
-        sftp_key = self._get_keypair_concurrency_key(access_key, is_private=True)
-
-        batch.set(regular_key, str(regular_concurrency))
-        batch.set(sftp_key, str(sftp_concurrency))
-
         async with self._client.client() as conn:
             await conn.exec(batch, raise_on_error=True)
 
@@ -1224,43 +1053,6 @@ class ValkeyStatClient:
             await conn.exec(batch, raise_on_error=True)
 
     @valkey_stat_resilience.apply()
-    async def check_keypair_concurrency(
-        self,
-        redis_key: str,
-        limit: int,
-    ) -> tuple[int, int]:
-        """
-        Check and increment keypair concurrency usage.
-
-        :param redis_key: The key for storing concurrency count.
-        :param limit: The maximum allowed concurrent sessions.
-        :return: Tuple of (ok, concurrency_used) where ok is 1 if allowed, 0 if limit exceeded.
-        """
-        async with self._client.client() as conn:
-            # Set default value if key doesn't exist
-            current_value = await conn.get(redis_key)
-            if current_value is None:
-                await conn.set(redis_key, "0")
-
-            # Get current count
-            result = await conn.get(redis_key)
-            if result is not None:
-                try:
-                    current_count = int(str(result))
-                except (ValueError, TypeError):
-                    current_count = 0
-            else:
-                current_count = 0
-
-            # Check if limit is exceeded
-            if limit > 0 and current_count >= limit:
-                return (0, current_count)
-
-            # Increment counter
-            await conn.incr(redis_key)
-        return (1, current_count + 1)
-
-    @valkey_stat_resilience.apply()
     async def scan_and_get_manager_status(
         self,
         pattern: str,
@@ -1308,78 +1100,6 @@ class ValkeyStatClient:
     ) -> str:
         return f"kp:{access_key}:last_call_time"
 
-    @valkey_stat_resilience.apply()
-    async def update_compute_concurrency_by_map(
-        self,
-        concurrency_map: Mapping[str, int],
-    ) -> None:
-        """
-        Update compute concurrency values from a map of access keys to concurrency counts.
-
-        :param concurrency_map: Dictionary mapping access keys to their compute concurrency counts.
-        """
-        if not concurrency_map:
-            return
-
-        updates: dict[str, bytes] = {}
-        for access_key, concurrency_count in concurrency_map.items():
-            key = f"{_COMPUTE_CONCURRENCY_USED_KEY_PREFIX}{access_key}"
-            updates[key] = str(concurrency_count).encode("utf-8")
-
-        await self.set_multiple_keys(updates)
-
-    @valkey_stat_resilience.apply()
-    async def update_system_concurrency_by_map(
-        self,
-        concurrency_map: Mapping[str, int],
-    ) -> None:
-        """
-        Update system (SFTP) concurrency values from a map of access keys to concurrency counts.
-
-        :param concurrency_map: Dictionary mapping access keys to their system concurrency counts.
-        """
-        if not concurrency_map:
-            return
-
-        updates: dict[str, bytes] = {}
-        for access_key, concurrency_count in concurrency_map.items():
-            key = f"{_SYSTEM_CONCURRENCY_USED_KEY_PREFIX}{access_key}"
-            updates[key] = str(concurrency_count).encode("utf-8")
-
-        await self.set_multiple_keys(updates)
-
-    @valkey_stat_resilience.apply()
-    async def update_concurrency_by_fullscan(
-        self,
-        access_key_to_concurrency: Mapping[str, int],
-    ) -> None:
-        """
-        Update concurrency values by doing a full scan and setting all keys.
-        Used when the system has no sessions to reset all concurrency to 0.
-
-        :param access_key_to_concurrency: Dictionary mapping access keys to their concurrency counts.
-        """
-        updates: dict[str, bytes] = {}
-
-        # Scan and update compute concurrency keys
-        compute_keys = await self._keys(f"{_COMPUTE_CONCURRENCY_USED_KEY_PREFIX}*")
-        for key in compute_keys:
-            key_str = key.decode("utf-8")
-            access_key = key_str.replace(_COMPUTE_CONCURRENCY_USED_KEY_PREFIX, "")
-            concurrency_count = access_key_to_concurrency.get(access_key, 0)
-            updates[key_str] = str(concurrency_count).encode("utf-8")
-
-        # Scan and update system concurrency keys
-        system_keys = await self._keys(f"{_SYSTEM_CONCURRENCY_USED_KEY_PREFIX}*")
-        for key in system_keys:
-            key_str = key.decode("utf-8")
-            access_key = key_str.replace(_SYSTEM_CONCURRENCY_USED_KEY_PREFIX, "")
-            concurrency_count = access_key_to_concurrency.get(access_key, 0)
-            updates[key_str] = str(concurrency_count).encode("utf-8")
-
-        if updates:
-            await self.set_multiple_keys(updates)
-
     async def get_total_resource_slots(self) -> TotalResourceData | None:
         """
         Get total resource slots data from cache.
@@ -1420,30 +1140,6 @@ class ValkeyStatClient:
             log.warning("Failed to serialize TotalResourceData to cache: {}", e)
             raise
 
-    def _invalidate_keypair_concurrencies(
-        self, batch: Batch, access_keys: list[AccessKey]
-    ) -> Batch:
-        """
-        Delete concurrency counters for multiple access keys in a batch.
-        Removes both regular and SFTP concurrency values for all provided keys.
-
-        :param access_keys: List of access keys to delete concurrency for.
-        """
-        if not access_keys:
-            return batch
-
-        # Prepare all keys for deletion
-        keys_to_delete = []
-        for access_key in access_keys:
-            regular_key = self._get_keypair_concurrency_key(access_key, is_private=False)
-            sftp_key = self._get_keypair_concurrency_key(access_key, is_private=True)
-            keys_to_delete.extend([regular_key, sftp_key])
-
-        # Delete all keys in a single operation
-        if keys_to_delete:
-            batch.delete(cast(list[str | bytes], keys_to_delete))
-        return batch
-
     def _invalidate_total_resource_slots(self, batch: Batch) -> Batch:
         """
         Invalidate (delete) the total resource slots cache.
@@ -1460,8 +1156,9 @@ class ValkeyStatClient:
 
     async def invalidate_kernel_related_cache(self, access_keys: list[AccessKey]) -> None:
         """
-        Invalidate all kernel-related caches including resource presets, total resource slots,
-        and keypair concurrencies for the given access keys.
+        Invalidate all kernel-related caches: resource presets and the
+        total resource slots. (Keypair concurrency counters no longer
+        exist; concurrency is counted from the database.)
         """
 
         async with self._client.client() as conn:
@@ -1473,7 +1170,6 @@ class ValkeyStatClient:
             if resource_preset_keys:
                 batch.delete([_RESOURCE_PRESET_CHECK_INDEX_KEY])
             batch = self._invalidate_total_resource_slots(batch)
-            batch = self._invalidate_keypair_concurrencies(batch, access_keys)
 
             await conn.exec(batch, raise_on_error=True)
 

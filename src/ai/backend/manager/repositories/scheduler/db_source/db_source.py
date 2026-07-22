@@ -55,7 +55,7 @@ from ai.backend.manager.data.dotfile.types import DotfileBundle, DotfileEntry, S
 from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.kernel.types import KernelListResult, KernelStatus
 from ai.backend.manager.data.permission.types import RBACElementRef
-from ai.backend.manager.data.resource.types import SlotTypePolicy
+from ai.backend.manager.data.resource.types import SlotTypePolicy, UserEnqueuePolicy
 from ai.backend.manager.data.session.creation import (
     ContainerUserInfo,
     ImageInfo,
@@ -173,7 +173,7 @@ from ai.backend.manager.repositories.scheduler.types.session import (
 )
 from ai.backend.manager.repositories.scheduler.types.session_creation import (
     AllowedScalingGroup,
-    SessionSpecContextFetch,
+    SessionSpecContext,
 )
 from ai.backend.manager.repositories.scheduling_history import (
     SessionSchedulingHistoryCreatorSpec,
@@ -278,33 +278,40 @@ class ScheduleDBSource:
     ) -> _ScalingGroupWithSlotInventory:
         """Load a scaling group together with its per-RG slot inventory.
 
-        Eager-loads ``agents`` -> ``agent_resource_rows`` -> ``slot_type_row``
-        via ``selectinload``, filters out TERMINATED agents, and projects
-        the remaining rows into ``{slot_name: SlotTypes}``. The ``AgentRow``
-        instances themselves are not exposed — callers only see the SG row
-        and the derived inventory.
+        The inventory is an aggregate (which slot kinds the group's
+        non-terminated agents serve), so it comes from a single DISTINCT
+        scan instead of eager-loading the agent fleet.
 
         Raises:
             ScalingGroupNotFound: when the scaling group does not exist.
         """
         sg_row = (
             await db_sess.scalars(
-                sa.select(ScalingGroupRow)
-                .options(
-                    selectinload(ScalingGroupRow.agents)
-                    .selectinload(AgentRow.agent_resource_rows)
-                    .selectinload(AgentResourceRow.slot_type_row)
-                )
-                .where(ScalingGroupRow.id == resource_group_id)
+                sa.select(ScalingGroupRow).where(ScalingGroupRow.id == resource_group_id)
             )
         ).one_or_none()
         if sg_row is None:
             raise ScalingGroupNotFound(f"Resource group {resource_group_id} not found")
+
+        ar = AgentResourceRow.__table__
+        rst = ResourceSlotTypeRow.__table__
+        inventory_rows = (
+            await db_sess.execute(
+                sa.select(ar.c.slot_name, rst.c.slot_type)
+                .distinct()
+                .select_from(
+                    ar.join(AgentRow, ar.c.agent_id == AgentRow.id).join(
+                        rst, rst.c.slot_name == ar.c.slot_name
+                    )
+                )
+                .where(
+                    AgentRow.resource_group_id == resource_group_id,
+                    AgentRow.status != AgentStatus.TERMINATED,
+                )
+            )
+        ).all()
         active_slot_types: dict[SlotName, SlotTypes] = {
-            SlotName(ar.slot_name): SlotTypes(ar.slot_type_row.slot_type)
-            for agent in sg_row.agents
-            if agent.status != AgentStatus.TERMINATED
-            for ar in agent.agent_resource_rows
+            SlotName(row.slot_name): SlotTypes(row.slot_type) for row in inventory_rows
         }
         return _ScalingGroupWithSlotInventory(
             sg_row=sg_row,
@@ -1546,17 +1553,14 @@ class ScheduleDBSource:
     async def fetch_session_spec_contexts(
         self,
         draft: SessionSpecDraft,
-    ) -> SessionSpecContextFetch:
+    ) -> SessionSpecContext:
         """Batch-fetch the DB reads the draft-based preparer and validator
         rules depend on, inside a single readonly transaction.
 
-        Returns raw fetched data as :class:`SessionSpecContextFetch` — the
-        scheduling controller converts it into its typed
-        ``SessionSpecPreparationContext`` +
-        ``SessionSpecValidationContext`` pair. Keeping the repository
-        unaware of the controller's typed contexts breaks the import
-        cycle between ``repositories.scheduler`` and the sokovan
-        ``scheduling_controller`` subtree.
+        Returns a :class:`SessionSpecContext` the preparer and validator
+        chains consume directly; the controller only fills in
+        ``vfolder_mounts_by_role`` after the separate storage-manager
+        resolution step.
         """
         resource_group_id = draft.scope.resource_group_id
         access_key = draft.resource_spec.identity.access_key
@@ -1627,17 +1631,32 @@ class ScheduleDBSource:
                 else ContainerUserInfo()
             )
 
-            keypair_policy = None
-            if access_key is not None:
-                kp_row = (
-                    await db_sess.scalars(
-                        sa.select(KeyPairRow)
-                        .options(selectinload(KeyPairRow.resource_policy_row))
-                        .where(KeyPairRow.access_key == access_key)
+            # Enqueue gates are user-scoped; the policy values are sourced
+            # from the user's main keypair policy (no user-level columns yet).
+            user_enqueue_policy = None
+            if user_uuid is not None:
+                policy_row = (
+                    await db_sess.execute(
+                        sa.select(
+                            KeyPairResourcePolicyRow.max_containers_per_session,
+                            KeyPairResourcePolicyRow.max_pending_session_count,
+                            KeyPairResourcePolicyRow.allowed_vfolder_hosts,
+                        )
+                        .select_from(UserRow)
+                        .join(KeyPairRow, UserRow.main_access_key == KeyPairRow.access_key)
+                        .join(
+                            KeyPairResourcePolicyRow,
+                            KeyPairRow.resource_policy == KeyPairResourcePolicyRow.name,
+                        )
+                        .where(UserRow.uuid == user_uuid)
                     )
                 ).one_or_none()
-                if kp_row is not None and kp_row.resource_policy_row is not None:
-                    keypair_policy = kp_row.resource_policy_row.to_dataclass()
+                if policy_row is not None:
+                    user_enqueue_policy = UserEnqueuePolicy(
+                        max_containers_per_session=policy_row.max_containers_per_session,
+                        max_pending_session_count=policy_row.max_pending_session_count,
+                        allowed_vfolder_hosts=policy_row.allowed_vfolder_hosts,
+                    )
 
             dotfile_bundle = DotfileBundle()
             if domain_name is not None and user_uuid is not None and access_key is not None:
@@ -1663,7 +1682,7 @@ class ScheduleDBSource:
                 )
                 pending_session_count = int(pending_count_result.scalar_one())
 
-        return SessionSpecContextFetch(
+        return SessionSpecContext(
             resource_group_defaults=rg_defaults,
             resource_group_network=network_info,
             container_user_info=user_container,
@@ -1671,7 +1690,7 @@ class ScheduleDBSource:
             resource_group_allow_fractional=resource_group_allow_fractional,
             dotfile_data=dotfile_bundle,
             pending_session_count=pending_session_count,
-            keypair_resource_policy=keypair_policy,
+            user_enqueue_policy=user_enqueue_policy,
             known_slot_types=known_slot_types,
             slot_type_policy=slot_type_policy,
         )
@@ -1682,6 +1701,7 @@ class ScheduleDBSource:
         *,
         storage_manager: StorageSessionManager,
         allowed_vfolder_types: list[str],
+        user_enqueue_policy: UserEnqueuePolicy | None,
     ) -> dict[str, tuple[VFolderMount, ...]]:
         """Resolve each kernel group's vfolder mounts, keyed by ``role``.
 
@@ -1695,7 +1715,6 @@ class ScheduleDBSource:
         user_uuid = draft.resource_spec.identity.user_uuid
         domain_name = str(draft.scope.domain_name) if draft.scope.domain_name else None
         project_id = draft.scope.project_id
-        access_key = draft.resource_spec.identity.access_key
         kernel_specs = tuple(draft.resource_spec.options.kernel_groups or ())
 
         vfolder_mounts_by_role: dict[str, tuple[VFolderMount, ...]] = {}
@@ -1703,21 +1722,13 @@ class ScheduleDBSource:
             return vfolder_mounts_by_role
 
         async with self._db.begin_readonly_session_read_committed() as db_sess:
+            # The policy was already fetched by fetch_session_spec_contexts;
+            # only the allowed vfolder hosts matter here.
             resource_policy_dict: dict[str, Any] = {}
-            if access_key is not None:
-                kp_row = (
-                    await db_sess.scalars(
-                        sa.select(KeyPairRow)
-                        .options(selectinload(KeyPairRow.resource_policy_row))
-                        .where(KeyPairRow.access_key == access_key)
-                    )
-                ).one_or_none()
-                if kp_row is not None and kp_row.resource_policy_row is not None:
-                    resource_policy_dict = {
-                        "allowed_vfolder_hosts": (
-                            kp_row.resource_policy_row.to_dataclass().allowed_vfolder_hosts
-                        ),
-                    }
+            if user_enqueue_policy is not None:
+                resource_policy_dict = {
+                    "allowed_vfolder_hosts": user_enqueue_policy.allowed_vfolder_hosts,
+                }
 
             user_scope_for_mounts = UserScope(
                 domain_name=domain_name,

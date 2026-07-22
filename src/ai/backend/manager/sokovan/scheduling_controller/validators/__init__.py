@@ -11,7 +11,6 @@ from .required_resource_slot_rule import RequiredResourceSlotRule
 from .resource_limit_rule import ResourceLimitRule
 from .service_port_rule import ServicePortRule
 from .session_spec_base import (
-    SessionSpecValidationContext,
     SessionSpecValidator,
     SessionSpecValidatorRule,
 )
@@ -27,7 +26,6 @@ __all__ = [
     "RequiredResourceSlotRule",
     "ResourceLimitRule",
     "ServicePortRule",
-    "SessionSpecValidationContext",
     "SessionSpecValidator",
     "SessionSpecValidatorRule",
 ]

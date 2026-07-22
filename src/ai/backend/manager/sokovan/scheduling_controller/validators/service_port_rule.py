@@ -7,8 +7,10 @@ from typing import Any, override
 
 from ai.backend.manager.data.session.spec import SessionSpec
 from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.repositories.scheduler.types.session_creation import (
+    SessionSpecContext,
+)
 from ai.backend.manager.sokovan.scheduling_controller.validators.session_spec_base import (
-    SessionSpecValidationContext,
     SessionSpecValidatorRule,
 )
 
@@ -26,7 +28,7 @@ class ServicePortRule(SessionSpecValidatorRule):
     def validate(
         self,
         spec: SessionSpec,
-        context: SessionSpecValidationContext,
+        context: SessionSpecContext,
     ) -> None:
         for idx, kernel in enumerate(spec.resource_spec.kernel_specs):
             preopen = set(kernel.preopen_ports)

@@ -7,7 +7,7 @@ frozen permissions) is performed by the controller inside its readonly
 batch-fetch transaction — a pure preparer rule would need to issue DB
 reads otherwise, breaking the ``prepare`` signature's "no IO"
 invariant. See
-:attr:`SessionSpecPreparationContext.vfolder_mounts_by_role`.
+:attr:`SessionSpecContext.vfolder_mounts_by_role`.
 
 Runs after :class:`.expand_kernel_groups_rule.ExpandKernelGroupsRule`
 so ``draft.kernel_specs`` is already expanded per-replica; each kernel
@@ -24,9 +24,11 @@ from __future__ import annotations
 from typing import override
 
 from ai.backend.manager.data.session.draft import SessionResourceSpecDraft
+from ai.backend.manager.repositories.scheduler.types.session_creation import (
+    SessionSpecContext,
+)
 from ai.backend.manager.sokovan.scheduling_controller.preparers.draft_rule import (
     SessionSpecDraftRule,
-    SessionSpecPreparationContext,
 )
 
 
@@ -41,7 +43,7 @@ class ResolveVFolderMountsRule(SessionSpecDraftRule):
     async def prepare(
         self,
         draft: SessionResourceSpecDraft,
-        context: SessionSpecPreparationContext,
+        context: SessionSpecContext,
     ) -> SessionResourceSpecDraft:
         resolved = context.vfolder_mounts_by_role
         if not resolved or not draft.kernel_specs:

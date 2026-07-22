@@ -23,12 +23,14 @@ from ai.backend.manager.data.resource.types import SlotTypePolicy
 from ai.backend.manager.data.session.creation import ImageInfo
 from ai.backend.manager.data.session.spec import KernelSpec, SessionSpec
 from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.repositories.scheduler.types.session_creation import (
+    SessionSpecContext,
+)
 from ai.backend.manager.sokovan.scheduling_controller.resource_parse import (
     image_min_slots,
     parse_quantity,
 )
 from ai.backend.manager.sokovan.scheduling_controller.validators.session_spec_base import (
-    SessionSpecValidationContext,
     SessionSpecValidatorRule,
 )
 
@@ -44,7 +46,7 @@ class ResourceLimitRule(SessionSpecValidatorRule):
     def validate(
         self,
         spec: SessionSpec,
-        context: SessionSpecValidationContext,
+        context: SessionSpecContext,
     ) -> None:
         for idx, kernel in enumerate(spec.resource_spec.kernel_specs):
             image_info = context.image_infos.get(kernel.execution_spec.resource_input.image_id)

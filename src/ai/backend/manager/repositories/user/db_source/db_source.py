@@ -851,19 +851,6 @@ class UserDBSource:
         Delete user's all keypairs with Valkey cleanup.
         """
         async with self._db.begin() as conn:
-            ak_rows = await conn.execute(
-                sa.select(keypairs.c.access_key).where(keypairs.c.user == user_uuid),
-            )
-            if (row := ak_rows.first()) and (access_key := row.access_key):
-                # Log concurrency used only when there is at least one keypair.
-                await valkey_stat_client.delete_keypair_concurrency(
-                    access_key=access_key,
-                    is_private=False,
-                )
-                await valkey_stat_client.delete_keypair_concurrency(
-                    access_key=access_key,
-                    is_private=True,
-                )
             result = await conn.execute(
                 sa.delete(keypairs).where(keypairs.c.user == user_uuid),
             )

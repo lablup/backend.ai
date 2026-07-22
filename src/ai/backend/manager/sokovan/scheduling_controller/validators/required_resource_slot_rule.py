@@ -13,9 +13,11 @@ from typing import override
 
 from ai.backend.manager.data.session.spec import SessionSpec
 from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.repositories.scheduler.types.session_creation import (
+    SessionSpecContext,
+)
 from ai.backend.manager.sokovan.scheduling_controller.resource_parse import parse_quantity
 from ai.backend.manager.sokovan.scheduling_controller.validators.session_spec_base import (
-    SessionSpecValidationContext,
     SessionSpecValidatorRule,
 )
 
@@ -31,7 +33,7 @@ class RequiredResourceSlotRule(SessionSpecValidatorRule):
     def validate(
         self,
         spec: SessionSpec,
-        context: SessionSpecValidationContext,
+        context: SessionSpecContext,
     ) -> None:
         required = context.slot_type_policy.required
         if not required:

@@ -7,8 +7,10 @@ from typing import override
 from ai.backend.manager.data.session.spec import SessionSpec
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.models.vfolder import verify_vfolder_name
+from ai.backend.manager.repositories.scheduler.types.session_creation import (
+    SessionSpecContext,
+)
 from ai.backend.manager.sokovan.scheduling_controller.validators.session_spec_base import (
-    SessionSpecValidationContext,
     SessionSpecValidatorRule,
 )
 
@@ -30,7 +32,7 @@ class MountNameValidationRule(SessionSpecValidatorRule):
     def validate(
         self,
         spec: SessionSpec,
-        _context: SessionSpecValidationContext,
+        _context: SessionSpecContext,
     ) -> None:
         for kernel_idx, kernel in enumerate(spec.resource_spec.kernel_specs):
             seen_paths: set[str] = set()

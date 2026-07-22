@@ -17,9 +17,11 @@ from __future__ import annotations
 from typing import override
 
 from ai.backend.manager.data.session.draft import SessionResourceSpecDraft
+from ai.backend.manager.repositories.scheduler.types.session_creation import (
+    SessionSpecContext,
+)
 from ai.backend.manager.sokovan.scheduling_controller.preparers.draft_rule import (
     SessionSpecDraftRule,
-    SessionSpecPreparationContext,
 )
 
 _SUDO_ENABLED_ENV_KEY = "SUDO_SESSION_ENABLED"
@@ -37,7 +39,7 @@ class InjectSessionEnvironRule(SessionSpecDraftRule):
     async def prepare(
         self,
         draft: SessionResourceSpecDraft,
-        context: SessionSpecPreparationContext,
+        context: SessionSpecContext,
     ) -> SessionResourceSpecDraft:
         if not draft.internal_data_extras.sudo_session_enabled:
             return draft

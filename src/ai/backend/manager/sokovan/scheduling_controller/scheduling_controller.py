@@ -1,5 +1,6 @@
 """Scheduling controller for managing session lifecycle and scheduling operations."""
 
+import dataclasses
 import logging
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -47,7 +48,7 @@ from ai.backend.manager.repositories.scheduler import (
     MarkTerminatingResult,
     SchedulerRepository,
 )
-from ai.backend.manager.repositories.scheduler.types.session_creation import SessionSpecContextFetch
+from ai.backend.manager.repositories.scheduler.types.session_creation import SessionSpecContext
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.exceptions import (
     BatchAgentSelectionFailedError,
 )
@@ -72,7 +73,6 @@ from .preparers import (
     InjectSessionEnvironRule,
     MergeResourceGroupDefaultsRule,
     ResolveVFolderMountsRule,
-    SessionSpecPreparationContext,
     SessionSpecPreparer,
 )
 from .validators import (
@@ -86,7 +86,6 @@ from .validators import (
     RequiredResourceSlotRule,
     ResourceLimitRule,
     ServicePortRule,
-    SessionSpecValidationContext,
     SessionSpecValidator,
 )
 
@@ -178,7 +177,7 @@ class SchedulingController:
         ])
 
         # Draft-based spec validator chain. Runs against the finalized
-        # ``SessionSpec`` + ``SessionSpecValidationContext``.
+        # ``SessionSpec`` + ``SessionSpecContext``.
         self._spec_validator = SessionSpecValidator([
             PendingSessionCountLimitRule(),
             ContainerLimitRule(),
@@ -266,30 +265,17 @@ class SchedulingController:
                 draft,
                 storage_manager=self._storage_manager,
                 allowed_vfolder_types=allowed_vfolder_types,
+                user_enqueue_policy=fetched.user_enqueue_policy,
             )
 
-        prep_ctx = SessionSpecPreparationContext(
-            resource_group_defaults=fetched.resource_group_defaults,
-            resource_group_network=fetched.resource_group_network,
-            container_user_info=fetched.container_user_info,
-            image_infos=fetched.image_infos,
-            resource_group_allow_fractional=fetched.resource_group_allow_fractional,
-            dotfile_data=fetched.dotfile_data,
-            vfolder_mounts_by_role=vfolder_mounts_by_role,
-        )
-        val_ctx = SessionSpecValidationContext(
-            keypair_resource_policy=fetched.keypair_resource_policy,
-            image_infos=fetched.image_infos,
-            known_slot_types=fetched.known_slot_types,
-            slot_type_policy=fetched.slot_type_policy,
-            dotfile_data=fetched.dotfile_data,
-            pending_session_count=fetched.pending_session_count,
-        )
+        # One shared context: the fetch result plus the separately
+        # resolved vfolder mounts.
+        context = dataclasses.replace(fetched, vfolder_mounts_by_role=vfolder_mounts_by_role)
 
         with self._metric_observer.measure_phase(
             "scheduling_controller", rg_id, "spec_preparation"
         ):
-            resource_spec = await self._spec_preparer.prepare(draft.resource_spec, prep_ctx)
+            resource_spec = await self._spec_preparer.prepare(draft.resource_spec, context)
             scope = SessionScope.model_validate(draft.scope.model_dump(exclude_none=True))
             spec = SessionSpec(resource_spec=resource_spec, scope=scope)
 
@@ -306,7 +292,7 @@ class SchedulingController:
             raise RejectedByHook.from_hook_result(hook_result)
 
         with self._metric_observer.measure_phase("scheduling_controller", rg_id, "spec_validation"):
-            self._spec_validator.validate(spec, val_ctx)
+            self._spec_validator.validate(spec, context)
 
         with self._metric_observer.measure_phase("scheduling_controller", rg_id, "enqueue"):
             session_id = await self._repository.enqueue_session_from_spec(spec)
@@ -345,7 +331,7 @@ class SchedulingController:
         return session_id
 
     def _prepare_kernel_data(
-        self, spec: SessionResourceSpec, fetched: SessionSpecContextFetch
+        self, spec: SessionResourceSpec, fetched: SessionSpecContext
     ) -> dict[KernelId, _KernelComputeScheduleData]:
         prepared_data: dict[KernelId, _KernelComputeScheduleData] = {}
         for kernel_spec in spec.kernel_specs:
@@ -471,18 +457,9 @@ class SchedulingController:
         fetched = await self._repository.fetch_session_spec_contexts(
             SessionSpecDraft(scope=SessionScopeDraft(), resource_spec=draft)
         )
-        prep_ctx = SessionSpecPreparationContext(
-            resource_group_defaults=fetched.resource_group_defaults,
-            resource_group_network=fetched.resource_group_network,
-            container_user_info=fetched.container_user_info,
-            image_infos=fetched.image_infos,
-            resource_group_allow_fractional=fetched.resource_group_allow_fractional,
-            dotfile_data=fetched.dotfile_data,
-            # Node fitting does not depend on vfolder mounts; skip the
-            # storage-RPC resolution by leaving the per-role mount map empty.
-            vfolder_mounts_by_role={},
-        )
-        resource_spec = await self._spec_preparer.prepare(draft, prep_ctx)
+        # Node fitting does not depend on vfolder mounts; the storage-RPC
+        # resolution is skipped so the per-role mount map stays empty.
+        resource_spec = await self._spec_preparer.prepare(draft, fetched)
         compute_schedule_kernel_data = self._prepare_kernel_data(resource_spec, fetched)
         return await self._compute_schedule(
             resource_spec, resource_group_id, compute_schedule_kernel_data

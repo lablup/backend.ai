@@ -34,9 +34,11 @@ from ai.backend.manager.data.session.draft import (
 )
 from ai.backend.manager.data.session.options import ResourceOpts
 from ai.backend.manager.defs import DEFAULT_SHARED_MEMORY_SIZE, INTRINSIC_SLOTS
+from ai.backend.manager.repositories.scheduler.types.session_creation import (
+    SessionSpecContext,
+)
 from ai.backend.manager.sokovan.scheduling_controller.preparers.draft_rule import (
     SessionSpecDraftRule,
-    SessionSpecPreparationContext,
 )
 from ai.backend.manager.sokovan.scheduling_controller.resource_parse import (
     image_min_slots,
@@ -57,7 +59,7 @@ class ComputeKernelResourcesRule(SessionSpecDraftRule):
     async def prepare(
         self,
         draft: SessionResourceSpecDraft,
-        context: SessionSpecPreparationContext,
+        context: SessionSpecContext,
     ) -> SessionResourceSpecDraft:
         if draft.options.kernel_groups is None:
             return draft

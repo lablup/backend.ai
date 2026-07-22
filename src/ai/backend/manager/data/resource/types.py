@@ -2,7 +2,12 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
-from ai.backend.common.types import DefaultForUnspecified, ResourceSlot, SlotName
+from ai.backend.common.types import (
+    DefaultForUnspecified,
+    ResourceSlot,
+    SlotName,
+    VFolderHostPermissionMap,
+)
 
 
 @dataclass
@@ -60,3 +65,17 @@ class SlotTypePolicy:
 
     enabled: frozenset[SlotName] = field(default_factory=frozenset)
     required: frozenset[SlotName] = field(default_factory=frozenset)
+
+
+@dataclass(frozen=True)
+class UserEnqueuePolicy:
+    """Per-user gates applied at session enqueue.
+
+    Sourced from the user's main-keypair resource policy row until
+    user-level policy columns exist; carries only the fields the
+    enqueue path actually consumes.
+    """
+
+    max_containers_per_session: int
+    max_pending_session_count: int | None
+    allowed_vfolder_hosts: VFolderHostPermissionMap

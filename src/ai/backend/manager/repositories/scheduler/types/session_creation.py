@@ -9,9 +9,10 @@ from ai.backend.common.types import (
     SessionId,
     SlotName,
     SlotTypes,
+    VFolderMount,
 )
 from ai.backend.manager.data.dotfile.types import DotfileBundle
-from ai.backend.manager.data.resource.types import KeyPairResourcePolicyData, SlotTypePolicy
+from ai.backend.manager.data.resource.types import SlotTypePolicy, UserEnqueuePolicy
 from ai.backend.manager.data.session.creation import (
     ContainerUserInfo,
     ImageInfo,
@@ -40,15 +41,17 @@ class AllowedScalingGroup:
 
 
 @dataclass
-class SessionSpecContextFetch:
-    """Raw data fetched by ``ScheduleDBSource.fetch_session_spec_contexts``.
+class SessionSpecContext:
+    """Shared read-only context the preparer and validator chains consume.
 
-    Kept as a plain record so the repository layer does not need to
-    import sokovan's scheduling-controller types (which would create a
-    circular import: preparer/validator types pull data-layer types
-    defined right here). The controller converts this bundle into its
-    typed :class:`SessionSpecPreparationContext` +
-    :class:`SessionSpecValidationContext` pair.
+    Assembled from ``ScheduleDBSource.fetch_session_spec_contexts`` in a
+    single readonly transaction; ``vfolder_mounts_by_role`` is filled in
+    by the controller after the separate storage-manager resolution step
+    (it stays empty for resource-only callers such as compute-schedule).
+
+    ``vfolder_mounts_by_role`` is keyed by ``KernelGroup.role``: each
+    group's mount requests resolve to one ``VFolderMount`` tuple that
+    every replica sharing the role copies verbatim.
     """
 
     resource_group_defaults: DefaultSessionOptions
@@ -57,7 +60,8 @@ class SessionSpecContextFetch:
     image_infos: dict[ImageID, ImageInfo]
     resource_group_allow_fractional: bool
     dotfile_data: DotfileBundle
-    keypair_resource_policy: KeyPairResourcePolicyData | None
+    user_enqueue_policy: UserEnqueuePolicy | None
     known_slot_types: Mapping[SlotName, SlotTypes] = field(default_factory=dict)
     slot_type_policy: SlotTypePolicy = field(default_factory=SlotTypePolicy)
     pending_session_count: int = 0
+    vfolder_mounts_by_role: Mapping[str, tuple[VFolderMount, ...]] = field(default_factory=dict)

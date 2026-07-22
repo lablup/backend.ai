@@ -17,46 +17,9 @@ by the preparer, not the rule surface — see
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from collections.abc import Mapping
-from dataclasses import dataclass, field
 
-from ai.backend.common.identifier.image import ImageID
-from ai.backend.common.types import VFolderMount
-from ai.backend.manager.data.dotfile.types import DotfileBundle
-from ai.backend.manager.data.session.creation import (
-    ContainerUserInfo,
-    ImageInfo,
-    ScalingGroupNetworkInfo,
-)
 from ai.backend.manager.data.session.draft import SessionResourceSpecDraft
-from ai.backend.manager.data.session.options import DefaultSessionOptions
-
-
-@dataclass(frozen=True)
-class SessionSpecPreparationContext:
-    """Read-only per-session state carried through the preparer chain.
-
-    Holds only the pre-fetched state the preparer rules read. Values
-    used solely for post-preparation validation (resource policies,
-    slot-type catalogs, active-session counts, ...) live on
-    :class:`~.validators.session_spec_base.SessionSpecValidationContext`
-    instead.
-
-    ``vfolder_mounts_by_role`` is keyed by ``KernelGroup.role``. The
-    controller's batch fetch resolves each group's mount requests into
-    a ``VFolderMount`` tuple once and the preparer chain copies the
-    tuple onto every :class:`KernelSpecDraft` whose ``cluster_role``
-    matches — replicas of the same role share one entry without
-    duplication. Empty dict when the request carried no mounts.
-    """
-
-    resource_group_defaults: DefaultSessionOptions
-    resource_group_network: ScalingGroupNetworkInfo | None = None
-    container_user_info: ContainerUserInfo | None = None
-    image_infos: Mapping[ImageID, ImageInfo] = field(default_factory=dict)
-    resource_group_allow_fractional: bool = False
-    dotfile_data: DotfileBundle = field(default_factory=DotfileBundle)
-    vfolder_mounts_by_role: Mapping[str, tuple[VFolderMount, ...]] = field(default_factory=dict)
+from ai.backend.manager.repositories.scheduler.types.session_creation import SessionSpecContext
 
 
 class SessionSpecDraftRule(ABC):
@@ -77,7 +40,7 @@ class SessionSpecDraftRule(ABC):
     async def prepare(
         self,
         draft: SessionResourceSpecDraft,
-        context: SessionSpecPreparationContext,
+        context: SessionSpecContext,
     ) -> SessionResourceSpecDraft:
         """Return a new draft with this rule's fields resolved."""
         raise NotImplementedError

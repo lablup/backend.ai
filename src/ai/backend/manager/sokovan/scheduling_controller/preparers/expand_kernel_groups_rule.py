@@ -26,9 +26,11 @@ from ai.backend.manager.data.session.draft import (
     KernelSpecDraft,
     SessionResourceSpecDraft,
 )
+from ai.backend.manager.repositories.scheduler.types.session_creation import (
+    SessionSpecContext,
+)
 from ai.backend.manager.sokovan.scheduling_controller.preparers.draft_rule import (
     SessionSpecDraftRule,
-    SessionSpecPreparationContext,
 )
 
 
@@ -48,7 +50,7 @@ class ExpandKernelGroupsRule(SessionSpecDraftRule):
     async def prepare(
         self,
         draft: SessionResourceSpecDraft,
-        context: SessionSpecPreparationContext,
+        context: SessionSpecContext,
     ) -> SessionResourceSpecDraft:
         groups = draft.options.kernel_groups
         if groups is None:

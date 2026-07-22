@@ -34,6 +34,7 @@ from ai.backend.common.types import (
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.kernel.types import KernelListResult, KernelStatus
+from ai.backend.manager.data.resource.types import UserEnqueuePolicy
 from ai.backend.manager.data.session.types import SessionInfo, SessionStatus
 from ai.backend.manager.data.sokovan import (
     AllocationBatch,
@@ -65,7 +66,7 @@ from .types.session import (
     TerminatingKernelWithAgentData,
     TerminatingSessionData,
 )
-from .types.session_creation import SessionSpecContextFetch
+from .types.session_creation import SessionSpecContext
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -216,7 +217,7 @@ class SchedulerRepository:
     async def fetch_session_spec_contexts(
         self,
         draft: SessionSpecDraft,
-    ) -> SessionSpecContextFetch:
+    ) -> SessionSpecContext:
         """Batch-fetch raw data needed to assemble the draft-path
         preparation / validation contexts.
 
@@ -235,6 +236,7 @@ class SchedulerRepository:
         *,
         storage_manager: StorageSessionManager,
         allowed_vfolder_types: list[str],
+        user_enqueue_policy: UserEnqueuePolicy | None,
     ) -> dict[str, tuple[VFolderMount, ...]]:
         """Resolve each kernel group's vfolder mounts, keyed by ``role``.
 
@@ -245,6 +247,7 @@ class SchedulerRepository:
             draft,
             storage_manager=storage_manager,
             allowed_vfolder_types=allowed_vfolder_types,
+            user_enqueue_policy=user_enqueue_policy,
         )
 
     @scheduler_repository_resilience.apply()
@@ -572,43 +575,16 @@ class SchedulerRepository:
     @scheduler_repository_resilience.apply()
     async def get_keypair_concurrency(self, access_key: AccessKey, is_sftp: bool = False) -> int:
         """
-        Get keypair concurrency with cache-through pattern.
-        First checks cache, falls back to DB if not cached, and updates cache.
+        Count the keypair's active sessions straight from the database.
+
+        The database is the single source of truth for concurrency; the
+        former Valkey counter cache has been removed.
 
         :param access_key: The access key to query
         :param is_sftp: Whether to get SFTP concurrency (True) or regular concurrency (False)
         :return: Current concurrency count
         """
-        # Try to get from cache first
-        try:
-            cached_value = await self._cache_source.get_keypair_concurrency(access_key, is_sftp)
-            if cached_value is not None:
-                return cached_value
-        except Exception as e:
-            log.warning(
-                "Failed to get keypair concurrency from cache for {}: {}",
-                access_key,
-                e,
-            )
-
-        # Cache miss - refresh both values from DB
         concurrency_data = await self._db_source.get_keypair_concurrencies_from_db(access_key)
-
-        # Update cache with both values at once
-        try:
-            await self._cache_source.set_keypair_concurrencies(
-                access_key,
-                concurrency_data.regular_count,
-                concurrency_data.sftp_count,
-            )
-        except Exception as e:
-            log.warning(
-                "Failed to update keypair concurrency cache for {}: {}",
-                access_key,
-                e,
-            )
-
-        # Return the requested value
         return concurrency_data.sftp_count if is_sftp else concurrency_data.regular_count
 
     @scheduler_repository_resilience.apply()

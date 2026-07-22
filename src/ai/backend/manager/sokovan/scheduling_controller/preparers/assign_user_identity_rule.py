@@ -17,9 +17,11 @@ from typing import override
 
 from ai.backend.common.contexts.user import current_user
 from ai.backend.manager.data.session.draft import SessionResourceSpecDraft
+from ai.backend.manager.repositories.scheduler.types.session_creation import (
+    SessionSpecContext,
+)
 from ai.backend.manager.sokovan.scheduling_controller.preparers.draft_rule import (
     SessionSpecDraftRule,
-    SessionSpecPreparationContext,
 )
 
 
@@ -34,7 +36,7 @@ class AssignUserIdentityRule(SessionSpecDraftRule):
     async def prepare(
         self,
         draft: SessionResourceSpecDraft,
-        context: SessionSpecPreparationContext,
+        context: SessionSpecContext,
     ) -> SessionResourceSpecDraft:
         if draft.identity.user_uuid is not None:
             return draft

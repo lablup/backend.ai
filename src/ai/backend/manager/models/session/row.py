@@ -5,7 +5,6 @@ import enum
 import logging
 from collections.abc import AsyncIterator, Callable, Iterable, Mapping, Sequence
 from contextlib import asynccontextmanager as actxmgr
-from dataclasses import dataclass, field
 from datetime import datetime
 from functools import partial
 from typing import (
@@ -337,31 +336,6 @@ async def _match_sessions_by_name(
     )
     result = await db_session.execute(query)
     return result.scalars().all()
-
-
-COMPUTE_CONCURRENCY_USED_KEY_PREFIX = "keypair.concurrency_used."
-SYSTEM_CONCURRENCY_USED_KEY_PREFIX = "keypair.sftp_concurrency_used."
-
-
-@dataclass
-class ConcurrencyUsed:
-    access_key: AccessKey
-    compute_session_ids: set[SessionId] = field(default_factory=set)
-    system_session_ids: set[SessionId] = field(default_factory=set)
-
-    @property
-    def compute_concurrency_used_key(self) -> str:
-        return f"{COMPUTE_CONCURRENCY_USED_KEY_PREFIX}{self.access_key}"
-
-    @property
-    def system_concurrency_used_key(self) -> str:
-        return f"{SYSTEM_CONCURRENCY_USED_KEY_PREFIX}{self.access_key}"
-
-    def to_cnt_map(self) -> Mapping[str, int]:
-        return {
-            self.compute_concurrency_used_key: len(self.compute_session_ids),
-            self.system_concurrency_used_key: len(self.system_session_ids),
-        }
 
 
 class KernelLoadingStrategy(enum.StrEnum):

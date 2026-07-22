@@ -14,8 +14,10 @@ from typing import override
 
 from ai.backend.manager.data.session.spec import SessionSpec
 from ai.backend.manager.errors.kernel import QuotaExceeded
+from ai.backend.manager.repositories.scheduler.types.session_creation import (
+    SessionSpecContext,
+)
 from ai.backend.manager.sokovan.scheduling_controller.validators.session_spec_base import (
-    SessionSpecValidationContext,
     SessionSpecValidatorRule,
 )
 
@@ -31,9 +33,9 @@ class PendingSessionCountLimitRule(SessionSpecValidatorRule):
     def validate(
         self,
         spec: SessionSpec,
-        context: SessionSpecValidationContext,
+        context: SessionSpecContext,
     ) -> None:
-        policy = context.keypair_resource_policy
+        policy = context.user_enqueue_policy
         if policy is None:
             return
         limit = policy.max_pending_session_count

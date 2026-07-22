@@ -20,9 +20,11 @@ from __future__ import annotations
 from typing import override
 
 from ai.backend.manager.data.session.draft import SessionResourceSpecDraft
+from ai.backend.manager.repositories.scheduler.types.session_creation import (
+    SessionSpecContext,
+)
 from ai.backend.manager.sokovan.scheduling_controller.preparers.draft_rule import (
     SessionSpecDraftRule,
-    SessionSpecPreparationContext,
 )
 
 
@@ -37,12 +39,9 @@ class AssignContainerUserMappingRule(SessionSpecDraftRule):
     async def prepare(
         self,
         draft: SessionResourceSpecDraft,
-        context: SessionSpecPreparationContext,
+        context: SessionSpecContext,
     ) -> SessionResourceSpecDraft:
         info = context.container_user_info
-        if info is None:
-            return draft
-
         new_kernels = tuple(
             k.model_copy(
                 update={

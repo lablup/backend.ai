@@ -20,9 +20,11 @@ from typing import override
 from ai.backend.common.types import SlotName
 from ai.backend.manager.data.session.spec import SessionSpec
 from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.repositories.scheduler.types.session_creation import (
+    SessionSpecContext,
+)
 from ai.backend.manager.sokovan.scheduling_controller.resource_parse import image_min_slots
 from ai.backend.manager.sokovan.scheduling_controller.validators.session_spec_base import (
-    SessionSpecValidationContext,
     SessionSpecValidatorRule,
 )
 
@@ -38,7 +40,7 @@ class ImageSlotTypeRule(SessionSpecValidatorRule):
     def validate(
         self,
         spec: SessionSpec,
-        context: SessionSpecValidationContext,
+        context: SessionSpecContext,
     ) -> None:
         known_slot_types = context.known_slot_types
         enabled = context.slot_type_policy.enabled
