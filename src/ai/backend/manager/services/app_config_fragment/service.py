@@ -19,6 +19,10 @@ from ai.backend.manager.services.app_config_fragment.actions.create import (
     CreateAppConfigFragmentAction,
     CreateAppConfigFragmentActionResult,
 )
+from ai.backend.manager.services.app_config_fragment.actions.domain_scoped_search import (
+    DomainScopedSearchAppConfigFragmentAction,
+    DomainScopedSearchAppConfigFragmentActionResult,
+)
 from ai.backend.manager.services.app_config_fragment.actions.get import (
     GetAppConfigFragmentAction,
     GetAppConfigFragmentActionResult,
@@ -27,13 +31,13 @@ from ai.backend.manager.services.app_config_fragment.actions.purge import (
     PurgeAppConfigFragmentAction,
     PurgeAppConfigFragmentActionResult,
 )
-from ai.backend.manager.services.app_config_fragment.actions.scoped_search import (
-    ScopedSearchAppConfigFragmentAction,
-    ScopedSearchAppConfigFragmentActionResult,
-)
 from ai.backend.manager.services.app_config_fragment.actions.update import (
     UpdateAppConfigFragmentAction,
     UpdateAppConfigFragmentActionResult,
+)
+from ai.backend.manager.services.app_config_fragment.actions.user_scoped_search import (
+    UserScopedSearchAppConfigFragmentAction,
+    UserScopedSearchAppConfigFragmentActionResult,
 )
 
 __all__ = ("AppConfigFragmentService",)
@@ -75,18 +79,28 @@ class AppConfigFragmentService:
             has_previous_page=result.has_previous_page,
         )
 
-    async def scoped_search(
-        self, action: ScopedSearchAppConfigFragmentAction
-    ) -> ScopedSearchAppConfigFragmentActionResult:
-        targets = list(action.targets())
-        scopes = [t.to_search_scope() for t in targets]
-        result = await self._repository.scoped_search(action.querier, scopes)
-        return ScopedSearchAppConfigFragmentActionResult(
+    async def domain_scoped_search(
+        self, action: DomainScopedSearchAppConfigFragmentAction
+    ) -> DomainScopedSearchAppConfigFragmentActionResult:
+        result = await self._repository.scoped_search(action.querier, action.scope)
+        return DomainScopedSearchAppConfigFragmentActionResult(
+            domain_id=action.scope.domain_id,
             data=result.items,
             total_count=result.total_count,
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,
-            queried_refs=[t.to_rbac_element_ref() for t in targets],
+        )
+
+    async def user_scoped_search(
+        self, action: UserScopedSearchAppConfigFragmentAction
+    ) -> UserScopedSearchAppConfigFragmentActionResult:
+        result = await self._repository.scoped_search(action.querier, action.scope)
+        return UserScopedSearchAppConfigFragmentActionResult(
+            user_id=action.scope.user_id,
+            data=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
         )
 
     async def update(

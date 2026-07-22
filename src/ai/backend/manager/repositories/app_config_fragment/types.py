@@ -49,9 +49,8 @@ class ResolvedAppConfigScope:
 class DomainAppConfigFragmentSearchScope(SearchScope):
     """Fragments written at one domain scope (``scope_type == domain``, ``scope_id == domain_id``).
 
-    One scope = one item of a scoped fragment query; the repository combines multiple
-    scopes with ``OR``. ``existence_checks`` is empty by ``SearchableActionTarget``
-    convention — RBAC already gates scope reachability.
+    ``existence_checks`` is empty: RBAC already gates whether the caller can reach this
+    domain, so a missing domain is indistinguishable from an unreachable one.
     """
 
     domain_id: DomainID

@@ -24,6 +24,10 @@ from ai.backend.manager.services.app_config_fragment.actions.create import (
     CreateAppConfigFragmentAction,
     CreateAppConfigFragmentActionResult,
 )
+from ai.backend.manager.services.app_config_fragment.actions.domain_scoped_search import (
+    DomainScopedSearchAppConfigFragmentAction,
+    DomainScopedSearchAppConfigFragmentActionResult,
+)
 from ai.backend.manager.services.app_config_fragment.actions.get import (
     GetAppConfigFragmentAction,
     GetAppConfigFragmentActionResult,
@@ -32,13 +36,13 @@ from ai.backend.manager.services.app_config_fragment.actions.purge import (
     PurgeAppConfigFragmentAction,
     PurgeAppConfigFragmentActionResult,
 )
-from ai.backend.manager.services.app_config_fragment.actions.scoped_search import (
-    ScopedSearchAppConfigFragmentAction,
-    ScopedSearchAppConfigFragmentActionResult,
-)
 from ai.backend.manager.services.app_config_fragment.actions.update import (
     UpdateAppConfigFragmentAction,
     UpdateAppConfigFragmentActionResult,
+)
+from ai.backend.manager.services.app_config_fragment.actions.user_scoped_search import (
+    UserScopedSearchAppConfigFragmentAction,
+    UserScopedSearchAppConfigFragmentActionResult,
 )
 from ai.backend.manager.services.app_config_fragment.service import (
     AppConfigFragmentService,
@@ -51,8 +55,11 @@ class AppConfigFragmentProcessors(AbstractProcessorPackage):
     admin_search: ScopeActionProcessor[
         AdminSearchAppConfigFragmentAction, AdminSearchAppConfigFragmentActionResult
     ]
-    scoped_search: BulkActionProcessor[
-        ScopedSearchAppConfigFragmentAction, ScopedSearchAppConfigFragmentActionResult
+    domain_scoped_search: ScopeActionProcessor[
+        DomainScopedSearchAppConfigFragmentAction, DomainScopedSearchAppConfigFragmentActionResult
+    ]
+    user_scoped_search: ScopeActionProcessor[
+        UserScopedSearchAppConfigFragmentAction, UserScopedSearchAppConfigFragmentActionResult
     ]
     update: SingleEntityActionProcessor[
         UpdateAppConfigFragmentAction, UpdateAppConfigFragmentActionResult
@@ -84,9 +91,15 @@ class AppConfigFragmentProcessors(AbstractProcessorPackage):
             service.get, action_monitors, validators=[validators.rbac.single_entity]
         )
         # admin_search is system-wide (all scopes) — gated by superadmin_required at the API
-        # layer, so it carries no per-scope RBAC validator. Non-admins use scoped_search.
+        # layer, so it carries no per-scope RBAC validator. Non-admins use the scoped
+        # searches below, one per scope the fragments may be written at.
         self.admin_search = ScopeActionProcessor(service.admin_search, action_monitors)
-        self.scoped_search = BulkActionProcessor(service.scoped_search, monitors=action_monitors)
+        self.domain_scoped_search = ScopeActionProcessor(
+            service.domain_scoped_search, action_monitors, validators=[validators.rbac.scope]
+        )
+        self.user_scoped_search = ScopeActionProcessor(
+            service.user_scoped_search, action_monitors, validators=[validators.rbac.scope]
+        )
         self.update = SingleEntityActionProcessor(
             service.update, action_monitors, validators=[validators.rbac.single_entity]
         )
@@ -106,7 +119,8 @@ class AppConfigFragmentProcessors(AbstractProcessorPackage):
             CreateAppConfigFragmentAction.spec(),
             GetAppConfigFragmentAction.spec(),
             AdminSearchAppConfigFragmentAction.spec(),
-            ScopedSearchAppConfigFragmentAction.spec(),
+            DomainScopedSearchAppConfigFragmentAction.spec(),
+            UserScopedSearchAppConfigFragmentAction.spec(),
             UpdateAppConfigFragmentAction.spec(),
             PurgeAppConfigFragmentAction.spec(),
             BulkUpdateAppConfigFragmentAction.spec(),

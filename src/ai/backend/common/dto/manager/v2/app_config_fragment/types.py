@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from enum import StrEnum
+from uuid import UUID
 
 from pydantic import Field
 
@@ -10,9 +11,23 @@ from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.data.app_config.types import AppConfigScopeType
 
 __all__ = (
-    "AppConfigScopeTypeFilter",
+    "AppConfigFragmentDomainScope",
     "AppConfigFragmentOrderField",
+    "AppConfigFragmentUserScope",
+    "AppConfigScopeTypeFilter",
 )
+
+
+class AppConfigFragmentDomainScope(BaseRequestModel):
+    """Scope for a domain-scoped app config fragment search."""
+
+    domain_id: UUID = Field(description="Domain whose fragments to search.")
+
+
+class AppConfigFragmentUserScope(BaseRequestModel):
+    """Scope for a user-scoped app config fragment search."""
+
+    user_id: UUID = Field(description="User whose fragments to search.")
 
 
 class AppConfigScopeTypeFilter(BaseRequestModel):

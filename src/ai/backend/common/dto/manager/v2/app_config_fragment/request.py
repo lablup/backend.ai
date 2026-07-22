@@ -10,26 +10,26 @@ from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter
 from ai.backend.common.dto.manager.v2.app_config_fragment.types import (
+    AppConfigFragmentDomainScope,
     AppConfigFragmentOrderField,
+    AppConfigFragmentUserScope,
     AppConfigScopeTypeFilter,
 )
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.identifier.app_config import AppConfigScopeID
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
-from ai.backend.common.identifier.domain import DomainID
-from ai.backend.common.identifier.user import UserID
 
 __all__ = (
     "AdminSearchAppConfigFragmentInput",
     "AppConfigFragmentFilter",
     "AppConfigFragmentOrder",
-    "AppConfigFragmentScope",
     "AppConfigFragmentUpdateItem",
     "BulkPurgeAppConfigFragmentInput",
     "BulkUpdateAppConfigFragmentInput",
     "CreateAppConfigFragmentInput",
-    "ScopedSearchAppConfigFragmentInput",
+    "DomainScopedSearchAppConfigFragmentInput",
     "UpdateAppConfigFragmentInput",
+    "UserScopedSearchAppConfigFragmentInput",
 )
 
 
@@ -142,32 +142,29 @@ class AdminSearchAppConfigFragmentInput(BaseRequestModel):
     )
 
 
-class AppConfigFragmentScope(BaseRequestModel):
-    """Scope for a scoped fragment search — OR across all domain/user items.
+class DomainScopedSearchAppConfigFragmentInput(BaseRequestModel):
+    """Input for a fragment search scoped to one domain."""
 
-    Raises if every category is empty.
-    """
-
-    domain: list[DomainID] | None = Field(
-        default=None, description="Domain ids whose fragments to search."
+    scope: AppConfigFragmentDomainScope = Field(description="Domain the search acts at.")
+    order: list[AppConfigFragmentOrder] | None = Field(
+        default=None, description="Order specifiers, applied in sequence."
     )
-    user: list[UserID] | None = Field(
-        default=None, description="User ids whose fragments to search."
+    first: int | None = Field(default=None, ge=1, description="Cursor-forward page size.")
+    after: str | None = Field(default=None, description="Cursor-forward start cursor.")
+    last: int | None = Field(default=None, ge=1, description="Cursor-backward page size.")
+    before: str | None = Field(default=None, description="Cursor-backward end cursor.")
+    limit: int | None = Field(
+        default=None, ge=1, description="Offset-based: maximum number of results."
+    )
+    offset: int | None = Field(
+        default=None, ge=0, description="Offset-based: number of results to skip."
     )
 
-    @model_validator(mode="after")
-    def _require_non_empty(self) -> Self:
-        if not self.domain and not self.user:
-            raise ValueError(
-                "AppConfigFragmentScope requires a non-empty value for 'domain' or 'user'"
-            )
-        return self
 
+class UserScopedSearchAppConfigFragmentInput(BaseRequestModel):
+    """Input for a fragment search scoped to one user."""
 
-class ScopedSearchAppConfigFragmentInput(BaseRequestModel):
-    """Input for a scoped fragment search keyed by domain/user scope (OR-combined)."""
-
-    scope: AppConfigFragmentScope = Field(description="Scope (OR across all items).")
+    scope: AppConfigFragmentUserScope = Field(description="User the search acts at.")
     order: list[AppConfigFragmentOrder] | None = Field(
         default=None, description="Order specifiers, applied in sequence."
     )

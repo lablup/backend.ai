@@ -12,8 +12,9 @@ from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
     BulkPurgeAppConfigFragmentInput,
     BulkUpdateAppConfigFragmentInput,
     CreateAppConfigFragmentInput,
-    ScopedSearchAppConfigFragmentInput,
+    DomainScopedSearchAppConfigFragmentInput,
     UpdateAppConfigFragmentInput,
+    UserScopedSearchAppConfigFragmentInput,
 )
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
 from ai.backend.logging import BraceStyleAdapter
@@ -94,10 +95,18 @@ class V2AppConfigFragmentHandler:
         result = await self._adapter.admin_search(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
-    async def scoped_search(
+    async def domain_scoped_search(
         self,
-        body: BodyParam[ScopedSearchAppConfigFragmentInput],
+        body: BodyParam[DomainScopedSearchAppConfigFragmentInput],
     ) -> APIResponse:
-        """Search the fragments visible to the calling principal (auth required)."""
-        result = await self._adapter.scoped_search(body.parsed)
+        """Search the fragments written at one domain scope (auth required)."""
+        result = await self._adapter.domain_scoped_search(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def user_scoped_search(
+        self,
+        body: BodyParam[UserScopedSearchAppConfigFragmentInput],
+    ) -> APIResponse:
+        """Search the fragments written at one user scope (auth required)."""
+        result = await self._adapter.user_scoped_search(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
