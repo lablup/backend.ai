@@ -15,7 +15,7 @@ from ai.backend.common.data.idle_checker.types import (
 )
 from ai.backend.common.identifier.idle_checker import IdleCheckerID
 from ai.backend.common.types import SessionId, SessionTypes
-from ai.backend.manager.data.idle_checker.types import IdleCheckSession
+from ai.backend.manager.data.idle_checker.types import IdleCheckSession, IdleJudgmentStatus
 from ai.backend.manager.errors.common import InternalServerError
 from ai.backend.manager.repositories.idle_checker.types import (
     IdleCheckAssignmentData,
@@ -29,11 +29,7 @@ from ai.backend.manager.sokovan.idle_check.checkers.base import (
     IdleJudgment,
 )
 from ai.backend.manager.sokovan.idle_check.handlers.reconcile import IdleCheckReconcileHandler
-from ai.backend.manager.sokovan.idle_check.types import (
-    IdleCheckReconcileInfo,
-    IdleCheckReport,
-    IdleReason,
-)
+from ai.backend.manager.sokovan.idle_check.types import IdleCheckReconcileInfo
 
 _NOW = datetime(2026, 1, 2, tzinfo=UTC)
 
@@ -84,7 +80,12 @@ class FakeChecker(IdleChecker):
             IdleJudgment(
                 checker_id=assignment.definition.checker_id,
                 session_id=session.session_id,
-                is_idle=session.session_id in self.idle_session_ids,
+                expire_at=_NOW,
+                status=(
+                    IdleJudgmentStatus.IDLE
+                    if session.session_id in self.idle_session_ids
+                    else IdleJudgmentStatus.ACTIVE
+                ),
                 message=self._message,
             )
             for assignment in assignments
@@ -193,7 +194,7 @@ class TestIdleCheckReconcileHandler:
         assert lifetime_checker.judge_contexts == [expected_context]
         assert network_checker.judge_contexts == [expected_context]
 
-    async def test_merges_idle_reasons(
+    async def test_returns_all_judgments(
         self,
         handler: IdleCheckReconcileHandler,
         first_session_id: SessionId,
@@ -218,37 +219,39 @@ class TestIdleCheckReconcileHandler:
 
         result = await handler.execute(reconcile_info)
 
-        assert result.reports == [
-            IdleCheckReport(
+        assert result.judgments == [
+            IdleJudgment(
+                checker_id=lifetime_definition.checker_id,
                 session_id=first_session_id,
-                reasons=[
-                    IdleReason(
-                        checker_id=lifetime_definition.checker_id,
-                        message="max lifetime exceeded",
-                    ),
-                    IdleReason(
-                        checker_id=network_definition.checker_id,
-                        message="no network activity",
-                    ),
-                ],
+                expire_at=_NOW,
+                status=IdleJudgmentStatus.IDLE,
+                message="max lifetime exceeded",
             ),
-            IdleCheckReport(
+            IdleJudgment(
+                checker_id=lifetime_definition.checker_id,
                 session_id=second_session_id,
-                reasons=[
-                    IdleReason(
-                        checker_id=lifetime_definition.checker_id,
-                        message="max lifetime exceeded",
-                    )
-                ],
+                expire_at=_NOW,
+                status=IdleJudgmentStatus.IDLE,
+                message="max lifetime exceeded",
+            ),
+            IdleJudgment(
+                checker_id=network_definition.checker_id,
+                session_id=first_session_id,
+                expire_at=_NOW,
+                status=IdleJudgmentStatus.IDLE,
+                message="no network activity",
             ),
         ]
+        assert result.processed_count() == 3
 
-    async def test_active_session_has_no_report(
+    async def test_returns_non_idle_judgments(
         self,
         handler: IdleCheckReconcileHandler,
         first_session_id: SessionId,
         lifetime_definition: IdleCheckerDefinitionData,
         network_definition: IdleCheckerDefinitionData,
+        lifetime_checker: FakeChecker,
+        network_checker: FakeChecker,
     ) -> None:
         reconcile_info = IdleCheckReconcileInfo(
             batch=IdleCheckBatchData(
@@ -262,7 +265,14 @@ class TestIdleCheckReconcileHandler:
 
         result = await handler.execute(reconcile_info)
 
-        assert result.reports == []
+        assert len(result.judgments) == 2
+        assert all(judgment.status is IdleJudgmentStatus.ACTIVE for judgment in result.judgments)
+        assert all(judgment.expire_at == _NOW for judgment in result.judgments)
+        expected_call = [(lifetime_definition.checker_id, [first_session_id])]
+        assert lifetime_checker.judge_calls == [expected_call]
+        assert network_checker.judge_calls == [
+            [(network_definition.checker_id, [first_session_id])]
+        ]
 
     async def test_skips_unimplemented_checker_types(
         self,
@@ -285,14 +295,5 @@ class TestIdleCheckReconcileHandler:
 
         result = await handler.execute(reconcile_info)
 
-        assert result.reports == [
-            IdleCheckReport(
-                session_id=first_session_id,
-                reasons=[
-                    IdleReason(
-                        checker_id=lifetime_definition.checker_id,
-                        message="max lifetime exceeded",
-                    )
-                ],
-            )
-        ]
+        assert len(result.judgments) == 1
+        assert result.judgments[0].checker_id == lifetime_definition.checker_id
