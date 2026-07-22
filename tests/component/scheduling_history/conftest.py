@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock
 
 import pytest
 
 from ai.backend.manager.actions.validators import ActionValidators
+from ai.backend.manager.actions.validators.rbac import RBACValidators
 from ai.backend.manager.api.rest.routing import RouteRegistry
 
 # Statically imported so that Pants includes these modules in the test PEX.
@@ -30,7 +31,11 @@ def scheduling_history_processors(
     repo = SchedulingHistoryRepository(database_engine)
     service = SchedulingHistoryService(repo)
     return SchedulingHistoryProcessors(
-        service=service, action_monitors=[], validators=MagicMock(spec=ActionValidators)
+        service=service,
+        action_monitors=[],
+        validators=ActionValidators(
+            rbac=RBACValidators(scope=AsyncMock(), single_entity=AsyncMock(), bulk=AsyncMock()),
+        ),
     )
 
 
