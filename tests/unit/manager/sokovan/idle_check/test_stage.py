@@ -13,22 +13,19 @@ from ai.backend.common.data.idle_checker.types import (
     IdleCheckerSpec,
     SessionLifetimeSpec,
 )
-from ai.backend.common.data.permission.types import ScopeType
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.identifier.idle_checker import IdleCheckerID
 from ai.backend.common.types import SessionId, SessionTypes
 from ai.backend.manager.data.idle_checker.types import IdleCheckSession
-from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.repositories.idle_checker.repository import IdleCheckerRepository
 from ai.backend.manager.repositories.idle_checker.types import (
-    BoundCheckerData,
     ExpiredIdleCheckBatchData,
     ExpiredIdleCheckData,
+    IdleCheckAssignmentData,
     IdleCheckBatchData,
     IdleCheckerDefinitionData,
-    IdleCheckTargetData,
 )
 from ai.backend.manager.sokovan.idle_check.checkers.session_lifetime import (
     SessionLifetimeChecker,
@@ -73,24 +70,13 @@ class TestBuildIdleCheckStage:
             ),
         )
         return IdleCheckBatchData(
-            targets=(
-                IdleCheckTargetData(
-                    session=session,
-                    checkers=(
-                        BoundCheckerData(
-                            scope=ScopeId(ScopeType.DOMAIN, str(uuid4())),
-                            binding_created_at=datetime(2026, 1, 1, tzinfo=UTC),
-                            checker=definition,
-                        ),
-                    ),
-                ),
-            )
+            assignments=[IdleCheckAssignmentData(session=session, checker=definition)]
         )
 
     @pytest.fixture()
     def idle_checker_repository(self, idle_check_batch: IdleCheckBatchData) -> AsyncMock:
         repository = AsyncMock(spec=IdleCheckerRepository)
-        repository.fetch_idle_check_batch.return_value = idle_check_batch
+        repository.fetch_judgment_batch.return_value = idle_check_batch
         return repository
 
     @pytest.fixture()

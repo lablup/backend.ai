@@ -66,12 +66,10 @@ class IdleCheckReconcileHandler(ReconcilerHandler[IdleCheckReconcileInfo, IdleCh
         sessions_by_checker: defaultdict[IdleCheckerID, dict[SessionId, IdleCheckSession]] = (
             defaultdict(dict)
         )
-        for target in batch.targets:
-            for bound in target.checkers:
-                definitions[bound.checker.checker_id] = bound.checker
-                sessions_by_checker[bound.checker.checker_id][target.session.session_id] = (
-                    target.session
-                )
+        for assignment in batch.assignments:
+            checker_id = assignment.checker.checker_id
+            definitions[checker_id] = assignment.checker
+            sessions_by_checker[checker_id][assignment.session.session_id] = assignment.session
         assignments_by_type: defaultdict[CheckerType, list[CheckerAssignment]] = defaultdict(list)
         for checker_id, definition in definitions.items():
             assignments_by_type[definition.checker_type].append(

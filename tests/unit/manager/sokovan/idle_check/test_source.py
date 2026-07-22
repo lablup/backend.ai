@@ -12,7 +12,7 @@ class TestIdleCheckSource:
     async def test_returns_fetched_batch_with_current_time(self) -> None:
         batch = MagicMock()
         repository = MagicMock()
-        repository.fetch_idle_check_batch = AsyncMock(return_value=batch)
+        repository.fetch_judgment_batch = AsyncMock(return_value=batch)
         target_statuses = IdleCheckTargetStatuses(
             session_statuses=frozenset([SessionStatus.RUNNING])
         )
@@ -22,5 +22,5 @@ class TestIdleCheckSource:
         )
 
         assert reconcile_info.batch is batch
-        repository.fetch_idle_check_batch.assert_awaited_once_with(target_statuses.session_statuses)
+        repository.fetch_judgment_batch.assert_awaited_once_with(target_statuses.session_statuses)
         assert reconcile_info.current_time.tzinfo == UTC
