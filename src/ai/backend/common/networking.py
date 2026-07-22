@@ -6,6 +6,8 @@ from contextlib import closing
 from typing import TYPE_CHECKING, TypeVar, overload
 
 import aiohttp
+import aiohttp.connector
+import aiohttp.resolver
 
 if TYPE_CHECKING:
     import yarl
@@ -13,9 +15,34 @@ if TYPE_CHECKING:
 __all__ = (
     "curl",
     "find_free_port",
+    "force_threaded_dns_resolver",
 )
 
 T = TypeVar("T")
+
+
+def force_threaded_dns_resolver() -> None:
+    """Make aiohttp use its ThreadedResolver regardless of aiodns presence.
+
+    Since aiodns 3.2, aiohttp selects the aiodns/pycares ``AsyncResolver`` as
+    its default resolver whenever the package is importable. Every ephemeral
+    ``ClientSession``/``TCPConnector`` then creates a c-ares channel that is
+    never destroyed, leaking native heap memory and one ``/dev/urandom`` file
+    descriptor per channel on long-running services (see also
+    https://github.com/aio-libs/aiodns/issues/191 for the aiodns >= 3.3
+    variant that additionally exhausts inotify watches).
+
+    aiohttp offers no configuration knob for this choice and injecting
+    ``resolver=`` at every connector creation site is easy to miss, so we
+    override the module-level defaults once at service startup. Our outbound
+    HTTP traffic targets a small set of fixed hosts, making threaded
+    ``getaddrinfo`` resolution entirely sufficient.
+    """
+    aiohttp.resolver.DefaultResolver = aiohttp.resolver.ThreadedResolver
+    # aiohttp.connector re-imports DefaultResolver at import time, so its copy
+    # must be overridden as well; setattr avoids mypy's attr-defined complaint
+    # about the non-re-exported name.
+    setattr(aiohttp.connector, "DefaultResolver", aiohttp.resolver.ThreadedResolver)
 
 
 @overload
