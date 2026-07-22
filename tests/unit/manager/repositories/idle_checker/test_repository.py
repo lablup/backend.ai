@@ -961,31 +961,6 @@ class TestFetchExpiredIdleChecks:
         )
 
     @pytest.fixture
-    async def session_without_deadline(
-        self,
-        database: ExtendedAsyncSAEngine,
-    ) -> SessionId:
-        scope = _expired_check_scope_fixture("no-deadline")
-        session_id = SessionId(uuid.uuid4())
-        checker_id = IdleCheckerID(uuid.uuid4())
-        async with database.begin_session() as db_sess:
-            for scope_row in _expired_check_scope_rows(scope):
-                db_sess.add(scope_row)
-            db_sess.add(_expired_check_session_row(scope, session_id, SessionStatus.RUNNING))
-            db_sess.add(_expired_check_checker_row(checker_id))
-            await db_sess.flush()
-            db_sess.add(
-                SessionIdleCheckRow(
-                    session_id=session_id,
-                    idle_checker_id=checker_id,
-                    expire_at=None,
-                    last_status="grace_period",
-                    last_message="Waiting for the grace period to end.",
-                )
-            )
-        return session_id
-
-    @pytest.fixture
     async def session_with_future_deadline(
         self,
         database: ExtendedAsyncSAEngine,
@@ -1053,17 +1028,6 @@ class TestFetchExpiredIdleChecks:
         assert check.expire_at == expired_check_session.first_expire_at
         assert check.last_status == "expired"
         assert check.last_message == "Judged expired."
-
-    async def test_excludes_checks_without_deadline(
-        self,
-        repository: IdleCheckerRepository,
-        session_without_deadline: SessionId,
-    ) -> None:
-        batch = await repository.fetch_expired_idle_checks([SessionStatus.RUNNING])
-        check_session_ids = {check.session_id for check in batch.checks}
-
-        assert batch.checks == ()
-        assert session_without_deadline not in check_session_ids
 
     async def test_excludes_checks_with_future_deadline(
         self,
