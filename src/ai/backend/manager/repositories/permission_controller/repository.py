@@ -202,7 +202,7 @@ class PermissionControllerRepository:
         result = await self._db_source.bulk_remove_role_permissions(purgers)
         failures = [
             BulkRolePermissionRemoveFailure(
-                permission_id=cast(uuid.UUID, error.purger.pk_value),
+                permission_id=cast(uuid.UUID, error.purger.spec.pk_value()),
                 message=str(error.exception),
             )
             for error in result.errors

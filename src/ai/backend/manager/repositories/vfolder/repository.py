@@ -833,7 +833,7 @@ class VfolderRepository:
             VFolderDeletionNotAllowed: If the vfolder is mounted or endpoint-referenced.
             VFolderHasLinkedModelCard: If a model card still references the vfolder.
         """
-        vfolder_uuid = cast(uuid.UUID, purger.pk_value)
+        vfolder_uuid = cast(uuid.UUID, purger.spec.pk_value())
         async with self._db.begin_session() as session:
             # Fetch vfolder first to validate status/in-use before purging.
             vfolder_row = await self._get_vfolder_by_id(session, vfolder_uuid)

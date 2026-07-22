@@ -60,6 +60,7 @@ from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.container_registry.creators import (
     ContainerRegistryCreatorSpec,
 )
+from ai.backend.manager.repositories.container_registry.purgers import ContainerRegistryPurgerSpec
 from ai.backend.manager.repositories.container_registry.repository import (
     ContainerRegistryRepository,
 )
@@ -1259,7 +1260,7 @@ class TestContainerRegistryRepository:
         registry_name = test_registry.registry_name
 
         # When: Delete the registry
-        purger = Purger(row_class=ContainerRegistryRow, pk_value=registry_id)
+        purger = Purger(spec=ContainerRegistryPurgerSpec(registry_id=registry_id))
         result = await repository.delete_registry(purger)
 
         # Then: Returns deleted registry data
@@ -1268,7 +1269,7 @@ class TestContainerRegistryRepository:
 
         # And: Registry no longer exists
         with pytest.raises(ContainerRegistryNotFound):
-            purger = Purger(row_class=ContainerRegistryRow, pk_value=registry_id)
+            purger = Purger(spec=ContainerRegistryPurgerSpec(registry_id=registry_id))
             await repository.delete_registry(purger)
 
     async def test_delete_registry_not_found(
@@ -1281,7 +1282,7 @@ class TestContainerRegistryRepository:
 
         # When/Then: Raises ContainerRegistryNotFound
         with pytest.raises(ContainerRegistryNotFound):
-            purger = Purger(row_class=ContainerRegistryRow, pk_value=non_existent_id)
+            purger = Purger(spec=ContainerRegistryPurgerSpec(registry_id=non_existent_id))
             await repository.delete_registry(purger)
 
     async def test_delete_registry_returns_data_before_deletion(
@@ -1294,7 +1295,7 @@ class TestContainerRegistryRepository:
         registry = test_registry_with_custom_props
 
         # When: Delete the registry
-        purger = Purger(row_class=ContainerRegistryRow, pk_value=registry.id)
+        purger = Purger(spec=ContainerRegistryPurgerSpec(registry_id=registry.id))
         result = await repository.delete_registry(purger)
 
         # Then: Returns all registry data with correct properties

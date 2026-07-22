@@ -424,7 +424,7 @@ class PurgeVFolderAction(VFolderSingleEntityAction):
 
     @override
     def entity_id(self) -> str | None:
-        return str(self.purger.pk_value)
+        return str(self.purger.spec.pk_value())
 
     @override
     @classmethod
@@ -433,13 +433,13 @@ class PurgeVFolderAction(VFolderSingleEntityAction):
 
     @override
     def target_entity_id(self) -> str:
-        return str(self.purger.pk_value)
+        return str(self.purger.spec.pk_value())
 
     @override
     def target_element(self) -> RBACElementRef:
         return RBACElementRef(
             element_type=RBACElementType.VFOLDER,
-            element_id=str(self.purger.pk_value),
+            element_id=str(self.purger.spec.pk_value()),
         )
 
 

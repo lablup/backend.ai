@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Sequence
 from typing import TYPE_CHECKING, override
 from uuid import UUID
 
@@ -15,6 +15,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from ai.backend.manager.errors.repository import (
     ForeignKeyViolationError,
     RepositoryIntegrityError,
+    UnsupportedCompositePrimaryKeyError,
 )
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.repositories.base import (
@@ -29,12 +30,40 @@ from ai.backend.manager.repositories.base import (
     execute_bulk_purger_partial,
     execute_purger,
 )
+from ai.backend.manager.repositories.base.purger import PurgerSpec
+from ai.backend.manager.repositories.base.types import ConflictCheck
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 # Note: This test file uses test-specific ORM models defined here, not application models.
 # Tables are created/dropped per test class, which is appropriate for testing the purger itself.
+
+
+class SimplePurgerSpec[TRow: Base](PurgerSpec[TRow]):
+    """Test spec: plain PK delete with optional conflict checks."""
+
+    def __init__(
+        self,
+        row_class: type[TRow],
+        pk_value: UUID | str | int,
+        conflict_checks: Sequence[ConflictCheck] = (),
+    ) -> None:
+        self._row_class = row_class
+        self._pk_value = pk_value
+        self._conflict_checks = conflict_checks
+
+    @override
+    def row_class(self) -> type[TRow]:
+        return self._row_class
+
+    @override
+    def pk_value(self) -> UUID | str | int:
+        return self._pk_value
+
+    @override
+    def conflict_checks(self) -> Sequence[ConflictCheck]:
+        return self._conflict_checks
 
 
 # =============================================================================
@@ -107,8 +136,7 @@ class TestPurgerIntPK:
         async with database_connection.begin_session() as db_sess:
             target_id = sample_data[0]
             purger: Purger[PurgerTestRowInt] = Purger(
-                row_class=PurgerTestRowInt,
-                pk_value=target_id,
+                spec=SimplePurgerSpec(PurgerTestRowInt, target_id)
             )
 
             result = await execute_purger(db_sess, purger)
@@ -133,8 +161,7 @@ class TestPurgerIntPK:
         """Test deleting when PK doesn't exist."""
         async with database_connection.begin_session() as db_sess:
             purger: Purger[PurgerTestRowInt] = Purger(
-                row_class=PurgerTestRowInt,
-                pk_value=99999,
+                spec=SimplePurgerSpec(PurgerTestRowInt, 99999)
             )
 
             result = await execute_purger(db_sess, purger)
@@ -193,8 +220,7 @@ class TestPurgerUUIDPK:
         async with database_connection.begin_session() as db_sess:
             target_id = sample_data[0]
             purger: Purger[PurgerTestRowUUID] = Purger(
-                row_class=PurgerTestRowUUID,
-                pk_value=target_id,
+                spec=SimplePurgerSpec(PurgerTestRowUUID, target_id)
             )
 
             result = await execute_purger(db_sess, purger)
@@ -212,8 +238,7 @@ class TestPurgerUUIDPK:
         """Test deleting when UUID PK doesn't exist."""
         async with database_connection.begin_session() as db_sess:
             purger: Purger[PurgerTestRowUUID] = Purger(
-                row_class=PurgerTestRowUUID,
-                pk_value=uuid.uuid4(),
+                spec=SimplePurgerSpec(PurgerTestRowUUID, uuid.uuid4())
             )
 
             result = await execute_purger(db_sess, purger)
@@ -233,9 +258,11 @@ class SimpleBatchPurgerSpec(BatchPurgerSpec[Base]):
         self,
         row_class: type[Base],
         conditions: list[sa.sql.expression.ColumnElement[bool]] | None = None,
+        conflict_checks: Sequence[ConflictCheck] = (),
     ) -> None:
         self._row_class = row_class
         self._conditions = conditions or []
+        self._conflict_checks = conflict_checks
 
     @override
     def build_subquery(self) -> sa.sql.Select[tuple[Base]]:
@@ -243,6 +270,10 @@ class SimpleBatchPurgerSpec(BatchPurgerSpec[Base]):
         for cond in self._conditions:
             query = query.where(cond)
         return query
+
+    @override
+    def conflict_checks(self) -> Sequence[ConflictCheck]:
+        return self._conflict_checks
 
 
 class BatchPurgerBasicRow(Base):  # type: ignore[misc]
@@ -544,6 +575,10 @@ class ORMBatchPurgerSpec(BatchPurgerSpec[Base]):
             query = query.where(cond)
         return query
 
+    @override
+    def conflict_checks(self) -> Sequence[ConflictCheck]:
+        return ()
+
 
 class TestBatchPurgerWithORMModel:
     """Tests for batch purger operations using ORM model."""
@@ -656,6 +691,10 @@ class CompositePKBatchPurgerSpec(BatchPurgerSpec[BatchPurgerCompositePKRow]):
         for cond in self._conditions:
             query = query.where(cond)
         return query
+
+    @override
+    def conflict_checks(self) -> Sequence[ConflictCheck]:
+        return ()
 
 
 class TestBatchPurgerCompositePK:
@@ -830,7 +869,7 @@ class TestPurgerIntegrityError:
 
         # Attempt to delete parent → FK violation
         async with database_connection.begin_session() as db_sess:
-            purger: Purger[PurgerParentRow] = Purger(row_class=parent_cls, pk_value=1)
+            purger: Purger[PurgerParentRow] = Purger(spec=SimplePurgerSpec(parent_cls, 1))
             with pytest.raises(ForeignKeyViolationError) as exc_info:
                 await execute_purger(db_sess, purger)
 
@@ -852,7 +891,7 @@ class TestPurgerIntegrityError:
 
         # Delete parent → should succeed
         async with database_connection.begin_session() as db_sess:
-            purger: Purger[PurgerParentRow] = Purger(row_class=parent_cls, pk_value=1)
+            purger: Purger[PurgerParentRow] = Purger(spec=SimplePurgerSpec(parent_cls, 1))
             result = await execute_purger(db_sess, purger)
 
             assert result is not None
@@ -1035,9 +1074,9 @@ class TestBulkPurgerPartial:
         # Execute bulk purger partial with 3 purgers
         async with database_connection.begin_session() as db_sess:
             purgers = [
-                Purger(row_class=test_row_class, pk_value=1),
-                Purger(row_class=test_row_class, pk_value=2),
-                Purger(row_class=test_row_class, pk_value=3),
+                Purger(spec=SimplePurgerSpec(test_row_class, 1)),
+                Purger(spec=SimplePurgerSpec(test_row_class, 2)),
+                Purger(spec=SimplePurgerSpec(test_row_class, 3)),
             ]
             result = await execute_bulk_purger_partial(db_sess, purgers)
 
@@ -1083,9 +1122,9 @@ class TestBulkPurgerPartial:
         # Execute bulk purger partial with 3 purgers
         async with database_connection.begin_session() as db_sess:
             purgers = [
-                Purger(row_class=parent_cls, pk_value=1),
-                Purger(row_class=parent_cls, pk_value=2),  # Has FK constraint
-                Purger(row_class=parent_cls, pk_value=3),
+                Purger(spec=SimplePurgerSpec(parent_cls, 1)),
+                Purger(spec=SimplePurgerSpec(parent_cls, 2)),  # Has FK constraint
+                Purger(spec=SimplePurgerSpec(parent_cls, 3)),
             ]
             result = await execute_bulk_purger_partial(db_sess, purgers)
 
@@ -1105,7 +1144,7 @@ class TestBulkPurgerPartial:
             # Verify error (parent-2 with FK constraint)
             error = result.errors[0]
             assert isinstance(error, BulkPurgerError)
-            assert error.purger.pk_value == 2
+            assert error.purger.spec.pk_value() == 2
             assert error.index == 1  # Second purger in the list
             assert isinstance(error.exception, ForeignKeyViolationError)
             assert isinstance(error.exception, RepositoryIntegrityError)
@@ -1134,9 +1173,9 @@ class TestBulkPurgerPartial:
         # Execute bulk purger partial with 3 purgers (one targets non-existent id=2)
         async with database_connection.begin_session() as db_sess:
             purgers = [
-                Purger(row_class=test_row_class, pk_value=1),
-                Purger(row_class=test_row_class, pk_value=2),  # Non-existent PK
-                Purger(row_class=test_row_class, pk_value=3),
+                Purger(spec=SimplePurgerSpec(test_row_class, 1)),
+                Purger(spec=SimplePurgerSpec(test_row_class, 2)),  # Non-existent PK
+                Purger(spec=SimplePurgerSpec(test_row_class, 3)),
             ]
             result = await execute_bulk_purger_partial(db_sess, purgers)
 
@@ -1197,11 +1236,11 @@ class TestBulkPurgerPartial:
         # Execute bulk purger partial with 5 purgers
         async with database_connection.begin_session() as db_sess:
             purgers = [
-                Purger(row_class=parent_cls, pk_value=1),  # index 0 - success
-                Purger(row_class=parent_cls, pk_value=2),  # index 1 - FK error
-                Purger(row_class=parent_cls, pk_value=3),  # index 2 - success
-                Purger(row_class=parent_cls, pk_value=4),  # index 3 - FK error
-                Purger(row_class=parent_cls, pk_value=5),  # index 4 - success
+                Purger(spec=SimplePurgerSpec(parent_cls, 1)),  # index 0 - success
+                Purger(spec=SimplePurgerSpec(parent_cls, 2)),  # index 1 - FK error
+                Purger(spec=SimplePurgerSpec(parent_cls, 3)),  # index 2 - success
+                Purger(spec=SimplePurgerSpec(parent_cls, 4)),  # index 3 - FK error
+                Purger(spec=SimplePurgerSpec(parent_cls, 5)),  # index 4 - success
             ]
             result = await execute_bulk_purger_partial(db_sess, purgers)
 
@@ -1211,9 +1250,9 @@ class TestBulkPurgerPartial:
 
             # Verify error indices
             assert result.errors[0].index == 1  # parent-2
-            assert result.errors[0].purger.pk_value == 2
+            assert result.errors[0].purger.spec.pk_value() == 2
             assert result.errors[1].index == 3  # parent-4
-            assert result.errors[1].purger.pk_value == 4
+            assert result.errors[1].purger.spec.pk_value() == 4
 
 
 # =============================================================================
@@ -1309,3 +1348,157 @@ class TestBatchPurgerEagerJoin:
 
             remaining = await db_sess.execute(sa.select(sa.func.count()).select_from(seeded_child))
             assert remaining.scalar() == 2
+
+
+# =============================================================================
+# Conflict Check Tests
+# =============================================================================
+
+
+class TestPurgerConflictChecks:
+    """Tests for spec-declared conflict checks validated before deletion."""
+
+    @pytest.fixture
+    async def fk_tables(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[tuple[type[PurgerParentRow], type[PurgerChildRow]], None]:
+        """Create parent and child tables with FK constraint."""
+        async with database_connection.begin() as conn:
+            await conn.run_sync(
+                lambda c: Base.metadata.create_all(
+                    c, [PurgerParentRow.__table__, PurgerChildRow.__table__]
+                )
+            )
+
+        yield PurgerParentRow, PurgerChildRow
+
+        async with database_connection.begin() as conn:
+            await conn.execute(sa.text("DROP TABLE IF EXISTS test_purger_ie_child CASCADE"))
+            await conn.execute(sa.text("DROP TABLE IF EXISTS test_purger_ie_parent CASCADE"))
+
+    async def test_conflict_check_blocks_deletion(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        fk_tables: tuple[type[PurgerParentRow], type[PurgerChildRow]],
+    ) -> None:
+        """A failing conflict check raises the declared error before the DELETE runs."""
+        parent_cls, child_cls = fk_tables
+
+        async with database_connection.begin_session() as db_sess:
+            db_sess.add(PurgerParentRow(id=1, name="parent-1"))
+            await db_sess.flush()
+            db_sess.add(PurgerChildRow(id=1, parent_id=1, name="child-1"))
+
+        async with database_connection.begin_session() as db_sess:
+            spec = SimplePurgerSpec(
+                parent_cls,
+                1,
+                conflict_checks=(
+                    ConflictCheck(
+                        condition=lambda: child_cls.parent_id == 1,
+                        error=RepositoryIntegrityError("child rows exist"),
+                    ),
+                ),
+            )
+            with pytest.raises(RepositoryIntegrityError) as exc_info:
+                await execute_purger(db_sess, Purger(spec=spec))
+
+            # The declared error is raised, not the FK-violation fallback from the DELETE.
+            assert type(exc_info.value) is RepositoryIntegrityError
+
+            count_result = await db_sess.execute(sa.select(sa.func.count()).select_from(parent_cls))
+            assert count_result.scalar() == 1
+
+    async def test_conflict_check_passes_when_no_conflict(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        fk_tables: tuple[type[PurgerParentRow], type[PurgerChildRow]],
+    ) -> None:
+        """A passing conflict check lets the deletion proceed."""
+        parent_cls, child_cls = fk_tables
+
+        async with database_connection.begin_session() as db_sess:
+            db_sess.add(PurgerParentRow(id=1, name="parent-1"))
+
+        async with database_connection.begin_session() as db_sess:
+            spec = SimplePurgerSpec(
+                parent_cls,
+                1,
+                conflict_checks=(
+                    ConflictCheck(
+                        condition=lambda: child_cls.parent_id == 1,
+                        error=RepositoryIntegrityError("child rows exist"),
+                    ),
+                ),
+            )
+            result = await execute_purger(db_sess, Purger(spec=spec))
+
+            assert result is not None
+            assert result.row.id == 1
+
+            count_result = await db_sess.execute(sa.select(sa.func.count()).select_from(parent_cls))
+            assert count_result.scalar() == 0
+
+    async def test_first_failing_conflict_check_wins(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        fk_tables: tuple[type[PurgerParentRow], type[PurgerChildRow]],
+    ) -> None:
+        """When multiple checks fail, the first declared check's error is raised."""
+        parent_cls, child_cls = fk_tables
+
+        async with database_connection.begin_session() as db_sess:
+            db_sess.add(PurgerParentRow(id=1, name="parent-1"))
+            await db_sess.flush()
+            db_sess.add(PurgerChildRow(id=1, parent_id=1, name="child-1"))
+
+        async with database_connection.begin_session() as db_sess:
+            spec = SimplePurgerSpec(
+                parent_cls,
+                1,
+                conflict_checks=(
+                    ConflictCheck(
+                        condition=lambda: child_cls.parent_id == 1,
+                        error=UnsupportedCompositePrimaryKeyError("first check"),
+                    ),
+                    ConflictCheck(
+                        condition=lambda: child_cls.id == 1,
+                        error=RepositoryIntegrityError("second check"),
+                    ),
+                ),
+            )
+            with pytest.raises(UnsupportedCompositePrimaryKeyError):
+                await execute_purger(db_sess, Purger(spec=spec))
+
+    async def test_batch_purger_conflict_check_blocks_deletion(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+        fk_tables: tuple[type[PurgerParentRow], type[PurgerChildRow]],
+    ) -> None:
+        """A failing conflict check blocks the whole batch deletion."""
+        parent_cls, child_cls = fk_tables
+
+        async with database_connection.begin_session() as db_sess:
+            db_sess.add(PurgerParentRow(id=1, name="parent-1"))
+            db_sess.add(PurgerParentRow(id=2, name="parent-2"))
+            await db_sess.flush()
+            db_sess.add(PurgerChildRow(id=1, parent_id=1, name="child-1"))
+
+        async with database_connection.begin_session() as db_sess:
+            spec = SimpleBatchPurgerSpec(
+                row_class=parent_cls,
+                conflict_checks=(
+                    ConflictCheck(
+                        condition=lambda: child_cls.parent_id == 1,
+                        error=RepositoryIntegrityError("child rows exist"),
+                    ),
+                ),
+            )
+            with pytest.raises(RepositoryIntegrityError) as exc_info:
+                await execute_batch_purger(db_sess, BatchPurger(spec=spec))
+
+            assert type(exc_info.value) is RepositoryIntegrityError
+
+            count_result = await db_sess.execute(sa.select(sa.func.count()).select_from(parent_cls))
+            assert count_result.scalar() == 2

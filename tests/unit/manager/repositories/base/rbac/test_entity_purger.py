@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, override
 from uuid import UUID
@@ -44,6 +44,7 @@ from ai.backend.manager.repositories.base.rbac.entity_purger import (
     execute_rbac_entity_batch_purger,
     execute_rbac_entity_purger,
 )
+from ai.backend.manager.repositories.base.types import ConflictCheck
 from ai.backend.testutils.db import with_tables
 
 if TYPE_CHECKING:
@@ -102,11 +103,23 @@ class RBACEntityPurgerRestrictReferrer(Base):  # type: ignore[misc]
 # =============================================================================
 
 
-class SimpleRBACEntityPurgerSpec(RBACEntityPurgerSpec):
+class SimpleRBACEntityPurgerSpec(RBACEntityPurgerSpec[RBACEntityPurgerTestRow]):
     """Simple spec for entity purger testing."""
 
     def __init__(self, entity_uuid: UUID) -> None:
         self._entity_uuid = entity_uuid
+
+    @override
+    def row_class(self) -> type[RBACEntityPurgerTestRow]:
+        return RBACEntityPurgerTestRow
+
+    @override
+    def pk_value(self) -> UUID:
+        return self._entity_uuid
+
+    @override
+    def conflict_checks(self) -> Sequence[ConflictCheck]:
+        return ()
 
     @override
     def element_type(self) -> RBACElementType:
@@ -282,8 +295,6 @@ class TestRBACEntityPurgerBasic:
         async with database_connection.begin_session_read_committed() as db_sess:
             spec = SimpleRBACEntityPurgerSpec(entity_uuid=ctx.entity_uuid)
             purger: RBACEntityPurger[RBACEntityPurgerTestRow] = RBACEntityPurger(
-                row_class=RBACEntityPurgerTestRow,
-                pk_value=ctx.entity_uuid,
                 spec=spec,
             )
             result = await execute_rbac_entity_purger(db_sess, purger)
@@ -316,8 +327,6 @@ class TestRBACEntityPurgerBasic:
         async with database_connection.begin_session_read_committed() as db_sess:
             spec = SimpleRBACEntityPurgerSpec(entity_uuid=nonexistent_uuid)
             purger: RBACEntityPurger[RBACEntityPurgerTestRow] = RBACEntityPurger(
-                row_class=RBACEntityPurgerTestRow,
-                pk_value=nonexistent_uuid,
                 spec=spec,
             )
             result = await execute_rbac_entity_purger(db_sess, purger)
@@ -454,8 +463,6 @@ class TestRBACEntityPurgerWithPermissions:
         async with database_connection.begin_session_read_committed() as db_sess:
             spec = SimpleRBACEntityPurgerSpec(entity_uuid=ctx.entity_uuid)
             purger: RBACEntityPurger[RBACEntityPurgerTestRow] = RBACEntityPurger(
-                row_class=RBACEntityPurgerTestRow,
-                pk_value=ctx.entity_uuid,
                 spec=spec,
             )
             await execute_rbac_entity_purger(db_sess, purger)
@@ -476,8 +483,6 @@ class TestRBACEntityPurgerWithPermissions:
             # Delete only entity1
             spec = SimpleRBACEntityPurgerSpec(entity_uuid=ctx.entity_uuid1)
             purger: RBACEntityPurger[RBACEntityPurgerTestRow] = RBACEntityPurger(
-                row_class=RBACEntityPurgerTestRow,
-                pk_value=ctx.entity_uuid1,
                 spec=spec,
             )
             await execute_rbac_entity_purger(db_sess, purger)
@@ -543,8 +548,6 @@ class TestRBACEntityPurgerMultipleScopes:
         async with database_connection.begin_session_read_committed() as db_sess:
             spec = SimpleRBACEntityPurgerSpec(entity_uuid=ctx.entity_uuid)
             purger: RBACEntityPurger[RBACEntityPurgerTestRow] = RBACEntityPurger(
-                row_class=RBACEntityPurgerTestRow,
-                pk_value=ctx.entity_uuid,
                 spec=spec,
             )
             await execute_rbac_entity_purger(db_sess, purger)
@@ -622,8 +625,6 @@ class TestRBACEntityPurgerBidirectionalCleanup:
 
             spec = SimpleRBACEntityPurgerSpec(entity_uuid=ctx.entity_uuid)
             purger: RBACEntityPurger[RBACEntityPurgerTestRow] = RBACEntityPurger(
-                row_class=RBACEntityPurgerTestRow,
-                pk_value=ctx.entity_uuid,
                 spec=spec,
             )
             await execute_rbac_entity_purger(db_sess, purger)
@@ -656,8 +657,6 @@ class TestRBACEntityPurgerBidirectionalCleanup:
 
             spec = SimpleRBACEntityPurgerSpec(entity_uuid=ctx.entity_uuid)
             purger: RBACEntityPurger[RBACEntityPurgerTestRow] = RBACEntityPurger(
-                row_class=RBACEntityPurgerTestRow,
-                pk_value=ctx.entity_uuid,
                 spec=spec,
             )
             await execute_rbac_entity_purger(db_sess, purger)
@@ -680,6 +679,10 @@ class TestEntityBatchPurgerSpec(RBACEntityBatchPurgerSpec[RBACEntityPurgerTestRo
     @override
     def build_subquery(self) -> sa.sql.Select[tuple[RBACEntityPurgerTestRow]]:
         return sa.select(RBACEntityPurgerTestRow)
+
+    @override
+    def conflict_checks(self) -> Sequence[ConflictCheck]:
+        return ()
 
     @override
     def element_type(self) -> RBACElementType:
@@ -917,11 +920,24 @@ class CompositePKPurgerTestRow(Base):  # type: ignore[misc]
     name: Mapped[str] = mapped_column(sa.String(50), nullable=False)
 
 
-class CompositePKPurgerSpec(RBACEntityPurgerSpec):
+class CompositePKPurgerSpec(RBACEntityPurgerSpec[CompositePKPurgerTestRow]):
     """Purger spec for composite PK testing."""
 
     def __init__(self, entity_uuid: str) -> None:
         self._entity_uuid = entity_uuid
+
+    @override
+    def row_class(self) -> type[CompositePKPurgerTestRow]:
+        return CompositePKPurgerTestRow
+
+    @override
+    def pk_value(self) -> int:
+        # PK value (error raised before lookup due to composite PK)
+        return 1
+
+    @override
+    def conflict_checks(self) -> Sequence[ConflictCheck]:
+        return ()
 
     @override
     def element_type(self) -> RBACElementType:
@@ -941,6 +957,10 @@ class CompositePKBatchPurgerSpec(RBACEntityBatchPurgerSpec[CompositePKPurgerTest
     @override
     def build_subquery(self) -> sa.Select[Any]:
         return sa.select(CompositePKPurgerTestRow)
+
+    @override
+    def conflict_checks(self) -> Sequence[ConflictCheck]:
+        return ()
 
     @override
     def element_type(self) -> RBACElementType:
@@ -964,8 +984,6 @@ class TestRBACEntityPurgerCompositePK:
             async with database_connection.begin_session_read_committed() as db_sess:
                 spec = CompositePKPurgerSpec(entity_uuid="test-123")
                 purger = RBACEntityPurger(
-                    row_class=CompositePKPurgerTestRow,
-                    pk_value=1,  # PK value (error raised before lookup due to composite PK)
                     spec=spec,
                 )
 
@@ -1100,8 +1118,6 @@ class TestRBACEntityPurgerTransactionRollback:
         async with database_connection.begin_session_read_committed() as db_sess:
             spec = SimpleRBACEntityPurgerSpec(entity_uuid=ctx.entity_uuid)
             purger: RBACEntityPurger[RBACEntityPurgerTestRow] = RBACEntityPurger(
-                row_class=RBACEntityPurgerTestRow,
-                pk_value=ctx.entity_uuid,
                 spec=spec,
             )
             with pytest.raises(ForeignKeyViolationError):

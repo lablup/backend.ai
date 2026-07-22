@@ -97,6 +97,7 @@ from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.purger import Purger
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.scaling_group.creators import ScalingGroupCreatorSpec
+from ai.backend.manager.repositories.scaling_group.purgers import ScalingGroupPurgerSpec
 from ai.backend.manager.repositories.scaling_group.updaters import (
     ScalingGroupMetadataUpdaterSpec,
     ScalingGroupNetworkConfigUpdaterSpec,
@@ -658,7 +659,7 @@ class ResourceGroupAdapter(BaseAdapter):
         Returns:
             Pydantic node representing the purged resource group.
         """
-        purger = Purger(row_class=ScalingGroupRow, pk_value=name)
+        purger = Purger(spec=ScalingGroupPurgerSpec(name=name))
         action_result = await self._processors.scaling_group.purge_scaling_group.wait_for_complete(
             PurgeScalingGroupAction(purger=purger)
         )

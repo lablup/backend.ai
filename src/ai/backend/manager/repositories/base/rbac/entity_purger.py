@@ -20,20 +20,22 @@ from ai.backend.manager.models.rbac_models.association_scopes_entities import (
 )
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.repositories.base.integrity import parse_integrity_error
-from ai.backend.manager.repositories.base.purger import BatchPurgerSpec, Purger, PurgerResult, TRow
+from ai.backend.manager.repositories.base.purger import (
+    BatchPurgerSpec,
+    Purger,
+    PurgerResult,
+    PurgerSpec,
+    TRow,
+    validate_conflict_checks,
+)
 
 # =============================================================================
 # Spec Classes
 # =============================================================================
 
 
-class RBACEntityPurgerSpec(ABC):
-    """Spec for building RBAC entity info for single-row purge.
-
-    Implementations specify which entity to purge by providing:
-    - element_type(): Returns the RBACElementType identifying this entity kind
-    - entity_ref(): Returns the RBACElementRef to delete
-    """
+class RBACEntityPurgerSpec[TRow: Base](PurgerSpec[TRow], ABC):
+    """PurgerSpec that additionally provides RBAC entity info for cleanup."""
 
     @abstractmethod
     def element_type(self) -> RBACElementType:
@@ -66,16 +68,14 @@ class RBACEntityBatchPurgerSpec(BatchPurgerSpec[TRow], ABC):
 
 
 @dataclass
-class RBACEntityPurger(Purger[TRow]):
+class RBACEntityPurger[TRow: Base](Purger[TRow]):
     """Single-row RBAC entity purger by primary key.
 
-    Inherits row_class and pk_value from Purger.
-
     Attributes:
-        spec: RBACEntityPurgerSpec providing entity info for RBAC cleanup.
+        spec: RBACEntityPurgerSpec defining what to delete and its RBAC entity info.
     """
 
-    spec: RBACEntityPurgerSpec
+    spec: RBACEntityPurgerSpec[TRow]
 
 
 @dataclass
@@ -292,7 +292,7 @@ async def _delete_row_by_pk_returning(
             error type and constraint name instead of inspecting raw
             ``sqlalchemy.exc.IntegrityError``.
     """
-    row_class = purger.row_class
+    row_class = purger.spec.row_class()
     table = row_class.__table__
     pk_columns = list(table.primary_key.columns)
 
@@ -301,7 +301,7 @@ async def _delete_row_by_pk_returning(
             f"Purger only supports single-column primary keys (table: {table.name})",
         )
 
-    stmt = sa.delete(table).where(pk_columns[0] == purger.pk_value).returning(*table.columns)
+    stmt = sa.delete(table).where(pk_columns[0] == purger.spec.pk_value()).returning(*table.columns)
     try:
         result = await db_sess.execute(stmt)
     except sa.exc.IntegrityError as e:
@@ -348,6 +348,8 @@ async def execute_rbac_entity_purger(
     entity_ref = purger.spec.entity_ref()
     element_type = purger.spec.element_type()
 
+    await validate_conflict_checks(db_sess, purger.spec.conflict_checks())
+
     # 2. Delete RBAC entries
     await _delete_rbac_for_entity(db_sess, entity_ref, element_type)
 
@@ -393,6 +395,8 @@ async def execute_rbac_entity_batch_purger(
 
     pk_col = pk_columns[0]
     element_type = purger.spec.element_type()
+
+    await validate_conflict_checks(db_sess, purger.spec.conflict_checks())
 
     while True:
         # 1. DELETE with RETURNING - get PKs and delete in one query

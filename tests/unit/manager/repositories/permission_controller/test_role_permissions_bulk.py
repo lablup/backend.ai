@@ -38,6 +38,7 @@ from ai.backend.manager.repositories.permission_controller.creators import (
 from ai.backend.manager.repositories.permission_controller.db_source.db_source import (
     PermissionDBSource,
 )
+from ai.backend.manager.repositories.permission_controller.purgers import PermissionPurgerSpec
 from ai.backend.testutils.db import TableOrORM, with_tables
 
 if TYPE_CHECKING:
@@ -238,7 +239,7 @@ class TestBulkRolePermissions:
     async def test_bulk_remove_unknown_pk_returns_no_success(
         self, perm_db_source: PermissionDBSource
     ) -> None:
-        purgers = [Purger(row_class=PermissionRow, pk_value=uuid.uuid4())]
+        purgers = [Purger(spec=PermissionPurgerSpec(permission_id=uuid.uuid4()))]
         result = await perm_db_source.bulk_remove_role_permissions(purgers)
         assert result.success_count() == 0
         assert not result.has_failures()
@@ -258,7 +259,7 @@ class TestBulkRolePermissions:
             _spec(role_id, RBACElementType.SESSION, OperationType.HARD_DELETE),
         )
         result = await perm_db_source.bulk_remove_role_permissions([
-            Purger(row_class=PermissionRow, pk_value=drop_id)
+            Purger(spec=PermissionPurgerSpec(permission_id=drop_id))
         ])
         assert result.success_count() == 1
         remaining_ids = {keep_id}

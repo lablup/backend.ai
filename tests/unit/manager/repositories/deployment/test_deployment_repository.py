@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Sequence
+from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
-from typing import Any
+from typing import Any, override
 from unittest.mock import MagicMock
 
 import pytest
@@ -96,9 +97,10 @@ from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.repositories.base.pagination import OffsetPagination
-from ai.backend.manager.repositories.base.purger import Purger
+from ai.backend.manager.repositories.base.purger import Purger, PurgerSpec
 from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
+from ai.backend.manager.repositories.base.types import ConflictCheck
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.base.upserter import Upserter
 from ai.backend.manager.repositories.deployment import DeploymentRepository
@@ -120,6 +122,25 @@ from ai.backend.manager.repositories.deployment.updaters import (
 from ai.backend.manager.repositories.deployment.upserters import DeploymentPolicyUpserterSpec
 from ai.backend.manager.types import OptionalState
 from ai.backend.testutils.db import with_tables
+
+
+@dataclass
+class DeploymentPolicyPurgerSpec(PurgerSpec[DeploymentPolicyRow]):
+    """Test-local PurgerSpec for deleting a deployment policy."""
+
+    policy_id: uuid.UUID
+
+    @override
+    def row_class(self) -> type[DeploymentPolicyRow]:
+        return DeploymentPolicyRow
+
+    @override
+    def pk_value(self) -> uuid.UUID:
+        return self.policy_id
+
+    @override
+    def conflict_checks(self) -> Sequence[ConflictCheck]:
+        return ()
 
 
 def create_test_password_info(password: str) -> PasswordInfo:
@@ -2486,8 +2507,7 @@ class TestDeploymentPolicyOperations:
     ) -> None:
         """Test deleting a deployment policy using Purger."""
         purger = Purger(
-            row_class=DeploymentPolicyRow,
-            pk_value=test_deployment_policy_data.id,
+            spec=DeploymentPolicyPurgerSpec(policy_id=test_deployment_policy_data.id),
         )
 
         result = await deployment_repository.delete_deployment_policy(purger)
@@ -2506,8 +2526,7 @@ class TestDeploymentPolicyOperations:
         """Test that delete_deployment_policy returns None for nonexistent policy."""
         nonexistent_id = uuid.uuid4()
         purger = Purger(
-            row_class=DeploymentPolicyRow,
-            pk_value=nonexistent_id,
+            spec=DeploymentPolicyPurgerSpec(policy_id=nonexistent_id),
         )
 
         result = await deployment_repository.delete_deployment_policy(purger)
