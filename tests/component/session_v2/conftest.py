@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import secrets
 import uuid
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable, Coroutine
 from dataclasses import dataclass
 from datetime import datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -19,6 +19,7 @@ from ai.backend.client.v2.auth import HMACAuth
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
+from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.permission.types import (
     EntityType,
     OperationType,
@@ -27,7 +28,9 @@ from ai.backend.common.data.permission.types import (
     RoleStatus,
     ScopeType,
 )
+from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.plugin.monitor import ErrorPluginContext
 from ai.backend.common.types import ResourceSlot, SessionId, SessionTypes
@@ -42,8 +45,16 @@ from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.api.rest.v2.session.handler import V2SessionHandler
 from ai.backend.manager.api.rest.v2.session.registry import register_v2_session_routes
+from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
+from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.agent.types import AgentStatus
+from ai.backend.manager.data.image.types import ImageStatus, ImageType
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
+from ai.backend.manager.models.agent.row import AgentRow
+from ai.backend.manager.models.container_registry import ContainerRegistryRow
+from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.kernel import kernels
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
@@ -53,18 +64,33 @@ from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
+from ai.backend.manager.repositories.scheduler import SchedulerRepository
 from ai.backend.manager.repositories.session.repository import SessionRepository
+from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.services.processors import Processors
 from ai.backend.manager.services.session.processors import SessionProcessors
 from ai.backend.manager.services.session.service import SessionService, SessionServiceArgs
+from ai.backend.manager.sokovan.scheduler.provisioner.selectors.concentrated import (
+    ConcentratedAgentSelector,
+)
+from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import AgentSelector
+from ai.backend.manager.sokovan.scheduling_controller import (
+    SchedulingController,
+    SchedulingControllerArgs,
+)
 from ai.backend.testutils.fixtures import DomainFixtureData
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
     from tests.component.conftest import ServerInfo, UserFixtureData
+
+    from ai.backend.common.plugin.hook import HookPluginContext
+
+AgentFactoryFunc = Callable[[dict[str, str]], Coroutine[Any, Any, str]]
 
 
 @dataclass
@@ -143,12 +169,11 @@ async def session_processors(
     )
 
 
-@pytest.fixture()
-def server_module_registries(
+def build_session_registries(
     route_deps: RouteDeps,
     session_processors: SessionProcessors,
 ) -> list[RouteRegistry]:
-    """Register v2 session routes for testing."""
+    """Build the v2 session route registries around the given processors."""
     processors = MagicMock(spec=Processors)
     processors.session = session_processors
     adapter = SessionAdapter(processors)
@@ -156,6 +181,15 @@ def server_module_registries(
     v2_reg = RouteRegistry.create("v2", route_deps.cors_options)
     v2_reg.add_subregistry(register_v2_session_routes(handler, route_deps))
     return [v2_reg]
+
+
+@pytest.fixture()
+def server_module_registries(
+    route_deps: RouteDeps,
+    session_processors: SessionProcessors,
+) -> list[RouteRegistry]:
+    """Register v2 session routes for testing."""
+    return build_session_registries(route_deps, session_processors)
 
 
 @pytest.fixture()
@@ -466,3 +500,199 @@ async def user_session_seed(
     )
     yield seed
     await _cleanup_session(db_engine, seed.session_id)
+
+
+# ---------------------------------------------------------------------------
+# Compute-schedule: real scheduling controller + agent/image seeds
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture()
+async def resource_slot_types_seed(db_engine: SAEngine) -> None:
+    """Ensure resource_slot_types has seed data for cpu/mem slots."""
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            sa.text(
+                "INSERT INTO resource_slot_types (slot_name, slot_type, rank)"
+                " VALUES ('cpu', 'count', 40), ('mem', 'bytes', 50)"
+                " ON CONFLICT DO NOTHING"
+            )
+        )
+
+
+@pytest.fixture()
+async def compute_registry_fixture(db_engine: SAEngine) -> AsyncIterator[uuid.UUID]:
+    """Insert a test Docker container registry and yield its UUID."""
+    registry_id = uuid.uuid4()
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            sa.insert(ContainerRegistryRow.__table__).values(
+                id=registry_id,
+                url="https://registry.session.test.local",
+                registry_name=f"session-registry-{registry_id.hex[:8]}",
+                type=ContainerRegistryType.DOCKER,
+            )
+        )
+    yield registry_id
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            ContainerRegistryRow.__table__.delete().where(
+                ContainerRegistryRow.__table__.c.id == registry_id
+            )
+        )
+
+
+@pytest.fixture()
+async def compute_image_fixture(
+    db_engine: SAEngine,
+    compute_registry_fixture: uuid.UUID,
+) -> AsyncIterator[ImageID]:
+    """Insert an x86_64 image with min-only resource limits; yield its ID."""
+    image_id = ImageID(uuid.uuid4())
+    unique = secrets.token_hex(4)
+    image_name = f"compute-image-{unique}"
+    canonical = f"registry.session.test.local/testproject/{image_name}:latest"
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            sa.insert(ImageRow.__table__).values(
+                id=image_id,
+                name=canonical,
+                project="testproject",
+                image=image_name,
+                tag="latest",
+                registry="registry.session.test.local",
+                registry_id=compute_registry_fixture,
+                architecture="x86_64",
+                config_digest=f"sha256:{image_id.hex * 2}",
+                size_bytes=2048000,
+                is_local=False,
+                type=ImageType.COMPUTE,
+                accelerators=None,
+                labels={},
+                resources={
+                    "cpu": {"min": "1"},
+                    "mem": {"min": "536870912"},
+                },
+                status=ImageStatus.ALIVE,
+            )
+        )
+    yield image_id
+    async with db_engine.begin() as conn:
+        await conn.execute(ImageRow.__table__.delete().where(ImageRow.__table__.c.id == image_id))
+
+
+@pytest.fixture()
+async def agent_factory(
+    db_engine: SAEngine,
+    scaling_group_name: ResourceGroupName,
+    scaling_group_id: ResourceGroupID,
+) -> AsyncIterator[AgentFactoryFunc]:
+    """Factory that seeds ALIVE schedulable x86_64 agents in the test scaling group."""
+    created_ids: list[str] = []
+
+    async def _create(available_slots: dict[str, str]) -> str:
+        agent_id = f"i-test-{secrets.token_hex(4)}"
+        async with db_engine.begin() as conn:
+            await conn.execute(
+                sa.insert(AgentRow.__table__).values(
+                    id=agent_id,
+                    status=AgentStatus.ALIVE,
+                    region="local",
+                    scaling_group=scaling_group_name,
+                    resource_group_id=scaling_group_id,
+                    schedulable=True,
+                    available_slots=ResourceSlot(available_slots),
+                    occupied_slots=ResourceSlot(),
+                    addr=f"10.0.0.{len(created_ids) + 1}:6001",
+                    version="26.0.0",
+                    architecture="x86_64",
+                    compute_plugins={},
+                )
+            )
+        created_ids.append(agent_id)
+        return agent_id
+
+    yield _create
+
+    if created_ids:
+        async with db_engine.begin() as conn:
+            await conn.execute(
+                AgentRow.__table__.delete().where(AgentRow.__table__.c.id.in_(created_ids))
+            )
+
+
+@pytest.fixture()
+async def compute_session_processors(
+    database_engine: ExtendedAsyncSAEngine,
+    background_task_manager: BackgroundTaskManager,
+    error_monitor: ErrorPluginContext,
+    rbac_permission_repo: PermissionControllerRepository,
+    storage_manager: StorageSessionManager,
+    valkey_clients: ValkeyClients,
+    config_provider: ManagerConfigProvider,
+    event_producer: EventProducer,
+    network_plugin_ctx: NetworkPluginContext,
+    hook_plugin_ctx: HookPluginContext,
+    resource_slot_types_seed: None,
+) -> SessionProcessors:
+    """SessionProcessors wired with a real SchedulingController and UserRepository.
+
+    Drives the actual compute-schedule path (spec preparation + agent
+    selection) against the real DB instead of a mocked controller.
+    """
+    # The shared _TestConfigProvider mocks get_raw to "true" for every key,
+    # which breaks the int-typed config/agent/max-container-count read in the
+    # scheduling path; "not configured" is the realistic default here.
+    cast(MagicMock, config_provider._legacy_etcd_config_loader).get_raw = AsyncMock(
+        return_value=None
+    )
+    scheduler_repository = SchedulerRepository(
+        database_engine,
+        valkey_clients.stat,
+        config_provider,
+    )
+    scheduling_controller = SchedulingController(
+        SchedulingControllerArgs(
+            repository=scheduler_repository,
+            config_provider=config_provider,
+            storage_manager=storage_manager,
+            event_producer=event_producer,
+            valkey_schedule=valkey_clients.schedule,
+            network_plugin_ctx=network_plugin_ctx,
+            hook_plugin_ctx=hook_plugin_ctx,
+            agent_selector=AgentSelector(
+                ConcentratedAgentSelector(
+                    config_provider.config.manager.agent_selection_resource_priority
+                )
+            ),
+        )
+    )
+    args = SessionServiceArgs(
+        agent_registry=AsyncMock(),
+        event_fetcher=AsyncMock(),
+        background_task_manager=background_task_manager,
+        event_hub=AsyncMock(),
+        error_monitor=error_monitor,
+        idle_checker_host=AsyncMock(),
+        session_repository=SessionRepository(database_engine),
+        scheduler_repository=scheduler_repository,
+        scheduling_controller=scheduling_controller,
+        appproxy_client_pool=AsyncMock(),
+        user_repository=UserRepository(database_engine),
+    )
+    service = SessionService(args)
+    real_single_entity_validator = SingleEntityActionRBACValidator(
+        rbac_permission_repo, MagicMock()
+    )
+    real_bulk_validator = BulkActionRBACValidator(rbac_permission_repo, MagicMock())
+    return SessionProcessors(
+        service=service,
+        action_monitors=[],
+        validators=ActionValidators(
+            rbac=RBACValidators(
+                scope=AsyncMock(),
+                single_entity=real_single_entity_validator,
+                bulk=real_bulk_validator,
+            )
+        ),
+    )
