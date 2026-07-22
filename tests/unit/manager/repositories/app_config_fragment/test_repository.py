@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec
 from ai.backend.common.data.permission.types import EntityType, ScopeType
-from ai.backend.common.identifier.app_config import AppConfigScopeIdentifier
+from ai.backend.common.identifier.app_config import AppConfigScopeID
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
 from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.user import UserID
@@ -66,10 +66,10 @@ _OTHER_DOMAIN_ID = DomainID(uuid.uuid4())
 _OTHER_USER_ID = UserID(uuid.uuid4())
 
 # The same owners seen as a fragment's scope_id, which is polymorphic over scope kinds.
-_DOMAIN_SCOPE_ID = AppConfigScopeIdentifier(_DOMAIN_ID)
-_USER_SCOPE_ID = AppConfigScopeIdentifier(_USER_ID)
-_OTHER_DOMAIN_SCOPE_ID = AppConfigScopeIdentifier(_OTHER_DOMAIN_ID)
-_OTHER_USER_SCOPE_ID = AppConfigScopeIdentifier(_OTHER_USER_ID)
+_DOMAIN_SCOPE_ID = AppConfigScopeID(_DOMAIN_ID)
+_USER_SCOPE_ID = AppConfigScopeID(_USER_ID)
+_OTHER_DOMAIN_SCOPE_ID = AppConfigScopeID(_OTHER_DOMAIN_ID)
+_OTHER_USER_SCOPE_ID = AppConfigScopeID(_OTHER_USER_ID)
 
 
 @pytest.fixture
@@ -149,7 +149,7 @@ async def fragment_at_every_scope(
     database: ExtendedAsyncSAEngine, theme_registered: None
 ) -> dict[AppConfigScopeType, AppConfigFragmentData]:
     """Situation: ``theme`` already holds one fragment at each scope, keyed by that scope."""
-    owners: dict[AppConfigScopeType, AppConfigScopeIdentifier | None] = {
+    owners: dict[AppConfigScopeType, AppConfigScopeID | None] = {
         AppConfigScopeType.PUBLIC: None,
         AppConfigScopeType.DOMAIN: _DOMAIN_SCOPE_ID,
         AppConfigScopeType.USER: _USER_SCOPE_ID,
@@ -535,9 +535,9 @@ class TestBulkUpdate:
                 pk_value=missing_id,  # missing -> reported
             ),
         ])
-        # partial: the existing fragment is updated; the missing one (index 1) is reported
+        # partial: the missing fragment is reported by its id
         assert [u.config for u in result.succeeded] == [{"x": 1}]
-        assert [f.index for f in result.failed] == [1]
+        assert [f.id for f in result.failed] == [missing_id]
         assert (await repository.get_by_id(two_fragments[0].id)).config == {"x": 1}
 
 
@@ -566,9 +566,9 @@ class TestBulkPurge:
             AppConfigFragmentPurgerSpec(fragment_id=two_fragments[0].id),
             AppConfigFragmentPurgerSpec(fragment_id=missing_id),  # missing -> reported
         ])
-        # partial: the existing fragment is purged; the missing one (index 1) is reported
+        # partial: the missing fragment is reported by its id
         assert [p.id for p in result.succeeded] == [two_fragments[0].id]
-        assert [f.index for f in result.failed] == [1]
+        assert [f.id for f in result.failed] == [missing_id]
         with pytest.raises(AppConfigFragmentNotFound):
             await repository.get_by_id(two_fragments[0].id)
 
@@ -724,7 +724,7 @@ class _FragmentScopeCase:
     """
 
     scope_type: AppConfigScopeType
-    scope_id: AppConfigScopeIdentifier | None
+    scope_id: AppConfigScopeID | None
     expected_bindings: list[_ScopeBinding] = field(default_factory=list)
 
 

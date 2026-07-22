@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Any
 
 from ai.backend.common.data.app_config.types import AppConfigScopeType
-from ai.backend.common.identifier.app_config import AppConfigScopeIdentifier
+from ai.backend.common.identifier.app_config import AppConfigScopeID
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
 
 
@@ -16,7 +16,7 @@ class AppConfigFragmentData:
     id: AppConfigFragmentID
     config_name: str
     scope_type: AppConfigScopeType
-    scope_id: AppConfigScopeIdentifier | None
+    scope_id: AppConfigScopeID | None
     config: dict[str, Any]
     created_at: datetime
     updated_at: datetime
@@ -34,9 +34,13 @@ class AppConfigFragmentSearchResult:
 
 @dataclass(frozen=True)
 class AppConfigFragmentBulkItemError:
-    """One failed item of a partial bulk mutation: its batch position and a reason."""
+    """One failed item of a partial bulk mutation: the fragment it targeted and a reason.
 
-    index: int
+    Every bulk item names its own fragment, so the id is what the caller can act on — a
+    batch position would make them correlate the failure back by hand.
+    """
+
+    id: AppConfigFragmentID
     message: str
 
 
