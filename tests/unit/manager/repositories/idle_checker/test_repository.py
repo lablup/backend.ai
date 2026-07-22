@@ -35,6 +35,7 @@ from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.idle_checker.repository import IdleCheckerRepository
+from ai.backend.manager.repositories.idle_checker.types import SessionIdleCheckPair
 from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.testutils.db import with_tables
 
@@ -467,3 +468,26 @@ class TestFetchExpiredIdleChecks:
         assert check_session_ids == {expired_check_session.session_id}
         for check in batch.checks:
             assert check.expire_at <= batch.now
+
+    async def test_fetches_current_pairs_only_for_target_session_statuses(
+        self,
+        repository: IdleCheckerRepository,
+        expired_check_session: ExpiredCheckSessionData,
+        terminated_session_with_expired_check: SessionId,
+    ) -> None:
+        batch = await repository.fetch_current_session_idle_checks([SessionStatus.RUNNING])
+
+        assert set(batch.pairs) == {
+            SessionIdleCheckPair(
+                expired_check_session.session_id,
+                expired_check_session.first_checker_id,
+            ),
+            SessionIdleCheckPair(
+                expired_check_session.session_id,
+                expired_check_session.second_checker_id,
+            ),
+        }
+        assert terminated_session_with_expired_check not in {
+            pair.session_id for pair in batch.pairs
+        }
+        assert batch.now.tzinfo is not None

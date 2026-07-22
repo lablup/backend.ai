@@ -34,7 +34,9 @@ class IdleCheckAssignmentSyncSource(
         desired_pairs = await self._repository.fetch_desired_session_idle_check_pairs(
             target_statuses.session_statuses
         )
-        current_batch = await self._repository.fetch_current_session_idle_checks()
+        current_batch = await self._repository.fetch_current_session_idle_checks(
+            target_statuses.session_statuses
+        )
         return IdleCheckAssignmentSyncReconcileInfo(
             desired_pairs=desired_pairs,
             current_pairs=current_batch.pairs,

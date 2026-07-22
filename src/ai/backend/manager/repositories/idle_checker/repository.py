@@ -34,8 +34,11 @@ class IdleCheckerRepository:
     ) -> list[SessionIdleCheckPair]:
         return await self._db_source.fetch_desired_session_idle_check_pairs(session_statuses)
 
-    async def fetch_current_session_idle_checks(self) -> SessionIdleCheckPairBatchData:
-        return await self._db_source.fetch_current_session_idle_checks()
+    async def fetch_current_session_idle_checks(
+        self,
+        session_statuses: Collection[SessionStatus],
+    ) -> SessionIdleCheckPairBatchData:
+        return await self._db_source.fetch_current_session_idle_checks(session_statuses)
 
     async def fetch_expired_idle_checks(
         self, session_statuses: Collection[SessionStatus]

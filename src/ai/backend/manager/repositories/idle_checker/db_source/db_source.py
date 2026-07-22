@@ -171,10 +171,17 @@ class IdleCheckerDBSource:
             for row in rows
         ]
 
-    async def fetch_current_session_idle_checks(self) -> SessionIdleCheckPairBatchData:
-        query = sa.select(
-            SessionIdleCheckRow.session_id,
-            SessionIdleCheckRow.idle_checker_id,
+    async def fetch_current_session_idle_checks(
+        self,
+        session_statuses: Collection[SessionStatus],
+    ) -> SessionIdleCheckPairBatchData:
+        query = (
+            sa.select(
+                SessionIdleCheckRow.session_id,
+                SessionIdleCheckRow.idle_checker_id,
+            )
+            .join(SessionRow, SessionIdleCheckRow.session_id == SessionRow.id)
+            .where(SessionRow.status.in_(session_statuses))
         )
         querier = BatchQuerier(pagination=NoPagination())
         async with self._ops.read_ops() as r:

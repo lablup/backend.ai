@@ -104,4 +104,6 @@ class TestIdleCheckAssignmentSyncSource:
         case.repository.fetch_desired_session_idle_check_pairs.assert_awaited_once_with(
             case.target_statuses.session_statuses
         )
-        case.repository.fetch_current_session_idle_checks.assert_awaited_once_with()
+        case.repository.fetch_current_session_idle_checks.assert_awaited_once_with(
+            case.target_statuses.session_statuses
+        )
