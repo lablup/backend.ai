@@ -8,7 +8,6 @@ from dataclasses import dataclass, field
 
 import pytest
 import sqlalchemy as sa
-from tests.unit.manager.repositories.test_utils import create_test_password_info
 
 from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec
@@ -22,6 +21,7 @@ from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.app_config_fragment.types import (
     AppConfigFragmentData,
 )
+from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.errors.app_config import (
     AppConfigFragmentNotFound,
     AppConfigFragmentWriteNotAllowed,
@@ -33,6 +33,7 @@ from ai.backend.manager.models.app_config_definition.row import AppConfigDefinit
 from ai.backend.manager.models.app_config_fragment.conditions import AppConfigFragmentConditions
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
 from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
@@ -452,7 +453,12 @@ async def scope_owners(database: ExtendedAsyncSAEngine) -> None:
                 uuid=_USER_ID,
                 email="app-config-fragment@lablup.com",
                 username="app-config-fragment",
-                password=create_test_password_info("test_password"),
+                password=PasswordInfo(
+                    password="test_password",
+                    algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
+                    rounds=100_000,
+                    salt_size=32,
+                ),
                 domain_name=_DOMAIN_NAME,
                 resource_policy=_RESOURCE_POLICY_NAME,
             )
