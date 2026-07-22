@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import Decimal
+from functools import cached_property
 
 from ai.backend.common.identifier.architecture import ArchName
-from ai.backend.common.types import AgentId, SlotName
+from ai.backend.common.types import AgentId, SessionId, SlotName
 
 
 @dataclass(frozen=True)
@@ -62,18 +63,36 @@ class AgentMeta:
         )
 
 
+@dataclass(frozen=True)
+class AgentLimit:
+    """Per-agent cap enforced during selection."""
+
+    # Maximum number of containers allowed per agent
+    max_container_count: int | None
+
+
 @dataclass
 class ResourceGroupResource:
-    """The resource group's schedulable agents and their per-slot aggregate."""
+    """The resource group's schedulable agents plus per-agent observations.
+
+    This is the value agent-selection trackers are built from; both the
+    scheduling pass and the compute-schedule fitting check consume it.
+    """
 
     agents: list[AgentMeta]
-    # Per-slot capacity/reserved/used summed over the group's agents
-    slots: Mapping[SlotName, SlotResource]
+    # Sessions that previously failed per agent (retry deprioritization
+    # hints from Valkey; empty for the fitting check)
+    failed_sessions_by_agent: Mapping[AgentId, frozenset[SessionId]] = field(default_factory=dict)
 
-    @classmethod
-    def from_agents(cls, agents: list[AgentMeta]) -> ResourceGroupResource:
+    @cached_property
+    def slots(self) -> Mapping[SlotName, SlotResource]:
+        """Per-slot capacity/reserved/used summed over the agents.
+
+        Computed on first use; only capacity-aware consumers (DRF) pay
+        for the aggregation.
+        """
         totals: dict[SlotName, SlotResource] = {}
-        for agent in agents:
+        for agent in self.agents:
             for slot_name, resource in agent.resources.slots.items():
                 current = totals.get(slot_name)
                 if current is None:
@@ -84,4 +103,4 @@ class ResourceGroupResource:
                         reserved=current.reserved + resource.reserved,
                         used=current.used + resource.used,
                     )
-        return cls(agents=agents, slots=totals)
+        return totals

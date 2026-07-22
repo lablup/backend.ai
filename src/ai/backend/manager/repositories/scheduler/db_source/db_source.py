@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Any, cast
 from uuid import UUID
 
 if TYPE_CHECKING:
-    from ai.backend.manager.data.session.draft import SessionSpecDraft
+    from ai.backend.manager.data.session.draft import KernelGroupDraft, SessionSpecDraft
     from ai.backend.manager.data.session.spec import SessionSpec
 
 import sqlalchemy as sa
@@ -117,9 +117,11 @@ from ai.backend.manager.repositories.scheduler.creators import (
 )
 from ai.backend.manager.repositories.scheduler.options import ImageConditions
 from ai.backend.manager.repositories.scheduler.types.resource_group import ResourceGroupFetch
+from ai.backend.manager.repositories.scheduler.types.scheduling import SchedulingFetch
 from ai.backend.manager.repositories.scheduler.types.session import PendingSessions
 from ai.backend.manager.repositories.scheduler.types.session_creation import (
     AllowedScalingGroup,
+    ComputeScheduleFetch,
     SessionSpecFetch,
     UserEnqueueFetch,
 )
@@ -130,7 +132,6 @@ from ai.backend.manager.types import UserScope
 from ai.backend.manager.views.sokovan.agent import (
     AgentMeta,
     AgentResource,
-    ResourceGroupResource,
     SlotResource,
 )
 from ai.backend.manager.views.sokovan.allocation import (
@@ -150,7 +151,6 @@ from ai.backend.manager.views.sokovan.lifecycle import (
 )
 from ai.backend.manager.views.sokovan.resource_group import ResourceGroupMeta
 from ai.backend.manager.views.sokovan.results import ScheduledSessionData
-from ai.backend.manager.views.sokovan.scheduling import SchedulingData
 from ai.backend.manager.views.sokovan.search import (
     SessionWithKernelsAndUserSearchResult,
     SessionWithKernelsSearchResult,
@@ -167,16 +167,13 @@ from ai.backend.manager.views.sokovan.session_creation import (
     ResourceGroupEnqueueInfo,
 )
 from ai.backend.manager.views.sokovan.snapshot import (
-    GlobalScopeSnapshot,
     ResourceAllocation,
     ResourceGroupSchedulingPolicy,
-    ResourceGroupScopeSnapshot,
     ResourceLimit,
     ResourceOccupancySnapshot,
     ResourcePolicySnapshot,
     SessionDependencySnapshot,
     SlotAllocation,
-    SystemSnapshot,
     UserResourceAllocation,
     UserResourceLimit,
 )
@@ -240,11 +237,14 @@ class ScheduleDBSource:
     ) -> None:
         self._db = db
 
-    async def get_scheduling_data(
-        self, resource_group_id: ResourceGroupID, max_container_count: int | None
-    ) -> SchedulingData:
+    async def fetch_scheduling_fetch(
+        self, resource_group_id: ResourceGroupID
+    ) -> SchedulingFetch | None:
         """
-        Fetch all scheduling data from database in a single session.
+        Batch-fetch the DB-side sources of one scheduling run in a single
+        session; ``None`` when the group has no pending sessions. The
+        repository composes the result with the Valkey retry hints and
+        the configured agent limit.
         Raises ScalingGroupNotFound if the resource group doesn't exist.
         """
         async with self._db.begin_readonly_session_read_committed() as db_sess:
@@ -254,23 +254,28 @@ class ScheduleDBSource:
             # 2. Get pending sessions
             pending_sessions = await self._fetch_pending_sessions(db_sess, resource_group.meta.id)
             if not pending_sessions.sessions:
-                return SchedulingData(
-                    resource_group=resource_group.meta,
-                    workloads=[],
-                    system_snapshot=None,
-                    max_container_count=max_container_count,
-                )
+                return None
 
-            # 3. Assemble the system snapshot (fetches its own agent observations)
-            system_snapshot = await self._fetch_system_snapshot(
-                db_sess, resource_group.meta.id, pending_sessions, resource_group.policy
+            # 3. Fetch the remaining observations bounded by the pending owners
+            agents = await self._fetch_agents(db_sess, resource_group.meta.id)
+            occupancy = await self._fetch_global_occupancy(db_sess, pending_sessions)
+            known_slot_types = await self._fetch_known_slot_types(db_sess)
+            resource_policy = await self._fetch_resource_limits(
+                db_sess,
+                pending_sessions,
+                known_slot_types,
             )
+            session_ids = [s.session_id for s in pending_sessions.sessions]
+            session_dependencies = await self._fetch_session_dependencies(db_sess, session_ids)
 
-            return SchedulingData(
+            return SchedulingFetch(
                 resource_group=resource_group.meta,
+                policy=resource_group.policy,
                 workloads=pending_sessions.sessions,
-                system_snapshot=system_snapshot,
-                max_container_count=max_container_count,
+                agents=agents,
+                occupancy=occupancy,
+                resource_policy=resource_policy,
+                session_dependencies=SessionDependencySnapshot(by_session=session_dependencies),
             )
 
     async def _fetch_resource_group_with_slot_inventory(
@@ -499,11 +504,6 @@ class ScheduleDBSource:
 
         return PendingSessions(sessions=workloads)
 
-    async def get_schedulable_agents(self, resource_group_id: ResourceGroupID) -> list[AgentMeta]:
-        """Targeted read of the group's schedulable agents (for fitting checks)."""
-        async with self._db.begin_readonly_session_read_committed() as db_sess:
-            return await self._fetch_agents(db_sess, resource_group_id)
-
     async def _fetch_agents(
         self, db_sess: SASession, resource_group_id: ResourceGroupID
     ) -> list[AgentMeta]:
@@ -568,46 +568,6 @@ class ScheduleDBSource:
         )
         rows = (await db_sess.execute(count_stmt)).all()
         return {AgentId(row.agent): row.container_count for row in rows}
-
-    async def _fetch_system_snapshot(
-        self,
-        db_sess: SASession,
-        resource_group_id: ResourceGroupID,
-        pending_sessions: PendingSessions,
-        scheduling_policy: ResourceGroupSchedulingPolicy,
-    ) -> SystemSnapshot:
-        """Assemble the scheduling snapshot, split by data scope.
-
-        Owns every observation it captures: the resource group's agents are
-        fetched here, while ``pending_sessions`` only bounds the occupancy
-        and limit scans to the owners being scheduled.
-        """
-        agents = await self._fetch_agents(db_sess, resource_group_id)
-        occupancy = await self._fetch_global_occupancy(db_sess, pending_sessions)
-
-        # Fetch resource limits for entities in pending sessions
-        known_slot_types = await self._fetch_known_slot_types(db_sess)
-        resource_policy = await self._fetch_resource_limits(
-            db_sess,
-            pending_sessions,
-            known_slot_types,
-        )
-
-        # Session dependencies
-        session_ids = [s.session_id for s in pending_sessions.sessions]
-        session_dependencies = await self._fetch_session_dependencies(db_sess, session_ids)
-
-        return SystemSnapshot(
-            resource_group=ResourceGroupScopeSnapshot(
-                resources=ResourceGroupResource.from_agents(agents),
-                session_dependencies=SessionDependencySnapshot(by_session=session_dependencies),
-                policy=scheduling_policy,
-            ),
-            global_scope=GlobalScopeSnapshot(
-                occupancy=occupancy,
-                resource_policy=resource_policy,
-            ),
-        )
 
     async def _fetch_known_slot_types(self, db_sess: SASession) -> dict[SlotName, SlotTypes]:
         """Known slot types from the resource_slot_types registry."""
@@ -1565,143 +1525,191 @@ class ScheduleDBSource:
         """Batch-fetch the DB-side sources of the enqueue context in a
         single readonly transaction. The repository composes the result
         with the storage-manager mount resolution."""
-        resource_group_id = draft.scope.resource_group_id
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
+            return await self._fetch_session_spec_fetch(db_sess, draft)
+
+    async def fetch_compute_schedule_fetch(
+        self,
+        draft: SessionSpecDraft,
+        resource_group_id: ResourceGroupID,
+    ) -> ComputeScheduleFetch:
+        """Batch-fetch the DB-side sources of the fitting check in a
+        single readonly transaction: the spec context plus the target
+        group's schedulable agents. The repository composes the result
+        with the configured agent limit."""
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
+            spec = await self._fetch_session_spec_fetch(db_sess, draft)
+            agents = await self._fetch_agents(db_sess, resource_group_id)
+            return ComputeScheduleFetch(spec=spec, agents=agents)
+
+    async def _fetch_session_spec_fetch(
+        self,
+        db_sess: SASession,
+        draft: SessionSpecDraft,
+    ) -> SessionSpecFetch:
+        """Batch-fetch the DB-side sources of the enqueue context, one
+        helper per source group of :class:`SessionSpecFetch`."""
+        kernel_specs = tuple(draft.resource_spec.options.kernel_groups or ())
+        return SessionSpecFetch(
+            resource_group=await self._fetch_resource_group_enqueue_info(
+                db_sess, draft.scope.resource_group_id
+            ),
+            global_info=await self._fetch_global_enqueue_info(db_sess, kernel_specs),
+            user=await self._fetch_user_enqueue_fetch(db_sess, draft),
+        )
+
+    async def _fetch_resource_group_enqueue_info(
+        self,
+        db_sess: SASession,
+        resource_group_id: ResourceGroupID | None,
+    ) -> ResourceGroupEnqueueInfo:
+        """Enqueue-time information of the target resource group; defaults
+        when the draft has no resource group yet."""
+        network_info: ScalingGroupNetworkInfo | None = None
+        rg_defaults = None
+        resource_group_allow_fractional = False
+        known_slot_types: Mapping[SlotName, SlotTypes] = {}
+        if resource_group_id:
+            rg_bundle = await self._fetch_resource_group_with_slot_inventory(
+                db_sess, resource_group_id
+            )
+            rg_row = rg_bundle.rg_row
+            known_slot_types = rg_bundle.active_slot_types
+            network_info = ScalingGroupNetworkInfo(
+                use_host_network=rg_row.use_host_network,
+                wsproxy_addr=rg_row.wsproxy_addr,
+            )
+            rg_defaults = rg_row.default_session_options
+            scheduler_opts = rg_row.scheduler_opts
+            resource_group_allow_fractional = bool(
+                getattr(scheduler_opts, "allow_fractional_resource_fragmentation", False)
+            )
+
+        if rg_defaults is None:
+            rg_defaults = DefaultSessionOptions()
+
+        return ResourceGroupEnqueueInfo(
+            defaults=rg_defaults,
+            network=network_info,
+            allow_fractional=resource_group_allow_fractional,
+            known_slot_types=known_slot_types,
+        )
+
+    async def _fetch_global_enqueue_info(
+        self,
+        db_sess: SASession,
+        kernel_specs: tuple[KernelGroupDraft, ...],
+    ) -> GlobalEnqueueInfo:
+        """Cluster-global registries: the images the draft references and
+        the slot type registry."""
+        slot_type_info = await self._fetch_slot_type_info(db_sess)
+
+        image_ids: list[UUID] = []
+        seen_ids: set[UUID] = set()
+        for group in kernel_specs:
+            img = group.execution_spec.resource_input.image_id
+            if img is None:
+                continue
+            img_uuid = UUID(str(img))
+            if img_uuid in seen_ids:
+                continue
+            seen_ids.add(img_uuid)
+            image_ids.append(img_uuid)
+        image_rows: list[ImageRow] = []
+        if image_ids:
+            image_rows = list(
+                (await db_sess.scalars(sa.select(ImageRow).where(ImageRow.id.in_(image_ids)))).all()
+            )
+        image_infos = {
+            ImageID(row.id): ImageInfo(
+                id=row.id,
+                canonical=row.name,
+                architecture=row.architecture,
+                registry=row.registry,
+                labels=row.labels,
+                resource_spec=cast(dict[str, Any], row.resources),
+            )
+            for row in image_rows
+        }
+
+        return GlobalEnqueueInfo(
+            image_infos=image_infos,
+            slot_type_info=slot_type_info,
+        )
+
+    async def _fetch_user_enqueue_fetch(
+        self,
+        db_sess: SASession,
+        draft: SessionSpecDraft,
+    ) -> UserEnqueueFetch:
+        """DB-derived enqueue-time information of the session owner."""
         access_key = draft.resource_spec.identity.access_key
         user_uuid = draft.resource_spec.identity.user_uuid
         domain_name = str(draft.scope.domain_name) if draft.scope.domain_name else None
         project_id = draft.scope.project_id
 
-        kernel_specs = tuple(draft.resource_spec.options.kernel_groups or ())
+        user_container = (
+            await self._fetch_user_container_info(db_sess, user_uuid)
+            if user_uuid is not None
+            else ContainerUserInfo()
+        )
 
-        async with self._db.begin_readonly_session_read_committed() as db_sess:
-            network_info: ScalingGroupNetworkInfo | None = None
-            rg_defaults = None
-            resource_group_allow_fractional = False
-            known_slot_types: Mapping[SlotName, SlotTypes] = {}
-            slot_type_info = await self._fetch_slot_type_info(db_sess)
-            if resource_group_id:
-                rg_bundle = await self._fetch_resource_group_with_slot_inventory(
-                    db_sess, resource_group_id
+        # Enqueue gates are user-scoped; the policy values are sourced
+        # from the user's main keypair policy (no user-level columns yet).
+        user_enqueue_policy = None
+        if user_uuid is not None:
+            policy_row = (
+                await db_sess.execute(
+                    sa.select(
+                        KeyPairResourcePolicyRow.max_containers_per_session,
+                        KeyPairResourcePolicyRow.max_pending_session_count,
+                        KeyPairResourcePolicyRow.allowed_vfolder_hosts,
+                    )
+                    .select_from(UserRow)
+                    .join(KeyPairRow, UserRow.main_access_key == KeyPairRow.access_key)
+                    .join(
+                        KeyPairResourcePolicyRow,
+                        KeyPairRow.resource_policy == KeyPairResourcePolicyRow.name,
+                    )
+                    .where(UserRow.uuid == user_uuid)
                 )
-                rg_row = rg_bundle.rg_row
-                known_slot_types = rg_bundle.active_slot_types
-                network_info = ScalingGroupNetworkInfo(
-                    use_host_network=rg_row.use_host_network,
-                    wsproxy_addr=rg_row.wsproxy_addr,
-                )
-                rg_defaults = rg_row.default_session_options
-                scheduler_opts = rg_row.scheduler_opts
-                resource_group_allow_fractional = bool(
-                    getattr(scheduler_opts, "allow_fractional_resource_fragmentation", False)
+            ).one_or_none()
+            if policy_row is not None:
+                user_enqueue_policy = UserEnqueuePolicy(
+                    max_containers_per_session=policy_row.max_containers_per_session,
+                    max_pending_session_count=policy_row.max_pending_session_count,
+                    allowed_vfolder_hosts=policy_row.allowed_vfolder_hosts,
                 )
 
-            if rg_defaults is None:
-                rg_defaults = DefaultSessionOptions()
-
-            image_ids: list[UUID] = []
-            seen_ids: set[UUID] = set()
-            for group in kernel_specs:
-                img = group.execution_spec.resource_input.image_id
-                if img is None:
-                    continue
-                img_uuid = UUID(str(img))
-                if img_uuid in seen_ids:
-                    continue
-                seen_ids.add(img_uuid)
-                image_ids.append(img_uuid)
-            image_rows: list[ImageRow] = []
-            if image_ids:
-                image_rows = list(
-                    (
-                        await db_sess.scalars(sa.select(ImageRow).where(ImageRow.id.in_(image_ids)))
-                    ).all()
-                )
-            image_infos = {
-                ImageID(row.id): ImageInfo(
-                    id=row.id,
-                    canonical=row.name,
-                    architecture=row.architecture,
-                    registry=row.registry,
-                    labels=row.labels,
-                    resource_spec=cast(dict[str, Any], row.resources),
-                )
-                for row in image_rows
-            }
-
-            user_container = (
-                await self._fetch_user_container_info(db_sess, user_uuid)
-                if user_uuid is not None
-                else ContainerUserInfo()
+        dotfile_bundle = DotfileBundle()
+        if domain_name is not None and user_uuid is not None and access_key is not None:
+            user_scope_for_dotfiles = UserScope(
+                domain_name=domain_name,
+                group_id=project_id if project_id is not None else UUID(int=0),
+                user_uuid=user_uuid,
+                user_role="user",
+            )
+            dotfile_bundle = await self._fetch_dotfile_data(
+                db_sess, user_scope_for_dotfiles, access_key
             )
 
-            # Enqueue gates are user-scoped; the policy values are sourced
-            # from the user's main keypair policy (no user-level columns yet).
-            user_enqueue_policy = None
-            if user_uuid is not None:
-                policy_row = (
-                    await db_sess.execute(
-                        sa.select(
-                            KeyPairResourcePolicyRow.max_containers_per_session,
-                            KeyPairResourcePolicyRow.max_pending_session_count,
-                            KeyPairResourcePolicyRow.allowed_vfolder_hosts,
-                        )
-                        .select_from(UserRow)
-                        .join(KeyPairRow, UserRow.main_access_key == KeyPairRow.access_key)
-                        .join(
-                            KeyPairResourcePolicyRow,
-                            KeyPairRow.resource_policy == KeyPairResourcePolicyRow.name,
-                        )
-                        .where(UserRow.uuid == user_uuid)
-                    )
-                ).one_or_none()
-                if policy_row is not None:
-                    user_enqueue_policy = UserEnqueuePolicy(
-                        max_containers_per_session=policy_row.max_containers_per_session,
-                        max_pending_session_count=policy_row.max_pending_session_count,
-                        allowed_vfolder_hosts=policy_row.allowed_vfolder_hosts,
-                    )
-
-            dotfile_bundle = DotfileBundle()
-            if domain_name is not None and user_uuid is not None and access_key is not None:
-                user_scope_for_dotfiles = UserScope(
-                    domain_name=domain_name,
-                    group_id=project_id if project_id is not None else UUID(int=0),
-                    user_uuid=user_uuid,
-                    user_role="user",
+        # Global per-user pending-session count for the enqueue queue-depth
+        # gate. Concurrent-session limits are enforced by the scheduler.
+        pending_session_count = 0
+        if user_uuid is not None:
+            pending_count_result = await db_sess.execute(
+                sa.select(sa.func.count()).where(
+                    SessionRow.user_uuid == user_uuid,
+                    SessionRow.status == SessionStatus.PENDING,
                 )
-                dotfile_bundle = await self._fetch_dotfile_data(
-                    db_sess, user_scope_for_dotfiles, access_key
-                )
+            )
+            pending_session_count = int(pending_count_result.scalar_one())
 
-            # Global per-user pending-session count for the enqueue queue-depth
-            # gate. Concurrent-session limits are enforced by the scheduler.
-            pending_session_count = 0
-            if user_uuid is not None:
-                pending_count_result = await db_sess.execute(
-                    sa.select(sa.func.count()).where(
-                        SessionRow.user_uuid == user_uuid,
-                        SessionRow.status == SessionStatus.PENDING,
-                    )
-                )
-                pending_session_count = int(pending_count_result.scalar_one())
-
-        return SessionSpecFetch(
-            resource_group=ResourceGroupEnqueueInfo(
-                defaults=rg_defaults,
-                network=network_info,
-                allow_fractional=resource_group_allow_fractional,
-                known_slot_types=known_slot_types,
-            ),
-            global_info=GlobalEnqueueInfo(
-                image_infos=image_infos,
-                slot_type_info=slot_type_info,
-            ),
-            user=UserEnqueueFetch(
-                policy=user_enqueue_policy,
-                container_user=user_container,
-                dotfiles=dotfile_bundle,
-                pending_session_count=pending_session_count,
-            ),
+        return UserEnqueueFetch(
+            policy=user_enqueue_policy,
+            container_user=user_container,
+            dotfiles=dotfile_bundle,
+            pending_session_count=pending_session_count,
         )
 
     async def pick_default_resource_group(

@@ -12,8 +12,8 @@ from typing import override
 
 from .selector import (
     AbstractAgentSelector,
-    AgentStateTracker,
 )
+from .tracker import AgentStateTracker
 from .types import ResourceRequirements
 from .utils import count_unutilized_capabilities, order_slots_by_priority
 

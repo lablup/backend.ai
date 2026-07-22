@@ -16,7 +16,7 @@ from ai.backend.common.types import (
     SlotName,
 )
 
-from .agent import ResourceGroupResource
+from .agent import AgentLimit, ResourceGroupResource
 from .workload import (
     ResourceRequest,
     SessionDependencyInfo,
@@ -227,6 +227,8 @@ class GlobalScopeSnapshot:
     occupancy: ResourceOccupancySnapshot
     # Resource limits per owner scope
     resource_policy: ResourcePolicySnapshot
+    # Per-agent container cap from manager configuration
+    agent_limit: AgentLimit
 
 
 @dataclass

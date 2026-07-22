@@ -120,7 +120,7 @@ class ScheduleSessionsLifecycleHandler(SessionLifecycleHandler):
 
         # Fetch scheduling data required by Provisioner
         scheduling_data = await self._repository.get_scheduling_data(resource_group_id)
-        if not scheduling_data.workloads:
+        if scheduling_data is None:
             log.debug(
                 "No scheduling data for resource group {}. Skipping all sessions.",
                 resource_group_id,

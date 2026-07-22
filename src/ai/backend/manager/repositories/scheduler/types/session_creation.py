@@ -12,6 +12,7 @@ from ai.backend.manager.data.dotfile.types import DotfileBundle
 from ai.backend.manager.data.resource.types import UserEnqueuePolicy
 from ai.backend.manager.data.session.creation import ContainerUserInfo
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts
+from ai.backend.manager.views.sokovan.agent import AgentMeta
 from ai.backend.manager.views.sokovan.session_creation import (
     GlobalEnqueueInfo,
     ResourceGroupEnqueueInfo,
@@ -71,3 +72,12 @@ class SessionSpecFetch:
     resource_group: ResourceGroupEnqueueInfo
     global_info: GlobalEnqueueInfo
     user: UserEnqueueFetch
+
+
+@dataclass(frozen=True)
+class ComputeScheduleFetch:
+    """DB-side sources of the fitting check: spec context plus the target
+    resource group's schedulable agents."""
+
+    spec: SessionSpecFetch
+    agents: list[AgentMeta]

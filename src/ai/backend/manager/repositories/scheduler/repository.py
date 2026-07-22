@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Mapping
+from collections import defaultdict
+from collections.abc import Mapping, Sequence
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
@@ -13,6 +14,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.data.session.draft import SessionSpecDraft
     from ai.backend.manager.data.session.spec import SessionSpec
 
+from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.identifier.domain import DomainID, DomainName
@@ -46,7 +48,7 @@ from ai.backend.manager.repositories.base.creator import BulkCreator
 from ai.backend.manager.repositories.base.updater import BatchUpdater
 from ai.backend.manager.repositories.vfolder.mount import prepare_vfolder_mounts
 from ai.backend.manager.types import UserScope
-from ai.backend.manager.views.sokovan.agent import AgentMeta
+from ai.backend.manager.views.sokovan.agent import AgentLimit, ResourceGroupResource
 from ai.backend.manager.views.sokovan.allocation import AllocationBatch
 from ai.backend.manager.views.sokovan.lifecycle import (
     KernelCreationInfo,
@@ -55,7 +57,7 @@ from ai.backend.manager.views.sokovan.lifecycle import (
     SessionsForStartWithImages,
     SessionWithKernels,
 )
-from ai.backend.manager.views.sokovan.scheduling import SchedulingData
+from ai.backend.manager.views.sokovan.scheduling import ComputeScheduleData, SchedulingData
 from ai.backend.manager.views.sokovan.search import (
     SessionWithKernelsAndUserSearchResult,
     SessionWithKernelsSearchResult,
@@ -67,6 +69,12 @@ from ai.backend.manager.views.sokovan.session import (
     TerminatingSessionData,
 )
 from ai.backend.manager.views.sokovan.session_creation import SessionSpecContext
+from ai.backend.manager.views.sokovan.snapshot import (
+    GlobalScopeSnapshot,
+    ResourceGroupScopeSnapshot,
+    SystemSnapshot,
+)
+from ai.backend.manager.views.sokovan.workload import SessionWorkload
 
 from .cache_source.cache_source import ScheduleCacheSource
 from .db_source.db_source import ScheduleDBSource
@@ -98,6 +106,7 @@ class SchedulerRepository:
     _db: ExtendedAsyncSAEngine
     _db_source: ScheduleDBSource
     _cache_source: ScheduleCacheSource
+    _valkey_schedule: ValkeyScheduleClient
     _config_provider: ManagerConfigProvider
     _storage_manager: StorageSessionManager
 
@@ -105,28 +114,94 @@ class SchedulerRepository:
         self,
         db: ExtendedAsyncSAEngine,
         valkey_stat: ValkeyStatClient,
+        valkey_schedule: ValkeyScheduleClient,
         config_provider: ManagerConfigProvider,
         storage_manager: StorageSessionManager,
     ) -> None:
         self._db = db
         self._db_source = ScheduleDBSource(db)
         self._cache_source = ScheduleCacheSource(valkey_stat)
+        self._valkey_schedule = valkey_schedule
         self._config_provider = config_provider
         self._storage_manager = storage_manager
 
     @scheduler_repository_resilience.apply()
-    async def get_schedulable_agents(self, resource_group_id: ResourceGroupID) -> list[AgentMeta]:
-        """Targeted read of the group's schedulable agents (for fitting checks)."""
-        return await self._db_source.get_schedulable_agents(resource_group_id)
+    async def get_scheduling_data(
+        self, resource_group_id: ResourceGroupID
+    ) -> SchedulingData | None:
+        """Assemble the complete read state of one scheduling run.
 
-    @scheduler_repository_resilience.apply()
-    async def get_scheduling_data(self, resource_group_id: ResourceGroupID) -> SchedulingData:
-        """
-        Get scheduling data from database.
+        Composes the DB-side fetch with the per-agent retry hints (Valkey)
+        and the configured agent limit, so the returned snapshot is always
+        fully populated; ``None`` when there is nothing to schedule.
         Raises ScalingGroupNotFound if the resource group doesn't exist.
         """
-        max_container_count = await self._get_max_container_count()
-        return await self._db_source.get_scheduling_data(resource_group_id, max_container_count)
+        fetch = await self._db_source.fetch_scheduling_fetch(resource_group_id)
+        if fetch is None:
+            return None
+        failed_sessions_by_agent = await self._fetch_failed_sessions_by_agent(fetch.workloads)
+        agent_limit = AgentLimit(max_container_count=await self._get_max_container_count())
+        system_snapshot = SystemSnapshot(
+            resource_group=ResourceGroupScopeSnapshot(
+                resources=ResourceGroupResource(
+                    agents=fetch.agents,
+                    failed_sessions_by_agent=failed_sessions_by_agent,
+                ),
+                session_dependencies=fetch.session_dependencies,
+                policy=fetch.policy,
+            ),
+            global_scope=GlobalScopeSnapshot(
+                occupancy=fetch.occupancy,
+                resource_policy=fetch.resource_policy,
+                agent_limit=agent_limit,
+            ),
+        )
+        return SchedulingData(
+            resource_group=fetch.resource_group,
+            workloads=fetch.workloads,
+            system_snapshot=system_snapshot,
+        )
+
+    async def _fetch_failed_sessions_by_agent(
+        self, workloads: Sequence[SessionWorkload]
+    ) -> dict[AgentId, frozenset[SessionId]]:
+        """Invert the per-session failed-agent hints (Valkey) into the
+        per-agent view the selection trackers consume.
+
+        Uses a single pipelined batch request instead of N round-trips.
+        """
+        failed_agents_list = await self._valkey_schedule.get_multiple_session_failed_agents([
+            workload.session_id for workload in workloads
+        ])
+        failed_sessions_by_agent: dict[AgentId, set[SessionId]] = defaultdict(set)
+        for workload, failed_agents in zip(workloads, failed_agents_list, strict=True):
+            for agent_id in failed_agents:
+                failed_sessions_by_agent[agent_id].add(workload.session_id)
+        return {
+            agent_id: frozenset(session_ids)
+            for agent_id, session_ids in failed_sessions_by_agent.items()
+        }
+
+    @scheduler_repository_resilience.apply()
+    async def fetch_compute_schedule_data(
+        self,
+        draft: SessionSpecDraft,
+        resource_group_id: ResourceGroupID,
+    ) -> ComputeScheduleData:
+        """Assemble the read bundle of the fitting check: the spec context
+        (mounts unresolved), the group's agents, and the same configured
+        agent limit the real scheduling pass enforces.
+        """
+        fetch = await self._db_source.fetch_compute_schedule_fetch(draft, resource_group_id)
+        return ComputeScheduleData(
+            spec_context=SessionSpecContext(
+                resource_group=fetch.spec.resource_group,
+                user=fetch.spec.user.to_info({}),
+                global_info=fetch.spec.global_info,
+            ),
+            resources=ResourceGroupResource(agents=fetch.agents),
+            limit=AgentLimit(max_container_count=await self._get_max_container_count()),
+        )
 
     @scheduler_repository_resilience.apply()
     async def allocate_sessions(self, allocation_batch: AllocationBatch) -> list[SessionId]:

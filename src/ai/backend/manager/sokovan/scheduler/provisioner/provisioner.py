@@ -46,14 +46,13 @@ from .selectors.dispersed import DispersedAgentSelector
 from .selectors.legacy import LegacyAgentSelector
 from .selectors.roundrobin import RoundRobinAgentSelector
 from .selectors.selector import (
-    AgentLimit,
     AgentSelection,
     AgentSelectionCriteria,
     AgentSelector,
-    AgentStateTracker,
     KernelResourceSpec,
     SessionMetadata,
 )
+from .selectors.tracker import AgentStateTracker, build_agent_trackers
 from .sequencers.drf import DRFSequencer
 from .sequencers.fair_share import FairShareSequencer
 from .sequencers.fifo import FIFOSequencer
@@ -69,14 +68,22 @@ class SchedulingState:
     """Prepared state of one scheduling run, consumed by every later stage.
 
     ``snapshot`` captures the observed state plus the applicable policies
-    (including the resource group's sequencer/selector pool keys);
-    ``trackers`` and ``limit`` feed agent selection.
+    (pool keys, agent limit); ``trackers`` are the mutable in-batch agent
+    buffers derived from the snapshot's resource observations.
     """
 
     snapshot: SystemSnapshot
-    trackers: Sequence[AgentStateTracker]
-    limit: AgentLimit
     resource_group: ResourceGroupMeta
+    trackers: Sequence[AgentStateTracker]
+
+    @classmethod
+    def from_scheduling_data(cls, data: SchedulingData) -> SchedulingState:
+        """Convert the repository's read state into the run state."""
+        return cls(
+            snapshot=data.system_snapshot,
+            resource_group=data.resource_group,
+            trackers=build_agent_trackers(data.system_snapshot.resource_group.resources),
+        )
 
 
 @dataclass
@@ -178,45 +185,13 @@ class SessionProvisioner:
         Returns:
             ScheduleResult containing scheduled session data
         """
-        # Use data from scheduling_data instead of making DB calls
         base_workloads = scheduling_data.workloads
-        resource_group = scheduling_data.resource_group
-        resource_group_id = resource_group.id
+        resource_group_id = scheduling_data.resource_group.id
 
-        system_snapshot = scheduling_data.system_snapshot
-        if system_snapshot is None:
-            log.warning("Missing snapshot data for resource group {}", resource_group_id)
-            return ScheduleResult(scheduled_session_ids=[], scheduling_failures=[])
-
-        # Load per-session failed agents from Valkey for retry deprioritization,
-        # inverted into a per-agent view for the state trackers below.
-        # Uses a single pipelined Batch request instead of N parallel round-trips.
-        failed_agents_list = await self._valkey_schedule.get_multiple_session_failed_agents([
-            workload.session_id for workload in base_workloads
-        ])
-        failed_sessions_by_agent: dict[AgentId, set[SessionId]] = defaultdict(set)
-        for workload, failed_agents in zip(base_workloads, failed_agents_list, strict=True):
-            for agent_id in failed_agents:
-                failed_sessions_by_agent[agent_id].add(workload.session_id)
-
-        # Prepared run state, built once up front and consumed by every
-        # later stage (sequencing, validation, agent selection, snapshot
-        # updates). Observations stay immutable; in-batch allocations and
-        # retry-failure hints live in the trackers.
-        state = SchedulingState(
-            snapshot=system_snapshot,
-            resource_group=resource_group,
-            trackers=[
-                AgentStateTracker(
-                    original_agent=agent.to_agent_info(),
-                    failed_session_ids=frozenset(failed_sessions_by_agent.get(agent.id, ())),
-                )
-                for agent in system_snapshot.resource_group.resources.agents
-            ],
-            limit=AgentLimit(
-                max_container_count=scheduling_data.max_container_count,
-            ),
-        )
+        # Prepared run state, converted once up front from the repository's
+        # read state and consumed by every later stage (sequencing,
+        # validation, agent selection, snapshot updates).
+        state = SchedulingState.from_scheduling_data(scheduling_data)
 
         # Perform sequencing (batch operation for all workloads)
         # Record as shared phase so all entity records include it
@@ -292,7 +267,7 @@ class SessionProvisioner:
             scheduled_session_ids = await self._allocator.allocate(batch)
 
         failure_ids = [f.session_id for f in scheduling_failures]
-        await self._valkey_schedule.set_pending_queue(resource_group.name, failure_ids)
+        await self._valkey_schedule.set_pending_queue(state.resource_group.name, failure_ids)
         return ScheduleResult(
             scheduled_session_ids=scheduled_session_ids,
             scheduling_failures=scheduling_failures,
@@ -386,7 +361,7 @@ class SessionProvisioner:
             state.snapshot.resource_group.policy.agent_selection_strategy
         ]
         selections = await selector.select_agents_for_batch_requirements(
-            state.trackers, criteria, state.limit
+            state.trackers, criteria, state.snapshot.global_scope.agent_limit
         )
 
         # Build session allocation from selections

@@ -13,7 +13,6 @@ from ai.backend.common.events.event_types.session.broadcast import SchedulingBro
 from ai.backend.common.events.types import AbstractBroadcastEvent
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.identifier.architecture import ArchName
-from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
 from ai.backend.common.types import KernelId, ResourceSlot, ResourceSlotEntry, SessionId, SlotName
@@ -48,16 +47,17 @@ from ai.backend.manager.sokovan.scheduler.provisioner.selectors.exceptions impor
     BatchAgentSelectionFailedError,
 )
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import (
-    AgentLimit,
     AgentSelectionCriteria,
     AgentSelector,
-    AgentStateTracker,
     KernelResourceSpec,
     SessionMetadata,
 )
+from ai.backend.manager.sokovan.scheduler.provisioner.selectors.tracker import (
+    build_agent_trackers,
+)
 from ai.backend.manager.sokovan.scheduler.types import ScheduleType
 from ai.backend.manager.sokovan.scheduling_controller.types import SessionValidationSpec
-from ai.backend.manager.views.sokovan.agent import AgentMeta
+from ai.backend.manager.views.sokovan.scheduling import ComputeScheduleData
 from ai.backend.manager.views.sokovan.session import MarkTerminatingResult
 from ai.backend.manager.views.sokovan.session_creation import SessionSpecContext
 from ai.backend.manager.views.sokovan.workload import ResourceRequest
@@ -106,21 +106,10 @@ class SchedulingControllerArgs:
 
 
 @dataclass
-class _Image:
-    id: ImageID
-    architecture: str
-
-
-@dataclass
-class _KernelComputeScheduleResourceSpec:
-    spec: KernelResourceSpec
-    image: _Image
-
-
-@dataclass
 class _KernelComputeScheduleData:
-    resource_spec: _KernelComputeScheduleResourceSpec
-
+    # Selector input (carries the required architecture)
+    spec: KernelResourceSpec
+    # Echo of the request for the per-kernel result
     requested_slots: tuple[ResourceSlotEntry, ...]
     reason_hint: UnschedulableReasonHint | None
     success: bool = True
@@ -340,22 +329,16 @@ class SchedulingController:
             if image_info is None:
                 raise ImageNotFound(f"Image '{resource_input.image_id}' not found")
             prepared_data[kernel_id] = _KernelComputeScheduleData(
-                resource_spec=_KernelComputeScheduleResourceSpec(
-                    image=_Image(
-                        id=resource_input.image_id,
-                        architecture=image_info.architecture,
+                spec=KernelResourceSpec(
+                    requested_slots=ResourceRequest(
+                        slots={
+                            SlotName(k): v
+                            for k, v in ResourceSlotEntry.inputs_to_resource_slot(
+                                resource_input.resources
+                            ).items()
+                        }
                     ),
-                    spec=KernelResourceSpec(
-                        requested_slots=ResourceRequest(
-                            slots={
-                                SlotName(k): v
-                                for k, v in ResourceSlotEntry.inputs_to_resource_slot(
-                                    resource_input.resources
-                                ).items()
-                            }
-                        ),
-                        required_architecture=ArchName(image_info.architecture),
-                    ),
+                    required_architecture=ArchName(image_info.architecture),
                 ),
                 requested_slots=tuple(resource_input.resources),
                 reason_hint=None,
@@ -366,11 +349,11 @@ class SchedulingController:
         self,
         spec: SessionResourceSpec,
         resource_group_id: ResourceGroupID,
-        agents: list[AgentMeta],
+        data: ComputeScheduleData,
         kernel_data: dict[KernelId, _KernelComputeScheduleData],
     ) -> ComputeScheduleResult:
         kernel_requirements: dict[KernelId, KernelResourceSpec] = {
-            kernel_id: data.resource_spec.spec for kernel_id, data in kernel_data.items()
+            kernel_id: entry.spec for kernel_id, entry in kernel_data.items()
         }
 
         if kernel_requirements:
@@ -385,15 +368,15 @@ class SchedulingController:
                 agent_selection_policy=(spec.options.scheduling_target.agent_selection_policy),
             )
             # Trackers are throwaway here: the fitting check only needs the
-            # immutable observations, never the committed batch state.
-            # Container-limit remediation is intentionally out of scope, so the
-            # per-agent container limit is not enforced for the fitting check.
-            trackers = [AgentStateTracker(original_agent=agent.to_agent_info()) for agent in agents]
+            # immutable observations, never the committed batch state. The
+            # same builder as the real scheduling pass is used; only the
+            # retry-failure hints are absent.
+            trackers = build_agent_trackers(data.resources)
             # A resource group with no candidate agents (NoAgentsInResourceGroupError)
             # is likewise a whole-request error, so it propagates too.
             try:
                 await self._agent_selector.select_agents_for_batch_requirements(
-                    trackers, criteria, AgentLimit(max_container_count=None)
+                    trackers, criteria, data.limit
                 )
             except BatchAgentSelectionFailedError as e:
                 for err in e.errors:
@@ -419,12 +402,12 @@ class SchedulingController:
 
         kernel_result = [
             ComputeScheduleKernelResult(
-                requested_slots=kernel_data.requested_slots,
-                requested_architecture=kernel_data.resource_spec.image.architecture,
-                success=kernel_data.success,
-                reason_hint=kernel_data.reason_hint,
+                requested_slots=entry.requested_slots,
+                requested_architecture=entry.spec.required_architecture,
+                success=entry.success,
+                reason_hint=entry.reason_hint,
             )
-            for kernel_data in kernel_data.values()
+            for entry in kernel_data.values()
         ]
         return ComputeScheduleResult(kernel_results=kernel_result)
 
@@ -443,17 +426,18 @@ class SchedulingController:
         # SessionScopeDraft is used only to fetch dotfile data and container user info.
         # Node fitting does not depend on vfolder mounts, so the storage-RPC
         # resolution is skipped and the per-role mount map stays empty.
-        fetched = await self._repository.fetch_session_spec_context(
-            SessionSpecDraft(scope=SessionScopeDraft(), resource_spec=draft),
-            resolve_mounts=False,
-        )
-        resource_spec = await self._spec_preparer.prepare(draft, fetched)
-        compute_schedule_kernel_data = self._prepare_kernel_data(resource_spec, fetched)
         # An unknown resource group (ScalingGroupNotFound) is a request error,
         # not a per-kernel fitting outcome, so let it propagate to the caller.
-        agents = await self._repository.get_schedulable_agents(resource_group_id)
+        fetched = await self._repository.fetch_compute_schedule_data(
+            SessionSpecDraft(scope=SessionScopeDraft(), resource_spec=draft),
+            resource_group_id,
+        )
+        resource_spec = await self._spec_preparer.prepare(draft, fetched.spec_context)
+        compute_schedule_kernel_data = self._prepare_kernel_data(
+            resource_spec, fetched.spec_context
+        )
         return await self._compute_schedule(
-            resource_spec, resource_group_id, agents, compute_schedule_kernel_data
+            resource_spec, resource_group_id, fetched, compute_schedule_kernel_data
         )
 
     async def mark_scheduling_needed(self, schedule_types: Sequence[ScheduleType]) -> None:

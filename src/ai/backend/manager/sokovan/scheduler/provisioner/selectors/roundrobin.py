@@ -15,8 +15,8 @@ from typing import override
 
 from .selector import (
     AbstractAgentSelector,
-    AgentStateTracker,
 )
+from .tracker import AgentStateTracker
 from .types import ResourceRequirements
 
 
