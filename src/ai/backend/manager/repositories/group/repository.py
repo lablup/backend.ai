@@ -10,6 +10,7 @@ from uuid import UUID
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.identifier.project import ProjectID
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
@@ -146,12 +147,12 @@ class GroupRepository:
 
         Idempotent: re-binding an existing member is a no-op.
         """
-        await self._db_source.bind_user_to_project(user_id, project_id)
+        await self._db_source.bind_user_to_project(UserID(user_id), ProjectID(project_id))
 
     @group_repository_resilience.apply()
     async def unbind_user_from_project(self, user_id: UUID, project_id: UUID) -> None:
         """Remove a user from a project (RBAC scope binding only)."""
-        await self._db_source.unbind_user_from_project(user_id, project_id)
+        await self._db_source.unbind_user_from_project(UserID(user_id), ProjectID(project_id))
 
     @group_repository_resilience.apply()
     async def get_project(self, project_id: UUID) -> GroupData:

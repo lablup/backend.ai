@@ -45,15 +45,12 @@ from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
     RolePermissionPresetRow,
 )
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
+from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.manager.repositories.base import (
-    BatchPurger,
-    BatchPurgerResult,
     BulkCreator,
-    Purger,
-    PurgerResult,
 )
 from ai.backend.manager.repositories.base.creator import BulkCreatorError
 from ai.backend.manager.repositories.base.integrity import parse_integrity_error
@@ -70,8 +67,11 @@ from ai.backend.manager.repositories.base.rbac.entity_creator import (
     execute_rbac_entity_creators,
 )
 from ai.backend.manager.repositories.base.rbac.entity_purger import (
+    RBACEntityBatchPurger,
+    RBACEntityBatchPurgerResult,
     RBACEntityPurger,
     RBACEntityPurgerResult,
+    execute_rbac_entity_batch_purger,
     execute_rbac_entity_purger,
 )
 from ai.backend.manager.repositories.ops.base.provider import DBOpsProvider, WriteOps
@@ -109,8 +109,9 @@ class ScopeCreation[TRow: Base](ABC):
 
 
 class ScopeMember(ABC):
-    """A member to attach to a scope; ``assign_role_on`` names the user to grant its
-    auto_assign roles, or ``None`` to skip."""
+    """A member to attach to or detach from a scope; ``assign_role_on`` names the user
+    whose role mappings at the scope follow the membership change (auto_assign roles
+    granted on add, every scope role revoked on remove), or ``None`` to skip."""
 
     @abstractmethod
     def entity_ref(self) -> EntityRef:
@@ -128,19 +129,25 @@ class EntityMembersAddition:
 
 
 @dataclass
-class ScopeDeletion[TRow: Base]:
-    """A real scope-entity row to delete together with its virtual scope."""
+class EntityMembersRemoval:
+    scope: ScopeRef
+    members: Collection[ScopeMember]
 
-    purger: Purger[TRow]
+
+@dataclass
+class ScopeDeletion[TRow: Base]:
+    """A real scope-entity row to delete together with its RBAC entries and virtual scope."""
+
+    purger: RBACEntityPurger[TRow]
     scope: ScopeRef
 
 
 @dataclass
 class ScopeBatchDeletion[TRow: Base]:
-    """A batch purger selecting real scope-entity rows to delete, together with the
-    virtual scopes to drop for the deleted rows."""
+    """A batch purger selecting real scope-entity rows to delete together with their RBAC
+    entries, and the virtual scopes to drop for the deleted rows."""
 
-    purger: BatchPurger[TRow]
+    purger: RBACEntityBatchPurger[TRow]
     scopes: Sequence[ScopeRef]
 
 
@@ -506,28 +513,30 @@ class RBACWriteOps(WriteOps):
     async def delete_scope[TRow: Base](
         self,
         deletion: ScopeDeletion[TRow],
-    ) -> PurgerResult[TRow] | None:
-        """Delete the real scope entity via ``deletion.purger`` and its virtual scope node.
+    ) -> RBACEntityPurgerResult[TRow] | None:
+        """Delete a scope in full: the real row with its RBAC entries (permissions and
+        scope associations in both directions) and its virtual scope node.
 
         Deleting the virtual scope cascades to its scope bindings and entity
-        memberships (FK ``ON DELETE CASCADE``).
+        memberships (FK ``ON DELETE CASCADE``). Returns ``None`` if the row is
+        already gone.
         """
-        result = await self.purge(deletion.purger)
+        result = await self.purge_scoped(deletion.purger)
         await self._delete_virtual_scopes([deletion.scope])
         return result
 
     async def batch_delete_scopes[TRow: Base](
         self,
         deletion: ScopeBatchDeletion[TRow],
-    ) -> BatchPurgerResult:
-        """Delete the real scope entities matched by ``deletion.purger`` and their virtual
-        scope nodes.
+    ) -> RBACEntityBatchPurgerResult:
+        """Delete the scopes matched by ``deletion.purger`` in full, as
+        :meth:`delete_scope` does for one.
 
-        The real scope rows are purged atomically via the batch purge (all-or-nothing), then
-        the virtual scope nodes for ``deletion.scopes`` are dropped (FK ``ON DELETE CASCADE``
+        The real scope rows are purged in batches with their RBAC entries, then the
+        virtual scope nodes for ``deletion.scopes`` are dropped (FK ``ON DELETE CASCADE``
         removes their edges).
         """
-        result = await self.batch_purge(deletion.purger)
+        result = await execute_rbac_entity_batch_purger(self._sess, deletion.purger)
         await self._delete_virtual_scopes(deletion.scopes)
         return result
 
@@ -625,14 +634,15 @@ class RBACWriteOps(WriteOps):
 
     async def remove_entity_members(
         self,
-        scope: ScopeRef,
-        entities: Collection[EntityRef],
+        removal: EntityMembersRemoval,
     ) -> None:
-        """Delete each entity's virtual-scope membership and scope association; role mappings
-        are left untouched."""
-        entity_refs = list(entities)
-        if not entity_refs:
+        """Delete each member's virtual-scope membership and scope association, and revoke
+        every role at the scope from members whose ``assign_role_on`` returns a user id."""
+        members = list(removal.members)
+        if not members:
             return
+        scope = removal.scope
+        entity_refs = [member.entity_ref() for member in members]
         virtual_scope_id = await self._resolve_virtual_scope_id(scope)
         await self._sess.execute(
             sa.delete(EntityMembershipRow).where(
@@ -652,6 +662,21 @@ class RBACWriteOps(WriteOps):
                 ).in_([(EntityType(ref.entity_type), str(ref.entity_id)) for ref in entity_refs]),
             )
         )
+        role_user_ids = [
+            user_id for member in members if (user_id := member.assign_role_on()) is not None
+        ]
+        if role_user_ids:
+            scope_role_ids = sa.select(AssociationScopesEntitiesRow.entity_id).where(
+                AssociationScopesEntitiesRow.scope_type == LegacyScopeType(scope.scope_type),
+                AssociationScopesEntitiesRow.scope_id == str(scope.scope_id),
+                AssociationScopesEntitiesRow.entity_type == EntityType.ROLE,
+            )
+            await self._sess.execute(
+                sa.delete(UserRoleRow).where(
+                    UserRoleRow.user_id.in_(role_user_ids),
+                    sa.cast(UserRoleRow.role_id, sa.String).in_(scope_role_ids),
+                )
+            )
 
     # -- Virtual scope: ensure compatibility for externally-created rows ----------
 

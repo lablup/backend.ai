@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import uuid
 from collections.abc import AsyncGenerator
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import MagicMock
 
 import pytest
 import sqlalchemy as sa
@@ -81,7 +81,6 @@ from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRo
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.group.creators import GroupCreatorSpec
-from ai.backend.manager.repositories.group.db_source import GroupDBSource
 from ai.backend.manager.repositories.group.repository import GroupRepository
 from ai.backend.manager.repositories.group.updaters import GroupUpdaterSpec
 from ai.backend.manager.types import OptionalState, TriState
@@ -161,38 +160,22 @@ class TestGroupRepositoryCreateResourcePolicyValidation:
         return policy_name
 
     @pytest.fixture
-    async def group_db_source_with_mock_role_manager(
+    async def group_repository(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> GroupDBSource:
-        """GroupDBSource with mocked RoleManager for create tests."""
-        db_source = GroupDBSource(db=db_with_cleanup)
-        mock_role_manager = MagicMock()
-        mock_role_manager.create_system_role = AsyncMock(return_value=None)
-        mock_role_manager.create_preset_roles = AsyncMock(return_value=[])
-        db_source._role_manager = mock_role_manager
-        return db_source
-
-    @pytest.fixture
-    async def group_repository_with_mock_role_manager(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        group_db_source_with_mock_role_manager: GroupDBSource,
     ) -> GroupRepository:
-        """GroupRepository with mocked RoleManager for create tests."""
-        repo = GroupRepository(
+        """GroupRepository for create tests."""
+        return GroupRepository(
             db=db_with_cleanup,
             config_provider=MagicMock(),
             valkey_stat_client=MagicMock(),
             storage_manager=MagicMock(spec=StorageSessionManager),
         )
-        repo._db_source = group_db_source_with_mock_role_manager
-        return repo
 
     async def test_create_succeeds_with_existing_project_resource_policy(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        group_repository_with_mock_role_manager: GroupRepository,
+        group_repository: GroupRepository,
         test_domain: str,
         project_resource_policy: str,
     ) -> None:
@@ -210,14 +193,14 @@ class TestGroupRepositoryCreateResourcePolicyValidation:
         )
         creator = Creator(spec=spec)
 
-        result = await group_repository_with_mock_role_manager.create(creator)
+        result = await group_repository.create(creator)
 
         assert result.name == spec.name
         assert result.resource_policy == project_resource_policy
 
     async def test_create_fails_with_nonexistent_project_resource_policy(
         self,
-        group_repository_with_mock_role_manager: GroupRepository,
+        group_repository: GroupRepository,
         test_domain: str,
     ) -> None:
         """Test that group creation fails when project_resource_policy does not exist."""
@@ -236,7 +219,7 @@ class TestGroupRepositoryCreateResourcePolicyValidation:
         creator = Creator(spec=spec)
 
         with pytest.raises(InvalidAPIParameters) as exc_info:
-            await group_repository_with_mock_role_manager.create(creator)
+            await group_repository.create(creator)
 
         assert "Resource policy" in str(exc_info.value)
         assert "does not exist" in str(exc_info.value)
@@ -498,6 +481,12 @@ class TestGroupRepository:
                     entity_id=str(member_role_id),
                 )
             )
+            session.add(
+                VirtualScopeRow(
+                    scope_type=ScopeType.PROJECT.value,
+                    scope_id=group_id,
+                )
+            )
             await session.commit()
 
         return group_id
@@ -520,36 +509,6 @@ class TestGroupRepository:
             valkey_stat_client=MagicMock(),
             storage_manager=storage_manager_mock,
         )
-
-    @pytest.fixture
-    async def group_db_source_with_mock_role_manager(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> GroupDBSource:
-        """GroupDBSource with mocked RoleManager for create tests"""
-        db_source = GroupDBSource(db=db_with_cleanup)
-        mock_role_manager = MagicMock()
-        mock_role_manager.create_system_role = AsyncMock(return_value=None)
-        mock_role_manager.create_preset_roles = AsyncMock(return_value=[])
-        db_source._role_manager = mock_role_manager
-        return db_source
-
-    @pytest.fixture
-    async def group_repository_with_mock_role_manager(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        storage_manager_mock: StorageSessionManager,
-        group_db_source_with_mock_role_manager: GroupDBSource,
-    ) -> GroupRepository:
-        """GroupRepository with mocked RoleManager for create tests"""
-        repo = GroupRepository(
-            db=db_with_cleanup,
-            config_provider=MagicMock(),
-            valkey_stat_client=MagicMock(),
-            storage_manager=storage_manager_mock,
-        )
-        repo._db_source = group_db_source_with_mock_role_manager
-        return repo
 
     @pytest.fixture
     def test_scaling_group_id(self) -> ResourceGroupID:
@@ -887,7 +846,7 @@ class TestGroupRepository:
     async def test_create_success(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        group_repository_with_mock_role_manager: GroupRepository,
+        group_repository: GroupRepository,
         test_domain: str,
         default_project_resource_policy: str,
     ) -> None:
@@ -900,7 +859,7 @@ class TestGroupRepository:
         )
         creator = Creator(spec=creator_spec)
 
-        result = await group_repository_with_mock_role_manager.create(creator)
+        result = await group_repository.create(creator)
 
         assert result.name == "test-new-group"
         assert result.domain_name == test_domain
@@ -909,7 +868,7 @@ class TestGroupRepository:
 
     async def test_create_domain_not_exists(
         self,
-        group_repository_with_mock_role_manager: GroupRepository,
+        group_repository: GroupRepository,
         default_project_resource_policy: str,
     ) -> None:
         """Test group creation fails when domain does not exist"""
@@ -921,12 +880,12 @@ class TestGroupRepository:
         creator = Creator(spec=creator_spec)
 
         with pytest.raises(InvalidAPIParameters):
-            await group_repository_with_mock_role_manager.create(creator)
+            await group_repository.create(creator)
 
     async def test_create_duplicate_name_in_domain(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        group_repository_with_mock_role_manager: GroupRepository,
+        group_repository: GroupRepository,
         test_domain: str,
         default_project_resource_policy: str,
     ) -> None:
@@ -938,16 +897,16 @@ class TestGroupRepository:
         )
 
         # First creation succeeds
-        await group_repository_with_mock_role_manager.create(Creator(spec=creator_spec))
+        await group_repository.create(Creator(spec=creator_spec))
 
         # Second creation with same name should fail
         with pytest.raises(InvalidAPIParameters):
-            await group_repository_with_mock_role_manager.create(Creator(spec=creator_spec))
+            await group_repository.create(Creator(spec=creator_spec))
 
     async def test_create_creates_domain_scope_association(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        group_repository_with_mock_role_manager: GroupRepository,
+        group_repository: GroupRepository,
         test_domain: str,
         default_project_resource_policy: str,
     ) -> None:
@@ -960,7 +919,7 @@ class TestGroupRepository:
         )
         creator = Creator(spec=creator_spec)
 
-        result = await group_repository_with_mock_role_manager.create(creator)
+        result = await group_repository.create(creator)
 
         # Verify AssociationScopesEntitiesRow was created
         async with db_with_cleanup.begin_readonly_session() as session:
@@ -983,7 +942,7 @@ class TestGroupRepository:
     async def test_create_creates_admin_and_member_system_roles(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        group_repository_with_mock_role_manager: GroupRepository,
+        group_repository: GroupRepository,
         test_domain: str,
         default_project_resource_policy: str,
     ) -> None:
@@ -995,7 +954,7 @@ class TestGroupRepository:
             resource_policy=default_project_resource_policy,
         )
 
-        result = await group_repository_with_mock_role_manager.create(Creator(spec=creator_spec))
+        result = await group_repository.create(Creator(spec=creator_spec))
 
         expected_names = {
             f"project-{str(result.id)[:8]}-admin",
