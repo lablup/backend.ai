@@ -12,27 +12,39 @@ import sqlalchemy as sa
 from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec
 from ai.backend.common.data.permission.types import EntityType, ScopeType
+from ai.backend.common.exception import BackendAIError, UserNotFound
 from ai.backend.common.identifier.app_config import AppConfigScopeID
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
 from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.user import UserID
+from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.app_config_fragment.types import (
     AppConfigFragmentData,
 )
+from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.errors.app_config import (
     AppConfigFragmentNotFound,
     AppConfigFragmentWriteNotAllowed,
 )
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
+from ai.backend.manager.errors.resource import DomainNotFound
 from ai.backend.manager.models.app_config_allow_list.row import AppConfigAllowListRow
 from ai.backend.manager.models.app_config_definition.row import AppConfigDefinitionRow
 from ai.backend.manager.models.app_config_fragment.conditions import AppConfigFragmentConditions
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
+from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.hasher.types import PasswordInfo
+from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.resource_policy import (
+    KeyPairResourcePolicyRow,
+    UserResourcePolicyRow,
+)
+from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.app_config_fragment.creators import (
     AppConfigFragmentCreatorSpec,
@@ -44,9 +56,8 @@ from ai.backend.manager.repositories.app_config_fragment.repository import (
     AppConfigFragmentRepository,
 )
 from ai.backend.manager.repositories.app_config_fragment.types import (
-    DomainAppConfigFragmentSearchScope,
+    AppConfigFragmentSearchScope,
     ResolvedAppConfigScope,
-    UserAppConfigFragmentSearchScope,
 )
 from ai.backend.manager.repositories.app_config_fragment.updaters import (
     AppConfigFragmentUpdaterSpec,
@@ -85,6 +96,12 @@ async def database(
             AssociationScopesEntitiesRow,
             RoleRow,
             PermissionRow,
+            # Owners of the domain / user scopes a scoped search existence-checks.
+            DomainRow,
+            UserResourcePolicyRow,
+            KeyPairResourcePolicyRow,
+            UserRow,
+            KeyPairRow,
         ],
     ):
         yield database_connection
@@ -395,51 +412,157 @@ class TestSearch:
         assert {item.id for item in result.items} == expected
 
 
+@dataclass(frozen=True)
+class _ScopedSearchCase:
+    """One scope a scoped search runs against, and the rows it must return."""
+
+    scope: AppConfigFragmentSearchScope
+    expected_scope_type: AppConfigScopeType
+    expected_scope_id: AppConfigScopeID | None
+
+
+@dataclass(frozen=True)
+class _MissingOwnerCase:
+    """A scope whose owner does not exist, and the error the existence check must raise."""
+
+    scope: AppConfigFragmentSearchScope
+    expected_error: type[BackendAIError]
+
+
+_DOMAIN_NAME = "app-config-fragment-test-domain"
+_RESOURCE_POLICY_NAME = "app-config-fragment-test-policy"
+
+
+@pytest.fixture
+async def scope_owners(database: ExtendedAsyncSAEngine) -> None:
+    """The domain and user a scoped search names, so its existence checks find them."""
+    async with database.begin_session() as db_sess:
+        db_sess.add_all([
+            DomainRow(id=_DOMAIN_ID, name=_DOMAIN_NAME, total_resource_slots=ResourceSlot()),
+            UserResourcePolicyRow(
+                name=_RESOURCE_POLICY_NAME,
+                max_vfolder_count=0,
+                max_quota_scope_size=-1,
+                max_session_count_per_model_session=10,
+                max_customized_image_count=10,
+            ),
+        ])
+        await db_sess.flush()
+        db_sess.add(
+            UserRow(
+                uuid=_USER_ID,
+                email="app-config-fragment@lablup.com",
+                username="app-config-fragment",
+                password=PasswordInfo(
+                    password="test_password",
+                    algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
+                    rounds=100_000,
+                    salt_size=32,
+                ),
+                domain_name=_DOMAIN_NAME,
+                resource_policy=_RESOURCE_POLICY_NAME,
+            )
+        )
+
+
 class TestScopedSearch:
-    async def test_domain_scope_returns_only_that_domain(
+    @pytest.mark.parametrize(
+        "case",
+        [
+            _ScopedSearchCase(
+                scope=AppConfigFragmentSearchScope(
+                    scope_type=AppConfigScopeType.DOMAIN, scope_id=_DOMAIN_SCOPE_ID
+                ),
+                expected_scope_type=AppConfigScopeType.DOMAIN,
+                expected_scope_id=_DOMAIN_SCOPE_ID,
+            ),
+            _ScopedSearchCase(
+                scope=AppConfigFragmentSearchScope(
+                    scope_type=AppConfigScopeType.USER, scope_id=_USER_SCOPE_ID
+                ),
+                expected_scope_type=AppConfigScopeType.USER,
+                expected_scope_id=_USER_SCOPE_ID,
+            ),
+            _ScopedSearchCase(
+                scope=AppConfigFragmentSearchScope(
+                    scope_type=AppConfigScopeType.PUBLIC, scope_id=None
+                ),
+                expected_scope_type=AppConfigScopeType.PUBLIC,
+                expected_scope_id=None,
+            ),
+        ],
+        ids=lambda case: case.scope.scope_type.value,
+    )
+    async def test_scope_returns_only_the_fragments_written_at_it(
         self,
         repository: AppConfigFragmentRepository,
         fragments_across_scopes: list[AppConfigFragmentData],
+        scope_owners: None,
+        case: _ScopedSearchCase,
     ) -> None:
         result = await repository.scoped_search(
             BatchQuerier(pagination=OffsetPagination(limit=10, offset=0)),
-            [DomainAppConfigFragmentSearchScope(domain_id=_DOMAIN_ID)],
+            [case.scope],
         )
-        # Only domain-scoped fragments of that domain — not the other domain, public, or users.
         expected = {
             f.id
             for f in fragments_across_scopes
-            if f.scope_type is AppConfigScopeType.DOMAIN and f.scope_id == _DOMAIN_SCOPE_ID
+            if f.scope_type is case.expected_scope_type and f.scope_id == case.expected_scope_id
         }
         assert {item.id for item in result.items} == expected
         assert result.total_count == len(expected)
 
-    async def test_user_scope_returns_only_that_user(
+    @pytest.mark.parametrize(
+        "case",
+        [
+            _MissingOwnerCase(
+                scope=AppConfigFragmentSearchScope(
+                    scope_type=AppConfigScopeType.DOMAIN,
+                    scope_id=AppConfigScopeID(uuid.uuid4()),
+                ),
+                expected_error=DomainNotFound,
+            ),
+            _MissingOwnerCase(
+                scope=AppConfigFragmentSearchScope(
+                    scope_type=AppConfigScopeType.USER,
+                    scope_id=AppConfigScopeID(uuid.uuid4()),
+                ),
+                expected_error=UserNotFound,
+            ),
+        ],
+        ids=lambda case: case.scope.scope_type.value,
+    )
+    async def test_missing_scope_owner_is_not_found(
         self,
         repository: AppConfigFragmentRepository,
         fragments_across_scopes: list[AppConfigFragmentData],
+        case: _MissingOwnerCase,
     ) -> None:
-        result = await repository.scoped_search(
-            BatchQuerier(pagination=OffsetPagination(limit=10, offset=0)),
-            [UserAppConfigFragmentSearchScope(user_id=_USER_ID)],
-        )
-        expected = {
-            f.id
-            for f in fragments_across_scopes
-            if f.scope_type is AppConfigScopeType.USER and f.scope_id == _USER_SCOPE_ID
-        }
-        assert {item.id for item in result.items} == expected
+        # A scope that does not exist is a 404, not an empty page — otherwise "no fragments
+        # here" and "no such domain" are indistinguishable to the caller.
+        with pytest.raises(case.expected_error):
+            await repository.scoped_search(
+                BatchQuerier(pagination=OffsetPagination(limit=10, offset=0)),
+                [case.scope],
+            )
 
-    async def test_scopes_or_combined_across_domain_and_user(
+    async def test_scopes_are_or_combined(
         self,
         repository: AppConfigFragmentRepository,
         fragments_across_scopes: list[AppConfigFragmentData],
+        scope_owners: None,
     ) -> None:
+        # The repository takes a sequence because the ops layer ORs the scopes; a single
+        # scoped search passes one, but the read path itself is not limited to one.
         result = await repository.scoped_search(
             BatchQuerier(pagination=OffsetPagination(limit=10, offset=0)),
             [
-                DomainAppConfigFragmentSearchScope(domain_id=_DOMAIN_ID),
-                UserAppConfigFragmentSearchScope(user_id=_USER_ID),
+                AppConfigFragmentSearchScope(
+                    scope_type=AppConfigScopeType.DOMAIN, scope_id=_DOMAIN_SCOPE_ID
+                ),
+                AppConfigFragmentSearchScope(
+                    scope_type=AppConfigScopeType.USER, scope_id=_USER_SCOPE_ID
+                ),
             ],
         )
         expected = {
@@ -449,16 +572,6 @@ class TestScopedSearch:
             or (f.scope_type is AppConfigScopeType.USER and f.scope_id == _USER_SCOPE_ID)
         }
         assert {item.id for item in result.items} == expected
-
-    async def test_scoped_search_unknown_scope_returns_empty(
-        self, repository: AppConfigFragmentRepository
-    ) -> None:
-        # Unconditional (no existence check): an unknown scope yields no rows, not an error.
-        result = await repository.scoped_search(
-            BatchQuerier(pagination=OffsetPagination(limit=10, offset=0)),
-            [DomainAppConfigFragmentSearchScope(domain_id=DomainID(uuid.uuid4()))],
-        )
-        assert result.items == []
 
 
 @pytest.fixture

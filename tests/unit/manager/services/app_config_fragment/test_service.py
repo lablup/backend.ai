@@ -30,6 +30,9 @@ from ai.backend.manager.repositories.app_config_fragment.purgers import (
 from ai.backend.manager.repositories.app_config_fragment.repository import (
     AppConfigFragmentRepository,
 )
+from ai.backend.manager.repositories.app_config_fragment.types import (
+    AppConfigFragmentSearchScope,
+)
 from ai.backend.manager.repositories.app_config_fragment.updaters import (
     AppConfigFragmentUpdaterSpec,
 )
@@ -57,9 +60,7 @@ from ai.backend.manager.services.app_config_fragment.actions.purge import (
     PurgeAppConfigFragmentAction,
 )
 from ai.backend.manager.services.app_config_fragment.actions.scoped_search import (
-    DomainAppConfigFragmentTarget,
     ScopedSearchAppConfigFragmentAction,
-    UserAppConfigFragmentTarget,
 )
 from ai.backend.manager.services.app_config_fragment.actions.update import (
     UpdateAppConfigFragmentAction,
@@ -73,6 +74,28 @@ _DOMAIN_ID = DomainID(uuid.uuid4())
 # The same owners seen as a fragment's scope_id, which is polymorphic over scope kinds.
 _USER_SCOPE_ID = AppConfigScopeID(_USER_ID)
 _DOMAIN_SCOPE_ID = AppConfigScopeID(_DOMAIN_ID)
+
+
+@dataclass(frozen=True)
+class _ScopedSearchCase:
+    """One scope a scoped search runs at, and the RBAC scope id it reports."""
+
+    scope: AppConfigFragmentSearchScope
+    expected_rbac_scope_id: str
+
+
+@pytest.fixture
+def scoped_fragment() -> AppConfigFragmentData:
+    """One fragment for the repository mock to return — the scope under test drives the case."""
+    return AppConfigFragmentData(
+        id=AppConfigFragmentID(uuid.uuid4()),
+        config_name="theme",
+        scope_type=AppConfigScopeType.USER,
+        scope_id=_USER_SCOPE_ID,
+        config={"k": "v"},
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
+    )
 
 
 @dataclass(frozen=True)
@@ -185,50 +208,49 @@ class TestAppConfigFragmentService:
         assert result.total_count == 1
         mock_repository.admin_search.assert_called_once_with(querier)
 
-    async def test_scoped_search_builds_domain_and_user_scopes(
-        self, service: AppConfigFragmentService, mock_repository: MagicMock
+    @pytest.mark.parametrize(
+        "case",
+        [
+            _ScopedSearchCase(
+                scope=AppConfigFragmentSearchScope(
+                    scope_type=AppConfigScopeType.DOMAIN, scope_id=_DOMAIN_SCOPE_ID
+                ),
+                expected_rbac_scope_id=str(_DOMAIN_SCOPE_ID),
+            ),
+            _ScopedSearchCase(
+                scope=AppConfigFragmentSearchScope(
+                    scope_type=AppConfigScopeType.USER, scope_id=_USER_SCOPE_ID
+                ),
+                expected_rbac_scope_id=str(_USER_SCOPE_ID),
+            ),
+        ],
+        ids=lambda case: case.scope.scope_type.value,
+    )
+    async def test_scoped_search_passes_the_scope_through_to_the_repository(
+        self,
+        service: AppConfigFragmentService,
+        mock_repository: MagicMock,
+        scoped_fragment: AppConfigFragmentData,
+        case: _ScopedSearchCase,
     ) -> None:
-        fragment = AppConfigFragmentData(
-            id=AppConfigFragmentID(uuid.uuid4()),
-            config_name="theme",
-            scope_type=AppConfigScopeType.USER,
-            scope_id=_USER_SCOPE_ID,
-            config={"k": "v"},
-            created_at=datetime.now(UTC),
-            updated_at=datetime.now(UTC),
-        )
         mock_repository.scoped_search = AsyncMock(
             return_value=AppConfigFragmentSearchResult(
-                items=[fragment],
+                items=[scoped_fragment],
                 total_count=1,
                 has_next_page=False,
                 has_previous_page=False,
             )
         )
         querier = BatchQuerier(pagination=OffsetPagination(limit=10, offset=0))
-        domain_id = DomainID(uuid.uuid4())
 
         result = await service.scoped_search(
-            ScopedSearchAppConfigFragmentAction(
-                items=[
-                    DomainAppConfigFragmentTarget(domain_id=domain_id),
-                    UserAppConfigFragmentTarget(user_id=_USER_ID),
-                ],
-                querier=querier,
-            )
+            ScopedSearchAppConfigFragmentAction(scope=case.scope, querier=querier)
         )
 
-        assert result.items == [fragment]
-        # queried_refs preserve the scoped principals (domain, then user).
-        assert [ref.element_id for ref in result.queried_refs] == [
-            str(domain_id),
-            str(_USER_ID),
-        ]
-        mock_repository.scoped_search.assert_called_once()
-        called_querier, called_scopes = mock_repository.scoped_search.call_args.args
-        assert called_querier is querier
-        assert called_scopes[0].domain_id == domain_id
-        assert called_scopes[1].user_id == _USER_ID
+        assert result.data == [scoped_fragment]
+        # The result reports the RBAC scope the search was authorized at.
+        assert result.scope_id() == case.expected_rbac_scope_id
+        mock_repository.scoped_search.assert_called_once_with(querier, [case.scope])
 
     # --- update ---
 
