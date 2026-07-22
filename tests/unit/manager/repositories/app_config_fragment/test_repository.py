@@ -447,7 +447,7 @@ class TestScopedSearch:
     ) -> None:
         result = await repository.scoped_search(
             BatchQuerier(pagination=OffsetPagination(limit=10, offset=0)),
-            case.scope,
+            [case.scope],
         )
         expected = {
             f.id
@@ -456,6 +456,32 @@ class TestScopedSearch:
         }
         assert {item.id for item in result.items} == expected
         assert result.total_count == len(expected)
+
+    async def test_scopes_are_or_combined(
+        self,
+        repository: AppConfigFragmentRepository,
+        fragments_across_scopes: list[AppConfigFragmentData],
+    ) -> None:
+        # The repository takes a sequence because the ops layer ORs the scopes; a single
+        # scoped search passes one, but the read path itself is not limited to one.
+        result = await repository.scoped_search(
+            BatchQuerier(pagination=OffsetPagination(limit=10, offset=0)),
+            [
+                AppConfigFragmentSearchScope(
+                    scope_type=AppConfigScopeType.DOMAIN, scope_id=_DOMAIN_SCOPE_ID
+                ),
+                AppConfigFragmentSearchScope(
+                    scope_type=AppConfigScopeType.USER, scope_id=_USER_SCOPE_ID
+                ),
+            ],
+        )
+        expected = {
+            f.id
+            for f in fragments_across_scopes
+            if (f.scope_type is AppConfigScopeType.DOMAIN and f.scope_id == _DOMAIN_SCOPE_ID)
+            or (f.scope_type is AppConfigScopeType.USER and f.scope_id == _USER_SCOPE_ID)
+        }
+        assert {item.id for item in result.items} == expected
 
 
 @pytest.fixture

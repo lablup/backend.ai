@@ -85,9 +85,9 @@ class AppConfigFragmentRepository:
 
     @app_config_fragment_repository_resilience.apply()
     async def scoped_search(
-        self, querier: BatchQuerier, scope: SearchScope
+        self, querier: BatchQuerier, scopes: Sequence[SearchScope]
     ) -> AppConfigFragmentSearchResult:
-        return await self._db_source.scoped_search(querier, scope)
+        return await self._db_source.scoped_search(querier, scopes)
 
     @app_config_fragment_repository_resilience.apply()
     async def bulk_update(

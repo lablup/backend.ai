@@ -78,7 +78,7 @@ class AppConfigFragmentService:
     async def scoped_search(
         self, action: ScopedSearchAppConfigFragmentAction
     ) -> ScopedSearchAppConfigFragmentActionResult:
-        result = await self._repository.scoped_search(action.querier, action.scope)
+        result = await self._repository.scoped_search(action.querier, [action.scope])
         return ScopedSearchAppConfigFragmentActionResult(
             scope=action.scope,
             data=result.items,

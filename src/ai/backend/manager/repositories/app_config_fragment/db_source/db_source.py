@@ -197,12 +197,12 @@ class AppConfigFragmentDBSource:
     async def scoped_search(
         self,
         querier: BatchQuerier,
-        scope: SearchScope,
+        scopes: Sequence[SearchScope],
     ) -> AppConfigFragmentSearchResult:
-        """Scoped path: query the fragments written at ``scope``."""
+        """Scoped path: query the fragments written at ``scopes`` (combined with OR)."""
         async with self._rbac_ops_provider.read_ops() as r:
             result = await r.batch_query_with_scopes(
-                sa.select(AppConfigFragmentRow), querier, [scope]
+                sa.select(AppConfigFragmentRow), querier, scopes
             )
             return AppConfigFragmentSearchResult(
                 items=[row.AppConfigFragmentRow.to_data() for row in result.rows],

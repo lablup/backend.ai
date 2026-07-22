@@ -250,7 +250,7 @@ class TestAppConfigFragmentService:
         assert result.data == [scoped_fragment]
         # The result reports the RBAC scope the search was authorized at.
         assert result.scope_id() == case.expected_rbac_scope_id
-        mock_repository.scoped_search.assert_called_once_with(querier, case.scope)
+        mock_repository.scoped_search.assert_called_once_with(querier, [case.scope])
 
     # --- update ---
 
