@@ -8,11 +8,18 @@ jobs:
   check-pr-prefix:
     runs-on: ubuntu-latest
     steps:
+      - name: Check out the revision
+        uses: actions/checkout@v6
+        with:
+          lfs: false
+      - name: Extract PR title prefix
+        id: title
+        uses: ./.github/actions/pr-title-prefix
       - name: Check PR title prefix
         env:
-          TITLE: ${{ github.event.pull_request.title }}
+          PREFIX: ${{ steps.title.outputs.prefix }}
         run: |
-          if echo "$TITLE" | tr ':' '\n' | head -n 1 | grep -qE '^(feat|fix|docs?|refactor|ci|chore|release|test|deps)(\([^)]+\))?$';
+          if echo "$PREFIX" | grep -qE '^(feat|fix|docs?|refactor|ci|chore|release|test|deps)$';
           then
             echo "PR title is valid."
           else

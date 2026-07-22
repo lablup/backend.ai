@@ -1,0 +1,31 @@
+name: check-version-change
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+jobs:
+  check-version-change:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the revision
+        uses: actions/checkout@v6
+        with:
+          lfs: false
+      - name: Detect release PR
+        uses: ./.github/actions/detect-release-pr
+      - uses: dorny/paths-filter@v3
+        if: env.IS_RELEASE_PR != 'true'
+        id: filter
+        with:
+          filters: |
+            version:
+              - 'VERSION'
+      - name: Fail if VERSION is changed in a non-release PR
+        if: env.IS_RELEASE_PR != 'true' && steps.filter.outputs.version == 'true'
+        run: |
+          echo "The VERSION file is modified, but the PR title does not have the 'release' prefix."
+          echo "If this is a release PR, retitle it with the 'release:' prefix and then push a new commit"
+          echo "(or close and reopen the PR) to re-trigger CI with the full test suite."
+          echo "Otherwise, revert the VERSION file change."
+          exit 1
