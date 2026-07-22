@@ -23,7 +23,7 @@ This proposal re-homes idle checking onto a sokovan reconciler stage and promote
 
 ### Goals
 
-- Run idle checking as separate sokovan reconciler stages for assignment sync, initial-delay handling, judgment, and expiry sweep on the generic Source → Handler → Applier flow.
+- Run idle checking as separate sokovan reconciler stages for assignment sync, initial grace period handling, judgment, and expiry sweep on the generic Source → Handler → Applier flow.
 - Model the idle checker as a first-class, reusable DB object that is independent of any scope.
 - Express scope application (domain / project / resource group) through a dedicated association table.
 - Drive utilization decisions from agent-emitted Prometheus metrics.
@@ -199,11 +199,11 @@ Idle checking uses four reconciler stages. The first reconciles applicability fr
 | Stage | Reconciler category | Source axis | Responsibility |
 |---|---|---|---|
 | Idle Check Assignment Sync | `IDLE_CHECK` | scopes, bindings, checkers, and sessions | Create and remove `session_idle_checks` rows to match current applicability |
-| Initial-delay handling | `SESSION_IDLE_CHECK` | existing `session_idle_checks` rows | Keep newly created rows at `NOT_CHECKED` while their initial delay applies |
+| Initial Grace Period | `SESSION_IDLE_CHECK` | existing `session_idle_checks` rows | Keep newly created rows at `NOT_CHECKED` while their initial grace period applies |
 | Judgment | `SESSION_IDLE_CHECK` | existing `session_idle_checks` rows | Run checkers and transition rows to `ACTIVE`, `IDLE`, or `IDLE_EXPIRED` |
 | Expiry sweep | `SESSION_IDLE_CHECK` | existing `IDLE_EXPIRED` rows | Transition affected sessions to `TERMINATING` |
 
-The categories are separate history axes. Assignment sync is recorded under `IDLE_CHECK`; the lifecycle of an existing session-checker row is recorded under `SESSION_IDLE_CHECK`. The initial-delay, judgment, and sweep stages use distinct reconciler phases within the latter category.
+The categories are separate history axes. Assignment sync is recorded under `IDLE_CHECK`; the lifecycle of an existing session-checker row is recorded under `SESSION_IDLE_CHECK`. The initial grace period, judgment, and sweep stages use distinct reconciler phases within the latter category.
 
 **1. Idle Check Assignment Sync stage** — materializes which checkers currently apply to which sessions.
 
@@ -213,11 +213,11 @@ The categories are separate history axes. Assignment sync is recorded under `IDL
 
 The `IDLE_EXPIRED` exclusion is enforced by the delete operation itself, not only by the Source snapshot. This prevents assignment sync from deleting a row that concurrently became expired after the Source read. Removing a session or checker itself remains a hard-delete boundary: the existing foreign-key cascades may remove its `session_idle_checks` rows, including expired rows.
 
-If a binding is disabled or removed, its non-expired rows are deleted. Re-enabling the binding later creates a fresh `NOT_CHECKED` row and restarts its initial-delay lifecycle. An `IDLE_EXPIRED` row is not reset by binding changes and remains owned by the sweep stage.
+If a binding is disabled or removed, its non-expired rows are deleted. Re-enabling the binding later creates a fresh `NOT_CHECKED` row and restarts its initial grace period. An `IDLE_EXPIRED` row is not reset by binding changes and remains owned by the sweep stage.
 
-**2. Initial-delay stage** — protects newly applicable sessions from being judged before the checker's initial delay has elapsed.
+**2. Initial Grace Period stage** — protects newly applicable sessions from being judged before the checker's initial grace period has elapsed.
 
-- **Source** — reads existing `NOT_CHECKED` rows together with only the checker and session data needed to determine whether the initial delay still applies.
+- **Source** — reads existing `NOT_CHECKED` rows together with only the checker and session data needed to determine whether the initial grace period still applies.
 - **Handler / Applier** — leave rows in `NOT_CHECKED` during the delay. Rows whose delay has elapsed become eligible for the judgment stage; the stages do not pass in-memory state to one another.
 
 **3. Judgment stage** — runs checker implementations for eligible existing rows.
@@ -236,7 +236,7 @@ Once a row becomes `IDLE_EXPIRED`, neither assignment sync nor judgment changes 
 
 ### Source Fetch Direction
 
-Scope resolution belongs only to the **Idle Check Assignment Sync** stage. It lives on the generic reconciler — one fetch per tick, not per resource group. Even so, its Source reads sessions **per resource group**, following the pattern the scheduler coordinator already uses (`ScheduleCoordinator` iterates scaling groups and reads each with `get_sessions_for_handler(scaling_group, …)`). The initial-delay, judgment, and sweep Sources start from `session_idle_checks` and do not repeat this work.
+Scope resolution belongs only to the **Idle Check Assignment Sync** stage. It lives on the generic reconciler — one fetch per tick, not per resource group. Even so, its Source reads sessions **per resource group**, following the pattern the scheduler coordinator already uses (`ScheduleCoordinator` iterates scaling groups and reads each with `get_sessions_for_handler(scaling_group, …)`). The initial grace period, judgment, and sweep Sources start from `session_idle_checks` and do not repeat this work.
 
 **Per resource group, the Source:**
 
@@ -331,7 +331,7 @@ Each stage runs independently on its own reconciliation tick and uses PostgreSQL
 sequenceDiagram
     participant DB as PostgreSQL
     participant Assignment as Assignment sync<br/>(IDLE_CHECK)
-    participant Delay as Initial-delay stage<br/>(SESSION_IDLE_CHECK)
+    participant Grace as Initial Grace Period stage<br/>(SESSION_IDLE_CHECK)
     participant Judgment as Judgment stage<br/>(SESSION_IDLE_CHECK)
     participant Sweep as Expiry-sweep stage<br/>(SESSION_IDLE_CHECK)
     participant Scheduler as Scheduling controller
@@ -342,12 +342,12 @@ sequenceDiagram
     Assignment->>DB: Create missing rows as NOT_CHECKED
     Assignment->>DB: Delete undesired rows where phase is not IDLE_EXPIRED
 
-    Note over DB,Delay: 2. Protect the initial-delay interval
-    Delay->>DB: Read NOT_CHECKED rows with checker and session data
-    alt Initial delay is still active
-        Note over DB,Delay: No write, phase remains NOT_CHECKED
-    else Initial delay has elapsed
-        Note over DB,Delay: Row becomes independently selectable by the judgment stage
+    Note over DB,Grace: 2. Protect the initial grace period
+    Grace->>DB: Read NOT_CHECKED rows with checker and session data
+    alt Initial grace period is still active
+        Note over DB,Grace: No write, phase remains NOT_CHECKED
+    else Initial grace period has elapsed
+        Note over DB,Grace: Row becomes independently selectable by the judgment stage
     end
 
     Note over DB,Judgment: 3. Evaluate existing rows
