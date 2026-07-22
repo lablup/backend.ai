@@ -40252,7 +40252,7 @@
         "description": "Purge many fragments by id, with per-item partial success (auth, RBAC).\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
-    "/v2/app-config-fragments/search": {
+    "/v2/app-config-fragments/admin/search": {
       "post": {
         "operationId": "v2/app-config-fragments.admin_search",
         "tags": [
