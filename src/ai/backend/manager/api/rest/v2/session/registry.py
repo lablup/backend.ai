@@ -28,6 +28,12 @@ def register_v2_session_routes(
     )
     registry.add(
         "POST",
+        "/compute-schedule",
+        handler.compute_schedule,
+        middlewares=[auth_required],
+    )
+    registry.add(
+        "POST",
         "/search",
         handler.admin_search_sessions,
         middlewares=[superadmin_required],

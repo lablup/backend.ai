@@ -26508,6 +26508,65 @@
         "title": "EnqueueSessionInput",
         "type": "object"
       },
+      "ComputeScheduleKernelResourceInput": {
+        "description": "Per-kernel resource inputs for a compute-schedule request.\n\nMirrors the scheduler's ``KernelResourceInput``: the requested resource\nslots plus an optional image whose architecture and resource-group\ndefaults are resolved downstream. Results are correlated to kernels by\nlist index, so no identifier is carried here.",
+        "properties": {
+          "image_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Image to schedule this kernel against. May be null when a resource-group default supplies the image downstream.",
+            "title": "Image Id"
+          },
+          "resources": {
+            "description": "Requested resource slots (cpu, mem, accelerators) for this kernel.",
+            "items": {
+              "$ref": "#/components/schemas/ResourceSlotEntryInput"
+            },
+            "title": "Resources",
+            "type": "array"
+          }
+        },
+        "title": "ComputeScheduleKernelResourceInput",
+        "type": "object"
+      },
+      "ComputeScheduleInput": {
+        "description": "Compute a session's scheduling against a resource group without provisioning.\n\n``cluster_mode`` decides whether kernel slots are summed onto a single\nnode (SINGLE_NODE) or placed individually (MULTI_NODE).",
+        "properties": {
+          "kernels": {
+            "description": "Per-kernel resource requests to test against the resource group.",
+            "items": {
+              "$ref": "#/components/schemas/ComputeScheduleKernelResourceInput"
+            },
+            "title": "Kernels",
+            "type": "array"
+          },
+          "cluster_mode": {
+            "$ref": "#/components/schemas/ClusterModeEnum",
+            "description": "Cluster networking mode governing how kernel slots are placed."
+          },
+          "resource_group_id": {
+            "description": "Target resource group to compute the scheduling against.",
+            "format": "uuid",
+            "title": "Resource Group Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kernels",
+          "cluster_mode",
+          "resource_group_id"
+        ],
+        "title": "ComputeScheduleInput",
+        "type": "object"
+      },
       "SessionFilter": {
         "description": "Filter criteria for session listing.",
         "properties": {
@@ -48492,6 +48551,35 @@
         },
         "parameters": [],
         "description": "Enqueue a new compute session.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/sessions/compute-schedule": {
+      "post": {
+        "operationId": "v2/sessions.compute_schedule",
+        "tags": [
+          "v2/sessions"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ComputeScheduleInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Compute whether a would-be session fits a resource group, without provisioning.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/sessions/search": {
