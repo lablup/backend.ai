@@ -16,7 +16,7 @@ from ai.backend.common.data.idle_checker.types import (
 )
 from ai.backend.common.identifier.idle_checker import IdleCheckerID
 from ai.backend.common.types import SessionId, SessionTypes
-from ai.backend.manager.data.idle_checker.types import IdleCheckPhase, IdleCheckSession
+from ai.backend.manager.data.idle_checker.types import IdleCheckSession, IdleJudgmentStatus
 from ai.backend.manager.repositories.idle_checker.types import IdleCheckerDefinitionData
 from ai.backend.manager.sokovan.idle_check.checkers.base import (
     CheckerAssignment,
@@ -121,12 +121,12 @@ class TestSessionLifetimeChecker:
         assert len(judgments) == 1
         assert judgments[0].session_id == session.session_id
         assert judgments[0].expire_at == _BASE_TIME + timedelta(seconds=30)
-        assert judgments[0].status is IdleCheckPhase.IDLE
+        assert judgments[0].status is IdleJudgmentStatus.IDLE
         assert judgments[0].message == (
             "Session lifetime check: max_lifetime_seconds=30, running_seconds=29"
         )
 
-    async def test_session_at_deadline_is_idle(
+    async def test_session_at_deadline_is_idle_until_applied(
         self,
         checker: SessionLifetimeChecker,
         session_factory: SessionFactory,
@@ -145,12 +145,12 @@ class TestSessionLifetimeChecker:
         assert len(judgments) == 1
         assert judgments[0].session_id == session.session_id
         assert judgments[0].expire_at == _BASE_TIME + timedelta(seconds=30)
-        assert judgments[0].status is IdleCheckPhase.IDLE_EXPIRED
+        assert judgments[0].status is IdleJudgmentStatus.IDLE
         assert judgments[0].message == (
             "Session lifetime check: max_lifetime_seconds=30, running_seconds=30"
         )
 
-    async def test_session_after_deadline_is_idle(
+    async def test_session_after_deadline_is_idle_until_applied(
         self,
         checker: SessionLifetimeChecker,
         session_factory: SessionFactory,
@@ -167,7 +167,7 @@ class TestSessionLifetimeChecker:
         )
 
         assert judgments[0].expire_at == _BASE_TIME + timedelta(seconds=30)
-        assert judgments[0].status is IdleCheckPhase.IDLE_EXPIRED
+        assert judgments[0].status is IdleJudgmentStatus.IDLE
         assert judgments[0].message == (
             "Session lifetime check: max_lifetime_seconds=30, running_seconds=31.2"
         )
@@ -230,8 +230,8 @@ class TestSessionLifetimeChecker:
             long_lifetime.definition.checker_id,
         ]
         assert [judgment.status for judgment in judgments] == [
-            IdleCheckPhase.IDLE_EXPIRED,
-            IdleCheckPhase.IDLE,
+            IdleJudgmentStatus.IDLE,
+            IdleJudgmentStatus.IDLE,
         ]
 
     async def test_evaluates_every_session_in_assignment(
@@ -256,8 +256,8 @@ class TestSessionLifetimeChecker:
             active_session.session_id,
         ]
         assert [judgment.status for judgment in judgments] == [
-            IdleCheckPhase.IDLE_EXPIRED,
-            IdleCheckPhase.IDLE,
+            IdleJudgmentStatus.IDLE,
+            IdleJudgmentStatus.IDLE,
         ]
 
     async def test_skips_mismatched_spec_and_evaluates_remaining_assignments(

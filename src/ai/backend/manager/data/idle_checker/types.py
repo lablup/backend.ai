@@ -14,6 +14,11 @@ class IdleCheckPhase(StrEnum):
     IDLE_EXPIRED = "idle_expired"
 
 
+class IdleJudgmentStatus(StrEnum):
+    ACTIVE = "active"
+    IDLE = "idle"
+
+
 @dataclass(frozen=True)
 class IdleCheckSession:
     """Session fields needed to evaluate idle checkers."""

@@ -7,7 +7,7 @@ from decimal import Decimal
 from typing import override
 
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.idle_checker.types import IdleCheckPhase
+from ai.backend.manager.data.idle_checker.types import IdleJudgmentStatus
 from ai.backend.manager.sokovan.idle_check.checkers.base import (
     CheckerAssignment,
     IdleChecker,
@@ -47,7 +47,6 @@ class SessionLifetimeChecker(IdleChecker):
                 running_seconds = Decimal(
                     str((context.current_time - session.starts_at).total_seconds())
                 ).normalize()
-                is_expired = running_seconds >= max_lifetime_seconds
                 expires_at = session.starts_at + timedelta(
                     seconds=lifetime_spec.max_lifetime_seconds
                 )
@@ -56,7 +55,7 @@ class SessionLifetimeChecker(IdleChecker):
                         checker_id=assignment.definition.checker_id,
                         session_id=session.session_id,
                         expire_at=expires_at,
-                        status=(IdleCheckPhase.IDLE_EXPIRED if is_expired else IdleCheckPhase.IDLE),
+                        status=IdleJudgmentStatus.IDLE,
                         message=(
                             "Session lifetime check: "
                             f"max_lifetime_seconds={max_lifetime_seconds:f}, "
