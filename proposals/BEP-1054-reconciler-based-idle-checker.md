@@ -23,7 +23,7 @@ This proposal re-homes idle checking onto a sokovan reconciler stage and promote
 
 ### Goals
 
-- Run idle checking as **two sokovan reconciler stages** — a deadline-refresh stage and an expiry-sweep stage — on the generic Source → Handler → Applier flow.
+- Run idle checking as separate sokovan reconciler stages for assignment sync, initial grace period handling, judgment, and expiry sweep on the generic Source → Handler → Applier flow.
 - Model the idle checker as a first-class, reusable DB object that is independent of any scope.
 - Express scope application (domain / project / resource group) through a dedicated association table.
 - Drive utilization decisions from agent-emitted Prometheus metrics.
@@ -59,7 +59,7 @@ Two properties matter for this proposal:
 
 The redesign rests on two ideas:
 
-1. **Idle checking becomes sokovan reconciler stages.** A `Source` gathers what to evaluate, a `Handler` drives the stage work, and an `Applier` writes stage-owned outcomes where applicable — the same shape as other reconciler stages. Computing each session's cleanup deadline and acting on an elapsed deadline are split into two such stages (see *Reconciler Stages*). The sweep delegates its cross-domain session transition from the Handler to the scheduling controller and keeps its Applier as a no-op.
+1. **Idle checking becomes sokovan reconciler stages.** A `Source` gathers what to evaluate, a `Handler` drives the stage work, and an `Applier` writes stage-owned outcomes where applicable — the same shape as other reconciler stages. Idle check assignment sync is separated from the lifecycle of existing session-checker rows, and acting on an expired judgment is separated from producing that judgment (see *Reconciler Stages*). The sweep delegates its cross-domain session transition from the Handler to the scheduling controller and keeps its Applier as a no-op.
 2. **The idle checker becomes a first-class DB object.** A checker is a reusable, scope-agnostic spec. Whether and where it applies is expressed by separate association rows that bind it to a domain, project, or resource group.
 
 ### Data Model
@@ -96,18 +96,27 @@ A dedicated association table (rather than reusing the RBAC `association_scopes_
 
 #### `session_idle_checks` — per-session projected cleanup time and latest judgment
 
-The deadline-refresh stage records, for each running session and each checker applied to it, **when that checker would next clean the session up** and the latest completed judgment. The sweep stage acts on this row, clients read it through the idle-check reporting API, and scheduling history records that an idle-check timeout triggered termination without duplicating the checker-specific report.
+The Idle Check Assignment Sync stage creates one row for each running session and each checker applied to it. Later stages use this table as their work queue and record **when that checker would next clean the session up** and its latest lifecycle phase. The sweep stage acts on this row, clients read it through the idle-check reporting API, and scheduling history records that an idle-check timeout triggered termination without duplicating the checker-specific report.
 
 | Column | Type | Description |
 |---|---|---|
 | `session_id` | UUID, FK → `sessions.id` (ON DELETE CASCADE) | The evaluated session |
 | `idle_checker_id` | UUID, FK → `idle_checkers.id` (ON DELETE CASCADE) | The checker that produced this deadline |
 | `expire_at` | timestamptz, nullable | When the session is scheduled to be cleaned up by this checker. `NULL` while the checker is in a grace period or cannot yet determine a deadline |
-| `last_status` | string | Status returned by the latest completed checker execution |
+| `last_status` | string | Current lifecycle phase: `NOT_CHECKED`, `ACTIVE`, `IDLE`, or `IDLE_EXPIRED` |
 | `last_message` | text | Human-readable reason returned with the latest judgment |
 | `updated_at` | timestamptz | When the latest judgment was persisted |
 
-Primary key `(session_id, idle_checker_id)` — one row per session × applied checker. `expire_at` is the **projected cleanup time, not a termination timestamp**: it is the deadline after which the sweep stage may perform the actual `TERMINATING` transition. The FK to `idle_checkers` ties each result back to the checker that owns it, so a `SessionIdleCheck` node can name its checker and a deleted checker's rows are removed by cascade.
+Primary key `(session_id, idle_checker_id)` — one row per session × applied checker. `expire_at` is the **projected cleanup time, not a termination timestamp**: it is the deadline after which the judgment stage may mark the row `IDLE_EXPIRED` and the sweep stage may perform the actual `TERMINATING` transition. The FK to `idle_checkers` ties each result back to the checker that owns it, so a `SessionIdleCheck` node can name its checker and a deleted checker's rows are removed by cascade.
+
+The phases have the following meanings:
+
+| Phase | Meaning |
+|---|---|
+| `NOT_CHECKED` | The binding applies, but the checker has not produced an effective judgment yet |
+| `ACTIVE` | The latest judgment found activity and refreshed the projected cleanup deadline |
+| `IDLE` | The latest judgment found the session idle, but the stored deadline has not elapsed |
+| `IDLE_EXPIRED` | The session is idle and the stored deadline has elapsed; ownership has passed to the sweep stage |
 
 #### Scope-ID convention
 
@@ -185,25 +194,49 @@ This buys three things:
 
 ### Reconciler Stages
 
-Idle checking is split into **two reconciler stages** so that computing and reporting deadlines is separated from acting on elapsed deadlines:
+Idle checking uses four reconciler stages. The first reconciles applicability from bindings; the remaining stages operate from existing `session_idle_checks` rows instead of resolving scopes again.
 
-**1. Deadline-refresh stage** — recomputes, per running session, when each applied checker would next terminate it, and persists that time.
+| Stage | Reconciler category | Source axis | Responsibility |
+|---|---|---|---|
+| Idle Check Assignment Sync | `IDLE_CHECK` | scopes, bindings, checkers, and sessions | Create and remove `session_idle_checks` rows to match current applicability |
+| Initial Grace Period | `SESSION_IDLE_CHECK` | existing `session_idle_checks` rows | Keep newly created rows at `NOT_CHECKED` while their initial grace period applies |
+| Judgment | `SESSION_IDLE_CHECK` | existing `session_idle_checks` rows | Run checkers and transition rows to `ACTIVE`, `IDLE`, or `IDLE_EXPIRED` |
+| Expiry sweep | `SESSION_IDLE_CHECK` | existing `IDLE_EXPIRED` rows | Transition affected sessions to `TERMINATING` |
 
-- **Source** — gathers the sessions to evaluate and the checkers that apply to them (see *Source Fetch Direction*).
-- **Handler** — pivots the batch by checker type and invokes each checker's single batched `judge` contract, producing `expire_at`, `last_status`, and `last_message` per (session, checker). Checker-owned external reads occur behind this contract; the Handler performs no external I/O beyond it.
-- **Applier** — upserts one `session_idle_checks` row per (session, checker) with the completed judgment, and **prunes non-due rows for checkers no longer applicable** to the session (binding removed or disabled). It marks nothing for termination. An existing row whose stored `expire_at` is already at or before the DB-sourced current time is neither updated nor pruned because the sweep stage now owns that row. The guard checks the stored deadline: a newly computed deadline that is already due is still inserted, or replaces a not-yet-due row, so that the sweep can observe it.
+The categories are separate history axes. Assignment sync is recorded under `IDLE_CHECK`; the lifecycle of an existing session-checker row is recorded under `SESSION_IDLE_CHECK`. The initial grace period, judgment, and sweep stages use distinct reconciler phases within the latter category.
 
-**2. Expiry-sweep stage** — terminates sessions whose deadline has already passed.
+**1. Idle Check Assignment Sync stage** — materializes which checkers currently apply to which sessions.
 
-- **Source** — reads `session_idle_checks` rows with non-null `expire_at <= now`, joined to `RUNNING` sessions. No per-resource-group iteration is required. Multiple due rows for one session remain available through the idle-check reporting API, while the session itself is transitioned at most once.
-- **Handler** — deduplicates the due rows by session without running the checker again, then passes the session IDs to the scheduling controller's common termination operation with the idle-timeout lifecycle reason and a generic idle-check timeout history message. The operation follows the existing scheduler termination lifecycle; sessions already terminating or terminal are skipped.
+- **Source** — resolves each eligible running session's scopes and enabled bindings, then compares the desired `(session_id, idle_checker_id)` set with existing rows.
+- **Handler** — produces rows to create and rows whose bindings no longer apply.
+- **Applier** — creates missing rows as `NOT_CHECKED` and deletes rows that are no longer desired, except rows already in `IDLE_EXPIRED`.
+
+The `IDLE_EXPIRED` exclusion is enforced by the delete operation itself, not only by the Source snapshot. This prevents assignment sync from deleting a row that concurrently became expired after the Source read. Removing a session or checker itself remains a hard-delete boundary: the existing foreign-key cascades may remove its `session_idle_checks` rows, including expired rows.
+
+If a binding is disabled or removed, its non-expired rows are deleted. Re-enabling the binding later creates a fresh `NOT_CHECKED` row and restarts its initial grace period. An `IDLE_EXPIRED` row is not reset by binding changes and remains owned by the sweep stage.
+
+**2. Initial Grace Period stage** — protects newly applicable sessions from being judged before the checker's initial grace period has elapsed.
+
+- **Source** — reads existing `NOT_CHECKED` rows together with only the checker and session data needed to determine whether the initial grace period still applies.
+- **Handler / Applier** — leave rows in `NOT_CHECKED` during the delay. Rows whose delay has elapsed become eligible for the judgment stage; the stages do not pass in-memory state to one another.
+
+**3. Judgment stage** — runs checker implementations for eligible existing rows.
+
+- **Source** — reads `session_idle_checks` rows eligible for judgment together with their checker definitions and session data. It does not resolve scope bindings; row creation and removal belong exclusively to assignment sync.
+- **Handler** — pivots the batch by checker type and invokes each checker's batched `judge` contract. Checker-owned external reads occur behind this contract.
+- **Applier** — applies the judgment to the existing row only. An `ACTIVE` judgment refreshes `expire_at`, `last_status`, and `last_message`. An `IDLE` judgment preserves `expire_at` while updating `last_status` and `last_message`; if the stored deadline has elapsed, it writes `IDLE_EXPIRED` instead. The stage does not insert missing rows.
+
+**4. Expiry-sweep stage** — terminates sessions represented by expired judgments.
+
+- **Source** — reads `session_idle_checks` rows in `IDLE_EXPIRED`, joined to `RUNNING` sessions. No per-resource-group iteration or checker execution is required. Multiple expired rows for one session remain available through the idle-check reporting API, while the session itself is transitioned at most once.
+- **Handler** — deduplicates rows by session, then passes the session IDs to the scheduling controller's common termination operation with the idle-timeout lifecycle reason and a generic idle-check timeout history message. The operation follows the existing scheduler termination lifecycle; sessions already terminating or terminal are skipped.
 - **Applier** — no-op. The Handler delegates the state-changing operation to the session scheduling domain instead of applying an idle-check-owned persistence result.
 
-The refresh stage is the only stage that runs checkers. It may update or remove a future deadline when activity, bindings, or checker definitions change. Once a stored deadline elapses, ownership passes to the sweep stage and refresh no longer changes that row. A change affects the deadline only if refresh persists it before the stored deadline elapses; the sweep does not re-evaluate runtime signals or checker applicability. Refresh cadence therefore determines how quickly such changes are reflected, while sweep cadence determines how long termination may occur after the deadline.
+Once a row becomes `IDLE_EXPIRED`, neither assignment sync nor judgment changes it. The sweep does not re-evaluate runtime signals or checker applicability. Judgment cadence determines how quickly runtime changes and elapsed deadlines are reflected, while sweep cadence determines how long termination may occur after `IDLE_EXPIRED` is persisted.
 
 ### Source Fetch Direction
 
-This describes the **deadline-refresh** stage's Source; the sweep stage instead reads indexed due `session_idle_checks` rows directly (see *Reconciler Stages*). The refresh stage lives on the **generic reconciler** — one fetch per tick, not per resource group. Even so, its Source reads sessions **per resource group**, following the pattern the scheduler coordinator already uses (`ScheduleCoordinator` iterates scaling groups and reads each with `get_sessions_for_handler(scaling_group, …)`).
+Scope resolution belongs only to the **Idle Check Assignment Sync** stage. It lives on the generic reconciler — one fetch per tick, not per resource group. Even so, its Source reads sessions **per resource group**, following the pattern the scheduler coordinator already uses (`ScheduleCoordinator` iterates scaling groups and reads each with `get_sessions_for_handler(scaling_group, …)`). The initial grace period, judgment, and sweep Sources start from `session_idle_checks` and do not repeat this work.
 
 **Per resource group, the Source:**
 
@@ -245,11 +278,11 @@ Because a session belongs to three scopes at once and each scope may carry sever
 - **The same checker reachable from multiple scopes.** One `idle_checker_id` may be bound at both the session's domain and its project. It resolves to a **single** effective checker, de-duplicated by checker id and evaluated once for that session.
 - **Multiple checkers bound to one scope.** A single scope (e.g. one resource group) may carry many bindings, each its own row with its own `enabled` flag; all enabled checkers participate. Multiple definitions of the same `checker_type` are batched into one implementation call.
 
-A binding with `enabled = false` is dropped from the union before any of this, so a disabled binding never contributes a checker.
+A binding with `enabled = false` is dropped from the desired union. Assignment sync therefore removes its non-expired `session_idle_checks` rows; an `IDLE_EXPIRED` row is retained for the sweep even after the binding is disabled or removed.
 
 ### Checker-Owned Runtime State
 
-The Source does not branch centrally on checker type to read Valkey or Prometheus. The Handler groups assignments by checker type and calls each implementation once per tick. Each checker owns its batched external reads and internal judgment material; the public contract exposes only assignments and judgments. This keeps query shapes inside the checker without exposing preparer state to the orchestration layer.
+The judgment Source does not branch centrally on checker type to read Valkey or Prometheus. The Handler groups assignments by checker type and calls each implementation once per tick. Each checker owns its batched external reads and internal judgment material; the public contract exposes only assignments and judgments. This keeps query shapes inside the checker without exposing preparer state to the orchestration layer.
 
 ### Checker Types
 
@@ -273,7 +306,7 @@ The **sweep** stage's Handler does not kill containers or perform the final `TER
 
 The common termination operation accepts an optional scheduling-history message and defaults to `mark_terminating success`. The sweep supplies a generic idle-check timeout message. For every session actually transitioned, the session status update, kernel status updates, and scheduling-history write happen atomically. Checker-specific `last_status` and `last_message` remain in `session_idle_checks` and are exposed through the idle-check reporting API instead of being duplicated in scheduling history.
 
-The generic reconciler's per-entity retry classification (`decisions()`) is intentionally unused in both stages: neither a set of result upserts nor a list of due sessions is a set of retryable per-entity outcomes. Both stages leave the classification path empty.
+The generic reconciler's per-entity retry classification (`decisions()`) is intentionally unused by these stages: neither a set of row mutations nor a list of expired sessions is a set of retryable per-entity outcomes. The stages leave the classification path empty.
 
 ### Deadline Persistence & Reporting
 
@@ -290,41 +323,57 @@ This DB-backed report **replaces the Valkey remaining-time report** previously p
 
 These fields are added to `SessionV2GQL` in `api/gql/session/types.py`. The legacy Graphene module is referenced only to remove the old `Session.idle_checks` JSONString that read the Valkey report; no new API surface is added there.
 
-### Data Flow
+### Stage Sequence
+
+Each stage runs independently on its own reconciliation tick and uses PostgreSQL as the hand-off boundary. No stage passes an in-memory result directly to the next stage.
 
 ```mermaid
-flowchart TB
-    subgraph DB[PostgreSQL]
-        Sessions[sessions]
-        Checkers[idle_checkers]
-        Bindings[idle_checker_bindings]
-        Deadlines[session_idle_checks]
+sequenceDiagram
+    participant DB as PostgreSQL
+    participant Assignment as Assignment sync<br/>(IDLE_CHECK)
+    participant Grace as Initial Grace Period stage<br/>(SESSION_IDLE_CHECK)
+    participant Judgment as Judgment stage<br/>(SESSION_IDLE_CHECK)
+    participant Sweep as Expiry-sweep stage<br/>(SESSION_IDLE_CHECK)
+    participant Scheduler as Scheduling controller
+
+    Note over DB,Assignment: 1. Sync idle check assignments
+    Assignment->>DB: Read eligible sessions, enabled bindings,<br/>checker definitions, and current rows
+    DB-->>Assignment: Desired and current session-checker pairs
+    Assignment->>DB: Create missing rows as NOT_CHECKED
+    Assignment->>DB: Delete undesired rows where phase is not IDLE_EXPIRED
+
+    Note over DB,Grace: 2. Protect the initial grace period
+    Grace->>DB: Read NOT_CHECKED rows with checker and session data
+    alt Initial grace period is still active
+        Note over DB,Grace: No write, phase remains NOT_CHECKED
+    else Initial grace period has elapsed
+        Note over DB,Grace: Row becomes independently selectable by the judgment stage
     end
 
-    subgraph Refresh[Deadline-refresh stage]
-        ReadSessions[read RG sessions + resolve scopes]
-        LoadCheckers[load bound checkers]
-        Judge[judge -> deadline + status + message]
-        Upsert[upsert + prune rows]
+    Note over DB,Judgment: 3. Evaluate existing rows
+    Judgment->>DB: Read rows eligible for judgment
+    DB-->>Judgment: Existing rows with checker and session data
+    Judgment->>Judgment: Batch by checker type and judge
+    alt Judgment is ACTIVE
+        Judgment->>DB: Set ACTIVE and refresh expire_at and message
+    else Judgment is IDLE and deadline remains
+        Judgment->>DB: Set IDLE and message, preserving expire_at
+    else Judgment is IDLE and deadline elapsed
+        Judgment->>DB: Set IDLE_EXPIRED and message, preserving expire_at
     end
 
-    subgraph Sweep[Expiry-sweep stage]
-        ReadDue[read indexed due rows for RUNNING sessions]
-        Mark[mark TERMINATING + write history atomically]
-    end
-
-    Sessions --> ReadSessions --> LoadCheckers
-    Checkers --> LoadCheckers
-    Bindings --> LoadCheckers
-    LoadCheckers --> Judge --> Upsert --> Deadlines
-    Deadlines --> ReadDue --> Mark
+    Note over Sweep,Scheduler: 4. Terminate expired sessions
+    Sweep->>DB: Read IDLE_EXPIRED rows for RUNNING sessions
+    DB-->>Sweep: Expired session-checker rows
+    Sweep->>Sweep: Deduplicate by session
+    Sweep->>Scheduler: Request TERMINATING transition
+    Scheduler->>DB: Update session and kernels and write history atomically
 ```
 
 
 ## Open Questions
 
 - Should utilization `and` / `or` threshold semantics match the legacy behavior or be redefined?
-- Row lifecycle: rows are removed by `ON DELETE CASCADE` when a session or checker is deleted, and non-due rows are pruned by refresh when a checker stops applying. Should sweep delete consumed due rows after writing history, or retain them until the session is deleted?
 
 ## References
 
