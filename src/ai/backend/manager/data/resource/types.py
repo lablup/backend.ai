@@ -1,3 +1,4 @@
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
@@ -6,6 +7,7 @@ from ai.backend.common.types import (
     DefaultForUnspecified,
     ResourceSlot,
     SlotName,
+    SlotTypes,
     VFolderHostPermissionMap,
 )
 
@@ -54,17 +56,19 @@ class ScalingGroupProxyTarget:
 
 @dataclass(frozen=True)
 class SlotTypeInfo:
-    """Global slot-type admin policy from `resource_slot_types`.
+    """Global slot-type registry from `resource_slot_types`.
 
-    - enabled: slot names with enabled=true. Image-side validators
-      (`ImageSlotTypeRule`, `ResourceLimitRule`) only enforce slots in this
-      set, so image-declared slots outside it are skipped instead of rejected.
-    - required: slot names with required=true. Sessions must request nonzero
-      amounts for these slots.
+    - types: slot name -> unit kind for every enabled slot, in registry
+      ``rank`` order (dict insertion order preserves it). Membership in
+      this mapping is the "enabled" test; image-side validators skip
+      slots outside it instead of rejecting them. The unit kind also
+      drives value humanization.
+    - required: slot names with required=true. Sessions must request
+      nonzero amounts for these slots.
     """
 
-    enabled: frozenset[SlotName] = field(default_factory=frozenset)
-    required: frozenset[SlotName] = field(default_factory=frozenset)
+    types: Mapping[SlotName, SlotTypes]
+    required: frozenset[SlotName]
 
 
 @dataclass(frozen=True)

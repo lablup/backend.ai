@@ -29,7 +29,14 @@ from ai.backend.manager.views.sokovan.session_creation import (
 
 
 class SessionSpecPreparer:
-    """Runs an ordered chain of draft rules and finalizes into a ``SessionSpec``.
+    """Runs the ordered draft-rule chain and finalizes into a ``SessionSpec``.
+
+    Rules come in two groups: ``resource_rules`` determine the resource
+    shape of the session (identity, RG defaults, kernel resources,
+    group expansion) and ``spec_rules`` complete the rest of the spec
+    (network, container user, environ, internal data, mounts). The full
+    chain is their union in declaration order; the fitting check runs
+    only the resource group via :meth:`prepare_resources`.
 
     Each rule receives the draft emitted by the previous one, so
     ordering matters (e.g. an image-resolution rule should run after
@@ -38,21 +45,45 @@ class SessionSpecPreparer:
     projected into the frozen spec.
     """
 
-    _rules: tuple[SessionSpecDraftRule, ...]
+    _resource_rules: tuple[SessionSpecDraftRule, ...]
+    _spec_rules: tuple[SessionSpecDraftRule, ...]
 
-    def __init__(self, rules: Iterable[SessionSpecDraftRule]) -> None:
-        self._rules = tuple(rules)
+    def __init__(
+        self,
+        resource_rules: Iterable[SessionSpecDraftRule],
+        spec_rules: Iterable[SessionSpecDraftRule],
+    ) -> None:
+        self._resource_rules = tuple(resource_rules)
+        self._spec_rules = tuple(spec_rules)
 
     async def prepare(
         self,
         initial_draft: SessionResourceSpecDraft,
         context: SessionSpecContext,
     ) -> SessionResourceSpec:
-        """Run every rule in declaration order and finalize."""
-        draft = initial_draft
-        for rule in self._rules:
-            draft = await rule.prepare(draft, context)
+        """Run the full chain (resource rules then spec rules) and finalize."""
+        draft = await self._run(self._resource_rules, initial_draft, context)
+        draft = await self._run(self._spec_rules, draft, context)
         return self._finalize(draft)
+
+    async def prepare_resources(
+        self,
+        initial_draft: SessionResourceSpecDraft,
+        context: SessionSpecContext,
+    ) -> SessionResourceSpec:
+        """Run only the resource-determination rules and finalize."""
+        draft = await self._run(self._resource_rules, initial_draft, context)
+        return self._finalize(draft)
+
+    @staticmethod
+    async def _run(
+        rules: tuple[SessionSpecDraftRule, ...],
+        draft: SessionResourceSpecDraft,
+        context: SessionSpecContext,
+    ) -> SessionResourceSpecDraft:
+        for rule in rules:
+            draft = await rule.prepare(draft, context)
+        return draft
 
     def _finalize(self, draft: SessionResourceSpecDraft) -> SessionResourceSpec:
         """Project a fully-prepared draft into a frozen ``SessionResourceSpec``."""

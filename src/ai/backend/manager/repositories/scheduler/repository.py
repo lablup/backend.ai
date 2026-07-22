@@ -36,8 +36,10 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.dotfile.types import DotfileBundle
 from ai.backend.manager.data.kernel.types import KernelListResult, KernelStatus
 from ai.backend.manager.data.resource.types import UserEnqueuePolicy
+from ai.backend.manager.data.session.creation import ContainerUserInfo
 from ai.backend.manager.data.session.types import SessionInfo, SessionStatus
 from ai.backend.manager.exceptions import ErrorStatusInfo
 from ai.backend.manager.models.scheduling_history.row import SessionSchedulingHistoryRow
@@ -68,7 +70,7 @@ from ai.backend.manager.views.sokovan.session import (
     TerminatingKernelWithAgentData,
     TerminatingSessionData,
 )
-from ai.backend.manager.views.sokovan.session_creation import SessionSpecContext
+from ai.backend.manager.views.sokovan.session_creation import SessionSpecContext, UserEnqueueInfo
 from ai.backend.manager.views.sokovan.snapshot import (
     GlobalScopeSnapshot,
     ResourceGroupScopeSnapshot,
@@ -194,10 +196,19 @@ class SchedulerRepository:
         """
         fetch = await self._db_source.fetch_compute_schedule_fetch(draft, resource_group_id)
         return ComputeScheduleData(
+            # Resource-only assembly: the fitting check runs no validators
+            # and no user-scoped rules, so the user part carries the
+            # scope-less baseline instead of DB reads.
             spec_context=SessionSpecContext(
-                resource_group=fetch.spec.resource_group,
-                user=fetch.spec.user.to_info({}),
-                global_info=fetch.spec.global_info,
+                resource_group=fetch.resource_group,
+                user=UserEnqueueInfo(
+                    policy=None,
+                    container_user=ContainerUserInfo(),
+                    dotfiles=DotfileBundle(),
+                    pending_session_count=0,
+                    vfolder_mounts_by_role={},
+                ),
+                global_info=fetch.global_info,
             ),
             resources=ResourceGroupResource(agents=fetch.agents),
             limit=AgentLimit(max_container_count=await self._get_max_container_count()),

@@ -6,7 +6,6 @@ from dataclasses import dataclass
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.types import (
     SlotName,
-    SlotTypes,
     VFolderMount,
 )
 from ai.backend.manager.data.dotfile.types import DotfileBundle
@@ -26,8 +25,9 @@ class ResourceGroupEnqueueInfo:
     defaults: DefaultSessionOptions
     network: ScalingGroupNetworkInfo | None
     allow_fractional: bool
-    # Slot kinds served by the group's non-terminated agents
-    known_slot_types: Mapping[SlotName, SlotTypes]
+    # Slot names served by the group's non-terminated agents (membership
+    # only; unit metadata lives in the global registry SlotTypeInfo)
+    served_slot_names: frozenset[SlotName]
 
 
 @dataclass(frozen=True)

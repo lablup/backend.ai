@@ -76,8 +76,12 @@ class SessionSpecFetch:
 
 @dataclass(frozen=True)
 class ComputeScheduleFetch:
-    """DB-side sources of the fitting check: spec context plus the target
-    resource group's schedulable agents."""
+    """DB-side sources of the fitting check (resource-only).
 
-    spec: SessionSpecFetch
+    Only what the resource subchain and the selector consume: the group's
+    enqueue info (defaults; no slot inventory), the referenced images, and
+    the schedulable agents. User reads are skipped entirely."""
+
+    resource_group: ResourceGroupEnqueueInfo
+    global_info: GlobalEnqueueInfo
     agents: list[AgentMeta]

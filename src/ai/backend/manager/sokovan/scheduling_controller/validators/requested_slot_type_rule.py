@@ -2,7 +2,7 @@
 
 Every ``resource_type`` in a kernel's requested resource list must be
 served by some non-terminated agent in the requested resource group.
-The context's ``known_slot_types`` is sourced from ``agent_resources``
+The context's ``served_slot_names`` is sourced from ``agent_resources``
 joined with ``agents`` (status != TERMINATED) and
 ``resource_slot_types``, so it reflects the RG's hardware inventory and
 the registered unit metadata in one mapping.
@@ -42,7 +42,7 @@ class RequestedSlotTypeRule(SessionSpecValidatorRule):
         spec: SessionSpec,
         context: SessionSpecContext,
     ) -> None:
-        rg_slot_types = context.resource_group.known_slot_types
+        rg_slot_types = context.resource_group.served_slot_names
         if not rg_slot_types:
             raise InvalidAPIParameters(
                 extra_msg=(

@@ -211,17 +211,15 @@ def _to_slot_quota(slots: ResourceSlot) -> dict[SlotName, Decimal]:
 
 @dataclass(frozen=True)
 class _ScalingGroupWithSlotInventory:
-    """Resource group bundled with the slot inventory served by its agents.
+    """Resource group bundled with the slot names served by its agents.
 
-    ``active_slot_types`` maps each slot name served by a non-terminated
-    agent in this resource group to its registered :class:`SlotTypes`
-    unit. The validator chain consults this map both for membership
-    (reject requests for slots the RG does not provide) and for unit
-    metadata (humanize values during error formatting).
+    ``served_slot_names`` is a membership set (reject requests for slots
+    the RG does not provide); slot unit metadata lives in the global
+    registry (:class:`SlotTypeInfo`).
     """
 
     rg_row: ScalingGroupRow
-    active_slot_types: Mapping[SlotName, SlotTypes]
+    served_slot_names: frozenset[SlotName]
 
 
 class ScheduleDBSource:
@@ -302,44 +300,37 @@ class ScheduleDBSource:
             raise ScalingGroupNotFound(f"Resource group {resource_group_id} not found")
 
         ar = AgentResourceRow.__table__
-        rst = ResourceSlotTypeRow.__table__
         inventory_rows = (
             await db_sess.execute(
-                sa.select(ar.c.slot_name, rst.c.slot_type)
+                sa.select(ar.c.slot_name)
                 .distinct()
-                .select_from(
-                    ar.join(AgentRow, ar.c.agent_id == AgentRow.id).join(
-                        rst, rst.c.slot_name == ar.c.slot_name
-                    )
-                )
+                .select_from(ar.join(AgentRow, ar.c.agent_id == AgentRow.id))
                 .where(
                     AgentRow.resource_group_id == resource_group_id,
                     AgentRow.status != AgentStatus.TERMINATED,
+                    AgentRow.schedulable == sa.true(),
                 )
             )
         ).all()
-        active_slot_types: dict[SlotName, SlotTypes] = {
-            SlotName(row.slot_name): SlotTypes(row.slot_type) for row in inventory_rows
-        }
         return _ScalingGroupWithSlotInventory(
             rg_row=rg_row,
-            active_slot_types=active_slot_types,
+            served_slot_names=frozenset(SlotName(row.slot_name) for row in inventory_rows),
         )
 
     async def _fetch_slot_type_info(self, db_sess: SASession) -> SlotTypeInfo:
-        stmt = sa.select(
-            ResourceSlotTypeRow.slot_name,
-            ResourceSlotTypeRow.enabled,
-            ResourceSlotTypeRow.required,
-        ).where(
-            sa.or_(
-                ResourceSlotTypeRow.enabled.is_(True),
-                ResourceSlotTypeRow.required.is_(True),
+        """Registry slot types in ``rank`` order (dict order preserves it)."""
+        stmt = (
+            sa.select(
+                ResourceSlotTypeRow.slot_name,
+                ResourceSlotTypeRow.slot_type,
+                ResourceSlotTypeRow.required,
             )
+            .where(ResourceSlotTypeRow.enabled.is_(True))
+            .order_by(ResourceSlotTypeRow.rank, ResourceSlotTypeRow.slot_name)
         )
         rows = (await db_sess.execute(stmt)).all()
         return SlotTypeInfo(
-            enabled=frozenset(SlotName(row.slot_name) for row in rows if row.enabled),
+            types={SlotName(row.slot_name): SlotTypes(row.slot_type) for row in rows},
             required=frozenset(SlotName(row.slot_name) for row in rows if row.required),
         )
 
@@ -1526,14 +1517,41 @@ class ScheduleDBSource:
         draft: SessionSpecDraft,
         resource_group_id: ResourceGroupID,
     ) -> ComputeScheduleFetch:
-        """Batch-fetch the DB-side sources of the fitting check in a
-        single readonly transaction: the spec context plus the target
-        group's schedulable agents. The repository composes the result
-        with the configured agent limit."""
+        """Resource-only batch fetch of the fitting check in a single
+        readonly transaction: the group's enqueue info (no slot
+        inventory), the images the draft references, and the schedulable
+        agents. User reads are skipped — the fitting check runs only the
+        resource subchain and the selector, neither of which consumes
+        user- or validator-facing values.
+        Raises ScalingGroupNotFound if the resource group doesn't exist.
+        """
+        kernel_specs = tuple(draft.resource_spec.options.kernel_groups or ())
         async with self._db.begin_readonly_session_read_committed() as db_sess:
-            spec = await self._fetch_session_spec_fetch(db_sess, draft)
+            rg_row = (
+                await db_sess.scalars(
+                    sa.select(ScalingGroupRow).where(ScalingGroupRow.id == resource_group_id)
+                )
+            ).one_or_none()
+            if rg_row is None:
+                raise ScalingGroupNotFound(f"Resource group {resource_group_id} not found")
+            resource_group = ResourceGroupEnqueueInfo(
+                defaults=rg_row.default_session_options or DefaultSessionOptions(),
+                network=ScalingGroupNetworkInfo(
+                    use_host_network=rg_row.use_host_network,
+                    wsproxy_addr=rg_row.wsproxy_addr,
+                ),
+                allow_fractional=bool(
+                    getattr(rg_row.scheduler_opts, "allow_fractional_resource_fragmentation", False)
+                ),
+                served_slot_names=frozenset(),
+            )
+            global_info = await self._fetch_global_enqueue_info(db_sess, kernel_specs)
             agents = await self._fetch_agents(db_sess, resource_group_id)
-            return ComputeScheduleFetch(spec=spec, agents=agents)
+            return ComputeScheduleFetch(
+                resource_group=resource_group,
+                global_info=global_info,
+                agents=agents,
+            )
 
     async def _fetch_session_spec_fetch(
         self,
@@ -1561,13 +1579,13 @@ class ScheduleDBSource:
         network_info: ScalingGroupNetworkInfo | None = None
         rg_defaults = None
         resource_group_allow_fractional = False
-        known_slot_types: Mapping[SlotName, SlotTypes] = {}
+        served_slot_names: frozenset[SlotName] = frozenset()
         if resource_group_id:
             rg_bundle = await self._fetch_resource_group_with_slot_inventory(
                 db_sess, resource_group_id
             )
             rg_row = rg_bundle.rg_row
-            known_slot_types = rg_bundle.active_slot_types
+            served_slot_names = rg_bundle.served_slot_names
             network_info = ScalingGroupNetworkInfo(
                 use_host_network=rg_row.use_host_network,
                 wsproxy_addr=rg_row.wsproxy_addr,
@@ -1585,7 +1603,7 @@ class ScheduleDBSource:
             defaults=rg_defaults,
             network=network_info,
             allow_fractional=resource_group_allow_fractional,
-            known_slot_types=known_slot_types,
+            served_slot_names=served_slot_names,
         )
 
     async def _fetch_global_enqueue_info(

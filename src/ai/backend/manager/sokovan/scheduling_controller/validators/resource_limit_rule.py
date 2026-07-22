@@ -58,7 +58,6 @@ class ResourceLimitRule(SessionSpecValidatorRule):
                 idx,
                 kernel,
                 image_info,
-                context.resource_group.known_slot_types,
                 context.global_info.slot_type_info,
             )
 
@@ -68,7 +67,6 @@ class ResourceLimitRule(SessionSpecValidatorRule):
         idx: int,
         kernel: KernelSpec,
         image_info: ImageInfo,
-        known_slot_types: Mapping[SlotName, SlotTypes],
         policy: SlotTypeInfo,
     ) -> None:
         min_slots = image_min_slots(image_info)
@@ -83,11 +81,11 @@ class ResourceLimitRule(SessionSpecValidatorRule):
         for slot_name, min_value in min_slots.items():
             if Decimal(min_value) <= Decimal(0):
                 continue
-            if SlotName(slot_name) not in policy.enabled:
+            if slot_name not in policy.types:
                 continue
             requested_value = requested.get(slot_name)
             if requested_value is None or requested_value < Decimal(min_value):
-                min_repr = cls._humanize_slots(min_slots, known_slot_types)
+                min_repr = cls._humanize_slots(min_slots, policy.types)
                 raise InvalidAPIParameters(
                     extra_msg=(
                         f"kernel_specs[{idx}] resource request is smaller than "

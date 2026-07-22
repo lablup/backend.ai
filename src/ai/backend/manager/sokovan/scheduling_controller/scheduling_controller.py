@@ -141,22 +141,27 @@ class SchedulingController:
         self._metric_observer = SchedulerPhaseMetricObserver.instance()
         self._operation_metrics = SchedulerOperationMetricObserver.instance()
 
-        # Draft-based spec preparer chain: builds a fully-resolved
-        # ``SessionSpec`` from a caller-supplied ``SessionSpecDraft``.
-        # Order matters — RG defaults merge first so later rules see the
-        # merged baseline; expand last on the options side so kernel
-        # specs exist before per-kernel rules run.
-        self._spec_preparer = SessionSpecPreparer([
-            AssignUserIdentityRule(),
-            MergeResourceGroupDefaultsRule(),
-            ComputeKernelResourcesRule(),
-            ExpandKernelGroupsRule(),
-            AssignNetworkConfigRule(),
-            AssignContainerUserMappingRule(),
-            InjectSessionEnvironRule(),
-            BuildInternalDataRule(),
-            ResolveVFolderMountsRule(),
-        ])
+        # Draft-based spec preparer. Order matters — RG defaults merge
+        # first so later rules see the merged baseline; expand last on
+        # the options side so kernel specs exist before per-kernel rules
+        # run. The resource rules determine resource amounts (identity
+        # included so the draft can be promoted) and are runnable alone
+        # via prepare_resources() for the fitting check.
+        self._spec_preparer = SessionSpecPreparer(
+            resource_rules=(
+                AssignUserIdentityRule(),
+                MergeResourceGroupDefaultsRule(),
+                ComputeKernelResourcesRule(),
+                ExpandKernelGroupsRule(),
+            ),
+            spec_rules=(
+                AssignNetworkConfigRule(),
+                AssignContainerUserMappingRule(),
+                InjectSessionEnvironRule(),
+                BuildInternalDataRule(),
+                ResolveVFolderMountsRule(),
+            ),
+        )
 
         # Draft-based spec validator chain. Runs against the finalized
         # ``SessionSpec`` + ``SessionSpecContext``.
@@ -416,20 +421,19 @@ class SchedulingController:
         """Compute whether each kernel of a would-be session fits the target
         resource group's nodes, without provisioning.
 
-        Reuses the enqueue prep chain (vfolder resolution skipped), then drives
-        the real agent selector against a live snapshot of the group's agents.
-        Results correspond positionally to ``draft.resource_spec.options.kernel_groups``.
+        Runs the resource-only subchain (same rules as the enqueue chain,
+        restricted to resource determination) over a resource-only read
+        bundle, then drives the real agent selector against a live
+        snapshot of the group's agents. Results correspond positionally
+        to ``draft.resource_spec.options.kernel_groups``.
         """
-        # SessionScopeDraft is used only to fetch dotfile data and container user info.
-        # Node fitting does not depend on vfolder mounts, so the storage-RPC
-        # resolution is skipped and the per-role mount map stays empty.
         # An unknown resource group (ScalingGroupNotFound) is a request error,
         # not a per-kernel fitting outcome, so let it propagate to the caller.
         fetched = await self._repository.fetch_compute_schedule_data(
             SessionSpecDraft(scope=SessionScopeDraft(), resource_spec=draft),
             resource_group_id,
         )
-        resource_spec = await self._spec_preparer.prepare(draft, fetched.spec_context)
+        resource_spec = await self._spec_preparer.prepare_resources(draft, fetched.spec_context)
         return await self._compute_schedule(resource_spec, resource_group_id, fetched)
 
     async def mark_scheduling_needed(self, schedule_types: Sequence[ScheduleType]) -> None:
