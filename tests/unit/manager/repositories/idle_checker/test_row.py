@@ -71,6 +71,7 @@ class TestSessionIdleCheckRow:
         session_id = SessionId(uuid.uuid4())
         checker_id = IdleCheckerID(uuid.uuid4())
         created_at = datetime(2026, 1, 1, tzinfo=UTC)
+        expire_at = datetime(2026, 1, 2, tzinfo=UTC)
         async with database.begin_session() as db_sess:
             db_sess.add(
                 ProjectResourcePolicyRow(
@@ -163,14 +164,14 @@ class TestSessionIdleCheckRow:
                 SessionIdleCheckRow(
                     session_id=session_id,
                     idle_checker_id=checker_id,
-                    expire_at=None,
-                    last_status="grace_period",
-                    last_message="Waiting for the grace period to end.",
+                    expire_at=expire_at,
+                    last_status="active",
+                    last_message="The session is active.",
                 )
             )
         return SessionIdleCheckFixture(session_id=session_id, checker_id=checker_id)
 
-    async def test_persists_null_expire_at_and_updated_at(
+    async def test_persists_expire_at_and_updated_at(
         self,
         database: ExtendedAsyncSAEngine,
         persisted_idle_check: SessionIdleCheckFixture,
@@ -182,8 +183,8 @@ class TestSessionIdleCheckRow:
             )
 
         assert row is not None
-        assert row.expire_at is None
-        assert row.last_status == "grace_period"
+        assert row.expire_at == datetime(2026, 1, 2, tzinfo=UTC)
+        assert row.last_status == "active"
         assert row.updated_at is not None
 
     async def test_rejects_duplicate_session_checker_pair(

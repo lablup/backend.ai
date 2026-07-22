@@ -22,9 +22,6 @@ class SessionIdleCheckConditions:
     @staticmethod
     def expired(now: datetime) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return sa.and_(
-                SessionIdleCheckRow.expire_at.isnot(None),
-                SessionIdleCheckRow.expire_at <= now,
-            )
+            return SessionIdleCheckRow.expire_at <= now
 
         return inner

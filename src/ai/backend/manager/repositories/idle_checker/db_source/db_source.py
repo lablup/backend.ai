@@ -130,9 +130,6 @@ class IdleCheckerDBSource:
         checks: list[ExpiredIdleCheckData] = []
         for row in result_rows:
             check_row: SessionIdleCheckRow = row.SessionIdleCheckRow
-            if check_row.expire_at is None:
-                # Unreachable under the expired() condition; guards the type.
-                continue
             checks.append(
                 ExpiredIdleCheckData(
                     session_id=check_row.session_id,
