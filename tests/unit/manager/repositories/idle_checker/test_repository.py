@@ -13,6 +13,7 @@ from ai.backend.common.data.idle_checker.types import (
     IdleCheckPhase,
     SessionLifetimeSpec,
 )
+from ai.backend.common.data.permission.types import ScopeType
 from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.idle_checker import IdleCheckerID
 from ai.backend.common.identifier.resource_group import ResourceGroupID
@@ -27,6 +28,7 @@ from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.idle_checker.row import (
+    IdleCheckerBindingRow,
     IdleCheckerRow,
     SessionIdleCheckRow,
 )
@@ -35,6 +37,7 @@ from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.idle_checker.repository import IdleCheckerRepository
+from ai.backend.manager.repositories.idle_checker.types import SessionIdleCheckPair
 from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.testutils.db import with_tables
 
@@ -184,6 +187,7 @@ class TestFetchJudgmentBatch:
                 ScalingGroupRow,
                 SessionRow,
                 IdleCheckerRow,
+                IdleCheckerBindingRow,
                 SessionIdleCheckRow,
             ],
         ):
@@ -228,6 +232,14 @@ class TestFetchJudgmentBatch:
                 db_sess.add(_expired_check_session_row(scope, session_id, status))
             db_sess.add(_expired_check_checker_row(checker_id))
             await db_sess.flush()
+            db_sess.add(
+                IdleCheckerBindingRow(
+                    scope_type=ScopeType.DOMAIN.value,
+                    scope_id=scope.domain_id,
+                    idle_checker_id=checker_id,
+                    enabled=True,
+                )
+            )
             for session_id, phase in check_specs:
                 db_sess.add(
                     SessionIdleCheckRow(
@@ -294,6 +306,34 @@ class TestFetchJudgmentBatch:
 
         session_ids = {assignment.session.session_id for assignment in batch.assignments}
         assert judgment_rows.terminated_session_id not in session_ids
+
+    async def test_fetches_desired_and_current_assignment_pairs(
+        self,
+        repository: IdleCheckerRepository,
+        judgment_rows: JudgmentRows,
+    ) -> None:
+        assignments = await repository.fetch_session_idle_check_assignments([SessionStatus.RUNNING])
+
+        assert set(assignments.desired_pairs) == {
+            SessionIdleCheckPair(session_id, judgment_rows.checker_id)
+            for session_id in (
+                judgment_rows.active_session_id,
+                judgment_rows.idle_session_id,
+                judgment_rows.not_checked_session_id,
+                judgment_rows.idle_expired_session_id,
+                judgment_rows.session_without_row_id,
+            )
+        }
+        assert set(assignments.current_pairs) == {
+            SessionIdleCheckPair(session_id, judgment_rows.checker_id)
+            for session_id in (
+                judgment_rows.active_session_id,
+                judgment_rows.idle_session_id,
+                judgment_rows.not_checked_session_id,
+                judgment_rows.idle_expired_session_id,
+            )
+        }
+        assert assignments.now.tzinfo is not None
 
 
 class TestFetchExpiredIdleChecks:

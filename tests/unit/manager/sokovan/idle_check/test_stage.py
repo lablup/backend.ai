@@ -11,6 +11,7 @@ from pytest_mock import MockerFixture
 from ai.backend.common.data.idle_checker.types import (
     CheckerType,
     IdleCheckerSpec,
+    IdleCheckPhase,
     SessionLifetimeSpec,
 )
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
@@ -124,7 +125,7 @@ class TestBuildIdleCheckSweepStage:
                     session_id=session_id,
                     checker_id=IdleCheckerID(uuid4()),
                     expire_at=now,
-                    last_status="expired",
+                    last_status=IdleCheckPhase.IDLE_EXPIRED,
                     last_message="maximum lifetime exceeded",
                 ),
             ),

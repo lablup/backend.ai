@@ -6,7 +6,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
 
-from ai.backend.common.data.idle_checker.types import CheckerType, IdleCheckerSpec
+from ai.backend.common.data.idle_checker.types import CheckerType, IdleCheckerSpec, IdleCheckPhase
 from ai.backend.common.identifier.idle_checker import IdleCheckerID
 from ai.backend.common.types import SessionId, SessionTypes
 from ai.backend.manager.data.idle_checker.types import IdleCheckSession
@@ -38,13 +38,28 @@ class IdleCheckBatchData:
 
 
 @dataclass(frozen=True)
+class SessionIdleCheckPair:
+    session_id: SessionId
+    checker_id: IdleCheckerID
+
+
+@dataclass(frozen=True)
+class SessionIdleCheckAssignmentData:
+    # Pairs that should exist, derived from enabled checker scope bindings.
+    desired_pairs: Sequence[SessionIdleCheckPair]
+    # Existing pairs for sessions in the target statuses, excluding terminal sessions.
+    current_pairs: Sequence[SessionIdleCheckPair]
+    now: datetime
+
+
+@dataclass(frozen=True)
 class ExpiredIdleCheckData:
     """One stored judgment whose deadline has passed, kept per checker as its own reason."""
 
     session_id: SessionId
     checker_id: IdleCheckerID
     expire_at: datetime
-    last_status: str
+    last_status: IdleCheckPhase
     last_message: str
 
 

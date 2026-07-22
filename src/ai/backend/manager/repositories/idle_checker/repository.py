@@ -7,6 +7,7 @@ from ai.backend.manager.repositories.idle_checker.db_source.db_source import Idl
 from ai.backend.manager.repositories.idle_checker.types import (
     ExpiredIdleCheckBatchData,
     IdleCheckBatchData,
+    SessionIdleCheckAssignmentData,
 )
 from ai.backend.manager.repositories.ops import DBOpsProvider
 
@@ -25,6 +26,12 @@ class IdleCheckerRepository:
         self, session_statuses: Collection[SessionStatus]
     ) -> IdleCheckBatchData:
         return await self._db_source.fetch_judgment_batch(session_statuses)
+
+    async def fetch_session_idle_check_assignments(
+        self,
+        session_statuses: Collection[SessionStatus],
+    ) -> SessionIdleCheckAssignmentData:
+        return await self._db_source.fetch_session_idle_check_assignments(session_statuses)
 
     async def fetch_expired_idle_checks(
         self, session_statuses: Collection[SessionStatus]

@@ -7,6 +7,7 @@ from uuid import UUID, uuid4
 
 import pytest
 
+from ai.backend.common.data.idle_checker.types import IdleCheckPhase
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.identifier.idle_checker import IdleCheckerID
 from ai.backend.common.types import SessionId
@@ -26,7 +27,7 @@ def _expired_check(
     checker_id: IdleCheckerID,
     *,
     seconds_ago: int,
-    status: str,
+    status: IdleCheckPhase,
     message: str,
 ) -> ExpiredIdleCheckData:
     return ExpiredIdleCheckData(
@@ -55,21 +56,21 @@ class TestIdleCheckSweepHandler:
             first_session_id,
             second_checker_id,
             seconds_ago=10,
-            status="expired",
+            status=IdleCheckPhase.IDLE_EXPIRED,
             message="network timeout",
         )
         second_check = _expired_check(
             first_session_id,
             first_checker_id,
             seconds_ago=20,
-            status="expired",
+            status=IdleCheckPhase.IDLE_EXPIRED,
             message="maximum lifetime exceeded",
         )
         third_check = _expired_check(
             second_session_id,
             first_checker_id,
             seconds_ago=5,
-            status="expired",
+            status=IdleCheckPhase.IDLE_EXPIRED,
             message="maximum lifetime exceeded",
         )
         reconcile_info = IdleCheckSweepReconcileInfo(

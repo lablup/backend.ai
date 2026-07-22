@@ -12,12 +12,14 @@ from ai.backend.common.data.idle_checker.types import (
     IdleCheckerSpec,
     IdleCheckPhase,
 )
+from ai.backend.common.data.permission.types import ScopeType
 from ai.backend.common.identifier.idle_checker import IdleCheckerID
 from ai.backend.common.types import SessionId, SessionTypes
 from ai.backend.manager.data.idle_checker.types import IdleCheckSession
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.models.idle_checker.conditions import SessionIdleCheckConditions
 from ai.backend.manager.models.idle_checker.row import (
+    IdleCheckerBindingRow,
     IdleCheckerRow,
     SessionIdleCheckRow,
 )
@@ -30,6 +32,8 @@ from ai.backend.manager.repositories.idle_checker.types import (
     IdleCheckAssignmentData,
     IdleCheckBatchData,
     IdleCheckerDefinitionData,
+    SessionIdleCheckAssignmentData,
+    SessionIdleCheckPair,
 )
 from ai.backend.manager.repositories.ops import DBOpsProvider
 
@@ -116,3 +120,73 @@ class IdleCheckerDBSource:
                 )
             )
         return ExpiredIdleCheckBatchData(checks=tuple(checks), now=now)
+
+    async def fetch_session_idle_check_assignments(
+        self,
+        session_statuses: Collection[SessionStatus],
+    ) -> SessionIdleCheckAssignmentData:
+        scope_matches = sa.or_(
+            sa.and_(
+                IdleCheckerBindingRow.scope_type == ScopeType.RESOURCE_GROUP.value,
+                IdleCheckerBindingRow.scope_id == SessionRow.resource_group_id,
+            ),
+            sa.and_(
+                IdleCheckerBindingRow.scope_type == ScopeType.PROJECT.value,
+                IdleCheckerBindingRow.scope_id == SessionRow.group_id,
+            ),
+            sa.and_(
+                IdleCheckerBindingRow.scope_type == ScopeType.DOMAIN.value,
+                IdleCheckerBindingRow.scope_id == SessionRow.domain_id,
+            ),
+        )
+        desired_query = (
+            sa.select(
+                SessionRow.id,
+                IdleCheckerBindingRow.idle_checker_id,
+            )
+            .select_from(SessionRow)
+            .join(IdleCheckerBindingRow, scope_matches)
+            .join(
+                IdleCheckerRow,
+                sa.and_(
+                    IdleCheckerRow.id == IdleCheckerBindingRow.idle_checker_id,
+                    SessionRow.session_type == sa.any_(IdleCheckerRow.target_session_types),
+                ),
+            )
+            .where(
+                SessionRow.status.in_(session_statuses),
+                SessionRow.starts_at.is_not(None),
+                IdleCheckerBindingRow.enabled == sa.true(),
+            )
+            .distinct()
+        )
+        current_query = (
+            sa.select(
+                SessionIdleCheckRow.session_id,
+                SessionIdleCheckRow.idle_checker_id,
+            )
+            .join(SessionRow, SessionIdleCheckRow.session_id == SessionRow.id)
+            .where(SessionRow.status.in_(session_statuses))
+        )
+        querier = BatchQuerier(pagination=NoPagination())
+        async with self._ops.read_ops() as r:
+            now = await r.current_time()
+            desired_rows = (await r.batch_query_in_global(desired_query, querier)).rows
+            current_rows = (await r.batch_query_in_global(current_query, querier)).rows
+        return SessionIdleCheckAssignmentData(
+            desired_pairs=tuple(
+                SessionIdleCheckPair(
+                    session_id=SessionId(row.id),
+                    checker_id=cast(IdleCheckerID, row.idle_checker_id),
+                )
+                for row in desired_rows
+            ),
+            current_pairs=tuple(
+                SessionIdleCheckPair(
+                    session_id=SessionId(row.session_id),
+                    checker_id=cast(IdleCheckerID, row.idle_checker_id),
+                )
+                for row in current_rows
+            ),
+            now=now,
+        )
