@@ -15,6 +15,7 @@ __all__ = (
     "AgentOrderField",
     "AgentStatusEnum",
     "AgentStatusFilter",
+    "ConflictingSessionCleanupPolicyEnum",
     "OrderDirection",
 )
 
@@ -26,6 +27,14 @@ class AgentStatusEnum(StrEnum):
     LOST = "LOST"
     RESTARTING = "RESTARTING"
     TERMINATED = "TERMINATED"
+
+
+class ConflictingSessionCleanupPolicyEnum(StrEnum):
+    """How to clean up sessions that conflict with an agent's resource group change."""
+
+    TERMINATE = "terminate"
+    # Re-enqueue conflicting sessions back to PENDING. Not implemented yet.
+    RESCHEDULE = "reschedule"
 
 
 class AgentOrderField(StrEnum):

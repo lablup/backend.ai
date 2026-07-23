@@ -15,6 +15,7 @@ from ai.backend.manager.api.gql.extensions import (
 )
 
 from .agent import (
+    admin_update_agent_resource_group,
     agent_stats,
     agents_v2,
 )
@@ -724,6 +725,7 @@ class Query:
 
 @strawberry.type
 class Mutation:
+    admin_update_agent_resource_group = admin_update_agent_resource_group
     admin_create_app_config_allow_list = admin_create_app_config_allow_list
     admin_purge_app_config_allow_list = admin_purge_app_config_allow_list
     admin_update_app_config_allow_list = admin_update_app_config_allow_list

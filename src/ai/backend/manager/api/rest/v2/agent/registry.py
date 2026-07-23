@@ -21,6 +21,12 @@ def register_v2_agent_routes(
     reg = RouteRegistry.create("agents", route_deps.cors_options)
     reg.add("POST", "/search", handler.admin_search, middlewares=[superadmin_required])
     reg.add(
+        "PATCH",
+        "/{agent_id}/resource-group",
+        handler.update_resource_group,
+        middlewares=[superadmin_required],
+    )
+    reg.add(
         "GET", "/total-resources", handler.get_total_resources, middlewares=[superadmin_required]
     )
     return reg

@@ -4,13 +4,18 @@ from collections.abc import Iterable
 from datetime import datetime
 from enum import StrEnum
 from typing import TYPE_CHECKING, Annotated, Any, Self, cast, override
+from uuid import UUID
 
 import strawberry
 from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 from strawberry.scalars import JSON
 
-from ai.backend.common.dto.manager.v2.agent.request import AgentFilter, AgentOrder
+from ai.backend.common.dto.manager.v2.agent.request import (
+    AgentFilter,
+    AgentOrder,
+    UpdateAgentResourceGroupInput,
+)
 from ai.backend.common.dto.manager.v2.agent.response import (
     AgentNetworkInfoGQLDTO,
     AgentNode,
@@ -20,11 +25,13 @@ from ai.backend.common.dto.manager.v2.agent.response import (
     AgentSystemInfoGQLDTO,
     ComputePluginEntryDTO,
     ComputePluginsGQLDTO,
+    UpdateAgentResourceGroupPayload,
 )
 from ai.backend.common.dto.manager.v2.agent.types import (
     AgentStatusEnum,
     AgentStatusFilter,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import AgentId
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.decorators import (
@@ -37,7 +44,11 @@ from ai.backend.manager.api.gql.decorators import (
     gql_pydantic_input,
     gql_pydantic_type,
 )
-from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin, PydanticNodeMixin
+from ai.backend.manager.api.gql.pydantic_compat import (
+    PydanticInputMixin,
+    PydanticNodeMixin,
+    PydanticOutputMixin,
+)
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import dedent_strip
 
@@ -121,6 +132,76 @@ class AgentFilterGQL(PydanticInputMixin[AgentFilter]):
 class AgentOrderByGQL(PydanticInputMixin[AgentOrder]):
     field: AgentOrderFieldGQL
     direction: OrderDirection = OrderDirection.ASC
+
+
+@gql_enum(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "How to clean up sessions that conflict with an agent's resource-group change."
+        ),
+    ),
+    name="ConflictingSessionCleanupPolicy",
+)
+class ConflictingSessionCleanupPolicyGQL(StrEnum):
+    TERMINATE = "terminate"
+    RESCHEDULE = "reschedule"
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Input for changing the resource group of an agent.",
+    ),
+    name="UpdateAgentResourceGroupInput",
+)
+class UpdateAgentResourceGroupInputGQL(PydanticInputMixin[UpdateAgentResourceGroupInput]):
+    resource_group_name: str = gql_field(
+        description="Name of the target resource group to move the agent into."
+    )
+    policy: ConflictingSessionCleanupPolicyGQL = gql_field(
+        description=(
+            "How to handle sessions still running on the agent under the old resource group. "
+            "Currently only TERMINATE is supported."
+        )
+    )
+    force: bool = gql_field(
+        default=False,
+        description=(
+            "When false, the change is rejected with a conflict error if the agent still has "
+            "active sessions. When true, the group is changed anyway and the conflicting "
+            "sessions are cleaned up per the policy."
+        ),
+    )
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Result of changing the resource group of an agent.",
+    ),
+    model=UpdateAgentResourceGroupPayload,
+    name="UpdateAgentResourceGroupPayload",
+)
+class UpdateAgentResourceGroupPayloadGQL(PydanticOutputMixin[UpdateAgentResourceGroupPayload]):
+    agent_id: str = gql_field(description="ID of the agent whose resource group was changed.")
+    resource_group_id: UUID = gql_field(description="UUID of the new resource group.")
+    resource_group_name: str = gql_field(description="Name of the new resource group.")
+    policy: ConflictingSessionCleanupPolicyGQL = gql_field(
+        description="Cleanup policy applied to the conflicting sessions."
+    )
+    conflicting_session_ids: list[UUID] = gql_field(
+        description=(
+            "IDs of the sessions that were still running on the agent under the old resource "
+            "group at the time of the change."
+        )
+    )
+    terminating_session_ids: list[UUID] = gql_field(
+        description=(
+            "IDs of the conflicting sessions that were actually transitioned to TERMINATING "
+            "by the applied policy. Their container cleanup proceeds asynchronously."
+        )
+    )
 
 
 @gql_pydantic_type(

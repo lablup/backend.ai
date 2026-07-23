@@ -6,10 +6,15 @@ import logging
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Final
 
-from ai.backend.common.api_handlers import APIResponse, BodyParam
-from ai.backend.common.dto.manager.v2.agent.request import AdminSearchAgentsInput
+from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
+from ai.backend.common.dto.manager.v2.agent.request import (
+    AdminSearchAgentsInput,
+    UpdateAgentResourceGroupInput,
+)
 from ai.backend.common.dto.manager.v2.agent.response import AgentResourceStatsPayload
+from ai.backend.common.types import AgentId
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.api.rest.v2.path_params import AgentIdPathParam
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.adapters.agent.adapter import AgentAdapter
@@ -29,6 +34,17 @@ class V2AgentHandler:
     ) -> APIResponse:
         """Search agents with filters, orders, and pagination (superadmin only)."""
         result = await self._adapter.admin_search(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def update_resource_group(
+        self,
+        path: PathParam[AgentIdPathParam],
+        body: BodyParam[UpdateAgentResourceGroupInput],
+    ) -> APIResponse:
+        """Change an agent's resource group (superadmin only)."""
+        result = await self._adapter.update_resource_group(
+            AgentId(path.parsed.agent_id), body.parsed
+        )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def get_total_resources(self) -> APIResponse:
