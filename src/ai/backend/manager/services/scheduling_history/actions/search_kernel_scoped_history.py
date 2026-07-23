@@ -19,7 +19,7 @@ from ai.backend.manager.repositories.scheduling_history.types import (
 
 
 @dataclass(frozen=True)
-class KernelSchedulingHistoryTarget(SearchableActionTarget):
+class KernelHistoryTarget(SearchableActionTarget):
     """Scope item of a kernel scheduling-history search.
 
     The owning session is the authorization subject of every variant, so
@@ -38,7 +38,7 @@ class KernelSchedulingHistoryTarget(SearchableActionTarget):
 
 
 @dataclass(frozen=True)
-class KernelSchedulingHistoryByKernelTarget(KernelSchedulingHistoryTarget):
+class KernelKernelHistoryTarget(KernelHistoryTarget):
     """Scope item narrowing the history to one kernel of the session.
 
     The caller resolves ``kernel_id -> session_id`` first
@@ -53,7 +53,7 @@ class KernelSchedulingHistoryByKernelTarget(KernelSchedulingHistoryTarget):
 
 
 @dataclass(frozen=True)
-class KernelSchedulingHistoryBySessionTarget(KernelSchedulingHistoryTarget):
+class SessionKernelHistoryTarget(KernelHistoryTarget):
     """Scope item covering the history of every kernel the session owns."""
 
     @override
@@ -70,10 +70,10 @@ class SearchKernelScopedHistoryAction(BaseScopeAction):
     session may read its kernels' scheduling history.
 
     This is still a single-target scope action, so it carries exactly one
-    ``KernelSchedulingHistoryTarget``.
+    ``KernelHistoryTarget``.
     """
 
-    target: KernelSchedulingHistoryTarget
+    target: KernelHistoryTarget
     querier: BatchQuerier
 
     @override
@@ -107,7 +107,7 @@ class SearchKernelScopedHistoryActionResult(BaseScopeActionResult):
     total_count: int
     has_next_page: bool
     has_previous_page: bool
-    target: KernelSchedulingHistoryTarget
+    target: KernelHistoryTarget
 
     @override
     def scope_type(self) -> ScopeType:

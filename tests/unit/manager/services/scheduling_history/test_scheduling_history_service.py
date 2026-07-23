@@ -60,10 +60,10 @@ from ai.backend.manager.services.scheduling_history.actions.search_kernel_histor
     SearchKernelHistoryAction,
 )
 from ai.backend.manager.services.scheduling_history.actions.search_kernel_scoped_history import (
-    KernelSchedulingHistoryByKernelTarget,
-    KernelSchedulingHistoryBySessionTarget,
-    KernelSchedulingHistoryTarget,
+    KernelHistoryTarget,
+    KernelKernelHistoryTarget,
     SearchKernelScopedHistoryAction,
+    SessionKernelHistoryTarget,
 )
 from ai.backend.manager.services.scheduling_history.actions.search_route_history import (
     SearchRouteHistoryAction,
@@ -390,7 +390,7 @@ class TestResolveKernelSessionAction:
 @dataclass(frozen=True)
 class _KernelScopedHistoryCase:
     label: str
-    target: KernelSchedulingHistoryTarget
+    target: KernelHistoryTarget
     expected_scope: SearchScope
 
 
@@ -400,14 +400,14 @@ class TestSearchKernelScopedHistoryAction:
         [
             _KernelScopedHistoryCase(
                 label="bound-to-kernel",
-                target=KernelSchedulingHistoryByKernelTarget(
+                target=KernelKernelHistoryTarget(
                     session_id=_SESSION_ID, kernel_id=_KERNEL_ID
                 ),
                 expected_scope=KernelSchedulingHistorySearchScope(kernel_id=_KERNEL_ID),
             ),
             _KernelScopedHistoryCase(
                 label="bound-to-session",
-                target=KernelSchedulingHistoryBySessionTarget(session_id=_SESSION_ID),
+                target=SessionKernelHistoryTarget(session_id=_SESSION_ID),
                 expected_scope=KernelSchedulingHistoryBySessionSearchScope(session_id=_SESSION_ID),
             ),
         ],

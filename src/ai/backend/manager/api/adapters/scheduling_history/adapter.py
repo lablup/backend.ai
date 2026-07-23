@@ -93,10 +93,10 @@ from ai.backend.manager.services.scheduling_history.actions.search_kernel_histor
     SearchKernelHistoryAction,
 )
 from ai.backend.manager.services.scheduling_history.actions.search_kernel_scoped_history import (
-    KernelSchedulingHistoryByKernelTarget,
-    KernelSchedulingHistoryBySessionTarget,
-    KernelSchedulingHistoryTarget,
+    KernelHistoryTarget,
+    KernelKernelHistoryTarget,
     SearchKernelScopedHistoryAction,
+    SessionKernelHistoryTarget,
 )
 from ai.backend.manager.services.scheduling_history.actions.search_route_history import (
     SearchRouteHistoryAction,
@@ -463,7 +463,7 @@ class SchedulingHistoryAdapter(BaseAdapter):
             raise InvalidAPIParameters(
                 "Kernel scheduling history scope accepts exactly one scope item"
             )
-        target: KernelSchedulingHistoryTarget
+        target: KernelHistoryTarget
         if kernel_items:
             kernel_id = KernelId(kernel_items[0].value)
             resolve_result = (
@@ -471,11 +471,11 @@ class SchedulingHistoryAdapter(BaseAdapter):
                     ResolveKernelSessionAction(kernel_id=kernel_id)
                 )
             )
-            target = KernelSchedulingHistoryByKernelTarget(
+            target = KernelKernelHistoryTarget(
                 session_id=resolve_result.session_id, kernel_id=kernel_id
             )
         else:
-            target = KernelSchedulingHistoryBySessionTarget(
+            target = SessionKernelHistoryTarget(
                 session_id=SessionId(session_items[0].value)
             )
         action_result = await self._processors.scheduling_history.search_kernel_scoped_history.wait_for_complete(
