@@ -9,7 +9,6 @@ from datetime import datetime
 import sqlalchemy as sa
 
 from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec, UUIDInMatchSpec
-from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.replica_group import ReplicaGroupID
 from ai.backend.manager.data.deployment.types import ReplicaGroupHandlerCategory
 from ai.backend.manager.data.session.types import SchedulingResult
@@ -41,23 +40,9 @@ class ReplicaGroupHistoryConditions:
         return inner
 
     @staticmethod
-    def by_replica_group_id(replica_group_id: ReplicaGroupID) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ReplicaGroupHistoryRow.replica_group_id == replica_group_id
-
-        return inner
-
-    @staticmethod
     def by_replica_group_ids(group_ids: Collection[ReplicaGroupID]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return ReplicaGroupHistoryRow.replica_group_id.in_(group_ids)
-
-        return inner
-
-    @staticmethod
-    def by_deployment_id(deployment_id: DeploymentID) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ReplicaGroupHistoryRow.deployment_id == deployment_id
 
         return inner
 
