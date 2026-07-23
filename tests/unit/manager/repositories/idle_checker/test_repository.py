@@ -158,7 +158,10 @@ def _expired_check_checker_row(checker_id: IdleCheckerID) -> IdleCheckerRow:
         target_session_types=[SessionTypes.INTERACTIVE],
         spec=IdleCheckerSpec(
             type=CheckerType.SESSION_LIFETIME,
-            session_lifetime=SessionLifetimeSpec(max_lifetime_seconds=3600),
+            session_lifetime=SessionLifetimeSpec(
+                initial_grace_seconds=45,
+                max_lifetime_seconds=3600,
+            ),
         ),
     )
 
@@ -287,6 +290,21 @@ class TestFetchJudgmentBatch:
         session_ids = {assignment.session.session_id for assignment in batch.assignments}
         assert judgment_rows.not_checked_session_id not in session_ids
         assert judgment_rows.idle_expired_session_id not in session_ids
+
+    async def test_fetches_only_not_checked_rows_for_initial_grace(
+        self,
+        repository: IdleCheckerRepository,
+        judgment_rows: JudgmentRows,
+    ) -> None:
+        batch = await repository.fetch_initial_grace_period_checks([SessionStatus.RUNNING])
+
+        assert [check.pair for check in batch.checks] == [
+            SessionIdleCheckPair(
+                judgment_rows.not_checked_session_id,
+                judgment_rows.checker_id,
+            )
+        ]
+        assert batch.checks[0].initial_grace_seconds == 45
 
     async def test_excludes_session_without_idle_check_row(
         self,

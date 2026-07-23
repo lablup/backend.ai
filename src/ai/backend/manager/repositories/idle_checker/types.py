@@ -44,6 +44,19 @@ class SessionIdleCheckPair:
 
 
 @dataclass(frozen=True)
+class InitialGracePeriodCheckData:
+    pair: SessionIdleCheckPair
+    initial_grace_seconds: int
+    grace_started_at: datetime
+
+
+@dataclass(frozen=True)
+class InitialGracePeriodBatchData:
+    checks: Sequence[InitialGracePeriodCheckData]
+    now: datetime
+
+
+@dataclass(frozen=True)
 class SessionIdleCheckAssignmentData:
     # Pairs that should exist, derived from enabled checker scope bindings.
     desired_pairs: Sequence[SessionIdleCheckPair]

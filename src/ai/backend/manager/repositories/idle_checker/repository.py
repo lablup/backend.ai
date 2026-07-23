@@ -8,6 +8,7 @@ from ai.backend.manager.repositories.idle_checker.db_source.db_source import Idl
 from ai.backend.manager.repositories.idle_checker.types import (
     ExpiredIdleCheckBatchData,
     IdleCheckBatchData,
+    InitialGracePeriodBatchData,
     SessionIdleCheckAssignmentData,
     SessionIdleCheckPair,
 )
@@ -34,6 +35,12 @@ class IdleCheckerRepository:
         session_statuses: Collection[SessionStatus],
     ) -> SessionIdleCheckAssignmentData:
         return await self._db_source.fetch_session_idle_check_assignments(session_statuses)
+
+    async def fetch_initial_grace_period_checks(
+        self,
+        session_statuses: Collection[SessionStatus],
+    ) -> InitialGracePeriodBatchData:
+        return await self._db_source.fetch_initial_grace_period_checks(session_statuses)
 
     async def fetch_expired_idle_checks(
         self, session_statuses: Collection[SessionStatus]

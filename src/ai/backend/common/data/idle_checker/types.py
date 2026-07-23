@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import enum
-from typing import Self
+from typing import Self, cast
 
 from pydantic import Field, model_validator
 
@@ -26,6 +26,11 @@ class IdleCheckPhase(enum.StrEnum):
 class SessionLifetimeSpec(BackendAISchema):
     """Config for ``CheckerType.SESSION_LIFETIME``."""
 
+    initial_grace_seconds: int = Field(
+        default=0,
+        ge=0,
+        description="Delay before the first session-lifetime judgment.",
+    )
     max_lifetime_seconds: int = Field(
         ge=0,
         description=(
@@ -42,12 +47,24 @@ class NetworkTimeoutSpec(BackendAISchema):
     Concrete fields land with the checker-logic stories.
     """
 
+    initial_grace_seconds: int = Field(
+        default=0,
+        ge=0,
+        description="Delay before the first network-timeout judgment.",
+    )
+
 
 class UtilizationSpec(BackendAISchema):
     """Config for ``CheckerType.UTILIZATION``.
 
     Concrete fields land with the checker-logic stories.
     """
+
+    initial_grace_seconds: int = Field(
+        default=0,
+        ge=0,
+        description="Delay before the first utilization judgment.",
+    )
 
 
 class IdleCheckerSpec(BackendAISchema):
@@ -63,6 +80,16 @@ class IdleCheckerSpec(BackendAISchema):
     )
     network: NetworkTimeoutSpec | None = Field(default=None, description="network_timeout config.")
     utilization: UtilizationSpec | None = Field(default=None, description="utilization config.")
+
+    @property
+    def initial_grace_seconds(self) -> int:
+        match self.type:
+            case CheckerType.SESSION_LIFETIME:
+                return cast(SessionLifetimeSpec, self.session_lifetime).initial_grace_seconds
+            case CheckerType.NETWORK_TIMEOUT:
+                return cast(NetworkTimeoutSpec, self.network).initial_grace_seconds
+            case CheckerType.UTILIZATION:
+                return cast(UtilizationSpec, self.utilization).initial_grace_seconds
 
     @model_validator(mode="after")
     def validate_spec_matches_type(self) -> Self:
