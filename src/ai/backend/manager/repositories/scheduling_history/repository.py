@@ -161,13 +161,13 @@ class SchedulingHistoryRepository:
         return await self._db_source.resolve_replica_group_deployment(replica_group_id)
 
     @scheduling_history_repository_resilience.apply()
-    async def search_replica_group_scoped_history(
+    async def scoped_search_replica_group_history(
         self,
         querier: BatchQuerier,
         scope: ReplicaGroupHistorySearchScope,
     ) -> ReplicaGroupHistoryListResult:
         """Search replica-group history within scope."""
-        return await self._db_source.search_replica_group_scoped_history(querier, scope)
+        return await self._db_source.scoped_search_replica_group_history(querier, scope)
 
     # ========== Route History (Admin) ==========
 
