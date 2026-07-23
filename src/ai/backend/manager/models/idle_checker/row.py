@@ -39,6 +39,7 @@ class IdleCheckerRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
         "initial_grace_period_seconds",
         sa.Integer(),
         nullable=False,
+        default=0,
     )
     spec: Mapped[IdleCheckerSpec] = mapped_column(
         "spec", PydanticColumn(IdleCheckerSpec), nullable=False

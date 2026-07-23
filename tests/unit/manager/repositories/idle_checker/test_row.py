@@ -154,7 +154,6 @@ class TestSessionIdleCheckRow:
                     description=None,
                     checker_type=CheckerType.SESSION_LIFETIME,
                     target_session_types=[SessionTypes.INTERACTIVE],
-                    initial_grace_period_seconds=0,
                     spec=IdleCheckerSpec(
                         type=CheckerType.SESSION_LIFETIME,
                         session_lifetime=SessionLifetimeSpec(max_lifetime_seconds=3600),
