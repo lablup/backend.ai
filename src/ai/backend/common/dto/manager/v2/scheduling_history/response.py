@@ -125,13 +125,7 @@ class RouteHistoryNode(BaseResponseModel):
 
 
 class ReplicaGroupHistoryNode(BaseResponseModel):
-    """Node model representing a replica-group scheduling history record.
-
-    ``category`` separates rows produced by lifecycle handlers (monotonic
-    lifecycle progression) from rows produced by scaling handlers
-    (reconciling replica count while lifecycle stays put). Clients filter /
-    group by this axis when rendering the history.
-    """
+    """Node model representing a replica-group scheduling history record."""
 
     id: ReplicaGroupHistoryID = Field(description="History record ID")
     replica_group_id: ReplicaGroupID = Field(description="Replica group this history belongs to")

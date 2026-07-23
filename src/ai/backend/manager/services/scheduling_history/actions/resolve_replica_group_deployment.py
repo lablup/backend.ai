@@ -14,12 +14,7 @@ from .base import SchedulingHistoryAction
 
 @dataclass
 class ResolveReplicaGroupDeploymentAction(SchedulingHistoryAction):
-    """Resolve the deployment owning a replica group.
-
-    Pre-step for a replica-group-only scope: the owning deployment is the
-    authorization subject, so the caller resolves it first and passes it to the
-    scoped action.
-    """
+    """Resolve the deployment owning a replica group."""
 
     replica_group_id: ReplicaGroupID
 

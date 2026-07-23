@@ -17,12 +17,7 @@ from ai.backend.manager.repositories.base import BatchQuerier
 class ScopedSearchReplicaGroupHistoryAction(BaseScopeAction):
     """Action to search the scheduling history of one replica group.
 
-    The owning deployment is the authorization subject, scope, and target:
-    replica groups hold no permission records of their own, so whoever may read
-    the deployment may read its replica groups' scheduling history. The caller
-    resolves ``replica_group_id -> deployment_id`` first
-    (``ResolveReplicaGroupDeploymentAction``) and passes both in;
-    ``replica_group_id`` bounds the repository query.
+    The owning deployment is the authorization scope; the caller resolves it.
     """
 
     replica_group_id: ReplicaGroupID

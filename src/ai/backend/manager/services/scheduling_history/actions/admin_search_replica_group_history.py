@@ -13,12 +13,7 @@ from ai.backend.manager.repositories.base import BatchQuerier
 
 @dataclass
 class AdminSearchReplicaGroupHistoryAction(BaseGlobalAction):
-    """Action to search replica-group scheduling history (admin API).
-
-    System-wide and unscoped: authorization is the SUPERADMIN role gate rather
-    than RBAC scope resolution, so this runs through ``GlobalActionProcessor``.
-    The scoped counterpart stays on the RBAC path.
-    """
+    """Action to search replica-group scheduling history (admin API)."""
 
     querier: BatchQuerier
 
