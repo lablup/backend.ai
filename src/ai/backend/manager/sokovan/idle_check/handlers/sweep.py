@@ -1,4 +1,4 @@
-"""Handler for grouping elapsed idle-check deadlines by session."""
+"""Handler for grouping IDLE_EXPIRED judgments by session."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ from ai.backend.manager.sokovan.scheduling_controller import SchedulingControlle
 
 
 class IdleCheckSweepHandler(ReconcilerHandler[IdleCheckSweepReconcileInfo, IdleCheckSweepResult]):
-    """Group stored due rows and request their session termination."""
+    """Group stored IDLE_EXPIRED rows and request their session termination."""
 
     _scheduling_controller: SchedulingController
 

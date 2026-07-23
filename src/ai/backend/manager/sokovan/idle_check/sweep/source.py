@@ -1,4 +1,4 @@
-"""Source of the expiry-sweep stage: stored judgments whose deadline has passed."""
+"""Source of the expiry-sweep stage: stored IDLE_EXPIRED judgments."""
 
 from __future__ import annotations
 

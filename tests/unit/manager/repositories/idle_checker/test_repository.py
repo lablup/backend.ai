@@ -561,7 +561,7 @@ class TestFetchExpiredIdleChecks:
         first_checker_id = IdleCheckerID(uuid.uuid4())
         second_checker_id = IdleCheckerID(uuid.uuid4())
         first_expire_at = datetime(2026, 1, 1, tzinfo=UTC)
-        second_expire_at = datetime(2026, 2, 1, tzinfo=UTC)
+        second_expire_at = datetime(2100, 1, 1, tzinfo=UTC)
         async with database.begin_session() as db_sess:
             for scope_row in _expired_check_scope_rows(scope):
                 db_sess.add(scope_row)
@@ -596,11 +596,11 @@ class TestFetchExpiredIdleChecks:
         )
 
     @pytest.fixture
-    async def session_with_future_deadline(
+    async def session_with_elapsed_deadline_still_idle(
         self,
         database: ExtendedAsyncSAEngine,
     ) -> SessionId:
-        scope = _expired_check_scope_fixture("future-deadline")
+        scope = _expired_check_scope_fixture("elapsed-deadline-still-idle")
         session_id = SessionId(uuid.uuid4())
         checker_id = IdleCheckerID(uuid.uuid4())
         async with database.begin_session() as db_sess:
@@ -613,9 +613,9 @@ class TestFetchExpiredIdleChecks:
                 SessionIdleCheckRow(
                     session_id=session_id,
                     idle_checker_id=checker_id,
-                    expire_at=datetime(2100, 1, 1, tzinfo=UTC),
-                    last_status=IdleCheckPhase.ACTIVE,
-                    last_message="The session is active.",
+                    expire_at=datetime(2026, 1, 1, tzinfo=UTC),
+                    last_status=IdleCheckPhase.IDLE,
+                    last_message="The session remains idle.",
                 )
             )
         return session_id
@@ -645,7 +645,7 @@ class TestFetchExpiredIdleChecks:
             )
         return session_id
 
-    async def test_returns_each_expired_check_of_running_session(
+    async def test_returns_each_idle_expired_check_regardless_of_deadline(
         self,
         repository: IdleCheckerRepository,
         expired_check_session: ExpiredCheckSessionData,
@@ -663,17 +663,23 @@ class TestFetchExpiredIdleChecks:
         assert check.expire_at == expired_check_session.first_expire_at
         assert check.last_status == IdleCheckPhase.IDLE_EXPIRED
         assert check.last_message == "Judged expired."
+        assert (
+            checks_by_key[
+                (expired_check_session.session_id, expired_check_session.second_checker_id)
+            ].expire_at
+            == expired_check_session.second_expire_at
+        )
 
-    async def test_excludes_checks_with_future_deadline(
+    async def test_excludes_elapsed_deadline_still_marked_idle(
         self,
         repository: IdleCheckerRepository,
-        session_with_future_deadline: SessionId,
+        session_with_elapsed_deadline_still_idle: SessionId,
     ) -> None:
         batch = await repository.fetch_expired_idle_checks([SessionStatus.RUNNING])
         check_session_ids = {check.session_id for check in batch.checks}
 
         assert batch.checks == ()
-        assert session_with_future_deadline not in check_session_ids
+        assert session_with_elapsed_deadline_still_idle not in check_session_ids
 
     async def test_excludes_sessions_not_in_target_statuses(
         self,
@@ -685,16 +691,3 @@ class TestFetchExpiredIdleChecks:
 
         assert batch.checks == ()
         assert terminated_session_with_expired_check not in check_session_ids
-
-    async def test_now_is_db_sourced_and_covers_every_deadline(
-        self,
-        repository: IdleCheckerRepository,
-        expired_check_session: ExpiredCheckSessionData,
-    ) -> None:
-        batch = await repository.fetch_expired_idle_checks([SessionStatus.RUNNING])
-        check_session_ids = {check.session_id for check in batch.checks}
-
-        assert batch.now.tzinfo is not None
-        assert check_session_ids == {expired_check_session.session_id}
-        for check in batch.checks:
-            assert check.expire_at <= batch.now
