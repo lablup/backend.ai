@@ -6,6 +6,8 @@ from dataclasses import dataclass
 from typing import Any, override
 from uuid import UUID
 
+import sqlalchemy as sa
+
 from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec
 from ai.backend.common.identifier.replica import ReplicaID
 from ai.backend.common.identifier.replica_group import ReplicaGroupID
@@ -20,9 +22,7 @@ from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
-from ai.backend.manager.models.replica_group_history.conditions import (
-    ReplicaGroupHistoryConditions,
-)
+from ai.backend.manager.models.replica_group_history.row import ReplicaGroupHistoryRow
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.scheduling_history.conditions import (
     DeploymentHistoryConditions,
@@ -193,7 +193,11 @@ class ReplicaGroupHistorySearchScope(SearchScope):
     @override
     def to_condition(self) -> QueryCondition:
         """Convert scope to a query condition for ReplicaGroupHistoryRow."""
-        return ReplicaGroupHistoryConditions.by_replica_group_id(self.replica_group_id)
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ReplicaGroupHistoryRow.replica_group_id == self.replica_group_id
+
+        return inner
 
     @property
     @override
