@@ -14,6 +14,8 @@ from pydantic import Field, model_validator
 from ai.backend.common.api_handlers import BaseRequestModel, BaseResponseModel
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
+from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.replica_group import ReplicaGroupID
 
 __all__ = (
     "DeploymentHistoryOrderField",
@@ -21,7 +23,9 @@ __all__ = (
     "KernelHistoryOrderField",
     "KernelHistoryScopeDTO",
     "OrderDirection",
+    "ReplicaGroupHistoryCategoryType",
     "ReplicaGroupHistoryOrderField",
+    "ReplicaGroupHistoryScopeDTO",
     "RouteHistoryOrderField",
     "RouteHistoryScopeDTO",
     "SchedulingResultType",
@@ -74,6 +78,13 @@ class RouteHistoryOrderField(StrEnum):
 
     CREATED_AT = "created_at"
     UPDATED_AT = "updated_at"
+
+
+class ReplicaGroupHistoryCategoryType(StrEnum):
+    """Handler category a replica-group history row was produced by."""
+
+    LIFECYCLE = "lifecycle"
+    SCALING = "scaling"
 
 
 class ReplicaGroupHistoryOrderField(StrEnum):
@@ -141,3 +152,25 @@ class RouteHistoryScopeDTO(BaseRequestModel):
     """Scope for route scheduling history queries."""
 
     route_id: UUID = Field(description="Route ID to get history for.")
+
+
+class ReplicaGroupHistoryScopeDTO(BaseRequestModel):
+    """Scope for replica-group scheduling history queries.
+
+    Both axes are optional but at least one is required: a deployment scope
+    covers every replica group under it, a replica-group scope narrows to one
+    group, and giving both intersects them.
+    """
+
+    deployment_id: DeploymentID | None = Field(
+        default=None, description="Deployment ID whose replica-group history to get."
+    )
+    replica_group_id: ReplicaGroupID | None = Field(
+        default=None, description="Replica group ID to get history for."
+    )
+
+    @model_validator(mode="after")
+    def _require_one_axis(self) -> ReplicaGroupHistoryScopeDTO:
+        if self.deployment_id is None and self.replica_group_id is None:
+            raise ValueError("Either deployment_id or replica_group_id must be given.")
+        return self
