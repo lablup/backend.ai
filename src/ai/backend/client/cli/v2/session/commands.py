@@ -85,12 +85,32 @@ def enqueue(payload: str) -> None:
         "(overrides --image-id and -r/--resource)."
     ),
 )
+@click.option(
+    "--designated-agent",
+    "designated_agents",
+    multiple=True,
+    help=(
+        "Restrict the fitting check to this agent ID (repeatable), "
+        "with the same semantics as the scheduling path."
+    ),
+)
+@click.option(
+    "--agent-selection-policy",
+    type=click.Choice(["strict", "preferred"]),
+    default=None,
+    help=(
+        "How designated agents are enforced (strict fails without capacity, "
+        "preferred falls back). Omit to inherit the resource group default."
+    ),
+)
 def compute_schedule(
     resource_group_id: UUID,
     cluster_mode: str,
     image_id: UUID | None,
     resources: tuple[str, ...],
     kernels: str | None,
+    designated_agents: tuple[str, ...],
+    agent_selection_policy: str | None,
 ) -> None:
     """Probe whether a would-be session fits a resource group, without provisioning."""
 
@@ -99,8 +119,10 @@ def compute_schedule(
         ComputeScheduleKernelResourceInput,
     )
     from ai.backend.common.dto.manager.v2.session.types import ClusterModeEnum
+    from ai.backend.common.dto.manager.v2.session_options.types import AgentSelectionPolicyEnum
     from ai.backend.common.identifier.resource_group import ResourceGroupID
     from ai.backend.common.json import load_json
+    from ai.backend.common.types import AgentId
 
     if kernels is not None:
         if kernels.startswith("@"):
@@ -129,6 +151,14 @@ def compute_schedule(
         kernels=kernel_inputs,
         cluster_mode=ClusterModeEnum(cluster_mode),
         resource_group_id=ResourceGroupID(resource_group_id),
+        designated_agent_ids=(
+            [AgentId(agent) for agent in designated_agents] if designated_agents else None
+        ),
+        agent_selection_policy=(
+            AgentSelectionPolicyEnum(agent_selection_policy)
+            if agent_selection_policy is not None
+            else None
+        ),
     )
 
     async def _run() -> None:

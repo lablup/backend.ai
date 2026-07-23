@@ -371,6 +371,12 @@ class SessionAdapter(BaseAdapter):
             kernels=kernels,
             cluster_mode=cluster_mode,
             resource_group_id=input.resource_group_id,
+            designated_agent_ids=input.designated_agent_ids,
+            agent_selection_policy=(
+                AgentSelectionPolicy(input.agent_selection_policy.value)
+                if input.agent_selection_policy is not None
+                else None
+            ),
         )
         result = await self._processors.session.compute_schedule.wait_for_complete(action)
         return ComputeSchedulePayload(

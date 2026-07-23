@@ -22,10 +22,14 @@ from ai.backend.common.dto.manager.v2.scheduler.request import (
     ComputeScheduleKernelResourceInput,
 )
 from ai.backend.common.dto.manager.v2.session.types import ClusterModeEnum
+from ai.backend.common.dto.manager.v2.session_options.types import AgentSelectionPolicyEnum
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.types import AgentId
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
+from ai.backend.manager.data.session.options import AgentSelectionPolicy, DefaultSessionOptions
+from ai.backend.manager.models.scaling_group import scaling_groups
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.services.session.processors import SessionProcessors
 
@@ -51,6 +55,8 @@ def _single_kernel_input(
     cpu: str,
     mem: str,
     cluster_mode: ClusterModeEnum = ClusterModeEnum.SINGLE_NODE,
+    designated_agent_ids: list[AgentId] | None = None,
+    agent_selection_policy: AgentSelectionPolicyEnum | None = None,
 ) -> ComputeScheduleInput:
     return ComputeScheduleInput(
         kernels=[
@@ -64,7 +70,27 @@ def _single_kernel_input(
         ],
         cluster_mode=cluster_mode,
         resource_group_id=resource_group_id,
+        designated_agent_ids=designated_agent_ids,
+        agent_selection_policy=agent_selection_policy,
     )
+
+
+@pytest.fixture()
+async def strict_agent_selection(
+    db_engine: SAEngine,
+    scaling_group_id: ResourceGroupID,
+) -> None:
+    """Make the test resource group enforce designated agents strictly."""
+    async with db_engine.begin() as conn:
+        await conn.execute(
+            sa.update(scaling_groups)
+            .where(scaling_groups.c.id == scaling_group_id)
+            .values(
+                default_session_options=DefaultSessionOptions(
+                    agent_selection_policy=AgentSelectionPolicy.STRICT,
+                )
+            )
+        )
 
 
 class TestComputeSchedule:
@@ -202,3 +228,102 @@ class TestComputeSchedule:
                 .where(SessionRow.__table__.c.name == "compute-schedule")
             )
         assert count == 0
+
+
+class TestComputeScheduleDesignatedAgents:
+    async def test_strict_policy_limits_fitting_to_designated_agents(
+        self,
+        admin_v2_registry: V2ClientRegistry,
+        scaling_group_id: ResourceGroupID,
+        compute_image_fixture: ImageID,
+        agent_factory: AgentFactoryFunc,
+        strict_agent_selection: None,
+    ) -> None:
+        """A too-small designated agent fails the fit even though a larger
+        undesignated agent could hold the kernel."""
+        small_agent = await agent_factory({"cpu": "2", "mem": "34359738368"})
+        await agent_factory({"cpu": "8", "mem": "34359738368"})
+        payload = await admin_v2_registry.session.compute_schedule(
+            _single_kernel_input(
+                scaling_group_id,
+                compute_image_fixture,
+                cpu="4",
+                mem="1073741824",
+                designated_agent_ids=[AgentId(small_agent)],
+            )
+        )
+        result = payload.results[0]
+        assert result.success is False
+        assert result.reason_hint is not None
+        assert result.reason_hint.required_reduction is not None
+        reduction = {
+            entry.resource_type: entry.quantity for entry in result.reason_hint.required_reduction
+        }
+        assert reduction["cpu"] == Decimal(2)
+
+    async def test_designated_agent_with_capacity_fits(
+        self,
+        admin_v2_registry: V2ClientRegistry,
+        scaling_group_id: ResourceGroupID,
+        compute_image_fixture: ImageID,
+        agent_factory: AgentFactoryFunc,
+        strict_agent_selection: None,
+    ) -> None:
+        await agent_factory({"cpu": "2", "mem": "34359738368"})
+        large_agent = await agent_factory({"cpu": "8", "mem": "34359738368"})
+        payload = await admin_v2_registry.session.compute_schedule(
+            _single_kernel_input(
+                scaling_group_id,
+                compute_image_fixture,
+                cpu="4",
+                mem="1073741824",
+                designated_agent_ids=[AgentId(large_agent)],
+            )
+        )
+        assert payload.results[0].success is True
+
+    async def test_request_policy_overrides_resource_group_default(
+        self,
+        admin_v2_registry: V2ClientRegistry,
+        scaling_group_id: ResourceGroupID,
+        compute_image_fixture: ImageID,
+        agent_factory: AgentFactoryFunc,
+    ) -> None:
+        """A STRICT policy in the request overrides the resource group's
+        default PREFERRED policy, so a too-small designated agent fails."""
+        small_agent = await agent_factory({"cpu": "2", "mem": "34359738368"})
+        await agent_factory({"cpu": "8", "mem": "34359738368"})
+        payload = await admin_v2_registry.session.compute_schedule(
+            _single_kernel_input(
+                scaling_group_id,
+                compute_image_fixture,
+                cpu="4",
+                mem="1073741824",
+                designated_agent_ids=[AgentId(small_agent)],
+                agent_selection_policy=AgentSelectionPolicyEnum.STRICT,
+            )
+        )
+        assert payload.results[0].success is False
+
+    async def test_preferred_policy_falls_back_past_designated_agents(
+        self,
+        admin_v2_registry: V2ClientRegistry,
+        scaling_group_id: ResourceGroupID,
+        compute_image_fixture: ImageID,
+        agent_factory: AgentFactoryFunc,
+    ) -> None:
+        """Under the default PREFERRED policy a designated agent without
+        capacity does not block fitting onto other agents — the same
+        semantics as the real scheduling path."""
+        small_agent = await agent_factory({"cpu": "2", "mem": "34359738368"})
+        await agent_factory({"cpu": "8", "mem": "34359738368"})
+        payload = await admin_v2_registry.session.compute_schedule(
+            _single_kernel_input(
+                scaling_group_id,
+                compute_image_fixture,
+                cpu="4",
+                mem="1073741824",
+                designated_agent_ids=[AgentId(small_agent)],
+            )
+        )
+        assert payload.results[0].success is True

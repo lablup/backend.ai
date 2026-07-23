@@ -340,6 +340,10 @@ class SessionService:
             options=SessionOptionsDraft(
                 cluster_mode=action.cluster_mode,
                 cluster_size=len(action.kernels),
+                scheduling_target=SchedulingTargetDraft(
+                    designated_agents=tuple(action.designated_agent_ids or ()),
+                    agent_selection_policy=action.agent_selection_policy,
+                ),
                 kernel_groups=kernel_groups,
             ),
         )

@@ -5,13 +5,14 @@ from typing import override
 
 from ai.backend.common.data.permission.types import EntityType
 from ai.backend.common.identifier.resource_group import ResourceGroupID
-from ai.backend.common.types import ClusterMode
+from ai.backend.common.types import AgentId, ClusterMode
 from ai.backend.manager.actions.action import BaseAction, BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.session.compute_schedule import (
     ComputeScheduleResult,
 )
 from ai.backend.manager.data.session.draft import KernelResourceInput
+from ai.backend.manager.data.session.options import AgentSelectionPolicy
 
 
 @dataclass(frozen=True)
@@ -29,6 +30,8 @@ class ComputeScheduleAction(BaseAction):
     kernels: list[KernelResourceInput]
     cluster_mode: ClusterMode
     resource_group_id: ResourceGroupID
+    designated_agent_ids: list[AgentId] | None
+    agent_selection_policy: AgentSelectionPolicy | None
 
     @override
     @classmethod
