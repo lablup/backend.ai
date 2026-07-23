@@ -84,6 +84,10 @@ class AppConfigFragmentRepository:
         return await self._db_source.admin_search(querier)
 
     @app_config_fragment_repository_resilience.apply()
+    async def batch_load_by_ids(self, querier: BatchQuerier) -> Sequence[AppConfigFragmentData]:
+        return await self._db_source.batch_load_by_ids(querier)
+
+    @app_config_fragment_repository_resilience.apply()
     async def scoped_search(
         self, querier: BatchQuerier, scopes: Sequence[SearchScope]
     ) -> AppConfigFragmentSearchResult:
