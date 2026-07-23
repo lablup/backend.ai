@@ -30,6 +30,9 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.app_config_allow_list.creators import (
     AppConfigAllowListCreatorSpec,
 )
+from ai.backend.manager.repositories.app_config_allow_list.purgers import (
+    AppConfigAllowListPurgerSpec,
+)
 from ai.backend.manager.repositories.app_config_allow_list.repository import (
     AppConfigAllowListRepository,
 )
@@ -38,6 +41,9 @@ from ai.backend.manager.repositories.app_config_allow_list.updaters import (
 )
 from ai.backend.manager.repositories.app_config_definition.creators import (
     AppConfigDefinitionCreatorSpec,
+)
+from ai.backend.manager.repositories.app_config_definition.purgers import (
+    AppConfigDefinitionPurgerSpec,
 )
 from ai.backend.manager.repositories.app_config_definition.repository import (
     AppConfigDefinitionRepository,
@@ -230,7 +236,7 @@ class TestPurge:
         existing_entry: AppConfigAllowListData,
     ) -> None:
         purged = await repository.purge(
-            Purger(row_class=AppConfigAllowListRow, pk_value=existing_entry.id)
+            Purger(spec=AppConfigAllowListPurgerSpec(allow_list_id=existing_entry.id))
         )
         assert purged.id == existing_entry.id
         with pytest.raises(AppConfigAllowListNotFound):
@@ -238,7 +244,9 @@ class TestPurge:
 
     async def test_purge_missing_raises(self, repository: AppConfigAllowListRepository) -> None:
         with pytest.raises(AppConfigAllowListNotFound):
-            await repository.purge(Purger(row_class=AppConfigAllowListRow, pk_value=_missing_id()))
+            await repository.purge(
+                Purger(spec=AppConfigAllowListPurgerSpec(allow_list_id=_missing_id()))
+            )
 
     async def test_purge_cascades_to_fragments(
         self,
@@ -258,7 +266,9 @@ class TestPurge:
             )
             await db_sess.flush()
 
-        await repository.purge(Purger(row_class=AppConfigAllowListRow, pk_value=existing_entry.id))
+        await repository.purge(
+            Purger(spec=AppConfigAllowListPurgerSpec(allow_list_id=existing_entry.id))
+        )
 
         async with database.begin_readonly_session() as db_sess:
             remaining = await db_sess.scalar(
@@ -289,7 +299,7 @@ class TestPurge:
             await db_sess.flush()
 
         await definition_repository.purge(
-            Purger(row_class=AppConfigDefinitionRow, pk_value=definition.id)
+            Purger(spec=AppConfigDefinitionPurgerSpec(definition_id=definition.id))
         )
 
         async with database.begin_readonly_session() as db_sess:

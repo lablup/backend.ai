@@ -17,7 +17,7 @@ class DeleteModelCardAction(ModelCardAction):
 
     @override
     def entity_id(self) -> str | None:
-        return str(self.purger.pk_value)
+        return str(self.purger.spec.pk_value())
 
     @override
     @classmethod

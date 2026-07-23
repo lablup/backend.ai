@@ -157,7 +157,7 @@ class ScalingGroupDBSource:
         Raises ScalingGroupNotFound if scaling group doesn't exist.
         """
         async with self._db.begin_session() as session:
-            scaling_group_name = purger.pk_value
+            scaling_group_name = purger.spec.pk_value()
 
             # Step 1: Find all sessions belonging to this scaling group
             session_ids_query = sa.select(SessionRow.id).where(
@@ -196,7 +196,9 @@ class ScalingGroupDBSource:
             result = await execute_purger(session, purger)
 
             if result is None:
-                raise ScalingGroupNotFound(f"Scaling group not found (name:{purger.pk_value})")
+                raise ScalingGroupNotFound(
+                    f"Scaling group not found (name:{purger.spec.pk_value()})"
+                )
 
             return result.row.to_dataclass()
 

@@ -14,9 +14,11 @@ from ai.backend.manager.data.app_config_definition.types import (
     AppConfigDefinitionListResult,
 )
 from ai.backend.manager.errors.app_config import AppConfigDefinitionNotFound
-from ai.backend.manager.models.app_config_definition.row import AppConfigDefinitionRow
 from ai.backend.manager.repositories.app_config_definition.creators import (
     AppConfigDefinitionCreatorSpec,
+)
+from ai.backend.manager.repositories.app_config_definition.purgers import (
+    AppConfigDefinitionPurgerSpec,
 )
 from ai.backend.manager.repositories.app_config_definition.repository import (
     AppConfigDefinitionRepository,
@@ -131,7 +133,7 @@ class TestAppConfigDefinitionService:
         definition_data: AppConfigDefinitionData,
     ) -> None:
         mock_repository.purge = AsyncMock(return_value=definition_data)
-        purger = Purger(row_class=AppConfigDefinitionRow, pk_value=definition_data.id)
+        purger = Purger(spec=AppConfigDefinitionPurgerSpec(definition_id=definition_data.id))
 
         result = await service.purge(PurgeAppConfigDefinitionAction(purger=purger))
 

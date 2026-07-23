@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 from uuid import UUID
@@ -14,6 +15,7 @@ from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.vfolder import VFolderPermissionRow
 from ai.backend.manager.repositories.base.purger import BatchPurger, BatchPurgerSpec
 from ai.backend.manager.repositories.base.rbac.entity_purger import RBACEntityBatchPurgerSpec
+from ai.backend.manager.repositories.base.types import ConflictCheck
 
 
 @dataclass
@@ -26,6 +28,10 @@ class UserErrorLogBatchPurgerSpec(BatchPurgerSpec[ErrorLogRow]):
     def build_subquery(self) -> sa.sql.Select[tuple[ErrorLogRow]]:
         return sa.select(ErrorLogRow).where(ErrorLogRow.__table__.c.user == self.user_uuid)
 
+    @override
+    def conflict_checks(self) -> Sequence[ConflictCheck]:
+        return ()
+
 
 @dataclass
 class UserKeyPairBatchPurgerSpec(BatchPurgerSpec[KeyPairRow]):
@@ -36,6 +42,10 @@ class UserKeyPairBatchPurgerSpec(BatchPurgerSpec[KeyPairRow]):
     @override
     def build_subquery(self) -> sa.sql.Select[tuple[KeyPairRow]]:
         return sa.select(KeyPairRow).where(KeyPairRow.user == self.user_uuid)
+
+    @override
+    def conflict_checks(self) -> Sequence[ConflictCheck]:
+        return ()
 
 
 @dataclass
@@ -48,6 +58,10 @@ class UserVFolderPermissionBatchPurgerSpec(BatchPurgerSpec[VFolderPermissionRow]
     def build_subquery(self) -> sa.sql.Select[tuple[VFolderPermissionRow]]:
         return sa.select(VFolderPermissionRow).where(VFolderPermissionRow.user == self.user_uuid)
 
+    @override
+    def conflict_checks(self) -> Sequence[ConflictCheck]:
+        return ()
+
 
 @dataclass
 class UserGroupAssociationBatchPurgerSpec(BatchPurgerSpec[AssocGroupUserRow]):
@@ -58,6 +72,10 @@ class UserGroupAssociationBatchPurgerSpec(BatchPurgerSpec[AssocGroupUserRow]):
     @override
     def build_subquery(self) -> sa.sql.Select[tuple[AssocGroupUserRow]]:
         return sa.select(AssocGroupUserRow).where(AssocGroupUserRow.user_id == self.user_uuid)
+
+    @override
+    def conflict_checks(self) -> Sequence[ConflictCheck]:
+        return ()
 
 
 @dataclass
@@ -73,6 +91,10 @@ class UserBatchPurgerSpec(RBACEntityBatchPurgerSpec[UserRow]):
     @override
     def element_type(self) -> RBACElementType:
         return RBACElementType.USER
+
+    @override
+    def conflict_checks(self) -> Sequence[ConflictCheck]:
+        return ()
 
 
 def create_user_error_log_purger(user_uuid: UUID) -> BatchPurger[ErrorLogRow]:

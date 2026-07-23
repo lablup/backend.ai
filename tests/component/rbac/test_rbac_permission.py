@@ -24,13 +24,13 @@ from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.errors.repository import (
     UniqueConstraintViolationError,
 )
-from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.purger import Purger
 from ai.backend.manager.repositories.permission_controller.creators import (
     PermissionCreatorSpec,
 )
+from ai.backend.manager.repositories.permission_controller.purgers import PermissionPurgerSpec
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
@@ -85,7 +85,9 @@ class TestPermissionCreate:
 
         # Cleanup
         await permission_controller_processors.delete_permission.wait_for_complete(
-            DeletePermissionAction(purger=Purger(row_class=PermissionRow, pk_value=result.data.id))
+            DeletePermissionAction(
+                purger=Purger(spec=PermissionPurgerSpec(permission_id=result.data.id))
+            )
         )
 
     async def test_create_permissions_with_various_combinations(
@@ -139,7 +141,9 @@ class TestPermissionCreate:
         # Cleanup
         for perm_id in created_ids:
             await permission_controller_processors.delete_permission.wait_for_complete(
-                DeletePermissionAction(purger=Purger(row_class=PermissionRow, pk_value=perm_id))
+                DeletePermissionAction(
+                    purger=Purger(spec=PermissionPurgerSpec(permission_id=perm_id))
+                )
             )
 
     async def test_create_duplicate_permission_raises_unique_constraint(
@@ -169,7 +173,9 @@ class TestPermissionCreate:
                 )
         finally:
             await permission_controller_processors.delete_permission.wait_for_complete(
-                DeletePermissionAction(purger=Purger(row_class=PermissionRow, pk_value=perm_id))
+                DeletePermissionAction(
+                    purger=Purger(spec=PermissionPurgerSpec(permission_id=perm_id))
+                )
             )
 
 
@@ -199,7 +205,7 @@ class TestPermissionDelete:
         perm_id = create_result.data.id
 
         delete_result = await permission_controller_processors.delete_permission.wait_for_complete(
-            DeletePermissionAction(purger=Purger(row_class=PermissionRow, pk_value=perm_id))
+            DeletePermissionAction(purger=Purger(spec=PermissionPurgerSpec(permission_id=perm_id)))
         )
 
         assert isinstance(delete_result.data, PermissionData)
@@ -228,13 +234,15 @@ class TestPermissionDelete:
         perm_id = create_result.data.id
 
         await permission_controller_processors.delete_permission.wait_for_complete(
-            DeletePermissionAction(purger=Purger(row_class=PermissionRow, pk_value=perm_id))
+            DeletePermissionAction(purger=Purger(spec=PermissionPurgerSpec(permission_id=perm_id)))
         )
 
         # Second delete must raise ObjectNotFound
         with pytest.raises(ObjectNotFound):
             await permission_controller_processors.delete_permission.wait_for_complete(
-                DeletePermissionAction(purger=Purger(row_class=PermissionRow, pk_value=perm_id))
+                DeletePermissionAction(
+                    purger=Purger(spec=PermissionPurgerSpec(permission_id=perm_id))
+                )
             )
 
     async def test_delete_nonexistent_permission_raises_not_found(
@@ -245,7 +253,7 @@ class TestPermissionDelete:
         with pytest.raises(ObjectNotFound):
             await permission_controller_processors.delete_permission.wait_for_complete(
                 DeletePermissionAction(
-                    purger=Purger(row_class=PermissionRow, pk_value=uuid.uuid4())
+                    purger=Purger(spec=PermissionPurgerSpec(permission_id=uuid.uuid4()))
                 )
             )
 
@@ -322,7 +330,7 @@ class TestCheckPermissionInScope:
             )
             await permission_controller_processors.delete_permission.wait_for_complete(
                 DeletePermissionAction(
-                    purger=Purger(row_class=PermissionRow, pk_value=perm_result.data.id)
+                    purger=Purger(spec=PermissionPurgerSpec(permission_id=perm_result.data.id))
                 )
             )
 

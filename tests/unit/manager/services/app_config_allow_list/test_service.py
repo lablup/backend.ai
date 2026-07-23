@@ -15,9 +15,11 @@ from ai.backend.manager.data.app_config_allow_list.types import (
     AppConfigAllowListSearchResult,
 )
 from ai.backend.manager.errors.app_config import AppConfigAllowListNotFound
-from ai.backend.manager.models.app_config_allow_list.row import AppConfigAllowListRow
 from ai.backend.manager.repositories.app_config_allow_list.creators import (
     AppConfigAllowListCreatorSpec,
+)
+from ai.backend.manager.repositories.app_config_allow_list.purgers import (
+    AppConfigAllowListPurgerSpec,
 )
 from ai.backend.manager.repositories.app_config_allow_list.repository import (
     AppConfigAllowListRepository,
@@ -163,7 +165,7 @@ class TestAppConfigAllowListService:
         allow_list_data: AppConfigAllowListData,
     ) -> None:
         mock_repository.purge = AsyncMock(return_value=allow_list_data)
-        purger = Purger(row_class=AppConfigAllowListRow, pk_value=allow_list_data.id)
+        purger = Purger(spec=AppConfigAllowListPurgerSpec(allow_list_id=allow_list_data.id))
 
         result = await service.purge(PurgeAppConfigAllowListAction(purger=purger))
 

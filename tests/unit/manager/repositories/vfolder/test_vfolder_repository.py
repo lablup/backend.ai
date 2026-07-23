@@ -834,8 +834,6 @@ class TestVfolderRepositoryPurge:
         assert await self._vfolder_exists(db_with_cleanup, vfolder_id)
 
         purger = RBACEntityPurger(
-            row_class=VFolderRow,
-            pk_value=vfolder_id,
             spec=VFolderPurgerSpec(vfolder_id=vfolder_id),
         )
         result = await vfolder_repository.purge_vfolder(purger)
@@ -852,8 +850,6 @@ class TestVfolderRepositoryPurge:
         """Test purge fails when vfolder doesn't exist."""
         non_existent_id = uuid.uuid4()
         purger = RBACEntityPurger(
-            row_class=VFolderRow,
-            pk_value=non_existent_id,
             spec=VFolderPurgerSpec(vfolder_id=non_existent_id),
         )
 
@@ -883,8 +879,6 @@ class TestVfolderRepositoryPurge:
         vfolder_id = vfolder_in_db
 
         purger = RBACEntityPurger(
-            row_class=VFolderRow,
-            pk_value=vfolder_id,
             spec=VFolderPurgerSpec(vfolder_id=vfolder_id),
         )
 
@@ -988,8 +982,6 @@ class TestVfolderRepositoryPurge:
         vfolder_id = vfolder_in_db
 
         purger = RBACEntityPurger(
-            row_class=VFolderRow,
-            pk_value=vfolder_id,
             spec=VFolderPurgerSpec(vfolder_id=vfolder_id),
         )
 

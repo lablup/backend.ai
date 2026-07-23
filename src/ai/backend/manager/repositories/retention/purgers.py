@@ -17,6 +17,7 @@ import sqlalchemy as sa
 
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.repositories.base.purger import BatchPurgerSpec
+from ai.backend.manager.repositories.base.types import ConflictCheck
 
 
 @dataclass
@@ -53,3 +54,7 @@ class RetentionPurgerSpec[TRow: Base](BatchPurgerSpec[TRow]):
         for condition in self.conditions:
             stmt = stmt.where(condition)
         return stmt
+
+    @override
+    def conflict_checks(self) -> Sequence[ConflictCheck]:
+        return ()

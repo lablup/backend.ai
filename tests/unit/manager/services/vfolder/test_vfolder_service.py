@@ -119,8 +119,6 @@ class TestVFolderServicePurge:
     @pytest.fixture
     def sample_purger(self, sample_vfolder_uuid: uuid.UUID) -> RBACEntityPurger[VFolderRow]:
         return RBACEntityPurger(
-            row_class=VFolderRow,
-            pk_value=sample_vfolder_uuid,
             spec=VFolderPurgerSpec(vfolder_id=sample_vfolder_uuid),
         )
 

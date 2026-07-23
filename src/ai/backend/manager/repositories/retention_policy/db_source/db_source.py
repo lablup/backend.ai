@@ -18,6 +18,7 @@ from ai.backend.manager.errors.retention import RetentionPolicyNotFound
 from ai.backend.manager.models.retention.row import RetentionPolicyRow
 from ai.backend.manager.repositories.base import BatchQuerier, Creator, Purger, Updater
 from ai.backend.manager.repositories.ops import DBOpsProvider
+from ai.backend.manager.repositories.retention_policy.purgers import RetentionPolicyPurgerSpec
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -44,7 +45,7 @@ class RetentionPolicyDBSource:
 
     async def delete(self, policy_id: RetentionPolicyID) -> RetentionPolicyData:
         async with self._ops.write_ops() as w:
-            result = await w.purge(Purger(row_class=RetentionPolicyRow, pk_value=policy_id))
+            result = await w.purge(Purger(spec=RetentionPolicyPurgerSpec(policy_id=policy_id)))
             if result is None:
                 raise RetentionPolicyNotFound()
             return result.row.to_data()

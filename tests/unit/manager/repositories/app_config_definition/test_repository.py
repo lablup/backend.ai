@@ -20,6 +20,9 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.app_config_definition.creators import (
     AppConfigDefinitionCreatorSpec,
 )
+from ai.backend.manager.repositories.app_config_definition.purgers import (
+    AppConfigDefinitionPurgerSpec,
+)
 from ai.backend.manager.repositories.app_config_definition.repository import (
     AppConfigDefinitionRepository,
 )
@@ -89,7 +92,7 @@ class TestPurge:
         existing_definition: AppConfigDefinitionData,
     ) -> None:
         purged = await repository.purge(
-            Purger(row_class=AppConfigDefinitionRow, pk_value=existing_definition.id)
+            Purger(spec=AppConfigDefinitionPurgerSpec(definition_id=existing_definition.id))
         )
         assert purged.id == existing_definition.id
         with pytest.raises(AppConfigDefinitionNotFound):
@@ -97,7 +100,9 @@ class TestPurge:
 
     async def test_purge_missing_raises(self, repository: AppConfigDefinitionRepository) -> None:
         with pytest.raises(AppConfigDefinitionNotFound):
-            await repository.purge(Purger(row_class=AppConfigDefinitionRow, pk_value=_missing_id()))
+            await repository.purge(
+                Purger(spec=AppConfigDefinitionPurgerSpec(definition_id=_missing_id()))
+            )
 
 
 class TestAdminSearch:

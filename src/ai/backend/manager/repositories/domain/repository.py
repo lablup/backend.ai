@@ -24,30 +24,32 @@ from ai.backend.manager.data.permission.permission_defs import (
 from ai.backend.manager.errors.resource import (
     DomainDeletionFailed,
     DomainHasActiveKernels,
-    DomainHasGroups,
-    DomainHasUsers,
     DomainUpdateNotAllowed,
     InvalidDomainConfiguration,
 )
 from ai.backend.manager.models.domain import DomainRow, domains, get_domains
-from ai.backend.manager.models.group import GroupRow, ProjectType, groups
+from ai.backend.manager.models.group import ProjectType, groups
 from ai.backend.manager.models.kernel import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES
 from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.rbac import SystemScope
 from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.resource_policy import keypair_resource_policies
 from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow, get_scaling_groups
-from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.creator import Creator, execute_creator
-from ai.backend.manager.repositories.base.purger import BatchPurger, execute_batch_purger
+from ai.backend.manager.repositories.base.purger import (
+    BatchPurger,
+    Purger,
+    execute_batch_purger,
+    execute_purger,
+)
 from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 from ai.backend.manager.repositories.domain.creators import DomainCreatorSpec
 from ai.backend.manager.repositories.domain.db_source import DomainDBSource
 from ai.backend.manager.repositories.domain.purgers import (
-    DomainBatchPurgerSpec,
     DomainKernelBatchPurgerSpec,
+    DomainPurgerSpec,
 )
 from ai.backend.manager.repositories.domain.types import DomainSearchResult, DomainSearchScope
 from ai.backend.manager.repositories.permission_controller.role_manager import RoleManager
@@ -135,29 +137,19 @@ class DomainRepository:
         Validates domain purge permissions and prerequisites.
         """
         async with self._db.begin_session() as session:
-            # Validate prerequisites
+            # Must run before the kernel cleanup below deletes the rows it inspects.
             if await self._domain_has_active_kernels(session, domain_name):
                 raise DomainHasActiveKernels(
                     "Domain has some active kernels. Terminate them first."
                 )
 
-            user_count = await self._get_domain_user_count(session, domain_name)
-            if user_count > 0:
-                raise DomainHasUsers("There are users bound to the domain. Remove users first.")
-
-            group_count = await self._get_domain_group_count(session, domain_name)
-            if group_count > 0:
-                raise DomainHasGroups("There are groups bound to the domain. Remove groups first.")
-
-            # Clean up kernels
             await self._delete_kernels(session, domain_name)
 
-            # Delete domain
-            result = await execute_batch_purger(
+            result = await execute_purger(
                 session,
-                BatchPurger(spec=DomainBatchPurgerSpec(domain_name=domain_name), batch_size=1),
+                Purger(spec=DomainPurgerSpec(domain_name=domain_name)),
             )
-            if result.deleted_count == 0:
+            if result is None:
                 raise DomainDeletionFailed(f"Failed to delete domain: {domain_name}")
 
     @domain_repository_resilience.apply()
@@ -278,28 +270,6 @@ class DomainRepository:
         )
         active_kernel_count = await session.scalar(query)
         return (active_kernel_count or 0) > 0
-
-    async def _get_domain_user_count(self, session: SASession, domain_name: str) -> int:
-        """
-        Private method to get user count for a domain.
-        """
-        query = (
-            sa.select(sa.func.count())
-            .select_from(UserRow)
-            .where(UserRow.domain_name == domain_name)
-        )
-        return await session.scalar(query) or 0
-
-    async def _get_domain_group_count(self, session: SASession, domain_name: str) -> int:
-        """
-        Private method to get group count for a domain.
-        """
-        query = (
-            sa.select(sa.func.count())
-            .select_from(GroupRow)
-            .where(GroupRow.domain_name == domain_name)
-        )
-        return await session.scalar(query) or 0
 
     @domain_repository_resilience.apply()
     async def create_domain_node_with_permissions(

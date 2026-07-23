@@ -26,11 +26,13 @@ class PurgeAppConfigAllowListAction(AppConfigAllowListSingleEntityAction):
 
     @override
     def target_entity_id(self) -> str:
-        return str(self.purger.pk_value)
+        return str(self.purger.spec.pk_value())
 
     @override
     def target_element(self) -> RBACElementRef:
-        return RBACElementRef(RBACElementType.APP_CONFIG_ALLOW_LIST, str(self.purger.pk_value))
+        return RBACElementRef(
+            RBACElementType.APP_CONFIG_ALLOW_LIST, str(self.purger.spec.pk_value())
+        )
 
 
 @dataclass

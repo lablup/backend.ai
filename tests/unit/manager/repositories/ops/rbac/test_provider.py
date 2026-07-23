@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import AsyncGenerator, Collection
+from collections.abc import AsyncGenerator, Collection, Sequence
 from dataclasses import dataclass, field
 from typing import override
 from uuid import UUID
@@ -55,6 +55,7 @@ from ai.backend.manager.repositories.base.rbac.entity_purger import (
     RBACEntityPurger,
     RBACEntityPurgerSpec,
 )
+from ai.backend.manager.repositories.base.types import ConflictCheck
 from ai.backend.manager.repositories.ops.rbac.provider import (
     EntityMembersAddition,
     RBACOpsProvider,
@@ -189,8 +190,20 @@ class RBACOpsCreatorSpec(CreatorSpec[RBACOpsTestRow]):
 
 
 @dataclass
-class RBACOpsPurgerSpec(RBACEntityPurgerSpec):
+class RBACOpsPurgerSpec(RBACEntityPurgerSpec[RBACOpsTestRow]):
     entity_id: str
+
+    @override
+    def row_class(self) -> type[RBACOpsTestRow]:
+        return RBACOpsTestRow
+
+    @override
+    def pk_value(self) -> int:
+        return int(self.entity_id)
+
+    @override
+    def conflict_checks(self) -> Sequence[ConflictCheck]:
+        return ()
 
     @override
     def element_type(self) -> RBACElementType:
@@ -671,8 +684,6 @@ class TestBulkPurgeScopedPartial:
         async with provider.write_ops() as w:
             result = await w.bulk_purge_scoped_partial([
                 RBACEntityPurger(
-                    row_class=RBACOpsTestRow,
-                    pk_value=doomed.id,
                     spec=RBACOpsPurgerSpec(entity_id=str(doomed.id)),
                 )
             ])
@@ -700,8 +711,6 @@ class TestBulkPurgeScopedPartial:
         async with provider.write_ops() as w:
             result = await w.bulk_purge_scoped_partial([
                 RBACEntityPurger(
-                    row_class=RBACOpsTestRow,
-                    pk_value=9_999_999,  # never existed
                     spec=RBACOpsPurgerSpec(entity_id="9999999"),
                 )
             ])
@@ -730,13 +739,9 @@ class TestBulkPurgeScopedPartial:
         async with provider.write_ops() as w:
             result = await w.bulk_purge_scoped_partial([
                 RBACEntityPurger(  # RESTRICT foreign key -> delete rejected
-                    row_class=RBACOpsTestRow,
-                    pk_value=blocked.id,
                     spec=RBACOpsPurgerSpec(entity_id=str(blocked.id)),
                 ),
                 RBACEntityPurger(
-                    row_class=RBACOpsTestRow,
-                    pk_value=free.id,
                     spec=RBACOpsPurgerSpec(entity_id=str(free.id)),
                 ),
             ])

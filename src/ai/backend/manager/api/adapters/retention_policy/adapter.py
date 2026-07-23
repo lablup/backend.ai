@@ -31,6 +31,7 @@ from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.purger import Purger
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.retention_policy.creators import RetentionPolicyCreatorSpec
+from ai.backend.manager.repositories.retention_policy.purgers import RetentionPolicyPurgerSpec
 from ai.backend.manager.repositories.retention_policy.updaters import RetentionPolicyUpdaterSpec
 from ai.backend.manager.services.retention_policy.actions.create import (
     CreateRetentionPolicyAction,
@@ -154,7 +155,7 @@ class RetentionPolicyAdapter(BaseAdapter):
 
     async def purge(self, policy_id: RetentionPolicyID) -> PurgeRetentionPolicyPayload:
         purger: Purger[RetentionPolicyRow] = Purger(
-            row_class=RetentionPolicyRow, pk_value=policy_id
+            spec=RetentionPolicyPurgerSpec(policy_id=policy_id)
         )
         result = await self._processors.retention_policy.purge.wait_for_complete(
             PurgeRetentionPolicyAction(id=policy_id, purger=purger)

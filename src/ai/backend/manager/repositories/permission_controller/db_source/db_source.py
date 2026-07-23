@@ -110,6 +110,10 @@ from ai.backend.manager.repositories.permission_controller.creators import (
     PermissionCreatorSpec,
     UserRoleCreatorSpec,
 )
+from ai.backend.manager.repositories.permission_controller.purgers import (
+    ObjectPermissionPurgerSpec,
+    PermissionPurgerSpec,
+)
 from ai.backend.manager.repositories.permission_controller.types import (
     PermissionSearchScope,
     ScopedRoleSearchScope,
@@ -238,7 +242,7 @@ class PermissionDBSource:
         async with self._db.begin_session() as db_session:
             result = await execute_purger(db_session, purger)
             if result is None:
-                raise ObjectNotFound(f"Permission with ID {purger.pk_value} does not exist.")
+                raise ObjectNotFound(f"Permission with ID {purger.spec.pk_value()} does not exist.")
             return result.row
 
     async def update_permission(
@@ -326,7 +330,7 @@ class PermissionDBSource:
         async with self._db.begin_session() as db_session:
             result = await execute_purger(db_session, purger)
             if result is None:
-                raise ObjectNotFound(f"Role with ID {purger.pk_value} does not exist.")
+                raise ObjectNotFound(f"Role with ID {purger.spec.pk_value()} does not exist.")
             return result.row
 
     async def assign_role(self, data: UserRoleAssignmentInput) -> UserRoleRow:
@@ -440,7 +444,7 @@ class PermissionDBSource:
 
             # 2. Remove scoped permissions
             for perm_id in input_data.remove_scoped_permission_ids:
-                perm_purger = Purger(row_class=PermissionRow, pk_value=perm_id)
+                perm_purger = Purger(spec=PermissionPurgerSpec(permission_id=perm_id))
                 await self._remove_permission(db_session, perm_purger)
 
             # 3. Add object permissions
@@ -458,7 +462,9 @@ class PermissionDBSource:
 
             # 4. Remove object permissions
             for obj_perm_id in input_data.remove_object_permission_ids:
-                obj_perm_purger = Purger(row_class=ObjectPermissionRow, pk_value=obj_perm_id)
+                obj_perm_purger = Purger(
+                    spec=ObjectPermissionPurgerSpec(object_permission_id=obj_perm_id)
+                )
                 await self._remove_object_permission_from_role(db_session, obj_perm_purger)
 
             # 5. Refresh and return

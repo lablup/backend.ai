@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 from uuid import UUID
@@ -11,8 +12,29 @@ from ai.backend.manager.models.scaling_group import (
     ScalingGroupForDomainRow,
     ScalingGroupForKeypairsRow,
     ScalingGroupForProjectRow,
+    ScalingGroupRow,
 )
-from ai.backend.manager.repositories.base.purger import BatchPurger, BatchPurgerSpec
+from ai.backend.manager.repositories.base.purger import BatchPurger, BatchPurgerSpec, PurgerSpec
+from ai.backend.manager.repositories.base.types import ConflictCheck
+
+
+@dataclass
+class ScalingGroupPurgerSpec(PurgerSpec[ScalingGroupRow]):
+    """PurgerSpec for deleting a scaling group."""
+
+    name: str
+
+    @override
+    def row_class(self) -> type[ScalingGroupRow]:
+        return ScalingGroupRow
+
+    @override
+    def pk_value(self) -> str:
+        return self.name
+
+    @override
+    def conflict_checks(self) -> Sequence[ConflictCheck]:
+        return ()
 
 
 @dataclass
@@ -31,6 +53,10 @@ class ScalingGroupForDomainPurgerSpec(BatchPurgerSpec[ScalingGroupForDomainRow])
             )
         )
 
+    @override
+    def conflict_checks(self) -> Sequence[ConflictCheck]:
+        return ()
+
 
 @dataclass
 class ScalingGroupsForDomainPurgerSpec(BatchPurgerSpec[ScalingGroupForDomainRow]):
@@ -48,6 +74,10 @@ class ScalingGroupsForDomainPurgerSpec(BatchPurgerSpec[ScalingGroupForDomainRow]
             )
         )
 
+    @override
+    def conflict_checks(self) -> Sequence[ConflictCheck]:
+        return ()
+
 
 @dataclass
 class AllScalingGroupsForDomainPurgerSpec(BatchPurgerSpec[ScalingGroupForDomainRow]):
@@ -60,6 +90,10 @@ class AllScalingGroupsForDomainPurgerSpec(BatchPurgerSpec[ScalingGroupForDomainR
         return sa.select(ScalingGroupForDomainRow).where(
             ScalingGroupForDomainRow.domain == self.domain,
         )
+
+    @override
+    def conflict_checks(self) -> Sequence[ConflictCheck]:
+        return ()
 
 
 @dataclass
@@ -78,6 +112,10 @@ class ScalingGroupForKeypairsPurgerSpec(BatchPurgerSpec[ScalingGroupForKeypairsR
             )
         )
 
+    @override
+    def conflict_checks(self) -> Sequence[ConflictCheck]:
+        return ()
+
 
 @dataclass
 class ScalingGroupsForKeypairsPurgerSpec(BatchPurgerSpec[ScalingGroupForKeypairsRow]):
@@ -94,6 +132,10 @@ class ScalingGroupsForKeypairsPurgerSpec(BatchPurgerSpec[ScalingGroupForKeypairs
                 ScalingGroupForKeypairsRow.access_key == self.access_key,
             )
         )
+
+    @override
+    def conflict_checks(self) -> Sequence[ConflictCheck]:
+        return ()
 
 
 def create_scaling_group_for_domain_purger(
@@ -140,6 +182,10 @@ class ScalingGroupForProjectPurgerSpec(BatchPurgerSpec[ScalingGroupForProjectRow
             )
         )
 
+    @override
+    def conflict_checks(self) -> Sequence[ConflictCheck]:
+        return ()
+
 
 @dataclass
 class ScalingGroupsForProjectPurgerSpec(BatchPurgerSpec[ScalingGroupForProjectRow]):
@@ -157,6 +203,10 @@ class ScalingGroupsForProjectPurgerSpec(BatchPurgerSpec[ScalingGroupForProjectRo
             )
         )
 
+    @override
+    def conflict_checks(self) -> Sequence[ConflictCheck]:
+        return ()
+
 
 @dataclass
 class AllScalingGroupsForProjectPurgerSpec(BatchPurgerSpec[ScalingGroupForProjectRow]):
@@ -169,6 +219,10 @@ class AllScalingGroupsForProjectPurgerSpec(BatchPurgerSpec[ScalingGroupForProjec
         return sa.select(ScalingGroupForProjectRow).where(
             ScalingGroupForProjectRow.group == self.project,
         )
+
+    @override
+    def conflict_checks(self) -> Sequence[ConflictCheck]:
+        return ()
 
 
 def create_scaling_group_for_project_purger(

@@ -112,11 +112,7 @@ class AppConfigFragmentDBSource:
 
     @app_config_fragment_db_source_resilience.apply()
     async def purge(self, purger_spec: AppConfigFragmentPurgerSpec) -> AppConfigFragmentData:
-        rbac_purger = RBACEntityPurger(
-            row_class=AppConfigFragmentRow,
-            pk_value=purger_spec.fragment_id,
-            spec=purger_spec,
-        )
+        rbac_purger = RBACEntityPurger(spec=purger_spec)
         async with self._rbac_ops_provider.write_ops() as w:
             result = await w.purge_scoped(rbac_purger)
             if result is None:
@@ -155,14 +151,7 @@ class AppConfigFragmentDBSource:
         purger_specs: Sequence[AppConfigFragmentPurgerSpec],
     ) -> AppConfigFragmentBulkResult:
         """Purge many fragments with per-item partial success, unbinding each from its scope."""
-        purgers = [
-            RBACEntityPurger(
-                row_class=AppConfigFragmentRow,
-                pk_value=spec.fragment_id,
-                spec=spec,
-            )
-            for spec in purger_specs
-        ]
+        purgers = [RBACEntityPurger(spec=spec) for spec in purger_specs]
         async with self._rbac_ops_provider.write_ops() as w:
             result = await w.bulk_purge_scoped_partial(purgers)
             succeeded = [row.to_data() for row in result.successes]

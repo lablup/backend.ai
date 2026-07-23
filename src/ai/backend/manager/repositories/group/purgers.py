@@ -17,6 +17,7 @@ from ai.backend.manager.models.rbac_models.association_scopes_entities import (
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.repositories.base.purger import BatchPurgerSpec
 from ai.backend.manager.repositories.base.rbac.entity_purger import RBACEntityBatchPurgerSpec
+from ai.backend.manager.repositories.base.types import ConflictCheck
 
 
 @dataclass
@@ -29,6 +30,10 @@ class GroupKernelBatchPurgerSpec(BatchPurgerSpec[KernelRow]):
     def build_subquery(self) -> sa.sql.Select[tuple[KernelRow]]:
         return sa.select(KernelRow).where(KernelRow.group_id == self.group_id)
 
+    @override
+    def conflict_checks(self) -> Sequence[ConflictCheck]:
+        return ()
+
 
 @dataclass
 class GroupSessionBatchPurgerSpec(BatchPurgerSpec[SessionRow]):
@@ -39,6 +44,10 @@ class GroupSessionBatchPurgerSpec(BatchPurgerSpec[SessionRow]):
     @override
     def build_subquery(self) -> sa.sql.Select[tuple[SessionRow]]:
         return sa.select(SessionRow).where(SessionRow.group_id == self.group_id)
+
+    @override
+    def conflict_checks(self) -> Sequence[ConflictCheck]:
+        return ()
 
 
 @dataclass
@@ -51,6 +60,10 @@ class SessionByIdsBatchPurgerSpec(BatchPurgerSpec[SessionRow]):
     def build_subquery(self) -> sa.sql.Select[tuple[SessionRow]]:
         return sa.select(SessionRow).where(SessionRow.id.in_(self.session_ids))
 
+    @override
+    def conflict_checks(self) -> Sequence[ConflictCheck]:
+        return ()
+
 
 @dataclass
 class GroupEndpointBatchPurgerSpec(BatchPurgerSpec[EndpointRow]):
@@ -61,6 +74,10 @@ class GroupEndpointBatchPurgerSpec(BatchPurgerSpec[EndpointRow]):
     @override
     def build_subquery(self) -> sa.sql.Select[tuple[EndpointRow]]:
         return sa.select(EndpointRow).where(EndpointRow.project == self.project_id)
+
+    @override
+    def conflict_checks(self) -> Sequence[ConflictCheck]:
+        return ()
 
 
 @dataclass
@@ -76,6 +93,10 @@ class GroupBatchPurgerSpec(RBACEntityBatchPurgerSpec[GroupRow]):
     @override
     def element_type(self) -> RBACElementType:
         return RBACElementType.PROJECT
+
+    @override
+    def conflict_checks(self) -> Sequence[ConflictCheck]:
+        return ()
 
 
 @dataclass
@@ -94,3 +115,7 @@ class UsersForProjectPurgerSpec(BatchPurgerSpec[AssociationScopesEntitiesRow]):
             AssociationScopesEntitiesRow.entity_type == EntityType.USER,
             AssociationScopesEntitiesRow.entity_id.in_(entity_ids),
         )
+
+    @override
+    def conflict_checks(self) -> Sequence[ConflictCheck]:
+        return ()
