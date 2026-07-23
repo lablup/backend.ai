@@ -3,6 +3,8 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
+from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.replica_group import ReplicaGroupID
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience import (
     MetricArgs,
@@ -15,6 +17,7 @@ from ai.backend.common.resilience.policies.retry import BackoffStrategy
 from ai.backend.common.types import KernelId, SessionId
 from ai.backend.manager.data.deployment.types import (
     DeploymentHistoryListResult,
+    ReplicaGroupHistoryListResult,
     RouteHistoryListResult,
 )
 from ai.backend.manager.data.kernel.types import (
@@ -29,6 +32,7 @@ from ai.backend.manager.repositories.base import BatchQuerier
 from .db_source import SchedulingHistoryDBSource
 from .types import (
     DeploymentHistorySearchScope,
+    ReplicaGroupHistorySearchScope,
     RouteHistorySearchScope,
     SessionSchedulingHistorySearchScope,
 )
@@ -133,6 +137,37 @@ class SchedulingHistoryRepository:
     ) -> DeploymentHistoryListResult:
         """Search deployment history within scope."""
         return await self._db_source.search_deployment_scoped_history(querier, scope)
+
+    # ========== Replica Group History (Admin) ==========
+
+    @scheduling_history_repository_resilience.apply()
+    async def admin_search_replica_group_history(
+        self,
+        querier: BatchQuerier,
+    ) -> ReplicaGroupHistoryListResult:
+        """Search replica-group history with pagination (admin API)."""
+        return await self._db_source.admin_search_replica_group_history(querier)
+
+    # ========== Replica Group History (Scoped) ==========
+
+    @scheduling_history_repository_resilience.apply()
+    async def resolve_replica_group_deployment(
+        self, replica_group_id: ReplicaGroupID
+    ) -> DeploymentID:
+        """Return the id of the deployment owning ``replica_group_id``.
+
+        Raises ``ReplicaGroupNotFound`` when no such replica group exists.
+        """
+        return await self._db_source.resolve_replica_group_deployment(replica_group_id)
+
+    @scheduling_history_repository_resilience.apply()
+    async def search_replica_group_scoped_history(
+        self,
+        querier: BatchQuerier,
+        scope: ReplicaGroupHistorySearchScope,
+    ) -> ReplicaGroupHistoryListResult:
+        """Search replica-group history within scope."""
+        return await self._db_source.search_replica_group_scoped_history(querier, scope)
 
     # ========== Route History (Admin) ==========
 

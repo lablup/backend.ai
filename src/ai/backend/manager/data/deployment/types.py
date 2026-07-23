@@ -1366,6 +1366,16 @@ class ReplicaGroupHistoryData:
 
 
 @dataclass
+class ReplicaGroupHistoryListResult:
+    """Search result with pagination for replica-group history."""
+
+    items: list[ReplicaGroupHistoryData]
+    total_count: int
+    has_next_page: bool
+    has_previous_page: bool
+
+
+@dataclass
 class DeploymentHistoryListResult:
     """Search result with pagination for deployment history."""
 
