@@ -430,15 +430,15 @@ class TestBaseGQLAdapterBuildPagination:
         that does decide, which used to escape as a bare ValueError and a 500.
         """
 
-        def key_on_a_row_uuid(cursor_id: str) -> Any:
-            uuid.UUID(cursor_id)
-            return MagicMock()
+        def parse_the_payload_as_a_uuid(cursor_id: str) -> Any:
+            uuid.UUID(cursor_id)  # raises ValueError for the payload this test sends
+            pytest.fail("the payload parsed, so this no longer exercises a rejected cursor")
 
         uuid_keyed_spec = PaginationSpec(
             forward_order=MagicMock(),
             backward_order=MagicMock(),
-            forward_condition_factory=key_on_a_row_uuid,
-            backward_condition_factory=key_on_a_row_uuid,
+            forward_condition_factory=parse_the_payload_as_a_uuid,
+            backward_condition_factory=parse_the_payload_as_a_uuid,
             tiebreaker_order=MagicMock(),
         )
         cursor = encode_cursor("not-a-uuid")
