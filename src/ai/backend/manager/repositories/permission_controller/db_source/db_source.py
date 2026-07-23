@@ -156,16 +156,15 @@ class _PermissionGroupKey:
 
 @dataclass(frozen=True)
 class _VirtualScopePermissionGroupKey:
-    """Group key for batching virtual-scope-chain resolution inputs.
+    """Batching key for virtual-scope-chain resolution.
 
-    Keys sharing the same ``(user_id, entity_type)`` are resolved by a single
-    SQL round-trip differing only in the per-target ``entity_id`` IN-list.
-    ``entity_type`` is the DB-facing :class:`EntityType` enum (converted from the
-    open ``EntityRef.entity_type``) so it binds against the permission columns.
+    ``entity_type`` matches membership rows; ``subject_entity_type`` matches
+    permission rows.
     """
 
     user_id: uuid.UUID
     entity_type: EntityType
+    subject_entity_type: EntityType
 
 
 class PermissionDBSource:
@@ -1224,8 +1223,7 @@ class PermissionDBSource:
         Walks ``entity -> entity_memberships -> scope_bindings -> scope`` and
         OR-combines the granted bitmask at each resolved scope, clipping every
         path by both hop caps (``granted & scope_cap & entity_cap``; ``None`` = no
-        ceiling). Keys sharing ``(user_id, entity_type)`` share one round-trip;
-        keys with no reachable grant map to :attr:`Permission.NONE`.
+        ceiling). Keys with no reachable grant map to :attr:`Permission.NONE`.
         """
         if not keys:
             return {}
@@ -1234,10 +1232,16 @@ class PermissionDBSource:
             _VirtualScopePermissionGroupKey, list[VirtualScopePermissionCheckKey]
         ] = defaultdict(list)
         for key in keys:
+            entity_type = EntityType(key.entity.entity_type)
             groups[
                 _VirtualScopePermissionGroupKey(
                     user_id=key.user_id,
-                    entity_type=EntityType(key.entity.entity_type),
+                    entity_type=entity_type,
+                    subject_entity_type=(
+                        EntityType(key.subject_entity_type)
+                        if key.subject_entity_type is not None
+                        else entity_type
+                    ),
                 )
             ].append(key)
 
@@ -1261,8 +1265,8 @@ class PermissionDBSource:
         group_key: _VirtualScopePermissionGroupKey,
         entity_ids: Sequence[EntityID],
     ) -> Mapping[EntityID, Permission]:
-        """Run the virtual-scope-chain query for a single ``(user_id, entity_type)``
-        group with N entity_ids.
+        """Run the virtual-scope-chain query for a single ``(user_id, entity_type,
+        subject_entity_type)`` group with N entity_ids.
 
         Returns a mapping from entity_id to its effective (cap-clipped, OR-combined)
         :class:`Permission`. Entities with no reachable grant are absent from the map.
@@ -1289,7 +1293,7 @@ class PermissionDBSource:
                         # scope_bindings.scope_id is a native UUID; permissions.scope_id
                         # stores its canonical string form. Cast to compare.
                         perm.c.scope_id == sa.cast(sb.c.scope_id, sa.String),
-                        perm.c.entity_type == group_key.entity_type,
+                        perm.c.entity_type == group_key.subject_entity_type,
                     ),
                 )
                 .join(roles, roles.c.id == perm.c.role_id)
