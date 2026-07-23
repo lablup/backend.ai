@@ -76,7 +76,7 @@ class SearchKernelScopedHistoryAction(BaseScopeAction):
     # records of their own, so the RBAC check has to be redirected to the owning
     # session; a kernel-keyed caller must resolve ``kernel_id -> session_id``
     # (``ResolveKernelSessionAction``) for no reason other than filling this in.
-    authorized_session_id: SessionId
+    _session_id: SessionId
     querier: BatchQuerier
 
     @override
@@ -95,13 +95,13 @@ class SearchKernelScopedHistoryAction(BaseScopeAction):
 
     @override
     def scope_id(self) -> str:
-        return str(self.authorized_session_id)
+        return str(self._session_id)
 
     @override
     def target_element(self) -> RBACElementRef:
         return RBACElementRef(
             element_type=RBACElementType.SESSION,
-            element_id=str(self.authorized_session_id),
+            element_id=str(self._session_id),
         )
 
 
@@ -114,7 +114,7 @@ class SearchKernelScopedHistoryActionResult(BaseScopeActionResult):
     has_next_page: bool
     has_previous_page: bool
     target: KernelHistoryTarget
-    authorized_session_id: SessionId
+    _session_id: SessionId
 
     @override
     def scope_type(self) -> ScopeType:
@@ -122,4 +122,4 @@ class SearchKernelScopedHistoryActionResult(BaseScopeActionResult):
 
     @override
     def scope_id(self) -> str:
-        return str(self.authorized_session_id)
+        return str(self._session_id)

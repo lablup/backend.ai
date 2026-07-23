@@ -429,7 +429,7 @@ class TestSearchKernelScopedHistoryAction:
         )
 
         action = SearchKernelScopedHistoryAction(
-            target=case.target, authorized_session_id=_SESSION_ID, querier=querier
+            target=case.target, _session_id=_SESSION_ID, querier=querier
         )
         result = await service.search_kernel_scoped_history(action)
 

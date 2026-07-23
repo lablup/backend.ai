@@ -465,10 +465,10 @@ class SchedulingHistoryAdapter(BaseAdapter):
                 "Kernel scheduling history scope accepts exactly one scope item"
             )
         target: KernelHistoryTarget
-        # TODO: Drop `authorized_session_id` and the kernel -> session resolution
-        # once virtual scopes land; the action can then authorize on the target's
-        # own RBAC element ref.
-        authorized_session_id: SessionId
+        # TODO: Drop `session_id` and the kernel -> session resolution once
+        # virtual scopes land; the action can then authorize on the target's own
+        # RBAC element ref.
+        session_id: SessionId
         if kernel_items:
             kernel_id = KernelId(kernel_items[0].value)
             target = KernelKernelHistoryTarget(kernel_id=kernel_id)
@@ -477,15 +477,14 @@ class SchedulingHistoryAdapter(BaseAdapter):
                     ResolveKernelSessionAction(kernel_id=kernel_id)
                 )
             )
-            authorized_session_id = resolve_result.session_id
+            session_id = resolve_result.session_id
         else:
             session_id = SessionId(session_items[0].value)
             target = SessionKernelHistoryTarget(session_id=session_id)
-            authorized_session_id = session_id
         action_result = await self._processors.scheduling_history.search_kernel_scoped_history.wait_for_complete(
             SearchKernelScopedHistoryAction(
                 target=target,
-                authorized_session_id=authorized_session_id,
+                _session_id=session_id,
                 querier=querier,
             )
         )
