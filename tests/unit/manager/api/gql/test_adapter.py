@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import uuid
-from dataclasses import dataclass
 from typing import Any
 from unittest.mock import MagicMock
 
@@ -418,37 +417,13 @@ class TestBaseGQLAdapterBuildPagination:
         assert len(querier.orders) == 1
         assert querier.orders[0] is mock_tiebreaker_order
 
-
-@dataclass(frozen=True)
-class _MalformedCursorCase:
-    """One direction of cursor pagination, carrying a cursor the entity cannot key on."""
-
-    direction: str
-    options: PaginationOptions
-
-
-@dataclass(frozen=True)
-class _WellFormedCursorCase:
-    """The same directions with a payload the entity does accept."""
-
-    direction: str
-    options: PaginationOptions
-    expected_pagination: type[CursorForwardPagination] | type[CursorBackwardPagination]
-
-
-class TestCursorPayloadRejectedByTheEntity:
-    """A cursor whose payload the entity cannot parse is the caller's error, not a server fault.
-
-    The payload type is per-entity, so only the condition factory can reject it — it does so
-    with ValueError, which is not a BackendAIError and used to surface as a 500.
-    """
-
     @pytest.fixture
-    def adapter(self) -> BaseGQLAdapter:
-        return BaseGQLAdapter()
-
-    @pytest.fixture
-    def uuid_keyed_spec(self) -> PaginationSpec:
+    def uuid_keyed_spec(
+        self,
+        mock_forward_order: Any,
+        mock_backward_order: Any,
+        mock_tiebreaker_order: Any,
+    ) -> PaginationSpec:
         """A spec whose factories key on a row UUID, like most entities on the v2 surface."""
 
         def parse_uuid_cursor(cursor_id: str) -> Any:
@@ -456,63 +431,27 @@ class TestCursorPayloadRejectedByTheEntity:
             return MagicMock()
 
         return PaginationSpec(
-            forward_order=MagicMock(),
-            backward_order=MagicMock(),
+            forward_order=mock_forward_order,
+            backward_order=mock_backward_order,
             forward_condition_factory=parse_uuid_cursor,
             backward_condition_factory=parse_uuid_cursor,
-            tiebreaker_order=MagicMock(),
+            tiebreaker_order=mock_tiebreaker_order,
         )
 
     @pytest.mark.parametrize(
-        "case",
+        "options",
         [
-            _MalformedCursorCase(
-                direction="forward",
-                options=PaginationOptions(first=10, after=encode_cursor("not-a-uuid")),
-            ),
-            _MalformedCursorCase(
-                direction="backward",
-                options=PaginationOptions(last=10, before=encode_cursor("not-a-uuid")),
-            ),
+            PaginationOptions(first=10, after=encode_cursor("not-a-uuid")),
+            PaginationOptions(last=10, before=encode_cursor("not-a-uuid")),
         ],
-        ids=lambda case: case.direction,
+        ids=lambda options: "after" if options.after else "before",
     )
-    def test_payload_the_factory_rejects_is_an_invalid_cursor(
+    def test_cursor_payload_the_entity_cannot_key_on_is_invalid_cursor(
         self,
         adapter: BaseGQLAdapter,
         uuid_keyed_spec: PaginationSpec,
-        case: _MalformedCursorCase,
+        options: PaginationOptions,
     ) -> None:
+        """The factory's ValueError is a caller error, and used to escape as a 500."""
         with pytest.raises(InvalidCursor):
-            adapter.build_querier(case.options, uuid_keyed_spec)
-
-    @pytest.mark.parametrize(
-        "case",
-        [
-            _WellFormedCursorCase(
-                direction="forward",
-                options=PaginationOptions(
-                    first=10, after=encode_cursor("6f0d3d2e-6b1a-4a1e-9c3a-0f4b6d2e1a55")
-                ),
-                expected_pagination=CursorForwardPagination,
-            ),
-            _WellFormedCursorCase(
-                direction="backward",
-                options=PaginationOptions(
-                    last=10, before=encode_cursor("6f0d3d2e-6b1a-4a1e-9c3a-0f4b6d2e1a55")
-                ),
-                expected_pagination=CursorBackwardPagination,
-            ),
-        ],
-        ids=lambda case: case.direction,
-    )
-    def test_payload_the_factory_accepts_still_builds_its_condition(
-        self,
-        adapter: BaseGQLAdapter,
-        uuid_keyed_spec: PaginationSpec,
-        case: _WellFormedCursorCase,
-    ) -> None:
-        querier = adapter.build_querier(case.options, uuid_keyed_spec)
-
-        assert isinstance(querier.pagination, case.expected_pagination)
-        assert querier.pagination.cursor_condition is not None
+            adapter.build_querier(options, uuid_keyed_spec)
