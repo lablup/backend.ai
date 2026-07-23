@@ -27,7 +27,11 @@ from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import Mapped, foreign, load_only, mapped_column, relationship, selectinload
 
-from ai.backend.common.defs import MODEL_VFOLDER_LENGTH_LIMIT
+from ai.backend.common.defs import (
+    MODEL_VFOLDER_LENGTH_LIMIT,
+    RESERVED_VFOLDER_PATTERNS,
+    RESERVED_VFOLDERS,
+)
 from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import (
     MountPermission,
@@ -55,11 +59,7 @@ from ai.backend.manager.data.vfolder.types import (
     VFolderOwnershipType,
 )
 from ai.backend.manager.data.vfolder.types import VFolderMountPermission as VFolderPermission
-from ai.backend.manager.defs import (
-    RESERVED_VFOLDER_PATTERNS,
-    RESERVED_VFOLDERS,
-    VFOLDER_DSTPATHS_MAP,
-)
+from ai.backend.manager.defs import VFOLDER_DSTPATHS_MAP
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.errors.storage import (
