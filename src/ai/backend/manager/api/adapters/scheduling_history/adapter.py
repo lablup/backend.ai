@@ -100,11 +100,17 @@ from ai.backend.manager.repositories.scheduling_history.types import (
     RouteHistorySearchScope,
     SessionSchedulingHistorySearchScope,
 )
+from ai.backend.manager.services.scheduling_history.actions.admin_search_replica_group_history import (
+    AdminSearchReplicaGroupHistoryAction,
+)
 from ai.backend.manager.services.scheduling_history.actions.resolve_kernel_session import (
     ResolveKernelSessionAction,
 )
 from ai.backend.manager.services.scheduling_history.actions.resolve_replica_group_deployment import (
     ResolveReplicaGroupDeploymentAction,
+)
+from ai.backend.manager.services.scheduling_history.actions.scoped_search_replica_group_history import (
+    ScopedSearchReplicaGroupHistoryAction,
 )
 from ai.backend.manager.services.scheduling_history.actions.search_deployment_history import (
     SearchDeploymentHistoryAction,
@@ -118,12 +124,6 @@ from ai.backend.manager.services.scheduling_history.actions.search_kernel_histor
 from ai.backend.manager.services.scheduling_history.actions.search_kernel_scoped_history import (
     SearchKernelScopedHistoryAction,
     SessionKernelHistoryTarget,
-)
-from ai.backend.manager.services.scheduling_history.actions.search_replica_group_history import (
-    SearchReplicaGroupHistoryAction,
-)
-from ai.backend.manager.services.scheduling_history.actions.search_replica_group_scoped_history import (
-    SearchReplicaGroupScopedHistoryAction,
 )
 from ai.backend.manager.services.scheduling_history.actions.search_route_history import (
     SearchRouteHistoryAction,
@@ -844,8 +844,8 @@ class SchedulingHistoryAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        action_result = await self._processors.scheduling_history.search_replica_group_history.wait_for_complete(
-            SearchReplicaGroupHistoryAction(querier=querier)
+        action_result = await self._processors.scheduling_history.admin_search_replica_group_history.wait_for_complete(
+            AdminSearchReplicaGroupHistoryAction(querier=querier)
         )
         return SearchReplicaGroupHistoriesPayload(
             items=[self._replica_group_data_to_dto(h) for h in action_result.items],
@@ -881,8 +881,8 @@ class SchedulingHistoryAdapter(BaseAdapter):
         resolve_result = await self._processors.scheduling_history.resolve_replica_group_deployment.wait_for_complete(
             ResolveReplicaGroupDeploymentAction(replica_group_id=input.scope.replica_group_id)
         )
-        action_result = await self._processors.scheduling_history.search_replica_group_scoped_history.wait_for_complete(
-            SearchReplicaGroupScopedHistoryAction(
+        action_result = await self._processors.scheduling_history.scoped_search_replica_group_history.wait_for_complete(
+            ScopedSearchReplicaGroupHistoryAction(
                 replica_group_id=input.scope.replica_group_id,
                 deployment_id=resolve_result.deployment_id,
                 querier=querier,
