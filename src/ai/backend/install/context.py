@@ -19,7 +19,7 @@ from contextvars import ContextVar
 from datetime import datetime
 from functools import partial
 from pathlib import Path
-from typing import Any, override
+from typing import Any, Final, override
 
 import aiofiles
 import aiotools
@@ -65,6 +65,7 @@ from .types import (
     PackageSource,
     Platform,
     PrerequisiteError,
+    ProxyBackend,
     ServerAddr,
     ServiceConfig,
     SftpAgentOptions,
@@ -72,6 +73,18 @@ from .types import (
 from .widgets import ProgressItem, SetupLog
 
 current_log: ContextVar[SetupLog] = ContextVar("current_log")
+
+# Must match the entrypoints in configs/traefik/traefik.halfstack.yml.
+TRAEFIK_API_PORT: Final[int] = 8080
+TRAEFIK_PORT_RANGE: Final[tuple[int, int]] = (10205, 10300)
+# The coordinator emits wildcard routers on the fixed "domainproxy"
+# entrypoint; the installer swaps the portproxy_* entrypoints for it when the
+# wildcard traffic pattern is selected (same port the builtin wildcard
+# frontend binds).
+TRAEFIK_DOMAINPROXY_PORT: Final[int] = 10250
+APPPROXY_TRAEFIK_PLUGIN_VERSION: Final[str] = "0.0.5"
+APPPROXY_TRAEFIK_PLUGIN_REPO: Final[str] = "lablup/backend.ai-appproxy-worker-traefik"
+TRAEFIK_MARKER_DIR_PLACEHOLDER: Final[str] = "/__APPPROXY_MARKER_DIR__"
 
 
 class PostGuide(enum.Enum):
@@ -180,6 +193,8 @@ class Context(metaclass=ABCMeta):
             appproxy_tcp_worker_addr=ServerAddr(HostPortPair(public_facing_address, 10202)),
             harbor=harbor,
             sftp_agent=sftp_agent,
+            frontend_mode=self.install_variable.frontend_mode,
+            proxy_backend=self.install_variable.proxy_backend,
         )
         return InstallInfo(
             version=self.dist_info.version,
@@ -591,6 +606,8 @@ class Context(metaclass=ABCMeta):
                 ("8120:2379", f"{self.install_info.halfstack_config.etcd_addr[0].bind.port}:2379"),
             ],
         )
+        if self.install_variable.proxy_backend == ProxyBackend.TRAEFIK:
+            await self.prepare_traefik_assets(dst_compose_path)
         sudo = " ".join(self.docker_sudo)
         profile_args_list: list[str] = []
         if self.install_variable.enable_observability:
@@ -600,6 +617,8 @@ class Context(metaclass=ABCMeta):
             profile_args_list.append("--profile telemetry")
         if self.install_variable.enable_storage:
             profile_args_list.append("--profile storage")
+        if self.install_variable.proxy_backend == ProxyBackend.TRAEFIK:
+            profile_args_list.append("--profile traefik")
         profile_args = " ".join(profile_args_list)
         compose_file_arg = "-f docker-compose.halfstack.current.yml"
         await self.run_shell(
@@ -611,6 +630,51 @@ class Context(metaclass=ABCMeta):
         """,
             cwd=self.install_info.base_path,
         )
+
+    @property
+    def traefik_marker_dir(self) -> Path:
+        return self.install_info.base_path / "volumes" / "traefik" / "marker"
+
+    async def prepare_traefik_assets(self, compose_path: Path) -> None:
+        """Prepare the Traefik static config, appproxy plugin, and marker
+        directory before ``compose up`` starts the "traefik" profile."""
+        self.log_header("Preparing the Traefik assets (app-proxy traefik backend)...")
+        marker_dir = self.traefik_marker_dir
+        marker_dir.mkdir(parents=True, exist_ok=True)
+        src_config_path = self.copy_config("traefik.yml")
+        dst_config_path = src_config_path.with_name("traefik.halfstack.current.yml")
+        src_config_path.rename(dst_config_path)
+        self.sed_in_place(dst_config_path, TRAEFIK_MARKER_DIR_PLACEHOLDER, str(marker_dir))
+        self.sed_in_place(compose_path, TRAEFIK_MARKER_DIR_PLACEHOLDER, str(marker_dir))
+        if self.install_variable.frontend_mode == FrontendMode.WILDCARD:
+            # The static config ships port-flavored (portproxy_* entrypoints).
+            # For the wildcard traffic pattern the coordinator emits routers on
+            # the fixed "domainproxy" entrypoint instead, and portproxy_10250
+            # would collide with it on :10250 -- so swap the entrypoint set.
+            yaml = YAML()
+            with dst_config_path.open("r") as fp:
+                static_conf = yaml.load(fp)
+            entrypoints = static_conf["entryPoints"]
+            for name in [k for k in entrypoints if k.startswith("portproxy_")]:
+                del entrypoints[name]
+            entrypoints["domainproxy"] = {
+                "address": f":{TRAEFIK_DOMAINPROXY_PORT}",
+            }
+            with dst_config_path.open("w") as fp:
+                yaml.dump(static_conf, fp)
+        plugin_root = marker_dir.parent
+        plugin_url = (
+            f"https://github.com/{APPPROXY_TRAEFIK_PLUGIN_REPO}/releases/download/"
+            f"{APPPROXY_TRAEFIK_PLUGIN_VERSION}/appproxy-traefik-plugin.tar.gz"
+        )
+        exit_code = await self.run_shell(
+            f'curl -fsSL "{plugin_url}" | tar xz -C "{plugin_root}"',
+        )
+        if exit_code != 0:
+            raise RuntimeError(
+                f"Failed to download and extract the appproxy Traefik plugin "
+                f"(exit {exit_code}); URL: {plugin_url}"
+            )
 
     async def load_fixtures(self) -> None:
         with self.resource_path("ai.backend.install.fixtures", "example-users.json") as path:
@@ -1209,6 +1273,7 @@ class Context(metaclass=ABCMeta):
         tls_advertised = self.install_variable.tls_advertised
         advertised_port = self.install_variable.advertised_port
         wildcard_domain = self.install_variable.wildcard_domain
+        proxy_backend = self.install_variable.proxy_backend
         public_facing_address = self.install_variable.public_facing_address
         apphub_address = self.install_variable.apphub_address
         app_address = self.install_variable.app_address
@@ -1249,6 +1314,18 @@ class Context(metaclass=ABCMeta):
             announce_addr_table["host"] = public_facing_address
             announce_addr_table["port"] = service.appproxy_coordinator_addr.bind.port
             data["proxy_coordinator"]["announce_addr"] = announce_addr_table  # type: ignore[index]
+            if proxy_backend == ProxyBackend.TRAEFIK:
+                # Publish routing rules to etcd for the Traefik dataplane.
+                data["proxy_coordinator"]["enable_traefik"] = True  # type: ignore[index]
+                traefik_etcd_addr_table = tomlkit.inline_table()
+                traefik_etcd_addr_table["host"] = halfstack.etcd_addr[0].face.host
+                traefik_etcd_addr_table["port"] = halfstack.etcd_addr[0].face.port
+                traefik_etcd_table = tomlkit.table()
+                traefik_etcd_table["namespace"] = "traefik"
+                traefik_etcd_table["addr"] = traefik_etcd_addr_table
+                traefik_table = tomlkit.table()
+                traefik_table["etcd"] = traefik_etcd_table
+                data["proxy_coordinator"]["traefik"] = traefik_table  # type: ignore[index]
         with coord_conf.open("w") as fp:
             tomlkit.dump(data, fp)
 
@@ -1286,11 +1363,44 @@ class Context(metaclass=ABCMeta):
             if tls_advertised:
                 data["proxy_worker"]["tls_advertised"] = True  # type: ignore[index]
 
-            # set frontend mode (port or wildcard)
-            data["proxy_worker"]["frontend_mode"] = frontend_mode.value  # type: ignore[index]
-
-            # configure based on frontend_mode
-            if frontend_mode == FrontendMode.WILDCARD:
+            # Configure based on (traffic pattern, dataplane backend).
+            if proxy_backend == ProxyBackend.TRAEFIK:
+                # Delegate the dataplane to the halfstack Traefik container;
+                # the traffic pattern becomes Traefik's internal sub-mode.
+                data["proxy_worker"]["frontend_mode"] = "traefik"  # type: ignore[index]
+                if "port_proxy" in data["proxy_worker"]:  # type: ignore[operator]
+                    del data["proxy_worker"]["port_proxy"]
+                traefik_table = tomlkit.table()
+                traefik_table["api_port"] = TRAEFIK_API_PORT
+                traefik_table["last_used_time_marker_directory"] = str(self.traefik_marker_dir)
+                if frontend_mode == FrontendMode.WILDCARD:
+                    if not wildcard_domain:
+                        raise RuntimeError(
+                            "The wildcard traffic pattern with the Traefik backend"
+                            " requires a wildcard domain -- pass --fqdn-prefix (or"
+                            " --app-base-domain) so the installer can derive it."
+                        )
+                    traefik_table["frontend_mode"] = "wildcard"
+                    traefik_wildcard_table = tomlkit.table()
+                    traefik_wildcard_table["domain"] = wildcard_domain
+                    traefik_wildcard_table["advertised_port"] = advertised_port
+                    traefik_wildcard_table["tls_advertised"] = tls_advertised
+                    traefik_table["wildcard_domain"] = traefik_wildcard_table
+                    # Advertise app URLs the same way as the builtin wildcard
+                    # frontend does.
+                    api_advertised_addr_table = tomlkit.inline_table()
+                    api_advertised_addr_table["host"] = app_address
+                    api_advertised_addr_table["port"] = advertised_port
+                    data["proxy_worker"]["api_advertised_addr"] = api_advertised_addr_table  # type: ignore[index]
+                else:
+                    traefik_table["frontend_mode"] = "port"
+                    traefik_port_proxy_table = tomlkit.table()
+                    traefik_port_proxy_table["advertised_host"] = public_facing_address
+                    traefik_port_proxy_table["port_range"] = list(TRAEFIK_PORT_RANGE)
+                    traefik_table["port_proxy"] = traefik_port_proxy_table
+                data["proxy_worker"]["traefik"] = traefik_table  # type: ignore[index]
+            elif frontend_mode == FrontendMode.WILDCARD:
+                data["proxy_worker"]["frontend_mode"] = frontend_mode.value  # type: ignore[index]
                 # Remove port_proxy section for wildcard mode
                 if "port_proxy" in data["proxy_worker"]:  # type: ignore[operator]
                     del data["proxy_worker"]["port_proxy"]
@@ -1307,12 +1417,13 @@ class Context(metaclass=ABCMeta):
                     wildcard_table["domain"] = wildcard_domain
                     bind_addr_table = tomlkit.inline_table()
                     bind_addr_table["host"] = "0.0.0.0"
-                    bind_addr_table["port"] = 10250
+                    bind_addr_table["port"] = TRAEFIK_DOMAINPROXY_PORT
                     wildcard_table["bind_addr"] = bind_addr_table
                     wildcard_table["advertised_port"] = advertised_port
                     wildcard_table.add(tomlkit.nl())  # Add newline before next section
                     data["proxy_worker"]["wildcard_domain"] = wildcard_table  # type: ignore[index]
             else:
+                data["proxy_worker"]["frontend_mode"] = frontend_mode.value  # type: ignore[index]
                 # update port_proxy.advertised_host
                 data["proxy_worker"]["port_proxy"]["advertised_host"] = public_facing_address  # type: ignore[index]
             data["proxy_worker"]["metric_access_allowed_hosts"] = (  # type: ignore[index]
