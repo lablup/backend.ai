@@ -98,11 +98,30 @@ class BulkUpdateAppConfigFragmentInput(BaseRequestModel):
         min_length=1, description="Fragments to update, each identified by its id."
     )
 
+    @model_validator(mode="after")
+    def _reject_repeated_targets(self) -> Self:
+        """Two items naming one fragment leave the winner to statement order, not to the caller.
+
+        The batch reports both as succeeded while only one config survives, so the request is
+        rejected rather than silently dropping an update.
+        """
+        ids = [item.id for item in self.items]
+        if len(set(ids)) != len(ids):
+            raise ValueError("items must not name the same fragment twice.")
+        return self
+
 
 class BulkPurgeAppConfigFragmentInput(BaseRequestModel):
     """Input for purging many fragments (per-item partial success)."""
 
     ids: list[AppConfigFragmentID] = Field(min_length=1, description="Fragment ids to purge.")
+
+    @model_validator(mode="after")
+    def _reject_repeated_targets(self) -> Self:
+        """A repeated id purges once and reports the repeat as a failure — reject it instead."""
+        if len(set(self.ids)) != len(self.ids):
+            raise ValueError("ids must not name the same fragment twice.")
+        return self
 
 
 class AppConfigFragmentFilter(BaseRequestModel):
