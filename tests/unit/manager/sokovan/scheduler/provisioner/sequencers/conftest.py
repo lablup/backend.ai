@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Callable, Mapping
+from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
@@ -104,7 +105,7 @@ def _make_workload(
         priority=priority,
         job_priority=0,
         session_type=session_type,
-        starts_at=None,
+        requested_starts_at=None,
         is_preemptible=False,
     )
 
@@ -169,6 +170,7 @@ def _make_snapshot(
             resource_policy=ResourcePolicySnapshot(by_user={}, by_project={}, by_domain={}),
             agent_limit=AgentLimit(max_container_count=None),
         ),
+        observed_at=datetime.now(UTC),
     )
 
 

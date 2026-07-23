@@ -93,7 +93,7 @@ def create_session_workload(
     priority: int = 0,
     job_priority: int = 0,
     session_type: SessionTypes = SessionTypes.INTERACTIVE,
-    starts_at: datetime | None = None,
+    requested_starts_at: datetime | None = None,
     is_preemptible: bool = False,
 ) -> SessionWorkload:
     """Create a SessionWorkload for testing.
@@ -123,7 +123,7 @@ def create_session_workload(
         priority=priority,
         job_priority=job_priority,
         session_type=session_type,
-        starts_at=starts_at,
+        requested_starts_at=requested_starts_at,
         is_preemptible=is_preemptible,
     )
 
@@ -137,6 +137,7 @@ def create_system_snapshot(
     occupancy: ResourceOccupancySnapshot | None = None,
     resource_policy: ResourcePolicySnapshot | None = None,
     max_container_count: int | None = None,
+    observed_at: datetime | None = None,
 ) -> SystemSnapshot:
     """Create a SystemSnapshot for testing."""
     return SystemSnapshot(
@@ -155,6 +156,7 @@ def create_system_snapshot(
             or ResourcePolicySnapshot(by_user={}, by_project={}, by_domain={}),
             agent_limit=AgentLimit(max_container_count=max_container_count),
         ),
+        observed_at=observed_at if observed_at is not None else datetime.now(tzutc()),
     )
 
 
@@ -283,14 +285,14 @@ def user_specific_minimal_workload(test_user_id: UserID) -> SessionWorkload:
 def batch_session_past_start_time() -> SessionWorkload:
     """Batch session with start time in the past."""
     past_time = datetime.now(tzutc()) - timedelta(hours=1)
-    return create_session_workload(session_type=SessionTypes.BATCH, starts_at=past_time)
+    return create_session_workload(session_type=SessionTypes.BATCH, requested_starts_at=past_time)
 
 
 @pytest.fixture
 def batch_session_future_start_time() -> SessionWorkload:
     """Batch session with start time in the future."""
     future_time = datetime.now(tzutc()) + timedelta(hours=1)
-    return create_session_workload(session_type=SessionTypes.BATCH, starts_at=future_time)
+    return create_session_workload(session_type=SessionTypes.BATCH, requested_starts_at=future_time)
 
 
 # =============================================================================

@@ -266,6 +266,7 @@ class ScheduleDBSource:
             )
             session_ids = [s.meta.session_id for s in pending_sessions.sessions]
             session_dependencies = await self._fetch_session_dependencies(db_sess, session_ids)
+            observed_at = await self._get_db_now_in_session(db_sess)
 
             return SchedulingFetch(
                 resource_group=resource_group.meta,
@@ -275,6 +276,7 @@ class ScheduleDBSource:
                 occupancy=occupancy,
                 resource_policy=resource_policy,
                 session_dependencies=SessionDependencySnapshot(by_session=session_dependencies),
+                observed_at=observed_at,
             )
 
     async def _fetch_resource_group_with_slot_inventory(
@@ -391,7 +393,7 @@ class ScheduleDBSource:
                     SessionRow.session_type,
                     SessionRow.cluster_mode,
                     SessionRow.designated_agent_ids,
-                    SessionRow.starts_at,
+                    SessionRow.requested_starts_at,
                     SessionRow.options,
                 )
             )
@@ -483,7 +485,7 @@ class ScheduleDBSource:
                     priority=row.priority,
                     job_priority=row.job_priority,
                     session_type=row.session_type,
-                    starts_at=row.starts_at,
+                    requested_starts_at=row.requested_starts_at,
                     is_preemptible=row.is_preemptible,
                 )
             )

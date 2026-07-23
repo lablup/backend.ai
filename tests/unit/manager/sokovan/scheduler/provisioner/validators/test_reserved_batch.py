@@ -18,6 +18,8 @@ from ai.backend.manager.views.sokovan.snapshot import SystemSnapshot
 
 from .conftest import SnapshotFactory, WorkloadFactory
 
+OBSERVED_AT = datetime(2026, 7, 23, 12, 0, 0, tzinfo=tzutc())
+
 
 class TestReservedBatchSessionValidator:
     @pytest.fixture
@@ -26,7 +28,7 @@ class TestReservedBatchSessionValidator:
 
     @pytest.fixture
     def snapshot(self, snapshot_factory: SnapshotFactory) -> SystemSnapshot:
-        return snapshot_factory()
+        return snapshot_factory(observed_at=OBSERVED_AT)
 
     def test_non_batch_session_passes(
         self,
@@ -36,7 +38,7 @@ class TestReservedBatchSessionValidator:
     ) -> None:
         workload = workload_factory(
             session_type=SessionTypes.INTERACTIVE,
-            starts_at=datetime.now(tzutc()) + timedelta(hours=1),
+            requested_starts_at=OBSERVED_AT + timedelta(hours=1),
         )
 
         validator.validate(snapshot, workload)
@@ -47,7 +49,7 @@ class TestReservedBatchSessionValidator:
         snapshot: SystemSnapshot,
         workload_factory: WorkloadFactory,
     ) -> None:
-        workload = workload_factory(session_type=SessionTypes.BATCH, starts_at=None)
+        workload = workload_factory(session_type=SessionTypes.BATCH, requested_starts_at=None)
 
         validator.validate(snapshot, workload)
 
@@ -59,7 +61,20 @@ class TestReservedBatchSessionValidator:
     ) -> None:
         workload = workload_factory(
             session_type=SessionTypes.BATCH,
-            starts_at=datetime.now(tzutc()) - timedelta(minutes=5),
+            requested_starts_at=OBSERVED_AT - timedelta(minutes=5),
+        )
+
+        validator.validate(snapshot, workload)
+
+    def test_batch_session_at_exact_start_time_passes(
+        self,
+        validator: ReservedBatchSessionValidator,
+        snapshot: SystemSnapshot,
+        workload_factory: WorkloadFactory,
+    ) -> None:
+        workload = workload_factory(
+            session_type=SessionTypes.BATCH,
+            requested_starts_at=OBSERVED_AT,
         )
 
         validator.validate(snapshot, workload)
@@ -72,7 +87,7 @@ class TestReservedBatchSessionValidator:
     ) -> None:
         workload = workload_factory(
             session_type=SessionTypes.BATCH,
-            starts_at=datetime.now(tzutc()) + timedelta(hours=1),
+            requested_starts_at=OBSERVED_AT + timedelta(hours=1),
         )
 
         with pytest.raises(ReservedBatchSessionNotReady):

@@ -157,6 +157,7 @@ class SchedulerRepository:
                 resource_policy=fetch.resource_policy,
                 agent_limit=agent_limit,
             ),
+            observed_at=fetch.observed_at,
         )
         return SchedulingData(
             resource_group=fetch.resource_group,

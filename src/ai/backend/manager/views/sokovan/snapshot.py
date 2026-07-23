@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, MutableMapping
 from dataclasses import dataclass
+from datetime import datetime
 from decimal import Decimal
 from typing import override
 
@@ -242,3 +243,6 @@ class SystemSnapshot:
 
     resource_group: ResourceGroupScopeSnapshot
     global_scope: GlobalScopeSnapshot
+    # DB-sourced time the snapshot was taken; time-based validations compare
+    # against this instead of per-server clocks (HA clock-skew safety)
+    observed_at: datetime
