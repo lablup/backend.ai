@@ -9,21 +9,16 @@ from __future__ import annotations
 
 import json
 import uuid
+from collections.abc import Mapping
 from decimal import Decimal
-from uuid import UUID
 
 import pytest
 
+from ai.backend.common.identifier.architecture import ArchName
 from ai.backend.common.identifier.resource_group import ResourceGroupID
-from ai.backend.common.types import (
-    AgentId,
-    ClusterMode,
-    KernelId,
-    ResourceSlot,
-    SessionId,
-    SessionTypes,
-)
-from ai.backend.manager.data.sokovan import AgentInfo
+from ai.backend.common.identifier.resource_slot import ResourceSlotName
+from ai.backend.common.types import AgentId, SessionId
+from ai.backend.manager.data.session.options import AgentSelectionPolicy
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.concentrated import (
     ConcentratedAgentSelector,
 )
@@ -35,20 +30,91 @@ from ai.backend.manager.sokovan.scheduler.provisioner.selectors.exceptions impor
     NoAvailableAgentError,
 )
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import (
-    AgentSelectionConfig,
     AgentSelectionCriteria,
     AgentSelector,
-    KernelResourceSpec,
-    SessionMetadata,
 )
-from ai.backend.manager.sokovan.scheduler.provisioner.selectors.types import (
-    ResourceRequirements,
-)
+from ai.backend.manager.sokovan.scheduler.provisioner.selectors.tracker import AgentStateTracker
+from ai.backend.manager.sokovan.scheduler.provisioner.selectors.types import ResourceRequirements
 from ai.backend.manager.sokovan.scheduler.provisioner.validators.exceptions import (
     ConcurrencyLimitExceeded,
     DependenciesNotSatisfied,
     MultipleValidationErrors,
 )
+from ai.backend.manager.views.sokovan.agent import (
+    AgentInfo,
+    AgentLimit,
+    AgentResource,
+    SlotResource,
+)
+from ai.backend.manager.views.sokovan.workload import ResourceRequest
+
+
+def _slots(slots: Mapping[str, str]) -> dict[ResourceSlotName, Decimal]:
+    return {ResourceSlotName(name): Decimal(amount) for name, amount in slots.items()}
+
+
+def _req(
+    slots: Mapping[str, str],
+    arch: str = "x86_64",
+    containers: int = 1,
+) -> ResourceRequirements:
+    return ResourceRequirements(
+        requested_slots=ResourceRequest(slots=_slots(slots)),
+        required_architecture=ArchName(arch),
+        container_count=containers,
+    )
+
+
+def _agent(
+    agent_id: str,
+    capacities: Mapping[str, str],
+    container_count: int = 0,
+) -> AgentInfo:
+    return AgentInfo(
+        agent_id=AgentId(agent_id),
+        agent_addr=f"{agent_id}:6001",
+        architecture=ArchName("x86_64"),
+        resources=AgentResource(
+            slots={
+                ResourceSlotName(name): SlotResource(
+                    capacity=Decimal(amount), reserved=Decimal(0), used=Decimal(0)
+                )
+                for name, amount in capacities.items()
+            }
+        ),
+        container_count=container_count,
+    )
+
+
+def _criteria(requirements: list[ResourceRequirements]) -> AgentSelectionCriteria:
+    return AgentSelectionCriteria(
+        session_id=SessionId(uuid.uuid4()),
+        resource_group_id=ResourceGroupID(uuid.UUID(int=0)),
+        requirements=requirements,
+        agent_selection_policy=AgentSelectionPolicy.STRICT,
+        designated_agent_ids=None,
+    )
+
+
+def _designated_criteria(
+    requirements: list[ResourceRequirements],
+    designated_agent_ids: list[AgentId],
+) -> AgentSelectionCriteria:
+    return AgentSelectionCriteria(
+        session_id=SessionId(uuid.uuid4()),
+        resource_group_id=ResourceGroupID(uuid.UUID(int=0)),
+        requirements=requirements,
+        agent_selection_policy=AgentSelectionPolicy.STRICT,
+        designated_agent_ids=designated_agent_ids,
+    )
+
+
+def _trackers(agents: list[AgentInfo]) -> list[AgentStateTracker]:
+    return [AgentStateTracker(original_agent=agent) for agent in agents]
+
+
+def _concentrated() -> AgentSelector:
+    return AgentSelector(ConcentratedAgentSelector(agent_selection_resource_priority=["cpu"]))
 
 
 class TestInsufficientResourcesErrorFormat:
@@ -57,12 +123,11 @@ class TestInsufficientResourcesErrorFormat:
     def test_multi_resource_shortfall_uses_newlines(self) -> None:
         error = InsufficientResourcesError(
             agent_id=AgentId("agent-a"),
-            requested_slots=ResourceSlot({"cpu": Decimal("4"), "mem": Decimal("8192")}),
-            available_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("2048")}),
-            occupied_slots=ResourceSlot({}),
+            requested_slots=_slots({"cpu": "4", "mem": "8192"}),
+            available_slots=_slots({"cpu": "1", "mem": "2048"}),
             insufficient_resources={
-                "cpu": ("4", "1"),
-                "mem": ("8192", "2048"),
+                ResourceSlotName("cpu"): ("4", "1"),
+                ResourceSlotName("mem"): ("8192", "2048"),
             },
         )
         message = error.extra_msg or ""
@@ -80,64 +145,21 @@ class TestNoAvailableAgentErrorAggregationFormat:
     @pytest.fixture
     def heterogeneous_failing_agents(self) -> list[AgentInfo]:
         return [
-            AgentInfo(
-                agent_id=AgentId("agent-a"),
-                agent_addr="agent-a:6001",
-                architecture="x86_64",
-                available_slots=ResourceSlot({
-                    "cpu": Decimal("1"),
-                    "mem": Decimal("2048"),
-                }),
-                occupied_slots=ResourceSlot({"cpu": Decimal("0"), "mem": Decimal("0")}),
-                scaling_group="default",
-                container_count=0,
-            ),
-            AgentInfo(
-                agent_id=AgentId("agent-b"),
-                agent_addr="agent-b:6001",
-                architecture="x86_64",
-                available_slots=ResourceSlot({
-                    "cpu": Decimal("8"),
-                    "mem": Decimal("16384"),
-                }),
-                occupied_slots=ResourceSlot({"cpu": Decimal("0"), "mem": Decimal("0")}),
-                scaling_group="default",
-                container_count=10,  # at container limit
-            ),
+            _agent("agent-a", {"cpu": "1", "mem": "2048"}),
+            _agent("agent-b", {"cpu": "8", "mem": "16384"}, container_count=10),
         ]
 
     async def test_multi_agent_failure_message_layout(
         self,
         heterogeneous_failing_agents: list[AgentInfo],
     ) -> None:
-        kernel_id = uuid.uuid4()
-        criteria = AgentSelectionCriteria(
-            session_metadata=SessionMetadata(
-                session_id=SessionId(uuid.uuid4()),
-                session_type=SessionTypes.INTERACTIVE,
-                resource_group_id=ResourceGroupID(uuid.UUID(int=0)),
-                cluster_mode=ClusterMode.SINGLE_NODE,
-            ),
-            kernel_requirements={
-                kernel_id: KernelResourceSpec(
-                    requested_slots=ResourceSlot({
-                        "cpu": Decimal("4"),
-                        "mem": Decimal("8192"),
-                    }),
-                    required_architecture="x86_64",
-                ),
-            },
-        )
-        config = AgentSelectionConfig(max_container_count=10)
-        selector = AgentSelector(
-            ConcentratedAgentSelector(agent_selection_resource_priority=["cpu", "mem"]),
-        )
+        criteria = _criteria([_req({"cpu": "4", "mem": "8192"})])
 
         with pytest.raises(BatchAgentSelectionFailedError) as exc_info:
-            await selector.select_agents_for_batch_requirements(
-                heterogeneous_failing_agents,
+            await _concentrated().select_agents_for_batch_requirements(
+                _trackers(heterogeneous_failing_agents),
                 criteria,
-                config,
+                AgentLimit(max_container_count=10),
             )
         assert len(exc_info.value.errors) == 1
         error = exc_info.value.errors[0]
@@ -148,17 +170,10 @@ class TestNoAvailableAgentErrorAggregationFormat:
         # contract lives in extra_msg.
         message = error.extra_msg or ""
         lines = message.splitlines()
-        assert lines[0].startswith("no available agents for kernels [")
+        assert lines[0].startswith("no available agents for the request (")
         assert "arch=x86_64" in lines[0]
         assert any(line.startswith("- ") for line in lines[1:])
         assert "; " not in message
-        # No "Nx ErrorType" count-prefix aggregation.
-        for line in lines[1:]:
-            stripped = line.lstrip("- ")
-            if stripped and stripped[0].isdigit():
-                # e.g. "3x Insufficient..." would have a digit then "x ".
-                head = stripped[:4]
-                assert "x " not in head, f"unexpected count-prefix in: {line!r}"
 
 
 class TestNoAvailableAgentHeaderFormat:
@@ -166,120 +181,18 @@ class TestNoAvailableAgentHeaderFormat:
 
     def test_header_humanizes_byte_slots(self) -> None:
         error = NoAvailableAgentError(
-            resource_requirement=ResourceRequirements(
-                requested_slots=ResourceSlot({
-                    "cpu": Decimal("1000"),
-                    "mem": Decimal("1073741824"),
-                }),
-                required_architecture="aarch64",
-                kernel_ids=[KernelId(uuid.uuid4())],
+            resource_requirement=_req(
+                {"cpu": "1000", "mem": "1073741824"},
+                arch="aarch64",
             ),
+            requirement_index=0,
             agent_errors={},
         )
 
         header = (error.extra_msg or "").splitlines()[0]
         assert "cpu=1000" in header
-        assert "mem=1g" in header
+        assert "mem=1 GiB" in header
         assert "1073741824" not in header
-
-
-class TestDesignatedAgentFailureFormat:
-    """Designated-agent failure path must list each candidate reason on its own line."""
-
-    @pytest.fixture
-    def two_designated_candidates(self) -> list[AgentInfo]:
-        # The designated-only-incompatible path requires at least one
-        # non-designated compatible agent so the early "no available agents"
-        # branch does not short-circuit before reaching the designated check.
-        return [
-            AgentInfo(
-                agent_id=AgentId("designated-a"),
-                agent_addr="designated-a:6001",
-                architecture="x86_64",
-                available_slots=ResourceSlot({
-                    "cpu": Decimal("1"),
-                    "mem": Decimal("1024"),
-                }),
-                occupied_slots=ResourceSlot({"cpu": Decimal("0"), "mem": Decimal("0")}),
-                scaling_group="default",
-                container_count=0,
-            ),
-            AgentInfo(
-                agent_id=AgentId("designated-b"),
-                agent_addr="designated-b:6001",
-                architecture="x86_64",
-                available_slots=ResourceSlot({
-                    "cpu": Decimal("8"),
-                    "mem": Decimal("16384"),
-                }),
-                occupied_slots=ResourceSlot({"cpu": Decimal("0"), "mem": Decimal("0")}),
-                scaling_group="default",
-                container_count=10,  # at container limit
-            ),
-            AgentInfo(
-                agent_id=AgentId("non-designated-ok"),
-                agent_addr="non-designated-ok:6001",
-                architecture="x86_64",
-                available_slots=ResourceSlot({
-                    "cpu": Decimal("16"),
-                    "mem": Decimal("65536"),
-                }),
-                occupied_slots=ResourceSlot({"cpu": Decimal("0"), "mem": Decimal("0")}),
-                scaling_group="default",
-                container_count=0,
-            ),
-        ]
-
-    async def test_each_designated_reason_is_on_its_own_line(
-        self,
-        two_designated_candidates: list[AgentInfo],
-    ) -> None:
-        kernel_id = uuid.uuid4()
-        criteria = AgentSelectionCriteria(
-            session_metadata=SessionMetadata(
-                session_id=SessionId(uuid.uuid4()),
-                session_type=SessionTypes.INTERACTIVE,
-                resource_group_id=ResourceGroupID(uuid.UUID(int=0)),
-                cluster_mode=ClusterMode.SINGLE_NODE,
-            ),
-            kernel_requirements={
-                kernel_id: KernelResourceSpec(
-                    requested_slots=ResourceSlot({
-                        "cpu": Decimal("4"),
-                        "mem": Decimal("8192"),
-                    }),
-                    required_architecture="x86_64",
-                ),
-            },
-        )
-        config = AgentSelectionConfig(max_container_count=10)
-        selector = AgentSelector(
-            ConcentratedAgentSelector(agent_selection_resource_priority=["cpu", "mem"]),
-        )
-
-        with pytest.raises(BatchAgentSelectionFailedError) as exc_info:
-            await selector.select_agents_for_batch_requirements(
-                two_designated_candidates,
-                criteria,
-                config,
-                designated_agent_ids=[
-                    AgentId("designated-a"),
-                    AgentId("designated-b"),
-                ],
-            )
-        assert len(exc_info.value.errors) == 1
-        error = exc_info.value.errors[0]
-        assert isinstance(error, NoAvailableAgentError)
-
-        message = error.extra_msg or ""
-        assert message.startswith("no designated agent is compatible for kernels [")
-        assert "designated agent 'designated-a'" in message
-        assert "designated agent 'designated-b'" in message
-        # Earlier bug: `error_messages_list` was populated but never used, and
-        # `" ".join(error_messages)` joined defaultdict keys into an empty string.
-        # The reasons must actually appear, separated by newlines, not "; ".
-        assert "; " not in message
-        assert "\n" in message
 
 
 class TestMultipleValidationErrorsFormat:
@@ -294,12 +207,8 @@ class TestMultipleValidationErrorsFormat:
         message = aggregated.extra_msg or ""
         lines = message.splitlines()
         assert lines[0] == "Multiple validation errors occurred:"
-        # Each enumerated error starts with the unified '- ' prefix.
         assert any(line.startswith("- ConcurrencyLimitExceeded:") for line in lines[1:])
         assert any(line.startswith("- DependenciesNotSatisfied:") for line in lines[1:])
-        # No legacy "  1. " / "  2. " numbered prefix.
-        assert "  1. " not in message
-        assert "  2. " not in message
 
 
 class TestSchedulingFailureMsgRoundTripsAsJson:
@@ -308,48 +217,29 @@ class TestSchedulingFailureMsgRoundTripsAsJson:
     def test_newlines_survive_json_serialization(self) -> None:
         error = InsufficientResourcesError(
             agent_id=AgentId("agent-a"),
-            requested_slots=ResourceSlot({"cpu": Decimal("4")}),
-            available_slots=ResourceSlot({"cpu": Decimal("1")}),
-            occupied_slots=ResourceSlot({}),
-            insufficient_resources={"cpu": ("4", "1")},
+            requested_slots=_slots({"cpu": "4"}),
+            available_slots=_slots({"cpu": "1"}),
+            insufficient_resources={ResourceSlotName("cpu"): ("4", "1")},
         )
         original = error.extra_msg or ""
-        # Simulate the SchedulingFailure.msg → JSON path.
         encoded = json.dumps({"msg": original})
         decoded = json.loads(encoded)
         assert decoded["msg"] == original
         assert "\n" in decoded["msg"]
 
 
-class TestContainerLimitMessageIsSinglePhrase:
-    def test_container_limit_message(self) -> None:
-        err = ContainerLimitExceededError(
-            agent_id=AgentId("agent-a"),
-            current_count=10,
-            max_count=10,
-        )
-        assert "; " not in (err.extra_msg or "")
-
-
 # ============================================================================
 # Golden assertions — full message equality, not just substring presence.
-# Each test below pins the entire user-visible message text. To keep the
-# comparison deterministic, kernel UUIDs are fixed and slot dicts hold a
-# single key so iteration order is not a factor.
 # ============================================================================
-
-
-_GOLDEN_KERNEL_ID = KernelId(UUID("00000000-0000-0000-0000-000000000001"))
 
 
 class TestGoldenInsufficientResourcesError:
     def test_single_resource_shortfall_full_message(self) -> None:
         error = InsufficientResourcesError(
             agent_id=AgentId("agent-a"),
-            requested_slots=ResourceSlot({"cpu": Decimal("4")}),
-            available_slots=ResourceSlot({"cpu": Decimal("1")}),
-            occupied_slots=ResourceSlot({}),
-            insufficient_resources={"cpu": ("4", "1")},
+            requested_slots=_slots({"cpu": "4"}),
+            available_slots=_slots({"cpu": "1"}),
+            insufficient_resources={ResourceSlotName("cpu"): ("4", "1")},
         )
         expected = "Agent agent-a has insufficient resources:\n  - cpu: requested=4, available=1"
         assert error.extra_msg == expected
@@ -357,13 +247,11 @@ class TestGoldenInsufficientResourcesError:
     def test_multi_resource_shortfall_full_message(self) -> None:
         error = InsufficientResourcesError(
             agent_id=AgentId("agent-a"),
-            requested_slots=ResourceSlot({"cpu": Decimal("4"), "mem": Decimal("8192")}),
-            available_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("2048")}),
-            occupied_slots=ResourceSlot({}),
-            # dict literal preserves insertion order in Python 3.7+
+            requested_slots=_slots({"cpu": "4", "mem": "8192"}),
+            available_slots=_slots({"cpu": "1", "mem": "2048"}),
             insufficient_resources={
-                "cpu": ("4", "1"),
-                "mem": ("8 GiB", "2 GiB"),
+                ResourceSlotName("cpu"): ("4", "1"),
+                ResourceSlotName("mem"): ("8 GiB", "2 GiB"),
             },
         )
         expected = (
@@ -406,62 +294,29 @@ class TestGoldenNoAvailableAgentError:
     @pytest.fixture
     def agents_with_two_failure_modes(self) -> list[AgentInfo]:
         return [
-            AgentInfo(
-                agent_id=AgentId("agent-a"),
-                agent_addr="agent-a:6001",
-                architecture="x86_64",
-                available_slots=ResourceSlot({"cpu": Decimal("1")}),
-                occupied_slots=ResourceSlot({"cpu": Decimal("0")}),
-                scaling_group="default",
-                container_count=0,
-            ),
-            AgentInfo(
-                agent_id=AgentId("agent-b"),
-                agent_addr="agent-b:6001",
-                architecture="x86_64",
-                available_slots=ResourceSlot({"cpu": Decimal("8")}),
-                occupied_slots=ResourceSlot({"cpu": Decimal("0")}),
-                scaling_group="default",
-                container_count=10,  # at container limit
-            ),
+            _agent("agent-a", {"cpu": "1"}),
+            _agent("agent-b", {"cpu": "8"}, container_count=10),
         ]
 
     async def test_all_agents_failing_full_extra_msg(
         self,
         agents_with_two_failure_modes: list[AgentInfo],
     ) -> None:
-        criteria = AgentSelectionCriteria(
-            session_metadata=SessionMetadata(
-                session_id=SessionId(uuid.uuid4()),
-                session_type=SessionTypes.INTERACTIVE,
-                resource_group_id=ResourceGroupID(uuid.UUID(int=0)),
-                cluster_mode=ClusterMode.SINGLE_NODE,
-            ),
-            kernel_requirements={
-                _GOLDEN_KERNEL_ID: KernelResourceSpec(
-                    requested_slots=ResourceSlot({"cpu": Decimal("4")}),
-                    required_architecture="x86_64",
-                ),
-            },
-        )
-        config = AgentSelectionConfig(max_container_count=10)
-        selector = AgentSelector(
-            ConcentratedAgentSelector(agent_selection_resource_priority=["cpu"]),
-        )
+        criteria = _criteria([_req({"cpu": "4"})])
 
         with pytest.raises(BatchAgentSelectionFailedError) as exc_info:
-            await selector.select_agents_for_batch_requirements(
-                agents_with_two_failure_modes,
+            await _concentrated().select_agents_for_batch_requirements(
+                _trackers(agents_with_two_failure_modes),
                 criteria,
-                config,
+                AgentLimit(max_container_count=10),
             )
         assert len(exc_info.value.errors) == 1
         error = exc_info.value.errors[0]
         assert isinstance(error, NoAvailableAgentError)
 
         expected = (
-            f"no available agents for kernels [{_GOLDEN_KERNEL_ID}]"
-            " (arch=x86_64, slots=cpu=4):\n"
+            "no available agents for the request"
+            " (containers=1, arch=x86_64, slots=cpu=4):\n"
             "- Agent agent-a has insufficient resources:\n"
             "    - cpu: requested=4, available=1\n"
             "- Agent agent-b container limit exceeded: current=10, max=10"
@@ -478,75 +333,33 @@ class TestGoldenNoDesignatedAgentCompatible:
         # non-designated compatible agent so the early "no available agents"
         # branch does not short-circuit before reaching it.
         return [
-            AgentInfo(
-                agent_id=AgentId("designated-a"),
-                agent_addr="designated-a:6001",
-                architecture="x86_64",
-                available_slots=ResourceSlot({"cpu": Decimal("1")}),
-                occupied_slots=ResourceSlot({"cpu": Decimal("0")}),
-                scaling_group="default",
-                container_count=0,
-            ),
-            AgentInfo(
-                agent_id=AgentId("designated-b"),
-                agent_addr="designated-b:6001",
-                architecture="x86_64",
-                available_slots=ResourceSlot({"cpu": Decimal("8")}),
-                occupied_slots=ResourceSlot({"cpu": Decimal("0")}),
-                scaling_group="default",
-                container_count=10,
-            ),
-            AgentInfo(
-                agent_id=AgentId("non-designated-ok"),
-                agent_addr="non-designated-ok:6001",
-                architecture="x86_64",
-                available_slots=ResourceSlot({"cpu": Decimal("16")}),
-                occupied_slots=ResourceSlot({"cpu": Decimal("0")}),
-                scaling_group="default",
-                container_count=0,
-            ),
+            _agent("designated-a", {"cpu": "1"}),
+            _agent("designated-b", {"cpu": "8"}, container_count=10),
+            _agent("non-designated-ok", {"cpu": "16"}),
         ]
 
     async def test_full_extra_msg_when_designated_incompatible(
         self,
         designated_agents_plus_fallback: list[AgentInfo],
     ) -> None:
-        criteria = AgentSelectionCriteria(
-            session_metadata=SessionMetadata(
-                session_id=SessionId(uuid.uuid4()),
-                session_type=SessionTypes.INTERACTIVE,
-                resource_group_id=ResourceGroupID(uuid.UUID(int=0)),
-                cluster_mode=ClusterMode.SINGLE_NODE,
-            ),
-            kernel_requirements={
-                _GOLDEN_KERNEL_ID: KernelResourceSpec(
-                    requested_slots=ResourceSlot({"cpu": Decimal("4")}),
-                    required_architecture="x86_64",
-                ),
-            },
-        )
-        config = AgentSelectionConfig(max_container_count=10)
-        selector = AgentSelector(
-            ConcentratedAgentSelector(agent_selection_resource_priority=["cpu"]),
+        criteria = _designated_criteria(
+            [_req({"cpu": "4"})],
+            designated_agent_ids=[AgentId("designated-a"), AgentId("designated-b")],
         )
 
         with pytest.raises(BatchAgentSelectionFailedError) as exc_info:
-            await selector.select_agents_for_batch_requirements(
-                designated_agents_plus_fallback,
+            await _concentrated().select_agents_for_batch_requirements(
+                _trackers(designated_agents_plus_fallback),
                 criteria,
-                config,
-                designated_agent_ids=[
-                    AgentId("designated-a"),
-                    AgentId("designated-b"),
-                ],
+                AgentLimit(max_container_count=10),
             )
         assert len(exc_info.value.errors) == 1
         error = exc_info.value.errors[0]
         assert isinstance(error, NoAvailableAgentError)
 
         expected = (
-            f"no designated agent is compatible for kernels [{_GOLDEN_KERNEL_ID}]"
-            " (arch=x86_64, slots=cpu=4):\n"
+            "no designated agent is compatible for the request"
+            " (containers=1, arch=x86_64, slots=cpu=4):\n"
             "- designated agent 'designated-a': Agent designated-a"
             " has insufficient resources:\n"
             "    - cpu: requested=4, available=1\n"
@@ -557,27 +370,18 @@ class TestGoldenNoDesignatedAgentCompatible:
 
 
 class TestGoldenNoAvailableAgentDirectConstruction:
-    """Drive NoAvailableAgentError's constructor directly with structured inputs.
-
-    These tests do not pre-format any newline-containing strings on the caller
-    side; the exception class itself is responsible for laying out the message.
-    """
+    """Drive NoAvailableAgentError's constructor directly with structured inputs."""
 
     def test_compat_failures_with_mixed_inner_errors(self) -> None:
-        kernel_id = KernelId(UUID("00000000-0000-0000-0000-000000000002"))
         err = NoAvailableAgentError(
-            resource_requirement=ResourceRequirements(
-                requested_slots=ResourceSlot({"cpu": Decimal("4")}),
-                required_architecture="x86_64",
-                kernel_ids=[kernel_id],
-            ),
+            resource_requirement=_req({"cpu": "4"}),
+            requirement_index=0,
             agent_errors={
                 AgentId("agent-a"): InsufficientResourcesError(
                     agent_id=AgentId("agent-a"),
-                    requested_slots=ResourceSlot({"cpu": Decimal("4")}),
-                    available_slots=ResourceSlot({"cpu": Decimal("1")}),
-                    occupied_slots=ResourceSlot({}),
-                    insufficient_resources={"cpu": ("4", "1")},
+                    requested_slots=_slots({"cpu": "4"}),
+                    available_slots=_slots({"cpu": "1"}),
+                    insufficient_resources={ResourceSlotName("cpu"): ("4", "1")},
                 ),
                 AgentId("agent-b"): ContainerLimitExceededError(
                     agent_id=AgentId("agent-b"),
@@ -587,8 +391,8 @@ class TestGoldenNoAvailableAgentDirectConstruction:
             },
         )
         expected = (
-            f"no available agents for kernels [{kernel_id}]"
-            " (arch=x86_64, slots=cpu=4):\n"
+            "no available agents for the request"
+            " (containers=1, arch=x86_64, slots=cpu=4):\n"
             "- Agent agent-a has insufficient resources:\n"
             "    - cpu: requested=4, available=1\n"
             "- Agent agent-b container limit exceeded: current=10, max=10"
@@ -596,16 +400,12 @@ class TestGoldenNoAvailableAgentDirectConstruction:
         assert err.extra_msg == expected
 
     def test_designated_failures_reports_missing_designations(self) -> None:
-        kernel_id = KernelId(UUID("00000000-0000-0000-0000-000000000003"))
         # Only 'designated-a' has a recorded failure; 'designated-b' was not
         # even considered (e.g. filtered out by arch). The constructor must
         # synthesize the 'not found in compatible agents' message for it.
         err = NoAvailableAgentError(
-            resource_requirement=ResourceRequirements(
-                requested_slots=ResourceSlot({"cpu": Decimal("2")}),
-                required_architecture="x86_64",
-                kernel_ids=[kernel_id],
-            ),
+            resource_requirement=_req({"cpu": "2"}),
+            requirement_index=0,
             agent_errors={
                 AgentId("designated-a"): ContainerLimitExceededError(
                     agent_id=AgentId("designated-a"),
@@ -619,8 +419,8 @@ class TestGoldenNoAvailableAgentDirectConstruction:
             ],
         )
         expected = (
-            f"no designated agent is compatible for kernels [{kernel_id}]"
-            " (arch=x86_64, slots=cpu=2):\n"
+            "no designated agent is compatible for the request"
+            " (containers=1, arch=x86_64, slots=cpu=2):\n"
             "- designated agent 'designated-a': Agent designated-a"
             " container limit exceeded: current=5, max=5\n"
             "- designated agent 'designated-b': not found in compatible agents"

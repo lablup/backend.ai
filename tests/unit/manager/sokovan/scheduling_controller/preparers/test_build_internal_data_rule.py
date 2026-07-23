@@ -2,7 +2,7 @@
 
 Verifies the session-level overlay onto per-kernel ``internal_data``:
 
-  * ``context.dotfile_data`` (dotfiles + optional ssh_keypair) flows onto every kernel draft
+  * ``context.user.dotfiles`` (dotfiles + optional ssh_keypair) flows onto every kernel draft
   * ``model_definition_path`` / ``model_definition`` / ``sudo_session_enabled``
     are added only when their input values are present
   * caller-pre-populated keys on a kernel's ``internal_data`` survive
@@ -22,19 +22,25 @@ from ai.backend.manager.data.dotfile.types import (
     DotfileEntry,
     SSHKeypair,
 )
+from ai.backend.manager.data.resource.types import SlotTypeInfo
+from ai.backend.manager.data.session.creation import ContainerUserInfo
 from ai.backend.manager.data.session.draft import (
     KernelSpecDraft,
+    ResourceSpecDraft,
     SessionResourceSpecDraft,
 )
 from ai.backend.manager.data.session.options import (
     DefaultSessionOptions,
     InternalDataExtras,
 )
-from ai.backend.manager.sokovan.scheduling_controller.preparers.build_internal_data_rule import (
+from ai.backend.manager.sokovan.scheduling_controller.preparers.specs.build_internal_data_rule import (
     BuildInternalDataRule,
 )
-from ai.backend.manager.sokovan.scheduling_controller.preparers.draft_rule import (
-    SessionSpecPreparationContext,
+from ai.backend.manager.views.sokovan.session_creation import (
+    GlobalEnqueueInfo,
+    ResourceGroupEnqueueInfo,
+    SessionSpecContext,
+    UserEnqueueInfo,
 )
 
 
@@ -43,10 +49,25 @@ def rule() -> BuildInternalDataRule:
     return BuildInternalDataRule()
 
 
-def _context(*, dotfile_data: DotfileBundle | None = None) -> SessionSpecPreparationContext:
-    return SessionSpecPreparationContext(
-        resource_group_defaults=DefaultSessionOptions(),
-        dotfile_data=dotfile_data or DotfileBundle(),
+def _context(*, dotfiles: DotfileBundle | None = None) -> SessionSpecContext:
+    return SessionSpecContext(
+        resource_group=ResourceGroupEnqueueInfo(
+            defaults=DefaultSessionOptions(),
+            network=None,
+            allow_fractional=False,
+            served_slot_names=frozenset(),
+        ),
+        user=UserEnqueueInfo(
+            policy=None,
+            container_user=ContainerUserInfo(),
+            dotfiles=dotfiles or DotfileBundle(),
+            pending_session_count=0,
+            vfolder_mounts_by_role={},
+        ),
+        global_info=GlobalEnqueueInfo(
+            image_infos={},
+            slot_type_info=SlotTypeInfo(types={}, required=frozenset()),
+        ),
     )
 
 
@@ -57,7 +78,7 @@ def _draft(
     model_definition: Mapping[str, Any] | None = None,
 ) -> SessionResourceSpecDraft:
     return SessionResourceSpecDraft(
-        kernel_specs=kernels,
+        resource=ResourceSpecDraft(kernel_specs=kernels),
         internal_data_extras=InternalDataExtras(
             sudo_session_enabled=sudo_session_enabled,
             model_definition_path=model_definition_path,
@@ -81,9 +102,9 @@ class TestBuildInternalDataRule:
         )
         draft = _draft(KernelSpecDraft(cluster_role="main"))
 
-        result = await rule.prepare(draft, _context(dotfile_data=bundle))
+        result = await rule.prepare(draft, _context(dotfiles=bundle))
 
-        kernel = result.kernel_specs[0]
+        kernel = result.resource.kernel_specs[0]
         assert kernel.internal_data["dotfiles"] == [
             {"path": "/etc/profile.d/bai.sh", "perm": "755", "data": "echo hi"},
         ]
@@ -100,7 +121,7 @@ class TestBuildInternalDataRule:
             model_definition={"kind": "Model", "name": "foo"},
         )
         result = await rule.prepare(draft, _context())
-        kernel = result.kernel_specs[0]
+        kernel = result.resource.kernel_specs[0]
         assert kernel.internal_data["model_definition_path"] == "/models/foo.yaml"
         assert kernel.internal_data["model_definition"] == {
             "kind": "Model",
@@ -115,7 +136,7 @@ class TestBuildInternalDataRule:
 
         on_draft = _draft(KernelSpecDraft(cluster_role="main"), sudo_session_enabled=True)
         on = await rule.prepare(on_draft, _context())
-        assert on.kernel_specs[0].internal_data == {"sudo_session_enabled": True}
+        assert on.resource.kernel_specs[0].internal_data == {"sudo_session_enabled": True}
 
     async def test_overlay_overrides_caller_keys_on_conflict(
         self, rule: BuildInternalDataRule
@@ -132,7 +153,7 @@ class TestBuildInternalDataRule:
             sudo_session_enabled=True,
         )
         result = await rule.prepare(draft, _context())
-        kernel = result.kernel_specs[0]
+        kernel = result.resource.kernel_specs[0]
         assert kernel.internal_data["sudo_session_enabled"] is True
         assert kernel.internal_data["prevent_vfolder_mounts"] is True
 
@@ -144,5 +165,5 @@ class TestBuildInternalDataRule:
             sudo_session_enabled=True,
         )
         result = await rule.prepare(draft, _context())
-        for k in result.kernel_specs:
+        for k in result.resource.kernel_specs:
             assert k.internal_data["sudo_session_enabled"] is True

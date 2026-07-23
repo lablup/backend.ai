@@ -27,8 +27,8 @@ from ai.backend.manager.repositories.scheduler.db_source.db_source import Schedu
 from .conftest import (
     create_pending_session_with_kernels,
     fetch_agent_resources,
-    make_allocation_batch,
     make_creation_info,
+    make_session_allocations,
     seed_agent_resources,
 )
 
@@ -101,14 +101,10 @@ class TestReservedConcurrency:
             )
             cpu_by_session[session_id] = sum((cpu for _, cpu, _ in spec), Decimal("0"))
             batches.append(
-                make_allocation_batch(
+                make_session_allocations(
                     session_id=session_id,
-                    scaling_group_name=test_scaling_group_name,
-                    resource_group_id=test_scaling_group_id,
-                    access_key=test_access_key,
                     kernel_assignments=[
-                        (kernel_ids[i], agent_id, cpu, mem)
-                        for i, (agent_id, cpu, mem) in enumerate(spec)
+                        (kernel_ids[i], agent_id) for i, (agent_id, _cpu, _mem) in enumerate(spec)
                     ],
                 )
             )
@@ -176,12 +172,9 @@ class TestReservedConcurrency:
                 agent_assignments=[(test_agent_id, Decimal("2"), Decimal("2048"))],
             )
             kernel_id = kernel_ids[0]
-            batch = make_allocation_batch(
+            batch = make_session_allocations(
                 session_id=session_id,
-                scaling_group_name=test_scaling_group_name,
-                resource_group_id=test_scaling_group_id,
-                access_key=test_access_key,
-                kernel_assignments=[(kernel_id, test_agent_id, Decimal("2"), Decimal("2048"))],
+                kernel_assignments=[(kernel_id, test_agent_id)],
             )
             allocated = await db_source.allocate_sessions(batch)
             if not allocated:
@@ -242,12 +235,9 @@ class TestReservedConcurrency:
                 agent_assignments=[(test_agent_id, Decimal("2"), Decimal("2048"))],
             )
             kernel_id = kernel_ids[0]
-            batch = make_allocation_batch(
+            batch = make_session_allocations(
                 session_id=session_id,
-                scaling_group_name=test_scaling_group_name,
-                resource_group_id=test_scaling_group_id,
-                access_key=test_access_key,
-                kernel_assignments=[(kernel_id, test_agent_id, Decimal("2"), Decimal("2048"))],
+                kernel_assignments=[(kernel_id, test_agent_id)],
             )
             await db_source.allocate_sessions(batch)
             if run:

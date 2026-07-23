@@ -2,7 +2,8 @@ from collections.abc import Sequence
 from typing import override
 
 from ai.backend.common.identifier.resource_group import ResourceGroupID
-from ai.backend.manager.data.sokovan import SessionWorkload, SystemSnapshot
+from ai.backend.manager.views.sokovan.snapshot import SystemSnapshot
+from ai.backend.manager.views.sokovan.workload import SessionWorkload
 
 from .sequencer import WorkloadSequencer
 

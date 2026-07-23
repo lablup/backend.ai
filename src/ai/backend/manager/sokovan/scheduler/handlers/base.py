@@ -7,11 +7,11 @@ from collections.abc import Sequence
 
 from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.manager.data.session.types import StatusTransitions
-from ai.backend.manager.data.sokovan import SessionWithKernels
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.models.kernel import KernelStatus
 from ai.backend.manager.models.session import SessionStatus
 from ai.backend.manager.sokovan.scheduler.results import SessionExecutionResult
+from ai.backend.manager.views.sokovan.lifecycle import SessionWithKernels
 
 
 class SessionLifecycleHandler(ABC):

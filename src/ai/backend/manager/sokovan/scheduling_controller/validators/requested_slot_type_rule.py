@@ -2,7 +2,7 @@
 
 Every ``resource_type`` in a kernel's requested resource list must be
 served by some non-terminated agent in the requested resource group.
-The context's ``known_slot_types`` is sourced from ``agent_resources``
+The context's ``served_slot_names`` is sourced from ``agent_resources``
 joined with ``agents`` (status != TERMINATED) and
 ``resource_slot_types``, so it reflects the RG's hardware inventory and
 the registered unit metadata in one mapping.
@@ -22,8 +22,10 @@ from ai.backend.manager.data.session.spec import SessionSpec
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.sokovan.scheduling_controller.resource_parse import parse_quantity
 from ai.backend.manager.sokovan.scheduling_controller.validators.session_spec_base import (
-    SessionSpecValidationContext,
     SessionSpecValidatorRule,
+)
+from ai.backend.manager.views.sokovan.session_creation import (
+    SessionSpecContext,
 )
 
 
@@ -38,9 +40,9 @@ class RequestedSlotTypeRule(SessionSpecValidatorRule):
     def validate(
         self,
         spec: SessionSpec,
-        context: SessionSpecValidationContext,
+        context: SessionSpecContext,
     ) -> None:
-        rg_slot_types = context.known_slot_types
+        rg_slot_types = context.resource_group.served_slot_names
         if not rg_slot_types:
             raise InvalidAPIParameters(
                 extra_msg=(

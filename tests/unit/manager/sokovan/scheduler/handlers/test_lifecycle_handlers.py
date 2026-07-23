@@ -13,22 +13,12 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Callable
-from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.data.sokovan import (
-    SessionsForPullWithImages,
-    SessionsForStartWithImages,
-    SessionWithKernels,
-)
-from ai.backend.manager.data.sokovan.allocation import SchedulingFailure
-from ai.backend.manager.repositories.scheduler.types.session import (
-    TerminatingSessionData,
-)
 from ai.backend.manager.sokovan.scheduler.handlers.lifecycle.check_precondition import (
     CheckPreconditionLifecycleHandler,
 )
@@ -42,10 +32,15 @@ from ai.backend.manager.sokovan.scheduler.handlers.lifecycle.terminate_sessions 
     TerminateSessionsLifecycleHandler,
 )
 from ai.backend.manager.sokovan.scheduler.results import ScheduleResult
-
-if TYPE_CHECKING:
-    pass
-
+from ai.backend.manager.views.sokovan.allocation import SchedulingFailure
+from ai.backend.manager.views.sokovan.lifecycle import (
+    SessionsForPullWithImages,
+    SessionsForStartWithImages,
+    SessionWithKernels,
+)
+from ai.backend.manager.views.sokovan.session import (
+    TerminatingSessionData,
+)
 
 # =============================================================================
 # ScheduleSessionsLifecycleHandler Tests (SC-SS-001 ~ SC-SS-005)
@@ -87,7 +82,7 @@ class TestScheduleSessionsLifecycleHandler:
         """
         # Arrange
         mock_repository.get_scheduling_data.return_value = MagicMock()
-        mock_provisioner.schedule_scaling_group.return_value = schedule_result_success_factory(
+        mock_provisioner.schedule_resource_group.return_value = schedule_result_success_factory(
             pending_sessions_multiple
         )
 
@@ -120,7 +115,7 @@ class TestScheduleSessionsLifecycleHandler:
         # Arrange - Only first session is scheduled
         first_session = pending_sessions_multiple[0]
         mock_repository.get_scheduling_data.return_value = MagicMock()
-        mock_provisioner.schedule_scaling_group.return_value = ScheduleResult(
+        mock_provisioner.schedule_resource_group.return_value = ScheduleResult(
             scheduled_session_ids=[first_session.session_info.identity.id],
             scheduling_failures=[],
         )
@@ -154,7 +149,7 @@ class TestScheduleSessionsLifecycleHandler:
         """
         # Arrange - No sessions scheduled, no failures reported
         mock_repository.get_scheduling_data.return_value = MagicMock()
-        mock_provisioner.schedule_scaling_group.return_value = ScheduleResult(
+        mock_provisioner.schedule_resource_group.return_value = ScheduleResult(
             scheduled_session_ids=[],
             scheduling_failures=[],
         )
@@ -187,7 +182,7 @@ class TestScheduleSessionsLifecycleHandler:
         """
         # Arrange - All sessions fail scheduling
         mock_repository.get_scheduling_data.return_value = MagicMock()
-        mock_provisioner.schedule_scaling_group.return_value = ScheduleResult(
+        mock_provisioner.schedule_resource_group.return_value = ScheduleResult(
             scheduled_session_ids=[],
             scheduling_failures=[
                 SchedulingFailure(
@@ -225,7 +220,7 @@ class TestScheduleSessionsLifecycleHandler:
         # Arrange
         scheduled_session, failed_session, *rest = pending_sessions_multiple
         mock_repository.get_scheduling_data.return_value = MagicMock()
-        mock_provisioner.schedule_scaling_group.return_value = ScheduleResult(
+        mock_provisioner.schedule_resource_group.return_value = ScheduleResult(
             scheduled_session_ids=[scheduled_session.session_info.identity.id],
             scheduling_failures=[
                 SchedulingFailure(
@@ -271,7 +266,7 @@ class TestScheduleSessionsLifecycleHandler:
         assert len(result.failures) == 0
 
         # Verify provisioner was not called
-        mock_provisioner.schedule_scaling_group.assert_not_awaited()
+        mock_provisioner.schedule_resource_group.assert_not_awaited()
         mock_repository.get_scheduling_data.assert_not_awaited()
 
     async def test_no_scheduling_data_skips_all_sessions(
@@ -281,16 +276,14 @@ class TestScheduleSessionsLifecycleHandler:
         mock_repository: AsyncMock,
         pending_sessions_multiple: list[SessionWithKernels],
     ) -> None:
-        """SC-SS-005: No pending sessions in scheduling data skips all sessions.
+        """SC-SS-005: Missing scheduling data skips all sessions.
 
-        Given: Repository returns scheduling data with no pending sessions
+        Given: Repository returns no scheduling data for the resource group
         When: Handler is invoked
         Then: All sessions marked as skipped with appropriate reason
         """
         # Arrange
-        mock_scheduling_data = MagicMock()
-        mock_scheduling_data.pending_sessions.sessions = []
-        mock_repository.get_scheduling_data.return_value = mock_scheduling_data
+        mock_repository.get_scheduling_data.return_value = None
 
         # Act
         result = await handler.execute(ResourceGroupID(uuid.uuid4()), pending_sessions_multiple)
@@ -305,7 +298,7 @@ class TestScheduleSessionsLifecycleHandler:
             assert skipped.reason == "no-scheduling-data"
 
         # Verify provisioner was not called
-        mock_provisioner.schedule_scaling_group.assert_not_awaited()
+        mock_provisioner.schedule_resource_group.assert_not_awaited()
 
 
 # =============================================================================

@@ -68,6 +68,7 @@ from .exception import (
 # ``from ai.backend.common.types import ImageID`` sites keep working and
 # will be removed once call sites are migrated.
 from .identifier.image import ImageID
+from .identifier.resource_slot import ResourceSlotName
 from .identifier.vfolder import VFolderUUID
 from .models.minilang.mount import MountPointParser
 
@@ -405,7 +406,6 @@ RuleId = NewType("RuleId", UUID)
 SessionId = NewType("SessionId", UUID)
 KernelId = NewType("KernelId", UUID)
 ImageAlias = NewType("ImageAlias", str)
-ArchName = NewType("ArchName", str)
 Subdomain = NewType("Subdomain", str)
 
 ResourceGroupID = NewType("ResourceGroupID", str)
@@ -1409,14 +1409,16 @@ class ResourceSlotEntry(BackendAISchema):
     layers without re-shaping.
     """
 
-    resource_type: str = Field(description="Resource type identifier (e.g., 'cpu', 'mem').")
+    resource_type: ResourceSlotName = Field(
+        description="Resource type identifier (e.g., 'cpu', 'mem')."
+    )
     quantity: str = Field(description="Quantity of the resource as a decimal string.")
 
     @classmethod
     def from_resource_slot(cls, slot: ResourceSlot) -> list[ResourceSlotEntry]:
         """Project a legacy ``ResourceSlot`` into an entry list."""
         return [
-            cls(resource_type=str(k), quantity=_stringify_number(Decimal(v)))
+            cls(resource_type=ResourceSlotName(str(k)), quantity=_stringify_number(Decimal(v)))
             for k, v in slot.items()
             if v is not None
         ]

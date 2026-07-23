@@ -1,195 +1,31 @@
-"""Session related types."""
+"""Repository-internal session fetch types."""
 
 from dataclasses import dataclass
-from datetime import datetime
 from functools import cached_property
-from uuid import UUID
 
-from ai.backend.common.identifier.resource_group import ResourceGroupID
-from ai.backend.common.types import (
-    AccessKey,
-    AgentId,
-    ClusterMode,
-    KernelId,
-    ResourceSlot,
-    SessionId,
-    SessionTypes,
-)
-from ai.backend.manager.data.kernel.types import KernelStatus
-from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.data.sokovan import KernelWorkload, SessionWorkload
-
-
-@dataclass
-class KernelData:
-    """Kernel data for scheduling."""
-
-    id: UUID
-    image: str
-    architecture: str
-    requested_slots: ResourceSlot
-    agent: AgentId | None
-
-    def to_kernel_workload(self) -> KernelWorkload:
-        """Convert to KernelWorkload entity."""
-        return KernelWorkload(
-            kernel_id=self.id,
-            image=self.image,
-            architecture=self.architecture,
-            requested_slots=self.requested_slots,
-        )
-
-
-@dataclass
-class PendingSessionData:
-    """Pending session data for scheduling."""
-
-    id: SessionId
-    access_key: AccessKey
-    requested_slots: ResourceSlot
-    user_uuid: UUID
-    group_id: UUID
-    domain_name: str
-    scaling_group_name: str
-    resource_group_id: ResourceGroupID
-    priority: int
-    job_priority: int
-    is_preemptible: bool
-    session_type: SessionTypes
-    cluster_mode: ClusterMode
-    starts_at: datetime | None
-    is_private: bool
-    designated_agent_ids: list[AgentId] | None
-    kernels: list[KernelData]
-
-    def to_session_workload(self) -> SessionWorkload:
-        """Convert to SessionWorkload entity."""
-        kernel_workloads = [k.to_kernel_workload() for k in self.kernels]
-        return SessionWorkload(
-            session_id=self.id,
-            access_key=self.access_key,
-            requested_slots=self.requested_slots,
-            user_uuid=self.user_uuid,
-            group_id=self.group_id,
-            domain_name=self.domain_name,
-            scaling_group=self.scaling_group_name,
-            resource_group_id=self.resource_group_id,
-            priority=self.priority,
-            job_priority=self.job_priority,
-            session_type=self.session_type,
-            cluster_mode=self.cluster_mode,
-            starts_at=self.starts_at,
-            is_private=self.is_private,
-            is_preemptible=self.is_preemptible,
-            kernels=kernel_workloads,
-            designated_agent_ids=self.designated_agent_ids,
-        )
+from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.project import ProjectID
+from ai.backend.common.identifier.user import UserID
+from ai.backend.manager.views.sokovan.workload import SessionWorkload
 
 
 @dataclass
 class PendingSessions:
-    """Wrapper for pending sessions with cached properties for entity extraction."""
+    """Wrapper for pending session workloads with cached owner-key extraction."""
 
-    sessions: list[PendingSessionData]
-
-    @cached_property
-    def access_keys(self) -> set[AccessKey]:
-        """Extract unique access keys from pending sessions."""
-        return {s.access_key for s in self.sessions}
+    sessions: list[SessionWorkload]
 
     @cached_property
-    def user_uuids(self) -> set[UUID]:
-        """Extract unique user UUIDs from pending sessions."""
-        return {s.user_uuid for s in self.sessions}
+    def user_uuids(self) -> set[UserID]:
+        """Extract unique user IDs from pending sessions."""
+        return {s.meta.owner.user_uuid for s in self.sessions}
 
     @cached_property
-    def group_ids(self) -> set[UUID]:
-        """Extract unique group IDs from pending sessions."""
-        return {s.group_id for s in self.sessions}
+    def project_ids(self) -> set[ProjectID]:
+        """Extract unique project IDs from pending sessions."""
+        return {s.meta.owner.project_id for s in self.sessions}
 
     @cached_property
-    def domain_names(self) -> set[str]:
-        """Extract unique domain names from pending sessions."""
-        return {s.domain_name for s in self.sessions}
-
-
-@dataclass
-class TerminatingKernelData:
-    """Kernel data for termination processing."""
-
-    kernel_id: KernelId
-    status: KernelStatus
-    container_id: str | None
-    agent_id: AgentId | None
-    agent_addr: str | None
-    occupied_slots: ResourceSlot
-
-
-@dataclass
-class TerminatingSessionData:
-    """Data for a session that needs to be terminated."""
-
-    session_id: SessionId
-    access_key: AccessKey
-    creation_id: str
-    status: SessionStatus
-    status_info: str
-    session_type: SessionTypes
-    kernels: list[TerminatingKernelData]
-
-
-@dataclass
-class TerminatingKernelWithAgentData:
-    """Kernel data with agent status for lost agent cleanup."""
-
-    kernel_id: KernelId
-    session_id: SessionId
-    status: KernelStatus
-    agent_id: AgentId | None
-    agent_status: str | None  # Agent status from AgentRow
-
-
-@dataclass
-class KernelTerminationResult:
-    """Result of termination for a single kernel."""
-
-    kernel_id: KernelId
-    agent_id: AgentId | None
-    occupied_slots: ResourceSlot
-    success: bool
-    error: str | None = None
-
-
-@dataclass
-class SweptSessionInfo:
-    """Information about a session that was swept during cleanup."""
-
-    session_id: SessionId
-    creation_id: str
-    access_key: AccessKey
-
-
-@dataclass
-class MarkTerminatingResult:
-    """Result of marking sessions for termination."""
-
-    cancelled_sessions: list[SessionId]  # Sessions that were cancelled (PENDING)
-    terminating_sessions: list[SessionId]  # Sessions marked as TERMINATING
-    force_terminated_sessions: list[SessionId]  # Sessions directly set to TERMINATED (forced)
-    skipped_sessions: list[
-        SessionId
-    ]  # Sessions not processed (already terminated, not found, etc.)
-
-    def has_processed(self) -> bool:
-        """Check if any sessions were actually processed (state changed)."""
-        return bool(
-            self.cancelled_sessions or self.terminating_sessions or self.force_terminated_sessions
-        )
-
-    def processed_count(self) -> int:
-        """Get count of sessions that were actually processed."""
-        return (
-            len(self.cancelled_sessions)
-            + len(self.terminating_sessions)
-            + len(self.force_terminated_sessions)
-        )
+    def domain_ids(self) -> set[DomainID]:
+        """Extract unique domain IDs from pending sessions."""
+        return {s.meta.owner.domain_id for s in self.sessions}

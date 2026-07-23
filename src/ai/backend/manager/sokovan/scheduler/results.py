@@ -12,8 +12,8 @@ from ai.backend.common.types import (
     SessionId,
 )
 from ai.backend.manager.data.kernel.types import KernelStatus
-from ai.backend.manager.data.sokovan.allocation import SchedulingFailure
 from ai.backend.manager.models.session import SessionStatus
+from ai.backend.manager.views.sokovan.allocation import SchedulingFailure
 
 __all__ = ["ScheduleResult"]
 

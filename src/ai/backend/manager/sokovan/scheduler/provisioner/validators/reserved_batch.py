@@ -6,7 +6,8 @@ from typing import override
 from dateutil.tz import tzutc
 
 from ai.backend.common.types import SessionTypes
-from ai.backend.manager.data.sokovan import SessionWorkload, SystemSnapshot
+from ai.backend.manager.views.sokovan.snapshot import SystemSnapshot
+from ai.backend.manager.views.sokovan.workload import SessionWorkload
 
 from .exceptions import ReservedBatchSessionNotReady
 from .validator import ValidatorRule

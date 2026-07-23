@@ -7,24 +7,31 @@ importing the selection logic. These types depend only on common value types.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping
 from dataclasses import dataclass
+from decimal import Decimal
 
-from ai.backend.common.types import AgentId, KernelId, ResourceSlot
+from ai.backend.common.identifier.architecture import ArchName
+from ai.backend.common.identifier.resource_slot import ResourceSlotName
+from ai.backend.common.types import AgentId
+from ai.backend.manager.views.sokovan.workload import ResourceRequest
 
 
 @dataclass
 class ResourceRequirements:
-    """Resource requirements for allocation."""
+    """One placement requirement: the slots, architecture, and container
+    count a single agent must be able to host.
+
+    For single-node sessions this is the whole session aggregated; for
+    multi-node sessions there is one requirement per container.
+    """
 
     # Resource slots required
-    requested_slots: ResourceSlot
+    requested_slots: ResourceRequest
     # Architecture required
-    required_architecture: str
-    # Kernel IDs that these requirements are for
-    # For single-node, this includes all kernel IDs
-    # For multi-node, this includes only one kernel ID
-    kernel_ids: Sequence[KernelId]
+    required_architecture: ArchName
+    # Number of containers this requirement puts on the selected agent
+    container_count: int
 
 
 @dataclass
@@ -42,5 +49,5 @@ class RemediationHint:
 
     available_archs: list[str] | None = None
     available_agent_ids: list[AgentId] | None = None
-    required_reduction: ResourceSlot | None = None
+    required_reduction: Mapping[ResourceSlotName, Decimal] | None = None
     required_container_reduction: int | None = None

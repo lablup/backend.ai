@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import logging
+from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from datetime import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 if TYPE_CHECKING:
@@ -13,6 +14,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.data.session.draft import SessionSpecDraft
     from ai.backend.manager.data.session.spec import SessionSpec
 
+from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.identifier.domain import DomainID, DomainName
@@ -28,23 +30,17 @@ from ai.backend.common.types import (
     AccessKey,
     AgentId,
     SessionId,
-    SlotName,
-    SlotTypes,
     VFolderMount,
+    VFolderMountOptions,
     VFolderMountRequest,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.dotfile.types import DotfileBundle
 from ai.backend.manager.data.kernel.types import KernelListResult, KernelStatus
+from ai.backend.manager.data.resource.types import UserEnqueuePolicy
+from ai.backend.manager.data.session.creation import ContainerUserInfo
 from ai.backend.manager.data.session.types import SessionInfo, SessionStatus
-from ai.backend.manager.data.sokovan import (
-    AllocationBatch,
-    KernelCreationInfo,
-    SessionRunningData,
-    SessionsForPullWithImages,
-    SessionsForStartWithImages,
-    SessionWithKernels,
-)
 from ai.backend.manager.exceptions import ErrorStatusInfo
 from ai.backend.manager.models.scheduling_history.row import SessionSchedulingHistoryRow
 from ai.backend.manager.models.session import SessionRow
@@ -52,23 +48,38 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.base.creator import BulkCreator
 from ai.backend.manager.repositories.base.updater import BatchUpdater
+from ai.backend.manager.repositories.vfolder.mount import prepare_vfolder_mounts
 from ai.backend.manager.types import UserScope
-
-from .cache_source.cache_source import ScheduleCacheSource
-from .db_source.db_source import ScheduleDBSource
-from .types.base import SchedulingSpec
-from .types.scheduling import SchedulingData
-from .types.search import (
+from ai.backend.manager.views.sokovan.agent import AgentLimit, ResourceGroupResource
+from ai.backend.manager.views.sokovan.allocation import SessionAllocation
+from ai.backend.manager.views.sokovan.lifecycle import (
+    KernelCreationInfo,
+    SessionRunningData,
+    SessionsForPullWithImages,
+    SessionsForStartWithImages,
+    SessionWithKernels,
+)
+from ai.backend.manager.views.sokovan.scheduling import ComputeScheduleData, SchedulingData
+from ai.backend.manager.views.sokovan.search import (
     SessionWithKernelsAndUserSearchResult,
     SessionWithKernelsSearchResult,
 )
-from .types.session import (
+from ai.backend.manager.views.sokovan.session import (
     MarkTerminatingResult,
     SweptSessionInfo,
     TerminatingKernelWithAgentData,
     TerminatingSessionData,
 )
-from .types.session_creation import SessionSpecContextFetch
+from ai.backend.manager.views.sokovan.session_creation import SessionSpecContext, UserEnqueueInfo
+from ai.backend.manager.views.sokovan.snapshot import (
+    GlobalScopeSnapshot,
+    ResourceGroupScopeSnapshot,
+    SystemSnapshot,
+)
+from ai.backend.manager.views.sokovan.workload import SessionWorkload
+
+from .cache_source.cache_source import ScheduleCacheSource
+from .db_source.db_source import ScheduleDBSource
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -94,44 +105,124 @@ class SchedulerRepository:
     Repository that orchestrates between DB and cache sources for scheduling operations.
     """
 
+    _db: ExtendedAsyncSAEngine
     _db_source: ScheduleDBSource
     _cache_source: ScheduleCacheSource
+    _valkey_schedule: ValkeyScheduleClient
     _config_provider: ManagerConfigProvider
+    _storage_manager: StorageSessionManager
 
     def __init__(
         self,
         db: ExtendedAsyncSAEngine,
         valkey_stat: ValkeyStatClient,
+        valkey_schedule: ValkeyScheduleClient,
         config_provider: ManagerConfigProvider,
+        storage_manager: StorageSessionManager,
     ) -> None:
+        self._db = db
         self._db_source = ScheduleDBSource(db)
         self._cache_source = ScheduleCacheSource(valkey_stat)
+        self._valkey_schedule = valkey_schedule
         self._config_provider = config_provider
+        self._storage_manager = storage_manager
 
     @scheduler_repository_resilience.apply()
-    async def get_scheduling_data(self, resource_group_id: ResourceGroupID) -> SchedulingData:
+    async def get_scheduling_data(
+        self, resource_group_id: ResourceGroupID
+    ) -> SchedulingData | None:
+        """Assemble the complete read state of one scheduling run.
+
+        Composes the DB-side fetch with the per-agent retry hints (Valkey)
+        and the configured agent limit, so the returned snapshot is always
+        fully populated; ``None`` when there is nothing to schedule.
+        Raises ScalingGroupNotFound if the resource group doesn't exist.
         """
-        Get scheduling data from database.
-        Raises ScalingGroupNotFound if scaling group doesn't exist.
-        """
-        known_slot_types = await self._get_known_slot_types()
-        max_container_count = await self._get_max_container_count()
-        spec = SchedulingSpec(
-            known_slot_types=known_slot_types,
-            max_container_count=max_container_count,
+        fetch = await self._db_source.fetch_scheduling_fetch(resource_group_id)
+        if fetch is None:
+            return None
+        failed_sessions_by_agent = await self._fetch_failed_sessions_by_agent(fetch.workloads)
+        agent_limit = AgentLimit(max_container_count=await self._get_max_container_count())
+        system_snapshot = SystemSnapshot(
+            resource_group=ResourceGroupScopeSnapshot(
+                resources=ResourceGroupResource(
+                    agents=fetch.agents,
+                    failed_sessions_by_agent=failed_sessions_by_agent,
+                ),
+                session_dependencies=fetch.session_dependencies,
+                policy=fetch.policy,
+            ),
+            global_scope=GlobalScopeSnapshot(
+                occupancy=fetch.occupancy,
+                resource_policy=fetch.resource_policy,
+                agent_limit=agent_limit,
+            ),
+        )
+        return SchedulingData(
+            resource_group=fetch.resource_group,
+            workloads=fetch.workloads,
+            system_snapshot=system_snapshot,
         )
 
-        return await self._db_source.get_scheduling_data(resource_group_id, spec)
+    async def _fetch_failed_sessions_by_agent(
+        self, workloads: Sequence[SessionWorkload]
+    ) -> dict[AgentId, frozenset[SessionId]]:
+        """Invert the per-session failed-agent hints (Valkey) into the
+        per-agent view the selection trackers consume.
+
+        Uses a single pipelined batch request instead of N round-trips.
+        """
+        failed_agents_list = await self._valkey_schedule.get_multiple_session_failed_agents([
+            workload.meta.session_id for workload in workloads
+        ])
+        failed_sessions_by_agent: dict[AgentId, set[SessionId]] = defaultdict(set)
+        for workload, failed_agents in zip(workloads, failed_agents_list, strict=True):
+            for agent_id in failed_agents:
+                failed_sessions_by_agent[agent_id].add(workload.meta.session_id)
+        return {
+            agent_id: frozenset(session_ids)
+            for agent_id, session_ids in failed_sessions_by_agent.items()
+        }
 
     @scheduler_repository_resilience.apply()
-    async def allocate_sessions(self, allocation_batch: AllocationBatch) -> list[SessionId]:
+    async def fetch_compute_schedule_data(
+        self,
+        resource_group_id: ResourceGroupID,
+        image_ids: Sequence[ImageID],
+    ) -> ComputeScheduleData:
+        """Assemble the read bundle of the fitting check: the spec context
+        (mounts unresolved), the group's agents, and the same configured
+        agent limit the real scheduling pass enforces.
+        """
+        fetch = await self._db_source.fetch_compute_schedule_fetch(resource_group_id, image_ids)
+        return ComputeScheduleData(
+            # Resource-only assembly: the fitting check runs no validators
+            # and no user-scoped rules, so the user part carries the
+            # scope-less baseline instead of DB reads.
+            spec_context=SessionSpecContext(
+                resource_group=fetch.resource_group,
+                user=UserEnqueueInfo(
+                    policy=None,
+                    container_user=ContainerUserInfo(),
+                    dotfiles=DotfileBundle(),
+                    pending_session_count=0,
+                    vfolder_mounts_by_role={},
+                ),
+                global_info=fetch.global_info,
+            ),
+            resources=ResourceGroupResource(agents=fetch.agents),
+            limit=AgentLimit(max_container_count=await self._get_max_container_count()),
+        )
+
+    @scheduler_repository_resilience.apply()
+    async def allocate_sessions(self, allocations: list[SessionAllocation]) -> list[SessionId]:
         """
         Allocate sessions by reserving and assigning their kernels to agents.
 
         Returns:
             The ids of the sessions that were actually allocated.
         """
-        return await self._db_source.allocate_sessions(allocation_batch)
+        return await self._db_source.allocate_sessions(allocations)
 
     @scheduler_repository_resilience.apply()
     async def get_pending_timeout_sessions_by_ids(
@@ -140,7 +231,7 @@ class SchedulerRepository:
     ) -> list[SweptSessionInfo]:
         """
         Get sessions that have exceeded their pending timeout from given session IDs.
-        Used by SweepSessionsLifecycleHandler for scaling group based processing.
+        Used by SweepSessionsLifecycleHandler for resource group based processing.
         """
         return await self._db_source.get_pending_timeout_sessions_by_ids(session_ids)
 
@@ -165,9 +256,9 @@ class SchedulerRepository:
         )
 
     @scheduler_repository_resilience.apply()
-    async def get_all_scaling_groups(self) -> list[ResourceGroupID]:
-        """Get ids of all defined scaling groups."""
-        return await self._db_source.get_all_scaling_groups()
+    async def get_all_resource_groups(self) -> list[ResourceGroupID]:
+        """Get ids of all defined resource groups."""
+        return await self._db_source.get_all_resource_groups()
 
     @scheduler_repository_resilience.apply()
     async def get_terminating_sessions_by_ids(
@@ -193,15 +284,9 @@ class SchedulerRepository:
         """
         Get kernels in TERMINATING sessions that have lost or missing agents
         from given session IDs.
-        Used by SweepLostAgentKernelsLifecycleHandler for scaling group based processing.
+        Used by SweepLostAgentKernelsLifecycleHandler for resource group based processing.
         """
         return await self._db_source.get_terminating_kernels_with_lost_agents_by_ids(session_ids)
-
-    async def _get_known_slot_types(self) -> Mapping[SlotName, SlotTypes]:
-        """
-        Get known slot types from configuration.
-        """
-        return await self._config_provider.legacy_etcd_config_loader.get_resource_slots()
 
     async def _get_max_container_count(self) -> int | None:
         """
@@ -228,39 +313,96 @@ class SchedulerRepository:
         return await self._db_source.enqueue_session_from_spec(spec)
 
     @scheduler_repository_resilience.apply()
-    async def fetch_session_spec_contexts(
-        self,
-        draft: SessionSpecDraft,
-    ) -> SessionSpecContextFetch:
-        """Batch-fetch raw data needed to assemble the draft-path
-        preparation / validation contexts.
-
-        Thin passthrough to :meth:`ScheduleDBSource.fetch_session_spec_contexts`.
-        The scheduling controller converts the returned bundle into the
-        typed ``SessionSpecPreparationContext`` /
-        ``SessionSpecValidationContext`` pair — this split keeps the
-        repository layer free of sokovan internals.
-        """
-        return await self._db_source.fetch_session_spec_contexts(draft)
-
-    @scheduler_repository_resilience.apply()
-    async def resolve_vfolder_mounts_by_role(
+    async def fetch_session_spec_context(
         self,
         draft: SessionSpecDraft,
         *,
-        storage_manager: StorageSessionManager,
-        allowed_vfolder_types: list[str],
+        resolve_mounts: bool = True,
+    ) -> SessionSpecContext:
+        """Assemble the complete enqueue context of one draft.
+
+        Composes the DB-side batch fetch with the storage-manager vfolder
+        mount resolution, so callers never observe a partially built
+        context. Resource-only callers pass ``resolve_mounts=False``.
+        """
+        fetch = await self._db_source.fetch_session_spec_fetch(draft)
+        vfolder_mounts_by_role: dict[str, tuple[VFolderMount, ...]] = {}
+        if resolve_mounts:
+            vfolder_mounts_by_role = await self._resolve_vfolder_mounts_by_role(
+                draft, fetch.user.policy
+            )
+        return SessionSpecContext(
+            resource_group=fetch.resource_group,
+            user=fetch.user.to_info(vfolder_mounts_by_role),
+            global_info=fetch.global_info,
+        )
+
+    async def _resolve_vfolder_mounts_by_role(
+        self,
+        draft: SessionSpecDraft,
+        user_enqueue_policy: UserEnqueuePolicy | None,
     ) -> dict[str, tuple[VFolderMount, ...]]:
         """Resolve each kernel group's vfolder mounts, keyed by ``role``.
 
-        Separated from :meth:`fetch_session_spec_contexts` so callers that only
-        need kernel resource resolution can skip the storage-manager RPC.
+        Lives at the repository level because it composes a DB read with
+        the storage-manager RPC. Each group's request list resolves to a
+        single ``VFolderMount`` tuple that every replica sharing the role
+        copies verbatim.
         """
-        return await self._db_source.resolve_vfolder_mounts_by_role(
-            draft,
-            storage_manager=storage_manager,
-            allowed_vfolder_types=allowed_vfolder_types,
+        user_uuid = draft.resource_spec.identity.user_uuid
+        domain_name = str(draft.scope.domain_name) if draft.scope.domain_name else None
+        project_id = draft.scope.project_id
+        kernel_specs = tuple(draft.resource_spec.resource.options.kernel_groups or ())
+
+        vfolder_mounts_by_role: dict[str, tuple[VFolderMount, ...]] = {}
+        if domain_name is None or user_uuid is None:
+            return vfolder_mounts_by_role
+
+        allowed_vfolder_types = list(
+            await self._config_provider.legacy_etcd_config_loader.get_vfolder_types()
         )
+        # Only the allowed vfolder hosts of the already-fetched policy matter here.
+        resource_policy_dict: dict[str, Any] = {}
+        if user_enqueue_policy is not None:
+            resource_policy_dict = {
+                "allowed_vfolder_hosts": user_enqueue_policy.allowed_vfolder_hosts,
+            }
+
+        user_scope_for_mounts = UserScope(
+            domain_name=domain_name,
+            group_id=project_id if project_id is not None else UUID(int=0),
+            user_uuid=user_uuid,
+            user_role="user",
+        )
+        async with self._db.begin_readonly_read_committed() as conn:
+            for group in kernel_specs:
+                per_group_requests: list[VFolderMountRequest] = []
+                for entry in group.execution_spec.mounts:
+                    per_group_requests.append(
+                        VFolderMountRequest(
+                            ref=UUID(str(entry.vfolder_id)),
+                            dst_path=entry.mount_destination,
+                            options=VFolderMountOptions(
+                                permission=entry.mount_perm,
+                                subpath=entry.subpath,
+                            ),
+                        )
+                    )
+                # Always resolve mounts even when the request list is empty:
+                # ``prepare_vfolder_mounts`` injects dot-prefixed auto-mount
+                # vfolders regardless of explicit requests, so skipping here
+                # would silently drop them.
+                vfolder_mounts_by_role[group.role] = tuple(
+                    await prepare_vfolder_mounts(
+                        conn,
+                        self._storage_manager,
+                        allowed_vfolder_types,
+                        user_scope_for_mounts,
+                        resource_policy_dict,
+                        per_group_requests,
+                    )
+                )
+        return vfolder_mounts_by_role
 
     @scheduler_repository_resilience.apply()
     async def pick_default_resource_group(
@@ -310,26 +452,6 @@ class SchedulerRepository:
     @scheduler_repository_resilience.apply()
     async def get_domain_id_by_name(self, name: DomainName) -> DomainID:
         return await self._db_source.get_domain_id_by_name(name)
-
-    @scheduler_repository_resilience.apply()
-    async def prepare_vfolder_mounts(
-        self,
-        storage_manager: StorageSessionManager,
-        allowed_vfolder_types: Sequence[str],
-        user_scope: UserScope,
-        resource_policy: Mapping[str, object],
-        mount_requests: Sequence[VFolderMountRequest],
-    ) -> Sequence[VFolderMount]:
-        """
-        Prepare vfolder mounts for the session.
-        """
-        return await self._db_source.prepare_vfolder_mounts(
-            storage_manager,
-            list(allowed_vfolder_types),
-            user_scope,
-            dict(resource_policy),
-            list(mount_requests),
-        )
 
     @scheduler_repository_resilience.apply()
     async def check_available_image(self, image_id: ImageID, domain: str, user_uuid: UUID) -> None:
@@ -587,43 +709,16 @@ class SchedulerRepository:
     @scheduler_repository_resilience.apply()
     async def get_keypair_concurrency(self, access_key: AccessKey, is_sftp: bool = False) -> int:
         """
-        Get keypair concurrency with cache-through pattern.
-        First checks cache, falls back to DB if not cached, and updates cache.
+        Count the keypair's active sessions straight from the database.
+
+        The database is the single source of truth for concurrency; the
+        former Valkey counter cache has been removed.
 
         :param access_key: The access key to query
         :param is_sftp: Whether to get SFTP concurrency (True) or regular concurrency (False)
         :return: Current concurrency count
         """
-        # Try to get from cache first
-        try:
-            cached_value = await self._cache_source.get_keypair_concurrency(access_key, is_sftp)
-            if cached_value is not None:
-                return cached_value
-        except Exception as e:
-            log.warning(
-                "Failed to get keypair concurrency from cache for {}: {}",
-                access_key,
-                e,
-            )
-
-        # Cache miss - refresh both values from DB
         concurrency_data = await self._db_source.get_keypair_concurrencies_from_db(access_key)
-
-        # Update cache with both values at once
-        try:
-            await self._cache_source.set_keypair_concurrencies(
-                access_key,
-                concurrency_data.regular_count,
-                concurrency_data.sftp_count,
-            )
-        except Exception as e:
-            log.warning(
-                "Failed to update keypair concurrency cache for {}: {}",
-                access_key,
-                e,
-            )
-
-        # Return the requested value
         return concurrency_data.sftp_count if is_sftp else concurrency_data.regular_count
 
     @scheduler_repository_resilience.apply()
@@ -701,7 +796,7 @@ class SchedulerRepository:
         Uses SessionInfo and KernelInfo types for unified data representation.
 
         Args:
-            resource_group_id: The scaling group id to filter by (first parameter for consistency)
+            resource_group_id: The resource group id to filter by (first parameter for consistency)
             session_statuses: Session statuses to include
             kernel_statuses: Kernel statuses to filter by. If non-None, includes sessions
                            that have at least one kernel in these statuses (simple filtering).

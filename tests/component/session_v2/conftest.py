@@ -7,6 +7,7 @@ import uuid
 from collections.abc import AsyncIterator, Callable, Coroutine
 from dataclasses import dataclass
 from datetime import datetime
+from decimal import Decimal
 from typing import TYPE_CHECKING, Any, cast
 from unittest.mock import AsyncMock, MagicMock
 
@@ -62,6 +63,7 @@ from ai.backend.manager.models.rbac_models.association_scopes_entities import (
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
+from ai.backend.manager.models.resource_slot.row import AgentResourceRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.plugin.network import NetworkPluginContext
@@ -609,6 +611,21 @@ async def agent_factory(
                     compute_plugins={},
                 )
             )
+            # The scheduling read path sources capacity from the normalized
+            # agent_resources table (filled by heartbeat in production).
+            await conn.execute(
+                sa.insert(AgentResourceRow.__table__),
+                [
+                    {
+                        "agent_id": agent_id,
+                        "slot_name": slot_name,
+                        "capacity": Decimal(quantity),
+                        "reserved": Decimal(0),
+                        "used": Decimal(0),
+                    }
+                    for slot_name, quantity in available_slots.items()
+                ],
+            )
         created_ids.append(agent_id)
         return agent_id
 
@@ -616,6 +633,11 @@ async def agent_factory(
 
     if created_ids:
         async with db_engine.begin() as conn:
+            await conn.execute(
+                AgentResourceRow.__table__.delete().where(
+                    AgentResourceRow.__table__.c.agent_id.in_(created_ids)
+                )
+            )
             await conn.execute(
                 AgentRow.__table__.delete().where(AgentRow.__table__.c.id.in_(created_ids))
             )
@@ -649,7 +671,9 @@ async def compute_session_processors(
     scheduler_repository = SchedulerRepository(
         database_engine,
         valkey_clients.stat,
+        valkey_clients.schedule,
         config_provider,
+        storage_manager,
     )
     scheduling_controller = SchedulingController(
         SchedulingControllerArgs(

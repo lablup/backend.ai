@@ -4,7 +4,7 @@ These cover the BA-6134 ``agent_resources.reserved`` feature. The fixtures
 build the FK-complete set of rows required to exercise ``ScheduleDBSource``
 against a real database via ``with_tables``, and the module-level helpers seed
 agent capacity, create PENDING sessions with pending ``resource_allocations``,
-and assemble ``AllocationBatch`` values.
+and assemble ``SessionAllocation`` values.
 """
 
 from __future__ import annotations
@@ -36,12 +36,6 @@ from ai.backend.common.types import (
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.data.sokovan import AllocationBatch, KernelCreationInfo
-from ai.backend.manager.data.sokovan.allocation import (
-    AgentAllocation,
-    KernelAllocation,
-    SessionAllocation,
-)
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
@@ -68,6 +62,11 @@ from ai.backend.manager.models.scheduling_history.row import SessionSchedulingHi
 from ai.backend.manager.models.session import SessionDependencyRow, SessionRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.views.sokovan.allocation import (
+    KernelAllocation,
+    SessionAllocation,
+)
+from ai.backend.manager.views.sokovan.lifecycle import KernelCreationInfo
 from ai.backend.testutils.db import with_tables
 
 # Tables required to satisfy FK constraints for ScheduleDBSource, in dependency order.
@@ -487,49 +486,31 @@ async def create_pending_session_with_kernels(
     return session_id, kernel_ids
 
 
-def make_allocation_batch(
+def make_session_allocations(
     *,
     session_id: SessionId,
-    scaling_group_name: str,
-    resource_group_id: ResourceGroupID,
-    access_key: AccessKey,
-    kernel_assignments: list[tuple[KernelId, str, Decimal, Decimal]],
-) -> AllocationBatch:
-    """Assemble a single-session AllocationBatch.
+    kernel_assignments: list[tuple[KernelId, str]],
+) -> list[SessionAllocation]:
+    """Assemble a single-session allocation batch.
 
-    Each entry in ``kernel_assignments`` is ``(kernel_id, agent_id,
-    cpu_slot, mem_slot)``. The reservation amount is taken by the db_source
-    from the kernel's pending ``resource_allocations`` rows, so the slots given
-    here only feed the (unused-by-reservation) agent_allocations metadata.
+    Each entry in ``kernel_assignments`` is ``(kernel_id, agent_id)``. The
+    reservation amount is taken by the db_source from the kernel's pending
+    ``resource_allocations`` rows.
     """
     kernel_allocations = [
         KernelAllocation(
             kernel_id=kernel_id,
             agent_id=AgentId(agent_id),
             agent_addr=_AGENT_ADDR,
-            scaling_group=scaling_group_name,
-            resource_group_id=resource_group_id,
         )
-        for kernel_id, agent_id, _cpu, _mem in kernel_assignments
+        for kernel_id, agent_id in kernel_assignments
     ]
-    agent_slots: dict[str, list[ResourceSlot]] = {}
-    for _kernel_id, agent_id, cpu, mem in kernel_assignments:
-        agent_slots.setdefault(agent_id, []).append(ResourceSlot({"cpu": cpu, "mem": mem}))
-    agent_allocations = [
-        AgentAllocation(agent_id=AgentId(agent_id), allocated_slots=slots)
-        for agent_id, slots in agent_slots.items()
+    return [
+        SessionAllocation(
+            session_id=session_id,
+            kernel_allocations=kernel_allocations,
+        )
     ]
-    allocation = SessionAllocation(
-        session_id=session_id,
-        session_type=SessionTypes.INTERACTIVE,
-        cluster_mode=ClusterMode.SINGLE_NODE,
-        scaling_group=scaling_group_name,
-        resource_group_id=resource_group_id,
-        kernel_allocations=kernel_allocations,
-        agent_allocations=agent_allocations,
-        access_key=access_key,
-    )
-    return AllocationBatch(allocations=[allocation], failures=[])
 
 
 async def fetch_agent_resources(

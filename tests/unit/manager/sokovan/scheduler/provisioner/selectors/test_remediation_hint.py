@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Mapping
 from decimal import Decimal
 
+from ai.backend.common.identifier.architecture import ArchName
 from ai.backend.common.identifier.resource_group import ResourceGroupID
-from ai.backend.common.types import AgentId, KernelId, ResourceSlot
+from ai.backend.common.identifier.resource_slot import ResourceSlotName
+from ai.backend.common.types import AgentId
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.exceptions import (
     ContainerLimitExceededError,
     InsufficientResourcesError,
@@ -14,31 +17,31 @@ from ai.backend.manager.sokovan.scheduler.provisioner.selectors.exceptions impor
     NoAvailableAgentError,
     NoCompatibleAgentError,
 )
-from ai.backend.manager.sokovan.scheduler.provisioner.selectors.types import (
-    ResourceRequirements,
-)
+from ai.backend.manager.sokovan.scheduler.provisioner.selectors.types import ResourceRequirements
+from ai.backend.manager.views.sokovan.workload import ResourceRequest
+
+
+def _slots(slots: Mapping[str, str]) -> dict[ResourceSlotName, Decimal]:
+    return {ResourceSlotName(name): Decimal(amount) for name, amount in slots.items()}
 
 
 def _requirement(arch: str = "x86_64") -> ResourceRequirements:
     return ResourceRequirements(
-        requested_slots=ResourceSlot({"cpu": Decimal("4")}),
-        required_architecture=arch,
-        kernel_ids=[KernelId(uuid.uuid4())],
+        requested_slots=ResourceRequest(slots=_slots({"cpu": "4"})),
+        required_architecture=ArchName(arch),
+        container_count=1,
     )
 
 
 def _insufficient(
     agent_id: str,
-    requested: dict[str, str],
-    available: dict[str, str],
+    requested: Mapping[str, str],
+    available: Mapping[str, str],
 ) -> InsufficientResourcesError:
-    requested_slots = ResourceSlot({k: Decimal(v) for k, v in requested.items()})
-    available_slots = ResourceSlot({k: Decimal(v) for k, v in available.items()})
     return InsufficientResourcesError(
         agent_id=AgentId(agent_id),
-        requested_slots=requested_slots,
-        available_slots=available_slots,
-        occupied_slots=ResourceSlot({}),
+        requested_slots=_slots(requested),
+        available_slots=_slots(available),
         insufficient_resources={},
     )
 
@@ -52,7 +55,7 @@ class TestInsufficientResourcesContribution:
         )
         suggestion = err.remediation_hint_contribution()
         # cpu short by 3; mem is not short -> excluded
-        assert suggestion.required_reduction == ResourceSlot({"cpu": Decimal("3")})
+        assert suggestion.required_reduction == _slots({"cpu": "3"})
         assert suggestion.required_container_reduction is None
 
 
@@ -71,6 +74,7 @@ class TestNoCompatibleAgentSuggestion:
     def test_change_arch_lists_available(self) -> None:
         err = NoCompatibleAgentError(
             resource_requirement=_requirement(arch="aarch64"),
+            requirement_index=0,
             available_architectures=["x86_64"],
         )
         suggestion = err.build_remediation_hint()
@@ -94,6 +98,7 @@ class TestNoAvailableAgentSuggestion:
     def test_merges_node_axis_min_reduction(self) -> None:
         err = NoAvailableAgentError(
             resource_requirement=_requirement(),
+            requirement_index=0,
             agent_errors={
                 AgentId("agent-a"): _insufficient(
                     "agent-a",
@@ -109,12 +114,13 @@ class TestNoAvailableAgentSuggestion:
         )
         suggestion = err.build_remediation_hint()
         # node-axis MIN -> the smaller reduction (agent-b's deficit)
-        assert suggestion.required_reduction == ResourceSlot({"cpu": Decimal("1")})
+        assert suggestion.required_reduction == _slots({"cpu": "1"})
         assert suggestion.required_container_reduction is None
 
     def test_merges_resource_and_container_reductions(self) -> None:
         err = NoAvailableAgentError(
             resource_requirement=_requirement(),
+            requirement_index=0,
             agent_errors={
                 AgentId("agent-a"): _insufficient(
                     "agent-a", requested={"cpu": "4"}, available={"cpu": "1"}
@@ -126,12 +132,13 @@ class TestNoAvailableAgentSuggestion:
         )
         suggestion = err.build_remediation_hint()
         # both remediations are surfaced simultaneously (no single discriminator)
-        assert suggestion.required_reduction == ResourceSlot({"cpu": Decimal("3")})
+        assert suggestion.required_reduction == _slots({"cpu": "3"})
         assert suggestion.required_container_reduction == 3  # 12 - 10 + 1
 
     def test_surfaces_available_agent_ids(self) -> None:
         err = NoAvailableAgentError(
             resource_requirement=_requirement(),
+            requirement_index=0,
             agent_errors={
                 AgentId("designated-a"): _insufficient(
                     "designated-a", requested={"cpu": "4"}, available={"cpu": "1"}
@@ -144,4 +151,13 @@ class TestNoAvailableAgentSuggestion:
         # the available alternatives are surfaced so a handler can compare them
         # against the (failing) designated agents
         assert suggestion.available_agent_ids == [AgentId("agent-x")]
-        assert suggestion.required_reduction == ResourceSlot({"cpu": Decimal("3")})
+        assert suggestion.required_reduction == _slots({"cpu": "3"})
+
+    def test_requirement_index_is_carried(self) -> None:
+        err = NoAvailableAgentError(
+            resource_requirement=_requirement(),
+            requirement_index=2,
+            agent_errors={},
+        )
+        assert err.requirement_index == 2
+        assert err.resource_requirement.required_architecture == ArchName("x86_64")

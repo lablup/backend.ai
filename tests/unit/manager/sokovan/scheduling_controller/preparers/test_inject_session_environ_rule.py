@@ -4,20 +4,27 @@ from __future__ import annotations
 
 import pytest
 
+from ai.backend.manager.data.dotfile.types import DotfileBundle
+from ai.backend.manager.data.resource.types import SlotTypeInfo
+from ai.backend.manager.data.session.creation import ContainerUserInfo
 from ai.backend.manager.data.session.draft import (
     KernelExecutionSpecDraft,
     KernelSpecDraft,
+    ResourceSpecDraft,
     SessionResourceSpecDraft,
 )
 from ai.backend.manager.data.session.options import (
     DefaultSessionOptions,
     InternalDataExtras,
 )
-from ai.backend.manager.sokovan.scheduling_controller.preparers.draft_rule import (
-    SessionSpecPreparationContext,
-)
-from ai.backend.manager.sokovan.scheduling_controller.preparers.inject_session_environ_rule import (
+from ai.backend.manager.sokovan.scheduling_controller.preparers.specs.inject_session_environ_rule import (
     InjectSessionEnvironRule,
+)
+from ai.backend.manager.views.sokovan.session_creation import (
+    GlobalEnqueueInfo,
+    ResourceGroupEnqueueInfo,
+    SessionSpecContext,
+    UserEnqueueInfo,
 )
 
 
@@ -26,9 +33,25 @@ def rule() -> InjectSessionEnvironRule:
     return InjectSessionEnvironRule()
 
 
-def _context() -> SessionSpecPreparationContext:
-    return SessionSpecPreparationContext(
-        resource_group_defaults=DefaultSessionOptions(),
+def _context() -> SessionSpecContext:
+    return SessionSpecContext(
+        resource_group=ResourceGroupEnqueueInfo(
+            defaults=DefaultSessionOptions(),
+            network=None,
+            allow_fractional=False,
+            served_slot_names=frozenset(),
+        ),
+        user=UserEnqueueInfo(
+            policy=None,
+            container_user=ContainerUserInfo(),
+            dotfiles=DotfileBundle(),
+            pending_session_count=0,
+            vfolder_mounts_by_role={},
+        ),
+        global_info=GlobalEnqueueInfo(
+            image_infos={},
+            slot_type_info=SlotTypeInfo(types={}, required=frozenset()),
+        ),
     )
 
 
@@ -36,7 +59,7 @@ def _draft_with_sudo(
     *, sudo: bool, kernel_specs: tuple[KernelSpecDraft, ...]
 ) -> SessionResourceSpecDraft:
     return SessionResourceSpecDraft(
-        kernel_specs=kernel_specs,
+        resource=ResourceSpecDraft(kernel_specs=kernel_specs),
         internal_data_extras=InternalDataExtras(sudo_session_enabled=sudo),
     )
 
@@ -58,7 +81,7 @@ class TestInjectSessionEnvironRule:
             ),
         )
         result = await rule.prepare(draft, _context())
-        for kernel in result.kernel_specs:
+        for kernel in result.resource.kernel_specs:
             assert kernel.execution_spec.environ["SUDO_SESSION_ENABLED"] == "1"
 
     async def test_preserves_caller_environ_keys(self, rule: InjectSessionEnvironRule) -> None:
@@ -75,6 +98,6 @@ class TestInjectSessionEnvironRule:
             ),
         )
         result = await rule.prepare(draft, _context())
-        env = result.kernel_specs[0].execution_spec.environ
+        env = result.resource.kernel_specs[0].execution_spec.environ
         assert env["PATH"] == "/custom/bin"
         assert env["SUDO_SESSION_ENABLED"] == "1"

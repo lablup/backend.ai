@@ -2,7 +2,7 @@
 Exceptions for the sokovan scheduler.
 """
 
-from abc import ABC, abstractmethod
+from abc import ABC
 from typing import override
 
 from ai.backend.common.exception import (
@@ -12,14 +12,12 @@ from ai.backend.common.exception import (
     ErrorDomain,
     ErrorOperation,
 )
-from ai.backend.manager.data.sokovan import SchedulingPredicate
 
 
 class SchedulingError(BackendAIError, ABC):
     """Base exception for scheduling errors.
 
-    All exceptions used in the scheduler must inherit from this class
-    and implement the failed_predicates method.
+    All exceptions used in the scheduler must inherit from this class.
     """
 
     error_type = "https://api.backend.ai/probs/scheduling-failed"
@@ -32,12 +30,3 @@ class SchedulingError(BackendAIError, ABC):
             operation=ErrorOperation.SCHEDULE,
             error_detail=ErrorDetail.INTERNAL_ERROR,
         )
-
-    @abstractmethod
-    def failed_predicates(self) -> list[SchedulingPredicate]:
-        """Return list of failed predicates for this error.
-
-        Returns:
-            List of SchedulingPredicate objects.
-        """
-        raise NotImplementedError

@@ -33,6 +33,7 @@ from ai.backend.common.identifier.domain import DomainName
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.identifier.resource_group import ResourceGroupName
+from ai.backend.common.identifier.resource_slot import ResourceSlotName
 from ai.backend.common.identifier.session import SessionID
 from ai.backend.common.json import load_json
 from ai.backend.common.plugin.monitor import ErrorPluginContext
@@ -55,6 +56,7 @@ from ai.backend.manager.data.session.draft import (
     KernelExecutionSpecDraft,
     KernelGroupDraft,
     KernelResourceInput,
+    ResourceSpecDraft,
     SchedulingTargetDraft,
     SessionClassificationDraft,
     SessionIdentityDraft,
@@ -322,15 +324,10 @@ class SessionService:
         return ResolveSessionActionResult(session_id=session_id)
 
     async def compute_schedule(self, action: ComputeScheduleAction) -> ComputeScheduleActionResult:
-        """Build a slim ``SessionSpecDraft`` (one kernel group per requested
+        """Build a resource-only draft (one kernel group per requested
         kernel, unique role for positional correlation) and delegate the
         node-fitting decision to the scheduling controller.
         """
-        user = await self._user_repository.get_user_by_uuid(action.user_uuid)
-        if user.main_access_key is None:
-            raise InternalServerError(f"User {action.user_uuid} has no main access key configured")
-        access_key = AccessKey(user.main_access_key)
-
         kernel_groups = tuple(
             KernelGroupDraft(
                 role=DEFAULT_ROLE if idx == 0 else f"sub{idx}",
@@ -339,15 +336,7 @@ class SessionService:
             )
             for idx, kernel in enumerate(action.kernels)
         )
-        resource_spec = SessionResourceSpecDraft(
-            identity=SessionIdentityDraft(
-                session_id=SessionID(uuid.uuid4()),
-                creation_id=uuid.uuid4().hex,
-                session_name="compute-schedule",
-                access_key=access_key,
-                user_uuid=action.user_uuid,
-            ),
-            classification=SessionClassificationDraft(session_type=SessionTypes.INTERACTIVE),
+        draft = ResourceSpecDraft(
             options=SessionOptionsDraft(
                 cluster_mode=action.cluster_mode,
                 cluster_size=len(action.kernels),
@@ -355,9 +344,7 @@ class SessionService:
             ),
         )
 
-        result = await self._scheduling_controller.compute_schedule(
-            action.resource_group_id, resource_spec
-        )
+        result = await self._scheduling_controller.compute_schedule(action.resource_group_id, draft)
         return ComputeScheduleActionResult(result=result)
 
     async def resolve_session_name(
@@ -1625,7 +1612,9 @@ class SessionService:
         await self._session_repository.resolve_image_by_id(action.image_id)
 
         resource_entries = tuple(
-            ResourceSlotEntry(resource_type=entry.resource_type, quantity=entry.quantity)
+            ResourceSlotEntry(
+                resource_type=ResourceSlotName(entry.resource_type), quantity=entry.quantity
+            )
             for entry in action.resource.entries
         )
         resource_opts_payload: dict[str, Any] = {}
@@ -1713,19 +1702,21 @@ class SessionService:
                 ),
                 callback_url=callback_url,
                 dependencies=dependencies,
-                options=SessionOptionsDraft(
-                    priority=action.scheduling.priority or SESSION_PRIORITY_DEFAULT,
-                    job_priority=action.scheduling.job_priority,
-                    is_preemptible=action.scheduling.is_preemptible,
-                    cluster_mode=action.resource.cluster_mode,
-                    cluster_size=action.resource.cluster_size,
-                    scheduling_target=SchedulingTargetDraft(
-                        designated_agents=tuple(
-                            AgentId(a) for a in (action.scheduling.agent_list or ())
+                resource=ResourceSpecDraft(
+                    options=SessionOptionsDraft(
+                        priority=action.scheduling.priority or SESSION_PRIORITY_DEFAULT,
+                        job_priority=action.scheduling.job_priority,
+                        is_preemptible=action.scheduling.is_preemptible,
+                        cluster_mode=action.resource.cluster_mode,
+                        cluster_size=action.resource.cluster_size,
+                        scheduling_target=SchedulingTargetDraft(
+                            designated_agents=tuple(
+                                AgentId(a) for a in (action.scheduling.agent_list or ())
+                            ),
                         ),
+                        kernel_groups=kernel_groups,
+                        handler_options=None,
                     ),
-                    kernel_groups=kernel_groups,
-                    handler_options=None,
                 ),
                 internal_data_extras=InternalDataExtras(
                     sudo_session_enabled=False,

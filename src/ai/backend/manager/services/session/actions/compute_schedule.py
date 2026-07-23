@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import override
-from uuid import UUID
 
 from ai.backend.common.data.permission.types import EntityType
 from ai.backend.common.identifier.resource_group import ResourceGroupID
@@ -30,7 +29,6 @@ class ComputeScheduleAction(BaseAction):
     kernels: list[KernelResourceInput]
     cluster_mode: ClusterMode
     resource_group_id: ResourceGroupID
-    user_uuid: UUID
 
     @override
     @classmethod

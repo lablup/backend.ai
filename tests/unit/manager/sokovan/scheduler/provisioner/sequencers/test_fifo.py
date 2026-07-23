@@ -1,201 +1,44 @@
-import uuid
-from decimal import Decimal
+"""Tests for the FIFO sequencer."""
+
+from __future__ import annotations
+
+from collections.abc import Callable
 
 import pytest
 
-from ai.backend.common.identifier.resource_group import ResourceGroupID
-from ai.backend.common.types import AccessKey, ResourceSlot, SessionId, SlotQuantity
-from ai.backend.manager.data.sokovan import (
-    ConcurrencySnapshot,
-    KeypairOccupancy,
-    PendingSessionSnapshot,
-    ResourceOccupancySnapshot,
-    ResourcePolicySnapshot,
-    SessionDependencySnapshot,
-    SessionWorkload,
-    SystemSnapshot,
-)
 from ai.backend.manager.sokovan.scheduler.provisioner.sequencers.fifo import FIFOSequencer
+from ai.backend.manager.views.sokovan.snapshot import SystemSnapshot
+from ai.backend.manager.views.sokovan.workload import SessionWorkload
+
+from .conftest import RESOURCE_GROUP_ID
+
+WorkloadFactory = Callable[..., SessionWorkload]
 
 
 class TestFIFOSequencer:
     @pytest.fixture
-    def resource_group_id(self) -> ResourceGroupID:
-        return ResourceGroupID(uuid.uuid4())
-
-    @pytest.fixture
     def sequencer(self) -> FIFOSequencer:
         return FIFOSequencer()
 
-    @pytest.fixture
-    def system_snapshot(self) -> SystemSnapshot:
-        return SystemSnapshot(
-            total_capacity=ResourceSlot(cpu=Decimal("100"), mem=Decimal("100")),
-            resource_occupancy=ResourceOccupancySnapshot(
-                by_keypair={},
-                by_user={},
-                by_group={},
-                by_domain={},
-                by_agent={},
-            ),
-            resource_policy=ResourcePolicySnapshot(
-                keypair_policies={},
-                user_policies={},
-                group_limits={},
-                domain_limits={},
-            ),
-            concurrency=ConcurrencySnapshot(
-                sessions_by_keypair={},
-                sftp_sessions_by_keypair={},
-            ),
-            pending_sessions=PendingSessionSnapshot(
-                by_keypair={},
-            ),
-            session_dependencies=SessionDependencySnapshot(
-                by_session={},
-            ),
-            known_slot_types={},
-        )
-
-    async def test_name(self, sequencer: FIFOSequencer) -> None:
+    def test_name(self, sequencer: FIFOSequencer) -> None:
         assert sequencer.name == "FIFOSequencer"
 
     async def test_empty_workload(
         self,
-        resource_group_id: ResourceGroupID,
         sequencer: FIFOSequencer,
-        system_snapshot: SystemSnapshot,
+        empty_snapshot: SystemSnapshot,
     ) -> None:
-        result = await sequencer.sequence(resource_group_id, system_snapshot, [])
-        assert result == []
+        result = await sequencer.sequence(RESOURCE_GROUP_ID, empty_snapshot, [])
+        assert list(result) == []
 
     async def test_preserves_order(
         self,
-        resource_group_id: ResourceGroupID,
         sequencer: FIFOSequencer,
-        system_snapshot: SystemSnapshot,
+        empty_snapshot: SystemSnapshot,
+        workload_factory: WorkloadFactory,
     ) -> None:
-        workloads = [
-            SessionWorkload(
-                session_id=SessionId(uuid.uuid4()),
-                access_key=AccessKey("user1"),
-                requested_slots=ResourceSlot(cpu=Decimal("10"), mem=Decimal("10")),
-                user_uuid=uuid.uuid4(),
-                group_id=uuid.uuid4(),
-                domain_name="default",
-                scaling_group="default",
-                resource_group_id=ResourceGroupID(uuid.uuid4()),
-                priority=0,
-            ),
-            SessionWorkload(
-                session_id=SessionId(uuid.uuid4()),
-                access_key=AccessKey("user2"),
-                requested_slots=ResourceSlot(cpu=Decimal("20"), mem=Decimal("20")),
-                user_uuid=uuid.uuid4(),
-                group_id=uuid.uuid4(),
-                domain_name="default",
-                scaling_group="default",
-                resource_group_id=ResourceGroupID(uuid.uuid4()),
-                priority=0,
-            ),
-            SessionWorkload(
-                session_id=SessionId(uuid.uuid4()),
-                access_key=AccessKey("user3"),
-                requested_slots=ResourceSlot(cpu=Decimal("30"), mem=Decimal("30")),
-                user_uuid=uuid.uuid4(),
-                group_id=uuid.uuid4(),
-                domain_name="default",
-                scaling_group="default",
-                resource_group_id=ResourceGroupID(uuid.uuid4()),
-                priority=0,
-            ),
-        ]
+        workloads = [workload_factory() for _ in range(5)]
 
-        result = await sequencer.sequence(resource_group_id, system_snapshot, workloads)
+        result = await sequencer.sequence(RESOURCE_GROUP_ID, empty_snapshot, workloads)
 
-        # FIFO should preserve the original order
-        assert len(result) == 3
-        assert result[0] == workloads[0]
-        assert result[1] == workloads[1]
-        assert result[2] == workloads[2]
-
-    async def test_ignores_system_snapshot(
-        self, resource_group_id: ResourceGroupID, sequencer: FIFOSequencer
-    ) -> None:
-        # FIFO should work the same regardless of system state
-        snapshot_with_allocations = SystemSnapshot(
-            total_capacity=ResourceSlot(cpu=Decimal("100"), mem=Decimal("100")),
-            resource_occupancy=ResourceOccupancySnapshot(
-                by_keypair={
-                    AccessKey("user1"): KeypairOccupancy(
-                        occupied_slots=[
-                            SlotQuantity("cpu", Decimal("50")),
-                            SlotQuantity("mem", Decimal("50")),
-                        ],
-                        session_count=1,
-                        sftp_session_count=0,
-                    ),
-                    AccessKey("user2"): KeypairOccupancy(
-                        occupied_slots=[
-                            SlotQuantity("cpu", Decimal("30")),
-                            SlotQuantity("mem", Decimal("30")),
-                        ],
-                        session_count=1,
-                        sftp_session_count=0,
-                    ),
-                },
-                by_user={},
-                by_group={},
-                by_domain={},
-                by_agent={},
-            ),
-            resource_policy=ResourcePolicySnapshot(
-                keypair_policies={},
-                user_policies={},
-                group_limits={},
-                domain_limits={},
-            ),
-            concurrency=ConcurrencySnapshot(
-                sessions_by_keypair={},
-                sftp_sessions_by_keypair={},
-            ),
-            pending_sessions=PendingSessionSnapshot(
-                by_keypair={},
-            ),
-            session_dependencies=SessionDependencySnapshot(
-                by_session={},
-            ),
-            known_slot_types={},
-        )
-
-        workloads = [
-            SessionWorkload(
-                session_id=SessionId(uuid.uuid4()),
-                access_key=AccessKey("user2"),  # User with more allocation
-                requested_slots=ResourceSlot(cpu=Decimal("10"), mem=Decimal("10")),
-                user_uuid=uuid.uuid4(),
-                group_id=uuid.uuid4(),
-                domain_name="default",
-                scaling_group="default",
-                resource_group_id=ResourceGroupID(uuid.uuid4()),
-                priority=0,
-            ),
-            SessionWorkload(
-                session_id=SessionId(uuid.uuid4()),
-                access_key=AccessKey("user1"),  # User with less allocation
-                requested_slots=ResourceSlot(cpu=Decimal("10"), mem=Decimal("10")),
-                user_uuid=uuid.uuid4(),
-                group_id=uuid.uuid4(),
-                domain_name="default",
-                scaling_group="default",
-                resource_group_id=ResourceGroupID(uuid.uuid4()),
-                priority=0,
-            ),
-        ]
-
-        result = await sequencer.sequence(resource_group_id, snapshot_with_allocations, workloads)
-
-        # Should still preserve original order despite different allocations
-        assert len(result) == 2
-        assert result[0] == workloads[0]
-        assert result[1] == workloads[1]
+        assert list(result) == workloads

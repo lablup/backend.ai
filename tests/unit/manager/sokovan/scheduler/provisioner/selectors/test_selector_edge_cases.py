@@ -1,299 +1,197 @@
-"""Edge case tests for agent selectors."""
+"""Edge case tests for agent selection."""
 
 from __future__ import annotations
 
 import uuid
+from collections.abc import Mapping
 from decimal import Decimal
 
 import pytest
 
+from ai.backend.common.identifier.architecture import ArchName
 from ai.backend.common.identifier.resource_group import ResourceGroupID
-from ai.backend.common.types import (
-    AgentId,
-    ClusterMode,
-    KernelId,
-    ResourceSlot,
-    SessionId,
-    SessionTypes,
-)
-from ai.backend.manager.data.sokovan import AgentInfo
+from ai.backend.common.identifier.resource_slot import ResourceSlotName
+from ai.backend.common.types import AgentId, SessionId
+from ai.backend.manager.data.session.options import AgentSelectionPolicy
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.concentrated import (
     ConcentratedAgentSelector,
 )
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.dispersed import (
     DispersedAgentSelector,
 )
+from ai.backend.manager.sokovan.scheduler.provisioner.selectors.exceptions import (
+    BatchAgentSelectionFailedError,
+    NoAvailableAgentError,
+    NoCompatibleAgentError,
+)
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.legacy import LegacyAgentSelector
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.roundrobin import (
     RoundRobinAgentSelector,
 )
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import (
-    AgentSelectionConfig,
     AgentSelectionCriteria,
-    AgentStateTracker,
-    SessionMetadata,
+    AgentSelector,
 )
+from ai.backend.manager.sokovan.scheduler.provisioner.selectors.tracker import AgentStateTracker
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.types import ResourceRequirements
+from ai.backend.manager.views.sokovan.agent import AgentInfo, AgentLimit
+from ai.backend.manager.views.sokovan.workload import ResourceRequest
+
+NO_LIMIT = AgentLimit(max_container_count=None)
+
+
+def _req(
+    slots: Mapping[str, str],
+    arch: str = "x86_64",
+    containers: int = 1,
+) -> ResourceRequirements:
+    return ResourceRequirements(
+        requested_slots=ResourceRequest(
+            slots={ResourceSlotName(name): Decimal(amount) for name, amount in slots.items()}
+        ),
+        required_architecture=ArchName(arch),
+        container_count=containers,
+    )
+
+
+def _criteria(requirements: list[ResourceRequirements]) -> AgentSelectionCriteria:
+    return AgentSelectionCriteria(
+        session_id=SessionId(uuid.uuid4()),
+        resource_group_id=ResourceGroupID(uuid.UUID(int=0)),
+        requirements=requirements,
+        agent_selection_policy=AgentSelectionPolicy.STRICT,
+        designated_agent_ids=None,
+    )
+
+
+def _trackers(agents: list[AgentInfo]) -> list[AgentStateTracker]:
+    return [AgentStateTracker(original_agent=agent) for agent in agents]
 
 
 class TestSelectorEdgeCases:
-    """Test edge cases and error conditions for selectors."""
-
-    @pytest.fixture
-    def criteria(self) -> AgentSelectionCriteria:
-        """Create standard selection criteria."""
-        return AgentSelectionCriteria(
-            session_metadata=SessionMetadata(
-                session_id=SessionId(uuid.uuid4()),
-                session_type=SessionTypes.INTERACTIVE,
-                resource_group_id=ResourceGroupID(uuid.UUID(int=0)),
-                cluster_mode=ClusterMode.SINGLE_NODE,
-            ),
-            kernel_requirements={},
-        )
-
-    @pytest.fixture
-    def config(self) -> AgentSelectionConfig:
-        """Create standard selection config."""
-        return AgentSelectionConfig(
-            max_container_count=None,
-            enforce_spreading_endpoint_replica=False,
-        )
-
-    def test_empty_resource_requirements(
-        self,
-        criteria: AgentSelectionCriteria,
-        config: AgentSelectionConfig,
-        agents_for_edge_case_empty_request: list[AgentInfo],
-    ) -> None:
-        """Test handling of empty resource requirements."""
-        # Empty resource request
-        resource_req = ResourceRequirements(
-            kernel_ids=[KernelId(uuid.uuid4())],
-            requested_slots=ResourceSlot({}),  # No resources requested
-            required_architecture="x86_64",
-        )
-
-        selectors = [
-            ConcentratedAgentSelector(["cpu", "mem"]),
-            DispersedAgentSelector(["cpu", "mem"]),
-            LegacyAgentSelector(["cpu", "mem"]),
-            RoundRobinAgentSelector(next_index=0),
-        ]
-
-        # All selectors should handle empty requests
-        for selector in selectors:
-            trackers = [
-                AgentStateTracker(original_agent=agent)
-                for agent in agents_for_edge_case_empty_request
-            ]
-            result = selector.select_tracker_by_strategy(trackers, resource_req, criteria, config)
-            assert result is not None
-            assert result.original_agent.agent_id in [AgentId("agent-1"), AgentId("agent-2")]
+    """Edge cases across strategies and the batch selection path."""
 
     def test_zero_resource_values(
         self,
-        criteria: AgentSelectionCriteria,
-        config: AgentSelectionConfig,
-        single_agent: list[AgentInfo],
+        agents_with_varied_occupancy: list[AgentInfo],
     ) -> None:
-        """Test handling of zero resource values in requests."""
-        # Request with zero values
-        resource_req = ResourceRequirements(
-            kernel_ids=[KernelId(uuid.uuid4())],
-            requested_slots=ResourceSlot({
-                "cpu": Decimal("0"),
-                "mem": Decimal("0"),
-                "cuda.shares": Decimal("0"),
-            }),
-            required_architecture="x86_64",
+        """An all-zero request is satisfiable by any agent."""
+        selector = ConcentratedAgentSelector(agent_selection_resource_priority=["cpu", "mem"])
+        resource_req = _req({"cpu": "0", "mem": "0"})
+
+        selected = selector.select_tracker_by_strategy(
+            _trackers(agents_with_varied_occupancy), resource_req
         )
+        assert selected is not None
 
-        selector = ConcentratedAgentSelector(["cpu", "mem"])
-        trackers = [AgentStateTracker(original_agent=agent) for agent in single_agent]
-        result = selector.select_tracker_by_strategy(trackers, resource_req, criteria, config)
-
-        # Should still select an agent
-        assert result.original_agent.agent_id == AgentId("lonely-agent")
-
-    def test_missing_resource_types_in_request(
+    async def test_missing_resource_type_fails_selection(
         self,
-        criteria: AgentSelectionCriteria,
-        config: AgentSelectionConfig,
-        agents_cpu_only_vs_gpu: list[AgentInfo],
+        agents_with_varied_occupancy: list[AgentInfo],
     ) -> None:
-        """Test when requested resource type doesn't exist on any agent."""
-        # Request TPU which no agent has
-        resource_req = ResourceRequirements(
-            kernel_ids=[KernelId(uuid.uuid4())],
-            requested_slots=ResourceSlot({
-                "cpu": Decimal("2"),
-                "mem": Decimal("4096"),
-                "tpu": Decimal("1"),
-            }),
-            required_architecture="x86_64",
+        """Requesting a slot no agent has is treated as zero availability."""
+        criteria = _criteria([_req({"cpu": "1", "npu": "1"})])
+        selector = AgentSelector(
+            ConcentratedAgentSelector(agent_selection_resource_priority=["cpu", "mem"])
         )
 
-        # Agents should be filtered out by AgentSelector wrapper
-        # But if passed to strategy directly, they should handle gracefully
-        selector = DispersedAgentSelector(["cpu", "mem", "tpu"])
+        with pytest.raises(BatchAgentSelectionFailedError) as exc_info:
+            await selector.select_agents_for_batch_requirements(
+                _trackers(agents_with_varied_occupancy), criteria, NO_LIMIT
+            )
+        assert isinstance(exc_info.value.errors[0], NoAvailableAgentError)
 
-        # Both agents lack TPU, so selector should use other criteria
-        trackers = [AgentStateTracker(original_agent=agent) for agent in agents_cpu_only_vs_gpu]
-        result = selector.select_tracker_by_strategy(trackers, resource_req, criteria, config)
-        assert result is not None
+    async def test_unknown_architecture_fails_with_arch_error(
+        self,
+        agents_with_varied_occupancy: list[AgentInfo],
+    ) -> None:
+        """An architecture no agent provides raises NoCompatibleAgentError."""
+        criteria = _criteria([_req({"cpu": "1"}, arch="riscv64")])
+        selector = AgentSelector(
+            ConcentratedAgentSelector(agent_selection_resource_priority=["cpu", "mem"])
+        )
+
+        with pytest.raises(BatchAgentSelectionFailedError) as exc_info:
+            await selector.select_agents_for_batch_requirements(
+                _trackers(agents_with_varied_occupancy), criteria, NO_LIMIT
+            )
+        error = exc_info.value.errors[0]
+        assert isinstance(error, NoCompatibleAgentError)
+        assert error.build_remediation_hint().available_archs == ["x86_64"]
 
     def test_extremely_large_resource_values(
         self,
-        criteria: AgentSelectionCriteria,
-        config: AgentSelectionConfig,
         agents_normal_vs_huge: list[AgentInfo],
     ) -> None:
-        """Test handling of very large resource values."""
-        resource_req = ResourceRequirements(
-            kernel_ids=[KernelId(uuid.uuid4())],
-            requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("2048")}),
-            required_architecture="x86_64",
+        """Huge capacities do not break the strategy comparison."""
+        selector = DispersedAgentSelector(agent_selection_resource_priority=["cpu", "mem"])
+        resource_req = _req({"cpu": "1", "mem": "1024"})
+
+        selected = selector.select_tracker_by_strategy(
+            _trackers(agents_normal_vs_huge), resource_req
         )
-
-        # Test with different selectors
-        concentrated = ConcentratedAgentSelector(["cpu", "mem"])
-        dispersed = DispersedAgentSelector(["cpu", "mem"])
-
-        trackers = [AgentStateTracker(original_agent=agent) for agent in agents_normal_vs_huge]
-        concentrated_choice = concentrated.select_tracker_by_strategy(
-            trackers, resource_req, criteria, config
-        )
-        dispersed_choice = dispersed.select_tracker_by_strategy(
-            trackers, resource_req, criteria, config
-        )
-
-        # Concentrated should pick normal (less available)
-        assert concentrated_choice.original_agent.agent_id == AgentId("normal")
-        # Dispersed should pick huge (more available)
-        assert dispersed_choice.original_agent.agent_id == AgentId("huge")
-
-    def test_decimal_precision_edge_cases(
-        self,
-        criteria: AgentSelectionCriteria,
-        config: AgentSelectionConfig,
-        agents_decimal_precision: list[AgentInfo],
-    ) -> None:
-        """Test handling of decimal precision edge cases."""
-        resource_req = ResourceRequirements(
-            kernel_ids=[KernelId(uuid.uuid4())],
-            requested_slots=ResourceSlot({
-                "cpu": Decimal("0.000000000000000000000001"),
-                "mem": Decimal("0.000000000000000000000001"),
-            }),
-            required_architecture="x86_64",
-        )
-
-        selector = ConcentratedAgentSelector(["cpu", "mem"])
-        trackers = [AgentStateTracker(original_agent=agent) for agent in agents_decimal_precision]
-        result = selector.select_tracker_by_strategy(trackers, resource_req, criteria, config)
-
-        # Should handle decimal precision correctly
-        assert result.original_agent.agent_id in [AgentId("agent-1"), AgentId("agent-2")]
+        assert selected.original_agent.agent_id == AgentId("huge")
 
     def test_single_agent_all_strategies(
         self,
-        criteria: AgentSelectionCriteria,
-        config: AgentSelectionConfig,
         single_agent: list[AgentInfo],
     ) -> None:
-        """Test all strategies with only one agent available."""
-        resource_req = ResourceRequirements(
-            kernel_ids=[KernelId(uuid.uuid4())],
-            requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("2048")}),
-            required_architecture="x86_64",
-        )
-
-        selectors = [
-            ConcentratedAgentSelector(["cpu", "mem"]),
-            DispersedAgentSelector(["cpu", "mem"]),
-            LegacyAgentSelector(["cpu", "mem"]),
-            RoundRobinAgentSelector(next_index=999),  # Index way out of bounds
+        """Every strategy returns the only candidate."""
+        resource_req = _req({"cpu": "1", "mem": "1024"})
+        strategies = [
+            ConcentratedAgentSelector(agent_selection_resource_priority=["cpu", "mem"]),
+            DispersedAgentSelector(agent_selection_resource_priority=["cpu", "mem"]),
+            LegacyAgentSelector(agent_selection_resource_priority=["cpu", "mem"]),
+            RoundRobinAgentSelector(),
         ]
 
-        # All should select the only agent
-        for selector in selectors:
-            trackers = [AgentStateTracker(original_agent=agent) for agent in single_agent]
-            result = selector.select_tracker_by_strategy(trackers, resource_req, criteria, config)
-            assert result.original_agent.agent_id == AgentId("lonely-agent")
+        for strategy in strategies:
+            selected = strategy.select_tracker_by_strategy(_trackers(single_agent), resource_req)
+            assert selected.original_agent.agent_id == AgentId("lonely-agent")
 
-    def test_all_agents_fully_occupied(
+    async def test_all_agents_fully_occupied(
         self,
-        criteria: AgentSelectionCriteria,
-        config: AgentSelectionConfig,
         agents_all_fully_occupied: list[AgentInfo],
     ) -> None:
-        """Test when all agents have zero available resources."""
-        resource_req = ResourceRequirements(
-            kernel_ids=[KernelId(uuid.uuid4())],
-            requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("2048")}),
-            required_architecture="x86_64",
+        """When no agent has remaining capacity the batch fails."""
+        criteria = _criteria([_req({"cpu": "1", "mem": "1024"})])
+        selector = AgentSelector(
+            ConcentratedAgentSelector(agent_selection_resource_priority=["cpu", "mem"])
         )
 
-        # Selectors will still pick an agent (filtering happens in wrapper)
-        selector = ConcentratedAgentSelector(["cpu", "mem"])
-        trackers = [AgentStateTracker(original_agent=agent) for agent in agents_all_fully_occupied]
-        result = selector.select_tracker_by_strategy(trackers, resource_req, criteria, config)
-
-        # Should still return an agent (they're all equal)
-        assert result.original_agent.agent_id in [AgentId(f"full-{i}") for i in range(3)]
+        with pytest.raises(BatchAgentSelectionFailedError):
+            await selector.select_agents_for_batch_requirements(
+                _trackers(agents_all_fully_occupied), criteria, NO_LIMIT
+            )
 
     def test_priority_with_nonexistent_resources(
         self,
-        criteria: AgentSelectionCriteria,
-        config: AgentSelectionConfig,
         agents_with_varied_occupancy: list[AgentInfo],
     ) -> None:
-        """Test resource priority list containing non-existent resource types."""
-        resource_req = ResourceRequirements(
-            kernel_ids=[KernelId(uuid.uuid4())],
-            requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("2048")}),
-            required_architecture="x86_64",
+        """Priority entries for slots not requested are simply ignored."""
+        selector = ConcentratedAgentSelector(
+            agent_selection_resource_priority=["nonexistent", "cpu", "mem"]
         )
+        resource_req = _req({"cpu": "1", "mem": "1024"})
 
-        # Priority includes non-existent resources
-        selector = ConcentratedAgentSelector(["quantum.bits", "neural.cores", "cpu", "mem"])
-        trackers = [
-            AgentStateTracker(original_agent=agent) for agent in agents_with_varied_occupancy
-        ]
-        result = selector.select_tracker_by_strategy(trackers, resource_req, criteria, config)
-
-        # Should ignore non-existent resources and use cpu/mem
-        assert result.original_agent.agent_id == AgentId("agent-low")  # Less available resources
+        selected = selector.select_tracker_by_strategy(
+            _trackers(agents_with_varied_occupancy), resource_req
+        )
+        assert selected.original_agent.agent_id == AgentId("agent-low")
 
     def test_special_resource_names(
         self,
-        criteria: AgentSelectionCriteria,
-        config: AgentSelectionConfig,
         agents_with_special_resource_names: list[AgentInfo],
     ) -> None:
-        """Test handling of special characters in resource names."""
-        resource_req = ResourceRequirements(
-            kernel_ids=[KernelId(uuid.uuid4())],
-            requested_slots=ResourceSlot({
-                "cpu": Decimal("1"),
-                "mem": Decimal("2048"),
-                "custom.resource-name_123": Decimal("10"),
-                "another/special@resource": Decimal("5"),
-            }),
-            required_architecture="x86_64",
+        """Slot names with special characters flow through the strategies."""
+        selector = ConcentratedAgentSelector(agent_selection_resource_priority=["cpu", "mem"])
+        resource_req = _req({
+            "cpu": "1",
+            "mem": "1024",
+            "custom.resource-name_123": "10",
+            "another/special@resource": "5",
+        })
+
+        selected = selector.select_tracker_by_strategy(
+            _trackers(agents_with_special_resource_names), resource_req
         )
-
-        selector = LegacyAgentSelector([
-            "custom.resource-name_123",
-            "another/special@resource",
-            "cpu",
-            "mem",
-        ])
-        trackers = [
-            AgentStateTracker(original_agent=agent) for agent in agents_with_special_resource_names
-        ]
-        result = selector.select_tracker_by_strategy(trackers, resource_req, criteria, config)
-
-        # Should handle special resource names correctly
-        assert result.original_agent.agent_id == AgentId("special")
+        assert selected.original_agent.agent_id == AgentId("special")

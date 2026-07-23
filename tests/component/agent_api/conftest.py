@@ -75,7 +75,9 @@ def agent_processors(
     scheduler_repository = SchedulerRepository(
         database_engine,
         valkey_stat=valkey_clients.stat,
+        valkey_schedule=valkey_clients.schedule,
         config_provider=config_provider,
+        storage_manager=MagicMock(),
     )
     service = AgentService(
         etcd=async_etcd,

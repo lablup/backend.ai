@@ -2,7 +2,7 @@
 
 Every slot key declared in an image's ``resource_spec`` must be served
 by some non-terminated agent in the requested resource group. The
-context's ``known_slot_types`` is sourced from
+context's ``served_slot_names`` is sourced from
 ``agent_resources`` joined with ``agents`` (status != TERMINATED) and
 ``resource_slot_types``, so it reflects the RG's hardware inventory and
 the registered unit metadata in one mapping.
@@ -17,13 +17,14 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import override
 
-from ai.backend.common.types import SlotName
 from ai.backend.manager.data.session.spec import SessionSpec
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.sokovan.scheduling_controller.resource_parse import image_min_slots
 from ai.backend.manager.sokovan.scheduling_controller.validators.session_spec_base import (
-    SessionSpecValidationContext,
     SessionSpecValidatorRule,
+)
+from ai.backend.manager.views.sokovan.session_creation import (
+    SessionSpecContext,
 )
 
 
@@ -38,11 +39,11 @@ class ImageSlotTypeRule(SessionSpecValidatorRule):
     def validate(
         self,
         spec: SessionSpec,
-        context: SessionSpecValidationContext,
+        context: SessionSpecContext,
     ) -> None:
-        known_slot_types = context.known_slot_types
-        enabled = context.slot_type_policy.enabled
-        if not known_slot_types:
+        served_slot_names = context.resource_group.served_slot_names
+        enabled_types = context.global_info.slot_type_info.types
+        if not served_slot_names:
             raise InvalidAPIParameters(
                 extra_msg=(
                     f"resource group '{spec.scope.resource_group_name}' has no "
@@ -51,15 +52,17 @@ class ImageSlotTypeRule(SessionSpecValidatorRule):
             )
         errors: list[str] = []
         for idx, kernel in enumerate(spec.resource_spec.kernel_specs):
-            image_info = context.image_infos.get(kernel.execution_spec.resource_input.image_id)
+            image_info = context.global_info.image_infos.get(
+                kernel.execution_spec.resource_input.image_id
+            )
             if image_info is None:
                 continue
             min_slots = image_min_slots(image_info)
             unknown = sorted(
                 slot_name
                 for slot_name in image_info.resource_spec
-                if SlotName(slot_name) in enabled
-                and SlotName(slot_name) not in known_slot_types
+                if slot_name in enabled_types
+                and slot_name not in served_slot_names
                 and min_slots.get(slot_name, Decimal(0)) > Decimal(0)
             )
             if unknown:

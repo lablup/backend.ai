@@ -2,11 +2,9 @@ from abc import ABC, abstractmethod
 from collections.abc import Iterable
 
 from ai.backend.common.types import SessionId
-from ai.backend.manager.data.sokovan import (
-    SessionWorkload,
-    SystemSnapshot,
-)
 from ai.backend.manager.sokovan.recorder import RecorderContext
+from ai.backend.manager.views.sokovan.snapshot import SystemSnapshot
+from ai.backend.manager.views.sokovan.workload import SessionWorkload
 
 from .exceptions import MultipleValidationErrors, SchedulingValidationError
 
@@ -72,7 +70,7 @@ class SchedulingValidator:
             SchedulingValidationError: If any validation fails
         """
         pool = RecorderContext[SessionId].current_pool()
-        recorder = pool.recorder(workload.session_id)
+        recorder = pool.recorder(workload.meta.session_id)
         errors: list[SchedulingValidationError] = []
 
         for rule in self._rules:

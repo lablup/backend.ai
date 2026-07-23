@@ -1,24 +1,23 @@
-"""Types for session creation and enqueueing."""
+"""Repository-internal session creation fetch types."""
 
 from collections.abc import Mapping
-from dataclasses import dataclass, field
-from typing import Any
+from dataclasses import dataclass
 
-from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.types import (
     SessionId,
-    SlotName,
-    SlotTypes,
+    VFolderMount,
 )
 from ai.backend.manager.data.dotfile.types import DotfileBundle
-from ai.backend.manager.data.resource.types import SlotTypePolicy
-from ai.backend.manager.data.session.creation import (
-    ContainerUserInfo,
-    ImageInfo,
-    ScalingGroupNetworkInfo,
-)
+from ai.backend.manager.data.resource.types import UserEnqueuePolicy
+from ai.backend.manager.data.session.creation import ContainerUserInfo
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts
+from ai.backend.manager.views.sokovan.agent import AgentMeta
+from ai.backend.manager.views.sokovan.session_creation import (
+    GlobalEnqueueInfo,
+    ResourceGroupEnqueueInfo,
+    UserEnqueueInfo,
+)
 
 
 @dataclass
@@ -31,7 +30,7 @@ class SessionDependencyData:
 
 @dataclass
 class AllowedScalingGroup:
-    """Allowed scaling group for a user."""
+    """Allowed resource group for a user (service/REST contract type)."""
 
     id: ResourceGroupID
     name: ResourceGroupName
@@ -39,25 +38,50 @@ class AllowedScalingGroup:
     scheduler_opts: ScalingGroupOpts
 
 
-@dataclass
-class SessionSpecContextFetch:
-    """Raw data fetched by ``ScheduleDBSource.fetch_session_spec_contexts``.
+@dataclass(frozen=True)
+class UserEnqueueFetch:
+    """DB-derived enqueue-time information of the session owner."""
 
-    Kept as a plain record so the repository layer does not need to
-    import sokovan's scheduling-controller types (which would create a
-    circular import: preparer/validator types pull data-layer types
-    defined right here). The controller converts this bundle into its
-    typed :class:`SessionSpecPreparationContext` +
-    :class:`SessionSpecValidationContext` pair.
+    policy: UserEnqueuePolicy | None
+    container_user: ContainerUserInfo
+    dotfiles: DotfileBundle
+    pending_session_count: int
+
+    def to_info(
+        self,
+        vfolder_mounts_by_role: Mapping[str, tuple[VFolderMount, ...]],
+    ) -> UserEnqueueInfo:
+        """Complete the DB-derived fields with the resolved mounts."""
+        return UserEnqueueInfo(
+            policy=self.policy,
+            container_user=self.container_user,
+            dotfiles=self.dotfiles,
+            pending_session_count=self.pending_session_count,
+            vfolder_mounts_by_role=vfolder_mounts_by_role,
+        )
+
+
+@dataclass(frozen=True)
+class SessionSpecFetch:
+    """DB-side sources of the enqueue context (no storage RPC involved).
+
+    The repository composes this with the separately resolved vfolder
+    mounts into the final :class:`SessionSpecContext`.
     """
 
-    resource_group_defaults: Any  # DefaultSessionOptions (avoid data-layer import here)
-    resource_group_network: ScalingGroupNetworkInfo | None
-    container_user_info: ContainerUserInfo
-    image_infos: dict[ImageID, ImageInfo]
-    resource_group_allow_fractional: bool
-    dotfile_data: DotfileBundle
-    keypair_resource_policy: Any | None  # KeyPairResourcePolicyData
-    known_slot_types: Mapping[SlotName, SlotTypes] = field(default_factory=dict)
-    slot_type_policy: SlotTypePolicy = field(default_factory=SlotTypePolicy)
-    active_session_count: int = 0
+    resource_group: ResourceGroupEnqueueInfo
+    global_info: GlobalEnqueueInfo
+    user: UserEnqueueFetch
+
+
+@dataclass(frozen=True)
+class ComputeScheduleFetch:
+    """DB-side sources of the fitting check (resource-only).
+
+    Only what the resource subchain and the selector consume: the group's
+    enqueue info (defaults; no slot inventory), the referenced images, and
+    the schedulable agents. User reads are skipped entirely."""
+
+    resource_group: ResourceGroupEnqueueInfo
+    global_info: GlobalEnqueueInfo
+    agents: list[AgentMeta]

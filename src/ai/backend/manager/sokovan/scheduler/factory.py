@@ -22,7 +22,6 @@ if TYPE_CHECKING:
 
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import KernelMatchType, SessionStatus
-from ai.backend.manager.data.sokovan import PromotionSpec
 from ai.backend.manager.sokovan.scheduler.fair_share import (
     FairShareAggregator,
     FairShareFactorCalculator,
@@ -52,41 +51,20 @@ from ai.backend.manager.sokovan.scheduler.launcher.launcher import (
     SessionLauncher,
     SessionLauncherArgs,
 )
-from ai.backend.manager.sokovan.scheduler.provisioner.allocators.repository_allocator import (
-    RepositoryAllocator,
-)
 from ai.backend.manager.sokovan.scheduler.provisioner.provisioner import (
     SessionProvisioner,
     SessionProvisionerArgs,
 )
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import AgentSelector
 from ai.backend.manager.sokovan.scheduler.provisioner.sequencers.fifo import FIFOSequencer
-from ai.backend.manager.sokovan.scheduler.provisioner.validators.concurrency import (
-    ConcurrencyValidator,
-)
 from ai.backend.manager.sokovan.scheduler.provisioner.validators.dependencies import (
     DependenciesValidator,
-)
-from ai.backend.manager.sokovan.scheduler.provisioner.validators.domain_resource_limit import (
-    DomainResourceLimitValidator,
-)
-from ai.backend.manager.sokovan.scheduler.provisioner.validators.group_resource_limit import (
-    GroupResourceLimitValidator,
-)
-from ai.backend.manager.sokovan.scheduler.provisioner.validators.keypair_resource_limit import (
-    KeypairResourceLimitValidator,
-)
-from ai.backend.manager.sokovan.scheduler.provisioner.validators.pending_session_count_limit import (
-    PendingSessionCountLimitValidator,
-)
-from ai.backend.manager.sokovan.scheduler.provisioner.validators.pending_session_resource_limit import (
-    PendingSessionResourceLimitValidator,
 )
 from ai.backend.manager.sokovan.scheduler.provisioner.validators.reserved_batch import (
     ReservedBatchSessionValidator,
 )
-from ai.backend.manager.sokovan.scheduler.provisioner.validators.user_resource_limit import (
-    UserResourceLimitValidator,
+from ai.backend.manager.sokovan.scheduler.provisioner.validators.resource_policy import (
+    ResourcePolicyValidator,
 )
 from ai.backend.manager.sokovan.scheduler.provisioner.validators.validator import (
     SchedulingValidator,
@@ -99,6 +77,7 @@ from ai.backend.manager.sokovan.scheduler.terminator.terminator import (
     SessionTerminator,
     SessionTerminatorArgs,
 )
+from ai.backend.manager.views.sokovan.result import PromotionSpec
 
 
 def create_default_scheduler_components(
@@ -128,17 +107,10 @@ def create_default_scheduler_components(
     # Create provisioner components
     sequencer = FIFOSequencer()
     validator = SchedulingValidator([
-        ConcurrencyValidator(),
         DependenciesValidator(),
-        DomainResourceLimitValidator(),
-        GroupResourceLimitValidator(),
-        KeypairResourceLimitValidator(),
-        PendingSessionCountLimitValidator(),
-        PendingSessionResourceLimitValidator(),
         ReservedBatchSessionValidator(),
-        UserResourceLimitValidator(),
+        ResourcePolicyValidator(),
     ])
-    allocator = RepositoryAllocator(repository)
 
     # Create provisioner
     provisioner = SessionProvisioner(
@@ -146,7 +118,6 @@ def create_default_scheduler_components(
             validator=validator,
             default_sequencer=sequencer,
             default_agent_selector=agent_selector,
-            allocator=allocator,
             repository=repository,
             fair_share_repository=fair_share_repository,
             config_provider=config_provider,

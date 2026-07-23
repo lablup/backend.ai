@@ -20,6 +20,7 @@ from ai.backend.common.defs.session import SESSION_PRIORITY_DEFAULT
 from ai.backend.common.identifier.domain import DomainName
 from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.identifier.resource_group import ResourceGroupName
+from ai.backend.common.identifier.resource_slot import ResourceSlotName
 from ai.backend.common.identifier.session import SessionID
 from ai.backend.common.types import (
     MountInfoEntry,
@@ -32,6 +33,7 @@ from ai.backend.manager.data.session.draft import (
     KernelExecutionSpecDraft,
     KernelGroupDraft,
     KernelResourceInput,
+    ResourceSpecDraft,
     SchedulingTargetDraft,
     SessionClassificationDraft,
     SessionIdentityDraft,
@@ -112,14 +114,16 @@ class DeploymentSessionDraftBuilder:
                 ),
                 network=SessionNetworkDraft(),
                 callback_url=target_revision.execution.callback_url,
-                options=SessionOptionsDraft(
-                    priority=SESSION_PRIORITY_DEFAULT,
-                    is_preemptible=False,
-                    cluster_mode=target_revision.cluster_config.mode,
-                    cluster_size=target_revision.cluster_config.size,
-                    scheduling_target=SchedulingTargetDraft(),
-                    kernel_groups=kernel_groups,
-                    handler_options=None,
+                resource=ResourceSpecDraft(
+                    options=SessionOptionsDraft(
+                        priority=SESSION_PRIORITY_DEFAULT,
+                        is_preemptible=False,
+                        cluster_mode=target_revision.cluster_config.mode,
+                        cluster_size=target_revision.cluster_config.size,
+                        scheduling_target=SchedulingTargetDraft(),
+                        kernel_groups=kernel_groups,
+                        handler_options=None,
+                    ),
                 ),
                 internal_data_extras=InternalDataExtras(
                     sudo_session_enabled=context.session_owner.sudo_session_enabled,
@@ -205,7 +209,7 @@ class DeploymentSessionDraftBuilder:
     ) -> tuple[ResourceSlotEntry, ...]:
         resource_slots = dict(target_revision.resource_config.resource_slot)
         return tuple(
-            ResourceSlotEntry(resource_type=str(k), quantity=str(Decimal(v)))
+            ResourceSlotEntry(resource_type=ResourceSlotName(str(k)), quantity=str(Decimal(v)))
             for k, v in resource_slots.items()
             if v is not None
         )

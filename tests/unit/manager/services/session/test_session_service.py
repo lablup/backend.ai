@@ -49,7 +49,6 @@ from ai.backend.manager.errors.storage import VFolderBadRequest
 from ai.backend.manager.models.network import NetworkType
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
-from ai.backend.manager.repositories.scheduler import MarkTerminatingResult
 from ai.backend.manager.repositories.session.repository import SessionRepository
 from ai.backend.manager.services.session.actions.complete import (
     CompleteAction,
@@ -116,6 +115,7 @@ from ai.backend.manager.services.session.actions.upload_files import (
     UploadFilesActionResult,
 )
 from ai.backend.manager.services.session.service import SessionService, SessionServiceArgs
+from ai.backend.manager.views.sokovan.session import MarkTerminatingResult
 
 # ==================== Shared Fixtures ====================
 
@@ -1918,7 +1918,7 @@ class TestEnqueueSession:
         await configured_session_service.enqueue_session(enqueue_action_without_rg)
 
         draft = mock_scheduling_controller.enqueue_session_from_draft.await_args.args[0]
-        assert draft.resource_spec.options.handler_options is None
+        assert draft.resource_spec.resource.options.handler_options is None
 
     async def test_leaves_resource_opts_unset_when_shmem_omitted(
         self,
@@ -1932,9 +1932,11 @@ class TestEnqueueSession:
         await configured_session_service.enqueue_session(enqueue_action_without_rg)
 
         draft = mock_scheduling_controller.enqueue_session_from_draft.await_args.args[0]
-        assert draft.resource_spec.options.kernel_groups is not None
+        assert draft.resource_spec.resource.options.kernel_groups is not None
         assert (
-            draft.resource_spec.options.kernel_groups[0].execution_spec.resource_input.resource_opts
+            draft.resource_spec.resource.options.kernel_groups[
+                0
+            ].execution_spec.resource_input.resource_opts
             is None
         )
 
@@ -1965,8 +1967,8 @@ class TestEnqueueSession:
         await configured_session_service.enqueue_session(action)
 
         draft = mock_scheduling_controller.enqueue_session_from_draft.await_args.args[0]
-        assert draft.resource_spec.options.kernel_groups is not None
-        resource_opts = draft.resource_spec.options.kernel_groups[
+        assert draft.resource_spec.resource.options.kernel_groups is not None
+        resource_opts = draft.resource_spec.resource.options.kernel_groups[
             0
         ].execution_spec.resource_input.resource_opts
         assert resource_opts is not None

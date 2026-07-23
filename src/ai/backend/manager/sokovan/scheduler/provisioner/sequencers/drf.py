@@ -4,8 +4,10 @@ from decimal import Decimal
 from typing import override
 
 from ai.backend.common.identifier.resource_group import ResourceGroupID
-from ai.backend.common.types import AccessKey, ResourceSlot
-from ai.backend.manager.data.sokovan import SessionWorkload, SystemSnapshot
+from ai.backend.common.identifier.user import UserID
+from ai.backend.manager.views.sokovan.agent import ResourceGroupResource
+from ai.backend.manager.views.sokovan.snapshot import ResourceAllocation, SystemSnapshot
+from ai.backend.manager.views.sokovan.workload import SessionWorkload
 
 from .sequencer import WorkloadSequencer
 
@@ -50,38 +52,32 @@ class DRFSequencer(WorkloadSequencer):
             return []
 
         # Calculate dominant share for each user
-        user_dominant_shares: dict[AccessKey, Decimal] = defaultdict(lambda: Decimal(0))
+        user_dominant_shares: dict[UserID, Decimal] = defaultdict(lambda: Decimal(0))
 
         # Calculate dominant shares from existing allocations
-        for access_key, occupancy in system_snapshot.resource_occupancy.by_keypair.items():
-            # Convert list[SlotQuantity] to ResourceSlot for DRF calculation
-            occupied = ResourceSlot({sq.slot_name: sq.quantity for sq in occupancy.occupied_slots})
-            dominant_share = self._calculate_dominant_share(
-                occupied, system_snapshot.total_capacity
+        for user_id, allocation in system_snapshot.global_scope.occupancy.by_user.items():
+            user_dominant_shares[user_id] = self._calculate_dominant_share(
+                allocation, system_snapshot.resource_group.resources
             )
-            user_dominant_shares[access_key] = dominant_share
 
         # Sort workloads by dominant share (ascending order - lower share gets higher priority)
         # For users with the same dominant share, maintain original order
-        return sorted(workloads, key=lambda w: user_dominant_shares[w.access_key])
+        return sorted(workloads, key=lambda w: user_dominant_shares[w.meta.owner.user_uuid])
 
     def _calculate_dominant_share(
-        self, resource_slots: ResourceSlot, total_capacity: ResourceSlot
+        self, allocation: ResourceAllocation, resources: ResourceGroupResource
     ) -> Decimal:
         """
-        Calculate the dominant share for given resource slots.
+        Calculate the dominant share for the given allocation.
         Dominant share is the maximum share across all resource types.
         """
         dominant_share = Decimal(0)
 
-        # Ensure keys are synchronized
-        total_capacity.sync_keys(resource_slots)
-
-        for slot, value in resource_slots.items():
-            capacity = Decimal(total_capacity[slot])
-            if capacity == 0:
+        for slot_name, slot_allocation in allocation.slots.items():
+            slot_resource = resources.slots.get(slot_name)
+            if slot_resource is None or slot_resource.capacity == 0:
                 continue
-            share = Decimal(value) / capacity
+            share = slot_allocation.allocated / slot_resource.capacity
             if share > dominant_share:
                 dominant_share = share
 

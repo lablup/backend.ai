@@ -7,8 +7,10 @@ from typing import override
 from ai.backend.manager.data.session.spec import SessionSpec
 from ai.backend.manager.errors.kernel import QuotaExceeded
 from ai.backend.manager.sokovan.scheduling_controller.validators.session_spec_base import (
-    SessionSpecValidationContext,
     SessionSpecValidatorRule,
+)
+from ai.backend.manager.views.sokovan.session_creation import (
+    SessionSpecContext,
 )
 
 
@@ -23,9 +25,9 @@ class ContainerLimitRule(SessionSpecValidatorRule):
     def validate(
         self,
         spec: SessionSpec,
-        context: SessionSpecValidationContext,
+        context: SessionSpecContext,
     ) -> None:
-        policy = context.keypair_resource_policy
+        policy = context.user.policy
         if policy is None:
             return
         limit = policy.max_containers_per_session

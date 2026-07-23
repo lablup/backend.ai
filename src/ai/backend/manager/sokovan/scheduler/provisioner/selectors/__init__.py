@@ -1,7 +1,7 @@
 """Agent selector interfaces and implementations for sokovan scheduler."""
 
 # Import exceptions first (they don't have dependencies)
-from ai.backend.manager.data.sokovan import AgentInfo
+from ai.backend.manager.views.sokovan.agent import AgentInfo, AgentLimit
 
 from .exceptions import (
     AgentSelectionError,
@@ -11,11 +11,8 @@ from .exceptions import (
 from .selector import (
     AbstractAgentSelector,
     AgentSelection,
-    AgentSelectionConfig,
     AgentSelectionCriteria,
     AgentSelector,
-    KernelResourceSpec,
-    SessionMetadata,
 )
 
 # Then import selector which depends on exceptions
@@ -30,10 +27,8 @@ __all__ = [
     "AbstractAgentSelector",
     "AgentInfo",
     "AgentSelection",
-    "AgentSelectionConfig",
+    "AgentLimit",
     "AgentSelectionCriteria",
     "AgentSelector",
-    "KernelResourceSpec",
     "ResourceRequirements",
-    "SessionMetadata",
 ]

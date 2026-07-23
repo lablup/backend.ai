@@ -12,14 +12,14 @@ from collections.abc import Mapping
 from decimal import Decimal
 from typing import Any, cast, override
 
+from ai.backend.common.identifier.resource_slot import ResourceSlotName
 from ai.backend.common.types import (
     BinarySize,
     ResourceSlot,
     ResourceSlotEntry,
-    SlotName,
     SlotTypes,
 )
-from ai.backend.manager.data.resource.types import SlotTypePolicy
+from ai.backend.manager.data.resource.types import SlotTypeInfo
 from ai.backend.manager.data.session.creation import ImageInfo
 from ai.backend.manager.data.session.spec import KernelSpec, SessionSpec
 from ai.backend.manager.errors.api import InvalidAPIParameters
@@ -28,8 +28,10 @@ from ai.backend.manager.sokovan.scheduling_controller.resource_parse import (
     parse_quantity,
 )
 from ai.backend.manager.sokovan.scheduling_controller.validators.session_spec_base import (
-    SessionSpecValidationContext,
     SessionSpecValidatorRule,
+)
+from ai.backend.manager.views.sokovan.session_creation import (
+    SessionSpecContext,
 )
 
 
@@ -44,18 +46,19 @@ class ResourceLimitRule(SessionSpecValidatorRule):
     def validate(
         self,
         spec: SessionSpec,
-        context: SessionSpecValidationContext,
+        context: SessionSpecContext,
     ) -> None:
         for idx, kernel in enumerate(spec.resource_spec.kernel_specs):
-            image_info = context.image_infos.get(kernel.execution_spec.resource_input.image_id)
+            image_info = context.global_info.image_infos.get(
+                kernel.execution_spec.resource_input.image_id
+            )
             if image_info is None:
                 continue
             self._validate_kernel(
                 idx,
                 kernel,
                 image_info,
-                context.known_slot_types,
-                context.slot_type_policy,
+                context.global_info.slot_type_info,
             )
 
     @classmethod
@@ -64,8 +67,7 @@ class ResourceLimitRule(SessionSpecValidatorRule):
         idx: int,
         kernel: KernelSpec,
         image_info: ImageInfo,
-        known_slot_types: Mapping[SlotName, SlotTypes],
-        policy: SlotTypePolicy,
+        policy: SlotTypeInfo,
     ) -> None:
         min_slots = image_min_slots(image_info)
         shmem = kernel.execution_spec.resource_input.resource_opts.shmem
@@ -76,22 +78,23 @@ class ResourceLimitRule(SessionSpecValidatorRule):
             entry.resource_type: parse_quantity(entry.quantity)
             for entry in kernel.execution_spec.resource_input.resources
         }
-        for slot_name, min_value in min_slots.items():
+        for raw_slot_name, min_value in min_slots.items():
+            slot_name = ResourceSlotName(raw_slot_name)
             if Decimal(min_value) <= Decimal(0):
                 continue
-            if SlotName(slot_name) not in policy.enabled:
+            if slot_name not in policy.types:
                 continue
             requested_value = requested.get(slot_name)
             if requested_value is None or requested_value < Decimal(min_value):
-                min_repr = cls._humanize_slots(min_slots, known_slot_types)
+                min_repr = cls._humanize_slots(min_slots, policy.types)
                 raise InvalidAPIParameters(
                     extra_msg=(
                         f"kernel_specs[{idx}] resource request is smaller than "
                         f"the image minimum ({min_repr})."
                     ),
                 )
-        if shmem is not None and "mem" in requested:
-            mem_value = requested["mem"]
+        if shmem is not None and ResourceSlotName("mem") in requested:
+            mem_value = requested[ResourceSlotName("mem")]
             if Decimal(int(shmem)) >= mem_value:
                 raise InvalidAPIParameters(
                     extra_msg=(
@@ -103,7 +106,7 @@ class ResourceLimitRule(SessionSpecValidatorRule):
     @staticmethod
     def _humanize_slots(
         slots: Mapping[str, Decimal],
-        known_slot_types: Mapping[SlotName, SlotTypes],
+        known_slot_types: Mapping[ResourceSlotName, SlotTypes],
     ) -> str:
         if not known_slot_types:
             return " ".join(f"{k}={v}" for k, v in slots.items())

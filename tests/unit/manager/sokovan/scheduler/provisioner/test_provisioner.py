@@ -1,320 +1,238 @@
-"""Tests for SessionProvisioner orchestration logic.
-
-Tests that the provisioner correctly orchestrates validator, sequencer, selector, and allocator.
-Individual component logic is tested separately - here we focus on orchestration flow
-and correct agent selector selection based on agent_selection_strategy.
-"""
+"""Tests for SessionProvisioner (PENDING -> SCHEDULED pipeline)."""
 
 from __future__ import annotations
 
-import uuid
-from datetime import datetime
-from decimal import Decimal
+from collections.abc import Sequence
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from dateutil.tz import tzutc
 
-from ai.backend.common.identifier.resource_group import ResourceGroupID
-from ai.backend.common.types import (
-    AccessKey,
-    AgentId,
-    AgentSelectionStrategy,
-    ClusterMode,
-    ResourceSlot,
-    SessionId,
-    SessionTypes,
-)
-from ai.backend.manager.data.sokovan import (
-    ResourceOccupancySnapshot,
-    SessionDependencySnapshot,
-)
-from ai.backend.manager.models.scaling_group import ScalingGroupOpts
-from ai.backend.manager.repositories.scheduler.types.agent import AgentMeta
-from ai.backend.manager.repositories.scheduler.types.base import SchedulingSpec
-from ai.backend.manager.repositories.scheduler.types.scaling_group import ScalingGroupMeta
-from ai.backend.manager.repositories.scheduler.types.scheduling import SchedulingData
-from ai.backend.manager.repositories.scheduler.types.session import (
-    PendingSessionData,
-    PendingSessions,
-)
-from ai.backend.manager.repositories.scheduler.types.snapshot import (
-    ResourcePolicies,
-    SnapshotData,
-)
+from ai.backend.common.types import AgentId, SessionId
 from ai.backend.manager.sokovan.recorder import RecorderContext
 from ai.backend.manager.sokovan.scheduler.provisioner.provisioner import (
+    SchedulingState,
     SessionProvisioner,
     SessionProvisionerArgs,
 )
-from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import (
-    AgentSelector,
+from ai.backend.manager.sokovan.scheduler.provisioner.selectors.concentrated import (
+    ConcentratedAgentSelector,
+)
+from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import AgentSelector
+from ai.backend.manager.sokovan.scheduler.provisioner.sequencers.fifo import FIFOSequencer
+from ai.backend.manager.sokovan.scheduler.provisioner.validators.dependencies import (
+    DependenciesValidator,
+)
+from ai.backend.manager.sokovan.scheduler.provisioner.validators.validator import (
+    SchedulingValidator,
+)
+from ai.backend.manager.sokovan.scheduler.results import ScheduleResult
+from ai.backend.manager.views.sokovan.allocation import SessionAllocation
+from ai.backend.manager.views.sokovan.scheduling import SchedulingData
+from ai.backend.manager.views.sokovan.workload import SessionWorkload
+
+from .conftest import (
+    RESOURCE_GROUP_NAME,
+    AgentMetaFactory,
+    SchedulingDataFactory,
+    WorkloadFactory,
 )
 
 
-def test_pending_session_to_workload_carries_job_priority() -> None:
-    """SessionWorkload built for scheduling carries the session's job_priority."""
-    session = PendingSessionData(
-        id=SessionId(uuid.uuid4()),
-        access_key=AccessKey("test-key"),
-        requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("1024")}),
-        user_uuid=uuid.uuid4(),
-        group_id=uuid.uuid4(),
-        domain_name="default",
-        scaling_group_name="test-sg",
-        resource_group_id=ResourceGroupID(uuid.uuid4()),
-        session_type=SessionTypes.INTERACTIVE,
-        cluster_mode=ClusterMode.SINGLE_NODE,
-        priority=0,
-        job_priority=42,
-        is_preemptible=True,
-        starts_at=None,
-        is_private=False,
-        kernels=[],
-        designated_agent_ids=None,
-    )
-    assert session.to_session_workload().job_priority == 42
-
-
-def _create_scheduling_data_with_strategy(
-    strategy: AgentSelectionStrategy,
-) -> SchedulingData:
-    """Create SchedulingData with specific agent_selection_strategy and one session."""
-    scheduler_opts = ScalingGroupOpts(agent_selection_strategy=strategy)
-
-    scaling_group_meta = ScalingGroupMeta(
-        id=ResourceGroupID(uuid.uuid4()),
-        name="test-sg",
-        scheduler="fifo",
-        scheduler_opts=scheduler_opts,
-    )
-
-    # Create one pending session
-    session = PendingSessionData(
-        id=SessionId(uuid.uuid4()),
-        access_key=AccessKey("test-key"),
-        requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("1024")}),
-        user_uuid=uuid.uuid4(),
-        group_id=uuid.uuid4(),
-        domain_name="default",
-        scaling_group_name="test-sg",
-        resource_group_id=ResourceGroupID(uuid.uuid4()),
-        session_type=SessionTypes.INTERACTIVE,
-        cluster_mode=ClusterMode.SINGLE_NODE,
-        priority=0,
-        job_priority=0,
-        is_preemptible=True,
-        starts_at=None,
-        is_private=False,
-        kernels=[],
-        designated_agent_ids=None,
-    )
-
-    # Create snapshot data
-    snapshot_data = SnapshotData(
-        resource_occupancy=ResourceOccupancySnapshot(
-            by_keypair={},
-            by_user={},
-            by_group={},
-            by_domain={},
-            by_agent={},
-        ),
-        resource_policies=ResourcePolicies(
-            keypair_policies={},
-            user_policies={},
-            group_limits={},
-            domain_limits={},
-        ),
-        session_dependencies=SessionDependencySnapshot(by_session={}),
-    )
-
-    # Create agent
-    agent = AgentMeta(
-        id=AgentId("agent-1"),
-        addr="agent-1:6001",
-        architecture="x86_64",
-        available_slots=ResourceSlot({"cpu": Decimal("8"), "mem": Decimal("16384")}),
-        resource_group_id=ResourceGroupID(uuid.uuid4()),
-        scaling_group="test-sg",
-    )
-
-    return SchedulingData(
-        scaling_group=scaling_group_meta,
-        pending_sessions=PendingSessions(sessions=[session]),
-        agents=[agent],
-        snapshot_data=snapshot_data,
-        spec=SchedulingSpec(
-            known_slot_types={},
-            max_container_count=None,
-        ),
-    )
-
-
-@pytest.fixture
-def minimal_scheduling_data() -> SchedulingData:
-    """Create minimal SchedulingData for testing."""
-    scheduler_opts = ScalingGroupOpts(agent_selection_strategy=AgentSelectionStrategy.DISPERSED)
-
-    scaling_group_meta = ScalingGroupMeta(
-        id=ResourceGroupID(uuid.uuid4()),
-        name="test-sg",
-        scheduler="fifo",
-        scheduler_opts=scheduler_opts,
-    )
-
-    return SchedulingData(
-        scaling_group=scaling_group_meta,
-        pending_sessions=PendingSessions(sessions=[]),
-        agents=[],
-        snapshot_data=None,
-        spec=SchedulingSpec(
-            known_slot_types={},
-            max_container_count=None,
-        ),
-    )
-
-
-@pytest.fixture
-def mock_config_provider() -> MagicMock:
-    """Create mock config provider."""
-    mock_config = MagicMock()
-    mock_config.config.manager.agent_selection_resource_priority = ["cpu", "mem"]
-    return mock_config
-
-
-@pytest.fixture
-def mock_repository() -> AsyncMock:
-    """Create mock repository."""
-    return AsyncMock()
-
-
-@pytest.fixture
-def mock_fair_share_repository() -> MagicMock:
-    """Create mock fair share repository."""
-    return MagicMock()
-
-
-@pytest.fixture
-def mock_validator() -> MagicMock:
-    """Create mock validator."""
-    validator = MagicMock()
-    validator.validate = MagicMock(return_value=None)
-    return validator
-
-
-@pytest.fixture
-def mock_sequencer() -> MagicMock:
-    """Create mock sequencer."""
-    sequencer = MagicMock()
-    sequencer.sequence = MagicMock(return_value=[])
-    sequencer.name = "test-sequencer"
-    sequencer.success_message = MagicMock(return_value="Sequencing succeeded")
-    return sequencer
-
-
-@pytest.fixture
-def mock_agent_selector() -> MagicMock:
-    """Create mock agent selector."""
-    selector = MagicMock()
-    selector.select_agents_for_batch_requirements = AsyncMock(return_value=[])
-    selector.strategy_name = MagicMock(return_value="test-strategy")
-    selector.strategy_success_message = MagicMock(return_value="Agent selection succeeded")
-    return selector
-
-
-@pytest.fixture
-def mock_allocator() -> MagicMock:
-    """Create mock allocator."""
-    allocator = MagicMock()
-    allocator.allocate = AsyncMock(return_value=[])
-    allocator.name = MagicMock(return_value="test-allocator")
-    allocator.success_message = MagicMock(return_value="Allocation succeeded")
-    return allocator
-
-
-@pytest.fixture
-def mock_selector_pool() -> dict[AgentSelectionStrategy, MagicMock]:
-    """Create mock selector pool for all strategies."""
-    mock_selectors = {s: MagicMock(spec=AgentSelector) for s in AgentSelectionStrategy}
-
-    for mock_selector in mock_selectors.values():
-        mock_selector.select_agents_for_batch_requirements = AsyncMock(return_value=[])
-        mock_selector.strategy_name = MagicMock(return_value="test-strategy")
-        mock_selector.strategy_success_message = MagicMock(return_value="Selection succeeded")
-
-    return mock_selectors
-
-
-@pytest.fixture
-def test_provisioner(
-    mock_repository: AsyncMock,
-    mock_fair_share_repository: MagicMock,
-    mock_validator: MagicMock,
-    mock_sequencer: MagicMock,
-    mock_agent_selector: MagicMock,
-    mock_allocator: MagicMock,
-    mock_config_provider: MagicMock,
+def _make_provisioner(
+    repository: AsyncMock,
+    valkey_schedule: AsyncMock,
 ) -> SessionProvisioner:
-    """Create SessionProvisioner with mock dependencies."""
-    valkey_schedule = MagicMock()
-    valkey_schedule.set_pending_queue = AsyncMock(return_value=None)
-    valkey_schedule.get_multiple_session_failed_agents = AsyncMock(
-        side_effect=lambda session_ids: [frozenset() for _ in session_ids]
-    )
-
+    config_provider = MagicMock()
+    config_provider.config.manager.agent_selection_resource_priority = ["cpu", "mem"]
     return SessionProvisioner(
         SessionProvisionerArgs(
-            validator=mock_validator,
-            default_sequencer=mock_sequencer,
-            default_agent_selector=mock_agent_selector,
-            allocator=mock_allocator,
-            repository=mock_repository,
-            fair_share_repository=mock_fair_share_repository,
-            config_provider=mock_config_provider,
+            validator=SchedulingValidator([DependenciesValidator()]),
+            default_sequencer=FIFOSequencer(),
+            default_agent_selector=AgentSelector(
+                ConcentratedAgentSelector(agent_selection_resource_priority=["cpu", "mem"])
+            ),
+            repository=repository,
+            fair_share_repository=MagicMock(),
+            config_provider=config_provider,
             valkey_schedule=valkey_schedule,
         )
     )
 
 
-class TestScheduleScalingGroup:
-    """Test schedule_scaling_group method."""
+@pytest.fixture
+def repository() -> AsyncMock:
+    repo = AsyncMock()
 
-    @pytest.mark.parametrize(
-        "strategy",
-        [
-            AgentSelectionStrategy.DISPERSED,
-            AgentSelectionStrategy.CONCENTRATED,
-            AgentSelectionStrategy.ROUNDROBIN,
-            AgentSelectionStrategy.LEGACY,
-        ],
-    )
-    async def test_uses_correct_agent_selector(
+    def _allocate(allocations: Sequence[SessionAllocation]) -> list[SessionId]:
+        return [allocation.session_id for allocation in allocations]
+
+    repo.allocate_sessions.side_effect = _allocate
+    return repo
+
+
+@pytest.fixture
+def valkey_schedule() -> AsyncMock:
+    return AsyncMock()
+
+
+@pytest.fixture
+def provisioner(repository: AsyncMock, valkey_schedule: AsyncMock) -> SessionProvisioner:
+    return _make_provisioner(repository, valkey_schedule)
+
+
+async def _schedule(
+    provisioner: SessionProvisioner,
+    scheduling_data: SchedulingData,
+    workloads: list[SessionWorkload],
+) -> ScheduleResult:
+    with RecorderContext[SessionId].scope(
+        "schedule", entity_ids=[w.meta.session_id for w in workloads]
+    ):
+        return await provisioner.schedule_resource_group(scheduling_data)
+
+
+class TestSchedulingState:
+    def test_from_scheduling_data_builds_trackers(
         self,
-        strategy: AgentSelectionStrategy,
-        test_provisioner: SessionProvisioner,
-        mock_selector_pool: dict[AgentSelectionStrategy, MagicMock],
+        workload_factory: WorkloadFactory,
+        agent_meta_factory: AgentMetaFactory,
+        scheduling_data_factory: SchedulingDataFactory,
     ) -> None:
-        """
-        Verify that schedule_scaling_group uses correct agent_selector.
-        """
-        # Given: Override provisioner's selector pool with mock selectors
-        test_provisioner._agent_selector_pool = mock_selector_pool
+        data = scheduling_data_factory(
+            workloads=[workload_factory()],
+            agents=[agent_meta_factory("agent-1"), agent_meta_factory("agent-2")],
+        )
 
-        # Given: SchedulingData with specific strategy
-        scheduling_data = _create_scheduling_data_with_strategy(strategy)
-        session_ids = [s.id for s in scheduling_data.pending_sessions.sessions]
+        state = SchedulingState.from_scheduling_data(data)
 
-        # When: Execute schedule_scaling_group within RecorderContext scope
-        # (In production, coordinator opens the scope before calling provisioner)
-        provision_time = datetime.now(tzutc())
-        with RecorderContext[SessionId].scope("test-provisioning", entity_ids=session_ids):
-            await test_provisioner.schedule_scaling_group(scheduling_data, provision_time)
+        assert state.snapshot is data.system_snapshot
+        assert state.resource_group is data.resource_group
+        assert len(state.trackers) == 2
+        assert {t.original_agent.agent_id for t in state.trackers} == {
+            AgentId("agent-1"),
+            AgentId("agent-2"),
+        }
 
-        # Then: The selector for the specified strategy was used
-        used_selector = mock_selector_pool[strategy]
-        used_selector.select_agents_for_batch_requirements.assert_called()
 
-        # And: Other selectors were not used
-        for other_strategy, other_selector in mock_selector_pool.items():
-            if other_strategy != strategy:
-                other_selector.select_agents_for_batch_requirements.assert_not_called()
+class TestScheduleResourceGroup:
+    async def test_successful_scheduling(
+        self,
+        provisioner: SessionProvisioner,
+        repository: AsyncMock,
+        valkey_schedule: AsyncMock,
+        workload_factory: WorkloadFactory,
+        scheduling_data_factory: SchedulingDataFactory,
+    ) -> None:
+        workload = workload_factory()
+        data = scheduling_data_factory(workloads=[workload])
+
+        result = await _schedule(provisioner, data, [workload])
+
+        assert result.scheduled_session_ids == [workload.meta.session_id]
+        assert result.scheduling_failures == []
+
+        repository.allocate_sessions.assert_awaited_once()
+        allocations = repository.allocate_sessions.await_args_list[0].args[0]
+        assert len(allocations) == 1
+        allocation = allocations[0]
+        assert allocation.session_id == workload.meta.session_id
+        assert [ka.kernel_id for ka in allocation.kernel_allocations] == [
+            workload.placement.kernels[0].kernel_id
+        ]
+        assert allocation.kernel_allocations[0].agent_id == AgentId("agent-1")
+        assert allocation.kernel_allocations[0].agent_addr == "agent-1:6001"
+
+        valkey_schedule.set_pending_queue.assert_awaited_once_with(RESOURCE_GROUP_NAME, [])
+
+    async def test_single_node_multi_kernel_lands_on_one_agent(
+        self,
+        provisioner: SessionProvisioner,
+        repository: AsyncMock,
+        workload_factory: WorkloadFactory,
+        scheduling_data_factory: SchedulingDataFactory,
+    ) -> None:
+        workload = workload_factory(
+            kernel_slots=[{"cpu": "2", "mem": "2048"}, {"cpu": "1", "mem": "1024"}]
+        )
+        data = scheduling_data_factory(workloads=[workload])
+
+        result = await _schedule(provisioner, data, [workload])
+
+        assert result.scheduled_session_ids == [workload.meta.session_id]
+        allocation = repository.allocate_sessions.await_args_list[0].args[0][0]
+        assert len(allocation.kernel_allocations) == 2
+        assert {ka.kernel_id for ka in allocation.kernel_allocations} == {
+            kernel.kernel_id for kernel in workload.placement.kernels
+        }
+        assert allocation.unique_agent_ids() == [AgentId("agent-1")]
+
+    async def test_insufficient_resources_reports_failure(
+        self,
+        provisioner: SessionProvisioner,
+        repository: AsyncMock,
+        valkey_schedule: AsyncMock,
+        workload_factory: WorkloadFactory,
+        agent_meta_factory: AgentMetaFactory,
+        scheduling_data_factory: SchedulingDataFactory,
+    ) -> None:
+        workload = workload_factory(kernel_slots=[{"cpu": "100", "mem": "999999"}])
+        data = scheduling_data_factory(
+            workloads=[workload],
+            agents=[agent_meta_factory("agent-1", {"cpu": "4", "mem": "8192"})],
+        )
+
+        result = await _schedule(provisioner, data, [workload])
+
+        assert result.scheduled_session_ids == []
+        assert len(result.scheduling_failures) == 1
+        failure = result.scheduling_failures[0]
+        assert failure.session_id == workload.meta.session_id
+        assert failure.msg
+
+        # The failed session goes to the pending queue keyed by group name
+        valkey_schedule.set_pending_queue.assert_awaited_once_with(
+            RESOURCE_GROUP_NAME, [workload.meta.session_id]
+        )
+        # The allocation write still happens (with an empty batch)
+        repository.allocate_sessions.assert_awaited_once_with([])
+
+    async def test_partial_failure_keeps_other_sessions(
+        self,
+        provisioner: SessionProvisioner,
+        repository: AsyncMock,
+        workload_factory: WorkloadFactory,
+        agent_meta_factory: AgentMetaFactory,
+        scheduling_data_factory: SchedulingDataFactory,
+    ) -> None:
+        """One session failing does not abort the other sessions of the pass."""
+        fitting = workload_factory(kernel_slots=[{"cpu": "2", "mem": "2048"}])
+        too_big = workload_factory(kernel_slots=[{"cpu": "100", "mem": "999999"}])
+        data = scheduling_data_factory(
+            workloads=[fitting, too_big],
+            agents=[agent_meta_factory("agent-1", {"cpu": "4", "mem": "8192"})],
+        )
+
+        result = await _schedule(provisioner, data, [fitting, too_big])
+
+        assert result.scheduled_session_ids == [fitting.meta.session_id]
+        assert [f.session_id for f in result.scheduling_failures] == [too_big.meta.session_id]
+
+    async def test_in_batch_occupancy_blocks_later_sessions(
+        self,
+        provisioner: SessionProvisioner,
+        workload_factory: WorkloadFactory,
+        agent_meta_factory: AgentMetaFactory,
+        scheduling_data_factory: SchedulingDataFactory,
+    ) -> None:
+        """Earlier allocations of the pass are observed by later sessions."""
+        first = workload_factory(kernel_slots=[{"cpu": "3", "mem": "6144"}])
+        second = workload_factory(kernel_slots=[{"cpu": "3", "mem": "6144"}])
+        data = scheduling_data_factory(
+            workloads=[first, second],
+            agents=[agent_meta_factory("agent-1", {"cpu": "4", "mem": "8192"})],
+        )
+
+        result = await _schedule(provisioner, data, [first, second])
+
+        assert result.scheduled_session_ids == [first.meta.session_id]
+        assert [f.session_id for f in result.scheduling_failures] == [second.meta.session_id]
