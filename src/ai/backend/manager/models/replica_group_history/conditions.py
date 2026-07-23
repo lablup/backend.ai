@@ -40,13 +40,6 @@ class ReplicaGroupHistoryConditions:
         return inner
 
     @staticmethod
-    def by_replica_group_id(replica_group_id: ReplicaGroupID) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ReplicaGroupHistoryRow.replica_group_id == replica_group_id
-
-        return inner
-
-    @staticmethod
     def by_replica_group_ids(group_ids: Collection[ReplicaGroupID]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return ReplicaGroupHistoryRow.replica_group_id.in_(group_ids)
