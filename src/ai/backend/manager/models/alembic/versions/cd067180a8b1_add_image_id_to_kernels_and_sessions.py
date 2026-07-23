@@ -34,8 +34,8 @@ def upgrade() -> None:
             ),
         )
 
-    fks = [fk["name"] for fk in inspector.get_foreign_keys("kernels")]
-    if "fk_kernels_image_id" not in fks:
+    fk_columns = [fk["constrained_columns"] for fk in inspector.get_foreign_keys("kernels")]
+    if ["image_id"] not in fk_columns:
         op.create_foreign_key(
             "fk_kernels_image_id",
             "kernels",
@@ -95,5 +95,4 @@ def upgrade() -> None:
 def downgrade() -> None:
     op.drop_column("sessions", "image_ids")
     op.drop_index("ix_kernels_image_id", table_name="kernels")
-    op.drop_constraint("fk_kernels_image_id", "kernels", type_="foreignkey")
     op.drop_column("kernels", "image_id")

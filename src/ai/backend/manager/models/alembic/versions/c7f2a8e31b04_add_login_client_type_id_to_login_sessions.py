@@ -32,8 +32,8 @@ def upgrade() -> None:
             ),
         )
 
-    fks = [fk["name"] for fk in inspector.get_foreign_keys("login_sessions")]
-    if "fk_login_sessions_login_client_type_id" not in fks:
+    fk_columns = [fk["constrained_columns"] for fk in inspector.get_foreign_keys("login_sessions")]
+    if ["login_client_type_id"] not in fk_columns:
         op.create_foreign_key(
             "fk_login_sessions_login_client_type_id",
             "login_sessions",
@@ -54,7 +54,4 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.drop_index("ix_login_sessions_login_client_type_id", table_name="login_sessions")
-    op.drop_constraint(
-        "fk_login_sessions_login_client_type_id", "login_sessions", type_="foreignkey"
-    )
     op.drop_column("login_sessions", "login_client_type_id")
