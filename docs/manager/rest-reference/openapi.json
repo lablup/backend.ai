@@ -20169,7 +20169,7 @@
         "type": "object"
       },
       "MountItemInput": {
-        "description": "A single virtual folder mount specification.",
+        "description": "A single virtual folder mount specification.\n\nShared by the session enqueue input and the session-options kernel\nexecution spec (lives here to avoid a session <-> session_options\ncircular import).",
         "properties": {
           "vfolder_id": {
             "description": "Virtual folder UUID to mount.",
@@ -26933,6 +26933,18 @@
             "default": null,
             "description": "Designated agent IDs for placement constraint.",
             "title": "Agent List"
+          },
+          "agent_selection_policy": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentSelectionPolicyEnum"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "How agent_list is enforced (strict/preferred). null inherits the resource group default."
           },
           "attach_network": {
             "anyOf": [
