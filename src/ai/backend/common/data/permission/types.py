@@ -189,6 +189,8 @@ class EntityType(enum.StrEnum):
     DEPLOYMENT_SCOPED_HISTORY = "deployment:scoped_history"
     DEPLOYMENT_ERROR = "deployment:error"
     DEPLOYMENT_TOKEN = "deployment:token"
+    # Replica group sub
+    REPLICA_GROUP_HISTORY = "replica_group:history"
     # Image sub
     IMAGE_ALIAS = "image:alias"
     IMAGE_TAG = "image:tag"

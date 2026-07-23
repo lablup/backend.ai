@@ -19,6 +19,7 @@ __all__ = (
     "KernelHistoryOrderField",
     "KernelHistoryScopeDTO",
     "OrderDirection",
+    "ReplicaGroupHistoryOrderField",
     "RouteHistoryOrderField",
     "RouteHistoryScopeDTO",
     "SchedulingResultType",
@@ -71,6 +72,18 @@ class RouteHistoryOrderField(StrEnum):
 
     CREATED_AT = "created_at"
     UPDATED_AT = "updated_at"
+
+
+class ReplicaGroupHistoryOrderField(StrEnum):
+    """Fields available for ordering replica-group scheduling history."""
+
+    CREATED_AT = "created_at"
+    UPDATED_AT = "updated_at"
+    PHASE = "phase"
+    FROM_STATUS = "from_status"
+    TO_STATUS = "to_status"
+    RESULT = "result"
+    ATTEMPTS = "attempts"
 
 
 class SubStepResultInfo(BaseResponseModel):
