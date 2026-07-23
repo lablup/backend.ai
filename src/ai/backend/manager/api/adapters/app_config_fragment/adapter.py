@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from functools import lru_cache
 
 from ai.backend.common.data.app_config.types import AppConfigScopeType
@@ -59,6 +60,9 @@ from ai.backend.manager.repositories.base import (
 )
 from ai.backend.manager.services.app_config_fragment.actions.admin_search import (
     AdminSearchAppConfigFragmentAction,
+)
+from ai.backend.manager.services.app_config_fragment.actions.batch_load_by_ids import (
+    BatchLoadAppConfigFragmentsByIdsAction,
 )
 from ai.backend.manager.services.app_config_fragment.actions.bulk_purge import (
     BulkPurgeAppConfigFragmentAction,
@@ -179,6 +183,32 @@ class AppConfigFragmentAdapter(BaseAdapter):
                 for error in action_result.failed
             ],
         )
+
+    async def batch_load_by_ids(
+        self, fragment_ids: Sequence[AppConfigFragmentID]
+    ) -> list[AppConfigFragmentNode | None]:
+        """Batch load fragments by id for the GraphQL DataLoader.
+
+        Returns nodes in the order of ``fragment_ids``, with ``None`` for ids that no longer
+        exist. Every requested id is RBAC-authorized before the load runs.
+        """
+        if not fragment_ids:
+            return []
+        querier = self._build_querier(
+            conditions=[AppConfigFragmentConditions.by_ids(list(fragment_ids))],
+            orders=[],
+            pagination_spec=_get_app_config_fragment_pagination_spec(),
+            limit=len(fragment_ids),
+        )
+        action_result = (
+            await self._processors.app_config_fragment.batch_load_by_ids.wait_for_complete(
+                BatchLoadAppConfigFragmentsByIdsAction(
+                    fragment_ids=list(fragment_ids), querier=querier
+                )
+            )
+        )
+        node_map = {node.id: node for node in map(self._fragment_to_node, action_result.items)}
+        return [node_map.get(fragment_id) for fragment_id in fragment_ids]
 
     # --- admin fragment search ---
 

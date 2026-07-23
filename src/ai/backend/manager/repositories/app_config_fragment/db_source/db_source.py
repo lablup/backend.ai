@@ -183,6 +183,17 @@ class AppConfigFragmentDBSource:
             )
 
     @app_config_fragment_db_source_resilience.apply()
+    async def batch_load_by_ids(self, querier: BatchQuerier) -> Sequence[AppConfigFragmentData]:
+        """Load the fragments the querier names by id, in no particular order.
+
+        No scope filter: the caller authorizes each requested fragment before this runs, so
+        filtering again here would hide rows the caller was already granted.
+        """
+        async with self._rbac_ops_provider.read_ops() as r:
+            result = await r.batch_query_in_global(sa.select(AppConfigFragmentRow), querier)
+            return [row.AppConfigFragmentRow.to_data() for row in result.rows]
+
+    @app_config_fragment_db_source_resilience.apply()
     async def scoped_search(
         self,
         querier: BatchQuerier,
