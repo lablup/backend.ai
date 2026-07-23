@@ -55,7 +55,7 @@ Check options with `--help`.
 - **service-catalog**: user(empty group) · admin(search)
 - **runtime-variant**: user(get, search) · admin(get, search, create, update, delete, bulk-delete)
 - **runtime-variant-preset**: user(get, search) · admin(get, search, create, update, delete)
-- **scheduling-history**: sub session / deployment / route — each (search, search-scoped)
+- **scheduling-history**: sub session / kernel / deployment / route — each (search, search-scoped)
 - **scheduling-handler**: admin(list)
 
 ### Storage
