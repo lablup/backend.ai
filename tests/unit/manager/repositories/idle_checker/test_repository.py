@@ -498,6 +498,34 @@ class TestFetchJudgmentBatch:
         assert row is not None
         assert row.last_status is IdleCheckPhase.IDLE_EXPIRED
 
+    async def test_deletes_assignment_after_batch_boundary(
+        self,
+        database: ExtendedAsyncSAEngine,
+        repository: IdleCheckerRepository,
+        judgment_rows: JudgmentRows,
+    ) -> None:
+        pair_to_delete = SessionIdleCheckPair(
+            judgment_rows.active_session_id,
+            judgment_rows.checker_id,
+        )
+        pairs_to_delete = [
+            SessionIdleCheckPair(
+                SessionId(uuid.uuid4()),
+                IdleCheckerID(uuid.uuid4()),
+            )
+            for _ in range(1000)
+        ]
+        pairs_to_delete.append(pair_to_delete)
+
+        await repository.sync_session_idle_check_assignments([], pairs_to_delete, datetime.now(UTC))
+
+        async with database.begin_readonly_session() as db_sess:
+            row = await db_sess.get(
+                SessionIdleCheckRow,
+                (pair_to_delete.session_id, pair_to_delete.checker_id),
+            )
+        assert row is None
+
 
 class TestFetchExpiredIdleChecks:
     @pytest.fixture

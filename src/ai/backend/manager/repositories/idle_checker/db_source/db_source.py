@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Collection, Sequence
 from datetime import datetime
+from itertools import batched
 from typing import cast
 
 import sqlalchemy as sa
@@ -46,6 +47,8 @@ from ai.backend.manager.repositories.idle_checker.types import (
     SessionIdleCheckPair,
 )
 from ai.backend.manager.repositories.ops import DBOpsProvider
+
+_ASSIGNMENT_DELETE_BATCH_SIZE = 1000
 
 
 class IdleCheckerDBSource:
@@ -215,6 +218,10 @@ class IdleCheckerDBSource:
                     )
                 )
             if pairs_to_delete:
-                await w.batch_purge(
-                    BatchPurger(spec=SessionIdleCheckBatchPurgerSpec(pairs_to_delete))
-                )
+                for pair_batch in batched(pairs_to_delete, _ASSIGNMENT_DELETE_BATCH_SIZE):
+                    await w.batch_purge(
+                        BatchPurger(
+                            spec=SessionIdleCheckBatchPurgerSpec(pair_batch),
+                            batch_size=_ASSIGNMENT_DELETE_BATCH_SIZE,
+                        )
+                    )
