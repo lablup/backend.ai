@@ -154,10 +154,7 @@ class SchedulingHistoryRepository:
     async def resolve_replica_group_deployment(
         self, replica_group_id: ReplicaGroupID
     ) -> DeploymentID:
-        """Return the id of the deployment owning ``replica_group_id``.
-
-        Raises ``ReplicaGroupNotFound`` when no such replica group exists.
-        """
+        """Return the id of the deployment owning ``replica_group_id``."""
         return await self._db_source.resolve_replica_group_deployment(replica_group_id)
 
     @scheduling_history_repository_resilience.apply()
