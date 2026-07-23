@@ -8,6 +8,8 @@ from collections.abc import AsyncGenerator
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.identifier.project import ProjectID
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.group.types import ProjectType
@@ -44,6 +46,8 @@ from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
+from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.manager.repositories.group.db_source import GroupDBSource
 from ai.backend.manager.repositories.permission_controller.db_source.db_source import (
     PermissionDBSource,
@@ -94,6 +98,8 @@ class TestRoleAssignment:
                 ReplicaGroupRow,
                 RoutingRow,
                 ResourcePresetRow,
+                VirtualScopeRow,
+                EntityMembershipRow,
             ],
         ):
             yield database_connection
@@ -160,6 +166,12 @@ class TestRoleAssignment:
                     integration_id=None,
                     resource_policy=policy_name,
                     type=ProjectType.GENERAL,
+                )
+            )
+            session.add(
+                VirtualScopeRow(
+                    scope_type=ScopeType.PROJECT.value,
+                    scope_id=project_id,
                 )
             )
             await session.commit()
@@ -330,7 +342,7 @@ class TestRoleAssignment:
         test_project: uuid.UUID,
     ) -> None:
         """bind_user_to_project creates the ASE row (PROJECT/USER)."""
-        await group_db_source.bind_user_to_project(user_1, test_project)
+        await group_db_source.bind_user_to_project(UserID(user_1), ProjectID(test_project))
 
         async with db_with_cleanup.begin_readonly_session() as session:
             assoc = await session.execute(
@@ -351,8 +363,8 @@ class TestRoleAssignment:
         test_project: uuid.UUID,
     ) -> None:
         """Calling bind twice does not create duplicate rows."""
-        await group_db_source.bind_user_to_project(user_1, test_project)
-        await group_db_source.bind_user_to_project(user_1, test_project)
+        await group_db_source.bind_user_to_project(UserID(user_1), ProjectID(test_project))
+        await group_db_source.bind_user_to_project(UserID(user_1), ProjectID(test_project))
 
         async with db_with_cleanup.begin_readonly_session() as session:
             assoc = await session.execute(
@@ -373,8 +385,8 @@ class TestRoleAssignment:
         test_project: uuid.UUID,
     ) -> None:
         """unbind_user_from_project removes the ASE row."""
-        await group_db_source.bind_user_to_project(user_1, test_project)
-        await group_db_source.unbind_user_from_project(user_1, test_project)
+        await group_db_source.bind_user_to_project(UserID(user_1), ProjectID(test_project))
+        await group_db_source.unbind_user_from_project(UserID(user_1), ProjectID(test_project))
 
         async with db_with_cleanup.begin_readonly_session() as session:
             assoc = await session.execute(

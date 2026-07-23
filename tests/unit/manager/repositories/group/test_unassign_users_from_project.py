@@ -38,6 +38,9 @@ from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
+from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.manager.repositories.group.db_source import GroupDBSource
 from ai.backend.manager.repositories.group.scope_binders import UserProjectEntityUnbinder
 from ai.backend.testutils.db import with_tables
@@ -84,6 +87,9 @@ class TestUnassignUsersFromProject:
                 ReplicaGroupRow,
                 RoutingRow,
                 ResourcePresetRow,
+                VirtualScopeRow,
+                ScopeBindingRow,
+                EntityMembershipRow,
             ],
         ):
             yield database_connection
@@ -158,6 +164,12 @@ class TestUnassignUsersFromProject:
                     integration_id=None,
                     resource_policy=policy_name,
                     type=ProjectType.GENERAL,
+                )
+            )
+            session.add(
+                VirtualScopeRow(
+                    scope_type=ScopeType.PROJECT.value,
+                    scope_id=project_id,
                 )
             )
             await session.commit()

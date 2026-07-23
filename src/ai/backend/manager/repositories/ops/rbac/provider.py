@@ -49,11 +49,7 @@ from ai.backend.manager.models.virtual_scope.entity_membership import EntityMemb
 from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.manager.repositories.base import (
-    BatchPurger,
-    BatchPurgerResult,
     BulkCreator,
-    Purger,
-    PurgerResult,
 )
 from ai.backend.manager.repositories.base.creator import BulkCreatorError
 from ai.backend.manager.repositories.base.integrity import parse_integrity_error
@@ -70,8 +66,11 @@ from ai.backend.manager.repositories.base.rbac.entity_creator import (
     execute_rbac_entity_creators,
 )
 from ai.backend.manager.repositories.base.rbac.entity_purger import (
+    RBACEntityBatchPurger,
+    RBACEntityBatchPurgerResult,
     RBACEntityPurger,
     RBACEntityPurgerResult,
+    execute_rbac_entity_batch_purger,
     execute_rbac_entity_purger,
 )
 from ai.backend.manager.repositories.ops.base.provider import DBOpsProvider, WriteOps
@@ -129,18 +128,18 @@ class EntityMembersAddition:
 
 @dataclass
 class ScopeDeletion[TRow: Base]:
-    """A real scope-entity row to delete together with its virtual scope."""
+    """A real scope-entity row to delete together with its RBAC entries and virtual scope."""
 
-    purger: Purger[TRow]
+    purger: RBACEntityPurger[TRow]
     scope: ScopeRef
 
 
 @dataclass
 class ScopeBatchDeletion[TRow: Base]:
-    """A batch purger selecting real scope-entity rows to delete, together with the
-    virtual scopes to drop for the deleted rows."""
+    """A batch purger selecting real scope-entity rows to delete together with their RBAC
+    entries, and the virtual scopes to drop for the deleted rows."""
 
-    purger: BatchPurger[TRow]
+    purger: RBACEntityBatchPurger[TRow]
     scopes: Sequence[ScopeRef]
 
 
@@ -506,28 +505,30 @@ class RBACWriteOps(WriteOps):
     async def delete_scope[TRow: Base](
         self,
         deletion: ScopeDeletion[TRow],
-    ) -> PurgerResult[TRow] | None:
-        """Delete the real scope entity via ``deletion.purger`` and its virtual scope node.
+    ) -> RBACEntityPurgerResult[TRow] | None:
+        """Delete a scope in full: the real row with its RBAC entries (permissions and
+        scope associations in both directions) and its virtual scope node.
 
         Deleting the virtual scope cascades to its scope bindings and entity
-        memberships (FK ``ON DELETE CASCADE``).
+        memberships (FK ``ON DELETE CASCADE``). Returns ``None`` if the row is
+        already gone.
         """
-        result = await self.purge(deletion.purger)
+        result = await self.purge_scoped(deletion.purger)
         await self._delete_virtual_scopes([deletion.scope])
         return result
 
     async def batch_delete_scopes[TRow: Base](
         self,
         deletion: ScopeBatchDeletion[TRow],
-    ) -> BatchPurgerResult:
-        """Delete the real scope entities matched by ``deletion.purger`` and their virtual
-        scope nodes.
+    ) -> RBACEntityBatchPurgerResult:
+        """Delete the scopes matched by ``deletion.purger`` in full, as
+        :meth:`delete_scope` does for one.
 
-        The real scope rows are purged atomically via the batch purge (all-or-nothing), then
-        the virtual scope nodes for ``deletion.scopes`` are dropped (FK ``ON DELETE CASCADE``
+        The real scope rows are purged in batches with their RBAC entries, then the
+        virtual scope nodes for ``deletion.scopes`` are dropped (FK ``ON DELETE CASCADE``
         removes their edges).
         """
-        result = await self.batch_purge(deletion.purger)
+        result = await execute_rbac_entity_batch_purger(self._sess, deletion.purger)
         await self._delete_virtual_scopes(deletion.scopes)
         return result
 
