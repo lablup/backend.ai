@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
@@ -25,13 +26,13 @@ from ai.backend.manager.models.scheduling_history import (
     RouteHistoryRow,
     SessionSchedulingHistoryRow,
 )
+from ai.backend.manager.models.scopes import SearchScope
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     execute_batch_querier,
 )
 from ai.backend.manager.repositories.scheduling_history.types import (
     DeploymentHistorySearchScope,
-    KernelSchedulingHistorySearchScope,
     RouteHistorySearchScope,
     SessionSchedulingHistorySearchScope,
 )
@@ -141,13 +142,13 @@ class SchedulingHistoryDBSource:
     async def search_kernel_scoped_history(
         self,
         querier: BatchQuerier,
-        scope: KernelSchedulingHistorySearchScope,
+        scopes: Sequence[SearchScope],
     ) -> KernelSchedulingHistoryListResult:
         """Search kernel history whose rows match any of ``scopes`` (OR), narrowed by ``querier``."""
         async with self._db.begin_readonly_session() as db_sess:
             query = sa.select(KernelSchedulingHistoryRow)
 
-            result = await execute_batch_querier(db_sess, query, querier, scopes=[scope])
+            result = await execute_batch_querier(db_sess, query, querier, scopes=scopes)
 
             items = [row.KernelSchedulingHistoryRow.to_data() for row in result.rows]
 

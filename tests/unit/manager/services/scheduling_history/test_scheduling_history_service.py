@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from unittest.mock import MagicMock, create_autospec
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from dateutil.tz import tzutc
@@ -40,8 +40,8 @@ from ai.backend.manager.repositories.base.pagination import NoPagination
 from ai.backend.manager.repositories.scheduling_history import SchedulingHistoryRepository
 from ai.backend.manager.repositories.scheduling_history.types import (
     DeploymentHistorySearchScope,
-    KernelSchedulingHistorySearchScope,
     RouteHistorySearchScope,
+    SessionKernelHistorySearchScope,
     SessionSchedulingHistorySearchScope,
 )
 from ai.backend.manager.services.scheduling_history.actions.resolve_kernel_session import (
@@ -58,6 +58,7 @@ from ai.backend.manager.services.scheduling_history.actions.search_kernel_histor
 )
 from ai.backend.manager.services.scheduling_history.actions.search_kernel_scoped_history import (
     SearchKernelScopedHistoryAction,
+    SessionKernelHistoryTarget,
 )
 from ai.backend.manager.services.scheduling_history.actions.search_route_history import (
     SearchRouteHistoryAction,
@@ -74,6 +75,7 @@ from ai.backend.manager.services.scheduling_history.actions.search_session_scope
 from ai.backend.manager.services.scheduling_history.service import SchedulingHistoryService
 
 _NOW = datetime.now(tz=tzutc())
+_SESSION_ID = SessionId(UUID("6ad4b5d1-3a4e-4a1f-9f6a-1c4a3f9d2b70"))
 
 
 @pytest.fixture
@@ -380,7 +382,7 @@ class TestResolveKernelSessionAction:
 
 
 class TestSearchKernelScopedHistoryAction:
-    async def test_scopes_to_the_owning_session_and_narrows_to_the_kernel(
+    async def test_scopes_to_the_session_owning_the_kernels(
         self,
         service: SchedulingHistoryService,
         mock_repository: MagicMock,
@@ -395,25 +397,22 @@ class TestSearchKernelScopedHistoryAction:
                 has_previous_page=False,
             )
         )
-        kernel_id = KernelId(uuid4())
-        session_id = SessionId(uuid4())
 
         action = SearchKernelScopedHistoryAction(
-            kernel_id=kernel_id, session_id=session_id, querier=querier
+            target=SessionKernelHistoryTarget(session_id=_SESSION_ID), querier=querier
         )
         result = await service.search_kernel_scoped_history(action)
 
         assert result.items == [history_item]
         # Authorized via session read: kernel permission records are intentionally
-        # empty, so the owning session is the subject, scope, and target of the
-        # RBAC check; kernel_id bounds the repository query.
+        # empty, so the session is the subject, scope, and target of the RBAC check.
         assert action.target_element() == RBACElementRef(
-            element_type=RBACElementType.SESSION, element_id=str(session_id)
+            element_type=RBACElementType.SESSION, element_id=str(_SESSION_ID)
         )
         assert action.scope_type() is ScopeType.SESSION
-        assert action.scope_id() == str(session_id)
+        assert action.scope_id() == str(_SESSION_ID)
         assert action.entity_type() is EntityType.SESSION
         mock_repository.search_kernel_scoped_history.assert_awaited_once_with(
             querier=querier,
-            scope=KernelSchedulingHistorySearchScope(kernel_id=kernel_id),
+            scopes=[SessionKernelHistorySearchScope(session_id=_SESSION_ID)],
         )

@@ -599,6 +599,7 @@ class KernelV2GQL(PydanticNodeMixin[KernelNode]):
         """Fetch the scheduling history of this kernel."""
         from uuid import UUID
 
+        from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
         from ai.backend.common.dto.manager.v2.scheduling_history.request import (
             ScopedSearchKernelHistoriesInput,
         )
@@ -616,7 +617,7 @@ class KernelV2GQL(PydanticNodeMixin[KernelNode]):
 
         result = await info.context.adapters.scheduling_history.scoped_search_kernel_history(
             ScopedSearchKernelHistoriesInput(
-                scope=KernelHistoryScopeDTO(kernel_id=UUID(str(self.id))),
+                scope=KernelHistoryScopeDTO(kernel=[UUIDScope(value=UUID(str(self.id)))]),
                 filter=filter.to_pydantic() if filter else None,
                 order=[o.to_pydantic() for o in order_by] if order_by else None,
                 first=first,
