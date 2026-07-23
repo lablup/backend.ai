@@ -9,13 +9,20 @@ from __future__ import annotations
 
 import asyncio
 import os
+import shlex
 from collections.abc import AsyncIterator, Generator, Sequence
 from dataclasses import dataclass, field
+from uuid import UUID
 
 import pytest
+import yarl
 
+from ai.backend.client.v2.auth import HMACAuth
+from ai.backend.client.v2.config import ClientConfig
+from ai.backend.client.v2.v2_registry import V2ClientRegistry
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.types import HostPortPair
+from ai.backend.testutils.dataplane.agent_control import AgentControlConfig, AgentController
 from ai.backend.testutils.dataplane.collectors.base import ResourceCollector
 from ai.backend.testutils.dataplane.collectors.containerd_objects import ContainerdObjectCollector
 from ai.backend.testutils.dataplane.collectors.docker_objects import DockerKernelContainerCollector
@@ -31,6 +38,7 @@ from ai.backend.testutils.dataplane.collectors.host import (
 )
 from ai.backend.testutils.dataplane.guard import LeakGuard
 from ai.backend.testutils.dataplane.nodes import Node, SudoNode, parse_node_specs
+from ai.backend.testutils.dataplane.session import SessionDriver, SessionSpec
 
 ENV_NODES = "BAI_DATAPLANE_NODES"
 
@@ -47,6 +55,18 @@ class DataplaneConfig:
     etcd_namespace: str = "local"
     agent_process_pattern: str = "ai.backend.agent"
     use_sudo: bool = True
+    manager_endpoint: str = "http://127.0.0.1:8091"
+    access_key: str = ""
+    secret_key: str = ""
+    image_id: str = ""
+    project_id: str = ""
+    agent_start_cmd: tuple[str, ...] = ()
+    agent_stop_cmd: tuple[str, ...] = ()
+    agent_rpc_port: int = 6011
+    privnet_mode: bool = False
+    """Whether the agent delegates host networking to a privnet daemon. Single-node cluster peer
+    resolution is unimplemented in that mode (the privnet owns the LOCAL pool the addresses are
+    computed from), so a scenario that needs it xfails rather than reporting a bug already known."""
 
     @property
     def state_dirs(self) -> tuple[str, ...]:
@@ -78,6 +98,15 @@ def dataplane_config() -> DataplaneConfig:
         etcd_namespace=_env("BAI_DATAPLANE_ETCD_NAMESPACE", "local"),
         agent_process_pattern=_env("BAI_DATAPLANE_AGENT_PATTERN", "ai.backend.agent"),
         use_sudo=_env("BAI_DATAPLANE_SUDO", "1") != "0",
+        manager_endpoint=_env("BAI_DATAPLANE_MANAGER", "http://127.0.0.1:8091"),
+        access_key=_env("BAI_DATAPLANE_ACCESS_KEY", ""),
+        secret_key=_env("BAI_DATAPLANE_SECRET_KEY", ""),
+        image_id=_env("BAI_DATAPLANE_IMAGE_ID", ""),
+        project_id=_env("BAI_DATAPLANE_PROJECT_ID", ""),
+        agent_start_cmd=tuple(shlex.split(_env("BAI_DATAPLANE_AGENT_START_CMD", ""))),
+        agent_stop_cmd=tuple(shlex.split(_env("BAI_DATAPLANE_AGENT_STOP_CMD", ""))),
+        agent_rpc_port=int(_env("BAI_DATAPLANE_AGENT_RPC_PORT", "6011")),
+        privnet_mode=_env("BAI_DATAPLANE_PRIVNET_MODE", "0") != "0",
     )
 
 
@@ -172,6 +201,70 @@ async def leak_guard(
     if report is not None and report.failed:
         return
     await guard.assert_clean()
+
+
+@pytest.fixture
+async def session_driver(dataplane_config: DataplaneConfig) -> AsyncIterator[SessionDriver]:
+    """A driver bound to a keypair reserved for this suite.
+
+    Reserved, not shared: concurrent sessions are capped per keypair, so borrowing the developer's
+    keypair means their running sessions decide whether the suite can start — which is how the
+    first live run of this suite failed.
+    """
+    if not (dataplane_config.access_key and dataplane_config.secret_key):
+        pytest.skip(
+            "BAI_DATAPLANE_ACCESS_KEY / _SECRET_KEY are unset; scenarios that create sessions "
+            "need a keypair reserved for the suite"
+        )
+    # V2ClientRegistry, not BackendAIClientRegistry: the latter's `.session` is the v1 client,
+    # which has no enqueue/terminate at all. The difference is invisible until the first live run.
+    registry = await V2ClientRegistry.create(
+        ClientConfig(endpoint=yarl.URL(dataplane_config.manager_endpoint)),
+        HMACAuth(
+            access_key=dataplane_config.access_key,
+            secret_key=dataplane_config.secret_key,
+        ),
+    )
+    try:
+        yield SessionDriver(registry.session)
+    finally:
+        await registry.close()
+
+
+@pytest.fixture
+def session_spec(dataplane_config: DataplaneConfig) -> SessionSpec:
+    """The image and project scenarios launch into.
+
+    Both are site facts — an image UUID differs per deployment — so they are configured rather
+    than discovered. Discovering them would make a scenario's placement depend on whatever the
+    search happened to return first.
+    """
+    if not (dataplane_config.image_id and dataplane_config.project_id):
+        pytest.skip("BAI_DATAPLANE_IMAGE_ID / _PROJECT_ID are unset")
+    return SessionSpec(
+        image_id=UUID(dataplane_config.image_id),
+        project_id=UUID(dataplane_config.project_id),
+    )
+
+
+@pytest.fixture
+def agent_control(nodes: Sequence[Node], dataplane_config: DataplaneConfig) -> AgentController:
+    """Restart control for the first node's agent.
+
+    Skips unless a start command is configured: how an agent is supervised is a deployment fact,
+    and guessing wrong kills the developer's agent without bringing it back.
+    """
+    config = AgentControlConfig(
+        start_cmd=dataplane_config.agent_start_cmd or None,
+        stop_cmd=dataplane_config.agent_stop_cmd or None,
+        process_pattern=dataplane_config.agent_process_pattern,
+        rpc_port=dataplane_config.agent_rpc_port,
+    )
+    if not config.configured:
+        pytest.skip(
+            "BAI_DATAPLANE_AGENT_START_CMD is unset; restart scenarios cannot bring the agent back"
+        )
+    return AgentController(nodes[0], config)
 
 
 @pytest.fixture

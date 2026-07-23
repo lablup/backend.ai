@@ -91,6 +91,26 @@ class LeakGuard:
             found |= result
         return frozenset(found - self.ignore)
 
+    async def stable_snapshot(
+        self, *, max_wait: float = 10.0, interval: float = 0.5
+    ) -> tuple[frozenset[Resource], bool]:
+        """Sample until two consecutive snapshots agree. Returns ``(snapshot, quiesced)``.
+
+        Shared by `baseline` and by any scenario that needs a trustworthy mid-test picture — a
+        restart scenario comparing before against after needs both sides taken this way, or the
+        comparison reports the settling as a change.
+        """
+        started = time.monotonic()
+        previous = await self.snapshot()
+        while True:
+            current = await self.snapshot()
+            if current == previous:
+                return current, True
+            if time.monotonic() - started >= max_wait:
+                return previous & current, False
+            previous = current
+            await asyncio.sleep(interval)
+
     async def baseline(
         self, *, max_wait: float = 10.0, interval: float = 0.5
     ) -> frozenset[Resource]:
@@ -111,20 +131,10 @@ class LeakGuard:
         falls back to the intersection of the last two samples — everything seen twice — and
         `quiesced` is left False.
         """
-        started = time.monotonic()
-        previous = await self.snapshot()
-        while True:
-            current = await self.snapshot()
-            if current == previous:
-                self._baseline = current
-                self.quiesced = True
-                return current
-            if time.monotonic() - started >= max_wait:
-                self._baseline = previous & current
-                self.quiesced = False
-                return self._baseline
-            previous = current
-            await asyncio.sleep(interval)
+        snapshot, quiesced = await self.stable_snapshot(max_wait=max_wait, interval=interval)
+        self._baseline = snapshot
+        self.quiesced = quiesced
+        return snapshot
 
     def _diff(self, current: frozenset[Resource]) -> tuple[tuple[Resource, ...], ...]:
         if self._baseline is None:
@@ -160,3 +170,17 @@ class LeakGuard:
         if not report.clean:
             raise AssertionError("host state did not return to baseline\n" + report.format())
         return report
+
+
+def compare(before: frozenset[Resource], after: frozenset[Resource]) -> LeakReport:
+    """Diff two snapshots taken by the same guard.
+
+    For scenarios that assert on a *transition* rather than on a return to baseline — "the agent
+    restarted and the host is byte-for-byte where it was". The vocabulary is deliberately the
+    guard's own: ``leaked`` is what appeared, ``collateral`` is what vanished, so a restart that
+    destroyed a live session's bridge reads the same way it would at teardown.
+    """
+    return LeakReport(
+        leaked=tuple(sorted(after - before)),
+        collateral=tuple(sorted(before - after)),
+    )
