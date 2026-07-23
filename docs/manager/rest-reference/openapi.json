@@ -26177,6 +26177,527 @@
         "title": "AdminSearchDeploymentHistoriesInput",
         "type": "object"
       },
+      "ReplicaGroupHistoryCategoryType": {
+        "description": "Handler category a replica-group history row was produced by.",
+        "enum": [
+          "lifecycle",
+          "scaling"
+        ],
+        "title": "ReplicaGroupHistoryCategoryType",
+        "type": "string"
+      },
+      "ReplicaGroupHistoryFilter": {
+        "description": "Filter conditions for replica-group scheduling history search.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by history record ID"
+          },
+          "replica_group_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by replica group ID"
+          },
+          "deployment_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by deployment ID"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ReplicaGroupHistoryCategoryType"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by handler category",
+            "title": "Category"
+          },
+          "phase": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by scheduling phase"
+          },
+          "from_status": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by from_status values",
+            "title": "From Status"
+          },
+          "to_status": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by to_status values",
+            "title": "To Status"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SchedulingResultFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by scheduling result"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by error code"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by message"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DateTimeFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by created_at"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DateTimeFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by updated_at"
+          },
+          "AND": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ReplicaGroupHistoryFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "AND conjunction.",
+            "title": "And"
+          },
+          "OR": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ReplicaGroupHistoryFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "OR conjunction.",
+            "title": "Or"
+          },
+          "NOT": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ReplicaGroupHistoryFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "NOT negation.",
+            "title": "Not"
+          }
+        },
+        "title": "ReplicaGroupHistoryFilter",
+        "type": "object"
+      },
+      "ReplicaGroupHistoryOrder": {
+        "description": "Order specification for replica-group scheduling history.",
+        "properties": {
+          "field": {
+            "$ref": "#/components/schemas/ReplicaGroupHistoryOrderField",
+            "description": "Field to order by"
+          },
+          "direction": {
+            "$ref": "#/components/schemas/OrderDirection",
+            "default": "DESC",
+            "description": "Order direction"
+          }
+        },
+        "required": [
+          "field"
+        ],
+        "title": "ReplicaGroupHistoryOrder",
+        "type": "object"
+      },
+      "ReplicaGroupHistoryOrderField": {
+        "description": "Fields available for ordering replica-group scheduling history.",
+        "enum": [
+          "created_at",
+          "updated_at",
+          "phase",
+          "from_status",
+          "to_status",
+          "result",
+          "attempts"
+        ],
+        "title": "ReplicaGroupHistoryOrderField",
+        "type": "string"
+      },
+      "AdminSearchReplicaGroupHistoriesInput": {
+        "description": "Input for admin search of replica-group scheduling histories.",
+        "properties": {
+          "filter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReplicaGroupHistoryFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter conditions"
+          },
+          "order": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ReplicaGroupHistoryOrder"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Order specifications",
+            "title": "Order"
+          },
+          "first": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor pagination: number of items",
+            "title": "First"
+          },
+          "after": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor pagination: after cursor",
+            "title": "After"
+          },
+          "last": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor pagination: last N items",
+            "title": "Last"
+          },
+          "before": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor pagination: before cursor",
+            "title": "Before"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Offset pagination: maximum items",
+            "title": "Limit"
+          },
+          "offset": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Offset pagination: number to skip",
+            "title": "Offset"
+          }
+        },
+        "title": "AdminSearchReplicaGroupHistoriesInput",
+        "type": "object"
+      },
+      "ReplicaGroupHistoryScopeDTO": {
+        "description": "Scope for replica-group scheduling history queries.\n\nBoth axes are optional but at least one is required: a deployment scope\ncovers every replica group under it, a replica-group scope narrows to one\ngroup, and giving both intersects them.",
+        "properties": {
+          "deployment_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Deployment ID whose replica-group history to get.",
+            "title": "Deployment Id"
+          },
+          "replica_group_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Replica group ID to get history for.",
+            "title": "Replica Group Id"
+          }
+        },
+        "title": "ReplicaGroupHistoryScopeDTO",
+        "type": "object"
+      },
+      "ScopedSearchReplicaGroupHistoriesInput": {
+        "description": "Input for searching replica-group scheduling histories under a non-admin scope.",
+        "properties": {
+          "scope": {
+            "$ref": "#/components/schemas/ReplicaGroupHistoryScopeDTO",
+            "description": "Scope restricting the rows returned"
+          },
+          "filter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReplicaGroupHistoryFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter conditions"
+          },
+          "order": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ReplicaGroupHistoryOrder"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Order specifications",
+            "title": "Order"
+          },
+          "first": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor pagination: number of items",
+            "title": "First"
+          },
+          "after": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor pagination: after cursor",
+            "title": "After"
+          },
+          "last": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor pagination: last N items",
+            "title": "Last"
+          },
+          "before": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor pagination: before cursor",
+            "title": "Before"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Offset pagination: maximum items",
+            "title": "Limit"
+          },
+          "offset": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Offset pagination: number to skip",
+            "title": "Offset"
+          }
+        },
+        "required": [
+          "scope"
+        ],
+        "title": "ScopedSearchReplicaGroupHistoriesInput",
+        "type": "object"
+      },
       "RouteHistoryFilter": {
         "description": "Filter for route history.",
         "properties": {
@@ -49251,6 +49772,64 @@
           }
         ],
         "description": "Search deployment histories scoped to a specific deployment.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/scheduling-history/replica-groups/admin/search": {
+      "post": {
+        "operationId": "v2/scheduling-history.admin_search_replica_group_history",
+        "tags": [
+          "v2/scheduling-history"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminSearchReplicaGroupHistoriesInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Search replica-group scheduling histories with admin scope.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/scheduling-history/replica-groups/scoped/search": {
+      "post": {
+        "operationId": "v2/scheduling-history.scoped_search_replica_group_history",
+        "tags": [
+          "v2/scheduling-history"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScopedSearchReplicaGroupHistoriesInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Search replica-group scheduling histories under a non-admin scope.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/scheduling-history/routes/search": {
