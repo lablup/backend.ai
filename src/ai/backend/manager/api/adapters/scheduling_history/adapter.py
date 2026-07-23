@@ -876,8 +876,6 @@ class SchedulingHistoryAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        # The owning deployment is the authorization subject; resolve it before
-        # dispatching so the RBAC check targets the deployment directly.
         resolve_result = await self._processors.scheduling_history.resolve_replica_group_deployment.wait_for_complete(
             ResolveReplicaGroupDeploymentAction(replica_group_id=input.scope.replica_group_id)
         )
