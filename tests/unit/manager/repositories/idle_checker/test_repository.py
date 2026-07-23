@@ -158,10 +158,8 @@ def _expired_check_checker_row(checker_id: IdleCheckerID) -> IdleCheckerRow:
         target_session_types=[SessionTypes.INTERACTIVE],
         spec=IdleCheckerSpec(
             type=CheckerType.SESSION_LIFETIME,
-            session_lifetime=SessionLifetimeSpec(
-                initial_grace_period_seconds=45,
-                max_lifetime_seconds=3600,
-            ),
+            initial_grace_period_seconds=45,
+            session_lifetime=SessionLifetimeSpec(max_lifetime_seconds=3600),
         ),
     )
 
