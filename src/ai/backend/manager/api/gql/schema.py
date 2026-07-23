@@ -34,7 +34,12 @@ from .app_config_definition import (
 from .app_config_fragment import (
     admin_app_config_fragments,
     app_config_fragment,
+    bulk_purge_app_config_fragments,
+    bulk_update_app_config_fragments,
+    create_app_config_fragment,
+    purge_app_config_fragment,
     scoped_app_config_fragments,
+    update_app_config_fragment,
 )
 from .artifact import (
     approve_artifact_revision,
@@ -735,6 +740,11 @@ class Mutation:
     admin_create_app_config_allow_list = admin_create_app_config_allow_list
     admin_purge_app_config_allow_list = admin_purge_app_config_allow_list
     admin_update_app_config_allow_list = admin_update_app_config_allow_list
+    create_app_config_fragment = create_app_config_fragment
+    update_app_config_fragment = update_app_config_fragment
+    purge_app_config_fragment = purge_app_config_fragment
+    bulk_update_app_config_fragments = bulk_update_app_config_fragments
+    bulk_purge_app_config_fragments = bulk_purge_app_config_fragments
     scan_artifacts = scan_artifacts
     scan_artifact_models = scan_artifact_models
     import_artifacts = import_artifacts

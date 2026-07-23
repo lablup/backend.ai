@@ -3,9 +3,15 @@
 from .resolver import (
     admin_app_config_fragments,
     app_config_fragment,
+    bulk_purge_app_config_fragments,
+    bulk_update_app_config_fragments,
+    create_app_config_fragment,
+    purge_app_config_fragment,
     scoped_app_config_fragments,
+    update_app_config_fragment,
 )
 from .types import (
+    AppConfigFragmentBulkErrorGQL,
     AppConfigFragmentConnection,
     AppConfigFragmentEdge,
     AppConfigFragmentFilterGQL,
@@ -13,11 +19,23 @@ from .types import (
     AppConfigFragmentOrderByGQL,
     AppConfigFragmentOrderFieldGQL,
     AppConfigFragmentScopeGQL,
+    AppConfigFragmentUpdateItemInputGQL,
     AppConfigScopeTypeFilterGQL,
+    BulkPurgeAppConfigFragmentInputGQL,
+    BulkPurgeAppConfigFragmentPayloadGQL,
+    BulkUpdateAppConfigFragmentInputGQL,
+    BulkUpdateAppConfigFragmentPayloadGQL,
+    CreateAppConfigFragmentInputGQL,
+    CreateAppConfigFragmentPayloadGQL,
+    PurgeAppConfigFragmentInputGQL,
+    PurgeAppConfigFragmentPayloadGQL,
+    UpdateAppConfigFragmentInputGQL,
+    UpdateAppConfigFragmentPayloadGQL,
 )
 
 __all__ = (
     # Types
+    "AppConfigFragmentBulkErrorGQL",
     "AppConfigFragmentConnection",
     "AppConfigFragmentEdge",
     "AppConfigFragmentFilterGQL",
@@ -25,9 +43,26 @@ __all__ = (
     "AppConfigFragmentOrderByGQL",
     "AppConfigFragmentOrderFieldGQL",
     "AppConfigFragmentScopeGQL",
+    "AppConfigFragmentUpdateItemInputGQL",
     "AppConfigScopeTypeFilterGQL",
+    "BulkPurgeAppConfigFragmentInputGQL",
+    "BulkPurgeAppConfigFragmentPayloadGQL",
+    "BulkUpdateAppConfigFragmentInputGQL",
+    "BulkUpdateAppConfigFragmentPayloadGQL",
+    "CreateAppConfigFragmentInputGQL",
+    "CreateAppConfigFragmentPayloadGQL",
+    "PurgeAppConfigFragmentInputGQL",
+    "PurgeAppConfigFragmentPayloadGQL",
+    "UpdateAppConfigFragmentInputGQL",
+    "UpdateAppConfigFragmentPayloadGQL",
     # Query resolvers
     "admin_app_config_fragments",
     "app_config_fragment",
     "scoped_app_config_fragments",
+    # Mutation resolvers
+    "bulk_purge_app_config_fragments",
+    "bulk_update_app_config_fragments",
+    "create_app_config_fragment",
+    "purge_app_config_fragment",
+    "update_app_config_fragment",
 )

@@ -810,6 +810,17 @@ type AppConfigFragment implements Node {
   updatedAt: DateTime!
 }
 
+"""
+Added in 26.8.0. One failed item of a partial-success bulk fragment mutation.
+"""
+type AppConfigFragmentBulkError {
+  """Id of the fragment the failed item targeted."""
+  id: UUID!
+
+  """Reason the item failed."""
+  message: String!
+}
+
 """Added in 26.8.0. Paginated connection for app config fragments."""
 type AppConfigFragmentConnection {
   """Pagination data for this connection"""
@@ -898,6 +909,17 @@ input AppConfigFragmentScopeTypeFilter {
 
   """Exclude any of the provided scope types."""
   notIn: [AppConfigScopeType!] = null
+}
+
+"""
+Added in 26.8.0. One item of a bulk fragment update, carrying its own target id.
+"""
+input AppConfigFragmentUpdateItemInput {
+  """App config fragment id to update."""
+  id: UUID!
+
+  """The replacement JSON config document."""
+  config: JSON!
 }
 
 enum AppConfigScopeType {
@@ -1795,6 +1817,23 @@ type BulkDeleteVFoldersV2Payload {
   deletedCount: Int!
 }
 
+"""Added in 26.8.0. Input for purging many app config fragments."""
+input BulkPurgeAppConfigFragmentInput {
+  """Fragment ids to purge."""
+  ids: [UUID!]!
+}
+
+"""
+Added in 26.8.0. Partial-success payload for a bulk app config fragment purge.
+"""
+type BulkPurgeAppConfigFragmentPayload {
+  """Ids of successfully purged fragments."""
+  items: [UUID!]!
+
+  """Per-item failures, each naming the fragment it targeted."""
+  failed: [AppConfigFragmentBulkError!]!
+}
+
 """Added in 26.4.4. Input for bulk-hard-deleting role presets."""
 input BulkPurgeRolePresetsInput {
   """Role preset UUIDs to purge."""
@@ -1992,6 +2031,23 @@ type BulkRolePresetFailureInfo {
 
   """Error message describing the failure."""
   message: String!
+}
+
+"""Added in 26.8.0. Input for updating many fragments' config documents."""
+input BulkUpdateAppConfigFragmentInput {
+  """Fragments to update, each identified by its id."""
+  items: [AppConfigFragmentUpdateItemInput!]!
+}
+
+"""
+Added in 26.8.0. Partial-success payload for a bulk app config fragment update.
+"""
+type BulkUpdateAppConfigFragmentPayload {
+  """Successfully updated fragments."""
+  items: [AppConfigFragment!]!
+
+  """Per-item failures, each naming the fragment it targeted."""
+  failed: [AppConfigFragmentBulkError!]!
 }
 
 """Added in 26.3.0. Error information for a failed user in bulk update."""
@@ -2479,6 +2535,31 @@ input CreateAppConfigDefinitionInput {
 type CreateAppConfigDefinitionPayload {
   """Created app config definition."""
   appConfigDefinition: AppConfigDefinition!
+}
+
+"""
+Added in 26.8.0. Input for creating a new app config fragment at a given scope.
+"""
+input CreateAppConfigFragmentInput {
+  """Registered config name."""
+  configName: String!
+
+  """Scope the fragment is written at (public | domain | user)."""
+  scopeType: AppConfigScopeType!
+
+  """
+  Scope identifier: the domain id (domain scope) or the user id (user scope). Null for public scope, which has no owner.
+  """
+  scopeId: UUID = null
+
+  """The fragment's JSON config document."""
+  config: JSON!
+}
+
+"""Added in 26.8.0. Payload for app config fragment creation."""
+type CreateAppConfigFragmentPayload {
+  """Created app config fragment."""
+  appConfigFragment: AppConfigFragment!
 }
 
 """Added in 25.19.0. Input for creating an auto-scaling rule."""
@@ -7528,6 +7609,27 @@ type Mutation {
   """
   adminUpdateAppConfigAllowList(input: UpdateAppConfigAllowListInput!): UpdateAppConfigAllowListPayload
 
+  """Added in 26.8.0. Create an app config fragment at a given scope."""
+  createAppConfigFragment(input: CreateAppConfigFragmentInput!): CreateAppConfigFragmentPayload
+
+  """
+  Added in 26.8.0. Replace an app config fragment's config document by id.
+  """
+  updateAppConfigFragment(id: UUID!, input: UpdateAppConfigFragmentInput!): UpdateAppConfigFragmentPayload
+
+  """Added in 26.8.0. Purge an app config fragment by id."""
+  purgeAppConfigFragment(input: PurgeAppConfigFragmentInput!): PurgeAppConfigFragmentPayload
+
+  """
+  Added in 26.8.0. Replace many app config fragments' config documents, reporting per-item failures.
+  """
+  bulkUpdateAppConfigFragments(input: BulkUpdateAppConfigFragmentInput!): BulkUpdateAppConfigFragmentPayload
+
+  """
+  Added in 26.8.0. Purge many app config fragments by id, reporting per-item failures.
+  """
+  bulkPurgeAppConfigFragments(input: BulkPurgeAppConfigFragmentInput!): BulkPurgeAppConfigFragmentPayload
+
   """
   Added in 25.14.0. Scan external registries to discover available artifacts. Searches HuggingFace or Reservoir registries for artifacts matching the specified criteria and registers them in the system with SCANNED status. The artifacts become available for import but are not downloaded until explicitly imported. This is the first step in the artifact workflow: Scan → Import → Use
   """
@@ -9716,6 +9818,18 @@ input PurgeAppConfigDefinitionInput {
 """Added in 26.7.0. Payload for app config definition purge."""
 type PurgeAppConfigDefinitionPayload {
   """UUID of the purged app config definition."""
+  id: UUID!
+}
+
+"""Added in 26.8.0. Input for purging one app config fragment."""
+input PurgeAppConfigFragmentInput {
+  """App config fragment id to purge."""
+  id: UUID!
+}
+
+"""Added in 26.8.0. Payload for app config fragment purge."""
+type PurgeAppConfigFragmentPayload {
+  """Id of the purged app config fragment."""
   id: UUID!
 }
 
@@ -13998,6 +14112,20 @@ input UpdateAppConfigAllowListInput {
 type UpdateAppConfigAllowListPayload {
   """Updated app config allow-list entry."""
   appConfigAllowList: AppConfigAllowList!
+}
+
+"""
+Added in 26.8.0. Input for replacing one app config fragment's config document.
+"""
+input UpdateAppConfigFragmentInput {
+  """The replacement JSON config document."""
+  config: JSON!
+}
+
+"""Added in 26.8.0. Payload for app config fragment update."""
+type UpdateAppConfigFragmentPayload {
+  """Updated app config fragment."""
+  appConfigFragment: AppConfigFragment!
 }
 
 """

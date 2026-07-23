@@ -26,6 +26,7 @@ __all__ = (
     "BulkPurgeAppConfigFragmentInput",
     "BulkUpdateAppConfigFragmentInput",
     "CreateAppConfigFragmentInput",
+    "PurgeAppConfigFragmentInput",
     "ScopedSearchAppConfigFragmentInput",
     "UpdateAppConfigFragmentInput",
 )
@@ -66,6 +67,17 @@ class UpdateAppConfigFragmentInput(BaseRequestModel):
     """
 
     config: dict[str, Any] = Field(description="The replacement JSON config document.")
+
+
+class PurgeAppConfigFragmentInput(BaseRequestModel):
+    """Input for purging one app config fragment.
+
+    REST names the target in the path; GraphQL has no path, so the id travels in this input
+    rather than as a bare mutation argument — a later purge option lands as a field here
+    instead of a second argument.
+    """
+
+    id: AppConfigFragmentID = Field(description="App config fragment id to purge.")
 
 
 class AppConfigFragmentUpdateItem(BaseRequestModel):
