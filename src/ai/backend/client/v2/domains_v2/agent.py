@@ -5,10 +5,12 @@ from __future__ import annotations
 from ai.backend.client.v2.base_domain import BaseDomainClient
 from ai.backend.common.dto.manager.v2.agent.request import (
     AdminSearchAgentsInput,
+    UpdateAgentResourceGroupInput,
 )
 from ai.backend.common.dto.manager.v2.agent.response import (
     AdminSearchAgentsPayload,
     AgentResourceStatsPayload,
+    UpdateAgentResourceGroupPayload,
 )
 
 _PATH = "/v2/agents"
@@ -27,6 +29,19 @@ class V2AgentClient(BaseDomainClient):
             f"{_PATH}/search",
             request=request,
             response_model=AdminSearchAgentsPayload,
+        )
+
+    async def update_resource_group(
+        self,
+        agent_id: str,
+        request: UpdateAgentResourceGroupInput,
+    ) -> UpdateAgentResourceGroupPayload:
+        """Change an agent's resource group (superadmin only)."""
+        return await self._client.typed_request(
+            "PATCH",
+            f"{_PATH}/{agent_id}/resource-group",
+            request=request,
+            response_model=UpdateAgentResourceGroupPayload,
         )
 
     async def get_total_resources(self) -> AgentResourceStatsPayload:

@@ -7,6 +7,8 @@ from strawberry import Info
 from strawberry.scalars import JSON
 
 from ai.backend.common.dto.manager.v2.agent.request import AdminSearchAgentsInput
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.common.types import AgentId
 from ai.backend.manager.api.gql.agent.types import (
     AgentFilterGQL,
     AgentOrderByGQL,
@@ -15,10 +17,13 @@ from ai.backend.manager.api.gql.agent.types import (
     AgentV2Connection,
     AgentV2Edge,
     AgentV2GQL,
+    UpdateAgentResourceGroupInputGQL,
+    UpdateAgentResourceGroupPayloadGQL,
 )
 from ai.backend.manager.api.gql.base import to_global_id
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    gql_mutation,
     gql_root_field,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
@@ -79,3 +84,27 @@ async def agents_v2(
         ),
         count=result.total_count,
     )
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Change the resource group of an agent (superadmin only). Sessions still running"
+            " on the agent under the old resource group are cleaned up per the given policy;"
+            " without force, the change is rejected with a conflict error when such sessions"
+            " exist."
+        ),
+    )
+)
+async def admin_update_agent_resource_group(
+    info: Info[StrawberryGQLContext],
+    agent_id: str,
+    input: UpdateAgentResourceGroupInputGQL,
+) -> UpdateAgentResourceGroupPayloadGQL | None:
+    """Change an agent's resource group."""
+    check_admin_only()
+    payload = await info.context.adapters.agent.update_resource_group(
+        AgentId(agent_id), input.to_pydantic()
+    )
+    return UpdateAgentResourceGroupPayloadGQL.from_pydantic(payload)
