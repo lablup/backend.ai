@@ -145,7 +145,7 @@ class IdleCheckerDBSource:
                 SessionIdleCheckRow.session_id,
                 SessionIdleCheckRow.idle_checker_id,
                 SessionIdleCheckRow.updated_at,
-                IdleCheckerRow.spec,
+                IdleCheckerRow.initial_grace_period_seconds,
             )
             .select_from(SessionIdleCheckRow)
             .join(SessionRow, SessionIdleCheckRow.session_id == SessionRow.id)
@@ -166,9 +166,7 @@ class IdleCheckerDBSource:
                         session_id=SessionId(row.session_id),
                         checker_id=cast(IdleCheckerID, row.idle_checker_id),
                     ),
-                    initial_grace_period_seconds=cast(
-                        IdleCheckerSpec, row.spec
-                    ).initial_grace_period_seconds,
+                    initial_grace_period_seconds=row.initial_grace_period_seconds,
                     grace_started_at=row.updated_at,
                 )
                 for row in rows

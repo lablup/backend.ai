@@ -74,6 +74,7 @@ Three tables. The checker carries no scope of its own; the association table car
 | `name` | string | Human-readable name |
 | `description` | string, nullable | Optional description |
 | `checker_type` | string | `session_lifetime` / `network_timeout` / `utilization` |
+| `initial_grace_period_seconds` | integer | Delay before the first judgment |
 | `spec` | JSONB | Checker-type-specific configuration payload |
 | `created_at` / `modified_at` | timestamptz | |
 

@@ -15,6 +15,12 @@ from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin,
 
 class IdleCheckerRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
     __tablename__ = "idle_checkers"
+    __table_args__ = (
+        sa.CheckConstraint(
+            "initial_grace_period_seconds >= 0",
+            name="initial_grace_period_seconds_non_negative",
+        ),
+    )
 
     id: Mapped[IdleCheckerID] = mapped_column(
         "id", GUID(IdleCheckerID), primary_key=True, server_default=sa.text("uuid_generate_v4()")
@@ -27,6 +33,11 @@ class IdleCheckerRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
     target_session_types: Mapped[list[SessionTypes]] = mapped_column(
         "target_session_types",
         sa.ARRAY(StrEnumType(SessionTypes, use_name=True)),
+        nullable=False,
+    )
+    initial_grace_period_seconds: Mapped[int] = mapped_column(
+        "initial_grace_period_seconds",
+        sa.Integer(),
         nullable=False,
     )
     spec: Mapped[IdleCheckerSpec] = mapped_column(

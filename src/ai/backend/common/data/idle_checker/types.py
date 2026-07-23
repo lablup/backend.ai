@@ -58,11 +58,6 @@ class IdleCheckerSpec(BackendAISchema):
     """
 
     type: CheckerType = Field(description="Idle checker kind; selects the sub-config.")
-    initial_grace_period_seconds: int = Field(
-        default=0,
-        ge=0,
-        description="Delay before the first idle-check judgment.",
-    )
     session_lifetime: SessionLifetimeSpec | None = Field(
         default=None, description="session_lifetime config."
     )
