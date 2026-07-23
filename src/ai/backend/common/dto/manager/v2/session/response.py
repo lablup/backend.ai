@@ -13,6 +13,7 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.dto.manager.field import VFolderPermissionField
 from ai.backend.common.dto.manager.pagination import PaginationInfo
 from ai.backend.common.types import SessionId
 
@@ -28,6 +29,7 @@ __all__ = (
     "SessionLogsPayload",
     "SessionMetadataInfo",
     "SessionMetadataInfoGQLDTO",
+    "SessionMountDTO",
     "SessionNetworkInfo",
     "SessionNode",
     "SessionResourceInfo",
@@ -144,6 +146,28 @@ class SessionNetworkInfo(BaseResponseModel):
     network_id: str | None = Field(default=None, description="ID of the network if applicable.")
 
 
+class SessionMountDTO(BaseResponseModel):
+    """A single virtual folder mount on a session.
+
+    Carries only mount-specific metadata. Folder attributes (name, usage mode,
+    etc.) are resolved separately through the associated vfolder node, keyed by
+    ``vfolder_id`` — the same vfolder may be mounted multiple times under
+    different subpaths.
+    """
+
+    vfolder_id: UUID = Field(description="UUID of the mounted virtual folder.")
+    subpath: str | None = Field(
+        default=None,
+        description="Subpath within the vfolder that is mounted. Null when the vfolder root is mounted.",
+    )
+    mount_destination: str = Field(
+        description="Mount destination (alias) path inside the session container."
+    )
+    permission: VFolderPermissionField = Field(
+        description="Effective mount permission for this mount (ro/rw/wd)."
+    )
+
+
 # ---------------------------------------------------------------------------
 # Main node model
 # ---------------------------------------------------------------------------
@@ -175,6 +199,14 @@ class SessionNode(BaseResponseModel):
     replica_id: UUID | None = Field(
         default=None,
         description="UUID of the routing replica this session serves, if any.",
+    )
+    mounts: list[SessionMountDTO] = Field(
+        default_factory=list,
+        description=(
+            "Virtual folder mounts of this session, including per-mount subpath, "
+            "alias (mount destination), and permission. Folder details are available "
+            "through each mount's associated vfolder node."
+        ),
     )
 
 

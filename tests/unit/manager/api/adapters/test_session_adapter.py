@@ -4,11 +4,14 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from decimal import Decimal
+from pathlib import PurePosixPath
 from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID, uuid4
 
 import pytest
 
+from ai.backend.common.data.vfolder.types import VFolderMountData
+from ai.backend.common.dto.manager.field import VFolderPermissionField
 from ai.backend.common.dto.manager.v2.common import ResourceSlotEntryInput
 from ai.backend.common.dto.manager.v2.session.request import (
     BatchConfigInput,
@@ -19,7 +22,14 @@ from ai.backend.common.dto.manager.v2.session.types import (
     ClusterModeEnum,
     CreateSessionTypeEnum,
 )
-from ai.backend.common.types import ClusterMode, SessionResult, SessionTypes
+from ai.backend.common.types import (
+    ClusterMode,
+    MountPermission,
+    SessionResult,
+    SessionTypes,
+    VFolderID,
+    VFolderUsageMode,
+)
 from ai.backend.manager.api.adapters.session.adapter import SessionAdapter
 from ai.backend.manager.data.session.types import SessionData, SessionStatus
 
@@ -28,6 +38,7 @@ def _create_session_data(
     session_id: UUID | None = None,
     name: str = "test-session",
     status: SessionStatus = SessionStatus.PENDING,
+    vfolder_mounts: list[VFolderMountData] | None = None,
 ) -> SessionData:
     """Create a minimal SessionData for testing adapter conversion."""
     return SessionData(
@@ -62,7 +73,7 @@ def _create_session_data(
         status_info=None,
         status_data=None,
         status_history=None,
-        vfolder_mounts=None,
+        vfolder_mounts=vfolder_mounts,
         environ=None,
         bootstrap_script=None,
         startup_command=None,
@@ -138,6 +149,55 @@ class TestSessionDataToNode:
         data = _create_session_data()
         node = SessionAdapter._session_data_to_node(data)
         assert len(node.resource.allocation.used.entries) == 0
+
+
+class TestSessionMountsConversion:
+    """Tests for vfolder mount conversion in _session_data_to_node."""
+
+    def test_no_mounts_produces_empty_list(self) -> None:
+        """SessionData without mounts should produce an empty mounts list."""
+        data = _create_session_data(vfolder_mounts=None)
+        node = SessionAdapter._session_data_to_node(data)
+        assert node.mounts == []
+
+    def test_mount_with_subpath_and_custom_destination(self) -> None:
+        """A mount with a non-default subpath and custom kernel path should map fully."""
+        folder_id = uuid4()
+        mount = VFolderMountData(
+            name="data",
+            vfid=VFolderID(quota_scope_id=None, folder_id=folder_id),
+            vfsubpath=PurePosixPath("inner/dir"),
+            host_path=PurePosixPath("/vfroot/data"),
+            kernel_path=PurePosixPath("/home/work/data"),
+            mount_perm=MountPermission.READ_ONLY,
+            usage_mode=VFolderUsageMode.GENERAL,
+        )
+        data = _create_session_data(vfolder_mounts=[mount])
+        node = SessionAdapter._session_data_to_node(data)
+
+        assert len(node.mounts) == 1
+        m = node.mounts[0]
+        assert m.vfolder_id == folder_id
+        assert m.subpath == "inner/dir"
+        assert m.mount_destination == "/home/work/data"
+        assert m.permission == VFolderPermissionField.READ_ONLY
+
+    def test_root_subpath_normalizes_to_none(self) -> None:
+        """A '.' vfsubpath (vfolder root) should normalize to subpath=None."""
+        mount = VFolderMountData(
+            name="root-mount",
+            vfid=VFolderID(quota_scope_id=None, folder_id=uuid4()),
+            vfsubpath=PurePosixPath("."),
+            host_path=PurePosixPath("/vfroot/root-mount"),
+            kernel_path=PurePosixPath("/home/work/root-mount"),
+            mount_perm=MountPermission.READ_WRITE,
+            usage_mode=VFolderUsageMode.GENERAL,
+        )
+        data = _create_session_data(vfolder_mounts=[mount])
+        node = SessionAdapter._session_data_to_node(data)
+
+        assert node.mounts[0].subpath is None
+        assert node.mounts[0].permission == VFolderPermissionField.READ_WRITE
 
 
 class TestEnqueueActionBuilding:

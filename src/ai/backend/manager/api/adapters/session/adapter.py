@@ -11,6 +11,7 @@ from uuid import UUID
 import sqlalchemy as sa
 
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.dto.manager.field import VFolderPermissionField
 from ai.backend.common.dto.manager.v2.deployment.types import (
     EnvironmentVariableEntryInfoDTO,
     EnvironmentVariablesInfoDTO,
@@ -62,6 +63,7 @@ from ai.backend.common.dto.manager.v2.session.response import (
     SessionLifecycleInfoGQLDTO,
     SessionLogsPayload,
     SessionMetadataInfoGQLDTO,
+    SessionMountDTO,
     SessionNetworkInfo,
     SessionNode,
     SessionResourceInfoGQLDTO,
@@ -1121,6 +1123,15 @@ class SessionAdapter(BaseAdapter):
                 network_id=data.network_id,
             ),
             replica_id=data.replica_id,
+            mounts=[
+                SessionMountDTO(
+                    vfolder_id=m.vfid.folder_id,
+                    subpath=None if str(m.vfsubpath) == "." else str(m.vfsubpath),
+                    mount_destination=str(m.kernel_path),
+                    permission=VFolderPermissionField(m.mount_perm.value),
+                )
+                for m in (data.vfolder_mounts or [])
+            ],
         )
 
     @staticmethod
