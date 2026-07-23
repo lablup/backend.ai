@@ -26201,30 +26201,6 @@
             "default": null,
             "description": "Filter by history record ID"
           },
-          "replica_group_id": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/UUIDFilter"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Filter by replica group ID"
-          },
-          "deployment_id": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/UUIDFilter"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Filter by deployment ID"
-          },
           "category": {
             "anyOf": [
               {
@@ -26544,37 +26520,18 @@
         "type": "object"
       },
       "ReplicaGroupHistoryScopeDTO": {
-        "description": "Scope for replica-group scheduling history queries.\n\nBoth axes are optional but at least one is required: a deployment scope\ncovers every replica group under it, a replica-group scope narrows to one\ngroup, and giving both intersects them.",
+        "description": "Scope for replica-group scheduling history queries.",
         "properties": {
-          "deployment_id": {
-            "anyOf": [
-              {
-                "format": "uuid",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Deployment ID whose replica-group history to get.",
-            "title": "Deployment Id"
-          },
           "replica_group_id": {
-            "anyOf": [
-              {
-                "format": "uuid",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
             "description": "Replica group ID to get history for.",
-            "title": "Replica Group Id"
+            "format": "uuid",
+            "title": "Replica Group Id",
+            "type": "string"
           }
         },
+        "required": [
+          "replica_group_id"
+        ],
         "title": "ReplicaGroupHistoryScopeDTO",
         "type": "object"
       },

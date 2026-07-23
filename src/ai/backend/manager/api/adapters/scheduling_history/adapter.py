@@ -37,7 +37,6 @@ from ai.backend.common.dto.manager.v2.scheduling_history.response import (
     SessionHistoryNode,
 )
 from ai.backend.common.dto.manager.v2.scheduling_history.types import SubStepResultInfo
-from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.kernel_scheduling_history import KernelSchedulingHistoryID
 from ai.backend.common.identifier.replica import ReplicaID
 from ai.backend.common.types import KernelId, SessionId
@@ -56,7 +55,6 @@ from ai.backend.manager.data.session.types import (
     SubStepResult,
 )
 from ai.backend.manager.errors.api import InvalidAPIParameters
-from ai.backend.manager.errors.repository import EmptySearchScopeError
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.replica_group_history.conditions import (
     ReplicaGroupHistoryConditions,
@@ -878,24 +876,15 @@ class SchedulingHistoryAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        # The owning deployment is the authorization subject; a replica-group-only
-        # scope resolves it first so the RBAC check targets the deployment directly.
-        deployment_id: DeploymentID
-        if input.scope.deployment_id is not None:
-            deployment_id = input.scope.deployment_id
-        elif input.scope.replica_group_id is not None:
-            resolve_result = await self._processors.scheduling_history.resolve_replica_group_deployment.wait_for_complete(
-                ResolveReplicaGroupDeploymentAction(replica_group_id=input.scope.replica_group_id)
-            )
-            deployment_id = resolve_result.deployment_id
-        else:
-            raise EmptySearchScopeError(
-                "A replica-group history scope needs a deployment_id or a replica_group_id."
-            )
+        # The owning deployment is the authorization subject; resolve it before
+        # dispatching so the RBAC check targets the deployment directly.
+        resolve_result = await self._processors.scheduling_history.resolve_replica_group_deployment.wait_for_complete(
+            ResolveReplicaGroupDeploymentAction(replica_group_id=input.scope.replica_group_id)
+        )
         action_result = await self._processors.scheduling_history.search_replica_group_scoped_history.wait_for_complete(
             SearchReplicaGroupScopedHistoryAction(
-                deployment_id=deployment_id,
                 replica_group_id=input.scope.replica_group_id,
+                deployment_id=resolve_result.deployment_id,
                 querier=querier,
             )
         )
@@ -915,22 +904,6 @@ class SchedulingHistoryAdapter(BaseAdapter):
                 filter.id,
                 equals_factory=ReplicaGroupHistoryConditions.by_id_filter,
                 in_factory=ReplicaGroupHistoryConditions.by_id_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-        if filter.replica_group_id is not None:
-            condition = self.convert_uuid_filter(
-                filter.replica_group_id,
-                equals_factory=ReplicaGroupHistoryConditions.by_replica_group_id_filter,
-                in_factory=ReplicaGroupHistoryConditions.by_replica_group_id_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-        if filter.deployment_id is not None:
-            condition = self.convert_uuid_filter(
-                filter.deployment_id,
-                equals_factory=ReplicaGroupHistoryConditions.by_deployment_id_filter,
-                in_factory=ReplicaGroupHistoryConditions.by_deployment_id_in,
             )
             if condition is not None:
                 conditions.append(condition)
