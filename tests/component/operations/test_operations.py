@@ -176,12 +176,21 @@ class TestUpdateAnnouncement:
         assert result.enabled is True
         assert result.message == "Test announcement"
 
-        # Cleanup: disable announcement
+        # Disabling hides the announcement but retains the message
         await admin_registry.operations.update_announcement(
             UpdateAnnouncementRequest(enabled=False)
         )
         result = await admin_registry.operations.get_announcement()
         assert result.enabled is False
+        assert result.message == "Test announcement"
+
+        # Cleanup: clear the stored message
+        await admin_registry.operations.update_announcement(
+            UpdateAnnouncementRequest(enabled=False, message="")
+        )
+        result = await admin_registry.operations.get_announcement()
+        assert result.enabled is False
+        assert result.message == ""
 
 
 class TestPerformSchedulerOps:

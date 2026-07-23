@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import socket
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
@@ -27,6 +28,14 @@ if TYPE_CHECKING:
     from ai.backend.manager.repositories.manager_admin import ManagerAdminRepository
 
 __all__ = ("ManagerAdminService",)
+
+# etcd key backing the system announcement. The value is a JSON object
+# ``{"enabled": bool, "message": str}`` so that disabling an announcement only
+# flips the flag and keeps the stored message (re-enabling does not require
+# retyping), without introducing a second key. Values written before this key
+# held JSON (a bare message string) are treated as enabled for backward
+# compatibility.
+_ANNOUNCEMENT_KEY = "manager/announcement"
 
 
 @dataclass
@@ -82,23 +91,43 @@ class ManagerAdminService:
 
     async def get_announcement(self, action: GetAnnouncementAction) -> GetAnnouncementActionResult:
         """Get the current announcement from etcd."""
-        data = await self._etcd.get("manager/announcement")
-        if data is None:
+        raw = await self._etcd.get(_ANNOUNCEMENT_KEY)
+        if raw is None:
             return GetAnnouncementActionResult(enabled=False, message="")
-        return GetAnnouncementActionResult(enabled=True, message=data)
+        try:
+            data = json.loads(raw)
+        except (ValueError, TypeError):
+            data = None
+        if isinstance(data, dict) and "enabled" in data and "message" in data:
+            return GetAnnouncementActionResult(
+                enabled=bool(data["enabled"]), message=str(data["message"])
+            )
+        # Legacy value: the key used to hold a bare message string. Treat its
+        # presence as an enabled announcement for backward compatibility.
+        return GetAnnouncementActionResult(enabled=True, message=raw)
 
     async def update_announcement(
         self, action: UpdateAnnouncementAction
     ) -> UpdateAnnouncementActionResult:
-        """Update the announcement in etcd."""
-        if action.enabled:
-            if not action.message:
-                raise InvalidAPIParameters(
-                    extra_msg="Empty message not allowed to enable announcement"
-                )
-            await self._etcd.put("manager/announcement", action.message)
+        """Update the announcement in etcd.
+
+        The message is retained across enable/disable: disabling only flips the
+        enabled flag and keeps the stored message, so re-enabling does not
+        require retyping it. Enabling still requires a non-empty message; pass an
+        explicit empty message to clear the stored text.
+        """
+        if action.enabled and not action.message:
+            raise InvalidAPIParameters(extra_msg="Empty message not allowed to enable announcement")
+        # A request without a message (e.g. a plain disable) preserves the
+        # existing text, so read the current message before rewriting the key.
+        if action.message is None:
+            current = await self.get_announcement(GetAnnouncementAction())
+            message = current.message
         else:
-            await self._etcd.delete("manager/announcement")
+            message = action.message
+        await self._etcd.put(
+            _ANNOUNCEMENT_KEY, json.dumps({"enabled": action.enabled, "message": message})
+        )
         return UpdateAnnouncementActionResult()
 
     async def perform_scheduler_ops(
