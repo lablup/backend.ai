@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import uuid
+from http import HTTPStatus
 from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
 
+from ai.backend.common.exception import BackendAIError
 from ai.backend.manager.api.adapter_options.pagination.pagination import DEFAULT_PAGINATION_LIMIT
 from ai.backend.manager.api.gql.adapter import (
     BaseGQLAdapter,
@@ -14,7 +17,7 @@ from ai.backend.manager.api.gql.adapter import (
     PaginationSpec,
 )
 from ai.backend.manager.api.gql.base import encode_cursor
-from ai.backend.manager.errors.api import InvalidGraphQLParameters
+from ai.backend.manager.errors.api import InvalidCursor, InvalidGraphQLParameters
 from ai.backend.manager.repositories.base import (
     CursorBackwardPagination,
     CursorForwardPagination,
@@ -415,3 +418,37 @@ class TestBaseGQLAdapterBuildPagination:
         # But tiebreaker is always appended
         assert len(querier.orders) == 1
         assert querier.orders[0] is mock_tiebreaker_order
+
+    def test_cursor_payload_the_entity_cannot_key_on_is_invalid_cursor(
+        self,
+        adapter: BaseGQLAdapter,
+    ) -> None:
+        """A payload only the entity can judge, rejected by its factory, is the caller's error.
+
+        The builder itself never decides what a cursor may carry — an entity keyed on a name
+        or an access key accepts this very payload. It only names the failure of the factory
+        that does decide, which used to escape as a bare ValueError and a 500.
+        """
+
+        def parse_the_payload_as_a_uuid(cursor_id: str) -> Any:
+            uuid.UUID(cursor_id)  # raises ValueError for the payload this test sends
+            pytest.fail("the payload parsed, so this no longer exercises a rejected cursor")
+
+        uuid_keyed_spec = PaginationSpec(
+            forward_order=MagicMock(),
+            backward_order=MagicMock(),
+            forward_condition_factory=parse_the_payload_as_a_uuid,
+            backward_condition_factory=parse_the_payload_as_a_uuid,
+            tiebreaker_order=MagicMock(),
+        )
+        cursor = encode_cursor("not-a-uuid")
+
+        with pytest.raises(InvalidCursor) as forward:
+            adapter.build_querier(PaginationOptions(first=10, after=cursor), uuid_keyed_spec)
+        with pytest.raises(InvalidCursor) as backward:
+            adapter.build_querier(PaginationOptions(last=10, before=cursor), uuid_keyed_spec)
+
+        # A BackendAIError carrying a 4xx: the handler reports its code instead of logging a fault.
+        for raised in (forward.value, backward.value):
+            assert isinstance(raised, BackendAIError)
+            assert raised.status_code == HTTPStatus.BAD_REQUEST
