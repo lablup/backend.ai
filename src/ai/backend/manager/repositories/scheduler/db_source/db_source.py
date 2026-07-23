@@ -1514,8 +1514,8 @@ class ScheduleDBSource:
 
     async def fetch_compute_schedule_fetch(
         self,
-        draft: SessionSpecDraft,
         resource_group_id: ResourceGroupID,
+        image_ids: Sequence[ImageID],
     ) -> ComputeScheduleFetch:
         """Resource-only batch fetch of the fitting check in a single
         readonly transaction: the group's enqueue info (no slot
@@ -1525,7 +1525,6 @@ class ScheduleDBSource:
         user- or validator-facing values.
         Raises ScalingGroupNotFound if the resource group doesn't exist.
         """
-        kernel_specs = tuple(draft.resource_spec.options.kernel_groups or ())
         async with self._db.begin_readonly_session_read_committed() as db_sess:
             rg_row = (
                 await db_sess.scalars(
@@ -1545,7 +1544,10 @@ class ScheduleDBSource:
                 ),
                 served_slot_names=frozenset(),
             )
-            global_info = await self._fetch_global_enqueue_info(db_sess, kernel_specs)
+            global_info = GlobalEnqueueInfo(
+                image_infos=await self._fetch_image_infos(db_sess, image_ids),
+                slot_type_info=await self._fetch_slot_type_info(db_sess),
+            )
             agents = await self._fetch_agents(db_sess, resource_group_id)
             return ComputeScheduleFetch(
                 resource_group=resource_group,
@@ -1560,7 +1562,7 @@ class ScheduleDBSource:
     ) -> SessionSpecFetch:
         """Batch-fetch the DB-side sources of the enqueue context, one
         helper per source group of :class:`SessionSpecFetch`."""
-        kernel_specs = tuple(draft.resource_spec.options.kernel_groups or ())
+        kernel_specs = tuple(draft.resource_spec.resource.options.kernel_groups or ())
         return SessionSpecFetch(
             resource_group=await self._fetch_resource_group_enqueue_info(
                 db_sess, draft.scope.resource_group_id
@@ -1613,25 +1615,33 @@ class ScheduleDBSource:
     ) -> GlobalEnqueueInfo:
         """Cluster-global registries: the images the draft references and
         the slot type registry."""
-        slot_type_info = await self._fetch_slot_type_info(db_sess)
-
-        image_ids: list[UUID] = []
-        seen_ids: set[UUID] = set()
+        image_ids: list[ImageID] = []
+        seen_ids: set[ImageID] = set()
         for group in kernel_specs:
             img = group.execution_spec.resource_input.image_id
-            if img is None:
+            if img is None or img in seen_ids:
                 continue
-            img_uuid = UUID(str(img))
-            if img_uuid in seen_ids:
-                continue
-            seen_ids.add(img_uuid)
-            image_ids.append(img_uuid)
-        image_rows: list[ImageRow] = []
-        if image_ids:
-            image_rows = list(
-                (await db_sess.scalars(sa.select(ImageRow).where(ImageRow.id.in_(image_ids)))).all()
+            seen_ids.add(img)
+            image_ids.append(img)
+        return GlobalEnqueueInfo(
+            image_infos=await self._fetch_image_infos(db_sess, image_ids),
+            slot_type_info=await self._fetch_slot_type_info(db_sess),
+        )
+
+    async def _fetch_image_infos(
+        self,
+        db_sess: SASession,
+        image_ids: Sequence[ImageID],
+    ) -> Mapping[ImageID, ImageInfo]:
+        """Resolve the referenced images from the registry."""
+        if not image_ids:
+            return {}
+        image_rows = (
+            await db_sess.scalars(
+                sa.select(ImageRow).where(ImageRow.id.in_([UUID(str(i)) for i in image_ids]))
             )
-        image_infos = {
+        ).all()
+        return {
             ImageID(row.id): ImageInfo(
                 id=row.id,
                 canonical=row.name,
@@ -1642,11 +1652,6 @@ class ScheduleDBSource:
             )
             for row in image_rows
         }
-
-        return GlobalEnqueueInfo(
-            image_infos=image_infos,
-            slot_type_info=slot_type_info,
-        )
 
     async def _fetch_user_enqueue_fetch(
         self,

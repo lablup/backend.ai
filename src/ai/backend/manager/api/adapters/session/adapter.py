@@ -364,7 +364,6 @@ class SessionAdapter(BaseAdapter):
             kernels=kernels,
             cluster_mode=cluster_mode,
             resource_group_id=input.resource_group_id,
-            user_uuid=self._require_user_id(),
         )
         result = await self._processors.session.compute_schedule.wait_for_complete(action)
         return ComputeSchedulePayload(

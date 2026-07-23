@@ -26,7 +26,7 @@ from typing import override
 
 from ai.backend.manager.data.session.draft import SessionResourceSpecDraft
 from ai.backend.manager.models.network import NetworkType
-from ai.backend.manager.sokovan.scheduling_controller.preparers.draft_rule import (
+from ai.backend.manager.sokovan.scheduling_controller.preparers.specs.draft_rule import (
     SessionSpecDraftRule,
 )
 from ai.backend.manager.views.sokovan.session_creation import (

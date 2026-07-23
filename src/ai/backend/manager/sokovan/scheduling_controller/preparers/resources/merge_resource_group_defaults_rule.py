@@ -32,18 +32,18 @@ from typing import override
 
 from ai.backend.manager.data.session.draft import (
     KernelExecutionSpecDraft,
-    SessionResourceSpecDraft,
+    ResourceSpecDraft,
 )
 from ai.backend.manager.data.session.options import KernelExecutionSpec
-from ai.backend.manager.sokovan.scheduling_controller.preparers.draft_rule import (
-    SessionSpecDraftRule,
+from ai.backend.manager.sokovan.scheduling_controller.preparers.resources.draft_rule import (
+    ResourceSpecDraftRule,
 )
 from ai.backend.manager.views.sokovan.session_creation import (
     SessionSpecContext,
 )
 
 
-class MergeResourceGroupDefaultsRule(SessionSpecDraftRule):
+class MergeResourceGroupDefaultsRule(ResourceSpecDraftRule):
     """Overlay RG defaults under caller-supplied draft values."""
 
     @override
@@ -53,9 +53,9 @@ class MergeResourceGroupDefaultsRule(SessionSpecDraftRule):
     @override
     async def prepare(
         self,
-        draft: SessionResourceSpecDraft,
+        draft: ResourceSpecDraft,
         context: SessionSpecContext,
-    ) -> SessionResourceSpecDraft:
+    ) -> ResourceSpecDraft:
         rg_defaults = context.resource_group.defaults
 
         # Option-level fill.

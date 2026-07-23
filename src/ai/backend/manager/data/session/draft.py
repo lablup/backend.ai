@@ -208,6 +208,20 @@ class SessionClassificationDraft(_DraftBaseModel):
     tag: str | None = None
 
 
+class ResourceSpecDraft(_DraftBaseModel):
+    """Resource-determining portion of a session draft.
+
+    The input of the resource preparer rules (and the whole draft the
+    fitting check operates on): the options that shape resource amounts
+    and the kernel specs the expansion rule fills. The full
+    :class:`SessionResourceSpecDraft` nests this as its ``resource``
+    field; promotion flattens it back into the flat spec shape.
+    """
+
+    options: SessionOptionsDraft = Field(default_factory=SessionOptionsDraft)
+    kernel_specs: tuple[KernelSpecDraft, ...] = ()
+
+
 class SessionResourceSpecDraft(_DraftBaseModel):
     """Scope-free draft consumed by the preparer chain."""
 
@@ -216,8 +230,7 @@ class SessionResourceSpecDraft(_DraftBaseModel):
     network: SessionNetworkDraft = Field(default_factory=SessionNetworkDraft)
     callback_url: yarl.URL | None = None
     dependencies: tuple[SessionID, ...] = ()
-    options: SessionOptionsDraft = Field(default_factory=SessionOptionsDraft)
-    kernel_specs: tuple[KernelSpecDraft, ...] = ()
+    resource: ResourceSpecDraft = Field(default_factory=ResourceSpecDraft)
     internal_data_extras: InternalDataExtras = Field(default_factory=InternalDataExtras)
 
 

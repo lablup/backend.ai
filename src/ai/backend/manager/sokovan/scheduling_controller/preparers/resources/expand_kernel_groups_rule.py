@@ -24,17 +24,17 @@ from typing import override
 
 from ai.backend.manager.data.session.draft import (
     KernelSpecDraft,
-    SessionResourceSpecDraft,
+    ResourceSpecDraft,
 )
-from ai.backend.manager.sokovan.scheduling_controller.preparers.draft_rule import (
-    SessionSpecDraftRule,
+from ai.backend.manager.sokovan.scheduling_controller.preparers.resources.draft_rule import (
+    ResourceSpecDraftRule,
 )
 from ai.backend.manager.views.sokovan.session_creation import (
     SessionSpecContext,
 )
 
 
-class ExpandKernelGroupsRule(SessionSpecDraftRule):
+class ExpandKernelGroupsRule(ResourceSpecDraftRule):
     """Flatten ``options.kernel_groups`` into per-replica kernel drafts.
 
     When ``options.kernel_groups`` is still ``None`` this rule is a
@@ -49,9 +49,9 @@ class ExpandKernelGroupsRule(SessionSpecDraftRule):
     @override
     async def prepare(
         self,
-        draft: SessionResourceSpecDraft,
+        draft: ResourceSpecDraft,
         context: SessionSpecContext,
-    ) -> SessionResourceSpecDraft:
+    ) -> ResourceSpecDraft:
         groups = draft.options.kernel_groups
         if groups is None:
             return draft

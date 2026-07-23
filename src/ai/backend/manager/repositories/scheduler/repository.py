@@ -187,14 +187,14 @@ class SchedulerRepository:
     @scheduler_repository_resilience.apply()
     async def fetch_compute_schedule_data(
         self,
-        draft: SessionSpecDraft,
         resource_group_id: ResourceGroupID,
+        image_ids: Sequence[ImageID],
     ) -> ComputeScheduleData:
         """Assemble the read bundle of the fitting check: the spec context
         (mounts unresolved), the group's agents, and the same configured
         agent limit the real scheduling pass enforces.
         """
-        fetch = await self._db_source.fetch_compute_schedule_fetch(draft, resource_group_id)
+        fetch = await self._db_source.fetch_compute_schedule_fetch(resource_group_id, image_ids)
         return ComputeScheduleData(
             # Resource-only assembly: the fitting check runs no validators
             # and no user-scoped rules, so the user part carries the
@@ -352,7 +352,7 @@ class SchedulerRepository:
         user_uuid = draft.resource_spec.identity.user_uuid
         domain_name = str(draft.scope.domain_name) if draft.scope.domain_name else None
         project_id = draft.scope.project_id
-        kernel_specs = tuple(draft.resource_spec.options.kernel_groups or ())
+        kernel_specs = tuple(draft.resource_spec.resource.options.kernel_groups or ())
 
         vfolder_mounts_by_role: dict[str, tuple[VFolderMount, ...]] = {}
         if domain_name is None or user_uuid is None:

@@ -111,6 +111,7 @@ from ai.backend.manager.data.session.draft import (
     KernelExecutionSpecDraft,
     KernelGroupDraft,
     KernelResourceInput,
+    ResourceSpecDraft,
     SchedulingTargetDraft,
     SessionClassificationDraft,
     SessionIdentityDraft,
@@ -1159,17 +1160,19 @@ class AgentRegistry:
                 network=SessionNetworkDraft(network_id=network_id),
                 callback_url=callback_url,
                 dependencies=dependencies,
-                options=SessionOptionsDraft(
-                    priority=priority,
-                    job_priority=job_priority,
-                    is_preemptible=is_preemptible,
-                    cluster_mode=cluster_mode,
-                    cluster_size=cluster_size,
-                    scheduling_target=SchedulingTargetDraft(
-                        designated_agents=tuple(AgentId(a) for a in (agent_list or ())),
+                resource=ResourceSpecDraft(
+                    options=SessionOptionsDraft(
+                        priority=priority,
+                        job_priority=job_priority,
+                        is_preemptible=is_preemptible,
+                        cluster_mode=cluster_mode,
+                        cluster_size=cluster_size,
+                        scheduling_target=SchedulingTargetDraft(
+                            designated_agents=tuple(AgentId(a) for a in (agent_list or ())),
+                        ),
+                        kernel_groups=tuple(groups_by_role.values()),
+                        handler_options=None,
                     ),
-                    kernel_groups=tuple(groups_by_role.values()),
-                    handler_options=None,
                 ),
                 internal_data_extras=InternalDataExtras(
                     sudo_session_enabled=sudo_session_enabled,

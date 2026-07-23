@@ -30,12 +30,12 @@ from ai.backend.common.types import BinarySize, ResourceSlotEntry
 from ai.backend.manager.data.session.creation import ImageInfo
 from ai.backend.manager.data.session.draft import (
     KernelExecutionSpecDraft,
-    SessionResourceSpecDraft,
+    ResourceSpecDraft,
 )
 from ai.backend.manager.data.session.options import ResourceOpts
 from ai.backend.manager.defs import DEFAULT_SHARED_MEMORY_SIZE, INTRINSIC_SLOTS
-from ai.backend.manager.sokovan.scheduling_controller.preparers.draft_rule import (
-    SessionSpecDraftRule,
+from ai.backend.manager.sokovan.scheduling_controller.preparers.resources.draft_rule import (
+    ResourceSpecDraftRule,
 )
 from ai.backend.manager.sokovan.scheduling_controller.resource_parse import (
     image_min_slots,
@@ -46,7 +46,7 @@ from ai.backend.manager.views.sokovan.session_creation import (
 )
 
 
-class ComputeKernelResourcesRule(SessionSpecDraftRule):
+class ComputeKernelResourcesRule(ResourceSpecDraftRule):
     """Resolve intrinsic slots and shared-memory on each kernel group."""
 
     _SHMEM_IMAGE_LABEL = "ai.backend.resource.preferred.shmem"
@@ -58,9 +58,9 @@ class ComputeKernelResourcesRule(SessionSpecDraftRule):
     @override
     async def prepare(
         self,
-        draft: SessionResourceSpecDraft,
+        draft: ResourceSpecDraft,
         context: SessionSpecContext,
-    ) -> SessionResourceSpecDraft:
+    ) -> ResourceSpecDraft:
         if draft.options.kernel_groups is None:
             return draft
 

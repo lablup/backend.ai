@@ -318,13 +318,7 @@ class SessionProvisioner:
         # Project the workload's placement into the plan (requirement +
         # kernel pairs) and the agent selection criteria.
         plan = PlacementPlan.from_placement(session_workload.placement)
-        criteria = AgentSelectionCriteria(
-            session_id=session_workload.meta.session_id,
-            resource_group_id=session_workload.meta.resource_group_id,
-            requirements=plan.requirements(),
-            agent_selection_policy=session_workload.placement.agent_selection_policy,
-            designated_agent_ids=session_workload.placement.designated_agent_ids,
-        )
+        criteria = AgentSelectionCriteria.from_workload(session_workload, plan)
 
         # Selection commits state changes into the trackers on full success
         selector = self._agent_selector_pool[

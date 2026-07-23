@@ -1,16 +1,17 @@
 """Preparers for session creation."""
 
-from .assign_container_user_mapping_rule import AssignContainerUserMappingRule
-from .assign_network_config_rule import AssignNetworkConfigRule
-from .assign_user_identity_rule import AssignUserIdentityRule
-from .build_internal_data_rule import BuildInternalDataRule
-from .compute_kernel_resources_rule import ComputeKernelResourcesRule
-from .draft_rule import SessionSpecDraftRule
-from .expand_kernel_groups_rule import ExpandKernelGroupsRule
-from .inject_session_environ_rule import InjectSessionEnvironRule
-from .merge_resource_group_defaults_rule import MergeResourceGroupDefaultsRule
-from .resolve_vfolder_mounts_rule import ResolveVFolderMountsRule
+from .resources.compute_kernel_resources_rule import ComputeKernelResourcesRule
+from .resources.draft_rule import ResourceSpecDraftRule
+from .resources.expand_kernel_groups_rule import ExpandKernelGroupsRule
+from .resources.merge_resource_group_defaults_rule import MergeResourceGroupDefaultsRule
 from .session_spec_preparer import SessionSpecPreparer
+from .specs.assign_container_user_mapping_rule import AssignContainerUserMappingRule
+from .specs.assign_network_config_rule import AssignNetworkConfigRule
+from .specs.assign_user_identity_rule import AssignUserIdentityRule
+from .specs.build_internal_data_rule import BuildInternalDataRule
+from .specs.draft_rule import SessionSpecDraftRule
+from .specs.inject_session_environ_rule import InjectSessionEnvironRule
+from .specs.resolve_vfolder_mounts_rule import ResolveVFolderMountsRule
 
 __all__ = [
     "AssignContainerUserMappingRule",
@@ -22,6 +23,7 @@ __all__ = [
     "InjectSessionEnvironRule",
     "MergeResourceGroupDefaultsRule",
     "ResolveVFolderMountsRule",
+    "ResourceSpecDraftRule",
     "SessionSpecDraftRule",
     "SessionSpecPreparer",
 ]

@@ -18,9 +18,15 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 
-from ai.backend.manager.data.session.draft import SessionResourceSpecDraft
+from ai.backend.manager.data.session.draft import (
+    ResourceSpecDraft,
+    SessionResourceSpecDraft,
+)
 from ai.backend.manager.data.session.spec import SessionResourceSpec
-from ai.backend.manager.sokovan.scheduling_controller.preparers.draft_rule import (
+from ai.backend.manager.sokovan.scheduling_controller.preparers.resources.draft_rule import (
+    ResourceSpecDraftRule,
+)
+from ai.backend.manager.sokovan.scheduling_controller.preparers.specs.draft_rule import (
     SessionSpecDraftRule,
 )
 from ai.backend.manager.views.sokovan.session_creation import (
@@ -31,12 +37,14 @@ from ai.backend.manager.views.sokovan.session_creation import (
 class SessionSpecPreparer:
     """Runs the ordered draft-rule chain and finalizes into a ``SessionSpec``.
 
-    Rules come in two groups: ``resource_rules`` determine the resource
-    shape of the session (identity, RG defaults, kernel resources,
-    group expansion) and ``spec_rules`` complete the rest of the spec
-    (network, container user, environ, internal data, mounts). The full
-    chain is their union in declaration order; the fitting check runs
-    only the resource group via :meth:`prepare_resources`.
+    Rules come in two hierarchies: ``resource_rules``
+    (:class:`ResourceSpecDraftRule`) determine the resource shape over
+    the :class:`ResourceSpecDraft` slice, and ``spec_rules``
+    (:class:`SessionSpecDraftRule`) complete the rest of the spec over
+    the full draft (identity, network, container user, environ,
+    internal data, mounts). :meth:`prepare` bridges the full draft
+    through the resource slice then runs the spec rules; the fitting
+    check runs only :meth:`prepare_resources`.
 
     Each rule receives the draft emitted by the previous one, so
     ordering matters (e.g. an image-resolution rule should run after
@@ -45,12 +53,12 @@ class SessionSpecPreparer:
     projected into the frozen spec.
     """
 
-    _resource_rules: tuple[SessionSpecDraftRule, ...]
+    _resource_rules: tuple[ResourceSpecDraftRule, ...]
     _spec_rules: tuple[SessionSpecDraftRule, ...]
 
     def __init__(
         self,
-        resource_rules: Iterable[SessionSpecDraftRule],
+        resource_rules: Iterable[ResourceSpecDraftRule],
         spec_rules: Iterable[SessionSpecDraftRule],
     ) -> None:
         self._resource_rules = tuple(resource_rules)
@@ -61,30 +69,36 @@ class SessionSpecPreparer:
         initial_draft: SessionResourceSpecDraft,
         context: SessionSpecContext,
     ) -> SessionResourceSpec:
-        """Run the full chain (resource rules then spec rules) and finalize."""
-        draft = await self._run(self._resource_rules, initial_draft, context)
-        draft = await self._run(self._spec_rules, draft, context)
+        """Run the full chain and finalize.
+
+        The full draft is bridged through the resource slice (resource
+        rules see only options/kernel_specs), folded back, and then the
+        spec rules complete the rest.
+        """
+        resource_draft = await self.prepare_resources(initial_draft.resource, context)
+        draft = initial_draft.model_copy(update={"resource": resource_draft})
+        for rule in self._spec_rules:
+            draft = await rule.prepare(draft, context)
         return self._finalize(draft)
 
     async def prepare_resources(
         self,
-        initial_draft: SessionResourceSpecDraft,
+        initial_draft: ResourceSpecDraft,
         context: SessionSpecContext,
-    ) -> SessionResourceSpec:
-        """Run only the resource-determination rules and finalize."""
-        draft = await self._run(self._resource_rules, initial_draft, context)
-        return self._finalize(draft)
-
-    @staticmethod
-    async def _run(
-        rules: tuple[SessionSpecDraftRule, ...],
-        draft: SessionResourceSpecDraft,
-        context: SessionSpecContext,
-    ) -> SessionResourceSpecDraft:
-        for rule in rules:
+    ) -> ResourceSpecDraft:
+        """Run only the resource-determination rules (no promotion)."""
+        draft = initial_draft
+        for rule in self._resource_rules:
             draft = await rule.prepare(draft, context)
         return draft
 
     def _finalize(self, draft: SessionResourceSpecDraft) -> SessionResourceSpec:
-        """Project a fully-prepared draft into a frozen ``SessionResourceSpec``."""
-        return SessionResourceSpec.model_validate(draft.model_dump(exclude_none=True))
+        """Project a fully-prepared draft into a frozen ``SessionResourceSpec``.
+
+        The nested ``resource`` slice is flattened back into the flat
+        spec shape here, so downstream consumers of the promoted spec
+        are unaffected by the draft-side nesting.
+        """
+        payload = draft.model_dump(exclude_none=True)
+        payload.update(payload.pop("resource", {}))
+        return SessionResourceSpec.model_validate(payload)

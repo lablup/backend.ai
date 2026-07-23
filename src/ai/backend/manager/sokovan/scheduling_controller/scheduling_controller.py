@@ -3,7 +3,7 @@
 import logging
 from collections.abc import Sequence
 from dataclasses import dataclass
-from uuid import UUID
+from uuid import uuid4
 
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.contexts.user import current_user
@@ -13,6 +13,7 @@ from ai.backend.common.events.event_types.session.broadcast import SchedulingBro
 from ai.backend.common.events.types import AbstractBroadcastEvent
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.identifier.architecture import ArchName
+from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
 from ai.backend.common.types import ResourceSlot, ResourceSlotEntry, SessionId, SlotName
@@ -25,12 +26,10 @@ from ai.backend.manager.data.session.compute_schedule import (
     UnschedulableReasonHint,
 )
 from ai.backend.manager.data.session.draft import (
-    SessionResourceSpecDraft,
-    SessionScopeDraft,
+    ResourceSpecDraft,
     SessionSpecDraft,
 )
 from ai.backend.manager.data.session.spec import (
-    SessionResourceSpec,
     SessionScope,
     SessionSpec,
 )
@@ -149,12 +148,12 @@ class SchedulingController:
         # via prepare_resources() for the fitting check.
         self._spec_preparer = SessionSpecPreparer(
             resource_rules=(
-                AssignUserIdentityRule(),
                 MergeResourceGroupDefaultsRule(),
                 ComputeKernelResourcesRule(),
                 ExpandKernelGroupsRule(),
             ),
             spec_rules=(
+                AssignUserIdentityRule(),
                 AssignNetworkConfigRule(),
                 AssignContainerUserMappingRule(),
                 InjectSessionEnvironRule(),
@@ -315,11 +314,11 @@ class SchedulingController:
 
     @staticmethod
     def _build_requirement_items(
-        spec: SessionResourceSpec,
+        prepared: ResourceSpecDraft,
         context: SessionSpecContext,
     ) -> list[ResourceRequirements]:
-        """Parse the prepared spec into per-item placement requirements,
-        order-aligned with ``spec.kernel_specs``.
+        """Parse the prepared resource draft into per-item placement
+        requirements, order-aligned with ``prepared.kernel_specs``.
 
         The fitting check only reasons about resource amounts, so no
         kernel-shaped values are materialized.
@@ -328,7 +327,7 @@ class SchedulingController:
             ImageNotFound: If a kernel group references an unknown image.
         """
         items: list[ResourceRequirements] = []
-        for kernel_spec in spec.kernel_specs:
+        for kernel_spec in prepared.kernel_specs:
             resource_input = kernel_spec.execution_spec.resource_input
             image_info = (
                 context.global_info.image_infos.get(resource_input.image_id)
@@ -355,18 +354,27 @@ class SchedulingController:
 
     async def _compute_schedule(
         self,
-        spec: SessionResourceSpec,
+        prepared: ResourceSpecDraft,
         resource_group_id: ResourceGroupID,
         data: ComputeScheduleData,
     ) -> ComputeScheduleResult:
-        items = self._build_requirement_items(spec, data.spec_context)
+        items = self._build_requirement_items(prepared, data.spec_context)
         failure_hints: dict[int, UnschedulableReasonHint] = {}
 
         if items:
-            plan = PlacementPlan.from_items(items, spec.options.cluster_mode)
-            scheduling_target = spec.options.scheduling_target
+            cluster_mode = prepared.options.cluster_mode
+            if cluster_mode is None:
+                raise InternalServerError("cluster_mode unresolved after the defaults merge")
+            scheduling_target = prepared.options.scheduling_target
+            if scheduling_target.agent_selection_policy is None:
+                raise InternalServerError(
+                    "agent_selection_policy unresolved after the defaults merge"
+                )
+            plan = PlacementPlan.from_items(items, cluster_mode)
             criteria = AgentSelectionCriteria(
-                session_id=SessionId(UUID(str(spec.identity.session_id))),
+                # The fitting check has no real session; the id only feeds
+                # the failed-agent retry filter, which is a no-op here.
+                session_id=SessionId(uuid4()),
                 resource_group_id=resource_group_id,
                 requirements=plan.requirements(),
                 agent_selection_policy=scheduling_target.agent_selection_policy,
@@ -409,32 +417,38 @@ class SchedulingController:
                 success=index not in failure_hints,
                 reason_hint=failure_hints.get(index),
             )
-            for index, (item, kernel_spec) in enumerate(zip(items, spec.kernel_specs, strict=True))
+            for index, (item, kernel_spec) in enumerate(
+                zip(items, prepared.kernel_specs, strict=True)
+            )
         ]
         return ComputeScheduleResult(kernel_results=kernel_result)
 
     async def compute_schedule(
         self,
         resource_group_id: ResourceGroupID,
-        draft: SessionResourceSpecDraft,
+        draft: ResourceSpecDraft,
     ) -> ComputeScheduleResult:
         """Compute whether each kernel of a would-be session fits the target
         resource group's nodes, without provisioning.
 
-        Runs the resource-only subchain (same rules as the enqueue chain,
-        restricted to resource determination) over a resource-only read
-        bundle, then drives the real agent selector against a live
-        snapshot of the group's agents. Results correspond positionally
-        to ``draft.resource_spec.options.kernel_groups``.
+        Runs the resource rules (the same instances the enqueue chain
+        uses) over a resource-only read bundle, then drives the real
+        agent selector against a live snapshot of the group's agents.
+        Results correspond positionally to ``draft.options.kernel_groups``.
         """
+        image_ids: list[ImageID] = []
+        seen_ids: set[ImageID] = set()
+        for group in draft.options.kernel_groups or ():
+            image_id = group.execution_spec.resource_input.image_id
+            if image_id is None or image_id in seen_ids:
+                continue
+            seen_ids.add(image_id)
+            image_ids.append(image_id)
         # An unknown resource group (ScalingGroupNotFound) is a request error,
         # not a per-kernel fitting outcome, so let it propagate to the caller.
-        fetched = await self._repository.fetch_compute_schedule_data(
-            SessionSpecDraft(scope=SessionScopeDraft(), resource_spec=draft),
-            resource_group_id,
-        )
-        resource_spec = await self._spec_preparer.prepare_resources(draft, fetched.spec_context)
-        return await self._compute_schedule(resource_spec, resource_group_id, fetched)
+        fetched = await self._repository.fetch_compute_schedule_data(resource_group_id, image_ids)
+        prepared = await self._spec_preparer.prepare_resources(draft, fetched.spec_context)
+        return await self._compute_schedule(prepared, resource_group_id, fetched)
 
     async def mark_scheduling_needed(self, schedule_types: Sequence[ScheduleType]) -> None:
         """

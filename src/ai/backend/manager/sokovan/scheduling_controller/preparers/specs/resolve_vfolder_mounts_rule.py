@@ -10,7 +10,7 @@ invariant. See
 :attr:`SessionSpecContext.vfolder_mounts_by_role`.
 
 Runs after :class:`.expand_kernel_groups_rule.ExpandKernelGroupsRule`
-so ``draft.kernel_specs`` is already expanded per-replica; each kernel
+so ``draft.resource.kernel_specs`` is already expanded per-replica; each kernel
 reads its ``cluster_role`` to fetch the tuple its
 :class:`KernelGroup` was resolved to. Replicas of the same role share
 the identical tuple without any per-replica duplication at
@@ -24,7 +24,7 @@ from __future__ import annotations
 from typing import override
 
 from ai.backend.manager.data.session.draft import SessionResourceSpecDraft
-from ai.backend.manager.sokovan.scheduling_controller.preparers.draft_rule import (
+from ai.backend.manager.sokovan.scheduling_controller.preparers.specs.draft_rule import (
     SessionSpecDraftRule,
 )
 from ai.backend.manager.views.sokovan.session_creation import (
@@ -46,14 +46,16 @@ class ResolveVFolderMountsRule(SessionSpecDraftRule):
         context: SessionSpecContext,
     ) -> SessionResourceSpecDraft:
         resolved = context.user.vfolder_mounts_by_role
-        if not resolved or not draft.kernel_specs:
+        if not resolved or not draft.resource.kernel_specs:
             return draft
         updated = []
-        for kernel in draft.kernel_specs:
+        for kernel in draft.resource.kernel_specs:
             role = kernel.cluster_role
             mounts = resolved.get(role, ()) if role is not None else ()
             if mounts == kernel.vfolder_mounts:
                 updated.append(kernel)
                 continue
             updated.append(kernel.model_copy(update={"vfolder_mounts": mounts}))
-        return draft.model_copy(update={"kernel_specs": tuple(updated)})
+        return draft.model_copy(
+            update={"resource": draft.resource.model_copy(update={"kernel_specs": tuple(updated)})}
+        )

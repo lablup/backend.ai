@@ -53,9 +53,11 @@ from ai.backend.manager.data.deployment.types import (
     ModelRevisionSpec,
     ModelRevisionSpecDraft,
     MountMetadata,
-    ResourceSpecDraft,
     RevisionDraft,
     RouteHealthStatus,
+)
+from ai.backend.manager.data.deployment.types import (
+    ResourceSpecDraft as DeploymentResourceSpecDraft,
 )
 from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.model_serving.types import (
@@ -71,6 +73,7 @@ from ai.backend.manager.data.session.draft import (
     KernelExecutionSpecDraft,
     KernelGroupDraft,
     KernelResourceInput,
+    ResourceSpecDraft,
     SchedulingTargetDraft,
     SessionClassificationDraft,
     SessionIdentityDraft,
@@ -383,7 +386,7 @@ class ModelServingService:
                 canonical=action.image,
                 architecture=action.architecture,
             ),
-            resource_spec=ResourceSpecDraft(
+            resource_spec=DeploymentResourceSpecDraft(
                 cluster_mode=action.cluster_mode,
                 cluster_size=action.cluster_size,
                 resource_slots=action.config.resources,
@@ -490,14 +493,16 @@ class ModelServingService:
                 ),
                 network=SessionNetworkDraft(),
                 callback_url=callback_url,
-                options=SessionOptionsDraft(
-                    priority=SESSION_PRIORITY_DEFAULT,
-                    is_preemptible=False,
-                    cluster_mode=action.cluster_mode,
-                    cluster_size=action.cluster_size,
-                    scheduling_target=SchedulingTargetDraft(),
-                    kernel_groups=kernel_groups,
-                    handler_options=None,
+                resource=ResourceSpecDraft(
+                    options=SessionOptionsDraft(
+                        priority=SESSION_PRIORITY_DEFAULT,
+                        is_preemptible=False,
+                        cluster_mode=action.cluster_mode,
+                        cluster_size=action.cluster_size,
+                        scheduling_target=SchedulingTargetDraft(),
+                        kernel_groups=kernel_groups,
+                        handler_options=None,
+                    ),
                 ),
                 internal_data_extras=InternalDataExtras(
                     sudo_session_enabled=sudo_session_enabled,

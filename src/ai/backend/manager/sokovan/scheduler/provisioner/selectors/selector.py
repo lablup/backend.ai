@@ -24,7 +24,11 @@ from ai.backend.common.types import (
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.session.options import AgentSelectionPolicy
 from ai.backend.manager.views.sokovan.agent import AgentInfo, AgentLimit
-from ai.backend.manager.views.sokovan.workload import ResourceRequest, SessionPlacement
+from ai.backend.manager.views.sokovan.workload import (
+    ResourceRequest,
+    SessionPlacement,
+    SessionWorkload,
+)
 
 from .exceptions import (
     BatchAgentSelectionFailedError,
@@ -71,6 +75,21 @@ class AgentSelectionCriteria:
     agent_selection_policy: AgentSelectionPolicy
     # Manually designated agents (user's explicit choice takes precedence)
     designated_agent_ids: list[AgentId] | None
+
+    @classmethod
+    def from_workload(
+        cls,
+        workload: SessionWorkload,
+        plan: PlacementPlan,
+    ) -> AgentSelectionCriteria:
+        """Project a session workload (and its grouped plan) into criteria."""
+        return cls(
+            session_id=workload.meta.session_id,
+            resource_group_id=workload.meta.resource_group_id,
+            requirements=plan.requirements(),
+            agent_selection_policy=workload.placement.agent_selection_policy,
+            designated_agent_ids=workload.placement.designated_agent_ids,
+        )
 
 
 @dataclass

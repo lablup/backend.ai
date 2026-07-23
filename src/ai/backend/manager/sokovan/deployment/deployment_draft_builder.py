@@ -32,6 +32,7 @@ from ai.backend.manager.data.session.draft import (
     KernelExecutionSpecDraft,
     KernelGroupDraft,
     KernelResourceInput,
+    ResourceSpecDraft,
     SchedulingTargetDraft,
     SessionClassificationDraft,
     SessionIdentityDraft,
@@ -112,14 +113,16 @@ class DeploymentSessionDraftBuilder:
                 ),
                 network=SessionNetworkDraft(),
                 callback_url=target_revision.execution.callback_url,
-                options=SessionOptionsDraft(
-                    priority=SESSION_PRIORITY_DEFAULT,
-                    is_preemptible=False,
-                    cluster_mode=target_revision.cluster_config.mode,
-                    cluster_size=target_revision.cluster_config.size,
-                    scheduling_target=SchedulingTargetDraft(),
-                    kernel_groups=kernel_groups,
-                    handler_options=None,
+                resource=ResourceSpecDraft(
+                    options=SessionOptionsDraft(
+                        priority=SESSION_PRIORITY_DEFAULT,
+                        is_preemptible=False,
+                        cluster_mode=target_revision.cluster_config.mode,
+                        cluster_size=target_revision.cluster_config.size,
+                        scheduling_target=SchedulingTargetDraft(),
+                        kernel_groups=kernel_groups,
+                        handler_options=None,
+                    ),
                 ),
                 internal_data_extras=InternalDataExtras(
                     sudo_session_enabled=context.session_owner.sudo_session_enabled,
