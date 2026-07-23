@@ -182,11 +182,38 @@ class TestSessionIdleCheckRow:
                 SessionIdleCheckRow,
                 (persisted_idle_check.session_id, persisted_idle_check.checker_id),
             )
+            checker_row = await db_sess.get(
+                IdleCheckerRow,
+                persisted_idle_check.checker_id,
+            )
 
         assert row is not None
         assert row.expire_at == datetime(2026, 1, 2, tzinfo=UTC)
         assert row.last_status is IdleCheckPhase.ACTIVE
         assert row.updated_at is not None
+        assert checker_row is not None
+        assert checker_row.initial_grace_period_seconds == 0
+
+    async def test_rejects_negative_initial_grace_period(
+        self,
+        database: ExtendedAsyncSAEngine,
+    ) -> None:
+        with pytest.raises(sa.exc.IntegrityError):
+            async with database.begin_session() as db_sess:
+                db_sess.add(
+                    IdleCheckerRow(
+                        id=IdleCheckerID(uuid.uuid4()),
+                        name="negative-grace-period-checker",
+                        description=None,
+                        checker_type=CheckerType.SESSION_LIFETIME,
+                        target_session_types=[SessionTypes.INTERACTIVE],
+                        initial_grace_period_seconds=-1,
+                        spec=IdleCheckerSpec(
+                            type=CheckerType.SESSION_LIFETIME,
+                            session_lifetime=SessionLifetimeSpec(max_lifetime_seconds=3600),
+                        ),
+                    )
+                )
 
     async def test_rejects_duplicate_session_checker_pair(
         self,

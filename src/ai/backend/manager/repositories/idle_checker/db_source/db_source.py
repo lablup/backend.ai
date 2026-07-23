@@ -42,6 +42,8 @@ from ai.backend.manager.repositories.idle_checker.types import (
     IdleCheckAssignmentData,
     IdleCheckBatchData,
     IdleCheckerDefinitionData,
+    InitialGracePeriodBatchData,
+    InitialGracePeriodCheckData,
     SessionIdleCheckAssignmentData,
     SessionIdleCheckPair,
 )
@@ -133,6 +135,44 @@ class IdleCheckerDBSource:
                 )
             )
         return ExpiredIdleCheckBatchData(checks=tuple(checks), now=now)
+
+    async def fetch_initial_grace_period_checks(
+        self,
+        session_statuses: Collection[SessionStatus],
+    ) -> InitialGracePeriodBatchData:
+        query = (
+            sa.select(
+                SessionIdleCheckRow.session_id,
+                SessionIdleCheckRow.idle_checker_id,
+                SessionIdleCheckRow.updated_at,
+                IdleCheckerRow.initial_grace_period_seconds,
+            )
+            .select_from(SessionIdleCheckRow)
+            .join(SessionRow, SessionIdleCheckRow.session_id == SessionRow.id)
+            .join(IdleCheckerRow, SessionIdleCheckRow.idle_checker_id == IdleCheckerRow.id)
+            .where(
+                SessionRow.status.in_(session_statuses),
+                SessionIdleCheckRow.last_status == IdleCheckPhase.NOT_CHECKED,
+            )
+        )
+        querier = BatchQuerier(pagination=NoPagination())
+        async with self._ops.read_ops() as r:
+            now = await r.current_time()
+            rows = (await r.batch_query_in_global(query, querier)).rows
+        return InitialGracePeriodBatchData(
+            checks=tuple(
+                InitialGracePeriodCheckData(
+                    pair=SessionIdleCheckPair(
+                        session_id=SessionId(row.session_id),
+                        checker_id=cast(IdleCheckerID, row.idle_checker_id),
+                    ),
+                    initial_grace_period_seconds=row.initial_grace_period_seconds,
+                    grace_started_at=row.updated_at,
+                )
+                for row in rows
+            ),
+            now=now,
+        )
 
     async def fetch_session_idle_check_assignments(
         self,
