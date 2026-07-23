@@ -78,8 +78,8 @@ def _resource_slot_entries_to_slot(
 
 def _resource_preset_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-        forward_order=ResourcePresetOrders.id(ascending=False),
-        backward_order=ResourcePresetOrders.id(ascending=True),
+        forward_order=ResourcePresetOrders.name(ascending=True),
+        backward_order=ResourcePresetOrders.name(ascending=False),
         forward_condition_factory=ResourcePresetConditions.by_cursor_forward,
         backward_condition_factory=ResourcePresetConditions.by_cursor_backward,
         tiebreaker_order=ResourcePresetRow.name.asc(),

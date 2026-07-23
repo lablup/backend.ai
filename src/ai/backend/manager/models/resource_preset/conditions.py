@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import uuid
+
 import sqlalchemy as sa
 
 from ai.backend.common.data.filter_specs import StringMatchSpec
@@ -128,18 +130,38 @@ class ResourcePresetConditions:
 
     @staticmethod
     def by_cursor_forward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for forward pagination (after cursor)."""
+        """Cursor condition for forward pagination (after cursor).
+
+        Reads the cursor row's ``name`` and compares against that, because that is what the page
+        is ordered by. This table carries no ``created_at`` to key on.
+        """
+        cursor_uuid = uuid.UUID(cursor_id)
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ResourcePresetRow.id < sa.text(f"'{cursor_id}'::uuid")
+            subquery = (
+                sa.select(ResourcePresetRow.name)
+                .where(ResourcePresetRow.id == cursor_uuid)
+                .scalar_subquery()
+            )
+            return ResourcePresetRow.name > subquery
 
         return inner
 
     @staticmethod
     def by_cursor_backward(cursor_id: str) -> QueryCondition:
-        """Cursor condition for backward pagination (before cursor)."""
+        """Cursor condition for backward pagination (before cursor).
+
+        Reads the cursor row's ``name`` and compares against that, because that is what the page
+        is ordered by. This table carries no ``created_at`` to key on.
+        """
+        cursor_uuid = uuid.UUID(cursor_id)
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ResourcePresetRow.id > sa.text(f"'{cursor_id}'::uuid")
+            subquery = (
+                sa.select(ResourcePresetRow.name)
+                .where(ResourcePresetRow.id == cursor_uuid)
+                .scalar_subquery()
+            )
+            return ResourcePresetRow.name < subquery
 
         return inner
