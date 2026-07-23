@@ -58,7 +58,6 @@ from ai.backend.manager.repositories.base.rbac.entity_purger import (
 from ai.backend.manager.repositories.base.types import ConflictCheck
 from ai.backend.manager.repositories.ops.rbac.provider import (
     EntityMembersAddition,
-    EntityMembersRemoval,
     RBACOpsProvider,
     ScopeCreation,
     ScopeMember,
@@ -871,10 +870,8 @@ class TestRemoveEntityMembers:
                 )
             )
             await w.remove_entity_members(
-                EntityMembersRemoval(
-                    scope=scope,
-                    members=[StubMember(member_id=removed_id)],
-                )
+                scope,
+                [EntityRef(entity_type=_TEST_MEMBER_ENTITY_TYPE, entity_id=removed_id)],
             )
 
         async with database_connection.begin_session_read_committed() as sess:

@@ -10,9 +10,10 @@ import sqlalchemy as sa
 from ai.backend.common.data.permission.types import EntityType, RBACElementType, ScopeType
 from ai.backend.common.identifier.project import ProjectID
 from ai.backend.manager.data.permission.types import RBACElementRef
+from ai.backend.manager.errors.resource import ProjectHasActiveKernelsError
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.group import GroupRow
-from ai.backend.manager.models.kernel import KernelRow
+from ai.backend.manager.models.kernel import AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES, KernelRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
@@ -36,7 +37,17 @@ class GroupKernelBatchPurgerSpec(BatchPurgerSpec[KernelRow]):
 
     @override
     def conflict_checks(self) -> Sequence[ConflictCheck]:
-        return ()
+        return (
+            ConflictCheck(
+                condition=lambda: sa.and_(
+                    KernelRow.group_id == self.group_id,
+                    KernelRow.status.in_(AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES),
+                ),
+                error=ProjectHasActiveKernelsError(
+                    f"error on deleting project {self.group_id} with active kernels"
+                ),
+            ),
+        )
 
 
 @dataclass

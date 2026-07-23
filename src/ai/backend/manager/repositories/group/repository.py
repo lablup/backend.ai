@@ -86,7 +86,8 @@ class GroupRepository:
         """Modify a group with validation."""
         if user_update_mode not in (None, "add", "remove"):
             raise InvalidUserUpdateMode("invalid user_update_mode")
-        return await self._db_source.modify_validated(updater, user_update_mode, user_uuids)
+        user_ids = [UserID(uid) for uid in user_uuids] if user_uuids is not None else None
+        return await self._db_source.modify_validated(updater, user_update_mode, user_ids)
 
     @group_repository_resilience.apply()
     async def mark_inactive(self, group_id: uuid.UUID) -> None:
@@ -132,7 +133,9 @@ class GroupRepository:
 
         Returns the list of newly assigned users.
         """
-        return await self._db_source.assign_users_to_project(project_id, user_ids, role_id)
+        return await self._db_source.assign_users_to_project(
+            ProjectID(project_id), [UserID(uid) for uid in user_ids], role_id
+        )
 
     @group_repository_resilience.apply()
     async def unassign_users_from_project(

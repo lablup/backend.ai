@@ -1106,7 +1106,11 @@ class TestGroupRepository:
         test_group: uuid.UUID,
         test_users_for_group: list[uuid.UUID],
     ) -> None:
-        """Test removing users from group with user_update_mode='remove'"""
+        """Test removing users from group with user_update_mode='remove'.
+
+        Membership removal deletes the RBAC scope binding only; role mappings
+        are left untouched.
+        """
         updater_spec = GroupUpdaterSpec()
         updater = Updater(spec=updater_spec, pk_value=test_group)
 
@@ -1144,25 +1148,15 @@ class TestGroupRepository:
             )
             assert member_role_id is not None
 
-            removed_user_role_rows = (
+            user_role_rows = (
                 await session.scalars(
                     sa.select(UserRoleRow).where(
-                        UserRoleRow.user_id == test_users_for_group[0],
+                        UserRoleRow.user_id.in_(test_users_for_group),
                         UserRoleRow.role_id == member_role_id,
                     )
                 )
             ).all()
-            assert len(removed_user_role_rows) == 0
-
-            remaining_user_role_rows = (
-                await session.scalars(
-                    sa.select(UserRoleRow).where(
-                        UserRoleRow.user_id.in_(test_users_for_group[1:3]),
-                        UserRoleRow.role_id == member_role_id,
-                    )
-                )
-            ).all()
-            assert len(remaining_user_role_rows) == 2
+            assert len(user_role_rows) == 3
 
             # RBAC scope binding: the removed user's (PROJECT, user) row must
             # be gone, while the remaining users' rows must still exist.

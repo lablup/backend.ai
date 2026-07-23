@@ -45,7 +45,6 @@ from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
     RolePermissionPresetRow,
 )
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
-from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
@@ -109,9 +108,8 @@ class ScopeCreation[TRow: Base](ABC):
 
 
 class ScopeMember(ABC):
-    """A member to attach to or detach from a scope; ``assign_role_on`` names the user
-    whose role mappings at the scope follow the membership change (auto_assign roles
-    granted on add, every scope role revoked on remove), or ``None`` to skip."""
+    """A member to attach to a scope; ``assign_role_on`` names the user to grant its
+    auto_assign roles, or ``None`` to skip."""
 
     @abstractmethod
     def entity_ref(self) -> EntityRef:
@@ -124,12 +122,6 @@ class ScopeMember(ABC):
 
 @dataclass
 class EntityMembersAddition:
-    scope: ScopeRef
-    members: Collection[ScopeMember]
-
-
-@dataclass
-class EntityMembersRemoval:
     scope: ScopeRef
     members: Collection[ScopeMember]
 
@@ -634,15 +626,14 @@ class RBACWriteOps(WriteOps):
 
     async def remove_entity_members(
         self,
-        removal: EntityMembersRemoval,
+        scope: ScopeRef,
+        entities: Collection[EntityRef],
     ) -> None:
-        """Delete each member's virtual-scope membership and scope association, and revoke
-        every role at the scope from members whose ``assign_role_on`` returns a user id."""
-        members = list(removal.members)
-        if not members:
+        """Delete each entity's virtual-scope membership and scope association; role mappings
+        are left untouched."""
+        entity_refs = list(entities)
+        if not entity_refs:
             return
-        scope = removal.scope
-        entity_refs = [member.entity_ref() for member in members]
         virtual_scope_id = await self._resolve_virtual_scope_id(scope)
         await self._sess.execute(
             sa.delete(EntityMembershipRow).where(
@@ -662,21 +653,6 @@ class RBACWriteOps(WriteOps):
                 ).in_([(EntityType(ref.entity_type), str(ref.entity_id)) for ref in entity_refs]),
             )
         )
-        role_user_ids = [
-            user_id for member in members if (user_id := member.assign_role_on()) is not None
-        ]
-        if role_user_ids:
-            scope_role_ids = sa.select(AssociationScopesEntitiesRow.entity_id).where(
-                AssociationScopesEntitiesRow.scope_type == LegacyScopeType(scope.scope_type),
-                AssociationScopesEntitiesRow.scope_id == str(scope.scope_id),
-                AssociationScopesEntitiesRow.entity_type == EntityType.ROLE,
-            )
-            await self._sess.execute(
-                sa.delete(UserRoleRow).where(
-                    UserRoleRow.user_id.in_(role_user_ids),
-                    sa.cast(UserRoleRow.role_id, sa.String).in_(scope_role_ids),
-                )
-            )
 
     # -- Virtual scope: ensure compatibility for externally-created rows ----------
 

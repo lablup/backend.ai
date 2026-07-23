@@ -8,6 +8,8 @@ from collections.abc import AsyncGenerator
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.identifier.project import ProjectID
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.group.types import ProjectType
@@ -38,6 +40,9 @@ from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
+from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.manager.repositories.group.db_source import GroupDBSource
 from ai.backend.manager.repositories.group.scope_binders import UserProjectEntityUnbinder
 from ai.backend.testutils.db import with_tables
@@ -85,6 +90,9 @@ class TestAssignUsersToProject:
                 ReplicaGroupRow,
                 RoutingRow,
                 ResourcePresetRow,
+                VirtualScopeRow,
+                ScopeBindingRow,
+                EntityMembershipRow,
             ],
         ):
             yield database_connection
@@ -157,8 +165,8 @@ class TestAssignUsersToProject:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain: str,
-    ) -> uuid.UUID:
-        project_id = uuid.uuid4()
+    ) -> ProjectID:
+        project_id = ProjectID(uuid.uuid4())
         policy_name = f"test-policy-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as session:
             session.add(
@@ -183,6 +191,12 @@ class TestAssignUsersToProject:
                     type=ProjectType.GENERAL,
                 )
             )
+            session.add(
+                VirtualScopeRow(
+                    scope_type=ScopeType.PROJECT.value,
+                    scope_id=project_id,
+                )
+            )
             await session.commit()
         return project_id
 
@@ -192,8 +206,8 @@ class TestAssignUsersToProject:
         domain_name: str,
         policy_name: str,
         password_info: PasswordInfo,
-    ) -> uuid.UUID:
-        user_uuid = uuid.uuid4()
+    ) -> UserID:
+        user_uuid = UserID(uuid.uuid4())
         async with db.begin_session() as session:
             session.add(
                 UserRow(
@@ -221,7 +235,7 @@ class TestAssignUsersToProject:
         test_domain: str,
         user_resource_policy: str,
         test_password_info: PasswordInfo,
-    ) -> uuid.UUID:
+    ) -> UserID:
         return await self._create_user(
             db_with_cleanup, test_domain, user_resource_policy, test_password_info
         )
@@ -233,7 +247,7 @@ class TestAssignUsersToProject:
         test_domain: str,
         user_resource_policy: str,
         test_password_info: PasswordInfo,
-    ) -> uuid.UUID:
+    ) -> UserID:
         return await self._create_user(
             db_with_cleanup, test_domain, user_resource_policy, test_password_info
         )
@@ -245,7 +259,7 @@ class TestAssignUsersToProject:
         other_domain: str,
         user_resource_policy: str,
         test_password_info: PasswordInfo,
-    ) -> uuid.UUID:
+    ) -> UserID:
         return await self._create_user(
             db_with_cleanup, other_domain, user_resource_policy, test_password_info
         )
@@ -279,10 +293,10 @@ class TestAssignUsersToProject:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         group_db_source: GroupDBSource,
-        test_project: uuid.UUID,
+        test_project: ProjectID,
         test_role: uuid.UUID,
-        same_domain_user_1: uuid.UUID,
-        same_domain_user_2: uuid.UUID,
+        same_domain_user_1: UserID,
+        same_domain_user_2: UserID,
     ) -> None:
         """Active users in same domain are assigned successfully."""
         result = await group_db_source.assign_users_to_project(
@@ -307,7 +321,7 @@ class TestAssignUsersToProject:
     async def test_assign_empty_list_returns_empty(
         self,
         group_db_source: GroupDBSource,
-        test_project: uuid.UUID,
+        test_project: ProjectID,
         test_role: uuid.UUID,
     ) -> None:
         """Empty user_ids list returns empty result without DB access."""
@@ -318,10 +332,10 @@ class TestAssignUsersToProject:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         group_db_source: GroupDBSource,
-        test_project: uuid.UUID,
+        test_project: ProjectID,
         test_role: uuid.UUID,
-        same_domain_user_1: uuid.UUID,
-        same_domain_user_2: uuid.UUID,
+        same_domain_user_1: UserID,
+        same_domain_user_2: UserID,
     ) -> None:
         """Already-assigned users are excluded; only new users are returned."""
         # Pre-assign user_1
@@ -349,10 +363,10 @@ class TestAssignUsersToProject:
     async def test_assign_filters_cross_domain_users(
         self,
         group_db_source: GroupDBSource,
-        test_project: uuid.UUID,
+        test_project: ProjectID,
         test_role: uuid.UUID,
-        same_domain_user_1: uuid.UUID,
-        cross_domain_user: uuid.UUID,
+        same_domain_user_1: UserID,
+        cross_domain_user: UserID,
     ) -> None:
         """Users from a different domain are silently excluded."""
         result = await group_db_source.assign_users_to_project(
@@ -365,23 +379,23 @@ class TestAssignUsersToProject:
     async def test_assign_filters_nonexistent_users(
         self,
         group_db_source: GroupDBSource,
-        test_project: uuid.UUID,
+        test_project: ProjectID,
         test_role: uuid.UUID,
     ) -> None:
         """Non-existent user UUIDs are silently excluded."""
-        fake_user = uuid.uuid4()
+        fake_user = UserID(uuid.uuid4())
         result = await group_db_source.assign_users_to_project(test_project, [fake_user], test_role)
         assert result == []
 
     async def test_assign_all_invalid_returns_empty(
         self,
         group_db_source: GroupDBSource,
-        test_project: uuid.UUID,
+        test_project: ProjectID,
         test_role: uuid.UUID,
-        cross_domain_user: uuid.UUID,
+        cross_domain_user: UserID,
     ) -> None:
         """When all users are invalid (wrong domain, nonexistent), return empty."""
-        fake_user = uuid.uuid4()
+        fake_user = UserID(uuid.uuid4())
 
         result = await group_db_source.assign_users_to_project(
             test_project, [cross_domain_user, fake_user], test_role
@@ -392,10 +406,10 @@ class TestAssignUsersToProject:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         group_db_source: GroupDBSource,
-        test_project: uuid.UUID,
+        test_project: ProjectID,
         test_role: uuid.UUID,
-        same_domain_user_1: uuid.UUID,
-        same_domain_user_2: uuid.UUID,
+        same_domain_user_1: UserID,
+        same_domain_user_2: UserID,
     ) -> None:
         """Assign creates UserRoleRow records for each user with the given role."""
         await group_db_source.assign_users_to_project(
@@ -415,9 +429,9 @@ class TestAssignUsersToProject:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         group_db_source: GroupDBSource,
-        test_project: uuid.UUID,
+        test_project: ProjectID,
         test_role: uuid.UUID,
-        same_domain_user_1: uuid.UUID,
+        same_domain_user_1: UserID,
     ) -> None:
         """Assign creates AssociationScopesEntitiesRow binding users to project scope."""
         await group_db_source.assign_users_to_project(test_project, [same_domain_user_1], test_role)
@@ -476,6 +490,9 @@ class TestUnassignUsersFromProject:
                 ReplicaGroupRow,
                 RoutingRow,
                 ResourcePresetRow,
+                VirtualScopeRow,
+                ScopeBindingRow,
+                EntityMembershipRow,
             ],
         ):
             yield database_connection
@@ -526,8 +543,8 @@ class TestUnassignUsersFromProject:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain: str,
-    ) -> uuid.UUID:
-        project_id = uuid.uuid4()
+    ) -> ProjectID:
+        project_id = ProjectID(uuid.uuid4())
         policy_name = f"test-policy-{uuid.uuid4().hex[:8]}"
         async with db_with_cleanup.begin_session() as session:
             session.add(
@@ -552,6 +569,12 @@ class TestUnassignUsersFromProject:
                     type=ProjectType.GENERAL,
                 )
             )
+            session.add(
+                VirtualScopeRow(
+                    scope_type=ScopeType.PROJECT.value,
+                    scope_id=project_id,
+                )
+            )
             await session.commit()
         return project_id
 
@@ -561,8 +584,8 @@ class TestUnassignUsersFromProject:
         domain_name: str,
         policy_name: str,
         password_info: PasswordInfo,
-    ) -> uuid.UUID:
-        user_uuid = uuid.uuid4()
+    ) -> UserID:
+        user_uuid = UserID(uuid.uuid4())
         async with db.begin_session() as session:
             session.add(
                 UserRow(
@@ -590,7 +613,7 @@ class TestUnassignUsersFromProject:
         test_domain: str,
         user_resource_policy: str,
         test_password_info: PasswordInfo,
-    ) -> uuid.UUID:
+    ) -> UserID:
         return await self._create_user(
             db_with_cleanup, test_domain, user_resource_policy, test_password_info
         )
@@ -602,7 +625,7 @@ class TestUnassignUsersFromProject:
         test_domain: str,
         user_resource_policy: str,
         test_password_info: PasswordInfo,
-    ) -> uuid.UUID:
+    ) -> UserID:
         return await self._create_user(
             db_with_cleanup, test_domain, user_resource_policy, test_password_info
         )
@@ -627,9 +650,9 @@ class TestUnassignUsersFromProject:
     async def project_with_role_registered(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_project: uuid.UUID,
+        test_project: ProjectID,
         test_role: uuid.UUID,
-    ) -> uuid.UUID:
+    ) -> ProjectID:
         """Register the test role in the project scope via association_scopes_entities."""
         async with db_with_cleanup.begin_session() as session:
             session.add(
@@ -656,9 +679,9 @@ class TestUnassignUsersFromProject:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         group_db_source: GroupDBSource,
-        project_with_role_registered: uuid.UUID,
+        project_with_role_registered: ProjectID,
         test_role: uuid.UUID,
-        same_domain_user_1: uuid.UUID,
+        same_domain_user_1: UserID,
     ) -> None:
         """Unassign reports the users it removed from the project scope."""
         project_id = project_with_role_registered
@@ -674,9 +697,9 @@ class TestUnassignUsersFromProject:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         group_db_source: GroupDBSource,
-        project_with_role_registered: uuid.UUID,
+        project_with_role_registered: ProjectID,
         test_role: uuid.UUID,
-        same_domain_user_1: uuid.UUID,
+        same_domain_user_1: UserID,
     ) -> None:
         """Unassign removes user's AssociationScopesEntitiesRow for the project scope."""
         project_id = project_with_role_registered
@@ -700,10 +723,10 @@ class TestUnassignUsersFromProject:
     async def test_unassign_nonexistent_user_reports_failure(
         self,
         group_db_source: GroupDBSource,
-        project_with_role_registered: uuid.UUID,
+        project_with_role_registered: ProjectID,
     ) -> None:
         """Non-existent user UUID is reported as failure."""
-        fake_user = uuid.uuid4()
+        fake_user = UserID(uuid.uuid4())
         result = await group_db_source.unassign_users_from_project(
             UserProjectEntityUnbinder(
                 user_uuids=[fake_user], project_id=project_with_role_registered
