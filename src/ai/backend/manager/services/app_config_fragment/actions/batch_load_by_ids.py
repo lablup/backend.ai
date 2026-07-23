@@ -10,7 +10,6 @@ from ai.backend.manager.actions.action.bulk import BaseBulkActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.app_config_fragment.types import AppConfigFragmentData
 from ai.backend.manager.data.permission.types import RBACElementRef
-from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.services.app_config_fragment.actions.base import (
     AppConfigFragmentBulkAction,
     AppConfigFragmentBulkTarget,
@@ -29,7 +28,6 @@ class BatchLoadAppConfigFragmentsByIdsAction(AppConfigFragmentBulkAction):
     """
 
     fragment_ids: Sequence[AppConfigFragmentID]
-    querier: BatchQuerier
 
     @override
     @classmethod
