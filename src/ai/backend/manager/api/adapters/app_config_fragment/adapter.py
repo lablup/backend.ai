@@ -194,17 +194,9 @@ class AppConfigFragmentAdapter(BaseAdapter):
         """
         if not fragment_ids:
             return []
-        querier = self._build_querier(
-            conditions=[AppConfigFragmentConditions.by_ids(list(fragment_ids))],
-            orders=[],
-            pagination_spec=_get_app_config_fragment_pagination_spec(),
-            limit=len(fragment_ids),
-        )
         action_result = (
             await self._processors.app_config_fragment.batch_load_by_ids.wait_for_complete(
-                BatchLoadAppConfigFragmentsByIdsAction(
-                    fragment_ids=list(fragment_ids), querier=querier
-                )
+                BatchLoadAppConfigFragmentsByIdsAction(fragment_ids=list(fragment_ids))
             )
         )
         node_map = {node.id: node for node in map(self._fragment_to_node, action_result.items)}

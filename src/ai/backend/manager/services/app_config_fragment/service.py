@@ -71,7 +71,7 @@ class AppConfigFragmentService:
     async def batch_load_by_ids(
         self, action: BatchLoadAppConfigFragmentsByIdsAction
     ) -> BatchLoadAppConfigFragmentsByIdsActionResult:
-        items = await self._repository.batch_load_by_ids(action.querier)
+        items = await self._repository.batch_load_by_ids(action.fragment_ids)
         return BatchLoadAppConfigFragmentsByIdsActionResult(items=items)
 
     async def admin_search(
