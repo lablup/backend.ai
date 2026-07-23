@@ -27117,6 +27117,34 @@
             "format": "uuid",
             "title": "Resource Group Id",
             "type": "string"
+          },
+          "designated_agent_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Restrict the fitting check to these agents, with the same semantics as the scheduling path. Null means no restriction.",
+            "title": "Designated Agent Ids"
+          },
+          "agent_selection_policy": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentSelectionPolicyEnum"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "How `designated_agent_ids` is enforced (STRICT fails without capacity, PREFERRED falls back). Null inherits the resource group default."
           }
         },
         "required": [

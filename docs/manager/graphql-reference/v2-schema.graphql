@@ -2151,6 +2151,16 @@ input ComputeScheduleInput {
   kernels: [ComputeScheduleKernelResourceInput!]!
   clusterMode: SessionClusterMode!
   resourceGroupId: ID!
+
+  """
+  Restrict the fitting check to these agents, with the same semantics as the scheduling path. Null means no restriction.
+  """
+  designatedAgentIds: [String!] = null
+
+  """
+  How designated agents are enforced (STRICT fails without capacity, PREFERRED falls back). Null inherits the resource group default.
+  """
+  agentSelectionPolicy: SessionAgentSelectionPolicy = null
 }
 
 """

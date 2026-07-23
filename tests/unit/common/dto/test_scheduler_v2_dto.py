@@ -31,9 +31,20 @@ class TestComputeScheduleInput:
             ],
             "cluster_mode": "single-node",
             "resource_group_id": str(uuid.uuid4()),
+            "designated_agent_ids": ["i-agent-01", "i-agent-02"],
+            "agent_selection_policy": "strict",
         })
         restored = ComputeScheduleInput.model_validate(original.model_dump(mode="json"))
         assert restored == original
+
+    def test_designated_agent_ids_and_policy_default_to_none(self) -> None:
+        parsed = ComputeScheduleInput.model_validate({
+            "kernels": [],
+            "cluster_mode": "single-node",
+            "resource_group_id": str(uuid.uuid4()),
+        })
+        assert parsed.designated_agent_ids is None
+        assert parsed.agent_selection_policy is None
 
     def test_image_id_defaults_to_none(self) -> None:
         kernel = ComputeScheduleKernelResourceInput.model_validate({
