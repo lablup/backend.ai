@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import uuid
+from http import HTTPStatus
 from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
 
+from ai.backend.common.exception import BackendAIError
 from ai.backend.manager.api.adapter_options.pagination.pagination import DEFAULT_PAGINATION_LIMIT
 from ai.backend.manager.api.gql.adapter import (
     BaseGQLAdapter,
@@ -417,41 +419,31 @@ class TestBaseGQLAdapterBuildPagination:
         assert len(querier.orders) == 1
         assert querier.orders[0] is mock_tiebreaker_order
 
-    @pytest.fixture
-    def uuid_keyed_spec(
+    def test_cursor_payload_the_entity_cannot_key_on_is_invalid_cursor(
         self,
-        mock_forward_order: Any,
-        mock_backward_order: Any,
-        mock_tiebreaker_order: Any,
-    ) -> PaginationSpec:
-        """A spec whose factories key on a row UUID, like most entities on the v2 surface."""
+        adapter: BaseGQLAdapter,
+    ) -> None:
+        """The factory's ValueError is a caller error, and used to escape as a 500."""
 
         def parse_uuid_cursor(cursor_id: str) -> Any:
             uuid.UUID(cursor_id)
             return MagicMock()
 
-        return PaginationSpec(
-            forward_order=mock_forward_order,
-            backward_order=mock_backward_order,
+        spec = PaginationSpec(
+            forward_order=MagicMock(),
+            backward_order=MagicMock(),
             forward_condition_factory=parse_uuid_cursor,
             backward_condition_factory=parse_uuid_cursor,
-            tiebreaker_order=mock_tiebreaker_order,
+            tiebreaker_order=MagicMock(),
         )
+        cursor = encode_cursor("not-a-uuid")
 
-    @pytest.mark.parametrize(
-        "options",
-        [
-            PaginationOptions(first=10, after=encode_cursor("not-a-uuid")),
-            PaginationOptions(last=10, before=encode_cursor("not-a-uuid")),
-        ],
-        ids=lambda options: "after" if options.after else "before",
-    )
-    def test_cursor_payload_the_entity_cannot_key_on_is_invalid_cursor(
-        self,
-        adapter: BaseGQLAdapter,
-        uuid_keyed_spec: PaginationSpec,
-        options: PaginationOptions,
-    ) -> None:
-        """The factory's ValueError is a caller error, and used to escape as a 500."""
-        with pytest.raises(InvalidCursor):
-            adapter.build_querier(options, uuid_keyed_spec)
+        with pytest.raises(InvalidCursor) as forward:
+            adapter.build_querier(PaginationOptions(first=10, after=cursor), spec)
+        with pytest.raises(InvalidCursor) as backward:
+            adapter.build_querier(PaginationOptions(last=10, before=cursor), spec)
+
+        # A BackendAIError carrying a 4xx: the handler reports its code instead of logging a fault.
+        for raised in (forward.value, backward.value):
+            assert isinstance(raised, BackendAIError)
+            assert raised.status_code == HTTPStatus.BAD_REQUEST
