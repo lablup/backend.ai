@@ -5705,10 +5705,14 @@ enum KernelSchedulingHistoryOrderField {
   ATTEMPTS
 }
 
-"""Added in 26.8.0. Scope for kernel scheduling history query"""
+"""
+Added in 26.8.0. Scope for kernel scheduling history query. All items are OR'd; raises an error if every field is empty.
+"""
 input KernelScope {
-  """Kernel ID to get history for"""
-  kernelId: UUID!
+  """
+  Kernel IDs to get history for. The scoped search is single-target for now, so exactly one item is accepted.
+  """
+  kernel: [UUIDScope!] = null
 }
 
 """

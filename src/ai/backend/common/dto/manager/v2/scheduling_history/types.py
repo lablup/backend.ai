@@ -6,12 +6,14 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import StrEnum
+from typing import Self
 from uuid import UUID
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel, BaseResponseModel
 from ai.backend.common.dto.manager.v2.common import OrderDirection
+from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 
 __all__ = (
     "DeploymentHistoryOrderField",
@@ -104,9 +106,22 @@ class SessionHistoryScopeDTO(BaseRequestModel):
 
 
 class KernelHistoryScopeDTO(BaseRequestModel):
-    """Scope for kernel scheduling history queries."""
+    """Scope for kernel scheduling history queries.
 
-    kernel_id: UUID = Field(description="Kernel ID to get history for.")
+    Items are OR'd. Raises an error if the list is empty. The scoped search is
+    still a single-target scope action, so only one item is dispatchable today;
+    the list shape keeps the wire contract stable for the multi-target case.
+    """
+
+    kernel: list[UUIDScope] | None = Field(
+        default=None, description="Kernel IDs to get history for."
+    )
+
+    @model_validator(mode="after")
+    def _require_non_empty(self) -> Self:
+        if not self.kernel:
+            raise ValueError("KernelHistoryScopeDTO requires a non-empty value for 'kernel'")
+        return self
 
 
 class DeploymentHistoryScopeDTO(BaseRequestModel):

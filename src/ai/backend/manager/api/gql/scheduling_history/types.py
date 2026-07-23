@@ -74,6 +74,7 @@ from ai.backend.manager.api.gql.pydantic_compat import (
     PydanticNodeMixin,
     PydanticOutputMixin,
 )
+from ai.backend.manager.api.gql.rbac.types.scope import UUIDScopeGQL
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 if TYPE_CHECKING:
@@ -438,7 +439,10 @@ class SessionScope(PydanticInputMixin[SessionHistoryScopeDTO]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        description="Scope for kernel scheduling history query",
+        description=(
+            "Scope for kernel scheduling history query. "
+            "All items are OR'd; raises an error if every field is empty."
+        ),
         added_version=NEXT_RELEASE_VERSION,
     ),
     name="KernelScope",
@@ -446,7 +450,13 @@ class SessionScope(PydanticInputMixin[SessionHistoryScopeDTO]):
 class KernelScopeGQL(PydanticInputMixin[KernelHistoryScopeDTO]):
     """Scope for kernel-level scheduling history queries."""
 
-    kernel_id: UUID = gql_field(description="Kernel ID to get history for")
+    kernel: list[UUIDScopeGQL] | None = gql_field(
+        description=(
+            "Kernel IDs to get history for. "
+            "The scoped search is single-target for now, so exactly one item is accepted."
+        ),
+        default=None,
+    )
 
 
 @gql_pydantic_input(

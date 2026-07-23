@@ -25761,19 +25761,41 @@
         "type": "object"
       },
       "KernelHistoryScopeDTO": {
-        "description": "Scope for kernel scheduling history queries.",
+        "description": "Scope for kernel scheduling history queries.\n\nItems are OR'd. Raises an error if the list is empty. The scoped search is\nstill a single-target scope action, so only one item is dispatchable today;\nthe list shape keeps the wire contract stable for the multi-target case.",
         "properties": {
-          "kernel_id": {
-            "description": "Kernel ID to get history for.",
+          "kernel": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/UUIDScope"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Kernel IDs to get history for.",
+            "title": "Kernel"
+          }
+        },
+        "title": "KernelHistoryScopeDTO",
+        "type": "object"
+      },
+      "UUIDScope": {
+        "description": "Single-UUID scope item wrapper.\n\nA thin wrapper around a UUID used as a scope item. The wrapper exists so\nthat scope-input lists stay structurally uniform with other scope item\ntypes and leave room for per-item metadata in the future.",
+        "properties": {
+          "value": {
             "format": "uuid",
-            "title": "Kernel Id",
+            "title": "Value",
             "type": "string"
           }
         },
         "required": [
-          "kernel_id"
+          "value"
         ],
-        "title": "KernelHistoryScopeDTO",
+        "title": "UUIDScope",
         "type": "object"
       },
       "ScopedSearchKernelHistoriesInput": {
