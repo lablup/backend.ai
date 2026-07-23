@@ -97,9 +97,6 @@ def build_pagination(
             try:
                 cursor_condition = spec.forward_condition_factory(cursor_value)
             except ValueError as e:
-                # The cursor decoded, but its payload is not an id this entity can key on
-                # (most factories parse it as a UUID). A malformed cursor is the caller's
-                # error, not a fault.
                 raise InvalidCursor(f"Invalid cursor value: {options.after}") from e
         return CursorForwardPagination(
             first=options.first,
