@@ -456,6 +456,10 @@ class SchedulingHistoryAdapter(BaseAdapter):
         )
         kernel_items = input.scope.kernel or []
         session_items = input.scope.session or []
+        # TODO: Drop this rejection once the scoped search becomes a bulk action.
+        # The scope input is already list-shaped and its items are meant to be
+        # OR'd, but SearchKernelScopedHistoryAction is a single-target
+        # BaseScopeAction, so only one item is dispatchable today.
         if len(kernel_items) + len(session_items) != 1:
             raise InvalidAPIParameters(
                 "Kernel scheduling history scope accepts exactly one scope item"

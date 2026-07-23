@@ -65,12 +65,11 @@ class SessionKernelHistoryTarget(KernelHistoryTarget):
 
 @dataclass
 class SearchKernelScopedHistoryAction(BaseScopeAction):
-    """Action to search kernel scheduling history under one scope item.
+    """Action to search kernel scheduling history under one scope item."""
 
-    This is still a single-target scope action, so it carries exactly one
-    ``KernelHistoryTarget``.
-    """
-
+    # TODO: Widen to a list of targets once this becomes a bulk action; the scope
+    # input already accepts several items and means them to be OR'd, but a
+    # BaseScopeAction authorizes exactly one target.
     target: KernelHistoryTarget
     # TODO: Drop once virtual scopes land, and authorize on
     # ``target.to_rbac_element_ref()`` instead. Kernels hold no permission
