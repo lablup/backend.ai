@@ -257,7 +257,7 @@ class SchedulingHistoryDBSource:
                 raise ReplicaGroupNotFound(str(replica_group_id))
             return DeploymentID(deployment_id)
 
-    async def search_replica_group_scoped_history(
+    async def scoped_search_replica_group_history(
         self,
         querier: BatchQuerier,
         scope: ReplicaGroupHistorySearchScope,
