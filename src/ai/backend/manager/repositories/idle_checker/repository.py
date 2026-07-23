@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from collections.abc import Collection
+from collections.abc import Collection, Sequence
+from datetime import datetime
 
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.repositories.idle_checker.db_source.db_source import IdleCheckerDBSource
@@ -8,6 +9,7 @@ from ai.backend.manager.repositories.idle_checker.types import (
     ExpiredIdleCheckBatchData,
     IdleCheckBatchData,
     SessionIdleCheckAssignmentData,
+    SessionIdleCheckPair,
 )
 from ai.backend.manager.repositories.ops import DBOpsProvider
 
@@ -37,3 +39,15 @@ class IdleCheckerRepository:
         self, session_statuses: Collection[SessionStatus]
     ) -> ExpiredIdleCheckBatchData:
         return await self._db_source.fetch_expired_idle_checks(session_statuses)
+
+    async def sync_session_idle_check_assignments(
+        self,
+        pairs_to_create: Sequence[SessionIdleCheckPair],
+        pairs_to_delete: Sequence[SessionIdleCheckPair],
+        now: datetime,
+    ) -> None:
+        await self._db_source.sync_session_idle_check_assignments(
+            pairs_to_create,
+            pairs_to_delete,
+            now,
+        )

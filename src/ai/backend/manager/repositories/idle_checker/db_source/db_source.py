@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Collection, Sequence
+from datetime import datetime
 from typing import cast
 
 import sqlalchemy as sa
@@ -25,7 +26,16 @@ from ai.backend.manager.models.idle_checker.row import (
 )
 from ai.backend.manager.models.session.conditions import SessionConditions
 from ai.backend.manager.models.session.row import SessionRow
-from ai.backend.manager.repositories.base import BatchQuerier, NoPagination
+from ai.backend.manager.repositories.base import (
+    BatchPurger,
+    BatchQuerier,
+    BulkCreator,
+    NoPagination,
+)
+from ai.backend.manager.repositories.idle_checker.creators import SessionIdleCheckCreatorSpec
+from ai.backend.manager.repositories.idle_checker.purgers import (
+    SessionIdleCheckBatchPurgerSpec,
+)
 from ai.backend.manager.repositories.idle_checker.types import (
     ExpiredIdleCheckBatchData,
     ExpiredIdleCheckData,
@@ -190,3 +200,21 @@ class IdleCheckerDBSource:
             ),
             now=now,
         )
+
+    async def sync_session_idle_check_assignments(
+        self,
+        pairs_to_create: Sequence[SessionIdleCheckPair],
+        pairs_to_delete: Sequence[SessionIdleCheckPair],
+        now: datetime,
+    ) -> None:
+        async with self._ops.write_ops() as w:
+            if pairs_to_create:
+                await w.bulk_create(
+                    BulkCreator(
+                        specs=[SessionIdleCheckCreatorSpec(pair, now) for pair in pairs_to_create]
+                    )
+                )
+            if pairs_to_delete:
+                await w.batch_purge(
+                    BatchPurger(spec=SessionIdleCheckBatchPurgerSpec(pairs_to_delete))
+                )
