@@ -1405,11 +1405,6 @@ class AgentRegistry:
 
         return await execute_with_retry(_query)
 
-    async def update_scaling_group(self, agent_id: AgentId, scaling_group: str) -> None:
-        verified_agent_id = await self.get_instance(agent_id)
-        async with self._agent_client_pool.acquire(verified_agent_id) as client:
-            await client.update_scaling_group(scaling_group)
-
     async def recalc_resource_usage(self) -> None:
         """Reconcile normalized resource records against actual kernel state.
 
