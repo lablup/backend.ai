@@ -1,8 +1,8 @@
 """Regression test for auto-mount (dot-prefixed) vfolder resolution.
 
-Exercised through ``SchedulerRepository.resolve_vfolder_mounts_by_role`` (the
-repository-layer entry point the scheduling controller calls for vfolder mount
-resolution) against a real test database.
+Exercised through ``SchedulerRepository._resolve_vfolder_mounts_by_role`` (the
+repository-layer resolution step ``fetch_session_spec_context`` composes into
+the enqueue context) against a real test database.
 
 Reproduces the 26.4.4rc6 regression where the underlying db_source
 short-circuited a kernel group with no explicit mount requests::
@@ -31,6 +31,7 @@ from uuid import UUID, uuid4
 
 import pytest
 
+from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.identifier.domain import DomainName
 from ai.backend.common.identifier.project import ProjectID
@@ -39,6 +40,7 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.session.draft import (
     KernelGroupDraft,
+    ResourceSpecDraft,
     SessionIdentityDraft,
     SessionOptionsDraft,
     SessionResourceSpecDraft,
@@ -290,18 +292,30 @@ class TestAutoMountVFolderResolution:
         return sm
 
     @pytest.fixture
+    def mock_config_provider(self) -> MagicMock:
+        """A config provider whose vfolder-type lookup allows user vfolders."""
+        config_provider = MagicMock(spec=ManagerConfigProvider)
+        config_provider.legacy_etcd_config_loader.get_vfolder_types = AsyncMock(
+            return_value=["user"]
+        )
+        return config_provider
+
+    @pytest.fixture
     def scheduler_repository(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        mock_config_provider: MagicMock,
+        mock_storage_manager: MagicMock,
     ) -> SchedulerRepository:
-        """A real repository over the test DB. The cache client and config
-        provider are unused by ``resolve_vfolder_mounts_by_role``, so they are
-        mocked.
+        """A real repository over the test DB. The cache clients are unused by
+        ``_resolve_vfolder_mounts_by_role``, so they are mocked.
         """
         return SchedulerRepository(
             db_with_cleanup,
             AsyncMock(spec=ValkeyStatClient),
-            MagicMock(spec=ManagerConfigProvider),
+            AsyncMock(spec=ValkeyScheduleClient),
+            mock_config_provider,
+            mock_storage_manager,
         )
 
     async def test_automount_resolved_without_explicit_mount_requests(
@@ -311,7 +325,6 @@ class TestAutoMountVFolderResolution:
         test_user: UUID,
         test_group: UUID,
         automount_vfolder_id: UUID,
-        mock_storage_manager: MagicMock,
     ) -> None:
         # A session with a single kernel group and NO explicit mounts —
         # exactly the case the regression dropped auto-mounts for.
@@ -322,8 +335,10 @@ class TestAutoMountVFolderResolution:
                     session_name="automount-regression",
                     user_uuid=test_user,
                 ),
-                options=SessionOptionsDraft(
-                    kernel_groups=(KernelGroupDraft(role="main", replica_count=1),),
+                resource=ResourceSpecDraft(
+                    options=SessionOptionsDraft(
+                        kernel_groups=(KernelGroupDraft(role="main", replica_count=1),),
+                    ),
                 ),
             ),
             scope=SessionScopeDraft(
@@ -333,11 +348,7 @@ class TestAutoMountVFolderResolution:
             ),
         )
 
-        result = await scheduler_repository.resolve_vfolder_mounts_by_role(
-            draft,
-            storage_manager=mock_storage_manager,
-            allowed_vfolder_types=["user"],
-        )
+        result = await scheduler_repository._resolve_vfolder_mounts_by_role(draft, None)
 
         # The "main" role must carry the auto-mount vfolder even though the
         # group requested no mounts explicitly.

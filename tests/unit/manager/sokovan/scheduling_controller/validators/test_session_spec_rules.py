@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import PurePosixPath
 from typing import Any
@@ -14,26 +13,26 @@ from ai.backend.common.identifier.domain import DomainID, DomainName
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.identifier.resource_group import ResourceGroupID, ResourceGroupName
+from ai.backend.common.identifier.resource_slot import ResourceSlotName
 from ai.backend.common.identifier.session import SessionID
 from ai.backend.common.types import (
     AccessKey,
     BinarySize,
     ClusterMode,
-    DefaultForUnspecified,
     MountPermission,
-    ResourceSlot,
     ResourceSlotEntry,
     SessionTypes,
-    SlotName,
     SlotTypes,
+    VFolderHostPermissionMap,
     VFolderID,
     VFolderMount,
     VFolderUsageMode,
 )
 from ai.backend.manager.data.dotfile.types import DotfileBundle, DotfileEntry
-from ai.backend.manager.data.resource.types import KeyPairResourcePolicyData, SlotTypePolicy
-from ai.backend.manager.data.session.creation import ImageInfo
+from ai.backend.manager.data.resource.types import SlotTypeInfo, UserEnqueuePolicy
+from ai.backend.manager.data.session.creation import ContainerUserInfo, ImageInfo
 from ai.backend.manager.data.session.options import (
+    DefaultSessionOptions,
     KernelExecutionSpec,
     KernelResourceConfig,
     ResourceOpts,
@@ -69,6 +68,9 @@ from ai.backend.manager.sokovan.scheduling_controller.validators.inference_model
 from ai.backend.manager.sokovan.scheduling_controller.validators.mount_name_validation_rule import (
     MountNameValidationRule,
 )
+from ai.backend.manager.sokovan.scheduling_controller.validators.pending_session_count_limit_rule import (
+    PendingSessionCountLimitRule,
+)
 from ai.backend.manager.sokovan.scheduling_controller.validators.requested_slot_type_rule import (
     RequestedSlotTypeRule,
 )
@@ -81,8 +83,11 @@ from ai.backend.manager.sokovan.scheduling_controller.validators.resource_limit_
 from ai.backend.manager.sokovan.scheduling_controller.validators.service_port_rule import (
     ServicePortRule,
 )
-from ai.backend.manager.sokovan.scheduling_controller.validators.session_spec_base import (
-    SessionSpecValidationContext,
+from ai.backend.manager.views.sokovan.session_creation import (
+    GlobalEnqueueInfo,
+    ResourceGroupEnqueueInfo,
+    SessionSpecContext,
+    UserEnqueueInfo,
 )
 
 
@@ -120,9 +125,12 @@ def _kernel(
             resource_input=KernelResourceConfig(
                 image_id=image_id,
                 resources=[
-                    ResourceSlotEntry(resource_type="cpu", quantity=str(Decimal(cpu))),
                     ResourceSlotEntry(
-                        resource_type="mem", quantity=str(Decimal(1024 * 1024 * 1024))
+                        resource_type=ResourceSlotName("cpu"), quantity=str(Decimal(cpu))
+                    ),
+                    ResourceSlotEntry(
+                        resource_type=ResourceSlotName("mem"),
+                        quantity=str(Decimal(1024 * 1024 * 1024)),
                     ),
                 ],
                 resource_opts=ResourceOpts(shmem=shmem),
@@ -177,28 +185,39 @@ def _spec(
 
 def _ctx(
     *,
-    keypair_policy: KeyPairResourcePolicyData | None = None,
+    policy: UserEnqueuePolicy | None = None,
     image_infos: dict[ImageID, ImageInfo] | None = None,
-    known_slot_types: dict[SlotName, SlotTypes] | None = None,
-    enabled_slot_names: frozenset[SlotName] | None = None,
-    required_slot_names: frozenset[SlotName] | None = None,
-    dotfile_data: DotfileBundle | None = None,
-) -> SessionSpecValidationContext:
-    known_slot_types_val = known_slot_types or {}
-    enabled_val = (
-        enabled_slot_names
-        if enabled_slot_names is not None
-        else frozenset(known_slot_types_val.keys())
+    slot_types: dict[ResourceSlotName, SlotTypes] | None = None,
+    served_slot_names: frozenset[ResourceSlotName] | None = None,
+    required_slot_names: frozenset[ResourceSlotName] | None = None,
+    dotfiles: DotfileBundle | None = None,
+    pending_session_count: int = 0,
+) -> SessionSpecContext:
+    slot_types_val = slot_types or {}
+    served = (
+        served_slot_names if served_slot_names is not None else frozenset(slot_types_val.keys())
     )
-    return SessionSpecValidationContext(
-        keypair_resource_policy=keypair_policy,
-        image_infos=image_infos or {},
-        known_slot_types=known_slot_types_val,
-        slot_type_policy=SlotTypePolicy(
-            enabled=enabled_val,
-            required=required_slot_names or frozenset(),
+    return SessionSpecContext(
+        resource_group=ResourceGroupEnqueueInfo(
+            defaults=DefaultSessionOptions(),
+            network=None,
+            allow_fractional=False,
+            served_slot_names=served,
         ),
-        dotfile_data=dotfile_data or DotfileBundle(),
+        user=UserEnqueueInfo(
+            policy=policy,
+            container_user=ContainerUserInfo(),
+            dotfiles=dotfiles or DotfileBundle(),
+            pending_session_count=pending_session_count,
+            vfolder_mounts_by_role={},
+        ),
+        global_info=GlobalEnqueueInfo(
+            image_infos=image_infos or {},
+            slot_type_info=SlotTypeInfo(
+                types=slot_types_val,
+                required=required_slot_names or frozenset(),
+            ),
+        ),
     )
 
 
@@ -222,23 +241,15 @@ def _image_info(
     )
 
 
-def _keypair_policy(
+def _policy(
     *,
     max_containers: int = 4,
-) -> KeyPairResourcePolicyData:
-    return KeyPairResourcePolicyData(
-        name="test",
-        created_at=datetime(2026, 1, 1, tzinfo=UTC),
-        default_for_unspecified=DefaultForUnspecified.LIMITED,
-        total_resource_slots=ResourceSlot(),
-        max_session_lifetime=0,
-        max_concurrent_sessions=10,
-        max_pending_session_count=None,
-        max_pending_session_resource_slots=None,
-        max_concurrent_sftp_sessions=0,
+    max_pending: int | None = None,
+) -> UserEnqueuePolicy:
+    return UserEnqueuePolicy(
         max_containers_per_session=max_containers,
-        idle_timeout=0,
-        allowed_vfolder_hosts={},
+        max_pending_session_count=max_pending,
+        allowed_vfolder_hosts=VFolderHostPermissionMap(),
     )
 
 
@@ -246,19 +257,47 @@ class TestContainerLimitRule:
     def test_within_limit(self) -> None:
         img = ImageID(uuid.uuid4())
         spec = _spec((_kernel(img), _kernel(img)))
-        ContainerLimitRule().validate(spec, _ctx(keypair_policy=_keypair_policy(max_containers=4)))
+        ContainerLimitRule().validate(spec, _ctx(policy=_policy(max_containers=4)))
 
     def test_exceeds_limit(self) -> None:
         img = ImageID(uuid.uuid4())
         spec = _spec((_kernel(img), _kernel(img), _kernel(img)))
         with pytest.raises(QuotaExceeded):
-            ContainerLimitRule().validate(
-                spec, _ctx(keypair_policy=_keypair_policy(max_containers=2))
-            )
+            ContainerLimitRule().validate(spec, _ctx(policy=_policy(max_containers=2)))
 
     def test_noop_without_policy(self) -> None:
         img = ImageID(uuid.uuid4())
         ContainerLimitRule().validate(_spec((_kernel(img),)), _ctx())
+
+
+class TestPendingSessionCountLimitRule:
+    def test_within_limit(self) -> None:
+        img = ImageID(uuid.uuid4())
+        spec = _spec((_kernel(img),))
+        PendingSessionCountLimitRule().validate(
+            spec, _ctx(policy=_policy(max_pending=2), pending_session_count=1)
+        )
+
+    def test_rejects_when_queue_full(self) -> None:
+        img = ImageID(uuid.uuid4())
+        spec = _spec((_kernel(img),))
+        with pytest.raises(QuotaExceeded):
+            PendingSessionCountLimitRule().validate(
+                spec, _ctx(policy=_policy(max_pending=2), pending_session_count=2)
+            )
+
+    def test_noop_without_policy(self) -> None:
+        img = ImageID(uuid.uuid4())
+        PendingSessionCountLimitRule().validate(
+            _spec((_kernel(img),)), _ctx(pending_session_count=100)
+        )
+
+    def test_noop_when_limit_unset(self) -> None:
+        img = ImageID(uuid.uuid4())
+        PendingSessionCountLimitRule().validate(
+            _spec((_kernel(img),)),
+            _ctx(policy=_policy(max_pending=None), pending_session_count=100),
+        )
 
 
 class TestResourceLimitRule:
@@ -273,7 +312,7 @@ class TestResourceLimitRule:
         spec = _spec((_kernel(img, cpu="1"),))
         ctx = _ctx(
             image_infos={img: _image_info(img, cpu_min="8")},
-            known_slot_types=dict(_RG_BASE),
+            slot_types=dict(_RG_BASE),
         )
         with pytest.raises(InvalidAPIParameters):
             ResourceLimitRule().validate(spec, ctx)
@@ -292,7 +331,7 @@ class TestResourceLimitRule:
         with pytest.raises(InvalidAPIParameters):
             ResourceLimitRule().validate(spec, ctx)
 
-    def test_skips_image_min_for_slot_not_in_enabled(self) -> None:
+    def test_skips_image_min_for_slot_not_in_registry(self) -> None:
         img = ImageID(uuid.uuid4())
         image_info = ImageInfo(
             id=uuid.UUID(str(img)),
@@ -307,11 +346,11 @@ class TestResourceLimitRule:
             },
         )
         spec = _spec((_kernel(img, cpu="2"),))
-        # cuda.device is absent from `enabled` (disabled by admin or unregistered),
-        # so its image-declared min must not be enforced.
+        # cuda.device is absent from the global registry (disabled by admin or
+        # unregistered), so its image-declared min must not be enforced.
         ctx = _ctx(
             image_infos={img: image_info},
-            known_slot_types=dict(_RG_BASE),
+            slot_types=dict(_RG_BASE),
         )
         ResourceLimitRule().validate(spec, ctx)
 
@@ -422,7 +461,7 @@ class TestDotfileVFolderConflictRule:
         img = ImageID(uuid.uuid4())
         spec = _spec((_kernel(img),))
         ctx = _ctx(
-            dotfile_data=DotfileBundle(
+            dotfiles=DotfileBundle(
                 dotfiles=(DotfileEntry(path="/home/work/.bashrc", perm="0644", data=""),),
             )
         )
@@ -435,7 +474,7 @@ class TestDotfileVFolderConflictRule:
             vfolder_mounts=(_vfolder_mount("data", kernel_path="/home/work/.bashrc"),),
         )
         ctx = _ctx(
-            dotfile_data=DotfileBundle(
+            dotfiles=DotfileBundle(
                 dotfiles=(DotfileEntry(path=".bashrc", perm="0644", data=""),),
             )
         )
@@ -449,7 +488,7 @@ class TestDotfileVFolderConflictRule:
             vfolder_mounts=(_vfolder_mount("data", kernel_path="/home/work/data"),),
         )
         ctx = _ctx(
-            dotfile_data=DotfileBundle(
+            dotfiles=DotfileBundle(
                 dotfiles=(DotfileEntry(path="/etc/profile", perm="0644", data=""),),
             )
         )
@@ -484,16 +523,19 @@ def _kernel_with_resources(
         execution_spec=KernelExecutionSpec(
             resource_input=KernelResourceConfig(
                 image_id=image_id,
-                resources=[ResourceSlotEntry(resource_type=k, quantity=q) for k, q in resources],
+                resources=[
+                    ResourceSlotEntry(resource_type=ResourceSlotName(k), quantity=q)
+                    for k, q in resources
+                ],
                 resource_opts=ResourceOpts(),
             ),
         ),
     )
 
 
-_RG_BASE: dict[SlotName, SlotTypes] = {
-    SlotName("cpu"): SlotTypes.COUNT,
-    SlotName("mem"): SlotTypes.BYTES,
+_RG_BASE: dict[ResourceSlotName, SlotTypes] = {
+    ResourceSlotName("cpu"): SlotTypes.COUNT,
+    ResourceSlotName("mem"): SlotTypes.BYTES,
 }
 
 
@@ -503,7 +545,7 @@ class TestImageSlotTypeRule:
         spec = _spec((_kernel(img),))
         ctx = _ctx(
             image_infos={img: _image_info_with_slots(img, slot_keys=("cpu", "mem"))},
-            known_slot_types=dict(_RG_BASE),
+            slot_types=dict(_RG_BASE),
         )
         ImageSlotTypeRule().validate(spec, ctx)
 
@@ -512,12 +554,15 @@ class TestImageSlotTypeRule:
         spec = _spec((_kernel(img),))
         ctx = _ctx(
             image_infos={img: _image_info_with_slots(img, slot_keys=("cpu", "mem", "cuda.device"))},
-            known_slot_types={**_RG_BASE, SlotName("cuda.shares"): SlotTypes.COUNT},
-            enabled_slot_names=frozenset({
-                SlotName("cpu"),
-                SlotName("mem"),
-                SlotName("cuda.shares"),
-                SlotName("cuda.device"),
+            slot_types={
+                **_RG_BASE,
+                ResourceSlotName("cuda.shares"): SlotTypes.COUNT,
+                ResourceSlotName("cuda.device"): SlotTypes.COUNT,
+            },
+            served_slot_names=frozenset({
+                ResourceSlotName("cpu"),
+                ResourceSlotName("mem"),
+                ResourceSlotName("cuda.shares"),
             }),
         )
         with pytest.raises(InvalidAPIParameters):
@@ -535,7 +580,7 @@ class TestImageSlotTypeRule:
     def test_noop_without_image_info(self) -> None:
         img = ImageID(uuid.uuid4())
         spec = _spec((_kernel(img),))
-        ctx = _ctx(known_slot_types=dict(_RG_BASE))
+        ctx = _ctx(slot_types=dict(_RG_BASE))
         ImageSlotTypeRule().validate(spec, ctx)
 
     def test_skips_image_slot_when_min_is_zero(self) -> None:
@@ -555,18 +600,19 @@ class TestImageSlotTypeRule:
         )
         ctx = _ctx(
             image_infos={img: image_info},
-            known_slot_types=dict(_RG_BASE),
+            slot_types={**_RG_BASE, ResourceSlotName("cuda.device"): SlotTypes.COUNT},
+            served_slot_names=frozenset({ResourceSlotName("cpu"), ResourceSlotName("mem")}),
         )
         ImageSlotTypeRule().validate(spec, ctx)
 
-    def test_skips_image_slot_not_in_enabled(self) -> None:
-        # cuda.device is declared by the image but absent from `enabled`,
-        # so the image-side check ignores it instead of rejecting the session.
+    def test_skips_image_slot_not_in_registry(self) -> None:
+        # cuda.device is declared by the image but absent from the global slot
+        # registry, so the image-side check ignores it instead of rejecting.
         img = ImageID(uuid.uuid4())
         spec = _spec((_kernel(img),))
         ctx = _ctx(
             image_infos={img: _image_info_with_slots(img, slot_keys=("cpu", "mem", "cuda.device"))},
-            known_slot_types=dict(_RG_BASE),
+            slot_types=dict(_RG_BASE),
         )
         ImageSlotTypeRule().validate(spec, ctx)
 
@@ -577,12 +623,8 @@ class TestImageSlotTypeRule:
         spec = _spec((_kernel(img),))
         ctx = _ctx(
             image_infos={img: _image_info_with_slots(img, slot_keys=("cpu", "mem", "cuda.device"))},
-            known_slot_types=dict(_RG_BASE),
-            enabled_slot_names=frozenset({
-                SlotName("cpu"),
-                SlotName("mem"),
-                SlotName("cuda.device"),
-            }),
+            slot_types={**_RG_BASE, ResourceSlotName("cuda.device"): SlotTypes.COUNT},
+            served_slot_names=frozenset({ResourceSlotName("cpu"), ResourceSlotName("mem")}),
         )
         with pytest.raises(InvalidAPIParameters):
             ImageSlotTypeRule().validate(spec, ctx)
@@ -594,7 +636,7 @@ class TestRequestedSlotTypeRule:
         spec = _spec((
             _kernel_with_resources(img, resources=(("cpu", "1"), ("mem", "1073741824"))),
         ))
-        ctx = _ctx(known_slot_types=dict(_RG_BASE))
+        ctx = _ctx(slot_types=dict(_RG_BASE))
         RequestedSlotTypeRule().validate(spec, ctx)
 
     def test_rejects_requested_slot_not_served_by_rg(self) -> None:
@@ -605,7 +647,7 @@ class TestRequestedSlotTypeRule:
                 resources=(("cpu", "1"), ("mem", "1073741824"), ("cuda.device", "1")),
             ),
         ))
-        ctx = _ctx(known_slot_types={**_RG_BASE, SlotName("cuda.shares"): SlotTypes.COUNT})
+        ctx = _ctx(slot_types={**_RG_BASE, ResourceSlotName("cuda.shares"): SlotTypes.COUNT})
         with pytest.raises(InvalidAPIParameters):
             RequestedSlotTypeRule().validate(spec, ctx)
 
@@ -623,7 +665,7 @@ class TestRequestedSlotTypeRule:
                 resources=(("cpu", "1"), ("mem", "1073741824"), ("cuda.device", "0")),
             ),
         ))
-        ctx = _ctx(known_slot_types=dict(_RG_BASE))
+        ctx = _ctx(slot_types=dict(_RG_BASE))
         RequestedSlotTypeRule().validate(spec, ctx)
 
 
@@ -633,13 +675,15 @@ class TestRequiredResourceSlotRule:
         return ImageID(uuid.uuid4())
 
     @pytest.fixture
-    def required_slot_ctx(self) -> SessionSpecValidationContext:
-        return _ctx(required_slot_names=frozenset({SlotName("cpu"), SlotName("mem")}))
+    def required_slot_ctx(self) -> SessionSpecContext:
+        return _ctx(
+            required_slot_names=frozenset({ResourceSlotName("cpu"), ResourceSlotName("mem")})
+        )
 
     def test_passes_when_required_slots_present(
         self,
         image_id: ImageID,
-        required_slot_ctx: SessionSpecValidationContext,
+        required_slot_ctx: SessionSpecContext,
     ) -> None:
         spec = _spec((
             _kernel_with_resources(image_id, resources=(("cpu", "1"), ("mem", "1073741824"))),
@@ -656,7 +700,7 @@ class TestRequiredResourceSlotRule:
     def test_rejects_missing_or_zero_required_slot(
         self,
         image_id: ImageID,
-        required_slot_ctx: SessionSpecValidationContext,
+        required_slot_ctx: SessionSpecContext,
         resources: tuple[tuple[str, str], ...],
         expected_missing_slot: str,
     ) -> None:

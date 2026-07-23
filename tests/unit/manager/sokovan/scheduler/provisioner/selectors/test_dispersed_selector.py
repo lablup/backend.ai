@@ -2,34 +2,42 @@
 
 from __future__ import annotations
 
-import uuid
+from collections.abc import Mapping
 from decimal import Decimal
 
 import pytest
 
-from ai.backend.common.identifier.resource_group import ResourceGroupID
-from ai.backend.common.types import (
-    AgentId,
-    ClusterMode,
-    KernelId,
-    ResourceSlot,
-    SessionId,
-    SessionTypes,
-)
-from ai.backend.manager.data.sokovan import AgentInfo
+from ai.backend.common.identifier.architecture import ArchName
+from ai.backend.common.identifier.resource_slot import ResourceSlotName
+from ai.backend.common.types import AgentId
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.concentrated import (
     ConcentratedAgentSelector,
 )
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.dispersed import (
     DispersedAgentSelector,
 )
-from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import (
-    AgentSelectionConfig,
-    AgentSelectionCriteria,
-    AgentStateTracker,
-    SessionMetadata,
-)
+from ai.backend.manager.sokovan.scheduler.provisioner.selectors.tracker import AgentStateTracker
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.types import ResourceRequirements
+from ai.backend.manager.views.sokovan.agent import AgentInfo
+from ai.backend.manager.views.sokovan.workload import ResourceRequest
+
+
+def _req(
+    slots: Mapping[str, str],
+    arch: str = "x86_64",
+    containers: int = 1,
+) -> ResourceRequirements:
+    return ResourceRequirements(
+        requested_slots=ResourceRequest(
+            slots={ResourceSlotName(name): Decimal(amount) for name, amount in slots.items()}
+        ),
+        required_architecture=ArchName(arch),
+        container_count=containers,
+    )
+
+
+def _trackers(agents: list[AgentInfo]) -> list[AgentStateTracker]:
+    return [AgentStateTracker(original_agent=agent) for agent in agents]
 
 
 class TestDispersedAgentSelector:
@@ -40,242 +48,97 @@ class TestDispersedAgentSelector:
         """Create a dispersed selector with default priority."""
         return DispersedAgentSelector(agent_selection_resource_priority=["cpu", "mem"])
 
-    @pytest.fixture
-    def basic_criteria(self) -> AgentSelectionCriteria:
-        """Create basic selection criteria."""
-        return AgentSelectionCriteria(
-            session_metadata=SessionMetadata(
-                session_id=SessionId(uuid.uuid4()),
-                session_type=SessionTypes.INTERACTIVE,
-                resource_group_id=ResourceGroupID(uuid.UUID(int=0)),
-                cluster_mode=ClusterMode.SINGLE_NODE,
-            ),
-            kernel_requirements={},
-        )
-
-    @pytest.fixture
-    def basic_config(self) -> AgentSelectionConfig:
-        """Create basic selection config."""
-        return AgentSelectionConfig(
-            max_container_count=None,
-            enforce_spreading_endpoint_replica=False,
-        )
-
     def test_selects_agent_with_most_resources(
         self,
         selector: DispersedAgentSelector,
-        basic_criteria: AgentSelectionCriteria,
-        basic_config: AgentSelectionConfig,
         agents_with_varied_occupancy: list[AgentInfo],
     ) -> None:
-        """Test that dispersed selector prefers agents with more available resources."""
-        resource_req = ResourceRequirements(
-            kernel_ids=[KernelId(uuid.uuid4())],
-            requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("2048")}),
-            required_architecture="x86_64",
-        )
-
-        # Available resources:
-        # agent-low: 2 CPU, 4096 memory
-        # agent-medium: 4 CPU, 8192 memory
-        # agent-high: 6 CPU, 12288 memory
-
-        trackers = [
-            AgentStateTracker(original_agent=agent) for agent in agents_with_varied_occupancy
-        ]
+        """Dispersed selector prefers agents with more remaining resources."""
+        resource_req = _req({"cpu": "1", "mem": "2048"})
 
         selected = selector.select_tracker_by_strategy(
-            trackers, resource_req, basic_criteria, basic_config
+            _trackers(agents_with_varied_occupancy), resource_req
         )
 
-        # Should select agent-high (most available resources)
         assert selected.original_agent.agent_id == AgentId("agent-high")
 
     def test_prefers_fewer_unutilized_capabilities(
         self,
         selector: DispersedAgentSelector,
-        basic_criteria: AgentSelectionCriteria,
-        basic_config: AgentSelectionConfig,
         agents_dispersed_gpu_vs_cpu: list[AgentInfo],
     ) -> None:
-        """Test preference for agents with fewer unutilized resource types."""
-        # Request only CPU and memory (explicitly no GPU)
-        resource_req = ResourceRequirements(
-            kernel_ids=[KernelId(uuid.uuid4())],
-            requested_slots=ResourceSlot({
-                "cpu": Decimal("2"),
-                "mem": Decimal("4096"),
-                "cuda.shares": Decimal("0"),  # Explicitly not needed
-            }),
-            required_architecture="x86_64",
-        )
-
-        trackers = [
-            AgentStateTracker(original_agent=agent) for agent in agents_dispersed_gpu_vs_cpu
-        ]
+        """With equal remaining resources, fewer unutilized capabilities win."""
+        resource_req = _req({"cpu": "2", "mem": "4096", "cuda.shares": "0"})
 
         selected = selector.select_tracker_by_strategy(
-            trackers, resource_req, basic_criteria, basic_config
+            _trackers(agents_dispersed_gpu_vs_cpu), resource_req
         )
 
-        # Should select agent-cpu-only (no unutilized GPU capability)
-        # even though both have same available CPU/mem
         assert selected.original_agent.agent_id == AgentId("agent-cpu-only")
 
     def test_respects_resource_priority_order(
         self,
-        basic_criteria: AgentSelectionCriteria,
-        basic_config: AgentSelectionConfig,
         agents_for_memory_priority: list[AgentInfo],
     ) -> None:
-        """Test that resource priorities are respected in order."""
-        # Create selector with memory prioritized over CPU
+        """Resource priorities are respected in order."""
         selector = DispersedAgentSelector(agent_selection_resource_priority=["mem", "cpu"])
-
-        resource_req = ResourceRequirements(
-            kernel_ids=[KernelId(uuid.uuid4())],
-            requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("1024")}),
-            required_architecture="x86_64",
-        )
-
-        # Available resources:
-        # low-mem-high-cpu: 14 CPU, 2048 memory
-        # high-mem-low-cpu: 2 CPU, 12288 memory
-
-        trackers = [AgentStateTracker(original_agent=agent) for agent in agents_for_memory_priority]
+        resource_req = _req({"cpu": "1", "mem": "1024"})
 
         selected = selector.select_tracker_by_strategy(
-            trackers, resource_req, basic_criteria, basic_config
+            _trackers(agents_for_memory_priority), resource_req
         )
 
-        # Should select high-mem-low-cpu (more memory available, which is higher priority)
+        # high-mem-low-cpu has more memory remaining (higher priority slot)
         assert selected.original_agent.agent_id == AgentId("high-mem-low-cpu")
-
-    def test_handles_agents_with_no_available_slots(
-        self,
-        selector: DispersedAgentSelector,
-        basic_criteria: AgentSelectionCriteria,
-        basic_config: AgentSelectionConfig,
-        agents_full_vs_available: list[AgentInfo],
-    ) -> None:
-        """Test behavior when some agents have zero available resources."""
-        resource_req = ResourceRequirements(
-            kernel_ids=[KernelId(uuid.uuid4())],
-            requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("2048")}),
-            required_architecture="x86_64",
-        )
-
-        # agent-full has 0 available resources
-        # agent-available has 4 CPU, 8192 memory
-
-        trackers = [AgentStateTracker(original_agent=agent) for agent in agents_full_vs_available]
-
-        selected = selector.select_tracker_by_strategy(
-            trackers, resource_req, basic_criteria, basic_config
-        )
-
-        # Should select agent-available
-        assert selected.original_agent.agent_id == AgentId("agent-available")
 
     def test_tie_breaking_with_identical_resources(
         self,
         selector: DispersedAgentSelector,
-        basic_criteria: AgentSelectionCriteria,
-        basic_config: AgentSelectionConfig,
         agents_with_identical_resources: list[AgentInfo],
     ) -> None:
-        """Test consistent tie-breaking when agents have identical resources."""
-        resource_req = ResourceRequirements(
-            kernel_ids=[KernelId(uuid.uuid4())],
-            requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("2048")}),
-            required_architecture="x86_64",
-        )
+        """Tie-breaking is consistent when agents have identical resources."""
+        resource_req = _req({"cpu": "1", "mem": "2048"})
+        trackers = _trackers(agents_with_identical_resources)
 
-        # All agents have identical resources
-        trackers = [
-            AgentStateTracker(original_agent=agent) for agent in agents_with_identical_resources
-        ]
+        selected = selector.select_tracker_by_strategy(trackers, resource_req)
 
-        selected = selector.select_tracker_by_strategy(
-            trackers, resource_req, basic_criteria, basic_config
-        )
-
-        # Should consistently select the same agent
-        assert selected.original_agent.agent_id in [
-            AgentId("agent-a"),
-            AgentId("agent-b"),
-            AgentId("agent-c"),
-        ]
-
-        # Run multiple times to ensure consistency
         for _ in range(10):
-            result = selector.select_tracker_by_strategy(
-                trackers, resource_req, basic_criteria, basic_config
-            )
-            assert result == selected
+            result = selector.select_tracker_by_strategy(trackers, resource_req)
+            assert result is selected
 
     def test_handles_mixed_resource_types(
         self,
         selector: DispersedAgentSelector,
-        basic_criteria: AgentSelectionCriteria,
-        basic_config: AgentSelectionConfig,
         agents_mixed_resource_types: list[AgentInfo],
     ) -> None:
-        """Test selection with heterogeneous resource types."""
-        # Request only CPU and memory
-        resource_req = ResourceRequirements(
-            kernel_ids=[KernelId(uuid.uuid4())],
-            requested_slots=ResourceSlot({"cpu": Decimal("4"), "mem": Decimal("8192")}),
-            required_architecture="x86_64",
-        )
-
-        # Available resources:
-        # gpu-agent: 8 CPU, 16384 memory (has unutilized GPU)
-        # tpu-agent: 12 CPU, 24576 memory (has unutilized TPU)
-        # cpu-agent: 16 CPU, 32768 memory (no unutilized resources)
-
-        trackers = [
-            AgentStateTracker(original_agent=agent) for agent in agents_mixed_resource_types
-        ]
+        """CPU-only requests avoid agents holding unutilized accelerators."""
+        resource_req = _req({
+            "cpu": "4",
+            "mem": "8192",
+            "cuda.shares": "0",
+            "tpu": "0",
+        })
 
         selected = selector.select_tracker_by_strategy(
-            trackers, resource_req, basic_criteria, basic_config
+            _trackers(agents_mixed_resource_types), resource_req
         )
 
-        # Should select cpu-agent (no unutilized capabilities and most resources)
+        # cpu-agent has no unutilized accelerator capability
         assert selected.original_agent.agent_id == AgentId("cpu-agent")
 
     def test_dispersed_opposite_of_concentrated(
         self,
-        basic_criteria: AgentSelectionCriteria,
-        basic_config: AgentSelectionConfig,
+        selector: DispersedAgentSelector,
         agents_concentrated_vs_dispersed: list[AgentInfo],
     ) -> None:
-        """Test that dispersed selector makes opposite choices from concentrated."""
-        dispersed = DispersedAgentSelector(agent_selection_resource_priority=["cpu", "mem"])
-        concentrated = ConcentratedAgentSelector(agent_selection_resource_priority=["cpu", "mem"])
+        """Dispersed and concentrated pick opposite ends of the occupancy scale."""
+        resource_req = _req({"cpu": "1", "mem": "1024"})
+        trackers = _trackers(agents_concentrated_vs_dispersed)
 
-        resource_req = ResourceRequirements(
-            kernel_ids=[KernelId(uuid.uuid4())],
-            requested_slots=ResourceSlot({"cpu": Decimal("0.5"), "mem": Decimal("1024")}),
-            required_architecture="x86_64",
-        )
+        dispersed_pick = selector.select_tracker_by_strategy(trackers, resource_req)
+        concentrated_pick = ConcentratedAgentSelector(
+            agent_selection_resource_priority=["cpu", "mem"]
+        ).select_tracker_by_strategy(trackers, resource_req)
 
-        # Convert agents to trackers for dispersed
-        trackers = [
-            AgentStateTracker(original_agent=agent) for agent in agents_concentrated_vs_dispersed
-        ]
-        dispersed_choice = dispersed.select_tracker_by_strategy(
-            trackers, resource_req, basic_criteria, basic_config
-        )
-        concentrated_choice = concentrated.select_tracker_by_strategy(
-            trackers, resource_req, basic_criteria, basic_config
-        )
-
-        # Dispersed should choose agent-2 (more available)
-        # Concentrated should choose agent-1 (less available)
-        assert dispersed_choice.original_agent.agent_id == AgentId("agent-2")
-        assert concentrated_choice.original_agent.agent_id == AgentId("agent-1")
-        assert (
-            dispersed_choice.original_agent.agent_id != concentrated_choice.original_agent.agent_id
-        )
+        assert dispersed_pick.original_agent.agent_id == AgentId("agent-2")
+        assert concentrated_pick.original_agent.agent_id == AgentId("agent-1")

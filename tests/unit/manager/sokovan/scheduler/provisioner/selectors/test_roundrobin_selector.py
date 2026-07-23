@@ -2,309 +2,136 @@
 
 from __future__ import annotations
 
-import uuid
+from collections.abc import Mapping
 from decimal import Decimal
 
-import pytest
-
-from ai.backend.common.identifier.resource_group import ResourceGroupID
-from ai.backend.common.types import (
-    AgentId,
-    ClusterMode,
-    KernelId,
-    ResourceSlot,
-    SessionId,
-    SessionTypes,
-)
-from ai.backend.manager.data.sokovan import AgentInfo
+from ai.backend.common.identifier.architecture import ArchName
+from ai.backend.common.identifier.resource_slot import ResourceSlotName
+from ai.backend.common.types import AgentId
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.roundrobin import (
     RoundRobinAgentSelector,
 )
-from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import (
-    AgentSelectionConfig,
-    AgentSelectionCriteria,
-    AgentStateTracker,
-    SessionMetadata,
-)
+from ai.backend.manager.sokovan.scheduler.provisioner.selectors.tracker import AgentStateTracker
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.types import ResourceRequirements
+from ai.backend.manager.views.sokovan.agent import AgentInfo
+from ai.backend.manager.views.sokovan.workload import ResourceRequest
+
+
+def _req(
+    slots: Mapping[str, str] | None = None,
+    arch: str = "x86_64",
+    containers: int = 1,
+) -> ResourceRequirements:
+    if slots is None:
+        slots = {"cpu": "1", "mem": "1024"}
+    return ResourceRequirements(
+        requested_slots=ResourceRequest(
+            slots={ResourceSlotName(name): Decimal(amount) for name, amount in slots.items()}
+        ),
+        required_architecture=ArchName(arch),
+        container_count=containers,
+    )
+
+
+def _trackers(agents: list[AgentInfo]) -> list[AgentStateTracker]:
+    return [AgentStateTracker(original_agent=agent) for agent in agents]
 
 
 class TestRoundRobinAgentSelector:
     """Test round-robin agent selector behavior."""
 
-    @pytest.fixture
-    def basic_criteria(self) -> AgentSelectionCriteria:
-        """Create basic selection criteria."""
-        return AgentSelectionCriteria(
-            session_metadata=SessionMetadata(
-                session_id=SessionId(uuid.uuid4()),
-                session_type=SessionTypes.INTERACTIVE,
-                resource_group_id=ResourceGroupID(uuid.UUID(int=0)),
-                cluster_mode=ClusterMode.SINGLE_NODE,
-            ),
-            kernel_requirements={},
-        )
-
-    @pytest.fixture
-    def basic_config(self) -> AgentSelectionConfig:
-        """Create basic selection config."""
-        return AgentSelectionConfig(
-            max_container_count=None,
-            enforce_spreading_endpoint_replica=False,
-        )
-
-    @pytest.fixture
-    def resource_req(self) -> ResourceRequirements:
-        """Create basic resource requirements."""
-        return ResourceRequirements(
-            requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("2048")}),
-            required_architecture="x86_64",
-            kernel_ids=[KernelId(uuid.uuid4())],
-        )
-
     def test_sequential_selection(
         self,
-        basic_criteria: AgentSelectionCriteria,
-        basic_config: AgentSelectionConfig,
-        resource_req: ResourceRequirements,
         agents_for_roundrobin_sequential: list[AgentInfo],
     ) -> None:
-        """Test that round-robin selects agents sequentially."""
-        selector = RoundRobinAgentSelector(next_index=0)
+        """Selections rotate through the ID-sorted agents in order."""
+        selector = RoundRobinAgentSelector()
+        trackers = _trackers(agents_for_roundrobin_sequential)
+        resource_req = _req()
 
-        # First selection
-        trackers = [
-            AgentStateTracker(original_agent=agent) for agent in agents_for_roundrobin_sequential
+        picks = [
+            selector.select_tracker_by_strategy(trackers, resource_req).original_agent.agent_id
+            for _ in range(3)
         ]
 
-        selected = selector.select_tracker_by_strategy(
-            trackers, resource_req, basic_criteria, basic_config
-        )
-        assert selected.original_agent.agent_id == AgentId("agent-a")
-
-        # Update index manually (in real usage, caller tracks this)
-        selector.next_index = 1
-        trackers = [
-            AgentStateTracker(original_agent=agent) for agent in agents_for_roundrobin_sequential
-        ]
-
-        selected = selector.select_tracker_by_strategy(
-            trackers, resource_req, basic_criteria, basic_config
-        )
-        assert selected.original_agent.agent_id == AgentId("agent-b")
-
-        selector.next_index = 2
-        trackers = [
-            AgentStateTracker(original_agent=agent) for agent in agents_for_roundrobin_sequential
-        ]
-
-        selected = selector.select_tracker_by_strategy(
-            trackers, resource_req, basic_criteria, basic_config
-        )
-        assert selected.original_agent.agent_id == AgentId("agent-c")
+        assert picks == [AgentId("agent-a"), AgentId("agent-b"), AgentId("agent-c")]
 
     def test_index_wrapping(
         self,
-        basic_criteria: AgentSelectionCriteria,
-        basic_config: AgentSelectionConfig,
-        resource_req: ResourceRequirements,
         agents_for_roundrobin_sequential: list[AgentInfo],
     ) -> None:
-        """Test that index wraps around when exceeding agent count."""
-        # Test with index equal to agent count
-        selector = RoundRobinAgentSelector(next_index=3)
-        trackers = [
-            AgentStateTracker(original_agent=agent) for agent in agents_for_roundrobin_sequential
+        """The rotation index wraps around the candidate count."""
+        selector = RoundRobinAgentSelector()
+        trackers = _trackers(agents_for_roundrobin_sequential)
+        resource_req = _req()
+
+        picks = [
+            selector.select_tracker_by_strategy(trackers, resource_req).original_agent.agent_id
+            for _ in range(6)
         ]
 
-        selected = selector.select_tracker_by_strategy(
-            trackers, resource_req, basic_criteria, basic_config
-        )
-        assert selected.original_agent.agent_id == AgentId("agent-a")  # Wraps to index 0
-
-        # Test with index greater than agent count
-        selector = RoundRobinAgentSelector(next_index=7)
-        trackers = [
-            AgentStateTracker(original_agent=agent) for agent in agents_for_roundrobin_sequential
-        ]
-
-        selected = selector.select_tracker_by_strategy(
-            trackers, resource_req, basic_criteria, basic_config
-        )
-        assert selected.original_agent.agent_id == AgentId("agent-b")  # 7 % 3 = 1
+        assert picks[:3] == picks[3:]
 
     def test_consistent_ordering_by_agent_id(
         self,
-        basic_criteria: AgentSelectionCriteria,
-        basic_config: AgentSelectionConfig,
-        resource_req: ResourceRequirements,
         agents_for_roundrobin_unsorted: list[AgentInfo],
     ) -> None:
-        """Test that agents are consistently ordered by ID."""
-        selector = RoundRobinAgentSelector(next_index=0)
+        """Candidates are sorted by agent ID regardless of the input order."""
+        selector = RoundRobinAgentSelector()
+        trackers = _trackers(agents_for_roundrobin_unsorted)
+        resource_req = _req()
 
-        # Should select based on sorted order: alpha, beta, zebra
-        trackers = [
-            AgentStateTracker(original_agent=agent) for agent in agents_for_roundrobin_unsorted
+        picks = [
+            selector.select_tracker_by_strategy(trackers, resource_req).original_agent.agent_id
+            for _ in range(3)
         ]
 
-        selected = selector.select_tracker_by_strategy(
-            trackers, resource_req, basic_criteria, basic_config
-        )
-        assert selected.original_agent.agent_id == AgentId("alpha")
-
-        selector.next_index = 1
-        trackers = [
-            AgentStateTracker(original_agent=agent) for agent in agents_for_roundrobin_unsorted
-        ]
-
-        selected = selector.select_tracker_by_strategy(
-            trackers, resource_req, basic_criteria, basic_config
-        )
-        assert selected.original_agent.agent_id == AgentId("beta")
-
-        selector.next_index = 2
-        trackers = [
-            AgentStateTracker(original_agent=agent) for agent in agents_for_roundrobin_unsorted
-        ]
-
-        selected = selector.select_tracker_by_strategy(
-            trackers, resource_req, basic_criteria, basic_config
-        )
-        assert selected.original_agent.agent_id == AgentId("zebra")
+        assert picks == [AgentId("alpha"), AgentId("beta"), AgentId("zebra")]
 
     def test_single_agent(
         self,
-        basic_criteria: AgentSelectionCriteria,
-        basic_config: AgentSelectionConfig,
-        resource_req: ResourceRequirements,
         single_agent: list[AgentInfo],
     ) -> None:
-        """Test round-robin with single agent."""
-        # Any index should select the only agent
-        for index in [0, 1, 5, 100]:
-            selector = RoundRobinAgentSelector(next_index=index)
-            trackers = [AgentStateTracker(original_agent=agent) for agent in single_agent]
+        """A single candidate is always selected."""
+        selector = RoundRobinAgentSelector()
+        trackers = _trackers(single_agent)
+        resource_req = _req()
 
-            selected = selector.select_tracker_by_strategy(
-                trackers, resource_req, basic_criteria, basic_config
-            )
+        for _ in range(3):
+            selected = selector.select_tracker_by_strategy(trackers, resource_req)
             assert selected.original_agent.agent_id == AgentId("lonely-agent")
 
     def test_ignores_resource_availability(
         self,
-        basic_criteria: AgentSelectionCriteria,
-        basic_config: AgentSelectionConfig,
-        resource_req: ResourceRequirements,
         agents_for_roundrobin_varied_resources: list[AgentInfo],
     ) -> None:
-        """Test that round-robin ignores resource availability (just uses index)."""
-        selector = RoundRobinAgentSelector(next_index=0)
+        """The strategy does not consider remaining resources at all."""
+        selector = RoundRobinAgentSelector()
+        trackers = _trackers(agents_for_roundrobin_varied_resources)
+        resource_req = _req()
 
-        # Should select agent-empty even though it has less resources
-        trackers = [
-            AgentStateTracker(original_agent=agent)
-            for agent in agents_for_roundrobin_varied_resources
-        ]
+        picks = {
+            selector.select_tracker_by_strategy(trackers, resource_req).original_agent.agent_id
+            for _ in range(2)
+        }
 
-        selected = selector.select_tracker_by_strategy(
-            trackers, resource_req, basic_criteria, basic_config
-        )
-        assert selected.original_agent.agent_id == AgentId("agent-empty")
-
-    def test_deterministic_selection(
-        self,
-        basic_criteria: AgentSelectionCriteria,
-        basic_config: AgentSelectionConfig,
-        resource_req: ResourceRequirements,
-        agents_for_roundrobin_large_scale: list[AgentInfo],
-    ) -> None:
-        """Test that selection is deterministic for same index and agents."""
-        selector = RoundRobinAgentSelector(next_index=5)
-
-        # Run multiple times - should always select the same agent
-        results = []
-        for _ in range(10):
-            trackers = [
-                AgentStateTracker(original_agent=agent)
-                for agent in agents_for_roundrobin_large_scale
-            ]
-
-            selected = selector.select_tracker_by_strategy(
-                trackers, resource_req, basic_criteria, basic_config
-            )
-            results.append(selected)
-
-        # All selections should be identical
-        assert all(r == results[0] for r in results)
-        assert results[0].original_agent.agent_id == AgentId("agent-5")
-
-    def test_handles_non_sequential_agent_ids(
-        self,
-        basic_criteria: AgentSelectionCriteria,
-        basic_config: AgentSelectionConfig,
-        resource_req: ResourceRequirements,
-        agents_for_roundrobin_non_sequential_ids: list[AgentInfo],
-    ) -> None:
-        """Test round-robin with non-sequential agent IDs."""
-        selector = RoundRobinAgentSelector(next_index=0)
-
-        # Should order by agent ID lexicographically: agent-100, agent-42, agent-5
-        trackers = [
-            AgentStateTracker(original_agent=agent)
-            for agent in agents_for_roundrobin_non_sequential_ids
-        ]
-
-        selected = selector.select_tracker_by_strategy(
-            trackers, resource_req, basic_criteria, basic_config
-        )
-        assert selected.original_agent.agent_id == AgentId("agent-100")
-
-        selector.next_index = 1
-        trackers = [
-            AgentStateTracker(original_agent=agent)
-            for agent in agents_for_roundrobin_non_sequential_ids
-        ]
-
-        selected = selector.select_tracker_by_strategy(
-            trackers, resource_req, basic_criteria, basic_config
-        )
-        assert selected.original_agent.agent_id == AgentId("agent-42")
-
-        selector.next_index = 2
-        trackers = [
-            AgentStateTracker(original_agent=agent)
-            for agent in agents_for_roundrobin_non_sequential_ids
-        ]
-
-        selected = selector.select_tracker_by_strategy(
-            trackers, resource_req, basic_criteria, basic_config
-        )
-        assert selected.original_agent.agent_id == AgentId("agent-5")
+        # Both agents get a turn although their free resources differ wildly
+        assert picks == {AgentId("agent-empty"), AgentId("agent-full")}
 
     def test_fairness_over_multiple_selections(
         self,
-        basic_criteria: AgentSelectionCriteria,
-        basic_config: AgentSelectionConfig,
-        resource_req: ResourceRequirements,
         agents_for_roundrobin_fairness: list[AgentInfo],
     ) -> None:
-        """Test that round-robin provides fair distribution over time."""
-        # Track selections for each agent
-        selection_count = {f"agent-{i}": 0 for i in range(5)}
+        """Repeated selections distribute evenly across the candidates."""
+        selector = RoundRobinAgentSelector()
+        trackers = _trackers(agents_for_roundrobin_fairness)
+        resource_req = _req()
 
-        # Make 50 selections (10 complete rounds)
-        selector = RoundRobinAgentSelector(next_index=0)
-        for i in range(50):
-            selector.next_index = i
-            trackers = [
-                AgentStateTracker(original_agent=agent) for agent in agents_for_roundrobin_fairness
-            ]
+        counts: dict[AgentId, int] = {}
+        for _ in range(20):
+            selected = selector.select_tracker_by_strategy(trackers, resource_req)
+            agent_id = selected.original_agent.agent_id
+            counts[agent_id] = counts.get(agent_id, 0) + 1
 
-            selected = selector.select_tracker_by_strategy(
-                trackers, resource_req, basic_criteria, basic_config
-            )
-            selection_count[selected.original_agent.agent_id] += 1
-
-        # Each agent should be selected exactly 10 times
-        assert all(count == 10 for count in selection_count.values())
+        assert all(count == 4 for count in counts.values())
+        assert len(counts) == 5

@@ -19,14 +19,18 @@ import uuid
 import pytest
 
 from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.identifier.resource_slot import ResourceSlotName
 from ai.backend.common.types import BinarySize, ClusterMode, ResourceSlotEntry
+from ai.backend.manager.data.dotfile.types import DotfileBundle
+from ai.backend.manager.data.resource.types import SlotTypeInfo
+from ai.backend.manager.data.session.creation import ContainerUserInfo
 from ai.backend.manager.data.session.draft import (
     KernelExecutionSpecDraft,
     KernelGroupDraft,
     KernelResourceInput,
+    ResourceSpecDraft,
     SchedulingTargetDraft,
     SessionOptionsDraft,
-    SessionResourceSpecDraft,
 )
 from ai.backend.manager.data.session.options import (
     AgentSelectionPolicy,
@@ -38,11 +42,14 @@ from ai.backend.manager.data.session.options import (
     ResourceOpts,
     SessionHandlerOptions,
 )
-from ai.backend.manager.sokovan.scheduling_controller.preparers.draft_rule import (
-    SessionSpecPreparationContext,
-)
-from ai.backend.manager.sokovan.scheduling_controller.preparers.merge_resource_group_defaults_rule import (
+from ai.backend.manager.sokovan.scheduling_controller.preparers.resources.merge_resource_group_defaults_rule import (
     MergeResourceGroupDefaultsRule,
+)
+from ai.backend.manager.views.sokovan.session_creation import (
+    GlobalEnqueueInfo,
+    ResourceGroupEnqueueInfo,
+    SessionSpecContext,
+    UserEnqueueInfo,
 )
 
 
@@ -71,7 +78,7 @@ def rg_defaults(rg_image_id: ImageID) -> DefaultSessionOptions:
         default_kernel_execution_spec=KernelExecutionSpec(
             resource_input=KernelResourceConfig(
                 image_id=rg_image_id,
-                resources=[ResourceSlotEntry(resource_type="cpu", quantity="2")],
+                resources=[ResourceSlotEntry(resource_type=ResourceSlotName("cpu"), quantity="2")],
                 resource_opts=ResourceOpts(shmem=BinarySize(128 * 1024 * 1024)),
             ),
             environ={"RG_BASE": "1"},
@@ -81,8 +88,26 @@ def rg_defaults(rg_image_id: ImageID) -> DefaultSessionOptions:
     )
 
 
-def _context(rg: DefaultSessionOptions) -> SessionSpecPreparationContext:
-    return SessionSpecPreparationContext(resource_group_defaults=rg)
+def _context(rg: DefaultSessionOptions) -> SessionSpecContext:
+    return SessionSpecContext(
+        resource_group=ResourceGroupEnqueueInfo(
+            defaults=rg,
+            network=None,
+            allow_fractional=False,
+            served_slot_names=frozenset(),
+        ),
+        user=UserEnqueueInfo(
+            policy=None,
+            container_user=ContainerUserInfo(),
+            dotfiles=DotfileBundle(),
+            pending_session_count=0,
+            vfolder_mounts_by_role={},
+        ),
+        global_info=GlobalEnqueueInfo(
+            image_infos={},
+            slot_type_info=SlotTypeInfo(types={}, required=frozenset()),
+        ),
+    )
 
 
 class TestMergeResourceGroupDefaultsRule:
@@ -92,9 +117,10 @@ class TestMergeResourceGroupDefaultsRule:
         rg_defaults: DefaultSessionOptions,
     ) -> None:
         """Unset option-level fields absorb every RG default."""
-        result = await rule.prepare(SessionResourceSpecDraft(), _context(rg_defaults))
+        result = await rule.prepare(ResourceSpecDraft(), _context(rg_defaults))
         opts = result.options
         assert opts.priority == 42
+        assert opts.job_priority == 0
         assert opts.is_preemptible is False
         assert opts.cluster_mode == ClusterMode.MULTI_NODE
         assert opts.handler_options == SessionHandlerOptions(
@@ -109,7 +135,7 @@ class TestMergeResourceGroupDefaultsRule:
         rg_defaults: DefaultSessionOptions,
     ) -> None:
         """Caller-set option-level fields survive the overlay."""
-        draft = SessionResourceSpecDraft(
+        draft = ResourceSpecDraft(
             options=SessionOptionsDraft(
                 priority=99,
                 cluster_mode=ClusterMode.SINGLE_NODE,
@@ -133,7 +159,7 @@ class TestMergeResourceGroupDefaultsRule:
         rg_image_id: ImageID,
     ) -> None:
         """A group without an execution_spec inherits every RG baseline field."""
-        draft = SessionResourceSpecDraft(
+        draft = ResourceSpecDraft(
             options=SessionOptionsDraft(
                 kernel_groups=(KernelGroupDraft(role="main", replica_count=1),),
             ),
@@ -143,7 +169,7 @@ class TestMergeResourceGroupDefaultsRule:
         merged = result.options.kernel_groups[0].execution_spec
         assert merged.resource_input.image_id == rg_image_id
         assert merged.resource_input.resources == (
-            ResourceSlotEntry(resource_type="cpu", quantity="2"),
+            ResourceSlotEntry(resource_type=ResourceSlotName("cpu"), quantity="2"),
         )
         assert merged.environ == {"RG_BASE": "1"}
         assert merged.startup_command == "rg-start"
@@ -159,7 +185,7 @@ class TestMergeResourceGroupDefaultsRule:
     ) -> None:
         """Caller-set execution_spec fields win over the RG baseline."""
         caller_image = ImageID(uuid.uuid4())
-        draft = SessionResourceSpecDraft(
+        draft = ResourceSpecDraft(
             options=SessionOptionsDraft(
                 kernel_groups=(
                     KernelGroupDraft(
@@ -182,7 +208,7 @@ class TestMergeResourceGroupDefaultsRule:
         assert merged.environ == {"CALLER": "yes"}
         # Unset fields still picked up from RG.
         assert merged.resource_input.resources == (
-            ResourceSlotEntry(resource_type="cpu", quantity="2"),
+            ResourceSlotEntry(resource_type=ResourceSlotName("cpu"), quantity="2"),
         )
         assert merged.startup_command == "rg-start"
 
@@ -192,7 +218,7 @@ class TestMergeResourceGroupDefaultsRule:
     ) -> None:
         """With no RG default_kernel_execution_spec, only option-level fill happens."""
         rg = DefaultSessionOptions(priority=7)
-        draft = SessionResourceSpecDraft(
+        draft = ResourceSpecDraft(
             options=SessionOptionsDraft(
                 kernel_groups=(KernelGroupDraft(role="main", replica_count=1),),
             ),

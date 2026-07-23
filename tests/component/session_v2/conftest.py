@@ -649,7 +649,9 @@ async def compute_session_processors(
     scheduler_repository = SchedulerRepository(
         database_engine,
         valkey_clients.stat,
+        valkey_clients.schedule,
         config_provider,
+        storage_manager,
     )
     scheduling_controller = SchedulingController(
         SchedulingControllerArgs(

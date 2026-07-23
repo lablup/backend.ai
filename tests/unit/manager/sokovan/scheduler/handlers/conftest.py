@@ -10,6 +10,7 @@ from uuid import uuid4
 import pytest
 from dateutil.tz import tzutc
 
+from ai.backend.common.identifier.architecture import ArchName
 from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import (
     AccessKey,
@@ -55,8 +56,10 @@ from ai.backend.manager.data.session.types import (
     SessionNetwork,
     SessionStatus,
 )
-from ai.backend.manager.data.sokovan import (
-    ImageConfigData,
+from ai.backend.manager.defs import DEFAULT_ROLE
+from ai.backend.manager.sokovan.scheduler.results import ScheduleResult
+from ai.backend.manager.views.sokovan.image import ImageConfigData
+from ai.backend.manager.views.sokovan.lifecycle import (
     KernelBindingData,
     SessionDataForPull,
     SessionDataForStart,
@@ -64,12 +67,10 @@ from ai.backend.manager.data.sokovan import (
     SessionsForStartWithImages,
     SessionWithKernels,
 )
-from ai.backend.manager.defs import DEFAULT_ROLE
-from ai.backend.manager.repositories.scheduler.types.session import (
+from ai.backend.manager.views.sokovan.session import (
     TerminatingKernelData,
     TerminatingSessionData,
 )
-from ai.backend.manager.sokovan.scheduler.results import ScheduleResult
 
 # =============================================================================
 # Internal Helper Functions (not fixtures)
@@ -345,7 +346,7 @@ def _create_kernel(
 def mock_provisioner() -> AsyncMock:
     """Mock SessionProvisioner for ScheduleSessionsLifecycleHandler tests."""
     provisioner = AsyncMock()
-    provisioner.schedule_scaling_group = AsyncMock(
+    provisioner.schedule_resource_group = AsyncMock(
         return_value=ScheduleResult(scheduled_session_ids=[], scheduling_failures=[])
     )
     return provisioner
@@ -583,7 +584,7 @@ def sessions_for_pull_factory() -> Callable[..., SessionsForPullWithImages]:
                         scaling_group=s.session_info.resource.scaling_group_name or "default",
                         image="test-image:latest",
                         image_id=None,
-                        architecture=k.image.architecture or "x86_64",
+                        architecture=ArchName(k.image.architecture or "x86_64"),
                     )
                     for k in s.kernel_infos
                 ],
@@ -597,7 +598,7 @@ def sessions_for_pull_factory() -> Callable[..., SessionsForPullWithImages]:
                 _image_id: ImageConfigData(
                     id=_image_id,
                     canonical="test-image:latest",
-                    architecture="x86_64",
+                    architecture=ArchName("x86_64"),
                     project=None,
                     is_local=False,
                     digest="sha256:abc123",
@@ -634,7 +635,7 @@ def sessions_for_start_factory() -> Callable[..., SessionsForStartWithImages]:
                         scaling_group=s.session_info.resource.scaling_group_name or "default",
                         image="test-image:latest",
                         image_id=None,
-                        architecture=k.image.architecture or "x86_64",
+                        architecture=ArchName(k.image.architecture or "x86_64"),
                     )
                     for k in s.kernel_infos
                 ],
@@ -652,7 +653,7 @@ def sessions_for_start_factory() -> Callable[..., SessionsForStartWithImages]:
                 _image_id: ImageConfigData(
                     id=_image_id,
                     canonical="test-image:latest",
-                    architecture="x86_64",
+                    architecture=ArchName("x86_64"),
                     project=None,
                     is_local=False,
                     digest="sha256:abc123",

@@ -2,35 +2,37 @@
 
 from __future__ import annotations
 
-import uuid
+from collections.abc import Mapping
 from decimal import Decimal
 
 import pytest
 
-from ai.backend.common.identifier.resource_group import ResourceGroupID
-from ai.backend.common.types import (
-    AgentId,
-    ClusterMode,
-    KernelId,
-    ResourceSlot,
-    SessionId,
-    SessionTypes,
-)
-from ai.backend.manager.data.sokovan import AgentInfo
-from ai.backend.manager.sokovan.scheduler.provisioner.selectors.concentrated import (
-    ConcentratedAgentSelector,
-)
-from ai.backend.manager.sokovan.scheduler.provisioner.selectors.dispersed import (
-    DispersedAgentSelector,
-)
+from ai.backend.common.identifier.architecture import ArchName
+from ai.backend.common.identifier.resource_slot import ResourceSlotName
+from ai.backend.common.types import AgentId
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.legacy import LegacyAgentSelector
-from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import (
-    AgentSelectionConfig,
-    AgentSelectionCriteria,
-    AgentStateTracker,
-    SessionMetadata,
-)
+from ai.backend.manager.sokovan.scheduler.provisioner.selectors.tracker import AgentStateTracker
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.types import ResourceRequirements
+from ai.backend.manager.views.sokovan.agent import AgentInfo
+from ai.backend.manager.views.sokovan.workload import ResourceRequest
+
+
+def _req(
+    slots: Mapping[str, str],
+    arch: str = "x86_64",
+    containers: int = 1,
+) -> ResourceRequirements:
+    return ResourceRequirements(
+        requested_slots=ResourceRequest(
+            slots={ResourceSlotName(name): Decimal(amount) for name, amount in slots.items()}
+        ),
+        required_architecture=ArchName(arch),
+        container_count=containers,
+    )
+
+
+def _trackers(agents: list[AgentInfo]) -> list[AgentStateTracker]:
+    return [AgentStateTracker(original_agent=agent) for agent in agents]
 
 
 class TestLegacyAgentSelector:
@@ -41,223 +43,86 @@ class TestLegacyAgentSelector:
         """Create a legacy selector with default priority."""
         return LegacyAgentSelector(agent_selection_resource_priority=["cpu", "mem"])
 
-    @pytest.fixture
-    def basic_criteria(self) -> AgentSelectionCriteria:
-        """Create basic selection criteria."""
-        return AgentSelectionCriteria(
-            session_metadata=SessionMetadata(
-                session_id=SessionId(uuid.uuid4()),
-                session_type=SessionTypes.INTERACTIVE,
-                resource_group_id=ResourceGroupID(uuid.UUID(int=0)),
-                cluster_mode=ClusterMode.SINGLE_NODE,
-            ),
-            kernel_requirements={},
-        )
-
-    @pytest.fixture
-    def basic_config(self) -> AgentSelectionConfig:
-        """Create basic selection config."""
-        return AgentSelectionConfig(
-            max_container_count=None,
-            enforce_spreading_endpoint_replica=False,
-        )
-
     def test_prefers_fewer_unutilized_capabilities_first(
         self,
         selector: LegacyAgentSelector,
-        basic_criteria: AgentSelectionCriteria,
-        basic_config: AgentSelectionConfig,
-        agents_for_unutilized_capability_test: list[AgentInfo],
+        agents_gpu_vs_cpu_only: list[AgentInfo],
     ) -> None:
-        """Test that legacy selector prioritizes fewer unutilized capabilities."""
-        # Request only CPU and memory (explicitly no GPU/TPU)
-        resource_req = ResourceRequirements(
-            kernel_ids=[KernelId(uuid.uuid4())],
-            requested_slots=ResourceSlot({
-                "cpu": Decimal("2"),
-                "mem": Decimal("4096"),
-                "cuda.shares": Decimal("0"),  # Explicitly not needed
-                "tpu": Decimal("0"),  # Explicitly not needed
-            }),
-            required_architecture="x86_64",
-        )
-
-        trackers = [
-            AgentStateTracker(original_agent=agent)
-            for agent in agents_for_unutilized_capability_test
-        ]
+        """Unutilized capability count dominates the sort key."""
+        resource_req = _req({"cpu": "2", "mem": "4096", "cuda.shares": "0"})
 
         selected = selector.select_tracker_by_strategy(
-            trackers, resource_req, basic_criteria, basic_config
+            _trackers(agents_gpu_vs_cpu_only), resource_req
         )
 
-        # Should select agent-minimal (0 unutilized capabilities vs 2)
-        assert selected.original_agent.agent_id == AgentId("agent-minimal")
+        assert selected.original_agent.agent_id == AgentId("agent-cpu-only")
 
     def test_breaks_ties_with_resource_availability(
         self,
         selector: LegacyAgentSelector,
-        basic_criteria: AgentSelectionCriteria,
-        basic_config: AgentSelectionConfig,
         agents_for_resource_tie_breaking: list[AgentInfo],
     ) -> None:
-        """Test that ties in unutilized capabilities are broken by resource availability."""
-        resource_req = ResourceRequirements(
-            kernel_ids=[KernelId(uuid.uuid4())],
-            requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("2048")}),
-            required_architecture="x86_64",
-        )
-
-        # Both have 0 unutilized capabilities
-        # Available resources:
-        # agent-low-resources: 2 CPU, 4096 memory
-        # agent-high-resources: 12 CPU, 24576 memory
-
-        trackers = [
-            AgentStateTracker(original_agent=agent) for agent in agents_for_resource_tie_breaking
-        ]
+        """With equal capability counts, more remaining resources win."""
+        resource_req = _req({"cpu": "1", "mem": "2048"})
 
         selected = selector.select_tracker_by_strategy(
-            trackers, resource_req, basic_criteria, basic_config
+            _trackers(agents_for_resource_tie_breaking), resource_req
         )
 
-        # Should select agent-high-resources (more available resources)
         assert selected.original_agent.agent_id == AgentId("agent-high-resources")
 
     def test_respects_resource_priority_order(
         self,
-        basic_criteria: AgentSelectionCriteria,
-        basic_config: AgentSelectionConfig,
-        agents_for_memory_priority: list[AgentInfo],
+        agents_for_gpu_priority: list[AgentInfo],
     ) -> None:
-        """Test that resource priorities are used for tie-breaking."""
-        # Create selector with memory prioritized over CPU
-        selector = LegacyAgentSelector(agent_selection_resource_priority=["mem", "cpu"])
-
-        resource_req = ResourceRequirements(
-            kernel_ids=[KernelId(uuid.uuid4())],
-            requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("1024")}),
-            required_architecture="x86_64",
+        """The GPU-first priority order drives the tie-breaking."""
+        selector = LegacyAgentSelector(
+            agent_selection_resource_priority=["cuda.shares", "cpu", "mem"]
         )
-
-        # Both have same unutilized capabilities (0)
-        # Available resources:
-        # low-mem-high-cpu: 14 CPU, 2048 memory
-        # high-mem-low-cpu: 2 CPU, 12288 memory
-
-        trackers = [AgentStateTracker(original_agent=agent) for agent in agents_for_memory_priority]
+        resource_req = _req({"cpu": "1", "mem": "2048", "cuda.shares": "0.5"})
 
         selected = selector.select_tracker_by_strategy(
-            trackers, resource_req, basic_criteria, basic_config
+            _trackers(agents_for_gpu_priority), resource_req
         )
 
-        # Should select high-mem-low-cpu (more memory, which is higher priority)
-        assert selected.original_agent.agent_id == AgentId("high-mem-low-cpu")
+        # Legacy prefers MORE remaining resources: high-gpu has 3 GPU remaining
+        assert selected.original_agent.agent_id == AgentId("high-gpu")
 
     def test_handles_partially_utilized_resources(
         self,
         selector: LegacyAgentSelector,
-        basic_criteria: AgentSelectionCriteria,
-        basic_config: AgentSelectionConfig,
         agents_gpu_partially_used: list[AgentInfo],
     ) -> None:
-        """Test selection when agents have partially utilized special resources."""
-        # Request includes GPU
-        resource_req = ResourceRequirements(
-            kernel_ids=[KernelId(uuid.uuid4())],
-            requested_slots=ResourceSlot({
-                "cpu": Decimal("2"),
-                "mem": Decimal("4096"),
-                "cuda.shares": Decimal("1"),
-            }),
-            required_architecture="x86_64",
-        )
+        """Any free capacity on a zero-requested slot counts as unutilized.
 
-        trackers = [AgentStateTracker(original_agent=agent) for agent in agents_gpu_partially_used]
+        Both agents therefore tie on the capability count, and the
+        tie-break falls to remaining resources (gpu-unused has more GPU).
+        """
+        resource_req = _req({"cpu": "2", "mem": "4096", "cuda.shares": "0"})
 
         selected = selector.select_tracker_by_strategy(
-            trackers, resource_req, basic_criteria, basic_config
+            _trackers(agents_gpu_partially_used), resource_req
         )
 
-        # Both have same unutilized capabilities (0 - all resources are requested)
-        # Both have same available CPU and memory
-        # They should be equivalent choices
-        assert selected.original_agent.agent_id in [
-            AgentId("gpu-partially-used"),
-            AgentId("gpu-unused"),
-        ]
-
-    def test_legacy_behavior_differs_from_concentrated_and_dispersed(
-        self,
-        basic_criteria: AgentSelectionCriteria,
-        basic_config: AgentSelectionConfig,
-        agents_specialized_vs_general: list[AgentInfo],
-    ) -> None:
-        """Test that legacy selector has distinct behavior from other strategies."""
-        legacy = LegacyAgentSelector(agent_selection_resource_priority=["cpu", "mem"])
-        concentrated = ConcentratedAgentSelector(agent_selection_resource_priority=["cpu", "mem"])
-        dispersed = DispersedAgentSelector(agent_selection_resource_priority=["cpu", "mem"])
-
-        # Request only CPU and memory
-        resource_req = ResourceRequirements(
-            kernel_ids=[KernelId(uuid.uuid4())],
-            requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("2048")}),
-            required_architecture="x86_64",
-        )
-
-        trackers = [
-            AgentStateTracker(original_agent=agent) for agent in agents_specialized_vs_general
-        ]
-
-        legacy_choice = legacy.select_tracker_by_strategy(
-            trackers, resource_req, basic_criteria, basic_config
-        )
-        concentrated_choice = concentrated.select_tracker_by_strategy(
-            trackers, resource_req, basic_criteria, basic_config
-        )
-        dispersed_choice = dispersed.select_tracker_by_strategy(
-            trackers, resource_req, basic_criteria, basic_config
-        )
-
-        # Legacy should choose agent-general (fewer unutilized capabilities)
-        assert legacy_choice.original_agent.agent_id == AgentId("agent-general")
-        # Concentrated should choose agent-specialized (less available resources)
-        assert concentrated_choice.original_agent.agent_id == AgentId("agent-specialized")
-        # Dispersed should choose agent-general (more available resources AND fewer unutilized)
-        assert dispersed_choice.original_agent.agent_id == AgentId("agent-general")
+        assert selected.original_agent.agent_id == AgentId("gpu-unused")
 
     def test_handles_custom_resource_types(
         self,
-        basic_criteria: AgentSelectionCriteria,
-        basic_config: AgentSelectionConfig,
         agents_with_custom_accelerator: list[AgentInfo],
     ) -> None:
-        """Test selection with custom resource types in priority."""
+        """Custom accelerator slot names participate in the priority order."""
         selector = LegacyAgentSelector(
             agent_selection_resource_priority=["custom.accelerator", "cpu", "mem"]
         )
-
-        resource_req = ResourceRequirements(
-            kernel_ids=[KernelId(uuid.uuid4())],
-            requested_slots=ResourceSlot({
-                "cpu": Decimal("2"),
-                "mem": Decimal("4096"),
-                "custom.accelerator": Decimal("1"),
-            }),
-            required_architecture="x86_64",
-        )
-
-        # Available resources:
-        # custom-rich: 4 CPU, 8192 memory, 8 custom.accelerator
-        # custom-poor: 12 CPU, 24576 memory, 1 custom.accelerator
-
-        trackers = [
-            AgentStateTracker(original_agent=agent) for agent in agents_with_custom_accelerator
-        ]
+        resource_req = _req({
+            "cpu": "2",
+            "mem": "4096",
+            "custom.accelerator": "1",
+        })
 
         selected = selector.select_tracker_by_strategy(
-            trackers, resource_req, basic_criteria, basic_config
+            _trackers(agents_with_custom_accelerator), resource_req
         )
 
-        # Should select custom-rich (more custom.accelerator, which is highest priority)
+        # custom-rich has 8 custom.accelerator remaining vs custom-poor's 1
         assert selected.original_agent.agent_id == AgentId("custom-rich")

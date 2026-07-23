@@ -1,367 +1,144 @@
+"""Tests for the Dominant Resource Fairness (DRF) sequencer."""
+
+from __future__ import annotations
+
 import uuid
-from decimal import Decimal
+from collections.abc import Callable
 
 import pytest
 
-from ai.backend.common.identifier.resource_group import ResourceGroupID
-from ai.backend.common.types import AccessKey, ResourceSlot, SessionId, SlotQuantity
-from ai.backend.manager.data.sokovan import (
-    ConcurrencySnapshot,
-    KeypairOccupancy,
-    PendingSessionSnapshot,
-    ResourceOccupancySnapshot,
-    ResourcePolicySnapshot,
-    SessionDependencySnapshot,
-    SessionWorkload,
-    SystemSnapshot,
-)
+from ai.backend.common.identifier.user import UserID
 from ai.backend.manager.sokovan.scheduler.provisioner.sequencers.drf import DRFSequencer
+from ai.backend.manager.views.sokovan.snapshot import SystemSnapshot
+from ai.backend.manager.views.sokovan.workload import SessionWorkload
+
+from .conftest import RESOURCE_GROUP_ID
+
+WorkloadFactory = Callable[..., SessionWorkload]
+SnapshotFactory = Callable[..., SystemSnapshot]
 
 
 class TestDRFSequencer:
     @pytest.fixture
-    def resource_group_id(self) -> ResourceGroupID:
-        return ResourceGroupID(uuid.uuid4())
-
-    @pytest.fixture
     def sequencer(self) -> DRFSequencer:
         return DRFSequencer()
 
-    @pytest.fixture
-    def empty_system_snapshot(self) -> SystemSnapshot:
-        return SystemSnapshot(
-            total_capacity=ResourceSlot(cpu=Decimal("100"), mem=Decimal("100")),
-            resource_occupancy=ResourceOccupancySnapshot(
-                by_keypair={},
-                by_user={},
-                by_group={},
-                by_domain={},
-                by_agent={},
-            ),
-            resource_policy=ResourcePolicySnapshot(
-                keypair_policies={},
-                user_policies={},
-                group_limits={},
-                domain_limits={},
-            ),
-            concurrency=ConcurrencySnapshot(
-                sessions_by_keypair={},
-                sftp_sessions_by_keypair={},
-            ),
-            pending_sessions=PendingSessionSnapshot(
-                by_keypair={},
-            ),
-            session_dependencies=SessionDependencySnapshot(
-                by_session={},
-            ),
-            known_slot_types={},
-        )
-
-    @pytest.fixture
-    def system_snapshot_with_allocations(self) -> SystemSnapshot:
-        return SystemSnapshot(
-            total_capacity=ResourceSlot(cpu=Decimal("100"), mem=Decimal("100")),
-            resource_occupancy=ResourceOccupancySnapshot(
-                by_keypair={
-                    AccessKey("user1"): KeypairOccupancy(
-                        occupied_slots=[
-                            SlotQuantity("cpu", Decimal("20")),
-                            SlotQuantity("mem", Decimal("10")),
-                        ],
-                        session_count=1,
-                        sftp_session_count=0,
-                    ),  # dominant share: 20%
-                    AccessKey("user2"): KeypairOccupancy(
-                        occupied_slots=[
-                            SlotQuantity("cpu", Decimal("10")),
-                            SlotQuantity("mem", Decimal("30")),
-                        ],
-                        session_count=1,
-                        sftp_session_count=0,
-                    ),  # dominant share: 30%
-                    AccessKey("user3"): KeypairOccupancy(
-                        occupied_slots=[
-                            SlotQuantity("cpu", Decimal("5")),
-                            SlotQuantity("mem", Decimal("5")),
-                        ],
-                        session_count=1,
-                        sftp_session_count=0,
-                    ),  # dominant share: 5%
-                },
-                by_user={},
-                by_group={},
-                by_domain={},
-                by_agent={},
-            ),
-            resource_policy=ResourcePolicySnapshot(
-                keypair_policies={},
-                user_policies={},
-                group_limits={},
-                domain_limits={},
-            ),
-            concurrency=ConcurrencySnapshot(
-                sessions_by_keypair={},
-                sftp_sessions_by_keypair={},
-            ),
-            pending_sessions=PendingSessionSnapshot(
-                by_keypair={},
-            ),
-            session_dependencies=SessionDependencySnapshot(
-                by_session={},
-            ),
-            known_slot_types={},
-        )
-
-    async def test_name(self, sequencer: DRFSequencer) -> None:
+    def test_name(self, sequencer: DRFSequencer) -> None:
         assert sequencer.name == "DRFSequencer"
 
     async def test_empty_workload(
         self,
-        resource_group_id: ResourceGroupID,
         sequencer: DRFSequencer,
-        empty_system_snapshot: SystemSnapshot,
+        empty_snapshot: SystemSnapshot,
     ) -> None:
-        result = await sequencer.sequence(resource_group_id, empty_system_snapshot, [])
-        assert result == []
+        result = await sequencer.sequence(RESOURCE_GROUP_ID, empty_snapshot, [])
+        assert list(result) == []
 
-    async def test_single_user_workloads(
+    async def test_single_user_workloads_keep_order(
         self,
-        resource_group_id: ResourceGroupID,
         sequencer: DRFSequencer,
-        empty_system_snapshot: SystemSnapshot,
+        snapshot_factory: SnapshotFactory,
+        workload_factory: WorkloadFactory,
     ) -> None:
-        workloads = [
-            SessionWorkload(
-                session_id=SessionId(uuid.uuid4()),
-                access_key=AccessKey("user1"),
-                requested_slots=ResourceSlot(cpu=Decimal("10"), mem=Decimal("10")),
-                user_uuid=uuid.uuid4(),
-                group_id=uuid.uuid4(),
-                domain_name="default",
-                scaling_group="default",
-                resource_group_id=ResourceGroupID(uuid.uuid4()),
-                priority=0,
-            ),
-            SessionWorkload(
-                session_id=SessionId(uuid.uuid4()),
-                access_key=AccessKey("user1"),
-                requested_slots=ResourceSlot(cpu=Decimal("20"), mem=Decimal("20")),
-                user_uuid=uuid.uuid4(),
-                group_id=uuid.uuid4(),
-                domain_name="default",
-                scaling_group="default",
-                resource_group_id=ResourceGroupID(uuid.uuid4()),
-                priority=0,
-            ),
-        ]
+        """Workloads of a single user keep their input order (stable sort)."""
+        user = UserID(uuid.uuid4())
+        workloads = [workload_factory(user_id=user) for _ in range(3)]
+        snapshot = snapshot_factory(
+            capacities={"cpu": "100", "mem": "102400"},
+            by_user={user: {"cpu": ("10", "0")}},
+        )
 
-        result = await sequencer.sequence(resource_group_id, empty_system_snapshot, workloads)
+        result = await sequencer.sequence(RESOURCE_GROUP_ID, snapshot, workloads)
 
-        # With no existing allocations, order should be preserved
-        assert len(result) == 2
-        assert result[0] == workloads[0]
-        assert result[1] == workloads[1]
+        assert list(result) == workloads
 
     async def test_multiple_users_different_dominant_shares(
         self,
-        resource_group_id: ResourceGroupID,
         sequencer: DRFSequencer,
-        system_snapshot_with_allocations: SystemSnapshot,
+        snapshot_factory: SnapshotFactory,
+        workload_factory: WorkloadFactory,
     ) -> None:
-        workloads = [
-            SessionWorkload(
-                session_id=SessionId(uuid.uuid4()),
-                access_key=AccessKey("user2"),  # 30% dominant share
-                requested_slots=ResourceSlot(cpu=Decimal("10"), mem=Decimal("10")),
-                user_uuid=uuid.uuid4(),
-                group_id=uuid.uuid4(),
-                domain_name="default",
-                scaling_group="default",
-                resource_group_id=ResourceGroupID(uuid.uuid4()),
-                priority=0,
-            ),
-            SessionWorkload(
-                session_id=SessionId(uuid.uuid4()),
-                access_key=AccessKey("user3"),  # 5% dominant share (lowest)
-                requested_slots=ResourceSlot(cpu=Decimal("10"), mem=Decimal("10")),
-                user_uuid=uuid.uuid4(),
-                group_id=uuid.uuid4(),
-                domain_name="default",
-                scaling_group="default",
-                resource_group_id=ResourceGroupID(uuid.uuid4()),
-                priority=0,
-            ),
-            SessionWorkload(
-                session_id=SessionId(uuid.uuid4()),
-                access_key=AccessKey("user1"),  # 20% dominant share
-                requested_slots=ResourceSlot(cpu=Decimal("10"), mem=Decimal("10")),
-                user_uuid=uuid.uuid4(),
-                group_id=uuid.uuid4(),
-                domain_name="default",
-                scaling_group="default",
-                resource_group_id=ResourceGroupID(uuid.uuid4()),
-                priority=0,
-            ),
-        ]
-
-        result = await sequencer.sequence(
-            resource_group_id, system_snapshot_with_allocations, workloads
+        """The user with the lower dominant share is scheduled first."""
+        heavy_user = UserID(uuid.uuid4())
+        light_user = UserID(uuid.uuid4())
+        heavy_workload = workload_factory(user_id=heavy_user)
+        light_workload = workload_factory(user_id=light_user)
+        snapshot = snapshot_factory(
+            capacities={"cpu": "100", "mem": "102400"},
+            by_user={
+                # heavy: cpu share 0.5; light: cpu share 0.1
+                heavy_user: {"cpu": ("30", "20")},
+                light_user: {"cpu": ("10", "0")},
+            },
         )
 
-        # Should be ordered by dominant share (ascending): user3 (5%), user1 (20%), user2 (30%)
-        assert len(result) == 3
-        assert result[0].access_key == AccessKey("user3")
-        assert result[1].access_key == AccessKey("user1")
-        assert result[2].access_key == AccessKey("user2")
+        result = await sequencer.sequence(
+            RESOURCE_GROUP_ID, snapshot, [heavy_workload, light_workload]
+        )
 
-    async def test_multiple_users_same_dominant_share(
+        assert list(result) == [light_workload, heavy_workload]
+
+    async def test_dominant_share_is_max_over_slots(
         self,
-        resource_group_id: ResourceGroupID,
         sequencer: DRFSequencer,
-        empty_system_snapshot: SystemSnapshot,
+        snapshot_factory: SnapshotFactory,
+        workload_factory: WorkloadFactory,
     ) -> None:
-        # All users have no existing allocations (0% dominant share)
-        workloads = [
-            SessionWorkload(
-                session_id=SessionId(uuid.uuid4()),
-                access_key=AccessKey("user1"),
-                requested_slots=ResourceSlot(cpu=Decimal("10"), mem=Decimal("10")),
-                user_uuid=uuid.uuid4(),
-                group_id=uuid.uuid4(),
-                domain_name="default",
-                scaling_group="default",
-                resource_group_id=ResourceGroupID(uuid.uuid4()),
-                priority=0,
-            ),
-            SessionWorkload(
-                session_id=SessionId(uuid.uuid4()),
-                access_key=AccessKey("user2"),
-                requested_slots=ResourceSlot(cpu=Decimal("10"), mem=Decimal("10")),
-                user_uuid=uuid.uuid4(),
-                group_id=uuid.uuid4(),
-                domain_name="default",
-                scaling_group="default",
-                resource_group_id=ResourceGroupID(uuid.uuid4()),
-                priority=0,
-            ),
-            SessionWorkload(
-                session_id=SessionId(uuid.uuid4()),
-                access_key=AccessKey("user3"),
-                requested_slots=ResourceSlot(cpu=Decimal("10"), mem=Decimal("10")),
-                user_uuid=uuid.uuid4(),
-                group_id=uuid.uuid4(),
-                domain_name="default",
-                scaling_group="default",
-                resource_group_id=ResourceGroupID(uuid.uuid4()),
-                priority=0,
-            ),
-        ]
+        """The dominant share is the maximum share across slot types."""
+        cpu_heavy = UserID(uuid.uuid4())
+        mem_heavy = UserID(uuid.uuid4())
+        cpu_workload = workload_factory(user_id=cpu_heavy)
+        mem_workload = workload_factory(user_id=mem_heavy)
+        snapshot = snapshot_factory(
+            capacities={"cpu": "100", "mem": "100000"},
+            by_user={
+                # cpu-heavy: cpu 0.6, mem 0.1 -> dominant 0.6
+                cpu_heavy: {"cpu": ("60", "0"), "mem": ("10000", "0")},
+                # mem-heavy: cpu 0.1, mem 0.4 -> dominant 0.4
+                mem_heavy: {"cpu": ("10", "0"), "mem": ("40000", "0")},
+            },
+        )
 
-        result = await sequencer.sequence(resource_group_id, empty_system_snapshot, workloads)
+        result = await sequencer.sequence(RESOURCE_GROUP_ID, snapshot, [cpu_workload, mem_workload])
 
-        # With same dominant share, order should be preserved
-        assert len(result) == 3
-        assert result[0] == workloads[0]
-        assert result[1] == workloads[1]
-        assert result[2] == workloads[2]
+        assert list(result) == [mem_workload, cpu_workload]
 
     async def test_new_user_gets_priority(
         self,
-        resource_group_id: ResourceGroupID,
         sequencer: DRFSequencer,
-        system_snapshot_with_allocations: SystemSnapshot,
+        snapshot_factory: SnapshotFactory,
+        workload_factory: WorkloadFactory,
     ) -> None:
-        workloads = [
-            SessionWorkload(
-                session_id=SessionId(uuid.uuid4()),
-                access_key=AccessKey("user2"),  # 30% dominant share
-                requested_slots=ResourceSlot(cpu=Decimal("10"), mem=Decimal("10")),
-                user_uuid=uuid.uuid4(),
-                group_id=uuid.uuid4(),
-                domain_name="default",
-                scaling_group="default",
-                resource_group_id=ResourceGroupID(uuid.uuid4()),
-                priority=0,
-            ),
-            SessionWorkload(
-                session_id=SessionId(uuid.uuid4()),
-                access_key=AccessKey("new_user"),  # 0% dominant share (new user)
-                requested_slots=ResourceSlot(cpu=Decimal("10"), mem=Decimal("10")),
-                user_uuid=uuid.uuid4(),
-                group_id=uuid.uuid4(),
-                domain_name="default",
-                scaling_group="default",
-                resource_group_id=ResourceGroupID(uuid.uuid4()),
-                priority=0,
-            ),
-        ]
+        """A user with no recorded occupancy has dominant share zero."""
+        existing_user = UserID(uuid.uuid4())
+        new_user = UserID(uuid.uuid4())
+        existing_workload = workload_factory(user_id=existing_user)
+        new_workload = workload_factory(user_id=new_user)
+        snapshot = snapshot_factory(
+            capacities={"cpu": "100", "mem": "102400"},
+            by_user={existing_user: {"cpu": ("50", "0")}},
+        )
 
         result = await sequencer.sequence(
-            resource_group_id, system_snapshot_with_allocations, workloads
+            RESOURCE_GROUP_ID, snapshot, [existing_workload, new_workload]
         )
 
-        # New user with 0% dominant share should get priority
-        assert len(result) == 2
-        assert result[0].access_key == AccessKey("new_user")
-        assert result[1].access_key == AccessKey("user2")
+        assert list(result) == [new_workload, existing_workload]
 
-    async def test_dominant_share_calculation_with_zero_capacity(
-        self, resource_group_id: ResourceGroupID, sequencer: DRFSequencer
+    async def test_zero_capacity_slot_is_skipped(
+        self,
+        sequencer: DRFSequencer,
+        snapshot_factory: SnapshotFactory,
+        workload_factory: WorkloadFactory,
     ) -> None:
-        # Test edge case where some resource has zero capacity
-        system_snapshot = SystemSnapshot(
-            total_capacity=ResourceSlot(
-                cpu=Decimal("100"), mem=Decimal("0")
-            ),  # Zero memory capacity
-            resource_occupancy=ResourceOccupancySnapshot(
-                by_keypair={
-                    AccessKey("user1"): KeypairOccupancy(
-                        occupied_slots=[
-                            SlotQuantity("cpu", Decimal("50")),
-                            SlotQuantity("mem", Decimal("10")),
-                        ],
-                        session_count=1,
-                        sftp_session_count=0,
-                    ),
-                },
-                by_user={},
-                by_group={},
-                by_domain={},
-                by_agent={},
-            ),
-            resource_policy=ResourcePolicySnapshot(
-                keypair_policies={},
-                user_policies={},
-                group_limits={},
-                domain_limits={},
-            ),
-            concurrency=ConcurrencySnapshot(
-                sessions_by_keypair={},
-                sftp_sessions_by_keypair={},
-            ),
-            pending_sessions=PendingSessionSnapshot(
-                by_keypair={},
-            ),
-            session_dependencies=SessionDependencySnapshot(
-                by_session={},
-            ),
-            known_slot_types={},
+        """Slots with zero capacity do not contribute to the dominant share."""
+        user = UserID(uuid.uuid4())
+        workload = workload_factory(user_id=user)
+        snapshot = snapshot_factory(
+            capacities={"cpu": "100", "cuda.shares": "0"},
+            by_user={user: {"cuda.shares": ("4", "0")}},
         )
 
-        workloads = [
-            SessionWorkload(
-                session_id=SessionId(uuid.uuid4()),
-                access_key=AccessKey("user1"),
-                requested_slots=ResourceSlot(cpu=Decimal("10"), mem=Decimal("10")),
-                user_uuid=uuid.uuid4(),
-                group_id=uuid.uuid4(),
-                domain_name="default",
-                scaling_group="default",
-                resource_group_id=ResourceGroupID(uuid.uuid4()),
-                priority=0,
-            ),
-        ]
+        result = await sequencer.sequence(RESOURCE_GROUP_ID, snapshot, [workload])
 
-        # Should not crash when dividing by zero capacity
-        result = await sequencer.sequence(resource_group_id, system_snapshot, workloads)
-        assert len(result) == 1
+        assert list(result) == [workload]

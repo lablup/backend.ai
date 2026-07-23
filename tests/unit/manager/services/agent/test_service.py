@@ -35,7 +35,6 @@ from ai.backend.manager.errors.agent import (
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.agent.repository import AgentRepository
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
-from ai.backend.manager.repositories.scheduler.types.session import MarkTerminatingResult
 from ai.backend.manager.services.agent.actions.get_watcher_status import (
     GetWatcherStatusAction,
 )
@@ -58,6 +57,7 @@ from ai.backend.manager.services.agent.actions.watcher_agent_stop import (
 from ai.backend.manager.services.agent.service import AgentService
 from ai.backend.manager.services.agent.types import ConflictingSessionCleanupPolicy
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
+from ai.backend.manager.views.sokovan.session import MarkTerminatingResult
 
 
 @pytest.fixture

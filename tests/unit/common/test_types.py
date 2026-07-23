@@ -12,6 +12,7 @@ from ai.backend.common.exception import (
     InvalidResourceSlotQuantity,
     UnknownResourceSlotType,
 )
+from ai.backend.common.identifier.resource_slot import ResourceSlotName
 from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import (
     BinarySize,
@@ -591,7 +592,11 @@ class TestResourceSlotEntryToResourceSlot:
         """Plain decimals and human-readable sizes such as ``"4g"`` for a memory
         slot are parsed with BinarySize tolerance, matching the legacy enqueue
         path, instead of raising and surfacing as a 500."""
-        entries = [ResourceSlotEntry(resource_type=case.resource_type, quantity=case.quantity)]
+        entries = [
+            ResourceSlotEntry(
+                resource_type=ResourceSlotName(case.resource_type), quantity=case.quantity
+            )
+        ]
         assert ResourceSlotEntry.inputs_to_resource_slot(entries) == ResourceSlot({
             case.resource_type: case.expected
         })
@@ -609,14 +614,16 @@ class TestResourceSlotEntryToResourceSlot:
         """A non-parseable or negative quantity is rejected with a 4xx
         ``InvalidResourceSlotQuantity`` (BackendAIError) rather than letting
         ``decimal.InvalidOperation`` propagate as an unhandled 500."""
-        entries = [ResourceSlotEntry(resource_type=resource_type, quantity=quantity)]
+        entries = [
+            ResourceSlotEntry(resource_type=ResourceSlotName(resource_type), quantity=quantity)
+        ]
         with pytest.raises(InvalidResourceSlotQuantity):
             ResourceSlotEntry.inputs_to_resource_slot(entries)
 
     def test_multiple_entries_are_merged(self) -> None:
         entries = [
-            ResourceSlotEntry(resource_type="cpu", quantity="2"),
-            ResourceSlotEntry(resource_type="mem", quantity="4g"),
+            ResourceSlotEntry(resource_type=ResourceSlotName("cpu"), quantity="2"),
+            ResourceSlotEntry(resource_type=ResourceSlotName("mem"), quantity="4g"),
         ]
         assert ResourceSlotEntry.inputs_to_resource_slot(entries) == ResourceSlot({
             "cpu": Decimal("2"),

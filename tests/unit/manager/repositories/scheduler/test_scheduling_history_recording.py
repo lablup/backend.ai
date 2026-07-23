@@ -664,7 +664,9 @@ class TestMarkTerminatingSchedulingHistory:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> SchedulerRepository:
-        return SchedulerRepository(db_with_cleanup, MagicMock(), MagicMock())
+        return SchedulerRepository(
+            db_with_cleanup, MagicMock(), MagicMock(), MagicMock(), MagicMock()
+        )
 
     @pytest.fixture
     async def running_session_id(

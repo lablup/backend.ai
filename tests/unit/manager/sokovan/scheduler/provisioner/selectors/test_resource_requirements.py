@@ -1,253 +1,139 @@
-"""Test resource requirements and aggregation logic."""
+"""Tests for PlacementPlan grouping of per-kernel requirements."""
 
-import uuid
+from __future__ import annotations
+
+from collections.abc import Mapping
 from decimal import Decimal
+from uuid import uuid4
 
 import pytest
 
-from ai.backend.common.identifier.resource_group import ResourceGroupID
-from ai.backend.common.types import ClusterMode, ResourceSlot, SessionId, SessionTypes
-from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import (
-    AgentSelectionCriteria,
-    KernelResourceSpec,
-    SessionMetadata,
+from ai.backend.common.identifier.architecture import ArchName
+from ai.backend.common.identifier.resource_slot import ResourceSlotName
+from ai.backend.common.types import ClusterMode, KernelId
+from ai.backend.manager.data.session.options import AgentSelectionPolicy
+from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import PlacementPlan
+from ai.backend.manager.sokovan.scheduler.provisioner.selectors.types import ResourceRequirements
+from ai.backend.manager.views.sokovan.workload import (
+    KernelWorkload,
+    ResourceRequest,
+    SessionPlacement,
 )
 
 
-class TestResourceRequirements:
-    """Test ResourceRequirements functionality."""
+def _slots(slots: Mapping[str, str]) -> dict[ResourceSlotName, Decimal]:
+    return {ResourceSlotName(name): Decimal(amount) for name, amount in slots.items()}
+
+
+def _item(slots: Mapping[str, str], arch: str = "x86_64") -> ResourceRequirements:
+    return ResourceRequirements(
+        requested_slots=ResourceRequest(slots=_slots(slots)),
+        required_architecture=ArchName(arch),
+        container_count=1,
+    )
+
+
+class TestPlacementPlanFromItems:
+    """Grouping semantics of PlacementPlan.from_items."""
 
     def test_single_node_aggregation(self) -> None:
-        """Test that single-node sessions aggregate resource requirements."""
-        # Create session metadata for single-node
-        session_metadata = SessionMetadata(
-            session_id=SessionId(uuid.uuid4()),
-            session_type=SessionTypes.INTERACTIVE,
-            resource_group_id=ResourceGroupID(uuid.UUID(int=0)),
-            cluster_mode=ClusterMode.SINGLE_NODE,
+        """Single-node sessions merge every item into one requirement."""
+        plan = PlacementPlan.from_items(
+            [
+                _item({"cpu": "4", "mem": "8192"}),
+                _item({"cpu": "2", "mem": "4096"}),
+            ],
+            ClusterMode.SINGLE_NODE,
         )
 
-        # Create kernel requirements with same architecture
-        kernel_reqs = {
-            uuid.uuid4(): KernelResourceSpec(
-                requested_slots=ResourceSlot({
-                    "cpu": Decimal("2"),
-                    "mem": Decimal("4096"),
-                }),
-                required_architecture="x86_64",
-            ),
-            uuid.uuid4(): KernelResourceSpec(
-                requested_slots=ResourceSlot({
-                    "cpu": Decimal("1"),
-                    "mem": Decimal("2048"),
-                }),
-                required_architecture="x86_64",
-            ),
-            uuid.uuid4(): KernelResourceSpec(
-                requested_slots=ResourceSlot({
-                    "cpu": Decimal("3"),
-                    "mem": Decimal("8192"),
-                }),
-                required_architecture="x86_64",
-            ),
-        }
-
-        criteria = AgentSelectionCriteria(
-            session_metadata=session_metadata,
-            kernel_requirements=kernel_reqs,
-        )
-
-        # Get aggregated requirements
-        resource_reqs = criteria.get_resource_requirements()
-
-        # Should return single aggregated requirement
-        assert len(resource_reqs) == 1
-
-        # Check aggregated values
-        agg_req = resource_reqs[0]
-        # For single-node, kernel_ids should include all kernels
-        assert len(agg_req.kernel_ids) == 3
-        assert agg_req.requested_slots["cpu"] == Decimal("6")  # 2+1+3
-        assert agg_req.requested_slots["mem"] == Decimal("14336")  # 4096+2048+8192
-        assert agg_req.required_architecture == "x86_64"
+        assert len(plan.groups) == 1
+        group = plan.groups[0]
+        assert group.indices == [0, 1]
+        assert group.requirement.requested_slots.slots == _slots({
+            "cpu": "6",
+            "mem": "12288",
+        })
+        assert group.requirement.required_architecture == ArchName("x86_64")
+        assert group.requirement.container_count == 2
 
     def test_single_node_mixed_architecture_error(self) -> None:
-        """Test that single-node sessions with mixed architectures raise error."""
-        session_metadata = SessionMetadata(
-            session_id=SessionId(uuid.uuid4()),
-            session_type=SessionTypes.BATCH,
-            resource_group_id=ResourceGroupID(uuid.UUID(int=0)),
-            cluster_mode=ClusterMode.SINGLE_NODE,
-        )
-
-        # Create kernel requirements with different architectures
-        kernel_reqs = {
-            uuid.uuid4(): KernelResourceSpec(
-                requested_slots=ResourceSlot({
-                    "cpu": Decimal("2"),
-                    "mem": Decimal("4096"),
-                }),
-                required_architecture="x86_64",
-            ),
-            uuid.uuid4(): KernelResourceSpec(
-                requested_slots=ResourceSlot({
-                    "cpu": Decimal("1"),
-                    "mem": Decimal("2048"),
-                }),
-                required_architecture="aarch64",  # Different architecture
-            ),
-        }
-
-        criteria = AgentSelectionCriteria(
-            session_metadata=session_metadata,
-            kernel_requirements=kernel_reqs,
-        )
-
-        # Should raise ValueError
-        with pytest.raises(ValueError) as exc_info:
-            criteria.get_resource_requirements()
-
-        assert "different architectures" in str(exc_info.value)
+        """A single-node session mixing architectures is rejected."""
+        with pytest.raises(ValueError, match="different architectures"):
+            PlacementPlan.from_items(
+                [
+                    _item({"cpu": "1"}, arch="x86_64"),
+                    _item({"cpu": "1"}, arch="aarch64"),
+                ],
+                ClusterMode.SINGLE_NODE,
+            )
 
     def test_multi_node_individual_resources(self) -> None:
-        """Test that multi-node sessions return individual kernel resources."""
-        session_metadata = SessionMetadata(
-            session_id=SessionId(uuid.uuid4()),
-            session_type=SessionTypes.INTERACTIVE,
-            resource_group_id=ResourceGroupID(uuid.UUID(int=0)),
+        """Multi-node sessions keep one group per item."""
+        plan = PlacementPlan.from_items(
+            [
+                _item({"cpu": "1", "mem": "2048"}),
+                _item({"cpu": "3", "mem": "6144"}, arch="aarch64"),
+            ],
+            ClusterMode.MULTI_NODE,
+        )
+
+        assert len(plan.groups) == 2
+        assert plan.groups[0].indices == [0]
+        assert plan.groups[1].indices == [1]
+        assert plan.groups[0].requirement.requested_slots.slots == _slots({
+            "cpu": "1",
+            "mem": "2048",
+        })
+        assert plan.groups[1].requirement.required_architecture == ArchName("aarch64")
+        assert all(group.requirement.container_count == 1 for group in plan.groups)
+
+    def test_empty_items(self) -> None:
+        """No items produce an empty plan."""
+        plan = PlacementPlan.from_items([], ClusterMode.SINGLE_NODE)
+        assert plan.groups == []
+        assert plan.requirements() == []
+
+    def test_single_node_disjoint_slot_names(self) -> None:
+        """Aggregation sums per-slot even when the items' slot sets differ."""
+        plan = PlacementPlan.from_items(
+            [
+                _item({"cpu": "2", "cuda.shares": "1"}),
+                _item({"cpu": "1", "mem": "2048"}),
+            ],
+            ClusterMode.SINGLE_NODE,
+        )
+
+        assert plan.groups[0].requirement.requested_slots.slots == _slots({
+            "cpu": "3",
+            "cuda.shares": "1",
+            "mem": "2048",
+        })
+
+
+class TestPlacementPlanFromPlacement:
+    """Projection from a SessionPlacement (kernel workloads)."""
+
+    def test_indices_refer_to_kernel_positions(self) -> None:
+        kernels = [
+            KernelWorkload(
+                kernel_id=KernelId(uuid4()),
+                architecture=ArchName("x86_64"),
+                requested_slots=ResourceRequest(slots=_slots({"cpu": "1"})),
+            ),
+            KernelWorkload(
+                kernel_id=KernelId(uuid4()),
+                architecture=ArchName("x86_64"),
+                requested_slots=ResourceRequest(slots=_slots({"cpu": "2"})),
+            ),
+        ]
+        placement = SessionPlacement(
             cluster_mode=ClusterMode.MULTI_NODE,
+            kernels=kernels,
+            agent_selection_policy=AgentSelectionPolicy.STRICT,
+            designated_agent_ids=None,
         )
 
-        # Create kernel requirements
-        kernel_ids = [uuid.uuid4() for _ in range(3)]
-        kernel_reqs = {
-            kernel_ids[0]: KernelResourceSpec(
-                requested_slots=ResourceSlot({
-                    "cpu": Decimal("2"),
-                    "mem": Decimal("4096"),
-                }),
-                required_architecture="x86_64",
-            ),
-            kernel_ids[1]: KernelResourceSpec(
-                requested_slots=ResourceSlot({
-                    "cpu": Decimal("1"),
-                    "mem": Decimal("2048"),
-                }),
-                required_architecture="x86_64",
-            ),
-            kernel_ids[2]: KernelResourceSpec(
-                requested_slots=ResourceSlot({
-                    "cpu": Decimal("3"),
-                    "mem": Decimal("8192"),
-                }),
-                required_architecture="aarch64",  # Different architecture is OK for multi-node
-            ),
-        }
+        plan = PlacementPlan.from_placement(placement)
 
-        criteria = AgentSelectionCriteria(
-            session_metadata=session_metadata,
-            kernel_requirements=kernel_reqs,
-        )
-
-        # Get resource requirements
-        resource_reqs = criteria.get_resource_requirements()
-
-        # Should return individual requirements
-        assert len(resource_reqs) == 3
-
-        # Verify each requirement matches original
-        for req in resource_reqs:
-            # Each multi-node requirement should have exactly one kernel ID
-            assert len(req.kernel_ids) == 1
-            kernel_id = req.kernel_ids[0]
-            # Find matching kernel requirement
-            original_req = kernel_reqs[kernel_id]
-            assert req.requested_slots == original_req.requested_slots
-            assert req.required_architecture == original_req.required_architecture
-
-    def test_empty_kernel_requirements(self) -> None:
-        """Test handling of empty kernel requirements."""
-        session_metadata = SessionMetadata(
-            session_id=SessionId(uuid.uuid4()),
-            session_type=SessionTypes.INFERENCE,
-            resource_group_id=ResourceGroupID(uuid.UUID(int=0)),
-            cluster_mode=ClusterMode.SINGLE_NODE,
-        )
-
-        criteria = AgentSelectionCriteria(
-            session_metadata=session_metadata,
-            kernel_requirements={},  # Empty
-        )
-
-        # Should return empty list for empty kernel requirements
-        resource_reqs = criteria.get_resource_requirements()
-        assert resource_reqs == []
-
-    def test_single_node_gpu_aggregation(self) -> None:
-        """Test GPU resource aggregation for single-node sessions."""
-        session_metadata = SessionMetadata(
-            session_id=SessionId(uuid.uuid4()),
-            session_type=SessionTypes.BATCH,
-            resource_group_id=ResourceGroupID(uuid.UUID(int=0)),
-            cluster_mode=ClusterMode.SINGLE_NODE,
-        )
-
-        # Create kernel requirements with GPU resources
-        kernel_reqs = {
-            uuid.uuid4(): KernelResourceSpec(
-                requested_slots=ResourceSlot({
-                    "cpu": Decimal("4"),
-                    "mem": Decimal("16384"),
-                    "cuda.shares": Decimal("1"),
-                }),
-                required_architecture="x86_64",
-            ),
-            uuid.uuid4(): KernelResourceSpec(
-                requested_slots=ResourceSlot({
-                    "cpu": Decimal("2"),
-                    "mem": Decimal("8192"),
-                    "cuda.shares": Decimal("0.5"),
-                }),
-                required_architecture="x86_64",
-            ),
-        }
-
-        criteria = AgentSelectionCriteria(
-            session_metadata=session_metadata,
-            kernel_requirements=kernel_reqs,
-        )
-
-        # Get aggregated requirements
-        resource_reqs = criteria.get_resource_requirements()
-
-        # Check aggregated GPU resources
-        assert len(resource_reqs) == 1
-        agg_req = resource_reqs[0]
-        assert len(agg_req.kernel_ids) == 2
-        assert agg_req.requested_slots["cpu"] == Decimal("6")
-        assert agg_req.requested_slots["mem"] == Decimal("24576")
-        assert agg_req.requested_slots["cuda.shares"] == Decimal("1.5")
-
-    def test_resource_slot_addition(self) -> None:
-        """Test that ResourceSlot addition works correctly."""
-        slot1 = ResourceSlot({
-            "cpu": Decimal("2"),
-            "mem": Decimal("4096"),
-            "cuda.shares": Decimal("1"),
-        })
-
-        slot2 = ResourceSlot({
-            "cpu": Decimal("3"),
-            "mem": Decimal("8192"),
-            "cuda.shares": Decimal("2"),
-            "special": Decimal("5"),  # Additional resource type
-        })
-
-        # Add slots
-        result = slot1 + slot2
-
-        # Check result
-        assert result["cpu"] == Decimal("5")
-        assert result["mem"] == Decimal("12288")
-        assert result["cuda.shares"] == Decimal("3")
-        assert result["special"] == Decimal("5")  # New resource type included
+        assert [group.indices for group in plan.groups] == [[0], [1]]
+        assert plan.groups[1].requirement.requested_slots.slots == _slots({"cpu": "2"})
