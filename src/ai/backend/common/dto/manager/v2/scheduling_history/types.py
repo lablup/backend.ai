@@ -9,12 +9,11 @@ from enum import StrEnum
 from typing import Self
 from uuid import UUID
 
-from pydantic import Field, model_validator
+from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel, BaseResponseModel
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
-from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.replica_group import ReplicaGroupID
 
 __all__ = (
@@ -155,22 +154,6 @@ class RouteHistoryScopeDTO(BaseRequestModel):
 
 
 class ReplicaGroupHistoryScopeDTO(BaseRequestModel):
-    """Scope for replica-group scheduling history queries.
+    """Scope for replica-group scheduling history queries."""
 
-    Both axes are optional but at least one is required: a deployment scope
-    covers every replica group under it, a replica-group scope narrows to one
-    group, and giving both intersects them.
-    """
-
-    deployment_id: DeploymentID | None = Field(
-        default=None, description="Deployment ID whose replica-group history to get."
-    )
-    replica_group_id: ReplicaGroupID | None = Field(
-        default=None, description="Replica group ID to get history for."
-    )
-
-    @model_validator(mode="after")
-    def _require_one_axis(self) -> ReplicaGroupHistoryScopeDTO:
-        if self.deployment_id is None and self.replica_group_id is None:
-            raise ValueError("Either deployment_id or replica_group_id must be given.")
-        return self
+    replica_group_id: ReplicaGroupID = Field(description="Replica group ID to get history for.")

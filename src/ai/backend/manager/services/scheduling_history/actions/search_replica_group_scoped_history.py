@@ -15,18 +15,18 @@ from ai.backend.manager.repositories.base import BatchQuerier
 
 @dataclass
 class SearchReplicaGroupScopedHistoryAction(BaseScopeAction):
-    """Action to search replica-group scheduling history under one deployment.
+    """Action to search the scheduling history of one replica group.
 
     The owning deployment is the authorization subject, scope, and target:
     replica groups hold no permission records of their own, so whoever may read
-    the deployment may read its replica groups' scheduling history. A
-    replica-group-only request resolves its deployment first
-    (``ResolveReplicaGroupDeploymentAction``); ``replica_group_id`` then only
-    narrows the repository query.
+    the deployment may read its replica groups' scheduling history. The caller
+    resolves ``replica_group_id -> deployment_id`` first
+    (``ResolveReplicaGroupDeploymentAction``) and passes both in;
+    ``replica_group_id`` bounds the repository query.
     """
 
+    replica_group_id: ReplicaGroupID
     deployment_id: DeploymentID
-    replica_group_id: ReplicaGroupID | None
     querier: BatchQuerier
 
     @override
@@ -57,14 +57,14 @@ class SearchReplicaGroupScopedHistoryAction(BaseScopeAction):
 
 @dataclass
 class SearchReplicaGroupScopedHistoryActionResult(BaseScopeActionResult):
-    """Result of searching replica-group scheduling history within scope."""
+    """Result of searching the scheduling history of one replica group."""
 
     items: list[ReplicaGroupHistoryData]
     total_count: int
     has_next_page: bool
     has_previous_page: bool
+    replica_group_id: ReplicaGroupID
     deployment_id: DeploymentID
-    replica_group_id: ReplicaGroupID | None
 
     @override
     def scope_type(self) -> ScopeType:
