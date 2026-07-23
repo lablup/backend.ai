@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.orm import selectinload
 
 from ai.backend.common.exception import AgentNotFound
@@ -209,6 +210,7 @@ class AgentDBSource:
         set, raises without changing anything. Otherwise updates the agent's group
         (name + id columns) and returns those kernels so the caller can transition
         their sessions. The check and the update run in one transaction.
+        Raises AgentNotFound when no agent row matches ``agent_id``.
         """
         active_statuses = (
             KernelStatus.resource_occupied_statuses() | KernelStatus.resource_requested_statuses()
@@ -231,7 +233,7 @@ class AgentDBSource:
                 distinct_sessions = len({kernel.session.session_id for kernel in kernels})
                 raise AgentHasConflictingSessions(agent_id, distinct_sessions)
 
-            await session.execute(
+            result = await session.execute(
                 sa.update(agents)
                 .where(agents.c.id == agent_id)
                 .values(
@@ -241,6 +243,8 @@ class AgentDBSource:
                     .scalar_subquery(),
                 )
             )
+            if cast(CursorResult[Any], result).rowcount == 0:
+                raise AgentNotFound(f"Agent with id {agent_id} not found")
         return kernels
 
     async def search_agents(

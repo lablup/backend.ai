@@ -172,7 +172,8 @@ class AgentRepository:
         """Change the agent's resource group, returning the kernels still on it.
 
         Raises AgentHasConflictingSessions if the agent has active kernels and
-        ``force`` is not set; otherwise updates the group and returns those kernels.
+        ``force`` is not set, and AgentNotFound if the agent does not exist;
+        otherwise updates the group and returns those kernels.
         """
         return await self._db_source.update_resource_group(agent_id, resource_group_id, force=force)
 

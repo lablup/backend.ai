@@ -1590,3 +1590,13 @@ class TestAgentDBSourceKernelFiltering:
         result = await db_source.update_resource_group(agent_id, target_id, force=True)
         assert [kernel.session.session_id for kernel in result] == [str(session_id)]
         assert await self._agent_group(db_with_tables, agent_id) == (target_name, target_id)
+
+    async def test_update_resource_group_nonexistent_agent_raises(
+        self,
+        db_source: AgentDBSource,
+        db_with_tables: ExtendedAsyncSAEngine,
+    ) -> None:
+        _, target_id = await self._seed_target_group(db_with_tables)
+
+        with pytest.raises(AgentNotFound):
+            await db_source.update_resource_group(AgentId(str(uuid4())), target_id, force=False)
