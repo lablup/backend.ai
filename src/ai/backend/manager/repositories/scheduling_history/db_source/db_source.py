@@ -243,10 +243,7 @@ class SchedulingHistoryDBSource:
     async def resolve_replica_group_deployment(
         self, replica_group_id: ReplicaGroupID
     ) -> DeploymentID:
-        """Return the id of the deployment owning ``replica_group_id``.
-
-        Raises ``ReplicaGroupNotFound`` when no such replica group exists.
-        """
+        """Return the id of the deployment owning ``replica_group_id``."""
         async with self._db.begin_readonly_session() as db_sess:
             deployment_id = await db_sess.scalar(
                 sa.select(ReplicaGroupRow.deployment_id).where(

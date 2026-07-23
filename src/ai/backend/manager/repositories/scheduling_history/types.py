@@ -182,9 +182,7 @@ class DeploymentHistorySearchScope(SearchScope):
 class ReplicaGroupHistorySearchScope(SearchScope):
     """Scope for replica-group history search.
 
-    Used for entity-scoped queries where replica_group_id is the scope
-    parameter. The owning deployment authorizes the query, but it does not
-    bound it — the caller resolves it separately.
+    Used for entity-scoped queries where replica_group_id is the scope parameter.
     """
 
     replica_group_id: ReplicaGroupID
