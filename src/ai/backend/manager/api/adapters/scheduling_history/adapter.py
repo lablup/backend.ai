@@ -93,6 +93,9 @@ from ai.backend.manager.services.scheduling_history.actions.search_kernel_histor
     SearchKernelHistoryAction,
 )
 from ai.backend.manager.services.scheduling_history.actions.search_kernel_scoped_history import (
+    KernelSchedulingHistoryByKernelTarget,
+    KernelSchedulingHistoryBySessionTarget,
+    KernelSchedulingHistoryTarget,
     SearchKernelScopedHistoryAction,
 )
 from ai.backend.manager.services.scheduling_history.actions.search_route_history import (
@@ -451,16 +454,16 @@ class SchedulingHistoryAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        # The session is the authorization subject in both cases; a kernel-scoped
-        # request resolves its owning session before dispatching so the RBAC check
-        # targets the session directly.
+        # The session is the authorization subject of every scope item; a
+        # kernel-scoped request resolves its owning session before dispatching so
+        # the RBAC check targets the session directly.
         kernel_items = input.scope.kernel or []
         session_items = input.scope.session or []
         if len(kernel_items) + len(session_items) != 1:
             raise InvalidAPIParameters(
                 "Kernel scheduling history scope accepts exactly one scope item"
             )
-        kernel_id: KernelId | None
+        target: KernelSchedulingHistoryTarget
         if kernel_items:
             kernel_id = KernelId(kernel_items[0].value)
             resolve_result = (
@@ -468,16 +471,15 @@ class SchedulingHistoryAdapter(BaseAdapter):
                     ResolveKernelSessionAction(kernel_id=kernel_id)
                 )
             )
-            session_id = resolve_result.session_id
-        else:
-            kernel_id = None
-            session_id = SessionId(session_items[0].value)
-        action_result = await self._processors.scheduling_history.search_kernel_scoped_history.wait_for_complete(
-            SearchKernelScopedHistoryAction(
-                kernel_id=kernel_id,
-                session_id=session_id,
-                querier=querier,
+            target = KernelSchedulingHistoryByKernelTarget(
+                session_id=resolve_result.session_id, kernel_id=kernel_id
             )
+        else:
+            target = KernelSchedulingHistoryBySessionTarget(
+                session_id=SessionId(session_items[0].value)
+            )
+        action_result = await self._processors.scheduling_history.search_kernel_scoped_history.wait_for_complete(
+            SearchKernelScopedHistoryAction(target=target, querier=querier)
         )
         return SearchKernelHistoriesPayload(
             items=[self._kernel_data_to_dto(h) for h in action_result.items],

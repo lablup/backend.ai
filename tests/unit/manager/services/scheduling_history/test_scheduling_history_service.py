@@ -60,6 +60,9 @@ from ai.backend.manager.services.scheduling_history.actions.search_kernel_histor
     SearchKernelHistoryAction,
 )
 from ai.backend.manager.services.scheduling_history.actions.search_kernel_scoped_history import (
+    KernelSchedulingHistoryByKernelTarget,
+    KernelSchedulingHistoryBySessionTarget,
+    KernelSchedulingHistoryTarget,
     SearchKernelScopedHistoryAction,
 )
 from ai.backend.manager.services.scheduling_history.actions.search_route_history import (
@@ -387,7 +390,7 @@ class TestResolveKernelSessionAction:
 @dataclass(frozen=True)
 class _KernelScopedHistoryCase:
     label: str
-    kernel_id: KernelId | None
+    target: KernelSchedulingHistoryTarget
     expected_scope: SearchScope
 
 
@@ -397,18 +400,20 @@ class TestSearchKernelScopedHistoryAction:
         [
             _KernelScopedHistoryCase(
                 label="bound-to-kernel",
-                kernel_id=_KERNEL_ID,
+                target=KernelSchedulingHistoryByKernelTarget(
+                    session_id=_SESSION_ID, kernel_id=_KERNEL_ID
+                ),
                 expected_scope=KernelSchedulingHistorySearchScope(kernel_id=_KERNEL_ID),
             ),
             _KernelScopedHistoryCase(
                 label="bound-to-session",
-                kernel_id=None,
+                target=KernelSchedulingHistoryBySessionTarget(session_id=_SESSION_ID),
                 expected_scope=KernelSchedulingHistoryBySessionSearchScope(session_id=_SESSION_ID),
             ),
         ],
         ids=lambda case: case.label,
     )
-    async def test_scopes_to_the_owning_session_and_narrows_by_the_query_bound(
+    async def test_scopes_to_the_owning_session_and_narrows_by_the_target(
         self,
         case: _KernelScopedHistoryCase,
         service: SchedulingHistoryService,
@@ -425,15 +430,13 @@ class TestSearchKernelScopedHistoryAction:
             )
         )
 
-        action = SearchKernelScopedHistoryAction(
-            kernel_id=case.kernel_id, session_id=_SESSION_ID, querier=querier
-        )
+        action = SearchKernelScopedHistoryAction(target=case.target, querier=querier)
         result = await service.search_kernel_scoped_history(action)
 
         assert result.items == [history_item]
         # Authorized via session read: kernel permission records are intentionally
         # empty, so the session is the subject, scope, and target of the RBAC check
-        # in both cases; kernel_id only bounds the repository query.
+        # for every target variant; the target only narrows the repository query.
         assert action.target_element() == RBACElementRef(
             element_type=RBACElementType.SESSION, element_id=str(_SESSION_ID)
         )
