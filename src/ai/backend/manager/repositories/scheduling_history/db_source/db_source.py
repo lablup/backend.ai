@@ -7,9 +7,12 @@ from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
 
+from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.replica_group import ReplicaGroupID
 from ai.backend.common.types import KernelId, SessionId
 from ai.backend.manager.data.deployment.types import (
     DeploymentHistoryListResult,
+    ReplicaGroupHistoryListResult,
     RouteHistoryListResult,
 )
 from ai.backend.manager.data.kernel.types import (
@@ -18,8 +21,11 @@ from ai.backend.manager.data.kernel.types import (
 from ai.backend.manager.data.session.types import (
     SessionSchedulingHistoryListResult,
 )
+from ai.backend.manager.errors.deployment import ReplicaGroupNotFound
 from ai.backend.manager.errors.kernel import KernelNotFound
 from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
+from ai.backend.manager.models.replica_group_history.row import ReplicaGroupHistoryRow
 from ai.backend.manager.models.scheduling_history import (
     DeploymentHistoryRow,
     KernelSchedulingHistoryRow,
@@ -33,6 +39,7 @@ from ai.backend.manager.repositories.base import (
 )
 from ai.backend.manager.repositories.scheduling_history.types import (
     DeploymentHistorySearchScope,
+    ReplicaGroupHistorySearchScope,
     RouteHistorySearchScope,
     SessionSchedulingHistorySearchScope,
 )
@@ -200,6 +207,70 @@ class SchedulingHistoryDBSource:
             items = [row.DeploymentHistoryRow.to_data() for row in result.rows]
 
             return DeploymentHistoryListResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    # ========== Replica Group History (Admin) ==========
+
+    async def admin_search_replica_group_history(
+        self,
+        querier: BatchQuerier,
+    ) -> ReplicaGroupHistoryListResult:
+        """Search replica-group history with pagination (admin API)."""
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(ReplicaGroupHistoryRow)
+
+            result = await execute_batch_querier(
+                db_sess,
+                query,
+                querier,
+            )
+
+            items = [row.ReplicaGroupHistoryRow.to_data() for row in result.rows]
+
+            return ReplicaGroupHistoryListResult(
+                items=items,
+                total_count=result.total_count,
+                has_next_page=result.has_next_page,
+                has_previous_page=result.has_previous_page,
+            )
+
+    # ========== Replica Group History (Scoped) ==========
+
+    async def resolve_replica_group_deployment(
+        self, replica_group_id: ReplicaGroupID
+    ) -> DeploymentID:
+        """Return the id of the deployment owning ``replica_group_id``.
+
+        Raises ``ReplicaGroupNotFound`` when no such replica group exists.
+        """
+        async with self._db.begin_readonly_session() as db_sess:
+            deployment_id = await db_sess.scalar(
+                sa.select(ReplicaGroupRow.deployment_id).where(
+                    ReplicaGroupRow.id == replica_group_id
+                )
+            )
+            if deployment_id is None:
+                raise ReplicaGroupNotFound(str(replica_group_id))
+            return DeploymentID(deployment_id)
+
+    async def search_replica_group_scoped_history(
+        self,
+        querier: BatchQuerier,
+        scope: ReplicaGroupHistorySearchScope,
+    ) -> ReplicaGroupHistoryListResult:
+        """Search replica-group history within scope."""
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(ReplicaGroupHistoryRow)
+
+            result = await execute_batch_querier(db_sess, query, querier, scopes=[scope])
+
+            items = [row.ReplicaGroupHistoryRow.to_data() for row in result.rows]
+
+            return ReplicaGroupHistoryListResult(
                 items=items,
                 total_count=result.total_count,
                 has_next_page=result.has_next_page,
