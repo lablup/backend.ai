@@ -12,15 +12,14 @@ Each client class inherits from `BaseDomainClient` and uses `self._client.typed_
 ## Naming conventions
 
 - admin methods: `admin_search()`, `admin_create()`, `admin_update()`, `admin_delete()`, `admin_purge()`
-- scoped search methods: currently `{scope}_search()` — e.g. `project_search(project_id, request)`, `domain_search(domain_name, request)`.
-  **Forward direction (under consideration):** unify to `scoped_search(request)` following the server `scopedFoosV2` convention, and take the scope
-  as a field of the request DTO. (The URL pattern and CLI surface must be decided together.)
+- scoped search methods: `scoped_search(request)`, taking the scope as a field of the request DTO.
+  **Legacy:** `{scope}_search()` — e.g. `project_search(project_id, request)` — do not add new ones.
 - self-service methods: `my_search()`, `my_issue()` — mapped to `/v2/{entity}/my/{operation}`
 - user-facing methods: `get()`, `enqueue()`
 
 **scoped search URL pattern:**
-- The SDK method calls `POST /v2/{entity}/{scope_type}/{scope_id}/search`.
-- e.g. `f"{_PATH}/projects/{project_id}/search"` (not `f"{_PATH}/search-by-project/{id}"`)
+- The SDK method calls `POST /v2/{entity}/scoped/search`, e.g. `f"{_PATH}/scoped/search"`.
+- **Legacy:** `POST /v2/{entity}/{scope_type}/{scope_id}/search` — do not add new ones.
 - Do NOT use the `search-by-{scope}` URL pattern.
 
 ## typed_request pattern

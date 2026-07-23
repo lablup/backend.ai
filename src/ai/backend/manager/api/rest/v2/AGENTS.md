@@ -20,7 +20,6 @@ REST v2 Handler → Adapter (api/adapters/) → Processor → Service → Reposi
 - Each handler is injected with an **individual adapter** (not the Adapters registry): call `self._adapter.method()` —
   no `self._adapters.domain.method()`.
 - The Adapter is shared with the GQL layer — do not create a REST-only adapter.
-- `admin_`-prefixed adapter methods → `superadmin_required` middleware, non-admin → `auth_required`.
 
 ## DTO
 
@@ -30,25 +29,33 @@ REST v2 Handler → Adapter (api/adapters/) → Processor → Service → Reposi
 
 ## Naming & scope
 
-- superadmin only: `admin_` prefix + `superadmin_required` middleware.
-- scoped: currently a `{scope}_` prefix. **Forward direction (under consideration):** unify to `scoped_` and receive the scope as a request field (see below).
-- self-service: `/v2/{entity}/my/` — the entity comes first, `my` is the scope qualifier.
+Method names carry the audience as a prefix: `admin_`, `scoped_`, `my_`.
+**Legacy:** scoped endpoints named after the scope (`project_search`) — do not add new ones.
 
-**search — always two variants:**
-- `POST /v2/{entity}/search`: superadmin only, no scope — system-wide query.
-- scoped search (non-admin): scope required — query within that scope.
-- There is no "unscoped system-wide query" for non-admins.
+**URL grammar:** `/v2/{entity}/{audience}/{operation}`
 
-**scoped search URL** (under consideration):
-- Current: `POST /v2/{entity}/{scope_type}/{scope_id}/search` — express the scope as a nested resource path (not `search-by-{scope}`).
-  Example: `/v2/sessions/projects/{project_id}/search`. (More examples: `CONTEXTS.md`)
-- **Forward direction:** fixed path `/v2/{entity}/scoped/search` + scope as a request body field (not a path param).
+| Segment | Rule |
+|---|---|
+| `{entity}` | The resource. For a sub-app covering several entities, the `{domain}/{entity}` pair — `/v2/scheduling-history/kernels/…`. `{entity}` below means the whole pair. |
+| `{audience}` | Exactly one of `admin` / `scoped` / `my`, matching the method prefix. Never omitted. |
+
+**the three audiences:**
+
+| Audience | Who | Scope | Middleware |
+|---|---|---|---|
+| `admin` | superadmin only | none — system-wide | `superadmin_required` |
+| `scoped` | non-admin | required | `auth_required` |
+| `my` | the caller | the adapter resolves the user via `current_user()` | `auth_required` |
+
+- search always has both `admin` and `scoped` variants — there is no "unscoped system-wide query" for non-admins.
+- e.g. `POST /v2/{entity}/admin/search`, `POST /v2/{entity}/scoped/search`, `POST /v2/keypairs/my/issue`.
+
+**how the scope reaches a `scoped` endpoint:**
+- The scope is a **request body field**, so the path stays the fixed `/v2/{entity}/scoped/search`.
   Consistent with SDK `scoped_search` and GQL `scopedFoosV2`.
-- All scoped search routes use the `auth_required` middleware.
-
-**self-service (`my`):**
-- `POST /v2/{entity}/my/{operation}` (e.g. `/v2/keypairs/my/search`). The adapter resolves the user via `current_user()`.
-  `auth_required` middleware.
+- **Legacy:** a nested resource path, `POST /v2/{entity}/{scope_type}/{scope_id}/search`
+  (e.g. `/v2/sessions/projects/{project_id}/search`). Most existing routes still look like this —
+  do not add new ones. (Examples: `CONTEXTS.md`)
 
 **create / update / get / delete / purge — criteria for splitting out `admin_`:**
 - admin-only entities: a single `admin_`.
