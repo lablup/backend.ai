@@ -208,7 +208,7 @@ class AppConfigFragmentAdapter(BaseAdapter):
             has_previous_page=action_result.has_previous_page,
         )
 
-    # --- scoped fragment search (principal-visibility) ---
+    # --- scoped fragment search (one scope, RBAC-authorized) ---
 
     async def scoped_search(
         self, input: ScopedSearchAppConfigFragmentInput

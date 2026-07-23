@@ -98,6 +98,6 @@ class V2AppConfigFragmentHandler:
         self,
         body: BodyParam[ScopedSearchAppConfigFragmentInput],
     ) -> APIResponse:
-        """Search the fragments visible to the calling principal (auth required)."""
+        """Search the fragments written at one scope (auth required, RBAC-authorized)."""
         result = await self._adapter.scoped_search(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)

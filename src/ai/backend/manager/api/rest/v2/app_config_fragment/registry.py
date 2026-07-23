@@ -19,17 +19,18 @@ def register_v2_app_config_fragment_routes(
 ) -> RouteRegistry:
     """Register all REST v2 app config fragment routes.
 
-    Writes and single-fragment reads are open to any authenticated user and gated by RBAC
-    at the processor (a user acts on their own user-scope, a domain admin on their domain's,
-    a superadmin on any; public is superadmin-only). Only the system-wide ``/admin/search``
-    is superadmin-only — non-admins list their visible fragments via ``/scoped/search``.
+    Every route but ``/admin/search`` is open to any authenticated user and gated by RBAC at
+    the processor (a user acts on their own user-scope, a domain admin on their domain's, a
+    superadmin on any; public is superadmin-only). ``/scoped/search`` is no exception: it
+    runs the same scope validator as a write at that scope. Only the system-wide
+    ``/admin/search`` skips RBAC, being superadmin-only at the middleware.
 
     Layout:
         POST   /                  create a fragment              (auth, RBAC)
         POST   /bulk-update       update many by id              (auth, RBAC)
         POST   /bulk-delete       purge many by id               (auth, RBAC)
         POST   /admin/search      system-wide paginated search   (superadmin)
-        POST   /scoped/search     principal-visible search       (auth)
+        POST   /scoped/search     search one scope's fragments   (auth, RBAC)
         GET    /{fragment_id}     get by id                      (auth, RBAC)
         PATCH  /{fragment_id}     update config by id            (auth, RBAC)
         DELETE /{fragment_id}     purge by id                    (auth, RBAC)

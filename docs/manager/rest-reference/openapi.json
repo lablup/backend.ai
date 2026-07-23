@@ -40294,7 +40294,7 @@
           }
         },
         "parameters": [],
-        "description": "Search the fragments visible to the calling principal (auth required).\n\n**Preconditions:**\n* User privilege required.\n"
+        "description": "Search the fragments written at one scope (auth required, RBAC-authorized).\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/app-config-fragments/{fragment_id}": {
