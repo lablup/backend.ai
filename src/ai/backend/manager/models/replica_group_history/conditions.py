@@ -40,6 +40,13 @@ class ReplicaGroupHistoryConditions:
         return inner
 
     @staticmethod
+    def by_replica_group_id(replica_group_id: ReplicaGroupID) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ReplicaGroupHistoryRow.replica_group_id == replica_group_id
+
+        return inner
+
+    @staticmethod
     def by_replica_group_ids(group_ids: Collection[ReplicaGroupID]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return ReplicaGroupHistoryRow.replica_group_id.in_(group_ids)
@@ -99,16 +106,6 @@ class ReplicaGroupHistoryConditions:
     def by_to_statuses(statuses: list[str]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return ReplicaGroupHistoryRow.to_status.in_(statuses)
-
-        return inner
-
-    # Equality condition for the scope's replica_group_id
-    @staticmethod
-    def by_replica_group_id_filter(spec: UUIDEqualMatchSpec) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            if spec.negated:
-                return ReplicaGroupHistoryRow.replica_group_id != spec.value
-            return ReplicaGroupHistoryRow.replica_group_id == spec.value
 
         return inner
 
