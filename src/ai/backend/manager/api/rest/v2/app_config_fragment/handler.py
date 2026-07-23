@@ -8,9 +8,11 @@ from typing import TYPE_CHECKING, Final
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
 from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
+    AdminSearchAppConfigFragmentInput,
     BulkPurgeAppConfigFragmentInput,
     BulkUpdateAppConfigFragmentInput,
     CreateAppConfigFragmentInput,
+    ScopedSearchAppConfigFragmentInput,
     UpdateAppConfigFragmentInput,
 )
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
@@ -82,4 +84,20 @@ class V2AppConfigFragmentHandler:
     ) -> APIResponse:
         """Purge many fragments by id, with per-item partial success (auth, RBAC)."""
         result = await self._adapter.bulk_purge(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def admin_search(
+        self,
+        body: BodyParam[AdminSearchAppConfigFragmentInput],
+    ) -> APIResponse:
+        """Search fragments across all scopes with pagination (superadmin only)."""
+        result = await self._adapter.admin_search(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def scoped_search(
+        self,
+        body: BodyParam[ScopedSearchAppConfigFragmentInput],
+    ) -> APIResponse:
+        """Search the fragments written at one scope (auth required, RBAC-authorized)."""
+        result = await self._adapter.scoped_search(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
