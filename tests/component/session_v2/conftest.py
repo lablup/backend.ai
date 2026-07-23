@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import secrets
+from decimal import Decimal
 import uuid
 from collections.abc import AsyncIterator, Callable, Coroutine
 from dataclasses import dataclass
@@ -52,6 +53,7 @@ from ai.backend.manager.data.image.types import ImageStatus, ImageType
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
+from ai.backend.manager.models.resource_slot.row import AgentResourceRow
 from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.image.row import ImageRow
@@ -609,6 +611,21 @@ async def agent_factory(
                     compute_plugins={},
                 )
             )
+            # The scheduling read path sources capacity from the normalized
+            # agent_resources table (filled by heartbeat in production).
+            await conn.execute(
+                sa.insert(AgentResourceRow.__table__),
+                [
+                    {
+                        "agent_id": agent_id,
+                        "slot_name": slot_name,
+                        "capacity": Decimal(quantity),
+                        "reserved": Decimal(0),
+                        "used": Decimal(0),
+                    }
+                    for slot_name, quantity in available_slots.items()
+                ],
+            )
         created_ids.append(agent_id)
         return agent_id
 
@@ -616,6 +633,11 @@ async def agent_factory(
 
     if created_ids:
         async with db_engine.begin() as conn:
+            await conn.execute(
+                AgentResourceRow.__table__.delete().where(
+                    AgentResourceRow.__table__.c.agent_id.in_(created_ids)
+                )
+            )
             await conn.execute(
                 AgentRow.__table__.delete().where(AgentRow.__table__.c.id.in_(created_ids))
             )
