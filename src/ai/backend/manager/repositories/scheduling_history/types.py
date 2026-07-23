@@ -7,7 +7,6 @@ from typing import Any, override
 from uuid import UUID
 
 from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec
-from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.replica import ReplicaID
 from ai.backend.common.identifier.replica_group import ReplicaGroupID
 from ai.backend.common.types import KernelId, SessionId
@@ -16,7 +15,6 @@ from ai.backend.manager.errors.kernel import (
     KernelNotFound,
     SessionNotFound,
 )
-from ai.backend.manager.errors.repository import EmptySearchScopeError
 from ai.backend.manager.errors.service import RouteNotFound
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.endpoint import EndpointRow
@@ -34,7 +32,6 @@ from ai.backend.manager.models.scheduling_history.conditions import (
 )
 from ai.backend.manager.models.scopes import ExistenceCheck, SearchScope
 from ai.backend.manager.models.session import SessionRow
-from ai.backend.manager.repositories.base.utils import combine_conditions_and
 
 __all__ = (
     "SessionSchedulingHistorySearchScope",
@@ -185,64 +182,32 @@ class DeploymentHistorySearchScope(SearchScope):
 class ReplicaGroupHistorySearchScope(SearchScope):
     """Scope for replica-group history search.
 
-    Both axes are optional but at least one must be given: a deployment scope
-    returns every replica group's history under that deployment, a replica-group
-    scope narrows to one group, and giving both intersects them. An empty scope
-    would widen into a global scan, so it is rejected on construction.
+    Used for entity-scoped queries where replica_group_id is the scope
+    parameter. The owning deployment authorizes the query, but it does not
+    bound it — the caller resolves it separately.
     """
 
-    deployment_id: DeploymentID | None = None
-    """The deployment whose replica-group history to search."""
-
-    replica_group_id: ReplicaGroupID | None = None
-    """The replica group to search history for."""
-
-    def __post_init__(self) -> None:
-        if self.deployment_id is None and self.replica_group_id is None:
-            raise EmptySearchScopeError(
-                "A replica-group history scope needs a deployment_id or a replica_group_id."
-            )
+    replica_group_id: ReplicaGroupID
+    """Required. The replica group to search history for."""
 
     @override
     def to_condition(self) -> QueryCondition:
         """Convert scope to a query condition for ReplicaGroupHistoryRow."""
-        conditions: list[QueryCondition] = []
-        if self.deployment_id is not None:
-            conditions.append(
-                ReplicaGroupHistoryConditions.by_deployment_id_filter(
-                    UUIDEqualMatchSpec(value=self.deployment_id, negated=False)
-                )
-            )
-        if self.replica_group_id is not None:
-            conditions.append(
-                ReplicaGroupHistoryConditions.by_replica_group_id_filter(
-                    UUIDEqualMatchSpec(value=self.replica_group_id, negated=False)
-                )
-            )
-        return combine_conditions_and(conditions)
+        return ReplicaGroupHistoryConditions.by_replica_group_id_filter(
+            UUIDEqualMatchSpec(value=self.replica_group_id, negated=False)
+        )
 
     @property
     @override
     def existence_checks(self) -> list[ExistenceCheck[Any]]:
-        """Check that each scoped entity exists."""
-        checks: list[ExistenceCheck[Any]] = []
-        if self.deployment_id is not None:
-            checks.append(
-                ExistenceCheck(
-                    column=EndpointRow.id,
-                    value=self.deployment_id,
-                    error=EndpointNotFound(str(self.deployment_id)),
-                )
-            )
-        if self.replica_group_id is not None:
-            checks.append(
-                ExistenceCheck(
-                    column=ReplicaGroupRow.id,
-                    value=self.replica_group_id,
-                    error=ReplicaGroupNotFound(str(self.replica_group_id)),
-                )
-            )
-        return checks
+        """Check that the replica group exists."""
+        return [
+            ExistenceCheck(
+                column=ReplicaGroupRow.id,
+                value=self.replica_group_id,
+                error=ReplicaGroupNotFound(str(self.replica_group_id)),
+            ),
+        ]
 
 
 # Route History Scope
