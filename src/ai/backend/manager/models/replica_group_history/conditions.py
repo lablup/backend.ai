@@ -54,7 +54,7 @@ class ReplicaGroupHistoryConditions:
         return inner
 
     @staticmethod
-    def by_categories(categories: list[ReplicaGroupHandlerCategory]) -> QueryCondition:
+    def by_categories(categories: Collection[ReplicaGroupHandlerCategory]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return ReplicaGroupHistoryRow.category.in_(categories)
 
@@ -68,7 +68,7 @@ class ReplicaGroupHistoryConditions:
         return inner
 
     @staticmethod
-    def by_results(results: list[SchedulingResult]) -> QueryCondition:
+    def by_results(results: Collection[SchedulingResult]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return ReplicaGroupHistoryRow.result.in_([str(r) for r in results])
 
@@ -82,21 +82,21 @@ class ReplicaGroupHistoryConditions:
         return inner
 
     @staticmethod
-    def by_result_not_in(results: list[SchedulingResult]) -> QueryCondition:
+    def by_result_not_in(results: Collection[SchedulingResult]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return ReplicaGroupHistoryRow.result.not_in([str(r) for r in results])
 
         return inner
 
     @staticmethod
-    def by_from_statuses(statuses: list[str]) -> QueryCondition:
+    def by_from_statuses(statuses: Collection[str]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return ReplicaGroupHistoryRow.from_status.in_(statuses)
 
         return inner
 
     @staticmethod
-    def by_to_statuses(statuses: list[str]) -> QueryCondition:
+    def by_to_statuses(statuses: Collection[str]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return ReplicaGroupHistoryRow.to_status.in_(statuses)
 
