@@ -54,7 +54,7 @@ class SessionIdleCheckAssignmentData:
 
 @dataclass(frozen=True)
 class ExpiredIdleCheckData:
-    """One stored judgment whose deadline has passed, kept per checker as its own reason."""
+    """One stored IDLE_EXPIRED judgment, kept per checker as its own reason."""
 
     session_id: SessionId
     checker_id: IdleCheckerID
@@ -65,9 +65,7 @@ class ExpiredIdleCheckData:
 
 @dataclass(frozen=True)
 class ExpiredIdleCheckBatchData:
-    """Idle checks expired as of the DB timestamp.
-    `now` is the same timestamp passed to the reconciler.
-    """
+    """Stored IDLE_EXPIRED judgments and the DB timestamp for the reconciler."""
 
     checks: Sequence[ExpiredIdleCheckData]
     now: datetime

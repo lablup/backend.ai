@@ -19,7 +19,6 @@ from ai.backend.common.identifier.idle_checker import IdleCheckerID
 from ai.backend.common.types import SessionId, SessionTypes
 from ai.backend.manager.data.idle_checker.types import IdleCheckSession
 from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.models.idle_checker.conditions import SessionIdleCheckConditions
 from ai.backend.manager.models.idle_checker.row import (
     IdleCheckerBindingRow,
     IdleCheckerRow,
@@ -107,15 +106,16 @@ class IdleCheckerDBSource:
         self,
         session_statuses: Collection[SessionStatus],
     ) -> ExpiredIdleCheckBatchData:
-        check_query = sa.select(SessionIdleCheckRow).join(
-            SessionRow, SessionIdleCheckRow.session_id == SessionRow.id
+        check_query = (
+            sa.select(SessionIdleCheckRow)
+            .join(SessionRow, SessionIdleCheckRow.session_id == SessionRow.id)
+            .where(SessionIdleCheckRow.last_status == IdleCheckPhase.IDLE_EXPIRED)
         )
         async with self._ops.read_ops() as r:
             now = await r.current_time()
             querier = BatchQuerier(
                 pagination=NoPagination(),
                 conditions=[
-                    SessionIdleCheckConditions.expired(now),
                     SessionConditions.by_statuses(session_statuses),
                 ],
             )
