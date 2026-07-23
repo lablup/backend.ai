@@ -38,11 +38,12 @@ class AppConfigFragmentWriteNotAllowed(GenericForbidden):
 
 
 class AppConfigResolveNotAllowed(GenericForbidden):
-    """A merged-AppConfig read was requested for a principal other than the caller.
+    """A merged-AppConfig read reached the adapter with no principal to resolve for.
 
-    Temporary per-request guard standing in for an RBAC validator: a resolve / scoped
-    search whose ``user_id`` does not match the authenticated caller is rejected.
+    ``/resolve`` is the read for the acting user, so the adapter takes the principal from
+    the session rather than from the request. An empty session there means the caller got
+    past ``auth_required`` without one; the anonymous read is ``/public/resolve``.
     """
 
     error_type = "https://api.backend.ai/probs/app-config-resolve-not-allowed"
-    error_title = "App config resolve is not allowed for this principal."
+    error_title = "App config resolve requires an authenticated principal."
