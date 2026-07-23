@@ -42,9 +42,9 @@ from ai.backend.manager.repositories.base.pagination import NoPagination
 from ai.backend.manager.repositories.scheduling_history import SchedulingHistoryRepository
 from ai.backend.manager.repositories.scheduling_history.types import (
     DeploymentHistorySearchScope,
-    KernelSchedulingHistoryBySessionSearchScope,
-    KernelSchedulingHistorySearchScope,
+    KernelKernelHistorySearchScope,
     RouteHistorySearchScope,
+    SessionKernelHistorySearchScope,
     SessionSchedulingHistorySearchScope,
 )
 from ai.backend.manager.services.scheduling_history.actions.resolve_kernel_session import (
@@ -401,12 +401,12 @@ class TestSearchKernelScopedHistoryAction:
             _KernelScopedHistoryCase(
                 label="bound-to-kernel",
                 target=KernelKernelHistoryTarget(kernel_id=_KERNEL_ID),
-                expected_scope=KernelSchedulingHistorySearchScope(kernel_id=_KERNEL_ID),
+                expected_scope=KernelKernelHistorySearchScope(kernel_id=_KERNEL_ID),
             ),
             _KernelScopedHistoryCase(
                 label="bound-to-session",
                 target=SessionKernelHistoryTarget(session_id=_SESSION_ID),
-                expected_scope=KernelSchedulingHistoryBySessionSearchScope(session_id=_SESSION_ID),
+                expected_scope=SessionKernelHistorySearchScope(session_id=_SESSION_ID),
             ),
         ],
         ids=lambda case: case.label,

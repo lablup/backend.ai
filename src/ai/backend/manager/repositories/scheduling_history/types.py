@@ -30,8 +30,8 @@ from ai.backend.manager.models.session import SessionRow
 
 __all__ = (
     "SessionSchedulingHistorySearchScope",
-    "KernelSchedulingHistoryBySessionSearchScope",
-    "KernelSchedulingHistorySearchScope",
+    "KernelKernelHistorySearchScope",
+    "SessionKernelHistorySearchScope",
     "DeploymentHistorySearchScope",
     "RouteHistorySearchScope",
 )
@@ -74,7 +74,7 @@ class SessionSchedulingHistorySearchScope(SearchScope):
 
 
 @dataclass(frozen=True)
-class KernelSchedulingHistorySearchScope(SearchScope):
+class KernelKernelHistorySearchScope(SearchScope):
     """Scope for kernel scheduling history search.
 
     Used for entity-scoped queries where kernel_id is the scope parameter.
@@ -104,11 +104,11 @@ class KernelSchedulingHistorySearchScope(SearchScope):
 
 
 @dataclass(frozen=True)
-class KernelSchedulingHistoryBySessionSearchScope(SearchScope):
+class SessionKernelHistorySearchScope(SearchScope):
     """Scope for kernel scheduling history search bounded by the owning session.
 
     Returns the history of every kernel belonging to the session, as opposed to
-    ``KernelSchedulingHistorySearchScope`` which bounds the query to one kernel.
+    ``KernelKernelHistorySearchScope`` which bounds the query to one kernel.
     """
 
     session_id: SessionId

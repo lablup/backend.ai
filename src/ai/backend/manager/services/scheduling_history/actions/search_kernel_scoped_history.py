@@ -13,8 +13,8 @@ from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.models.scopes import SearchScope
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.scheduling_history.types import (
-    KernelSchedulingHistoryBySessionSearchScope,
-    KernelSchedulingHistorySearchScope,
+    KernelKernelHistorySearchScope,
+    SessionKernelHistorySearchScope,
 )
 
 
@@ -35,7 +35,7 @@ class KernelKernelHistoryTarget(KernelHistoryTarget):
 
     @override
     def to_search_scope(self) -> SearchScope:
-        return KernelSchedulingHistorySearchScope(kernel_id=self.kernel_id)
+        return KernelKernelHistorySearchScope(kernel_id=self.kernel_id)
 
     @override
     def to_rbac_element_ref(self) -> RBACElementRef:
@@ -53,7 +53,7 @@ class SessionKernelHistoryTarget(KernelHistoryTarget):
 
     @override
     def to_search_scope(self) -> SearchScope:
-        return KernelSchedulingHistoryBySessionSearchScope(session_id=self.session_id)
+        return SessionKernelHistorySearchScope(session_id=self.session_id)
 
     @override
     def to_rbac_element_ref(self) -> RBACElementRef:

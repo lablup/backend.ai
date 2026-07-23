@@ -8,7 +8,7 @@ from .repositories import SchedulingHistoryRepositories
 from .repository import SchedulingHistoryRepository
 from .types import (
     DeploymentHistorySearchScope,
-    KernelSchedulingHistorySearchScope,
+    KernelKernelHistorySearchScope,
     RouteHistorySearchScope,
     SessionSchedulingHistorySearchScope,
 )
@@ -17,7 +17,7 @@ __all__ = (
     "DeploymentHistoryCreatorSpec",
     "DeploymentHistorySearchScope",
     "KernelSchedulingHistoryCreatorSpec",
-    "KernelSchedulingHistorySearchScope",
+    "KernelKernelHistorySearchScope",
     "RouteHistoryCreatorSpec",
     "RouteHistorySearchScope",
     "SchedulingHistoryRepositories",
