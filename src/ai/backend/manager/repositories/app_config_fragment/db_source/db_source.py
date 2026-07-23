@@ -36,6 +36,7 @@ from ai.backend.manager.repositories.app_config_fragment.purgers import (
 )
 from ai.backend.manager.repositories.app_config_fragment.types import (
     ResolvedAppConfigScope,
+    app_config_scope_existence_checks,
 )
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
@@ -90,6 +91,7 @@ class AppConfigFragmentDBSource:
                 if element_type is not None
                 else None
             ),
+            existence_checks=app_config_scope_existence_checks(spec.scope_type, spec.scope_id),
         )
         async with self._rbac_ops_provider.write_ops() as w:
             return (await w.create_scoped(rbac_creator)).row.to_data()
