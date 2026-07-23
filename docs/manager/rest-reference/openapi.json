@@ -1038,31 +1038,70 @@
         "type": "object"
       },
       "AppConfigFragmentScope": {
-        "description": "The single scope a scoped fragment search runs at, as ``(scope_type, scope_id)``.",
+        "description": "The scopes a scoped fragment search runs at, keyed by scope kind.\n\nEach category list is OR'd internally and across categories. ``public`` is a flag rather\nthan a list: it names one global scope that owns no id. Raises if every field is empty.",
         "properties": {
-          "scope_type": {
-            "$ref": "#/components/schemas/AppConfigScopeType",
-            "description": "Scope type: domain, user, or public (global)."
-          },
-          "scope_id": {
+          "domain": {
             "anyOf": [
               {
-                "format": "uuid",
-                "type": "string"
+                "items": {
+                  "$ref": "#/components/schemas/UUIDScope"
+                },
+                "type": "array"
               },
               {
                 "type": "null"
               }
             ],
             "default": null,
-            "description": "Scope identifier: the domain id (domain scope) or the user id (user scope). Null for public scope, which has no owner.",
-            "title": "Scope Id"
+            "description": "Domain ids whose fragments to search.",
+            "title": "Domain"
+          },
+          "user": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/UUIDScope"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "User ids whose fragments to search.",
+            "title": "User"
+          },
+          "public": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Search the public scope, which has no owner.",
+            "title": "Public"
+          }
+        },
+        "title": "AppConfigFragmentScope",
+        "type": "object"
+      },
+      "UUIDScope": {
+        "description": "Single-UUID scope item wrapper.\n\nA thin wrapper around a UUID used as a scope item. The wrapper exists so\nthat scope-input lists stay structurally uniform with other scope item\ntypes and leave room for per-item metadata in the future.",
+        "properties": {
+          "value": {
+            "format": "uuid",
+            "title": "Value",
+            "type": "string"
           }
         },
         "required": [
-          "scope_type"
+          "value"
         ],
-        "title": "AppConfigFragmentScope",
+        "title": "UUIDScope",
         "type": "object"
       },
       "ScopedSearchAppConfigFragmentInput": {

@@ -14,6 +14,7 @@ from ai.backend.common.dto.manager.v2.app_config_fragment.types import (
     AppConfigScopeTypeFilter,
 )
 from ai.backend.common.dto.manager.v2.common import OrderDirection
+from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 from ai.backend.common.identifier.app_config import AppConfigScopeID
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
 
@@ -141,24 +142,28 @@ class AdminSearchAppConfigFragmentInput(BaseRequestModel):
 
 
 class AppConfigFragmentScope(BaseRequestModel):
-    """The single scope a scoped fragment search runs at, as ``(scope_type, scope_id)``."""
+    """The scopes a scoped fragment search runs at, keyed by scope kind.
 
-    scope_type: AppConfigScopeType = Field(
-        description="Scope type: domain, user, or public (global)."
+    Each category list is OR'd internally and across categories. ``public`` is a flag rather
+    than a list: it names one global scope that owns no id. Raises if every field is empty.
+    """
+
+    domain: list[UUIDScope] | None = Field(
+        default=None, description="Domain ids whose fragments to search."
     )
-    scope_id: AppConfigScopeID | None = Field(
-        default=None,
-        description="Scope identifier: the domain id (domain scope) or the user id (user scope). "
-        "Null for public scope, which has no owner.",
+    user: list[UUIDScope] | None = Field(
+        default=None, description="User ids whose fragments to search."
+    )
+    public: bool | None = Field(
+        default=None, description="Search the public scope, which has no owner."
     )
 
     @model_validator(mode="after")
-    def _check_scope_id(self) -> Self:
-        if self.scope_type is AppConfigScopeType.PUBLIC:
-            if self.scope_id is not None:
-                raise ValueError("scope_id must be null for public scope.")
-        elif self.scope_id is None:
-            raise ValueError("scope_id is required for domain and user scopes.")
+    def _require_non_empty(self) -> Self:
+        if not self.domain and not self.user and not self.public:
+            raise ValueError(
+                "AppConfigFragmentScope requires a non-empty value for 'domain', 'user' or 'public'"
+            )
         return self
 
 

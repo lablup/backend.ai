@@ -41,6 +41,7 @@ from ai.backend.manager.api.gql.decorators import (
     gql_pydantic_input,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
+from ai.backend.manager.api.gql.rbac.types.scope import UUIDScopeGQL
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 __all__ = (
@@ -124,19 +125,28 @@ class AppConfigFragmentConnection(Connection[AppConfigFragmentGQL]):
 @gql_pydantic_input(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
-        description="The single scope a scoped fragment search runs at.",
+        description=(
+            "Scope for a scoped app config fragment search. "
+            "All items are OR'd; raises an error if every field is empty."
+        ),
     ),
     name="AppConfigFragmentScope",
 )
 class AppConfigFragmentScopeGQL(PydanticInputMixin[AppConfigFragmentScopeDTO]):
-    scope_type: AppConfigScopeType = gql_field(
-        description="Scope type: domain, user, or public (global)."
-    )
-    scope_id: UUID | None = gql_field(
+    domain: list[UUIDScopeGQL] | None = gql_field(
         description=(
-            "Scope identifier: the domain id (domain scope) or the user id (user scope). "
-            "Null for public scope, which has no owner."
+            "Domain ids whose fragments to search. "
+            "The scoped search is single-target for now, so exactly one scope is accepted "
+            "across all three fields."
         ),
+        default=None,
+    )
+    user: list[UUIDScopeGQL] | None = gql_field(
+        description="User ids whose fragments to search.",
+        default=None,
+    )
+    public: bool | None = gql_field(
+        description="Search the public scope, which has no owner.",
         default=None,
     )
 

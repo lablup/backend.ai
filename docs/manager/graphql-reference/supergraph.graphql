@@ -1191,17 +1191,22 @@ enum AppConfigFragmentOrderField
   UPDATED_AT @join__enumValue(graph: STRAWBERRY)
 }
 
-"""Added in 26.8.0. The single scope a scoped fragment search runs at."""
+"""
+Added in 26.8.0. Scope for a scoped app config fragment search. All items are OR'd; raises an error if every field is empty.
+"""
 input AppConfigFragmentScope
   @join__type(graph: STRAWBERRY)
 {
-  """Scope type: domain, user, or public (global)."""
-  scopeType: AppConfigScopeType!
+  """
+  Domain ids whose fragments to search. The scoped search is single-target for now, so exactly one scope is accepted across all three fields.
+  """
+  domain: [UUIDScope!] = null
 
-  """
-  Scope identifier: the domain id (domain scope) or the user id (user scope). Null for public scope, which has no owner.
-  """
-  scopeId: UUID = null
+  """User ids whose fragments to search."""
+  user: [UUIDScope!] = null
+
+  """Search the public scope, which has no owner."""
+  public: Boolean = null
 }
 
 """Added in 26.8.0. Filter input for the fragment scope_type enum field."""

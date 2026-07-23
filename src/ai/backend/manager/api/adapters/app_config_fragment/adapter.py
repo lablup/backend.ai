@@ -11,6 +11,7 @@ from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
     AdminSearchAppConfigFragmentInput,
     AppConfigFragmentFilter,
     AppConfigFragmentOrder,
+    AppConfigFragmentScope,
     BulkPurgeAppConfigFragmentInput,
     BulkUpdateAppConfigFragmentInput,
     CreateAppConfigFragmentInput,
@@ -32,12 +33,14 @@ from ai.backend.common.dto.manager.v2.app_config_fragment.types import (
     AppConfigScopeTypeFilter,
 )
 from ai.backend.common.dto.manager.v2.common import OrderDirection
+from ai.backend.common.identifier.app_config import AppConfigScopeID
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.app_config_fragment.types import (
     AppConfigFragmentData,
 )
+from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.models.app_config_fragment.conditions import AppConfigFragmentConditions
 from ai.backend.manager.models.app_config_fragment.orders import AppConfigFragmentOrders
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
@@ -247,10 +250,7 @@ class AppConfigFragmentAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        scope = AppConfigFragmentSearchScope(
-            scope_type=input.scope.scope_type,
-            scope_id=input.scope.scope_id,
-        )
+        scope = self._scope_to_search_scope(input.scope)
         action_result = await self._processors.app_config_fragment.scoped_search.wait_for_complete(
             ScopedSearchAppConfigFragmentAction(scope=scope, querier=querier)
         )
@@ -260,6 +260,38 @@ class AppConfigFragmentAdapter(BaseAdapter):
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,
         )
+
+    @staticmethod
+    def _scope_to_search_scope(scope: AppConfigFragmentScope) -> AppConfigFragmentSearchScope:
+        """Reduce the scope item lists to the single scope the scope action takes.
+
+        ``ScopedSearchAppConfigFragmentAction`` is a ``BaseScopeAction``, so it authorizes and
+        queries exactly one scope; reject a multi-scope request instead of silently dropping
+        the rest.
+        """
+        selected = [
+            AppConfigFragmentSearchScope(
+                scope_type=AppConfigScopeType.DOMAIN,
+                scope_id=AppConfigScopeID(item.value),
+            )
+            for item in scope.domain or []
+        ]
+        selected += [
+            AppConfigFragmentSearchScope(
+                scope_type=AppConfigScopeType.USER,
+                scope_id=AppConfigScopeID(item.value),
+            )
+            for item in scope.user or []
+        ]
+        if scope.public:
+            selected.append(
+                AppConfigFragmentSearchScope(scope_type=AppConfigScopeType.PUBLIC, scope_id=None)
+            )
+        if len(selected) > 1:
+            raise InvalidAPIParameters(
+                "App config fragment scoped search accepts at most one scope item"
+            )
+        return selected[0]
 
     # --- converters ---
 
