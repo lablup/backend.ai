@@ -9,7 +9,7 @@ from enum import StrEnum
 from typing import Self
 from uuid import UUID
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel, BaseResponseModel
 from ai.backend.common.dto.manager.v2.common import OrderDirection

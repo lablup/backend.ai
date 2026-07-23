@@ -58,8 +58,8 @@ class ScopedSearchReplicaGroupHistoryActionResult(BaseScopeActionResult):
     total_count: int
     has_next_page: bool
     has_previous_page: bool
-    replica_group_id: ReplicaGroupID
     deployment_id: DeploymentID
+    """The authorization scope this search ran under, reported by ``scope_id``."""
 
     @override
     def scope_type(self) -> ScopeType:
