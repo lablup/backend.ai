@@ -26,6 +26,7 @@ from collections.abc import Mapping
 from decimal import Decimal
 from typing import Any, override
 
+from ai.backend.common.identifier.resource_slot import ResourceSlotName
 from ai.backend.common.types import BinarySize, ResourceSlotEntry
 from ai.backend.manager.data.session.creation import ImageInfo
 from ai.backend.manager.data.session.draft import (
@@ -145,7 +146,7 @@ class ComputeKernelResourcesRule(ResourceSpecDraftRule):
         existing = {entry.resource_type: entry for entry in draft_resources}
         result: list[ResourceSlotEntry] = list(draft_resources)
         for slot in INTRINSIC_SLOTS:
-            slot_key = str(slot)
+            slot_key = ResourceSlotName(str(slot))
             current = existing.get(slot_key)
             if current is None or parse_quantity(current.quantity) == Decimal(0):
                 if slot_key in image_min_slots:

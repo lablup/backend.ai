@@ -71,6 +71,7 @@ from ai.backend.common.dto.manager.v2.session.response import (
     UpdateSessionPayload,
 )
 from ai.backend.common.dto.manager.v2.session.types import ClusterModeEnum, SessionStatusFilter
+from ai.backend.common.identifier.resource_slot import ResourceSlotName
 from ai.backend.common.identifier.session import SessionID
 from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import (
@@ -352,7 +353,7 @@ class SessionAdapter(BaseAdapter):
                 image_id=kernel.image_id,
                 resources=tuple(
                     DataResourceSlotEntry(
-                        resource_type=entry.resource_type,
+                        resource_type=ResourceSlotName(entry.resource_type),
                         quantity=entry.quantity,
                     )
                     for entry in kernel.resources

@@ -14,12 +14,12 @@ from dataclasses import dataclass
 from decimal import Decimal
 
 from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.identifier.resource_slot import ResourceSlotName
 from ai.backend.common.types import (
     AgentId,
     BinarySize,
     ClusterMode,
     SessionId,
-    SlotName,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.session.options import AgentSelectionPolicy
@@ -138,7 +138,7 @@ class PlacementPlan:
                     f"Single-node session has kernels with different architectures: {architectures}"
                 )
 
-            total_slots: dict[SlotName, Decimal] = {}
+            total_slots: dict[ResourceSlotName, Decimal] = {}
             for item in items:
                 for slot_name, amount in item.requested_slots.slots.items():
                     total_slots[slot_name] = total_slots.get(slot_name, Decimal(0)) + amount
@@ -443,7 +443,7 @@ class AgentSelector:
         container_count = tracker.current_container_count()
 
         # Check resource availability on the requested slots (missing = 0)
-        insufficient_details: dict[SlotName, tuple[str, str]] = {}
+        insufficient_details: dict[ResourceSlotName, tuple[str, str]] = {}
         for slot_name, requested in resource_req.requested_slots.slots.items():
             available = remaining_slots.get(slot_name, Decimal(0))
             if requested > available:

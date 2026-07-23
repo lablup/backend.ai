@@ -4,7 +4,7 @@ Utility functions for agent selectors.
 
 from decimal import Decimal
 
-from ai.backend.common.types import SlotName
+from ai.backend.common.identifier.resource_slot import ResourceSlotName
 from ai.backend.manager.views.sokovan.agent import AgentInfo
 from ai.backend.manager.views.sokovan.workload import ResourceRequest
 
@@ -44,7 +44,7 @@ def count_unutilized_capabilities(agent_info: AgentInfo, request: ResourceReques
 def order_slots_by_priority(
     request: ResourceRequest,
     priority_order: list[str],
-) -> list[SlotName]:
+) -> list[ResourceSlotName]:
     """
     Order the requested slot names according to the given priority list.
 
@@ -62,9 +62,9 @@ def order_slots_by_priority(
 
     # First, include slots that are in the priority list
     prioritized_slots = [
-        SlotName(slot_name)
+        ResourceSlotName(slot_name)
         for slot_name in priority_order
-        if SlotName(slot_name) in requested_slot_names
+        if ResourceSlotName(slot_name) in requested_slot_names
     ]
 
     # Then, add remaining slots in sorted order

@@ -33,6 +33,7 @@ from ai.backend.common.identifier.domain import DomainName
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.identifier.resource_group import ResourceGroupName
+from ai.backend.common.identifier.resource_slot import ResourceSlotName
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.common.identifier.session import SessionID
 from ai.backend.common.identifier.vfolder import VFolderUUID
@@ -289,7 +290,8 @@ class ModelServingService:
         if not resources:
             return ()
         return tuple(
-            ResourceSlotEntry(resource_type=str(k), quantity=str(v)) for k, v in resources.items()
+            ResourceSlotEntry(resource_type=ResourceSlotName(str(k)), quantity=str(v))
+            for k, v in resources.items()
         )
 
     async def list_serve(self, action: ListModelServiceAction) -> ListModelServiceActionResult:

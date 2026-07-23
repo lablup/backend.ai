@@ -19,13 +19,14 @@ from ai.backend.common.exception import (
     ErrorOperation,
 )
 from ai.backend.common.identifier.resource_group import ResourceGroupID
-from ai.backend.common.types import AgentId, BinarySize, SlotName
+from ai.backend.common.identifier.resource_slot import ResourceSlotName
+from ai.backend.common.types import AgentId, BinarySize
 from ai.backend.manager.sokovan.scheduler.exceptions import SchedulingError
 
 from .types import RemediationHint, ResourceRequirements
 
 
-def _humanize_slot(slot_name: SlotName, value: Decimal) -> str:
+def _humanize_slot(slot_name: ResourceSlotName, value: Decimal) -> str:
     # Format mem as human readable (e.g., "2 GiB" instead of raw bytes)
     if slot_name == "mem":
         return str(BinarySize(value))
@@ -338,16 +339,16 @@ class InsufficientResourcesError(TrackerCompatibilityError):
     error_title = "Agent has insufficient resources."
 
     _agent_id: AgentId
-    _requested_slots: Mapping[SlotName, Decimal]
-    _available_slots: Mapping[SlotName, Decimal]
-    _insufficient_resources: dict[SlotName, tuple[str, str]]
+    _requested_slots: Mapping[ResourceSlotName, Decimal]
+    _available_slots: Mapping[ResourceSlotName, Decimal]
+    _insufficient_resources: dict[ResourceSlotName, tuple[str, str]]
 
     def __init__(
         self,
         agent_id: AgentId,
-        requested_slots: Mapping[SlotName, Decimal],
-        available_slots: Mapping[SlotName, Decimal],
-        insufficient_resources: dict[SlotName, tuple[str, str]],
+        requested_slots: Mapping[ResourceSlotName, Decimal],
+        available_slots: Mapping[ResourceSlotName, Decimal],
+        insufficient_resources: dict[ResourceSlotName, tuple[str, str]],
     ) -> None:
         self._agent_id = agent_id
         self._requested_slots = requested_slots

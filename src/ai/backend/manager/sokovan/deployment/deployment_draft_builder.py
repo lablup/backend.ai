@@ -20,6 +20,7 @@ from ai.backend.common.defs.session import SESSION_PRIORITY_DEFAULT
 from ai.backend.common.identifier.domain import DomainName
 from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.identifier.resource_group import ResourceGroupName
+from ai.backend.common.identifier.resource_slot import ResourceSlotName
 from ai.backend.common.identifier.session import SessionID
 from ai.backend.common.types import (
     MountInfoEntry,
@@ -208,7 +209,7 @@ class DeploymentSessionDraftBuilder:
     ) -> tuple[ResourceSlotEntry, ...]:
         resource_slots = dict(target_revision.resource_config.resource_slot)
         return tuple(
-            ResourceSlotEntry(resource_type=str(k), quantity=str(Decimal(v)))
+            ResourceSlotEntry(resource_type=ResourceSlotName(str(k)), quantity=str(Decimal(v)))
             for k, v in resource_slots.items()
             if v is not None
         )

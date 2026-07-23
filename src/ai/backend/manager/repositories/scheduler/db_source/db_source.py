@@ -33,6 +33,7 @@ from ai.backend.common.identifier.resource_group import (
     ResourceGroupID,
     ResourceGroupName,
 )
+from ai.backend.common.identifier.resource_slot import ResourceSlotName
 from ai.backend.common.identifier.user import UserID
 from ai.backend.common.resource.types import TotalResourceData
 from ai.backend.common.types import (
@@ -43,7 +44,6 @@ from ai.backend.common.types import (
     ResourceSlot,
     SessionId,
     SessionTypes,
-    SlotName,
     SlotTypes,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
@@ -194,7 +194,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 def _create_resource_slot_from_policy(
     total_resource_slots: ResourceSlot | None,
     default_for_unspecified: DefaultForUnspecified | None,
-    known_slot_types: Mapping[SlotName, SlotTypes],
+    known_slot_types: Mapping[ResourceSlotName, SlotTypes],
 ) -> ResourceSlot:
     """Create ResourceSlot from policy data."""
     resource_policy_map = {
@@ -204,9 +204,9 @@ def _create_resource_slot_from_policy(
     return ResourceSlot.from_policy(resource_policy_map, cast(Mapping[str, Any], known_slot_types))
 
 
-def _to_slot_quota(slots: ResourceSlot) -> dict[SlotName, Decimal]:
+def _to_slot_quota(slots: ResourceSlot) -> dict[ResourceSlotName, Decimal]:
     """Project a policy-materialized ResourceSlot into a plain slot-quota mapping."""
-    return {SlotName(k): Decimal(v) for k, v in slots.items()}
+    return {ResourceSlotName(k): Decimal(v) for k, v in slots.items()}
 
 
 @dataclass(frozen=True)
@@ -219,7 +219,7 @@ class _ScalingGroupWithSlotInventory:
     """
 
     rg_row: ScalingGroupRow
-    served_slot_names: frozenset[SlotName]
+    served_slot_names: frozenset[ResourceSlotName]
 
 
 class ScheduleDBSource:
@@ -314,7 +314,7 @@ class ScheduleDBSource:
         ).all()
         return _ScalingGroupWithSlotInventory(
             rg_row=rg_row,
-            served_slot_names=frozenset(SlotName(row.slot_name) for row in inventory_rows),
+            served_slot_names=frozenset(ResourceSlotName(row.slot_name) for row in inventory_rows),
         )
 
     async def _fetch_slot_type_info(self, db_sess: SASession) -> SlotTypeInfo:
@@ -330,8 +330,8 @@ class ScheduleDBSource:
         )
         rows = (await db_sess.execute(stmt)).all()
         return SlotTypeInfo(
-            types={SlotName(row.slot_name): SlotTypes(row.slot_type) for row in rows},
-            required=frozenset(SlotName(row.slot_name) for row in rows if row.required),
+            types={ResourceSlotName(row.slot_name): SlotTypes(row.slot_type) for row in rows},
+            required=frozenset(ResourceSlotName(row.slot_name) for row in rows if row.required),
         )
 
     async def _fetch_resource_group(
@@ -428,7 +428,7 @@ class ScheduleDBSource:
 
         # Requested amounts from resource_allocations (written at enqueue);
         # (kernel_id, slot_name) is the primary key, so plain assignment
-        kernel_slots: dict[KernelId, dict[SlotName, Decimal]] = defaultdict(dict)
+        kernel_slots: dict[KernelId, dict[ResourceSlotName, Decimal]] = defaultdict(dict)
         if kernel_ids:
             ra = ResourceAllocationRow.__table__
             ra_result = await db_sess.execute(
@@ -438,7 +438,9 @@ class ScheduleDBSource:
                 )
             )
             for row in ra_result:
-                kernel_slots[KernelId(row.kernel_id)][SlotName(row.slot_name)] = row.requested
+                kernel_slots[KernelId(row.kernel_id)][ResourceSlotName(row.slot_name)] = (
+                    row.requested
+                )
 
         workloads: list[SessionWorkload] = []
         for session_id, row in session_rows.items():
@@ -511,7 +513,7 @@ class ScheduleDBSource:
         agents = []
         for agent_row in agent_rows:
             slots = {
-                SlotName(ar.slot_name): SlotResource(
+                ResourceSlotName(ar.slot_name): SlotResource(
                     capacity=ar.capacity,
                     reserved=ar.reserved,
                     used=ar.used,
@@ -553,7 +555,9 @@ class ScheduleDBSource:
         rows = (await db_sess.execute(count_stmt)).all()
         return {AgentId(row.agent): row.container_count for row in rows}
 
-    async def _fetch_known_slot_types(self, db_sess: SASession) -> dict[SlotName, SlotTypes]:
+    async def _fetch_known_slot_types(
+        self, db_sess: SASession
+    ) -> dict[ResourceSlotName, SlotTypes]:
         """Known slot types from the resource_slot_types registry."""
         rows = (
             await db_sess.execute(
@@ -563,7 +567,7 @@ class ScheduleDBSource:
                 ).where(ResourceSlotTypeRow.enabled.is_(True))
             )
         ).all()
-        return {SlotName(row.slot_name): SlotTypes(row.slot_type) for row in rows}
+        return {ResourceSlotName(row.slot_name): SlotTypes(row.slot_type) for row in rows}
 
     async def _fetch_global_occupancy(
         self,
@@ -623,12 +627,12 @@ class ScheduleDBSource:
         )
         occupancy_rows = (await db_sess.execute(occ_stmt)).all()
 
-        _user_accum: dict[UserID, dict[SlotName, SlotAllocation]] = defaultdict(dict)
-        _project_accum: dict[ProjectID, dict[SlotName, SlotAllocation]] = defaultdict(dict)
-        _domain_accum: dict[DomainID, dict[SlotName, SlotAllocation]] = defaultdict(dict)
+        _user_accum: dict[UserID, dict[ResourceSlotName, SlotAllocation]] = defaultdict(dict)
+        _project_accum: dict[ProjectID, dict[ResourceSlotName, SlotAllocation]] = defaultdict(dict)
+        _domain_accum: dict[DomainID, dict[ResourceSlotName, SlotAllocation]] = defaultdict(dict)
 
         for row in occupancy_rows:
-            slot_name = SlotName(row.slot_name)
+            slot_name = ResourceSlotName(row.slot_name)
             alloc = SlotAllocation(requested=row.requested, used=row.used)
             # Exactly one scope key is non-NULL per GROUPING SETS row (the
             # underlying columns themselves are never NULL). The OR filter
@@ -682,7 +686,7 @@ class ScheduleDBSource:
         self,
         db_sess: SASession,
         pending_sessions: PendingSessions,
-        known_slot_types: Mapping[SlotName, SlotTypes],
+        known_slot_types: Mapping[ResourceSlotName, SlotTypes],
     ) -> ResourcePolicySnapshot:
         """Fetch resource limits for entities in pending sessions."""
         user_limits = await self._fetch_user_limits(db_sess, pending_sessions, known_slot_types)
@@ -701,7 +705,7 @@ class ScheduleDBSource:
         self,
         db_sess: SASession,
         pending_sessions: PendingSessions,
-        known_slot_types: Mapping[SlotName, SlotTypes],
+        known_slot_types: Mapping[ResourceSlotName, SlotTypes],
     ) -> dict[ProjectID, ResourceLimit]:
         """Fetch project resource limits."""
         project_limits: dict[ProjectID, ResourceLimit] = {}
@@ -733,7 +737,7 @@ class ScheduleDBSource:
         self,
         db_sess: SASession,
         pending_sessions: PendingSessions,
-        known_slot_types: Mapping[SlotName, SlotTypes],
+        known_slot_types: Mapping[ResourceSlotName, SlotTypes],
     ) -> dict[DomainID, ResourceLimit]:
         """Fetch domain resource limits keyed by domain ID."""
         domain_limits: dict[DomainID, ResourceLimit] = {}
@@ -765,7 +769,7 @@ class ScheduleDBSource:
         self,
         db_sess: SASession,
         pending_sessions: PendingSessions,
-        known_slot_types: Mapping[SlotName, SlotTypes],
+        known_slot_types: Mapping[ResourceSlotName, SlotTypes],
     ) -> dict[UserID, UserResourceLimit]:
         """Fetch per-user limits for users in pending sessions.
 
@@ -1581,7 +1585,7 @@ class ScheduleDBSource:
         network_info: ScalingGroupNetworkInfo | None = None
         rg_defaults = None
         resource_group_allow_fractional = False
-        served_slot_names: frozenset[SlotName] = frozenset()
+        served_slot_names: frozenset[ResourceSlotName] = frozenset()
         if resource_group_id:
             rg_bundle = await self._fetch_resource_group_with_slot_inventory(
                 db_sess, resource_group_id

@@ -4,8 +4,8 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 
 from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.identifier.resource_slot import ResourceSlotName
 from ai.backend.common.types import (
-    SlotName,
     VFolderMount,
 )
 from ai.backend.manager.data.dotfile.types import DotfileBundle
@@ -27,7 +27,7 @@ class ResourceGroupEnqueueInfo:
     allow_fractional: bool
     # Slot names served by the group's non-terminated agents (membership
     # only; unit metadata lives in the global registry SlotTypeInfo)
-    served_slot_names: frozenset[SlotName]
+    served_slot_names: frozenset[ResourceSlotName]
 
 
 @dataclass(frozen=True)

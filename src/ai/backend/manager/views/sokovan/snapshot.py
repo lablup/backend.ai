@@ -9,11 +9,11 @@ from typing import override
 
 from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.project import ProjectID
+from ai.backend.common.identifier.resource_slot import ResourceSlotName
 from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import (
     AgentSelectionStrategy,
     SessionId,
-    SlotName,
 )
 
 from .agent import AgentLimit, ResourceGroupResource
@@ -47,7 +47,7 @@ class ResourceLimit:
     """Slot quota owned by one scope (project/domain)."""
 
     # Total slot quota (unspecified known slots are materialized per policy default)
-    slots: Mapping[SlotName, Decimal]
+    slots: Mapping[ResourceSlotName, Decimal]
 
 
 @dataclass(frozen=True)
@@ -63,7 +63,7 @@ class UserResourceLimit(ResourceLimit):
 class ResourceAllocation:
     """Cluster-wide observed slot occupancy for one scope (project/domain)."""
 
-    slots: Mapping[SlotName, SlotAllocation]
+    slots: Mapping[ResourceSlotName, SlotAllocation]
 
     @classmethod
     def empty(cls) -> ResourceAllocation:
@@ -84,7 +84,7 @@ class ResourceAllocation:
                 return True
         return False
 
-    def _merged_slots(self, request: ResourceRequest) -> dict[SlotName, SlotAllocation]:
+    def _merged_slots(self, request: ResourceRequest) -> dict[ResourceSlotName, SlotAllocation]:
         """Requested slots accumulate as reservations (the session is not running yet)."""
         slots = dict(self.slots)
         for slot_name, amount in request.slots.items():

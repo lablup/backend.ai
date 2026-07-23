@@ -15,8 +15,9 @@ from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.identifier.architecture import ArchName
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.identifier.resource_slot import ResourceSlotName
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
-from ai.backend.common.types import ResourceSlot, ResourceSlotEntry, SessionId, SlotName
+from ai.backend.common.types import ResourceSlot, ResourceSlotEntry, SessionId
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -340,7 +341,7 @@ class SchedulingController:
                 ResourceRequirements(
                     requested_slots=ResourceRequest(
                         slots={
-                            SlotName(k): v
+                            ResourceSlotName(k): v
                             for k, v in ResourceSlotEntry.inputs_to_resource_slot(
                                 resource_input.resources
                             ).items()
@@ -398,7 +399,7 @@ class SchedulingController:
                         required_reduction=(
                             tuple(
                                 ResourceSlotEntry(
-                                    resource_type=str(k),
+                                    resource_type=ResourceSlotName(str(k)),
                                     quantity=format(v, "f"),
                                 )
                                 for k, v in hint.required_reduction.items()

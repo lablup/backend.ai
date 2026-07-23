@@ -33,6 +33,7 @@ from ai.backend.common.identifier.domain import DomainName
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.identifier.resource_group import ResourceGroupName
+from ai.backend.common.identifier.resource_slot import ResourceSlotName
 from ai.backend.common.identifier.session import SessionID
 from ai.backend.common.json import load_json
 from ai.backend.common.plugin.monitor import ErrorPluginContext
@@ -1611,7 +1612,9 @@ class SessionService:
         await self._session_repository.resolve_image_by_id(action.image_id)
 
         resource_entries = tuple(
-            ResourceSlotEntry(resource_type=entry.resource_type, quantity=entry.quantity)
+            ResourceSlotEntry(
+                resource_type=ResourceSlotName(entry.resource_type), quantity=entry.quantity
+            )
             for entry in action.resource.entries
         )
         resource_opts_payload: dict[str, Any] = {}

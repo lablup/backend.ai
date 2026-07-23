@@ -12,11 +12,11 @@ from collections.abc import Mapping
 from decimal import Decimal
 from typing import Any, cast, override
 
+from ai.backend.common.identifier.resource_slot import ResourceSlotName
 from ai.backend.common.types import (
     BinarySize,
     ResourceSlot,
     ResourceSlotEntry,
-    SlotName,
     SlotTypes,
 )
 from ai.backend.manager.data.resource.types import SlotTypeInfo
@@ -78,7 +78,8 @@ class ResourceLimitRule(SessionSpecValidatorRule):
             entry.resource_type: parse_quantity(entry.quantity)
             for entry in kernel.execution_spec.resource_input.resources
         }
-        for slot_name, min_value in min_slots.items():
+        for raw_slot_name, min_value in min_slots.items():
+            slot_name = ResourceSlotName(raw_slot_name)
             if Decimal(min_value) <= Decimal(0):
                 continue
             if slot_name not in policy.types:
@@ -92,8 +93,8 @@ class ResourceLimitRule(SessionSpecValidatorRule):
                         f"the image minimum ({min_repr})."
                     ),
                 )
-        if shmem is not None and "mem" in requested:
-            mem_value = requested["mem"]
+        if shmem is not None and ResourceSlotName("mem") in requested:
+            mem_value = requested[ResourceSlotName("mem")]
             if Decimal(int(shmem)) >= mem_value:
                 raise InvalidAPIParameters(
                     extra_msg=(
@@ -105,7 +106,7 @@ class ResourceLimitRule(SessionSpecValidatorRule):
     @staticmethod
     def _humanize_slots(
         slots: Mapping[str, Decimal],
-        known_slot_types: Mapping[SlotName, SlotTypes],
+        known_slot_types: Mapping[ResourceSlotName, SlotTypes],
     ) -> str:
         if not known_slot_types:
             return " ".join(f"{k}={v}" for k, v in slots.items())

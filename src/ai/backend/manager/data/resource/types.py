@@ -3,10 +3,10 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
+from ai.backend.common.identifier.resource_slot import ResourceSlotName
 from ai.backend.common.types import (
     DefaultForUnspecified,
     ResourceSlot,
-    SlotName,
     SlotTypes,
     VFolderHostPermissionMap,
 )
@@ -67,8 +67,8 @@ class SlotTypeInfo:
       nonzero amounts for these slots.
     """
 
-    types: Mapping[SlotName, SlotTypes]
-    required: frozenset[SlotName]
+    types: Mapping[ResourceSlotName, SlotTypes]
+    required: frozenset[ResourceSlotName]
 
 
 @dataclass(frozen=True)

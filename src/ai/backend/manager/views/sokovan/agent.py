@@ -8,7 +8,8 @@ from decimal import Decimal
 from functools import cached_property
 
 from ai.backend.common.identifier.architecture import ArchName
-from ai.backend.common.types import AgentId, SessionId, SlotName
+from ai.backend.common.identifier.resource_slot import ResourceSlotName
+from ai.backend.common.types import AgentId, SessionId
 
 
 @dataclass(frozen=True)
@@ -24,7 +25,7 @@ class SlotResource:
 class AgentResource:
     """Per-agent slot resources from ``agent_resources``."""
 
-    slots: Mapping[SlotName, SlotResource]
+    slots: Mapping[ResourceSlotName, SlotResource]
 
 
 @dataclass
@@ -85,13 +86,13 @@ class ResourceGroupResource:
     failed_sessions_by_agent: Mapping[AgentId, frozenset[SessionId]] = field(default_factory=dict)
 
     @cached_property
-    def slots(self) -> Mapping[SlotName, SlotResource]:
+    def slots(self) -> Mapping[ResourceSlotName, SlotResource]:
         """Per-slot capacity/reserved/used summed over the agents.
 
         Computed on first use; only capacity-aware consumers (DRF) pay
         for the aggregation.
         """
-        totals: dict[SlotName, SlotResource] = {}
+        totals: dict[ResourceSlotName, SlotResource] = {}
         for agent in self.agents:
             for slot_name, resource in agent.resources.slots.items():
                 current = totals.get(slot_name)

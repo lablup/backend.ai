@@ -12,7 +12,8 @@ from dataclasses import dataclass
 from decimal import Decimal
 
 from ai.backend.common.identifier.architecture import ArchName
-from ai.backend.common.types import AgentId, SlotName
+from ai.backend.common.identifier.resource_slot import ResourceSlotName
+from ai.backend.common.types import AgentId
 from ai.backend.manager.views.sokovan.workload import ResourceRequest
 
 
@@ -48,5 +49,5 @@ class RemediationHint:
 
     available_archs: list[str] | None = None
     available_agent_ids: list[AgentId] | None = None
-    required_reduction: Mapping[SlotName, Decimal] | None = None
+    required_reduction: Mapping[ResourceSlotName, Decimal] | None = None
     required_container_reduction: int | None = None

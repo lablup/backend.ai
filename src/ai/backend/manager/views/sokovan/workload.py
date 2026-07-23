@@ -12,6 +12,7 @@ from ai.backend.common.identifier.architecture import ArchName
 from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.identifier.resource_slot import ResourceSlotName
 from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import (
     AccessKey,
@@ -21,7 +22,6 @@ from ai.backend.common.types import (
     SessionId,
     SessionResult,
     SessionTypes,
-    SlotName,
 )
 from ai.backend.manager.data.session.options import AgentSelectionPolicy
 from ai.backend.manager.data.session.types import SessionStatus
@@ -31,7 +31,7 @@ from ai.backend.manager.data.session.types import SessionStatus
 class ResourceRequest:
     """Requested slot amounts of one workload (kernel-level granularity)."""
 
-    slots: Mapping[SlotName, Decimal]
+    slots: Mapping[ResourceSlotName, Decimal]
 
 
 @dataclass(frozen=True)
@@ -128,7 +128,7 @@ class SessionWorkload:
     def requested_slots(self) -> SessionResourceRequest:
         """Session-level request: per-slot sums of the kernels plus the
         session count of the requested kind."""
-        slots: dict[SlotName, Decimal] = {}
+        slots: dict[ResourceSlotName, Decimal] = {}
         for kernel in self.placement.kernels:
             for slot_name, amount in kernel.requested_slots.slots.items():
                 slots[slot_name] = slots.get(slot_name, Decimal(0)) + amount

@@ -16,7 +16,7 @@ from ai.backend.common.exception import (
     ErrorDomain,
     ErrorOperation,
 )
-from ai.backend.common.types import SlotName
+from ai.backend.common.identifier.resource_slot import ResourceSlotName
 from ai.backend.manager.sokovan.scheduler.exceptions import SchedulingError
 
 
@@ -49,7 +49,7 @@ class SchedulingValidationError(SchedulingError, web.HTTPPreconditionFailed):
         raise NotImplementedError
 
 
-def _format_slots(slots: Mapping[SlotName, Decimal]) -> str:
+def _format_slots(slots: Mapping[ResourceSlotName, Decimal]) -> str:
     return " ".join(f"{k}={v}" for k, v in slots.items() if v)
 
 
@@ -112,9 +112,9 @@ class UserResourceQuotaExceeded(SchedulingValidationError):
     error_type = "https://api.backend.ai/probs/user-resource-quota-exceeded"
     error_title = "User resource quota exceeded."
 
-    _quota_slots: Mapping[SlotName, Decimal]
+    _quota_slots: Mapping[ResourceSlotName, Decimal]
 
-    def __init__(self, *, quota_slots: Mapping[SlotName, Decimal]) -> None:
+    def __init__(self, *, quota_slots: Mapping[ResourceSlotName, Decimal]) -> None:
         self._quota_slots = quota_slots
         super().__init__(self.summary())
 
@@ -137,9 +137,9 @@ class ProjectResourceQuotaExceeded(SchedulingValidationError):
     error_type = "https://api.backend.ai/probs/group-resource-quota-exceeded"
     error_title = "Project resource quota exceeded."
 
-    _quota_slots: Mapping[SlotName, Decimal]
+    _quota_slots: Mapping[ResourceSlotName, Decimal]
 
-    def __init__(self, *, quota_slots: Mapping[SlotName, Decimal]) -> None:
+    def __init__(self, *, quota_slots: Mapping[ResourceSlotName, Decimal]) -> None:
         self._quota_slots = quota_slots
         super().__init__(self.summary())
 
@@ -162,9 +162,9 @@ class DomainResourceQuotaExceeded(SchedulingValidationError):
     error_type = "https://api.backend.ai/probs/domain-resource-quota-exceeded"
     error_title = "Domain resource quota exceeded."
 
-    _quota_slots: Mapping[SlotName, Decimal]
+    _quota_slots: Mapping[ResourceSlotName, Decimal]
 
-    def __init__(self, *, quota_slots: Mapping[SlotName, Decimal]) -> None:
+    def __init__(self, *, quota_slots: Mapping[ResourceSlotName, Decimal]) -> None:
         self._quota_slots = quota_slots
         super().__init__(self.summary())
 

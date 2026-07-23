@@ -9,7 +9,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from decimal import Decimal
 
-from ai.backend.common.types import SessionId, SlotName
+from ai.backend.common.identifier.resource_slot import ResourceSlotName
+from ai.backend.common.types import SessionId
 from ai.backend.manager.views.sokovan.agent import AgentInfo, ResourceGroupResource
 from ai.backend.manager.views.sokovan.workload import ResourceRequest
 
@@ -27,14 +28,14 @@ class AgentStateTracker:
     original_agent: AgentInfo
     # Sessions that previously failed on this agent (retry deprioritization hint)
     failed_session_ids: frozenset[SessionId] = frozenset()
-    committed_slots: dict[SlotName, Decimal] = field(default_factory=dict)
+    committed_slots: dict[ResourceSlotName, Decimal] = field(default_factory=dict)
     committed_containers: int = 0
-    pending_slots: dict[SlotName, Decimal] = field(default_factory=dict)
+    pending_slots: dict[ResourceSlotName, Decimal] = field(default_factory=dict)
     pending_containers: int = 0
 
-    def remaining_slots(self) -> dict[SlotName, Decimal]:
+    def remaining_slots(self) -> dict[ResourceSlotName, Decimal]:
         """Per-slot remaining = capacity - reserved - used - in-batch allocations."""
-        remaining: dict[SlotName, Decimal] = {}
+        remaining: dict[ResourceSlotName, Decimal] = {}
         for slot_name, resource in self.original_agent.resources.slots.items():
             remaining[slot_name] = (
                 resource.capacity
