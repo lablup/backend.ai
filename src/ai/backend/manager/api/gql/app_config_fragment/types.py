@@ -22,8 +22,44 @@ from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
 from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
     AppConfigFragmentScope as AppConfigFragmentScopeDTO,
 )
+from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
+    AppConfigFragmentUpdateItem as AppConfigFragmentUpdateItemDTO,
+)
+from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
+    BulkPurgeAppConfigFragmentInput as BulkPurgeAppConfigFragmentInputDTO,
+)
+from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
+    BulkUpdateAppConfigFragmentInput as BulkUpdateAppConfigFragmentInputDTO,
+)
+from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
+    CreateAppConfigFragmentInput as CreateAppConfigFragmentInputDTO,
+)
+from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
+    PurgeAppConfigFragmentInput as PurgeAppConfigFragmentInputDTO,
+)
+from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
+    UpdateAppConfigFragmentInput as UpdateAppConfigFragmentInputDTO,
+)
+from ai.backend.common.dto.manager.v2.app_config_fragment.response import (
+    AppConfigFragmentBulkErrorInfo as AppConfigFragmentBulkErrorInfoDTO,
+)
 from ai.backend.common.dto.manager.v2.app_config_fragment.response import (
     AppConfigFragmentNode,
+)
+from ai.backend.common.dto.manager.v2.app_config_fragment.response import (
+    BulkPurgeAppConfigFragmentPayload as BulkPurgeAppConfigFragmentPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.app_config_fragment.response import (
+    BulkUpdateAppConfigFragmentPayload as BulkUpdateAppConfigFragmentPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.app_config_fragment.response import (
+    CreateAppConfigFragmentPayload as CreateAppConfigFragmentPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.app_config_fragment.response import (
+    PurgeAppConfigFragmentPayload as PurgeAppConfigFragmentPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.app_config_fragment.response import (
+    UpdateAppConfigFragmentPayload as UpdateAppConfigFragmentPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.app_config_fragment.types import (
     AppConfigScopeTypeFilter as AppConfigScopeTypeFilterDTO,
@@ -39,11 +75,13 @@ from ai.backend.manager.api.gql.decorators import (
     gql_field,
     gql_node_type,
     gql_pydantic_input,
+    gql_pydantic_type,
 )
-from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
+from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 __all__ = (
+    "AppConfigFragmentBulkErrorGQL",
     "AppConfigFragmentConnection",
     "AppConfigFragmentEdge",
     "AppConfigFragmentFilterGQL",
@@ -51,7 +89,18 @@ __all__ = (
     "AppConfigFragmentOrderByGQL",
     "AppConfigFragmentOrderFieldGQL",
     "AppConfigFragmentScopeGQL",
+    "AppConfigFragmentUpdateItemInputGQL",
     "AppConfigScopeTypeFilterGQL",
+    "BulkPurgeAppConfigFragmentInputGQL",
+    "BulkPurgeAppConfigFragmentPayloadGQL",
+    "BulkUpdateAppConfigFragmentInputGQL",
+    "BulkUpdateAppConfigFragmentPayloadGQL",
+    "CreateAppConfigFragmentInputGQL",
+    "CreateAppConfigFragmentPayloadGQL",
+    "PurgeAppConfigFragmentInputGQL",
+    "PurgeAppConfigFragmentPayloadGQL",
+    "UpdateAppConfigFragmentInputGQL",
+    "UpdateAppConfigFragmentPayloadGQL",
 )
 
 
@@ -219,3 +268,176 @@ class AppConfigFragmentOrderFieldGQL(StrEnum):
 class AppConfigFragmentOrderByGQL(PydanticInputMixin[AppConfigFragmentOrderDTO]):
     field: AppConfigFragmentOrderFieldGQL = gql_field(description="The field to order by.")
     direction: OrderDirection = gql_field(description="Sort direction.", default=OrderDirection.ASC)
+
+
+# ---------------------------------------------------------------------------
+# Mutation inputs / payloads
+# ---------------------------------------------------------------------------
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Input for creating a new app config fragment at a given scope.",
+    ),
+    name="CreateAppConfigFragmentInput",
+)
+class CreateAppConfigFragmentInputGQL(PydanticInputMixin[CreateAppConfigFragmentInputDTO]):
+    config_name: str = gql_field(description="Registered config name.")
+    scope_type: AppConfigScopeType = gql_field(
+        description="Scope the fragment is written at (public | domain | user)."
+    )
+    scope_id: UUID | None = gql_field(
+        description=(
+            "Scope identifier: the domain id (domain scope) or the user id (user scope). "
+            "Null for public scope, which has no owner."
+        ),
+        default=None,
+    )
+    config: JSON = gql_field(description="The fragment's JSON config document.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Payload for app config fragment creation.",
+    ),
+    model=CreateAppConfigFragmentPayloadDTO,
+    name="CreateAppConfigFragmentPayload",
+)
+class CreateAppConfigFragmentPayloadGQL(PydanticOutputMixin[CreateAppConfigFragmentPayloadDTO]):
+    app_config_fragment: AppConfigFragmentGQL = gql_field(
+        description="The created app config fragment."
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Input for replacing one app config fragment's config document.",
+    ),
+    name="UpdateAppConfigFragmentInput",
+)
+class UpdateAppConfigFragmentInputGQL(PydanticInputMixin[UpdateAppConfigFragmentInputDTO]):
+    config: JSON = gql_field(description="The replacement JSON config document.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Payload for app config fragment update.",
+    ),
+    model=UpdateAppConfigFragmentPayloadDTO,
+    name="UpdateAppConfigFragmentPayload",
+)
+class UpdateAppConfigFragmentPayloadGQL(PydanticOutputMixin[UpdateAppConfigFragmentPayloadDTO]):
+    app_config_fragment: AppConfigFragmentGQL = gql_field(
+        description="The updated app config fragment."
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Input for purging one app config fragment.",
+    ),
+    name="PurgeAppConfigFragmentInput",
+)
+class PurgeAppConfigFragmentInputGQL(PydanticInputMixin[PurgeAppConfigFragmentInputDTO]):
+    id: UUID = gql_field(description="App config fragment id to purge.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Payload for app config fragment purge.",
+    ),
+    model=PurgeAppConfigFragmentPayloadDTO,
+    all_fields=True,
+    name="PurgeAppConfigFragmentPayload",
+)
+class PurgeAppConfigFragmentPayloadGQL(PydanticOutputMixin[PurgeAppConfigFragmentPayloadDTO]):
+    pass
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="One item of a bulk fragment update, carrying its own target id.",
+    ),
+    name="AppConfigFragmentUpdateItemInput",
+)
+class AppConfigFragmentUpdateItemInputGQL(PydanticInputMixin[AppConfigFragmentUpdateItemDTO]):
+    id: UUID = gql_field(description="App config fragment id to update.")
+    config: JSON = gql_field(description="The replacement JSON config document.")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Input for updating many fragments' config documents.",
+    ),
+    name="BulkUpdateAppConfigFragmentInput",
+)
+class BulkUpdateAppConfigFragmentInputGQL(PydanticInputMixin[BulkUpdateAppConfigFragmentInputDTO]):
+    items: list[AppConfigFragmentUpdateItemInputGQL] = gql_field(
+        description="Fragments to update, each identified by its id."
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Input for purging many app config fragments.",
+    ),
+    name="BulkPurgeAppConfigFragmentInput",
+)
+class BulkPurgeAppConfigFragmentInputGQL(PydanticInputMixin[BulkPurgeAppConfigFragmentInputDTO]):
+    ids: list[UUID] = gql_field(description="Fragment ids to purge.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="One failed item of a partial-success bulk fragment mutation.",
+    ),
+    model=AppConfigFragmentBulkErrorInfoDTO,
+    all_fields=True,
+    name="AppConfigFragmentBulkError",
+)
+class AppConfigFragmentBulkErrorGQL(PydanticOutputMixin[AppConfigFragmentBulkErrorInfoDTO]):
+    pass
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Partial-success payload for a bulk app config fragment update.",
+    ),
+    model=BulkUpdateAppConfigFragmentPayloadDTO,
+    name="BulkUpdateAppConfigFragmentPayload",
+)
+class BulkUpdateAppConfigFragmentPayloadGQL(
+    PydanticOutputMixin[BulkUpdateAppConfigFragmentPayloadDTO]
+):
+    items: list[AppConfigFragmentGQL] = gql_field(description="Successfully updated fragments.")
+    failed: list[AppConfigFragmentBulkErrorGQL] = gql_field(
+        description="Per-item failures, each naming the fragment it targeted."
+    )
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Partial-success payload for a bulk app config fragment purge.",
+    ),
+    model=BulkPurgeAppConfigFragmentPayloadDTO,
+    name="BulkPurgeAppConfigFragmentPayload",
+)
+class BulkPurgeAppConfigFragmentPayloadGQL(
+    PydanticOutputMixin[BulkPurgeAppConfigFragmentPayloadDTO]
+):
+    items: list[UUID] = gql_field(description="Ids of successfully purged fragments.")
+    failed: list[AppConfigFragmentBulkErrorGQL] = gql_field(
+        description="Per-item failures, each naming the fragment it targeted."
+    )

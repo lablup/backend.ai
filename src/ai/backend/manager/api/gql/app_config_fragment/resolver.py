@@ -21,6 +21,7 @@ from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    gql_mutation,
     gql_root_field,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
@@ -33,6 +34,16 @@ from .types import (
     AppConfigFragmentGQL,
     AppConfigFragmentOrderByGQL,
     AppConfigFragmentScopeGQL,
+    BulkPurgeAppConfigFragmentInputGQL,
+    BulkPurgeAppConfigFragmentPayloadGQL,
+    BulkUpdateAppConfigFragmentInputGQL,
+    BulkUpdateAppConfigFragmentPayloadGQL,
+    CreateAppConfigFragmentInputGQL,
+    CreateAppConfigFragmentPayloadGQL,
+    PurgeAppConfigFragmentInputGQL,
+    PurgeAppConfigFragmentPayloadGQL,
+    UpdateAppConfigFragmentInputGQL,
+    UpdateAppConfigFragmentPayloadGQL,
 )
 
 
@@ -144,3 +155,78 @@ async def scoped_app_config_fragments(
         ),
         count=payload.total_count,
     )
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Create an app config fragment at a given scope.",
+    )
+)
+async def create_app_config_fragment(
+    info: Info[StrawberryGQLContext],
+    input: CreateAppConfigFragmentInputGQL,
+) -> CreateAppConfigFragmentPayloadGQL | None:
+    payload = await info.context.adapters.app_config_fragment.create(input.to_pydantic())
+    return CreateAppConfigFragmentPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Replace an app config fragment's config document by id.",
+    )
+)
+async def update_app_config_fragment(
+    info: Info[StrawberryGQLContext],
+    id: UUID,
+    input: UpdateAppConfigFragmentInputGQL,
+) -> UpdateAppConfigFragmentPayloadGQL | None:
+    payload = await info.context.adapters.app_config_fragment.update(
+        AppConfigFragmentID(id), input.to_pydantic()
+    )
+    return UpdateAppConfigFragmentPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Purge an app config fragment by id.",
+    )
+)
+async def purge_app_config_fragment(
+    info: Info[StrawberryGQLContext],
+    input: PurgeAppConfigFragmentInputGQL,
+) -> PurgeAppConfigFragmentPayloadGQL | None:
+    payload = await info.context.adapters.app_config_fragment.purge(input.to_pydantic().id)
+    return PurgeAppConfigFragmentPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Replace many app config fragments' config documents, reporting per-item failures."
+        ),
+    )
+)
+async def bulk_update_app_config_fragments(
+    info: Info[StrawberryGQLContext],
+    input: BulkUpdateAppConfigFragmentInputGQL,
+) -> BulkUpdateAppConfigFragmentPayloadGQL | None:
+    payload = await info.context.adapters.app_config_fragment.bulk_update(input.to_pydantic())
+    return BulkUpdateAppConfigFragmentPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Purge many app config fragments by id, reporting per-item failures.",
+    )
+)
+async def bulk_purge_app_config_fragments(
+    info: Info[StrawberryGQLContext],
+    input: BulkPurgeAppConfigFragmentInputGQL,
+) -> BulkPurgeAppConfigFragmentPayloadGQL | None:
+    payload = await info.context.adapters.app_config_fragment.bulk_purge(input.to_pydantic())
+    return BulkPurgeAppConfigFragmentPayloadGQL.from_pydantic(payload)
