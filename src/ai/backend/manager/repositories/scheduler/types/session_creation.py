@@ -2,8 +2,10 @@
 
 from collections.abc import Mapping
 from dataclasses import dataclass
+from decimal import Decimal
 
 from ai.backend.common.identifier.resource_group import ResourceGroupID, ResourceGroupName
+from ai.backend.common.identifier.resource_slot import ResourceSlotName
 from ai.backend.common.types import (
     SessionId,
     VFolderMount,
@@ -46,6 +48,7 @@ class UserEnqueueFetch:
     container_user: ContainerUserInfo
     dotfiles: DotfileBundle
     pending_session_count: int
+    pending_session_resource_slots: Mapping[ResourceSlotName, Decimal]
 
     def to_info(
         self,
@@ -57,6 +60,7 @@ class UserEnqueueFetch:
             container_user=self.container_user,
             dotfiles=self.dotfiles,
             pending_session_count=self.pending_session_count,
+            pending_session_resource_slots=self.pending_session_resource_slots,
             vfolder_mounts_by_role=vfolder_mounts_by_role,
         )
 

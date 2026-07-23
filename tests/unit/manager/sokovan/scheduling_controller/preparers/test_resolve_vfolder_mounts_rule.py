@@ -58,6 +58,7 @@ def _context(
             container_user=ContainerUserInfo(),
             dotfiles=DotfileBundle(),
             pending_session_count=0,
+            pending_session_resource_slots={},
             vfolder_mounts_by_role=vfolder_mounts_by_role or {},
         ),
         global_info=GlobalEnqueueInfo(

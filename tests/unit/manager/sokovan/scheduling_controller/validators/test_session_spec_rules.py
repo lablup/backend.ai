@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Mapping
 from decimal import Decimal
 from pathlib import PurePosixPath
 from typing import Any
@@ -70,6 +71,9 @@ from ai.backend.manager.sokovan.scheduling_controller.validators.mount_name_vali
 )
 from ai.backend.manager.sokovan.scheduling_controller.validators.pending_session_count_limit_rule import (
     PendingSessionCountLimitRule,
+)
+from ai.backend.manager.sokovan.scheduling_controller.validators.pending_session_resource_limit_rule import (
+    PendingSessionResourceLimitRule,
 )
 from ai.backend.manager.sokovan.scheduling_controller.validators.requested_slot_type_rule import (
     RequestedSlotTypeRule,
@@ -192,6 +196,7 @@ def _ctx(
     required_slot_names: frozenset[ResourceSlotName] | None = None,
     dotfiles: DotfileBundle | None = None,
     pending_session_count: int = 0,
+    pending_session_resource_slots: Mapping[ResourceSlotName, Decimal] | None = None,
 ) -> SessionSpecContext:
     slot_types_val = slot_types or {}
     served = (
@@ -209,6 +214,7 @@ def _ctx(
             container_user=ContainerUserInfo(),
             dotfiles=dotfiles or DotfileBundle(),
             pending_session_count=pending_session_count,
+            pending_session_resource_slots=pending_session_resource_slots or {},
             vfolder_mounts_by_role={},
         ),
         global_info=GlobalEnqueueInfo(
@@ -245,10 +251,12 @@ def _policy(
     *,
     max_containers: int = 4,
     max_pending: int | None = None,
+    max_pending_slots: Mapping[ResourceSlotName, Decimal] | None = None,
 ) -> UserEnqueuePolicy:
     return UserEnqueuePolicy(
         max_containers_per_session=max_containers,
         max_pending_session_count=max_pending,
+        max_pending_session_resource_slots=max_pending_slots,
         allowed_vfolder_hosts=VFolderHostPermissionMap(),
     )
 
@@ -297,6 +305,62 @@ class TestPendingSessionCountLimitRule:
         PendingSessionCountLimitRule().validate(
             _spec((_kernel(img),)),
             _ctx(policy=_policy(max_pending=None), pending_session_count=100),
+        )
+
+
+class TestPendingSessionResourceLimitRule:
+    def test_within_limit(self) -> None:
+        img = ImageID(uuid.uuid4())
+        spec = _spec((_kernel(img, cpu="1"),))
+        PendingSessionResourceLimitRule().validate(
+            spec,
+            _ctx(
+                policy=_policy(max_pending_slots={ResourceSlotName("cpu"): Decimal(4)}),
+                pending_session_resource_slots={ResourceSlotName("cpu"): Decimal(2)},
+            ),
+        )
+
+    def test_rejects_when_queue_resources_exceed_cap(self) -> None:
+        img = ImageID(uuid.uuid4())
+        spec = _spec((_kernel(img, cpu="1"),))
+        with pytest.raises(QuotaExceeded):
+            PendingSessionResourceLimitRule().validate(
+                spec,
+                _ctx(
+                    policy=_policy(max_pending_slots={ResourceSlotName("cpu"): Decimal(3)}),
+                    pending_session_resource_slots={ResourceSlotName("cpu"): Decimal(3)},
+                ),
+            )
+
+    def test_uncapped_slot_stays_unbounded(self) -> None:
+        img = ImageID(uuid.uuid4())
+        spec = _spec((_kernel(img, cpu="1"),))
+        PendingSessionResourceLimitRule().validate(
+            spec,
+            _ctx(
+                policy=_policy(max_pending_slots={ResourceSlotName("cpu"): Decimal(10)}),
+                pending_session_resource_slots={
+                    ResourceSlotName("cpu"): Decimal(1),
+                    ResourceSlotName("mem"): Decimal(1024**4),
+                },
+            ),
+        )
+
+    def test_noop_without_policy(self) -> None:
+        img = ImageID(uuid.uuid4())
+        PendingSessionResourceLimitRule().validate(
+            _spec((_kernel(img),)),
+            _ctx(pending_session_resource_slots={ResourceSlotName("cpu"): Decimal(100)}),
+        )
+
+    def test_noop_when_limit_unset(self) -> None:
+        img = ImageID(uuid.uuid4())
+        PendingSessionResourceLimitRule().validate(
+            _spec((_kernel(img),)),
+            _ctx(
+                policy=_policy(max_pending_slots=None),
+                pending_session_resource_slots={ResourceSlotName("cpu"): Decimal(100)},
+            ),
         )
 
 

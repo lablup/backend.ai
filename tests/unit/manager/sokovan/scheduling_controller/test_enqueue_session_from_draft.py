@@ -194,6 +194,7 @@ def _user_policy() -> UserEnqueuePolicy:
     return UserEnqueuePolicy(
         max_containers_per_session=4,
         max_pending_session_count=None,
+        max_pending_session_resource_slots=None,
         allowed_vfolder_hosts=VFolderHostPermissionMap(),
     )
 
@@ -222,6 +223,7 @@ def _spec_context(image_id: ImageID) -> SessionSpecContext:
             container_user=ContainerUserInfo(uid=1000, main_gid=1000, supplementary_gids=[]),
             dotfiles=DotfileBundle(),
             pending_session_count=0,
+            pending_session_resource_slots={},
             vfolder_mounts_by_role={"main": (_vfolder_mount(),)},
         ),
         global_info=GlobalEnqueueInfo(

@@ -2,6 +2,7 @@
 
 from collections.abc import Mapping
 from dataclasses import dataclass
+from decimal import Decimal
 
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.resource_slot import ResourceSlotName
@@ -45,6 +46,7 @@ class UserEnqueueInfo:
     container_user: ContainerUserInfo
     dotfiles: DotfileBundle
     pending_session_count: int
+    pending_session_resource_slots: Mapping[ResourceSlotName, Decimal]
     vfolder_mounts_by_role: Mapping[str, tuple[VFolderMount, ...]]
 
 

@@ -1,6 +1,7 @@
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
+from decimal import Decimal
 from typing import Any
 
 from ai.backend.common.identifier.resource_slot import ResourceSlotName
@@ -82,4 +83,5 @@ class UserEnqueuePolicy:
 
     max_containers_per_session: int
     max_pending_session_count: int | None
+    max_pending_session_resource_slots: Mapping[ResourceSlotName, Decimal] | None
     allowed_vfolder_hosts: VFolderHostPermissionMap

@@ -26,7 +26,12 @@ import pytest
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.resource_slot import ResourceSlotName
 from ai.backend.common.identifier.session import SessionID
-from ai.backend.common.types import AccessKey, ClusterMode, ResourceSlotEntry, SessionTypes
+from ai.backend.common.types import (
+    AccessKey,
+    ClusterMode,
+    ResourceSlotEntry,
+    SessionTypes,
+)
 from ai.backend.manager.data.dotfile.types import DotfileBundle
 from ai.backend.manager.data.resource.types import SlotTypeInfo
 from ai.backend.manager.data.session.creation import ContainerUserInfo
@@ -106,6 +111,7 @@ def context() -> SessionSpecContext:
             container_user=ContainerUserInfo(),
             dotfiles=DotfileBundle(),
             pending_session_count=0,
+            pending_session_resource_slots={},
             vfolder_mounts_by_role={},
         ),
         global_info=GlobalEnqueueInfo(

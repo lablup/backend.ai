@@ -6,6 +6,7 @@ from .image_slot_type_rule import ImageSlotTypeRule
 from .inference_model_folder_rule import InferenceModelFolderRule
 from .mount_name_validation_rule import MountNameValidationRule
 from .pending_session_count_limit_rule import PendingSessionCountLimitRule
+from .pending_session_resource_limit_rule import PendingSessionResourceLimitRule
 from .requested_slot_type_rule import RequestedSlotTypeRule
 from .required_resource_slot_rule import RequiredResourceSlotRule
 from .resource_limit_rule import ResourceLimitRule
@@ -17,6 +18,7 @@ from .session_spec_base import (
 
 __all__ = [
     "PendingSessionCountLimitRule",
+    "PendingSessionResourceLimitRule",
     "ContainerLimitRule",
     "DotfileVFolderConflictRule",
     "ImageSlotTypeRule",

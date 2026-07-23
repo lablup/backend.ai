@@ -101,6 +101,7 @@ def _context(rg: DefaultSessionOptions) -> SessionSpecContext:
             container_user=ContainerUserInfo(),
             dotfiles=DotfileBundle(),
             pending_session_count=0,
+            pending_session_resource_slots={},
             vfolder_mounts_by_role={},
         ),
         global_info=GlobalEnqueueInfo(
