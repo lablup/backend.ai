@@ -22,7 +22,7 @@ jobs:
       - name: Compute projected close date
         run: echo "CLOSE_DATE=$(date -u -d "+${DAYS_BEFORE_CLOSE} days" +%Y-%m-%d)" >> "$GITHUB_ENV"
 
-      - uses: actions/stale@v9
+      - uses: actions/stale@v10
         with:
           days-before-stale: ${{ env.DAYS_BEFORE_STALE }}
           days-before-close: ${{ env.DAYS_BEFORE_CLOSE }}
