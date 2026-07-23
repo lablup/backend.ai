@@ -38,6 +38,7 @@ from typing import TYPE_CHECKING, Any, cast
 from ai.backend.agent.containerd.oci import SESSION_ID_LABEL
 from ai.backend.agent.errors.network import UnusableVtep
 from ai.backend.agent.network.cni import CniAttacher, plan_to_invocations
+from ai.backend.agent.network.local_subnet import LocalSubnetAllocator, get_local_subnet_allocator
 from ai.backend.agent.network.native_attacher import HostLocalIpam, get_host_local_ipam
 from ai.backend.agent.network.port_forward import PortForwarder, forwards_for
 from ai.backend.agent.network.privnet import netns as netns_mod
@@ -126,6 +127,10 @@ class PrivNetServer:
     # The store the attach path allocates LOCAL addresses from. Read on recovery to find the
     # address a pre-restart attach assigned, which is the address its published ports DNAT to.
     _ipam: HostLocalIpam
+    # The node-local pool both backends carve their LOCAL block out of. The privnet is its single
+    # owner (it owns every privileged network op), so it is also the one that can answer which
+    # block a session holds — the LOCAL_SUBNET query the agent uses to resolve single-node peers.
+    _local_subnets: LocalSubnetAllocator
 
     def __init__(
         self,
@@ -141,6 +146,7 @@ class PrivNetServer:
         forwarder: PortForwarder | None = None,
         journal: PrivNetJournal | None = None,
         ipam: HostLocalIpam | None = None,
+        local_subnets: LocalSubnetAllocator | None = None,
         netns_pinner: netns_mod.NetnsPinner | None = None,
     ) -> None:
         self._socket_path = socket_path
@@ -159,6 +165,7 @@ class PrivNetServer:
         self._locks = {}
         self._journal = journal or PrivNetJournal()
         self._ipam = ipam or get_host_local_ipam()
+        self._local_subnets = local_subnets or get_local_subnet_allocator()
         self._netns = netns_pinner or netns_mod.NetnsPinner()
 
     def _lock(self, session_id: str) -> asyncio.Lock:
@@ -449,6 +456,8 @@ class PrivNetServer:
                         return PrivNetResponse(ok=True, host_ports=await self._unpublish_ports(req))
                     case PrivNetOp.LIST_PORTS:
                         return PrivNetResponse(ok=True, forwards=await self._list_ports())
+                    case PrivNetOp.LOCAL_SUBNET:
+                        return PrivNetResponse(ok=True, subnet=await self._local_subnet(session_id))
             except (policy.PolicyViolation, netns_mod.NetnsError, PrivNetError) as e:
                 return PrivNetResponse(ok=False, error=str(e))
             except Exception:
@@ -580,6 +589,18 @@ class PrivNetServer:
             (f.container_id, f.host_port, f.container_ip, f.container_port)
             for f in await self._forwarder.list_forwards()
         )
+
+    async def _local_subnet(self, session_id: str) -> str | None:
+        """This session's node-local LOCAL /26, or None if it holds no block.
+
+        Read-only, and the inverse of the concern the rest of this protocol guards: the agent is
+        asking which block the privnet ALREADY assigned so it can write /etc/hosts for a
+        single-node cluster, not declaring one — a session's subnet is exactly the thing the agent
+        must not be able to re-declare, and this only reads it. `subnet_of` never allocates, so a
+        query for an unknown or torn-down session returns None rather than minting a block a
+        stray kernel could then strand.
+        """
+        return await self._local_subnets.subnet_of(session_id)
 
     async def _detach(self, session_id: str, container_id: str | None) -> None:
         if container_id is None:

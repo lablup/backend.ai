@@ -41,6 +41,10 @@ class PrivNetOp(enum.StrEnum):
     # Node-wide: every published port, so a restarted agent can take them back out of its port
     # pool. Read-only, and the agent installed them all in the first place.
     LIST_PORTS = "list_ports"
+    # A session's node-local LOCAL /26. Read-only: the agent asks which block the privnet ALREADY
+    # assigned (to write /etc/hosts for a single-node cluster), it does not declare one — the
+    # inverse of the trust concern the rest of this protocol guards against.
+    LOCAL_SUBNET = "local_subnet"
 
 
 class ProtocolError(RuntimeError):
@@ -182,6 +186,8 @@ class PrivNetResponse:
     host_ports: tuple[int, ...] | None = None
     # LIST_PORTS: (container_id, host_port, container_ip, container_port) per published rule.
     forwards: tuple[tuple[str, int, str, int], ...] | None = None
+    # LOCAL_SUBNET: the session's node-local LOCAL CIDR, or None when it holds no block.
+    subnet: str | None = None
     error: str | None = None
 
     def encode(self) -> bytes:
@@ -192,6 +198,8 @@ class PrivNetResponse:
             payload["host_ports"] = list(self.host_ports)
         if self.forwards is not None:
             payload["forwards"] = [list(f) for f in self.forwards]
+        if self.subnet is not None:
+            payload["subnet"] = self.subnet
         if self.error is not None:
             payload["error"] = self.error
         return json.dumps(payload, separators=(",", ":")).encode() + b"\n"
@@ -212,11 +220,15 @@ class PrivNetResponse:
             isinstance(raw_ports, list) and all(isinstance(p, int) for p in raw_ports)
         ):
             raise ProtocolError("host_ports must be an array of integers")
+        subnet = data.get("subnet")
+        if subnet is not None and not isinstance(subnet, str):
+            raise ProtocolError("subnet must be a string or null")
         error = data.get("error")
         return cls(
             ok=bool(data["ok"]),
             assigned=assigned,
             host_ports=tuple(raw_ports) if raw_ports is not None else None,
             forwards=_decode_forwards(data.get("forwards")),
+            subnet=subnet,
             error=error,
         )

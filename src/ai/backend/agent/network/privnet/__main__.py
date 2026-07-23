@@ -154,6 +154,9 @@ async def _amain() -> None:
         runtime=runtime,
         cni_runner=NativeBridgeAttachRunner(uplink=uplink),
         backends=backends,
+        # The same pool instance both backends carve from, so the LOCAL_SUBNET query reads the very
+        # block a session's setup claimed rather than a second view that could drift from it.
+        local_subnets=local_subnets,
     )
     await server.serve_forever()
 

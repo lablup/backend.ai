@@ -19,6 +19,7 @@ import pytest
 
 from ai.backend.agent.containerd.oci import SESSION_ID_LABEL
 from ai.backend.agent.containerd.runtime.interface import ContainerInfo
+from ai.backend.agent.network.local_subnet import LocalSubnetAllocator
 from ai.backend.agent.network.native_attacher import HostLocalIpam
 from ai.backend.agent.network.privnet.client import (
     PrivNetClient,
@@ -223,6 +224,10 @@ class _Harness:
         self.state_dir = root
         self.journal = PrivNetJournal(root / "journal")
         self.ipam = HostLocalIpam(root / "ipam")
+        # An allocator on the harness's own state dir, not the process-global one, so LOCAL_SUBNET
+        # queries are isolated between tests (and survive a same-state_dir restart, like the real
+        # journal does).
+        self.local_subnets = LocalSubnetAllocator(root / "local-subnet")
         self.cni = _RecordingCni(self.ipam)
         self.server = PrivNetServer(
             socket_path=_short_socket_path(),
@@ -238,6 +243,7 @@ class _Harness:
             forwarder=cast(Any, self.forwarder),
             journal=self.journal,
             ipam=self.ipam,
+            local_subnets=self.local_subnets,
             netns_pinner=cast(Any, _FakeNetns()),
         )
         self._task: asyncio.Task[None] | None = None
@@ -272,6 +278,13 @@ class TestProtocol:
     def test_response_roundtrip(self) -> None:
         resp = PrivNetResponse(ok=True, assigned={"local": "172.30.0.3"})
         assert PrivNetResponse.decode(resp.encode()) == resp
+
+    def test_subnet_field_roundtrips(self) -> None:
+        resp = PrivNetResponse(ok=True, subnet="172.30.0.64/26")
+        assert PrivNetResponse.decode(resp.encode()) == resp
+
+    def test_absent_subnet_stays_none(self) -> None:
+        assert PrivNetResponse.decode(PrivNetResponse(ok=True).encode()).subnet is None
 
 
 class TestPolicy:
@@ -328,6 +341,34 @@ class TestPrivNetRpc:
             )
             await h.client().call(PrivNetRequest(PrivNetOp.TEARDOWN_SESSION, "sess-2"))
             assert h.backend.teardown_calls == ["sess-2"]
+
+    async def test_local_subnet_returns_the_block_the_privnet_assigned(self) -> None:
+        """The read-only query single-node cluster peer resolution rests on: the agent has no LOCAL
+        journal in privnet mode, so it asks the privnet which /26 a session holds."""
+        async with _Harness() as h:
+            subnet = await h.local_subnets.allocate_subnet("sess-local")
+            assert await h.client().local_subnet_of("sess-local") == subnet
+
+    async def test_local_subnet_of_an_unknown_session_is_none(self) -> None:
+        """Never allocates, so a query for a session the privnet holds no block for returns None
+        rather than minting one a stray kernel could strand."""
+        async with _Harness() as h:
+            assert await h.client().local_subnet_of("never-seen") is None
+
+    async def test_local_subnet_query_does_not_allocate(self) -> None:
+        """Querying an unknown session must leave the pool untouched — otherwise a repeated lookup
+        would hand out blocks."""
+        async with _Harness() as h:
+            await h.client().local_subnet_of("ghost")
+            assert await h.local_subnets.subnet_of("ghost") is None
+
+    async def test_local_subnet_degrades_to_none_when_the_privnet_is_unreachable(self) -> None:
+        """This lookup is on the kernel-creation path, so a failed query must degrade, not raise:
+        an unreachable or too-old privnet loses the peer /etc/hosts entries (the pre-existing gap)
+        rather than aborting the kernel. A raising query would break every single-node cluster in
+        a deploy where the agent leads the privnet in version."""
+        client = PrivNetClient("/nonexistent/privnet.sock")
+        assert await client.local_subnet_of("sess-x") is None
 
     async def test_rejects_unsafe_session_id(self) -> None:
         async with _Harness() as h:

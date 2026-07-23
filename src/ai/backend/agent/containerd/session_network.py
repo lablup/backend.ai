@@ -20,7 +20,7 @@ import asyncio
 import contextlib
 import json
 import logging
-from collections.abc import AsyncIterator, Callable, Mapping, Sequence
+from collections.abc import AsyncIterator, Awaitable, Callable, Mapping, Sequence
 from typing import TYPE_CHECKING, Any, cast
 
 from ai.backend.agent.containerd.oci import OWNER_AGENT_LABEL, SESSION_ID_LABEL
@@ -100,6 +100,9 @@ class ContainerdSessionNetwork:
     # The durable journals this process owns, and so may reconcile on restart. Both are None when
     # a privileged privnet owns the host state (it keeps its own records and outlives the agent).
     _local_subnets: LocalSubnetAllocator | None
+    # Privnet-mode fallback for the LOCAL subnet lookup: this process holds no journal there, so it
+    # asks the privnet (which owns the pool). None in-process.
+    _privnet_local_subnet: Callable[[str], Awaitable[str | None]] | None
     _ipam: HostLocalIpam | None
     # One lock per session, so the per-node data-plane setup runs once even when several kernels of
     # the same session are created concurrently on this node (the agent gathers up to
@@ -126,6 +129,7 @@ class ContainerdSessionNetwork:
         backends: Mapping[str, AbstractNetworkAgentPluginV2[Any]],
         provisioner_factory: Callable[[AbstractNetworkAgentPluginV2[Any], str], Any] | None = None,
         local_subnets: LocalSubnetAllocator | None = None,
+        privnet_local_subnet: Callable[[str], Awaitable[str | None]] | None = None,
         ipam: HostLocalIpam | None = None,
         vtep_ip: str | None = None,
     ) -> None:
@@ -144,6 +148,10 @@ class ContainerdSessionNetwork:
         self._tracker = SessionContainerTracker()
         self._attachments = {}
         self._local_subnets = local_subnets
+        # In privnet mode this process owns no LOCAL journal, so the subnet lookup single-node peer
+        # resolution needs is delegated to the privnet, which does own the pool. None in-process,
+        # where `_local_subnets` answers directly.
+        self._privnet_local_subnet = privnet_local_subnet
         self._ipam = ipam
         self._session_locks = {}
         self._session_lock_users = {}
@@ -591,12 +599,15 @@ class ContainerdSessionNetwork:
         mint a fresh block for a dead session — one no teardown will ever release, since the
         session's coordinator is gone, so it would leak from the node's pool until a restart.
 
-        None under a privileged privnet, which owns the pool and assigns the addresses itself — the
-        agent cannot compute them, so peer resolution there is the privnet's to add.
+        In privnet mode this process owns no LOCAL journal, so the lookup is delegated to the
+        privnet, which does — a read-only query for the block it already assigned. None only when
+        neither source is wired (or the privnet holds no block for the session).
         """
-        if self._local_subnets is None:
-            return None
-        return await self._local_subnets.subnet_of(session_id)
+        if self._local_subnets is not None:
+            return await self._local_subnets.subnet_of(session_id)
+        if self._privnet_local_subnet is not None:
+            return await self._privnet_local_subnet(session_id)
+        return None
 
     async def teardown_session(self, session_id: str) -> None:
         # Under the same per-session lock as setup, so a teardown racing the last kernel's setup
@@ -858,6 +869,9 @@ def build_containerd_session_network(
     # host state, keeps its own records, and outlives the agent.
     owned_local_subnets: LocalSubnetAllocator | None = None
     owned_ipam: HostLocalIpam | None = None
+    # In privnet mode the LOCAL subnet lookup is a read-only RPC to the pool's owner; None
+    # in-process, where owned_local_subnets answers directly.
+    privnet_local_subnet: Callable[[str], Awaitable[str | None]] | None = None
     if privnet_socket is not None:
         from ai.backend.agent.network.privnet.client import (
             PrivNetBackendProxy,
@@ -878,6 +892,7 @@ def build_containerd_session_network(
             return PrivNetProvisioner(client, session_id)
 
         make_provisioner = _privnet_provisioner_factory
+        privnet_local_subnet = client.local_subnet_of
     else:
         # The process-wide owner of the node-local pool: shared by both backends here (they carve
         # their LOCAL block out of the same pool) and by every other agent this runtime hosts.
@@ -901,6 +916,7 @@ def build_containerd_session_network(
         backends=backends,
         provisioner_factory=make_provisioner,
         local_subnets=owned_local_subnets,
+        privnet_local_subnet=privnet_local_subnet,
         ipam=owned_ipam,
         vtep_ip=vtep_ip,
     )

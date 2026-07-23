@@ -16,6 +16,7 @@ config — so it holds no CAP_NET_ADMIN / CAP_SYS_ADMIN.
 from __future__ import annotations
 
 import asyncio
+import logging
 from collections.abc import Callable, Sequence
 from typing import TYPE_CHECKING, Any, override
 
@@ -25,6 +26,7 @@ from ai.backend.agent.network.privnet.protocol import (
     PrivNetOp,
     PrivNetRequest,
     PrivNetResponse,
+    ProtocolError,
 )
 from ai.backend.agent.plugin.network_v2 import AbstractNetworkAgentPluginV2
 from ai.backend.common.network.types import (
@@ -34,6 +36,9 @@ from ai.backend.common.network.types import (
     NetworkRole,
     SessionNetMeta,
 )
+from ai.backend.logging import BraceStyleAdapter
+
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 if TYPE_CHECKING:
     from ai.backend.agent.kernel import AbstractKernel
@@ -66,6 +71,31 @@ class PrivNetClient:
         if not resp.ok:
             raise PrivNetClientError(resp.error or "privnet request failed")
         return resp
+
+    async def local_subnet_of(self, session_id: str) -> str | None:
+        """The session's node-local LOCAL /26, from the privnet that owns the pool.
+
+        The agent has no LOCAL journal of its own in privnet mode, so this is how it learns the
+        subnet it needs to lay out single-node cluster peers. Returns None when the privnet holds
+        no block for the session (unknown or torn down) — the query never allocates, so an
+        unresolved name degrades to "no peer entry" rather than minting a phantom block.
+
+        A failed query — an unreachable privnet, or one too old to know the verb — also degrades to
+        None, not an exception. This lookup sits on the kernel-creation path (``_peer_host_map``):
+        raising here would abort the whole kernel over a best-effort name-resolution step, and a
+        deploy where the agent leads the privnet in version would break every single-node cluster.
+        Degrading loses only the peer /etc/hosts entries (the pre-existing gap), and the kernel
+        still comes up.
+        """
+        try:
+            resp = await self.call(PrivNetRequest(op=PrivNetOp.LOCAL_SUBNET, session_id=session_id))
+        except (PrivNetClientError, OSError, ProtocolError) as e:
+            # PrivNetClientError: an ok=False reply (bad session, or an op an older privnet does
+            # not know). OSError: the socket is missing or the privnet is not accepting. Both mean
+            # "no answer", and on the kernel-creation path that must degrade, not abort.
+            log.warning("privnet LOCAL_SUBNET query for {} failed, degrading: {}", session_id, e)
+            return None
+        return resp.subnet
 
 
 def _network_config_from_meta(meta: SessionNetMeta) -> dict[str, Any]:
