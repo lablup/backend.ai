@@ -100,9 +100,11 @@ async def test_steady_state_scale_down_drains_excess() -> None:
     assert result.drain_instructions[0].count == 5
 
 
-async def test_rollout_still_requires_serving() -> None:
-    # A target revision is in flight (rollout): the current side must reach serving, not just
-    # count, so the rolling step waits before draining the old revision (no-downtime).
+async def test_rollout_converges_when_current_pending_but_target_serving() -> None:
+    # Rollout in flight with old-revision replicas stuck PENDING (live but not serving)
+    # while the new revision is fully serving. The current side converges on count alone;
+    # otherwise the group never reaches STABLE and the rolling step can never drain the
+    # old revision (livelock).
     view = _scaling_view(
         current_revision_id=DeploymentRevisionID(uuid.uuid4()),
         target_revision_id=DeploymentRevisionID(uuid.uuid4()),
@@ -112,6 +114,23 @@ async def test_rollout_still_requires_serving() -> None:
         current_serving=2,
         target_live=3,
         target_serving=3,
+    )
+    decision = await _decision(view)
+    assert decision.outcome() is HandlerOutcome.SUCCESS
+
+
+async def test_rollout_still_requires_target_serving() -> None:
+    # The target side must be fully serving before the group converges, so the rolling
+    # step never drains the old revision ahead of the new one (no-downtime invariant).
+    view = _scaling_view(
+        current_revision_id=DeploymentRevisionID(uuid.uuid4()),
+        target_revision_id=DeploymentRevisionID(uuid.uuid4()),
+        desired_current=3,
+        desired_target=3,
+        current_live=3,
+        current_serving=3,
+        target_live=3,
+        target_serving=2,
     )
     decision = await _decision(view)
     assert decision.outcome() is HandlerOutcome.FAILURE
