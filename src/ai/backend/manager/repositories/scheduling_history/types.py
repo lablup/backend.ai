@@ -8,12 +8,16 @@ from uuid import UUID
 
 from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec
 from ai.backend.common.identifier.replica import ReplicaID
-from ai.backend.common.types import SessionId
+from ai.backend.common.types import KernelId, SessionId
 from ai.backend.manager.errors.deployment import EndpointNotFound
-from ai.backend.manager.errors.kernel import SessionNotFound
+from ai.backend.manager.errors.kernel import (
+    KernelNotFound,
+    SessionNotFound,
+)
 from ai.backend.manager.errors.service import RouteNotFound
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.endpoint import EndpointRow
+from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.scheduling_history.conditions import (
     DeploymentHistoryConditions,
@@ -26,6 +30,7 @@ from ai.backend.manager.models.session import SessionRow
 
 __all__ = (
     "SessionSchedulingHistorySearchScope",
+    "KernelKernelHistorySearchScope",
     "SessionKernelHistorySearchScope",
     "DeploymentHistorySearchScope",
     "RouteHistorySearchScope",
@@ -66,6 +71,39 @@ class SessionSchedulingHistorySearchScope(SearchScope):
 
 
 # Kernel Scheduling History Scope
+
+
+@dataclass(frozen=True)
+class KernelKernelHistorySearchScope(SearchScope):
+    """Scope for kernel scheduling history search bounded by one kernel.
+
+    Not reachable yet: kernels hold no RBAC permission records of their own, so
+    a kernel-keyed query is authorized on the owning session and narrowed with a
+    ``kernel_id`` condition instead. This is what it should scope by once
+    virtual scopes land.
+    """
+
+    kernel_id: KernelId
+    """Required. The kernel to search history for."""
+
+    @override
+    def to_condition(self) -> QueryCondition:
+        """Convert scope to a query condition for KernelSchedulingHistoryRow."""
+        return KernelSchedulingHistoryConditions.by_kernel_id_filter(
+            UUIDEqualMatchSpec(value=self.kernel_id, negated=False)
+        )
+
+    @property
+    @override
+    def existence_checks(self) -> list[ExistenceCheck[Any]]:
+        """Check that the kernel exists."""
+        return [
+            ExistenceCheck(
+                column=KernelRow.id,
+                value=self.kernel_id,
+                error=KernelNotFound(str(self.kernel_id)),
+            ),
+        ]
 
 
 @dataclass(frozen=True)
