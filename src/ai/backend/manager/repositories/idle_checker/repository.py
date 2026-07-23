@@ -58,3 +58,9 @@ class IdleCheckerRepository:
             pairs_to_delete,
             now,
         )
+
+    async def mark_session_idle_checks_ready_to_check(
+        self,
+        pairs: Sequence[SessionIdleCheckPair],
+    ) -> None:
+        await self._db_source.mark_session_idle_checks_ready_to_check(pairs)

@@ -18,6 +18,7 @@ class CheckerType(enum.StrEnum):
 
 class IdleCheckPhase(enum.StrEnum):
     NOT_CHECKED = "not_checked"
+    READY_TO_CHECK = "ready_to_check"
     ACTIVE = "active"
     IDLE = "idle"
     IDLE_EXPIRED = "idle_expired"

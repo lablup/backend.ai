@@ -66,6 +66,7 @@ class JudgmentRows:
     active_session_id: SessionId
     idle_session_id: SessionId
     not_checked_session_id: SessionId
+    ready_to_check_session_id: SessionId
     idle_expired_session_id: SessionId
     session_without_row_id: SessionId
     terminated_session_id: SessionId
@@ -208,6 +209,7 @@ class TestFetchJudgmentBatch:
         active_session_id = SessionId(uuid.uuid4())
         idle_session_id = SessionId(uuid.uuid4())
         not_checked_session_id = SessionId(uuid.uuid4())
+        ready_to_check_session_id = SessionId(uuid.uuid4())
         idle_expired_session_id = SessionId(uuid.uuid4())
         session_without_row_id = SessionId(uuid.uuid4())
         terminated_session_id = SessionId(uuid.uuid4())
@@ -216,6 +218,7 @@ class TestFetchJudgmentBatch:
             (active_session_id, SessionStatus.RUNNING),
             (idle_session_id, SessionStatus.RUNNING),
             (not_checked_session_id, SessionStatus.RUNNING),
+            (ready_to_check_session_id, SessionStatus.RUNNING),
             (idle_expired_session_id, SessionStatus.RUNNING),
             (session_without_row_id, SessionStatus.RUNNING),
             (terminated_session_id, SessionStatus.TERMINATED),
@@ -224,6 +227,7 @@ class TestFetchJudgmentBatch:
             (active_session_id, IdleCheckPhase.ACTIVE),
             (idle_session_id, IdleCheckPhase.IDLE),
             (not_checked_session_id, IdleCheckPhase.NOT_CHECKED),
+            (ready_to_check_session_id, IdleCheckPhase.READY_TO_CHECK),
             (idle_expired_session_id, IdleCheckPhase.IDLE_EXPIRED),
             (terminated_session_id, IdleCheckPhase.ACTIVE),
         )
@@ -256,13 +260,14 @@ class TestFetchJudgmentBatch:
             active_session_id=active_session_id,
             idle_session_id=idle_session_id,
             not_checked_session_id=not_checked_session_id,
+            ready_to_check_session_id=ready_to_check_session_id,
             idle_expired_session_id=idle_expired_session_id,
             session_without_row_id=session_without_row_id,
             terminated_session_id=terminated_session_id,
             checker_id=checker_id,
         )
 
-    async def test_returns_active_and_idle_rows(
+    async def test_returns_ready_active_and_idle_rows(
         self,
         repository: IdleCheckerRepository,
         judgment_rows: JudgmentRows,
@@ -274,6 +279,7 @@ class TestFetchJudgmentBatch:
             for assignment in batch.assignments
         }
         assert pairs == {
+            (judgment_rows.ready_to_check_session_id, judgment_rows.checker_id),
             (judgment_rows.active_session_id, judgment_rows.checker_id),
             (judgment_rows.idle_session_id, judgment_rows.checker_id),
         }
@@ -288,6 +294,78 @@ class TestFetchJudgmentBatch:
         session_ids = {assignment.session.session_id for assignment in batch.assignments}
         assert judgment_rows.not_checked_session_id not in session_ids
         assert judgment_rows.idle_expired_session_id not in session_ids
+
+    async def test_marks_not_checked_row_ready_to_check(
+        self,
+        database: ExtendedAsyncSAEngine,
+        repository: IdleCheckerRepository,
+        judgment_rows: JudgmentRows,
+    ) -> None:
+        pair = SessionIdleCheckPair(
+            judgment_rows.not_checked_session_id,
+            judgment_rows.checker_id,
+        )
+
+        await repository.mark_session_idle_checks_ready_to_check([pair])
+
+        async with database.begin_readonly_session() as db_sess:
+            row = await db_sess.get(
+                SessionIdleCheckRow,
+                (pair.session_id, pair.checker_id),
+            )
+        assert row is not None
+        assert row.last_status is IdleCheckPhase.READY_TO_CHECK
+
+    async def test_does_not_overwrite_row_that_is_no_longer_not_checked(
+        self,
+        database: ExtendedAsyncSAEngine,
+        repository: IdleCheckerRepository,
+        judgment_rows: JudgmentRows,
+    ) -> None:
+        pair = SessionIdleCheckPair(
+            judgment_rows.active_session_id,
+            judgment_rows.checker_id,
+        )
+
+        await repository.mark_session_idle_checks_ready_to_check([pair])
+
+        async with database.begin_readonly_session() as db_sess:
+            row = await db_sess.get(
+                SessionIdleCheckRow,
+                (pair.session_id, pair.checker_id),
+            )
+        assert row is not None
+        assert row.last_status is IdleCheckPhase.ACTIVE
+
+    async def test_marks_existing_row_when_batch_contains_missing_pair(
+        self,
+        database: ExtendedAsyncSAEngine,
+        repository: IdleCheckerRepository,
+        judgment_rows: JudgmentRows,
+    ) -> None:
+        existing_pair = SessionIdleCheckPair(
+            judgment_rows.not_checked_session_id,
+            judgment_rows.checker_id,
+        )
+        missing_pair = SessionIdleCheckPair(
+            SessionId(uuid.uuid4()),
+            judgment_rows.checker_id,
+        )
+
+        await repository.mark_session_idle_checks_ready_to_check([existing_pair, missing_pair])
+
+        async with database.begin_readonly_session() as db_sess:
+            row = await db_sess.get(
+                SessionIdleCheckRow,
+                (existing_pair.session_id, existing_pair.checker_id),
+            )
+            missing_row = await db_sess.get(
+                SessionIdleCheckRow,
+                (missing_pair.session_id, missing_pair.checker_id),
+            )
+        assert row is not None
+        assert row.last_status is IdleCheckPhase.READY_TO_CHECK
+        assert missing_row is None
 
     async def test_fetches_only_not_checked_rows_for_initial_grace(
         self,
@@ -337,6 +415,7 @@ class TestFetchJudgmentBatch:
                 judgment_rows.active_session_id,
                 judgment_rows.idle_session_id,
                 judgment_rows.not_checked_session_id,
+                judgment_rows.ready_to_check_session_id,
                 judgment_rows.idle_expired_session_id,
                 judgment_rows.session_without_row_id,
             )
@@ -347,6 +426,7 @@ class TestFetchJudgmentBatch:
                 judgment_rows.active_session_id,
                 judgment_rows.idle_session_id,
                 judgment_rows.not_checked_session_id,
+                judgment_rows.ready_to_check_session_id,
                 judgment_rows.idle_expired_session_id,
             )
         }
