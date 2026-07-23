@@ -157,6 +157,7 @@ class SchedulingHistoryService:
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,
             target=action.target,
+            authorized_session_id=action.authorized_session_id,
         )
 
     async def search_deployment_scoped_history(

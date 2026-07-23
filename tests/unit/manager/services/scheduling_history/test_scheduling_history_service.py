@@ -400,9 +400,7 @@ class TestSearchKernelScopedHistoryAction:
         [
             _KernelScopedHistoryCase(
                 label="bound-to-kernel",
-                target=KernelKernelHistoryTarget(
-                    session_id=_SESSION_ID, kernel_id=_KERNEL_ID
-                ),
+                target=KernelKernelHistoryTarget(kernel_id=_KERNEL_ID),
                 expected_scope=KernelSchedulingHistorySearchScope(kernel_id=_KERNEL_ID),
             ),
             _KernelScopedHistoryCase(
@@ -430,13 +428,15 @@ class TestSearchKernelScopedHistoryAction:
             )
         )
 
-        action = SearchKernelScopedHistoryAction(target=case.target, querier=querier)
+        action = SearchKernelScopedHistoryAction(
+            target=case.target, authorized_session_id=_SESSION_ID, querier=querier
+        )
         result = await service.search_kernel_scoped_history(action)
 
         assert result.items == [history_item]
         # Authorized via session read: kernel permission records are intentionally
-        # empty, so the session is the subject, scope, and target of the RBAC check
-        # for every target variant; the target only narrows the repository query.
+        # empty, so the RBAC check is redirected to the session for every target
+        # variant; the target only narrows the repository query.
         assert action.target_element() == RBACElementRef(
             element_type=RBACElementType.SESSION, element_id=str(_SESSION_ID)
         )

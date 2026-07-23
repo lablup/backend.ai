@@ -454,9 +454,6 @@ class SchedulingHistoryAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        # The session is the authorization subject of every scope item; a
-        # kernel-scoped request resolves its owning session before dispatching so
-        # the RBAC check targets the session directly.
         kernel_items = input.scope.kernel or []
         session_items = input.scope.session or []
         if len(kernel_items) + len(session_items) != 1:
@@ -464,22 +461,29 @@ class SchedulingHistoryAdapter(BaseAdapter):
                 "Kernel scheduling history scope accepts exactly one scope item"
             )
         target: KernelHistoryTarget
+        # TODO: Drop `authorized_session_id` and the kernel -> session resolution
+        # once virtual scopes land; the action can then authorize on the target's
+        # own RBAC element ref.
+        authorized_session_id: SessionId
         if kernel_items:
             kernel_id = KernelId(kernel_items[0].value)
+            target = KernelKernelHistoryTarget(kernel_id=kernel_id)
             resolve_result = (
                 await self._processors.scheduling_history.resolve_kernel_session.wait_for_complete(
                     ResolveKernelSessionAction(kernel_id=kernel_id)
                 )
             )
-            target = KernelKernelHistoryTarget(
-                session_id=resolve_result.session_id, kernel_id=kernel_id
-            )
+            authorized_session_id = resolve_result.session_id
         else:
-            target = SessionKernelHistoryTarget(
-                session_id=SessionId(session_items[0].value)
-            )
+            session_id = SessionId(session_items[0].value)
+            target = SessionKernelHistoryTarget(session_id=session_id)
+            authorized_session_id = session_id
         action_result = await self._processors.scheduling_history.search_kernel_scoped_history.wait_for_complete(
-            SearchKernelScopedHistoryAction(target=target, querier=querier)
+            SearchKernelScopedHistoryAction(
+                target=target,
+                authorized_session_id=authorized_session_id,
+                querier=querier,
+            )
         )
         return SearchKernelHistoriesPayload(
             items=[self._kernel_data_to_dto(h) for h in action_result.items],

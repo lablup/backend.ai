@@ -20,14 +20,40 @@ from ai.backend.manager.repositories.scheduling_history.types import (
 
 @dataclass(frozen=True)
 class KernelHistoryTarget(SearchableActionTarget):
-    """Scope item of a kernel scheduling-history search.
+    """One scope item of a kernel scheduling-history search.
 
-    The owning session is the authorization subject of every variant, so
-    ``session_id`` alone decides the RBAC element ref; each variant only differs
-    in how far ``to_search_scope()`` narrows the rows.
+    Each variant carries only the id its own dimension is keyed by and derives
+    both the row filter and the RBAC element ref from it.
     """
 
+
+@dataclass(frozen=True)
+class KernelKernelHistoryTarget(KernelHistoryTarget):
+    """Scope item narrowing the history to one kernel."""
+
+    kernel_id: KernelId
+
+    @override
+    def to_search_scope(self) -> SearchScope:
+        return KernelSchedulingHistorySearchScope(kernel_id=self.kernel_id)
+
+    @override
+    def to_rbac_element_ref(self) -> RBACElementRef:
+        return RBACElementRef(
+            element_type=RBACElementType.KERNEL,
+            element_id=str(self.kernel_id),
+        )
+
+
+@dataclass(frozen=True)
+class SessionKernelHistoryTarget(KernelHistoryTarget):
+    """Scope item covering the history of every kernel the session owns."""
+
     session_id: SessionId
+
+    @override
+    def to_search_scope(self) -> SearchScope:
+        return KernelSchedulingHistoryBySessionSearchScope(session_id=self.session_id)
 
     @override
     def to_rbac_element_ref(self) -> RBACElementRef:
@@ -37,43 +63,21 @@ class KernelHistoryTarget(SearchableActionTarget):
         )
 
 
-@dataclass(frozen=True)
-class KernelKernelHistoryTarget(KernelHistoryTarget):
-    """Scope item narrowing the history to one kernel of the session.
-
-    The caller resolves ``kernel_id -> session_id`` first
-    (``ResolveKernelSessionAction``) and passes both in.
-    """
-
-    kernel_id: KernelId
-
-    @override
-    def to_search_scope(self) -> SearchScope:
-        return KernelSchedulingHistorySearchScope(kernel_id=self.kernel_id)
-
-
-@dataclass(frozen=True)
-class SessionKernelHistoryTarget(KernelHistoryTarget):
-    """Scope item covering the history of every kernel the session owns."""
-
-    @override
-    def to_search_scope(self) -> SearchScope:
-        return KernelSchedulingHistoryBySessionSearchScope(session_id=self.session_id)
-
-
 @dataclass
 class SearchKernelScopedHistoryAction(BaseScopeAction):
-    """Action to search kernel scheduling history within one session.
-
-    The session is the authorization subject, scope, and target: kernel
-    permission records are intentionally kept empty, so whoever may read the
-    session may read its kernels' scheduling history.
+    """Action to search kernel scheduling history under one scope item.
 
     This is still a single-target scope action, so it carries exactly one
     ``KernelHistoryTarget``.
     """
 
     target: KernelHistoryTarget
+    # TODO: Drop once virtual scopes land, and authorize on
+    # ``target.to_rbac_element_ref()`` instead. Kernels hold no permission
+    # records of their own, so the RBAC check has to be redirected to the owning
+    # session; a kernel-keyed caller must resolve ``kernel_id -> session_id``
+    # (``ResolveKernelSessionAction``) for no reason other than filling this in.
+    authorized_session_id: SessionId
     querier: BatchQuerier
 
     @override
@@ -92,22 +96,26 @@ class SearchKernelScopedHistoryAction(BaseScopeAction):
 
     @override
     def scope_id(self) -> str:
-        return str(self.target.session_id)
+        return str(self.authorized_session_id)
 
     @override
     def target_element(self) -> RBACElementRef:
-        return self.target.to_rbac_element_ref()
+        return RBACElementRef(
+            element_type=RBACElementType.SESSION,
+            element_id=str(self.authorized_session_id),
+        )
 
 
 @dataclass
 class SearchKernelScopedHistoryActionResult(BaseScopeActionResult):
-    """Result of searching kernel scheduling history within one session."""
+    """Result of searching kernel scheduling history under one scope item."""
 
     items: list[KernelSchedulingHistoryData]
     total_count: int
     has_next_page: bool
     has_previous_page: bool
     target: KernelHistoryTarget
+    authorized_session_id: SessionId
 
     @override
     def scope_type(self) -> ScopeType:
@@ -115,4 +123,4 @@ class SearchKernelScopedHistoryActionResult(BaseScopeActionResult):
 
     @override
     def scope_id(self) -> str:
-        return str(self.target.session_id)
+        return str(self.authorized_session_id)
