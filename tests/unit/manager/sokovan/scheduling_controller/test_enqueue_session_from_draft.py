@@ -73,6 +73,7 @@ from ai.backend.manager.data.session.draft import (
     SessionSpecDraft,
 )
 from ai.backend.manager.data.session.options import (
+    AgentSelectionPolicy,
     DefaultSessionOptions,
     ResourceOpts,
     SessionHandlerOptions,
@@ -209,10 +210,14 @@ def _make_user() -> UserData:
     )
 
 
-def _spec_context(image_id: ImageID) -> SessionSpecContext:
+def _spec_context(
+    image_id: ImageID,
+    *,
+    rg_defaults: DefaultSessionOptions | None = None,
+) -> SessionSpecContext:
     return SessionSpecContext(
         resource_group=ResourceGroupEnqueueInfo(
-            defaults=DefaultSessionOptions(),
+            defaults=rg_defaults if rg_defaults is not None else DefaultSessionOptions(),
             network=ScalingGroupNetworkInfo(use_host_network=False, wsproxy_addr=None),
             allow_fractional=False,
             served_slot_names=frozenset({ResourceSlotName("cpu"), ResourceSlotName("mem")}),
@@ -372,6 +377,80 @@ class TestEnqueueSessionFromDraft:
 
         enqueued_spec = repository.enqueue_session_from_spec.await_args.args[0]
         assert enqueued_spec.resource_spec.options.job_priority == 50
+
+    async def test_agent_selection_policy_override_beats_rg_default(
+        self,
+        draft: SessionSpecDraft,
+        image_id: ImageID,
+    ) -> None:
+        """A request-level STRICT policy survives over the RG default (PREFERRED)."""
+        resource = draft.resource_spec.resource
+        draft_strict = draft.model_copy(
+            update={
+                "resource_spec": draft.resource_spec.model_copy(
+                    update={
+                        "resource": resource.model_copy(
+                            update={
+                                "options": resource.options.model_copy(
+                                    update={
+                                        "scheduling_target": SchedulingTargetDraft(
+                                            agent_selection_policy=AgentSelectionPolicy.STRICT,
+                                        ),
+                                    }
+                                ),
+                            }
+                        ),
+                    }
+                ),
+            }
+        )
+
+        repository = AsyncMock()
+        repository.fetch_session_spec_context.return_value = _spec_context(image_id)
+        repository.query_accessible_resource_group_ids.return_value = frozenset({
+            draft_strict.scope.resource_group_id
+        })
+        repository.enqueue_session_from_spec.return_value = SessionID(uuid.uuid4())
+
+        controller, _, _ = _build_controller(repository)
+
+        with with_user(_make_user()):
+            await controller.enqueue_session_from_draft(draft_strict)
+
+        enqueued_spec = repository.enqueue_session_from_spec.await_args.args[0]
+        assert (
+            enqueued_spec.resource_spec.options.scheduling_target.agent_selection_policy
+            == AgentSelectionPolicy.STRICT
+        )
+
+    async def test_agent_selection_policy_unset_inherits_rg_default(
+        self,
+        draft: SessionSpecDraft,
+        image_id: ImageID,
+    ) -> None:
+        """An unset policy on the draft inherits the RG default."""
+        repository = AsyncMock()
+        repository.fetch_session_spec_context.return_value = _spec_context(
+            image_id,
+            rg_defaults=DefaultSessionOptions(
+                agent_selection_policy=AgentSelectionPolicy.STRICT,
+            ),
+        )
+        repository.query_accessible_resource_group_ids.return_value = frozenset({
+            draft.scope.resource_group_id
+        })
+        repository.enqueue_session_from_spec.return_value = SessionID(uuid.uuid4())
+
+        controller, _, _ = _build_controller(repository)
+
+        with with_user(_make_user()):
+            await controller.enqueue_session_from_draft(draft)
+
+        enqueued_spec = repository.enqueue_session_from_spec.await_args.args[0]
+        assert (
+            enqueued_spec.resource_spec.options.scheduling_target.agent_selection_policy
+            == AgentSelectionPolicy.STRICT
+        )
 
     async def test_pre_enqueue_hook_rejection_raises(
         self,

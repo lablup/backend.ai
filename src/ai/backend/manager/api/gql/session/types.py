@@ -83,6 +83,7 @@ from ai.backend.manager.api.gql.kernel.types import (
 from ai.backend.manager.api.gql.project_v2.types.node import ProjectV2GQL
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.resource_group.types import ResourceGroupGQL
+from ai.backend.manager.api.gql.session_options.types import AgentSelectionPolicyGQL
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.user.types.node import UserV2GQL
 from ai.backend.manager.errors.user import UserNotFound
@@ -659,6 +660,13 @@ class EnqueueSessionInputGQL(PydanticInputMixin[EnqueueSessionInputDTO]):
     is_preemptible: bool = gql_field(default=True, description="Whether preemptible.")
     dependencies: list[ID] | None = gql_field(default=None, description="Dependent session IDs.")
     agent_list: list[str] | None = gql_field(default=None, description="Designated agent IDs.")
+    agent_selection_policy: AgentSelectionPolicyGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            description=("How agent_list is enforced. null inherits the resource group default."),
+            added_version=NEXT_RELEASE_VERSION,
+        ),
+        default=None,
+    )
     attach_network: ID | None = gql_field(default=None, description="Network UUID to attach.")
 
     tag: str | None = gql_field(default=None, description="User-defined tag.")

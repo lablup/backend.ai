@@ -23,6 +23,7 @@ from ai.backend.common.dto.manager.v2.session.types import (
     ClusterModeEnum,
     CreateSessionTypeEnum,
 )
+from ai.backend.common.dto.manager.v2.session_options.types import AgentSelectionPolicyEnum
 from ai.backend.common.exception import BackendAISchemaValidationFailed
 
 
@@ -67,6 +68,31 @@ class TestEnqueueSessionInput:
         # Neutral-baseline design: values may go above 100 and below 0.
         assert _make(500).job_priority == 500
         assert _make(-5).job_priority == -5
+
+    def test_agent_selection_policy_parsing(self) -> None:
+        """agent_selection_policy accepts the enum values and defaults to None."""
+
+        def _make(**kwargs: object) -> EnqueueSessionInput:
+            return EnqueueSessionInput.model_validate({
+                "session_name": "policy-session",
+                "session_type": "interactive",
+                "image_id": str(uuid4()),
+                "resource_entries": [{"resource_type": "cpu", "quantity": "1"}],
+                "project_id": str(uuid4()),
+                **kwargs,
+            })
+
+        assert _make().agent_selection_policy is None
+        assert (
+            _make(agent_selection_policy="strict").agent_selection_policy
+            == AgentSelectionPolicyEnum.STRICT
+        )
+        assert (
+            _make(agent_selection_policy="preferred").agent_selection_policy
+            == AgentSelectionPolicyEnum.PREFERRED
+        )
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
+            _make(agent_selection_policy="invalid")
 
     def test_valid_batch_session(self) -> None:
         """Valid batch session with batch config."""

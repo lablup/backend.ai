@@ -5,6 +5,7 @@ from __future__ import annotations
 from decimal import Decimal
 from enum import StrEnum
 from functools import cached_property
+from uuid import UUID
 
 from pydantic import Field
 
@@ -120,6 +121,31 @@ class VFolderHostPermissionEntryInput(BaseRequestModel):
     host: str = Field(description="Virtual folder host name (e.g., 'default', 'nfs-vol1').")
     permissions: list[str] = Field(
         description="List of permission values (e.g., 'mount-in-session', 'upload-file')."
+    )
+
+
+class MountItemInput(BaseRequestModel):
+    """A single virtual folder mount specification.
+
+    Shared by the session enqueue input and the session-options kernel
+    execution spec (lives here to avoid a session <-> session_options
+    circular import).
+    """
+
+    vfolder_id: UUID = Field(description="Virtual folder UUID to mount.")
+    mount_path: str | None = Field(
+        default=None, description="Custom mount path. Uses default path if omitted."
+    )
+    permission: str | None = Field(
+        default=None, description="Mount permission override ('rw' or 'ro')."
+    )
+    subpath: str | None = Field(
+        default=None,
+        min_length=1,
+        description=(
+            "Subpath within the vfolder to mount. Omit (null) to mount the vfolder root."
+            " Empty string is rejected."
+        ),
     )
 
 

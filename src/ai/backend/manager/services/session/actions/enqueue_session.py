@@ -12,6 +12,7 @@ from ai.backend.common.types import AccessKey, ClusterMode, MountInfoEntry, Sess
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.permission.types import RBACElementRef
+from ai.backend.manager.data.session.options import AgentSelectionPolicy
 from ai.backend.manager.data.session.types import SessionData
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.services.session.base import SessionScopeAction
@@ -55,6 +56,7 @@ class SessionSchedulingSpec:
     is_preemptible: bool = True
     dependencies: list[uuid.UUID] | None = None
     agent_list: list[str] | None = None
+    agent_selection_policy: AgentSelectionPolicy | None = None
     attach_network: uuid.UUID | None = None
 
 

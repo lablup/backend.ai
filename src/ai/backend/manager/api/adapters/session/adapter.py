@@ -92,6 +92,7 @@ from ai.backend.manager.data.kernel.types import KernelInfo, KernelStatus, Kerne
 from ai.backend.manager.data.resource_slot.types import ResourceAllocationAggregate
 from ai.backend.manager.data.session.compute_schedule import ComputeScheduleKernelResult
 from ai.backend.manager.data.session.draft import KernelResourceInput
+from ai.backend.manager.data.session.options import AgentSelectionPolicy
 from ai.backend.manager.data.session.types import SessionData, SessionStatus
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.kernel.conditions import KernelConditions
@@ -313,6 +314,11 @@ class SessionAdapter(BaseAdapter):
                 is_preemptible=input.is_preemptible,
                 dependencies=input.dependencies,
                 agent_list=input.agent_list,
+                agent_selection_policy=(
+                    AgentSelectionPolicy(input.agent_selection_policy.value)
+                    if input.agent_selection_policy is not None
+                    else None
+                ),
                 attach_network=input.attach_network,
             ),
             batch=batch_spec,
