@@ -59,7 +59,7 @@ from ai.backend.manager.data.vfolder.types import (
     VFolderOwnershipType,
 )
 from ai.backend.manager.data.vfolder.types import VFolderMountPermission as VFolderPermission
-from ai.backend.manager.defs import is_noop_host
+from ai.backend.manager.defs import VFOLDER_DSTPATHS_MAP
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.errors.storage import (
