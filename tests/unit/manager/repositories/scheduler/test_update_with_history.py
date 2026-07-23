@@ -1057,3 +1057,78 @@ class TestUpdateWithHistory:
             records = (await db_sess.execute(history_stmt)).scalars().all()
             assert len(records) == 3
             assert all(r.attempts == 2 for r in records)
+
+    async def test_running_transition_preserves_requested_starts_at(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_id: DomainID,
+        test_domain_name: str,
+        test_scaling_group_id: ResourceGroupID,
+        test_scaling_group_name: str,
+        test_group_id: uuid.UUID,
+    ) -> None:
+        """The RUNNING transition writes starts_at without touching the
+        reserved start time recorded at enqueue."""
+        session_id = SessionId(uuid.uuid4())
+        requested_starts_at = datetime.now(tzutc()) - timedelta(minutes=30)
+
+        async with db_with_cleanup.begin_session() as db_sess:
+            session = SessionRow(
+                id=session_id,
+                creation_id=f"creation-{uuid.uuid4().hex[:8]}",
+                name=f"test-session-{uuid.uuid4().hex[:8]}",
+                session_type=SessionTypes.BATCH,
+                domain_id=test_domain_id,
+                domain_name=test_domain_name,
+                group_id=test_group_id,
+                resource_group_id=test_scaling_group_id,
+                scaling_group_name=test_scaling_group_name,
+                status=SessionStatus.CREATING,
+                result=SessionResult.UNDEFINED,
+                cluster_mode=ClusterMode.SINGLE_NODE,
+                cluster_size=1,
+                occupying_slots=ResourceSlot(),
+                requested_slots=ResourceSlot(),
+                vfolder_mounts={},
+                environ={},
+                priority=0,
+                created_at=datetime.now(tzutc()),
+                requested_starts_at=requested_starts_at,
+                num_queries=0,
+                use_host_network=False,
+            )
+            db_sess.add(session)
+            await db_sess.flush()
+
+        status_changed_at = datetime.now(tzutc())
+        updater = BatchUpdater(
+            spec=SessionStatusBatchUpdaterSpec(
+                to_status=SessionStatus.RUNNING,
+                status_changed_at=status_changed_at,
+            ),
+            conditions=[lambda: SessionRow.id.in_([session_id])],
+        )
+        bulk_creator = BulkCreator(
+            specs=[
+                SessionSchedulingHistoryCreatorSpec(
+                    session_id=session_id,
+                    phase="start",
+                    result=SchedulingResult.SUCCESS,
+                    message="Session started",
+                    from_status=SessionStatus.CREATING,
+                    to_status=SessionStatus.RUNNING,
+                )
+            ]
+        )
+
+        db_source = ScheduleDBSource(db_with_cleanup)
+        updated_count = await db_source.update_with_history(updater, bulk_creator)
+        assert updated_count == 1
+
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            stmt = sa.select(SessionRow).where(SessionRow.id == session_id)
+            updated_session = await db_sess.scalar(stmt)
+            assert updated_session is not None
+            assert updated_session.status == SessionStatus.RUNNING
+            assert updated_session.starts_at == status_changed_at
+            assert updated_session.requested_starts_at == requested_starts_at

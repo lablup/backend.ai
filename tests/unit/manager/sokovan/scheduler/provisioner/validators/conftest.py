@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Callable, Mapping
-from datetime import datetime
+from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
@@ -82,7 +82,7 @@ def _make_workload(
     session_id: SessionId | None = None,
     slots: Mapping[str, str] | None = None,
     session_type: SessionTypes = SessionTypes.INTERACTIVE,
-    starts_at: datetime | None = None,
+    requested_starts_at: datetime | None = None,
 ) -> SessionWorkload:
     if session_id is None:
         session_id = SessionId(uuid.uuid4())
@@ -114,7 +114,7 @@ def _make_workload(
         priority=0,
         job_priority=0,
         session_type=session_type,
-        starts_at=starts_at,
+        requested_starts_at=requested_starts_at,
         is_preemptible=False,
     )
 
@@ -126,6 +126,7 @@ def _make_snapshot(
     project_limit: ResourceLimit | None = None,
     domain_limit: ResourceLimit | None = None,
     occupancy: ResourceOccupancySnapshot | None = None,
+    observed_at: datetime | None = None,
 ) -> SystemSnapshot:
     if occupancy is None:
         occupancy = ResourceOccupancySnapshot(by_user={}, by_project={}, by_domain={})
@@ -147,6 +148,7 @@ def _make_snapshot(
             ),
             agent_limit=AgentLimit(max_container_count=None),
         ),
+        observed_at=observed_at if observed_at is not None else datetime.now(UTC),
     )
 
 

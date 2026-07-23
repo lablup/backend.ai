@@ -133,7 +133,7 @@ class SessionRowFromSpec(CreatorSpec[SessionRow]):
     """Build one :class:`SessionRow` from a :class:`SessionSpec`.
 
     Session-level snapshot fields (``vfolder_mounts``, ``environ``,
-    ``startup_command``, ``bootstrap_script``, ``starts_at``,
+    ``startup_command``, ``bootstrap_script``, ``requested_starts_at``,
     ``batch_timeout``) are sourced from the main kernel's execution
     spec. ``images`` / ``image_ids`` are deduplicated from each
     kernel's resolved :class:`ImageInfo`, with the main kernel's image
@@ -169,7 +169,7 @@ class SessionRowFromSpec(CreatorSpec[SessionRow]):
             )
 
         main_mounts = list(main_kernel.vfolder_mounts) if main_kernel else []
-        session_starts_at = main_kernel.execution_spec.starts_at if main_kernel else None
+        session_requested_starts_at = main_kernel.execution_spec.starts_at if main_kernel else None
         session_batch_timeout = (
             main_kernel.execution_spec.batch_timeout_sec if main_kernel else None
         )
@@ -212,7 +212,7 @@ class SessionRowFromSpec(CreatorSpec[SessionRow]):
             vfolder_mounts=main_mounts,
             environ=session_environ,
             tag=spec.resource_spec.classification.tag,
-            starts_at=session_starts_at,
+            requested_starts_at=session_requested_starts_at,
             batch_timeout=session_batch_timeout,
             callback_url=spec.resource_spec.callback_url,
             images=session_images,

@@ -588,7 +588,9 @@ class AgentRegistry:
                 starts_at = isoparse(starts_at_timestamp)
             except ValueError:
                 _td = str_to_timedelta(starts_at_timestamp)
-                starts_at = datetime.now(tzutc()) + _td
+                # Resolve the relative offset against DB time so the base
+                # point is consistent across managers (HA clock-skew safety)
+                starts_at = await self._scheduler_repository.get_db_now() + _td
 
         if cluster_size > 1:
             log.debug(" -> cluster_mode:{} (replicate)", cluster_mode)

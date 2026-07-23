@@ -537,8 +537,14 @@ class SessionRow(Base):  # type: ignore[misc]
     terminated_at: Mapped[datetime | None] = mapped_column(
         "terminated_at", sa.DateTime(timezone=True), nullable=True, default=sa.null(), index=True
     )
+    # Actual execution start time, written at the RUNNING transition.
     starts_at: Mapped[datetime | None] = mapped_column(
         "starts_at", sa.DateTime(timezone=True), nullable=True, default=sa.null()
+    )
+    # Reserved start time requested at enqueue (batch sessions); the scheduler
+    # holds the session until this time. Never overwritten after enqueue.
+    requested_starts_at: Mapped[datetime | None] = mapped_column(
+        "requested_starts_at", sa.DateTime(timezone=True), nullable=True, default=sa.null()
     )
     status: Mapped[SessionStatus] = mapped_column(
         "status",

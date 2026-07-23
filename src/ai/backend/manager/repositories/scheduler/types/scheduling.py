@@ -1,6 +1,7 @@
 """Repository-internal scheduling fetch types."""
 
 from dataclasses import dataclass
+from datetime import datetime
 
 from ai.backend.manager.views.sokovan.agent import AgentMeta
 from ai.backend.manager.views.sokovan.resource_group import ResourceGroupMeta
@@ -28,3 +29,5 @@ class SchedulingFetch:
     occupancy: ResourceOccupancySnapshot
     resource_policy: ResourcePolicySnapshot
     session_dependencies: SessionDependencySnapshot
+    # DB-sourced time the fetch ran (single time authority across managers)
+    observed_at: datetime

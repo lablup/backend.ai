@@ -113,9 +113,9 @@ class SessionWorkload:
     job_priority: int
     # Session type (INTERACTIVE, BATCH, INFERENCE)
     session_type: SessionTypes
-    # Reserved start time for batch sessions (the enqueue-time value; the
-    # column is overwritten with the actual start at the RUNNING transition)
-    starts_at: datetime | None
+    # Reserved start time requested at enqueue (batch sessions); the
+    # scheduler holds the session until this time
+    requested_starts_at: datetime | None
     # Whether this session can be preempted
     is_preemptible: bool
 
