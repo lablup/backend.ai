@@ -27,6 +27,7 @@ from ai.backend.common.identifier.deployment_preset import DeploymentPresetID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.replica_group import ReplicaGroupID
+from ai.backend.common.identifier.replica_group_history import ReplicaGroupHistoryID
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.common.identifier.runtime_variant_preset import RuntimeVariantPresetID
 from ai.backend.common.identifier.vfolder import VFolderUUID
@@ -1344,7 +1345,7 @@ class RouteHistoryData:
 class ReplicaGroupHistoryData:
     """Domain model for replica-group history."""
 
-    id: UUID
+    id: ReplicaGroupHistoryID
     replica_group_id: ReplicaGroupID
     deployment_id: DeploymentID
 
