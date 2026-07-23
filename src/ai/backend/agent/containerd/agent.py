@@ -748,7 +748,12 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         # PERSISTENT network gets the bridge backend and no manager-assigned addresses either, and
         # laying its peers out in THIS node's /26 would hand every node a different, wrong map
         # naming addresses that exist only on its own bridge.
-        if cluster_info.get("mode") is not ClusterMode.SINGLE_NODE:
+        #
+        # `!=`, not `is not`: cluster_info arrives over RPC as a plain dict (server.py casts it
+        # without conversion), so `mode` is the string "single-node", not the ClusterMode member.
+        # An identity check against the enum is always True, which silently skipped peer resolution
+        # for every single-node cluster — the whole reason /etc/hosts came out with no peers.
+        if cluster_info.get("mode") != ClusterMode.SINGLE_NODE:
             return {}, None
         peers = [h for h in (environ.get("BACKENDAI_CLUSTER_HOSTS") or "").split(",") if h]
         if len(peers) <= 1:
