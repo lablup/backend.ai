@@ -423,25 +423,30 @@ class TestBaseGQLAdapterBuildPagination:
         self,
         adapter: BaseGQLAdapter,
     ) -> None:
-        """The factory's ValueError is a caller error, and used to escape as a 500."""
+        """A payload only the entity can judge, rejected by its factory, is the caller's error.
 
-        def parse_uuid_cursor(cursor_id: str) -> Any:
+        The builder itself never decides what a cursor may carry — an entity keyed on a name
+        or an access key accepts this very payload. It only names the failure of the factory
+        that does decide, which used to escape as a bare ValueError and a 500.
+        """
+
+        def key_on_a_row_uuid(cursor_id: str) -> Any:
             uuid.UUID(cursor_id)
             return MagicMock()
 
-        spec = PaginationSpec(
+        uuid_keyed_spec = PaginationSpec(
             forward_order=MagicMock(),
             backward_order=MagicMock(),
-            forward_condition_factory=parse_uuid_cursor,
-            backward_condition_factory=parse_uuid_cursor,
+            forward_condition_factory=key_on_a_row_uuid,
+            backward_condition_factory=key_on_a_row_uuid,
             tiebreaker_order=MagicMock(),
         )
         cursor = encode_cursor("not-a-uuid")
 
         with pytest.raises(InvalidCursor) as forward:
-            adapter.build_querier(PaginationOptions(first=10, after=cursor), spec)
+            adapter.build_querier(PaginationOptions(first=10, after=cursor), uuid_keyed_spec)
         with pytest.raises(InvalidCursor) as backward:
-            adapter.build_querier(PaginationOptions(last=10, before=cursor), spec)
+            adapter.build_querier(PaginationOptions(last=10, before=cursor), uuid_keyed_spec)
 
         # A BackendAIError carrying a 4xx: the handler reports its code instead of logging a fault.
         for raised in (forward.value, backward.value):
