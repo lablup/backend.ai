@@ -222,7 +222,7 @@ class SchedulingHistoryService:
         action: SearchReplicaGroupScopedHistoryAction,
     ) -> SearchReplicaGroupScopedHistoryActionResult:
         """Searches the scheduling history of one replica group."""
-        result = await self._repository.search_replica_group_scoped_history(
+        result = await self._repository.scoped_search_replica_group_history(
             querier=action.querier,
             scope=ReplicaGroupHistorySearchScope(replica_group_id=action.replica_group_id),
         )
