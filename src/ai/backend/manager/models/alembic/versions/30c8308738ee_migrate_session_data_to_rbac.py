@@ -184,46 +184,6 @@ def _associate_sessions_to_scopes(db_conn: Connection) -> None:
                 db_conn.execute(insert_query, values)
 
 
-def _remove_session_permissions(db_conn: Connection) -> None:
-    """Remove all SESSION entity-type permissions."""
-    while True:
-        # Delete permissions in batches using a parameterized subquery
-        delete_query = sa.text("""
-            DELETE FROM permissions
-            WHERE id IN (
-                SELECT id FROM permissions
-                WHERE entity_type = :entity_type
-                LIMIT :limit
-            )
-        """)
-        result = db_conn.execute(
-            delete_query,
-            {"entity_type": SESSION_ENTITY_TYPE, "limit": BATCH_SIZE},
-        )
-        if result.rowcount == 0:
-            break
-
-
-def _remove_session_edges(db_conn: Connection) -> None:
-    """Remove all SESSION AUTO edges from association_scopes_entities."""
-    while True:
-        # Delete associations in batches using a parameterized subquery
-        delete_query = sa.text("""
-            DELETE FROM association_scopes_entities
-            WHERE id IN (
-                SELECT id FROM association_scopes_entities
-                WHERE entity_type = :entity_type
-                LIMIT :limit
-            )
-        """)
-        result = db_conn.execute(
-            delete_query,
-            {"entity_type": SESSION_ENTITY_TYPE, "limit": BATCH_SIZE},
-        )
-        if result.rowcount == 0:
-            break
-
-
 def upgrade() -> None:
     conn = op.get_bind()
     _add_entity_type_permissions(conn)
@@ -231,6 +191,6 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    conn = op.get_bind()
-    _remove_session_edges(conn)
-    _remove_session_permissions(conn)
+    # Forward-only: the seeded rows are indistinguishable from ones granted
+    # afterwards, so deleting by entity_type would erase operator-managed grants.
+    pass

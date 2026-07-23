@@ -141,54 +141,6 @@ def _associate_entity_to_scopes(db_conn: Connection) -> None:
         db_conn.execute(insert_query)
 
 
-def _remove_entity_from_scopes(db_conn: Connection) -> None:
-    """Remove all app_config-scope associations."""
-    entity_type = EntityType.APP_CONFIG.value
-
-    while True:
-        # Query records to delete
-        query = sa.text("""
-            SELECT id FROM association_scopes_entities
-            WHERE entity_type = :entity_type
-            LIMIT :limit
-        """)
-        rows = db_conn.execute(query, {"entity_type": entity_type, "limit": BATCH_SIZE}).all()
-        if not rows:
-            break
-
-        # Delete the queried records
-        ids = ", ".join(f"'{row.id}'" for row in rows)
-        delete_query = sa.text(f"""
-            DELETE FROM association_scopes_entities
-            WHERE id IN ({ids})
-        """)
-        db_conn.execute(delete_query)
-
-
-def _remove_entity_type_permissions(db_conn: Connection) -> None:
-    """Remove all APP_CONFIG entity type permissions."""
-    entity_type = EntityType.APP_CONFIG.value
-
-    while True:
-        # Query permission IDs to delete
-        query = sa.text("""
-            SELECT id FROM permissions
-            WHERE entity_type = :entity_type
-            LIMIT :limit
-        """)
-        rows = db_conn.execute(query, {"entity_type": entity_type, "limit": BATCH_SIZE}).all()
-        if not rows:
-            break
-
-        # Delete the queried permissions
-        ids = ", ".join(f"'{row.id}'" for row in rows)
-        delete_query = sa.text(f"""
-            DELETE FROM permissions
-            WHERE id IN ({ids})
-        """)
-        db_conn.execute(delete_query)
-
-
 def upgrade() -> None:
     conn = op.get_bind()
     _migrate_new_entity_type(conn)
@@ -196,6 +148,6 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    conn = op.get_bind()
-    _remove_entity_from_scopes(conn)
-    _remove_entity_type_permissions(conn)
+    # Forward-only: the seeded rows are indistinguishable from ones granted
+    # afterwards, so deleting by entity_type would erase operator-managed grants.
+    pass

@@ -30,11 +30,9 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    db_conn = op.get_bind()
-    db_conn.execute(
-        sa.text("DELETE FROM permissions WHERE entity_type = :entity_type"),
-        {"entity_type": MODEL_CARD_ENTITY_TYPE},
-    )
+    # Forward-only: the seeded rows are indistinguishable from ones granted
+    # afterwards, so deleting by entity_type would erase operator-managed grants.
+    pass
 
 
 def _add_model_card_permissions(db_conn: sa.engine.Connection) -> None:

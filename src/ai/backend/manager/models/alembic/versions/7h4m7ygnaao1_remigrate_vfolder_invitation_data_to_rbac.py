@@ -136,121 +136,6 @@ def _insert_entity_as_scope_permissions_for_invitations(db_conn: Connection) -> 
                 )
 
 
-def _revert_ref_edges_to_auto(db_conn: Connection) -> None:
-    """
-    Revert REF edges back to AUTO (restore old migration's state).
-
-    Only edges derived from vfolder invitations are reverted:
-    - entity_type = VFOLDER
-    - scope_type = 'user'
-    - (scope_id, entity_id) pairs present in vfolder_permissions (user_id, vfolder_id)
-
-    This is a batched operation to handle large datasets.
-    """
-    entity_type = EntityType.VFOLDER.value
-    last_id = uuid.UUID(int=0)
-
-    while True:
-        # Query invitation-derived REF edges in batches using keyset pagination
-        query = sa.text("""
-            SELECT ase.id
-            FROM association_scopes_entities AS ase
-            JOIN vfolder_permissions AS vp
-              ON ase.scope_type = 'user'
-             AND ase.entity_type = :entity_type
-             AND ase.scope_id = vp."user"::text
-             AND ase.entity_id = vp.vfolder::text
-            WHERE ase.relation_type = 'ref'
-              AND ase.id > :last_id
-            ORDER BY ase.id
-            LIMIT :limit
-        """)
-        rows = db_conn.execute(
-            query,
-            {"entity_type": entity_type, "last_id": last_id, "limit": BATCH_SIZE},
-        ).all()
-        if not rows:
-            break
-        last_id = rows[-1].id
-
-        # Update the queried records using parameterized query
-        for row in rows:
-            update_query = sa.text("""
-                UPDATE association_scopes_entities
-                SET relation_type = 'auto'
-                WHERE id = :id
-            """)
-            db_conn.execute(update_query, {"id": str(row.id)})
-
-
-def _remove_entity_as_scope_permissions(db_conn: Connection) -> None:
-    """
-    Remove entity-as-scope permissions for VFolder invitations.
-
-    This removes only those permissions that were introduced by this migration,
-    i.e., permissions derived from vfolder invitation records in vfolder_permissions
-    using the same mount-permission-to-operation mapping as in the upgrade step.
-
-    Batched operation to handle large datasets.
-    """
-    entity_type = EntityType.VFOLDER.value
-    last_id = uuid.UUID(int=0)
-
-    while True:
-        # Fetch a batch of vfolder invitation records from vfolder_permissions
-        vfolder_query = sa.text("""
-            SELECT
-                vp.id,
-                ur.role_id,
-                vp.vfolder::text AS vfolder_id,
-                vp.permission AS mount_permission
-            FROM vfolder_permissions vp
-            JOIN user_roles ur ON vp."user" = ur.user_id
-            WHERE vp.id > :last_id
-            ORDER BY vp.id
-            LIMIT :limit
-        """)
-        vfolder_rows = db_conn.execute(
-            vfolder_query,
-            {"last_id": last_id, "limit": BATCH_SIZE},
-        ).all()
-
-        if not vfolder_rows:
-            break
-
-        for row in vfolder_rows:
-            try:
-                # Map mount_permission to one or more RBAC operations,
-                # mirroring the logic used during upgrade
-                mount_perm = VFolderPermission(row.mount_permission)
-                operations = vfolder_mount_permission_to_operation[mount_perm]
-            except (ValueError, KeyError):
-                # Skip invalid permissions
-                continue
-
-            for operation in operations:
-                delete_query = sa.text("""
-                    DELETE FROM permissions
-                    WHERE role_id = :role_id
-                      AND scope_type = 'vfolder'
-                      AND scope_id = :scope_id
-                      AND entity_type = :entity_type
-                      AND operation = :operation
-                """)
-                db_conn.execute(
-                    delete_query,
-                    {
-                        "role_id": str(row.role_id),
-                        "scope_id": row.vfolder_id,
-                        "entity_type": entity_type,
-                        "operation": operation.value,
-                    },
-                )
-
-        # Advance pagination cursor using the highest processed vfolder_permissions.id
-        last_id = vfolder_rows[-1].id
-
-
 def upgrade() -> None:
     conn = op.get_bind()
     _upsert_ref_edges_for_invitations(conn)
@@ -258,6 +143,6 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    conn = op.get_bind()
-    _remove_entity_as_scope_permissions(conn)
-    _revert_ref_edges_to_auto(conn)
+    # Forward-only: the seeded rows are indistinguishable from ones granted
+    # afterwards, so reverting them would erase operator-managed grants.
+    pass
