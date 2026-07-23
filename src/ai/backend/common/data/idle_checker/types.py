@@ -26,7 +26,7 @@ class IdleCheckPhase(enum.StrEnum):
 class SessionLifetimeSpec(BackendAISchema):
     """Config for ``CheckerType.SESSION_LIFETIME``."""
 
-    initial_grace_seconds: int = Field(
+    initial_grace_period_seconds: int = Field(
         default=0,
         ge=0,
         description="Delay before the first session-lifetime judgment.",
@@ -47,7 +47,7 @@ class NetworkTimeoutSpec(BackendAISchema):
     Concrete fields land with the checker-logic stories.
     """
 
-    initial_grace_seconds: int = Field(
+    initial_grace_period_seconds: int = Field(
         default=0,
         ge=0,
         description="Delay before the first network-timeout judgment.",
@@ -60,7 +60,7 @@ class UtilizationSpec(BackendAISchema):
     Concrete fields land with the checker-logic stories.
     """
 
-    initial_grace_seconds: int = Field(
+    initial_grace_period_seconds: int = Field(
         default=0,
         ge=0,
         description="Delay before the first utilization judgment.",
@@ -82,14 +82,14 @@ class IdleCheckerSpec(BackendAISchema):
     utilization: UtilizationSpec | None = Field(default=None, description="utilization config.")
 
     @property
-    def initial_grace_seconds(self) -> int:
+    def initial_grace_period_seconds(self) -> int:
         match self.type:
             case CheckerType.SESSION_LIFETIME:
-                return cast(SessionLifetimeSpec, self.session_lifetime).initial_grace_seconds
+                return cast(SessionLifetimeSpec, self.session_lifetime).initial_grace_period_seconds
             case CheckerType.NETWORK_TIMEOUT:
-                return cast(NetworkTimeoutSpec, self.network).initial_grace_seconds
+                return cast(NetworkTimeoutSpec, self.network).initial_grace_period_seconds
             case CheckerType.UTILIZATION:
-                return cast(UtilizationSpec, self.utilization).initial_grace_seconds
+                return cast(UtilizationSpec, self.utilization).initial_grace_period_seconds
 
     @model_validator(mode="after")
     def validate_spec_matches_type(self) -> Self:

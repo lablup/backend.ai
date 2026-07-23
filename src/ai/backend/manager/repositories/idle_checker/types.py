@@ -46,7 +46,7 @@ class SessionIdleCheckPair:
 @dataclass(frozen=True)
 class InitialGracePeriodCheckData:
     pair: SessionIdleCheckPair
-    initial_grace_seconds: int
+    initial_grace_period_seconds: int
     grace_started_at: datetime
 
 

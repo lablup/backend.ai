@@ -166,7 +166,9 @@ class IdleCheckerDBSource:
                         session_id=SessionId(row.session_id),
                         checker_id=cast(IdleCheckerID, row.idle_checker_id),
                     ),
-                    initial_grace_seconds=cast(IdleCheckerSpec, row.spec).initial_grace_seconds,
+                    initial_grace_period_seconds=cast(
+                        IdleCheckerSpec, row.spec
+                    ).initial_grace_period_seconds,
                     grace_started_at=row.updated_at,
                 )
                 for row in rows

@@ -159,7 +159,7 @@ def _expired_check_checker_row(checker_id: IdleCheckerID) -> IdleCheckerRow:
         spec=IdleCheckerSpec(
             type=CheckerType.SESSION_LIFETIME,
             session_lifetime=SessionLifetimeSpec(
-                initial_grace_seconds=45,
+                initial_grace_period_seconds=45,
                 max_lifetime_seconds=3600,
             ),
         ),
@@ -304,7 +304,7 @@ class TestFetchJudgmentBatch:
                 judgment_rows.checker_id,
             )
         ]
-        assert batch.checks[0].initial_grace_seconds == 45
+        assert batch.checks[0].initial_grace_period_seconds == 45
 
     async def test_excludes_session_without_idle_check_row(
         self,
