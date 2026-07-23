@@ -208,10 +208,16 @@ class ReplicaGroupHistorySearchScope(SearchScope):
         """Convert scope to a query condition for ReplicaGroupHistoryRow."""
         conditions: list[QueryCondition] = []
         if self.deployment_id is not None:
-            conditions.append(ReplicaGroupHistoryConditions.by_deployment_id(self.deployment_id))
+            conditions.append(
+                ReplicaGroupHistoryConditions.by_deployment_id_filter(
+                    UUIDEqualMatchSpec(value=self.deployment_id, negated=False)
+                )
+            )
         if self.replica_group_id is not None:
             conditions.append(
-                ReplicaGroupHistoryConditions.by_replica_group_id(self.replica_group_id)
+                ReplicaGroupHistoryConditions.by_replica_group_id_filter(
+                    UUIDEqualMatchSpec(value=self.replica_group_id, negated=False)
+                )
             )
         return combine_conditions_and(conditions)
 
