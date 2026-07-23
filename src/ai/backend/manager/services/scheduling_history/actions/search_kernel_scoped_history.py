@@ -113,7 +113,7 @@ class SearchKernelScopedHistoryActionResult(BaseScopeActionResult):
     total_count: int
     has_next_page: bool
     has_previous_page: bool
-    target: KernelHistoryTarget
+    # TODO: Drop once virtual scopes land, together with the action's own field.
     _session_id: SessionId
 
     @override
