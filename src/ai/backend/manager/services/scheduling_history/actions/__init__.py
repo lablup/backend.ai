@@ -5,6 +5,10 @@ from .resolve_kernel_session import (
     ResolveKernelSessionAction,
     ResolveKernelSessionActionResult,
 )
+from .resolve_replica_group_deployment import (
+    ResolveReplicaGroupDeploymentAction,
+    ResolveReplicaGroupDeploymentActionResult,
+)
 from .search_deployment_history import (
     SearchDeploymentHistoryAction,
     SearchDeploymentHistoryActionResult,
@@ -20,6 +24,14 @@ from .search_kernel_history import (
 from .search_kernel_scoped_history import (
     SearchKernelScopedHistoryAction,
     SearchKernelScopedHistoryActionResult,
+)
+from .search_replica_group_history import (
+    SearchReplicaGroupHistoryAction,
+    SearchReplicaGroupHistoryActionResult,
+)
+from .search_replica_group_scoped_history import (
+    SearchReplicaGroupScopedHistoryAction,
+    SearchReplicaGroupScopedHistoryActionResult,
 )
 from .search_route_history import (
     SearchRouteHistoryAction,
@@ -41,6 +53,8 @@ from .search_session_scoped_history import (
 __all__ = (
     "ResolveKernelSessionAction",
     "ResolveKernelSessionActionResult",
+    "ResolveReplicaGroupDeploymentAction",
+    "ResolveReplicaGroupDeploymentActionResult",
     "SchedulingHistoryAction",
     # Admin actions
     "SearchSessionHistoryAction",
@@ -49,6 +63,8 @@ __all__ = (
     "SearchKernelHistoryActionResult",
     "SearchDeploymentHistoryAction",
     "SearchDeploymentHistoryActionResult",
+    "SearchReplicaGroupHistoryAction",
+    "SearchReplicaGroupHistoryActionResult",
     "SearchRouteHistoryAction",
     "SearchRouteHistoryActionResult",
     # Scoped actions (added in 26.2.0)
@@ -58,6 +74,8 @@ __all__ = (
     "SearchKernelScopedHistoryActionResult",
     "SearchDeploymentScopedHistoryAction",
     "SearchDeploymentScopedHistoryActionResult",
+    "SearchReplicaGroupScopedHistoryAction",
+    "SearchReplicaGroupScopedHistoryActionResult",
     "SearchRouteScopedHistoryAction",
     "SearchRouteScopedHistoryActionResult",
 )

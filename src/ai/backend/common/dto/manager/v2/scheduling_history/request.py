@@ -14,6 +14,9 @@ from .types import (
     KernelHistoryOrderField,
     KernelHistoryScopeDTO,
     OrderDirection,
+    ReplicaGroupHistoryCategoryType,
+    ReplicaGroupHistoryOrderField,
+    ReplicaGroupHistoryScopeDTO,
     RouteHistoryOrderField,
     SchedulingResultType,
     SessionHistoryOrderField,
@@ -21,16 +24,20 @@ from .types import (
 
 __all__ = (
     "AdminSearchDeploymentHistoriesInput",
+    "AdminSearchReplicaGroupHistoriesInput",
     "AdminSearchRouteHistoriesInput",
     "AdminSearchSessionHistoriesInput",
     "DeploymentHistoryFilter",
     "DeploymentHistoryOrder",
     "KernelHistoryFilter",
     "KernelHistoryOrder",
+    "ReplicaGroupHistoryFilter",
+    "ReplicaGroupHistoryOrder",
     "RouteHistoryFilter",
     "RouteHistoryOrder",
     "SchedulingResultFilter",
     "ScopedSearchKernelHistoriesInput",
+    "ScopedSearchReplicaGroupHistoriesInput",
     "SearchDeploymentHistoryInput",
     "AdminSearchKernelHistoriesInput",
     "SearchRouteHistoryInput",
@@ -204,6 +211,44 @@ class SearchRouteHistoryInput(BaseRequestModel):
     offset: int = Field(default=0, ge=0, description="Number of items to skip")
 
 
+class ReplicaGroupHistoryFilter(BaseRequestModel):
+    """Filter conditions for replica-group scheduling history search."""
+
+    id: UUIDFilter | None = Field(default=None, description="Filter by history record ID")
+    replica_group_id: UUIDFilter | None = Field(
+        default=None, description="Filter by replica group ID"
+    )
+    deployment_id: UUIDFilter | None = Field(default=None, description="Filter by deployment ID")
+    category: list[ReplicaGroupHistoryCategoryType] | None = Field(
+        default=None, description="Filter by handler category"
+    )
+    phase: StringFilter | None = Field(default=None, description="Filter by scheduling phase")
+    from_status: list[str] | None = Field(default=None, description="Filter by from_status values")
+    to_status: list[str] | None = Field(default=None, description="Filter by to_status values")
+    result: SchedulingResultFilter | None = Field(
+        default=None, description="Filter by scheduling result"
+    )
+    error_code: StringFilter | None = Field(default=None, description="Filter by error code")
+    message: StringFilter | None = Field(default=None, description="Filter by message")
+    created_at: DateTimeFilter | None = Field(default=None, description="Filter by created_at")
+    updated_at: DateTimeFilter | None = Field(default=None, description="Filter by updated_at")
+    AND: list[ReplicaGroupHistoryFilter] | None = Field(
+        default=None, description="AND conjunction."
+    )
+    OR: list[ReplicaGroupHistoryFilter] | None = Field(default=None, description="OR conjunction.")
+    NOT: list[ReplicaGroupHistoryFilter] | None = Field(default=None, description="NOT negation.")
+
+
+ReplicaGroupHistoryFilter.model_rebuild()
+
+
+class ReplicaGroupHistoryOrder(BaseRequestModel):
+    """Order specification for replica-group scheduling history."""
+
+    field: ReplicaGroupHistoryOrderField = Field(description="Field to order by")
+    direction: OrderDirection = Field(default=OrderDirection.DESC, description="Order direction")
+
+
 class AdminSearchSessionHistoriesInput(BaseRequestModel):
     """Input for admin search of session scheduling histories."""
 
@@ -266,6 +311,37 @@ class AdminSearchRouteHistoriesInput(BaseRequestModel):
 
     filter: RouteHistoryFilter | None = Field(default=None, description="Filter conditions")
     order: list[RouteHistoryOrder] | None = Field(default=None, description="Order specifications")
+    first: int | None = Field(default=None, description="Cursor pagination: number of items")
+    after: str | None = Field(default=None, description="Cursor pagination: after cursor")
+    last: int | None = Field(default=None, description="Cursor pagination: last N items")
+    before: str | None = Field(default=None, description="Cursor pagination: before cursor")
+    limit: int | None = Field(default=None, description="Offset pagination: maximum items")
+    offset: int | None = Field(default=None, description="Offset pagination: number to skip")
+
+
+class AdminSearchReplicaGroupHistoriesInput(BaseRequestModel):
+    """Input for admin search of replica-group scheduling histories."""
+
+    filter: ReplicaGroupHistoryFilter | None = Field(default=None, description="Filter conditions")
+    order: list[ReplicaGroupHistoryOrder] | None = Field(
+        default=None, description="Order specifications"
+    )
+    first: int | None = Field(default=None, description="Cursor pagination: number of items")
+    after: str | None = Field(default=None, description="Cursor pagination: after cursor")
+    last: int | None = Field(default=None, description="Cursor pagination: last N items")
+    before: str | None = Field(default=None, description="Cursor pagination: before cursor")
+    limit: int | None = Field(default=None, description="Offset pagination: maximum items")
+    offset: int | None = Field(default=None, description="Offset pagination: number to skip")
+
+
+class ScopedSearchReplicaGroupHistoriesInput(BaseRequestModel):
+    """Input for searching replica-group scheduling histories under a non-admin scope."""
+
+    scope: ReplicaGroupHistoryScopeDTO = Field(description="Scope restricting the rows returned")
+    filter: ReplicaGroupHistoryFilter | None = Field(default=None, description="Filter conditions")
+    order: list[ReplicaGroupHistoryOrder] | None = Field(
+        default=None, description="Order specifications"
+    )
     first: int | None = Field(default=None, description="Cursor pagination: number of items")
     after: str | None = Field(default=None, description="Cursor pagination: after cursor")
     last: int | None = Field(default=None, description="Cursor pagination: last N items")
