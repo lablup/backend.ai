@@ -603,11 +603,12 @@ class TestSchedulingHistoryRepository:
 
     # ========== Replica Group History Tests ==========
 
-    async def _seed_replica_groups(
+    @pytest.fixture
+    async def replica_group_ids(
         self,
-        db: ExtendedAsyncSAEngine,
+        db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> tuple[DeploymentID, ReplicaGroupID, ReplicaGroupID]:
-        """Insert a deployment with two replica groups and return their ids.
+        """Create a deployment with two replica groups and return their ids.
 
         The scoped search checks the replica group exists, so the rows and the
         endpoint they hang off must be real; that in turn needs the domain,
@@ -623,7 +624,7 @@ class TestSchedulingHistoryRepository:
         target_group_id = ReplicaGroupID(uuid.uuid4())
         sibling_group_id = ReplicaGroupID(uuid.uuid4())
 
-        async with db.begin_session() as db_sess:
+        async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 DomainRow(
                     name=domain_name,
@@ -729,11 +730,10 @@ class TestSchedulingHistoryRepository:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         scheduling_history_repository: SchedulingHistoryRepository,
+        replica_group_ids: tuple[DeploymentID, ReplicaGroupID, ReplicaGroupID],
     ) -> None:
         """Test that the unscoped admin search returns rows from every replica group"""
-        deployment_id, target_group_id, sibling_group_id = await self._seed_replica_groups(
-            db_with_cleanup
-        )
+        deployment_id, target_group_id, sibling_group_id = replica_group_ids
 
         async with db_with_cleanup.begin_session() as db_sess:
             for group_id in (target_group_id, sibling_group_id):
@@ -767,9 +767,10 @@ class TestSchedulingHistoryRepository:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         scheduling_history_repository: SchedulingHistoryRepository,
+        replica_group_ids: tuple[DeploymentID, ReplicaGroupID, ReplicaGroupID],
     ) -> None:
         """Test searching replica-group history with pagination"""
-        deployment_id, target_group_id, _ = await self._seed_replica_groups(db_with_cleanup)
+        deployment_id, target_group_id, _ = replica_group_ids
 
         async with db_with_cleanup.begin_session() as db_sess:
             for i in range(5):
@@ -802,9 +803,10 @@ class TestSchedulingHistoryRepository:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         scheduling_history_repository: SchedulingHistoryRepository,
+        replica_group_ids: tuple[DeploymentID, ReplicaGroupID, ReplicaGroupID],
     ) -> None:
         """Test searching replica-group history filtered by handler category"""
-        deployment_id, target_group_id, _ = await self._seed_replica_groups(db_with_cleanup)
+        deployment_id, target_group_id, _ = replica_group_ids
 
         async with db_with_cleanup.begin_session() as db_sess:
             for i in range(3):
@@ -849,11 +851,10 @@ class TestSchedulingHistoryRepository:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         scheduling_history_repository: SchedulingHistoryRepository,
+        replica_group_ids: tuple[DeploymentID, ReplicaGroupID, ReplicaGroupID],
     ) -> None:
         """Test that the scoped search leaves out the sibling replica group"""
-        deployment_id, target_group_id, sibling_group_id = await self._seed_replica_groups(
-            db_with_cleanup
-        )
+        deployment_id, target_group_id, sibling_group_id = replica_group_ids
 
         async with db_with_cleanup.begin_session() as db_sess:
             for i in range(3):
@@ -899,11 +900,10 @@ class TestSchedulingHistoryRepository:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         scheduling_history_repository: SchedulingHistoryRepository,
+        replica_group_ids: tuple[DeploymentID, ReplicaGroupID, ReplicaGroupID],
     ) -> None:
         """Test that a querier condition narrows further, still bounded by the scope"""
-        deployment_id, target_group_id, sibling_group_id = await self._seed_replica_groups(
-            db_with_cleanup
-        )
+        deployment_id, target_group_id, sibling_group_id = replica_group_ids
 
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
@@ -960,9 +960,10 @@ class TestSchedulingHistoryRepository:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         scheduling_history_repository: SchedulingHistoryRepository,
+        replica_group_ids: tuple[DeploymentID, ReplicaGroupID, ReplicaGroupID],
     ) -> None:
         """Test that the requested order reaches the query"""
-        deployment_id, target_group_id, _ = await self._seed_replica_groups(db_with_cleanup)
+        deployment_id, target_group_id, _ = replica_group_ids
 
         async with db_with_cleanup.begin_session() as db_sess:
             for attempts in (2, 3, 1):
@@ -1017,9 +1018,10 @@ class TestSchedulingHistoryRepository:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         scheduling_history_repository: SchedulingHistoryRepository,
+        replica_group_ids: tuple[DeploymentID, ReplicaGroupID, ReplicaGroupID],
     ) -> None:
         """Test resolving the deployment owning a replica group"""
-        deployment_id, target_group_id, _ = await self._seed_replica_groups(db_with_cleanup)
+        deployment_id, target_group_id, _ = replica_group_ids
 
         resolved = await scheduling_history_repository.resolve_replica_group_deployment(
             target_group_id
