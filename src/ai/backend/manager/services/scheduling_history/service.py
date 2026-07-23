@@ -221,13 +221,10 @@ class SchedulingHistoryService:
         self,
         action: SearchReplicaGroupScopedHistoryAction,
     ) -> SearchReplicaGroupScopedHistoryActionResult:
-        """Searches replica-group scheduling history within the authorized deployment."""
+        """Searches the scheduling history of one replica group."""
         result = await self._repository.search_replica_group_scoped_history(
             querier=action.querier,
-            scope=ReplicaGroupHistorySearchScope(
-                deployment_id=action.deployment_id,
-                replica_group_id=action.replica_group_id,
-            ),
+            scope=ReplicaGroupHistorySearchScope(replica_group_id=action.replica_group_id),
         )
 
         return SearchReplicaGroupScopedHistoryActionResult(
@@ -235,8 +232,8 @@ class SchedulingHistoryService:
             total_count=result.total_count,
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,
-            deployment_id=action.deployment_id,
             replica_group_id=action.replica_group_id,
+            deployment_id=action.deployment_id,
         )
 
     async def search_route_scoped_history(
