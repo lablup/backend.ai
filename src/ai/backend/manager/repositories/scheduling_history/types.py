@@ -8,7 +8,7 @@ from uuid import UUID
 
 from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec
 from ai.backend.common.identifier.replica import ReplicaID
-from ai.backend.common.types import KernelId
+from ai.backend.common.types import KernelId, SessionId
 from ai.backend.manager.errors.deployment import EndpointNotFound
 from ai.backend.manager.errors.kernel import (
     KernelNotFound,
@@ -30,6 +30,7 @@ from ai.backend.manager.models.session import SessionRow
 
 __all__ = (
     "SessionSchedulingHistorySearchScope",
+    "KernelSchedulingHistoryBySessionSearchScope",
     "KernelSchedulingHistorySearchScope",
     "DeploymentHistorySearchScope",
     "RouteHistorySearchScope",
@@ -98,6 +99,37 @@ class KernelSchedulingHistorySearchScope(SearchScope):
                 column=KernelRow.id,
                 value=self.kernel_id,
                 error=KernelNotFound(str(self.kernel_id)),
+            ),
+        ]
+
+
+@dataclass(frozen=True)
+class KernelSchedulingHistoryBySessionSearchScope(SearchScope):
+    """Scope for kernel scheduling history search bounded by the owning session.
+
+    Returns the history of every kernel belonging to the session, as opposed to
+    ``KernelSchedulingHistorySearchScope`` which bounds the query to one kernel.
+    """
+
+    session_id: SessionId
+    """Required. The session whose kernels' history is searched."""
+
+    @override
+    def to_condition(self) -> QueryCondition:
+        """Convert scope to a query condition for KernelSchedulingHistoryRow."""
+        return KernelSchedulingHistoryConditions.by_session_id_filter(
+            UUIDEqualMatchSpec(value=self.session_id, negated=False)
+        )
+
+    @property
+    @override
+    def existence_checks(self) -> list[ExistenceCheck[Any]]:
+        """Check that the session exists."""
+        return [
+            ExistenceCheck(
+                column=SessionRow.id,
+                value=self.session_id,
+                error=SessionNotFound(str(self.session_id)),
             ),
         ]
 

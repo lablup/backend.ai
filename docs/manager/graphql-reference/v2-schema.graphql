@@ -5710,9 +5710,14 @@ Added in 26.8.0. Scope for kernel scheduling history query. All items are OR'd; 
 """
 input KernelScope {
   """
-  Kernel IDs to get history for. The scoped search is single-target for now, so exactly one item is accepted.
+  Kernel IDs to get history for. The scoped search is single-target for now, so exactly one item is accepted across all fields.
   """
   kernel: [UUIDScope!] = null
+
+  """
+  Session IDs to get the history of every owned kernel for. The scoped search is single-target for now, so exactly one item is accepted across all fields.
+  """
+  session: [UUIDScope!] = null
 }
 
 """

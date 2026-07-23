@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from ai.backend.manager.models.scopes import SearchScope
 from ai.backend.manager.repositories.scheduling_history import SchedulingHistoryRepository
 from ai.backend.manager.repositories.scheduling_history.types import (
+    KernelSchedulingHistoryBySessionSearchScope,
     KernelSchedulingHistorySearchScope,
 )
 
@@ -149,9 +151,14 @@ class SchedulingHistoryService:
         action: SearchKernelScopedHistoryAction,
     ) -> SearchKernelScopedHistoryActionResult:
         """Searches kernel scheduling history within the caller's authorized scopes."""
+        scope: SearchScope
+        if action.kernel_id is not None:
+            scope = KernelSchedulingHistorySearchScope(kernel_id=action.kernel_id)
+        else:
+            scope = KernelSchedulingHistoryBySessionSearchScope(session_id=action.session_id)
         result = await self._repository.search_kernel_scoped_history(
             querier=action.querier,
-            scope=KernelSchedulingHistorySearchScope(kernel_id=action.kernel_id),
+            scope=scope,
         )
 
         return SearchKernelScopedHistoryActionResult(

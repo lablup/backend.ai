@@ -14,16 +14,20 @@ from ai.backend.manager.repositories.base import BatchQuerier
 
 @dataclass
 class SearchKernelScopedHistoryAction(BaseScopeAction):
-    """Action to search the scheduling history of one kernel.
+    """Action to search kernel scheduling history within one session.
 
-    The owning session is the authorization subject, scope, and target: kernel
+    The session is the authorization subject, scope, and target: kernel
     permission records are intentionally kept empty, so whoever may read the
-    session may read its kernels' scheduling history. The caller resolves
-    ``kernel_id -> session_id`` first (``ResolveKernelSessionAction``) and
-    passes both in; ``kernel_id`` bounds the repository query.
+    session may read its kernels' scheduling history.
+
+    ``kernel_id`` only bounds the repository query. When the caller scopes by
+    kernel it resolves ``kernel_id -> session_id`` first
+    (``ResolveKernelSessionAction``) and passes both in; when it scopes by
+    session it passes ``kernel_id=None`` and the history of every kernel in the
+    session is returned.
     """
 
-    kernel_id: KernelId
+    kernel_id: KernelId | None
     session_id: SessionId
     querier: BatchQuerier
 
@@ -55,13 +59,13 @@ class SearchKernelScopedHistoryAction(BaseScopeAction):
 
 @dataclass
 class SearchKernelScopedHistoryActionResult(BaseScopeActionResult):
-    """Result of searching the scheduling history of one kernel."""
+    """Result of searching kernel scheduling history within one session."""
 
     items: list[KernelSchedulingHistoryData]
     total_count: int
     has_next_page: bool
     has_previous_page: bool
-    kernel_id: KernelId
+    kernel_id: KernelId | None
     session_id: SessionId
 
     @override

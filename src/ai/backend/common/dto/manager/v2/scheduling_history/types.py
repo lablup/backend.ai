@@ -108,19 +108,26 @@ class SessionHistoryScopeDTO(BaseRequestModel):
 class KernelHistoryScopeDTO(BaseRequestModel):
     """Scope for kernel scheduling history queries.
 
-    Items are OR'd. Raises an error if the list is empty. The scoped search is
-    still a single-target scope action, so only one item is dispatchable today;
-    the list shape keeps the wire contract stable for the multi-target case.
+    Each list is OR'd internally and across categories. Raises an error if every
+    field is empty. The scoped search is still a single-target scope action, so
+    only one item is dispatchable today; the list shape keeps the wire contract
+    stable for the multi-target case.
     """
 
     kernel: list[UUIDScope] | None = Field(
         default=None, description="Kernel IDs to get history for."
     )
+    session: list[UUIDScope] | None = Field(
+        default=None,
+        description="Session IDs to get the history of every owned kernel for.",
+    )
 
     @model_validator(mode="after")
     def _require_non_empty(self) -> Self:
-        if not self.kernel:
-            raise ValueError("KernelHistoryScopeDTO requires a non-empty value for 'kernel'")
+        if not self.kernel and not self.session:
+            raise ValueError(
+                "KernelHistoryScopeDTO requires a non-empty value for 'kernel' or 'session'"
+            )
         return self
 
 

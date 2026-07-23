@@ -30,13 +30,10 @@ from ai.backend.common.dto.manager.v2.scheduling_history.response import (
     SearchKernelHistoriesPayload,
     SessionHistoryNode,
 )
-from ai.backend.common.dto.manager.v2.scheduling_history.types import (
-    KernelHistoryScopeDTO,
-    SubStepResultInfo,
-)
+from ai.backend.common.dto.manager.v2.scheduling_history.types import SubStepResultInfo
 from ai.backend.common.identifier.kernel_scheduling_history import KernelSchedulingHistoryID
 from ai.backend.common.identifier.replica import ReplicaID
-from ai.backend.common.types import KernelId
+from ai.backend.common.types import KernelId, SessionId
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.deployment.types import DeploymentHistoryData, RouteHistoryData
@@ -454,18 +451,31 @@ class SchedulingHistoryAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        kernel_id = self._scope_to_kernel_id(input.scope)
-        # The owning session is the authorization subject; resolve it before
-        # dispatching so the RBAC check targets the session directly.
-        resolve_result = (
-            await self._processors.scheduling_history.resolve_kernel_session.wait_for_complete(
-                ResolveKernelSessionAction(kernel_id=kernel_id)
+        # The session is the authorization subject in both cases; a kernel-scoped
+        # request resolves its owning session before dispatching so the RBAC check
+        # targets the session directly.
+        kernel_items = input.scope.kernel or []
+        session_items = input.scope.session or []
+        if len(kernel_items) + len(session_items) != 1:
+            raise InvalidAPIParameters(
+                "Kernel scheduling history scope accepts exactly one scope item"
             )
-        )
+        kernel_id: KernelId | None
+        if kernel_items:
+            kernel_id = KernelId(kernel_items[0].value)
+            resolve_result = (
+                await self._processors.scheduling_history.resolve_kernel_session.wait_for_complete(
+                    ResolveKernelSessionAction(kernel_id=kernel_id)
+                )
+            )
+            session_id = resolve_result.session_id
+        else:
+            kernel_id = None
+            session_id = SessionId(session_items[0].value)
         action_result = await self._processors.scheduling_history.search_kernel_scoped_history.wait_for_complete(
             SearchKernelScopedHistoryAction(
                 kernel_id=kernel_id,
-                session_id=resolve_result.session_id,
+                session_id=session_id,
                 querier=querier,
             )
         )
@@ -475,21 +485,6 @@ class SchedulingHistoryAdapter(BaseAdapter):
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,
         )
-
-    @staticmethod
-    def _scope_to_kernel_id(scope: KernelHistoryScopeDTO) -> KernelId:
-        """Reduce the scope item list to the single target the scope action takes.
-
-        ``SearchKernelScopedHistoryAction`` is a ``BaseScopeAction``, so it
-        authorizes and queries exactly one kernel; reject multi-item scopes
-        instead of silently dropping the rest.
-        """
-        items = scope.kernel or []
-        if len(items) > 1:
-            raise InvalidAPIParameters(
-                "Kernel scheduling history scope accepts at most one kernel item"
-            )
-        return KernelId(items[0].value)
 
     def _convert_kernel_filter(self, filter: KernelHistoryFilter) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []

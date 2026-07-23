@@ -22,12 +22,12 @@ from ai.backend.manager.data.kernel.types import (
 from ai.backend.manager.data.session.types import (
     SessionSchedulingHistoryListResult,
 )
+from ai.backend.manager.models.scopes import SearchScope
 from ai.backend.manager.repositories.base import BatchQuerier
 
 from .db_source import SchedulingHistoryDBSource
 from .types import (
     DeploymentHistorySearchScope,
-    KernelSchedulingHistorySearchScope,
     RouteHistorySearchScope,
     SessionSchedulingHistorySearchScope,
 )
@@ -107,7 +107,7 @@ class SchedulingHistoryRepository:
     async def search_kernel_scoped_history(
         self,
         querier: BatchQuerier,
-        scope: KernelSchedulingHistorySearchScope,
+        scope: SearchScope,
     ) -> KernelSchedulingHistoryListResult:
         """Search kernel history whose rows match any of ``scopes`` (OR)."""
         return await self._db_source.search_kernel_scoped_history(querier, scope)

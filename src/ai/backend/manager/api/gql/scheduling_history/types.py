@@ -453,7 +453,16 @@ class KernelScopeGQL(PydanticInputMixin[KernelHistoryScopeDTO]):
     kernel: list[UUIDScopeGQL] | None = gql_field(
         description=(
             "Kernel IDs to get history for. "
-            "The scoped search is single-target for now, so exactly one item is accepted."
+            "The scoped search is single-target for now, so exactly one item is accepted "
+            "across all fields."
+        ),
+        default=None,
+    )
+    session: list[UUIDScopeGQL] | None = gql_field(
+        description=(
+            "Session IDs to get the history of every owned kernel for. "
+            "The scoped search is single-target for now, so exactly one item is accepted "
+            "across all fields."
         ),
         default=None,
     )

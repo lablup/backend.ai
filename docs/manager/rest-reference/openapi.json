@@ -25761,7 +25761,7 @@
         "type": "object"
       },
       "KernelHistoryScopeDTO": {
-        "description": "Scope for kernel scheduling history queries.\n\nItems are OR'd. Raises an error if the list is empty. The scoped search is\nstill a single-target scope action, so only one item is dispatchable today;\nthe list shape keeps the wire contract stable for the multi-target case.",
+        "description": "Scope for kernel scheduling history queries.\n\nEach list is OR'd internally and across categories. Raises an error if every\nfield is empty. The scoped search is still a single-target scope action, so\nonly one item is dispatchable today; the list shape keeps the wire contract\nstable for the multi-target case.",
         "properties": {
           "kernel": {
             "anyOf": [
@@ -25778,6 +25778,22 @@
             "default": null,
             "description": "Kernel IDs to get history for.",
             "title": "Kernel"
+          },
+          "session": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/UUIDScope"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Session IDs to get the history of every owned kernel for.",
+            "title": "Session"
           }
         },
         "title": "KernelHistoryScopeDTO",
