@@ -10,10 +10,14 @@ from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpe
 from ai.backend.manager.actions.validators import ActionValidators
 
 from .actions import (
+    AdminSearchReplicaGroupHistoryAction,
+    AdminSearchReplicaGroupHistoryActionResult,
     ResolveKernelSessionAction,
     ResolveKernelSessionActionResult,
     ResolveReplicaGroupDeploymentAction,
     ResolveReplicaGroupDeploymentActionResult,
+    ScopedSearchReplicaGroupHistoryAction,
+    ScopedSearchReplicaGroupHistoryActionResult,
     SearchDeploymentHistoryAction,
     SearchDeploymentHistoryActionResult,
     SearchDeploymentScopedHistoryAction,
@@ -22,10 +26,6 @@ from .actions import (
     SearchKernelHistoryActionResult,
     SearchKernelScopedHistoryAction,
     SearchKernelScopedHistoryActionResult,
-    SearchReplicaGroupHistoryAction,
-    SearchReplicaGroupHistoryActionResult,
-    SearchReplicaGroupScopedHistoryAction,
-    SearchReplicaGroupScopedHistoryActionResult,
     SearchRouteHistoryAction,
     SearchRouteHistoryActionResult,
     SearchRouteScopedHistoryAction,
@@ -51,8 +51,8 @@ class SchedulingHistoryProcessors(AbstractProcessorPackage):
     search_deployment_history: ActionProcessor[
         SearchDeploymentHistoryAction, SearchDeploymentHistoryActionResult
     ]
-    search_replica_group_history: GlobalActionProcessor[
-        SearchReplicaGroupHistoryAction, SearchReplicaGroupHistoryActionResult
+    admin_search_replica_group_history: GlobalActionProcessor[
+        AdminSearchReplicaGroupHistoryAction, AdminSearchReplicaGroupHistoryActionResult
     ]
     search_route_history: ActionProcessor[SearchRouteHistoryAction, SearchRouteHistoryActionResult]
 
@@ -72,8 +72,8 @@ class SchedulingHistoryProcessors(AbstractProcessorPackage):
     resolve_replica_group_deployment: ActionProcessor[
         ResolveReplicaGroupDeploymentAction, ResolveReplicaGroupDeploymentActionResult
     ]
-    search_replica_group_scoped_history: ScopeActionProcessor[
-        SearchReplicaGroupScopedHistoryAction, SearchReplicaGroupScopedHistoryActionResult
+    scoped_search_replica_group_history: ScopeActionProcessor[
+        ScopedSearchReplicaGroupHistoryAction, ScopedSearchReplicaGroupHistoryActionResult
     ]
     search_route_scoped_history: ActionProcessor[
         SearchRouteScopedHistoryAction, SearchRouteScopedHistoryActionResult
@@ -95,8 +95,8 @@ class SchedulingHistoryProcessors(AbstractProcessorPackage):
         self.search_deployment_history = ActionProcessor(
             service.search_deployment_history, action_monitors
         )
-        self.search_replica_group_history = GlobalActionProcessor(
-            service.search_replica_group_history, action_monitors
+        self.admin_search_replica_group_history = GlobalActionProcessor(
+            service.admin_search_replica_group_history, action_monitors
         )
         self.search_route_history = ActionProcessor(service.search_route_history, action_monitors)
 
@@ -118,8 +118,8 @@ class SchedulingHistoryProcessors(AbstractProcessorPackage):
         self.resolve_replica_group_deployment = ActionProcessor(
             service.resolve_replica_group_deployment, action_monitors
         )
-        self.search_replica_group_scoped_history = ScopeActionProcessor(
-            service.search_replica_group_scoped_history,
+        self.scoped_search_replica_group_history = ScopeActionProcessor(
+            service.scoped_search_replica_group_history,
             monitors=action_monitors,
             validators=[validators.rbac.scope],
         )
@@ -134,7 +134,7 @@ class SchedulingHistoryProcessors(AbstractProcessorPackage):
             SearchSessionHistoryAction.spec(),
             SearchKernelHistoryAction.spec(),
             SearchDeploymentHistoryAction.spec(),
-            SearchReplicaGroupHistoryAction.spec(),
+            AdminSearchReplicaGroupHistoryAction.spec(),
             SearchRouteHistoryAction.spec(),
             # Scoped actions (added in 26.2.0)
             SearchSessionScopedHistoryAction.spec(),
@@ -142,6 +142,6 @@ class SchedulingHistoryProcessors(AbstractProcessorPackage):
             SearchKernelScopedHistoryAction.spec(),
             SearchDeploymentScopedHistoryAction.spec(),
             ResolveReplicaGroupDeploymentAction.spec(),
-            SearchReplicaGroupScopedHistoryAction.spec(),
+            ScopedSearchReplicaGroupHistoryAction.spec(),
             SearchRouteScopedHistoryAction.spec(),
         ]

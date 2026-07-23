@@ -12,7 +12,7 @@ from ai.backend.manager.repositories.base import BatchQuerier
 
 
 @dataclass
-class SearchReplicaGroupHistoryAction(BaseGlobalAction):
+class AdminSearchReplicaGroupHistoryAction(BaseGlobalAction):
     """Action to search replica-group scheduling history (admin API).
 
     System-wide and unscoped: authorization is the SUPERADMIN role gate rather
@@ -38,7 +38,7 @@ class SearchReplicaGroupHistoryAction(BaseGlobalAction):
 
 
 @dataclass
-class SearchReplicaGroupHistoryActionResult(BaseActionResult):
+class AdminSearchReplicaGroupHistoryActionResult(BaseActionResult):
     """Result of searching replica-group scheduling history."""
 
     items: list[ReplicaGroupHistoryData]
