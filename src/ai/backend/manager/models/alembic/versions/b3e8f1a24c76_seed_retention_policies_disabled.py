@@ -7,7 +7,7 @@ swept automatically. Flip the column default to ``false`` and disable the seeded
 rows so nothing is purged until a super-admin turns a category on.
 
 Revision ID: b3e8f1a24c76
-Revises: 577c7a215934
+Revises: ea422739665b
 Create Date: 2026-07-21
 
 """
@@ -17,7 +17,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "b3e8f1a24c76"
-down_revision = "577c7a215934"
+down_revision = "ea422739665b"
 # Part of: NEXT_RELEASE_VERSION
 branch_labels = None
 depends_on = None
@@ -44,9 +44,6 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    # The ``enabled`` flag is operator-managed policy state; do not flip rows
+    # back to enabled here — only restore the previous column default.
     op.alter_column("retention_policies", "enabled", server_default=sa.true())
-    op.execute(
-        sa.text(
-            "UPDATE retention_policies SET enabled = true WHERE category = ANY(:categories)"
-        ).bindparams(categories=SEED_CATEGORIES)
-    )

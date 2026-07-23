@@ -1,0 +1,52 @@
+{
+  "retention_policies": [
+    {
+      "id": "b1e5f4a0-0001-4c10-8a01-000000000001",
+      "category": "logs",
+      "retention_period": {"days": 365},
+      "enabled": false
+    },
+    {
+      "id": "b1e5f4a0-0002-4c10-8a01-000000000002",
+      "category": "login",
+      "retention_period": {"days": 365},
+      "enabled": false
+    },
+    {
+      "id": "b1e5f4a0-0003-4c10-8a01-000000000003",
+      "category": "reconcile_history",
+      "retention_period": {"days": 365},
+      "enabled": false
+    },
+    {
+      "id": "b1e5f4a0-0004-4c10-8a01-000000000004",
+      "category": "roles_invitations",
+      "retention_period": {"days": 365},
+      "enabled": false
+    },
+    {
+      "id": "b1e5f4a0-0005-4c10-8a01-000000000005",
+      "category": "deployments",
+      "retention_period": {"days": 365},
+      "enabled": false
+    },
+    {
+      "id": "b1e5f4a0-0006-4c10-8a01-000000000006",
+      "category": "sessions",
+      "retention_period": {"days": 365},
+      "enabled": false
+    },
+    {
+      "id": "b1e5f4a0-0007-4c10-8a01-000000000007",
+      "category": "usage_records",
+      "retention_period": {"days": 90},
+      "enabled": false
+    },
+    {
+      "id": "b1e5f4a0-0008-4c10-8a01-000000000008",
+      "category": "usage_buckets",
+      "retention_period": {"days": 730},
+      "enabled": false
+    }
+  ]
+}
