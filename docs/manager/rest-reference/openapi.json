@@ -1038,52 +1038,39 @@
         "type": "object"
       },
       "AppConfigFragmentScope": {
-        "description": "Scope for a scoped fragment search — OR across all domain/user items.\n\nRaises if every category is empty.",
+        "description": "The single scope a scoped fragment search runs at, as ``(scope_type, scope_id)``.",
         "properties": {
-          "domain": {
-            "anyOf": [
-              {
-                "items": {
-                  "format": "uuid",
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Domain ids whose fragments to search.",
-            "title": "Domain"
+          "scope_type": {
+            "$ref": "#/components/schemas/AppConfigScopeType",
+            "description": "Scope type: domain, user, or public (global)."
           },
-          "user": {
+          "scope_id": {
             "anyOf": [
               {
-                "items": {
-                  "format": "uuid",
-                  "type": "string"
-                },
-                "type": "array"
+                "format": "uuid",
+                "type": "string"
               },
               {
                 "type": "null"
               }
             ],
             "default": null,
-            "description": "User ids whose fragments to search.",
-            "title": "User"
+            "description": "Scope identifier: the domain id (domain scope) or the user id (user scope). Null for public scope, which has no owner.",
+            "title": "Scope Id"
           }
         },
+        "required": [
+          "scope_type"
+        ],
         "title": "AppConfigFragmentScope",
         "type": "object"
       },
       "ScopedSearchAppConfigFragmentInput": {
-        "description": "Input for a scoped fragment search keyed by domain/user scope (OR-combined).",
+        "description": "Input for a scoped fragment search, keyed by the scope the fragments are written at.",
         "properties": {
           "scope": {
             "$ref": "#/components/schemas/AppConfigFragmentScope",
-            "description": "Scope (OR across all items)."
+            "description": "The scope to search at."
           },
           "order": {
             "anyOf": [

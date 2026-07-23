@@ -16,8 +16,6 @@ from ai.backend.common.dto.manager.v2.app_config_fragment.types import (
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.identifier.app_config import AppConfigScopeID
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
-from ai.backend.common.identifier.domain import DomainID
-from ai.backend.common.identifier.user import UserID
 
 __all__ = (
     "AdminSearchAppConfigFragmentInput",
@@ -143,31 +141,31 @@ class AdminSearchAppConfigFragmentInput(BaseRequestModel):
 
 
 class AppConfigFragmentScope(BaseRequestModel):
-    """Scope for a scoped fragment search — OR across all domain/user items.
+    """The single scope a scoped fragment search runs at, as ``(scope_type, scope_id)``."""
 
-    Raises if every category is empty.
-    """
-
-    domain: list[DomainID] | None = Field(
-        default=None, description="Domain ids whose fragments to search."
+    scope_type: AppConfigScopeType = Field(
+        description="Scope type: domain, user, or public (global)."
     )
-    user: list[UserID] | None = Field(
-        default=None, description="User ids whose fragments to search."
+    scope_id: AppConfigScopeID | None = Field(
+        default=None,
+        description="Scope identifier: the domain id (domain scope) or the user id (user scope). "
+        "Null for public scope, which has no owner.",
     )
 
     @model_validator(mode="after")
-    def _require_non_empty(self) -> Self:
-        if not self.domain and not self.user:
-            raise ValueError(
-                "AppConfigFragmentScope requires a non-empty value for 'domain' or 'user'"
-            )
+    def _check_scope_id(self) -> Self:
+        if self.scope_type is AppConfigScopeType.PUBLIC:
+            if self.scope_id is not None:
+                raise ValueError("scope_id must be null for public scope.")
+        elif self.scope_id is None:
+            raise ValueError("scope_id is required for domain and user scopes.")
         return self
 
 
 class ScopedSearchAppConfigFragmentInput(BaseRequestModel):
-    """Input for a scoped fragment search keyed by domain/user scope (OR-combined)."""
+    """Input for a scoped fragment search, keyed by the scope the fragments are written at."""
 
-    scope: AppConfigFragmentScope = Field(description="Scope (OR across all items).")
+    scope: AppConfigFragmentScope = Field(description="The scope to search at.")
     order: list[AppConfigFragmentOrder] | None = Field(
         default=None, description="Order specifiers, applied in sequence."
     )
