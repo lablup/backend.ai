@@ -5,6 +5,10 @@ from ai.backend.manager.repositories.scheduling_history.types import (
     ReplicaGroupHistorySearchScope,
 )
 
+from .actions.admin_search_replica_group_history import (
+    AdminSearchReplicaGroupHistoryAction,
+    AdminSearchReplicaGroupHistoryActionResult,
+)
 from .actions.resolve_kernel_session import (
     ResolveKernelSessionAction,
     ResolveKernelSessionActionResult,
@@ -12,6 +16,10 @@ from .actions.resolve_kernel_session import (
 from .actions.resolve_replica_group_deployment import (
     ResolveReplicaGroupDeploymentAction,
     ResolveReplicaGroupDeploymentActionResult,
+)
+from .actions.scoped_search_replica_group_history import (
+    ScopedSearchReplicaGroupHistoryAction,
+    ScopedSearchReplicaGroupHistoryActionResult,
 )
 from .actions.search_deployment_history import (
     SearchDeploymentHistoryAction,
@@ -28,14 +36,6 @@ from .actions.search_kernel_history import (
 from .actions.search_kernel_scoped_history import (
     SearchKernelScopedHistoryAction,
     SearchKernelScopedHistoryActionResult,
-)
-from .actions.search_replica_group_history import (
-    SearchReplicaGroupHistoryAction,
-    SearchReplicaGroupHistoryActionResult,
-)
-from .actions.search_replica_group_scoped_history import (
-    SearchReplicaGroupScopedHistoryAction,
-    SearchReplicaGroupScopedHistoryActionResult,
 )
 from .actions.search_route_history import (
     SearchRouteHistoryAction,
@@ -113,16 +113,16 @@ class SchedulingHistoryService:
             has_previous_page=result.has_previous_page,
         )
 
-    async def search_replica_group_history(
+    async def admin_search_replica_group_history(
         self,
-        action: SearchReplicaGroupHistoryAction,
-    ) -> SearchReplicaGroupHistoryActionResult:
+        action: AdminSearchReplicaGroupHistoryAction,
+    ) -> AdminSearchReplicaGroupHistoryActionResult:
         """Searches replica-group scheduling history (admin API)."""
         result = await self._repository.admin_search_replica_group_history(
             querier=action.querier,
         )
 
-        return SearchReplicaGroupHistoryActionResult(
+        return AdminSearchReplicaGroupHistoryActionResult(
             items=result.items,
             total_count=result.total_count,
             has_next_page=result.has_next_page,
@@ -217,17 +217,17 @@ class SchedulingHistoryService:
         )
         return ResolveReplicaGroupDeploymentActionResult(deployment_id=deployment_id)
 
-    async def search_replica_group_scoped_history(
+    async def scoped_search_replica_group_history(
         self,
-        action: SearchReplicaGroupScopedHistoryAction,
-    ) -> SearchReplicaGroupScopedHistoryActionResult:
+        action: ScopedSearchReplicaGroupHistoryAction,
+    ) -> ScopedSearchReplicaGroupHistoryActionResult:
         """Searches the scheduling history of one replica group."""
         result = await self._repository.scoped_search_replica_group_history(
             querier=action.querier,
             scope=ReplicaGroupHistorySearchScope(replica_group_id=action.replica_group_id),
         )
 
-        return SearchReplicaGroupScopedHistoryActionResult(
+        return ScopedSearchReplicaGroupHistoryActionResult(
             items=result.items,
             total_count=result.total_count,
             has_next_page=result.has_next_page,

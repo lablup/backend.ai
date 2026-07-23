@@ -14,7 +14,7 @@ from ai.backend.manager.repositories.base import BatchQuerier
 
 
 @dataclass
-class SearchReplicaGroupScopedHistoryAction(BaseScopeAction):
+class ScopedSearchReplicaGroupHistoryAction(BaseScopeAction):
     """Action to search the scheduling history of one replica group.
 
     The owning deployment is the authorization subject, scope, and target:
@@ -56,7 +56,7 @@ class SearchReplicaGroupScopedHistoryAction(BaseScopeAction):
 
 
 @dataclass
-class SearchReplicaGroupScopedHistoryActionResult(BaseScopeActionResult):
+class ScopedSearchReplicaGroupHistoryActionResult(BaseScopeActionResult):
     """Result of searching the scheduling history of one replica group."""
 
     items: list[ReplicaGroupHistoryData]

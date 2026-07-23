@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+from .admin_search_replica_group_history import (
+    AdminSearchReplicaGroupHistoryAction,
+    AdminSearchReplicaGroupHistoryActionResult,
+)
 from .base import SchedulingHistoryAction
 from .resolve_kernel_session import (
     ResolveKernelSessionAction,
@@ -8,6 +12,10 @@ from .resolve_kernel_session import (
 from .resolve_replica_group_deployment import (
     ResolveReplicaGroupDeploymentAction,
     ResolveReplicaGroupDeploymentActionResult,
+)
+from .scoped_search_replica_group_history import (
+    ScopedSearchReplicaGroupHistoryAction,
+    ScopedSearchReplicaGroupHistoryActionResult,
 )
 from .search_deployment_history import (
     SearchDeploymentHistoryAction,
@@ -24,14 +32,6 @@ from .search_kernel_history import (
 from .search_kernel_scoped_history import (
     SearchKernelScopedHistoryAction,
     SearchKernelScopedHistoryActionResult,
-)
-from .search_replica_group_history import (
-    SearchReplicaGroupHistoryAction,
-    SearchReplicaGroupHistoryActionResult,
-)
-from .search_replica_group_scoped_history import (
-    SearchReplicaGroupScopedHistoryAction,
-    SearchReplicaGroupScopedHistoryActionResult,
 )
 from .search_route_history import (
     SearchRouteHistoryAction,
@@ -63,8 +63,8 @@ __all__ = (
     "SearchKernelHistoryActionResult",
     "SearchDeploymentHistoryAction",
     "SearchDeploymentHistoryActionResult",
-    "SearchReplicaGroupHistoryAction",
-    "SearchReplicaGroupHistoryActionResult",
+    "AdminSearchReplicaGroupHistoryAction",
+    "AdminSearchReplicaGroupHistoryActionResult",
     "SearchRouteHistoryAction",
     "SearchRouteHistoryActionResult",
     # Scoped actions (added in 26.2.0)
@@ -74,8 +74,8 @@ __all__ = (
     "SearchKernelScopedHistoryActionResult",
     "SearchDeploymentScopedHistoryAction",
     "SearchDeploymentScopedHistoryActionResult",
-    "SearchReplicaGroupScopedHistoryAction",
-    "SearchReplicaGroupScopedHistoryActionResult",
+    "ScopedSearchReplicaGroupHistoryAction",
+    "ScopedSearchReplicaGroupHistoryActionResult",
     "SearchRouteScopedHistoryAction",
     "SearchRouteScopedHistoryActionResult",
 )
