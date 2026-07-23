@@ -3,7 +3,6 @@ Common definitions/constants used throughout the manager.
 """
 
 import enum
-import re
 from typing import Final
 
 from ai.backend.common.arch import CURRENT_ARCH
@@ -42,34 +41,7 @@ DEFAULT_ROLE: Final = "main"
 
 PASSWORD_PLACEHOLDER: Final = "*****"
 
-_RESERVED_VFOLDER_PATTERNS = [r"^\.[a-z0-9]+rc$", r"^\.[a-z0-9]+_profile$"]
 RESERVED_DOTFILES = [".terminfo", ".jupyter", ".ssh", ".ssh/authorized_keys", ".local", ".config"]
-RESERVED_VFOLDERS = [
-    ".terminfo",
-    ".jupyter",
-    ".tmux.conf",
-    ".ssh",
-    "/bin",
-    "/boot",
-    "/dev",
-    "/etc",
-    "/lib",
-    "/lib64",
-    "/media",
-    "/mnt",
-    "/opt",
-    "/proc",
-    "/root",
-    "/run",
-    "/sbin",
-    "/srv",
-    "/sys",
-    "/tmp",
-    "/usr",
-    "/var",
-    "/home",
-]
-RESERVED_VFOLDER_PATTERNS = [re.compile(x) for x in _RESERVED_VFOLDER_PATTERNS]
 
 # Mapping between vfolder names and their in-container paths.
 VFOLDER_DSTPATHS_MAP = {
