@@ -9,6 +9,7 @@ import sqlalchemy as sa
 from ai.backend.common.data.idle_checker.types import IdleCheckPhase
 from ai.backend.manager.models.idle_checker.row import SessionIdleCheckRow
 from ai.backend.manager.repositories.base import BatchPurgerSpec
+from ai.backend.manager.repositories.base.types import ConflictCheck
 from ai.backend.manager.repositories.idle_checker.types import SessionIdleCheckPair
 
 
@@ -26,3 +27,7 @@ class SessionIdleCheckBatchPurgerSpec(BatchPurgerSpec[SessionIdleCheckRow]):
             ).in_(pair_values),
             SessionIdleCheckRow.last_status != IdleCheckPhase.IDLE_EXPIRED,
         )
+
+    @override
+    def conflict_checks(self) -> Sequence[ConflictCheck]:
+        return ()
