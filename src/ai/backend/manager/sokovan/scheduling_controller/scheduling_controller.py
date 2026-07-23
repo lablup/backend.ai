@@ -85,6 +85,7 @@ from .validators import (
     InferenceModelFolderRule,
     MountNameValidationRule,
     PendingSessionCountLimitRule,
+    PendingSessionResourceLimitRule,
     RequestedSlotTypeRule,
     RequiredResourceSlotRule,
     ResourceLimitRule,
@@ -167,6 +168,7 @@ class SchedulingController:
         # ``SessionSpec`` + ``SessionSpecContext``.
         self._spec_validator = SessionSpecValidator([
             PendingSessionCountLimitRule(),
+            PendingSessionResourceLimitRule(),
             ContainerLimitRule(),
             ImageSlotTypeRule(),
             RequestedSlotTypeRule(),

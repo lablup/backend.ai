@@ -1685,6 +1685,7 @@ class ScheduleDBSource:
                     sa.select(
                         KeyPairResourcePolicyRow.max_containers_per_session,
                         KeyPairResourcePolicyRow.max_pending_session_count,
+                        KeyPairResourcePolicyRow.max_pending_session_resource_slots,
                         KeyPairResourcePolicyRow.allowed_vfolder_hosts,
                     )
                     .select_from(UserRow)
@@ -1700,6 +1701,11 @@ class ScheduleDBSource:
                 user_enqueue_policy = UserEnqueuePolicy(
                     max_containers_per_session=policy_row.max_containers_per_session,
                     max_pending_session_count=policy_row.max_pending_session_count,
+                    max_pending_session_resource_slots=(
+                        _to_slot_quota(policy_row.max_pending_session_resource_slots)
+                        if policy_row.max_pending_session_resource_slots is not None
+                        else None
+                    ),
                     allowed_vfolder_hosts=policy_row.allowed_vfolder_hosts,
                 )
 
@@ -1715,9 +1721,13 @@ class ScheduleDBSource:
                 db_sess, user_scope_for_dotfiles, access_key
             )
 
-        # Global per-user pending-session count for the enqueue queue-depth
-        # gate. Concurrent-session limits are enforced by the scheduler.
+        # Global per-user pending-session count and requested-slot total for
+        # the enqueue queue-depth / queue-resource gates. Concurrent-session
+        # limits are enforced by the scheduler. The slot total is aggregated
+        # from resource_allocations, the same normalized source the
+        # scheduling snapshot reads pending requests from.
         pending_session_count = 0
+        pending_session_resource_slots: dict[ResourceSlotName, Decimal] = {}
         if user_uuid is not None:
             pending_count_result = await db_sess.execute(
                 sa.select(sa.func.count()).where(
@@ -1727,11 +1737,30 @@ class ScheduleDBSource:
             )
             pending_session_count = int(pending_count_result.scalar_one())
 
+            pending_slots_result = await db_sess.execute(
+                sa.select(
+                    ResourceAllocationRow.slot_name,
+                    sa.func.sum(ResourceAllocationRow.requested),
+                )
+                .join(KernelRow, ResourceAllocationRow.kernel_id == KernelRow.id)
+                .where(
+                    KernelRow.user_uuid == user_uuid,
+                    KernelRow.status == KernelStatus.PENDING,
+                    ResourceAllocationRow.free_at.is_(None),
+                )
+                .group_by(ResourceAllocationRow.slot_name)
+            )
+            pending_session_resource_slots = {
+                ResourceSlotName(slot_name): Decimal(total)
+                for slot_name, total in pending_slots_result
+            }
+
         return UserEnqueueFetch(
             policy=user_enqueue_policy,
             container_user=user_container,
             dotfiles=dotfile_bundle,
             pending_session_count=pending_session_count,
+            pending_session_resource_slots=pending_session_resource_slots,
         )
 
     async def pick_default_resource_group(
