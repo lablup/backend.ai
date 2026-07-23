@@ -193,9 +193,7 @@ class ReplicaGroupHistorySearchScope(SearchScope):
     @override
     def to_condition(self) -> QueryCondition:
         """Convert scope to a query condition for ReplicaGroupHistoryRow."""
-        return ReplicaGroupHistoryConditions.by_replica_group_id_filter(
-            UUIDEqualMatchSpec(value=self.replica_group_id, negated=False)
-        )
+        return ReplicaGroupHistoryConditions.by_replica_group_id(self.replica_group_id)
 
     @property
     @override
