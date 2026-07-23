@@ -14,7 +14,11 @@ from pydantic import Field, field_validator
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.defs import DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UUIDFilter
-from ai.backend.common.dto.manager.v2.common import BinarySizeInput, ResourceSlotEntryInput
+from ai.backend.common.dto.manager.v2.common import (
+    BinarySizeInput,
+    MountItemInput,
+    ResourceSlotEntryInput,
+)
 from ai.backend.common.dto.manager.v2.session.types import (
     ClusterModeEnum,
     CreateSessionTypeEnum,
@@ -22,6 +26,7 @@ from ai.backend.common.dto.manager.v2.session.types import (
     SessionOrderField,
     SessionStatusFilter,
 )
+from ai.backend.common.dto.manager.v2.session_options.types import AgentSelectionPolicyEnum
 from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
@@ -252,26 +257,6 @@ class ResourceOptsInput(BaseRequestModel):
     )
 
 
-class MountItemInput(BaseRequestModel):
-    """A single virtual folder mount specification."""
-
-    vfolder_id: UUID = Field(description="Virtual folder UUID to mount.")
-    mount_path: str | None = Field(
-        default=None, description="Custom mount path. Uses default path if omitted."
-    )
-    permission: str | None = Field(
-        default=None, description="Mount permission override ('rw' or 'ro')."
-    )
-    subpath: str | None = Field(
-        default=None,
-        min_length=1,
-        description=(
-            "Subpath within the vfolder to mount. Omit (null) to mount the vfolder root."
-            " Empty string is rejected."
-        ),
-    )
-
-
 class BatchConfigInput(BaseRequestModel):
     """Batch session specific configuration. Required when session_type is BATCH."""
 
@@ -348,6 +333,13 @@ class EnqueueSessionInput(BaseRequestModel):
     )
     agent_list: list[str] | None = Field(
         default=None, description="Designated agent IDs for placement constraint."
+    )
+    agent_selection_policy: AgentSelectionPolicyEnum | None = Field(
+        default=None,
+        description=(
+            "How agent_list is enforced (strict/preferred). "
+            "null inherits the resource group default."
+        ),
     )
     attach_network: UUID | None = Field(
         default=None, description="Persistent network UUID to attach."

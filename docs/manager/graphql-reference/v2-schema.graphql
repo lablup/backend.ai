@@ -4795,6 +4795,11 @@ input EnqueueSessionInput {
   """Designated agent IDs."""
   agentList: [String!] = null
 
+  """
+  Added in 26.8.0. How agent_list is enforced. null inherits the resource group default.
+  """
+  agentSelectionPolicy: SessionAgentSelectionPolicy = null
+
   """Network UUID to attach."""
   attachNetwork: ID = null
 

@@ -1713,6 +1713,7 @@ class SessionService:
                             designated_agents=tuple(
                                 AgentId(a) for a in (action.scheduling.agent_list or ())
                             ),
+                            agent_selection_policy=action.scheduling.agent_selection_policy,
                         ),
                         kernel_groups=kernel_groups,
                         handler_options=None,

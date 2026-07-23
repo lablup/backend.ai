@@ -19,8 +19,10 @@ from ai.backend.common.dto.manager.v2.session.types import (
     ClusterModeEnum,
     CreateSessionTypeEnum,
 )
+from ai.backend.common.dto.manager.v2.session_options.types import AgentSelectionPolicyEnum
 from ai.backend.common.types import ClusterMode, SessionResult, SessionTypes
 from ai.backend.manager.api.adapters.session.adapter import SessionAdapter
+from ai.backend.manager.data.session.options import AgentSelectionPolicy
 from ai.backend.manager.data.session.types import SessionData, SessionStatus
 
 
@@ -240,6 +242,57 @@ class TestEnqueueActionBuilding:
         action = mock_processors.session.enqueue_session.wait_for_complete.call_args[0][0]
         assert action.resource.cluster_mode == ClusterMode.MULTI_NODE
         assert action.resource.cluster_size == 4
+
+    async def test_enqueue_with_agent_selection_policy(
+        self,
+        adapter: SessionAdapter,
+        mock_processors: MagicMock,
+    ) -> None:
+        """A request-level policy should be converted to the domain enum."""
+        dto = EnqueueSessionInput(
+            session_name="strict-session",
+            session_type=CreateSessionTypeEnum.INTERACTIVE,
+            image_id=uuid4(),
+            resource_entries=[ResourceSlotEntryInput(resource_type="cpu", quantity="1")],
+            project_id=uuid4(),
+            agent_list=["agent-1"],
+            agent_selection_policy=AgentSelectionPolicyEnum.STRICT,
+        )
+        await adapter.enqueue(
+            dto,
+            user_id=uuid4(),
+            user_role="user",
+            access_key="TESTKEY",
+            domain_name="default",
+            group_id=dto.project_id,
+        )
+        action = mock_processors.session.enqueue_session.wait_for_complete.call_args[0][0]
+        assert action.scheduling.agent_list == ["agent-1"]
+        assert action.scheduling.agent_selection_policy == AgentSelectionPolicy.STRICT
+
+    async def test_enqueue_without_agent_selection_policy(
+        self,
+        adapter: SessionAdapter,
+        mock_processors: MagicMock,
+    ) -> None:
+        """An omitted policy should stay None so the RG default applies."""
+        dto = EnqueueSessionInput(
+            session_name="default-policy-session",
+            session_type=CreateSessionTypeEnum.INTERACTIVE,
+            image_id=uuid4(),
+            resource_entries=[ResourceSlotEntryInput(resource_type="cpu", quantity="1")],
+            project_id=uuid4(),
+        )
+        await adapter.enqueue(
+            dto,
+            user_id=uuid4(),
+            user_role="user",
+            access_key="TESTKEY",
+            domain_name="default",
+            group_id=dto.project_id,
+        )
+        action = mock_processors.session.enqueue_session.wait_for_complete.call_args[0][0]
+        assert action.scheduling.agent_selection_policy is None
 
 
 class TestTerminateActionBuilding:
