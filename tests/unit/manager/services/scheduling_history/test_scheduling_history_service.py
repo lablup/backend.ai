@@ -5,9 +5,10 @@ Tests the service layer with mocked repositories.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime
 from unittest.mock import MagicMock, create_autospec
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from dateutil.tz import tzutc
@@ -35,11 +36,13 @@ from ai.backend.manager.data.session.types import (
     SessionSchedulingHistoryData,
     SessionSchedulingHistoryListResult,
 )
+from ai.backend.manager.models.scopes import SearchScope
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.base.pagination import NoPagination
 from ai.backend.manager.repositories.scheduling_history import SchedulingHistoryRepository
 from ai.backend.manager.repositories.scheduling_history.types import (
     DeploymentHistorySearchScope,
+    KernelSchedulingHistoryBySessionSearchScope,
     KernelSchedulingHistorySearchScope,
     RouteHistorySearchScope,
     SessionSchedulingHistorySearchScope,
@@ -74,6 +77,8 @@ from ai.backend.manager.services.scheduling_history.actions.search_session_scope
 from ai.backend.manager.services.scheduling_history.service import SchedulingHistoryService
 
 _NOW = datetime.now(tz=tzutc())
+_KERNEL_ID = KernelId(UUID("fa6a3549-2020-43c5-b451-a9a3d7309732"))
+_SESSION_ID = SessionId(UUID("6ad4b5d1-3a4e-4a1f-9f6a-1c4a3f9d2b70"))
 
 
 @pytest.fixture
@@ -379,9 +384,33 @@ class TestResolveKernelSessionAction:
         mock_repository.resolve_session_id.assert_awaited_once_with(kernel_id)
 
 
+@dataclass(frozen=True)
+class _KernelScopedHistoryCase:
+    label: str
+    kernel_id: KernelId | None
+    expected_scope: SearchScope
+
+
 class TestSearchKernelScopedHistoryAction:
-    async def test_scopes_to_the_owning_session_and_narrows_to_the_kernel(
+    @pytest.mark.parametrize(
+        "case",
+        [
+            _KernelScopedHistoryCase(
+                label="bound-to-kernel",
+                kernel_id=_KERNEL_ID,
+                expected_scope=KernelSchedulingHistorySearchScope(kernel_id=_KERNEL_ID),
+            ),
+            _KernelScopedHistoryCase(
+                label="bound-to-session",
+                kernel_id=None,
+                expected_scope=KernelSchedulingHistoryBySessionSearchScope(session_id=_SESSION_ID),
+            ),
+        ],
+        ids=lambda case: case.label,
+    )
+    async def test_scopes_to_the_owning_session_and_narrows_by_the_query_bound(
         self,
+        case: _KernelScopedHistoryCase,
         service: SchedulingHistoryService,
         mock_repository: MagicMock,
         querier: BatchQuerier,
@@ -395,25 +424,23 @@ class TestSearchKernelScopedHistoryAction:
                 has_previous_page=False,
             )
         )
-        kernel_id = KernelId(uuid4())
-        session_id = SessionId(uuid4())
 
         action = SearchKernelScopedHistoryAction(
-            kernel_id=kernel_id, session_id=session_id, querier=querier
+            kernel_id=case.kernel_id, session_id=_SESSION_ID, querier=querier
         )
         result = await service.search_kernel_scoped_history(action)
 
         assert result.items == [history_item]
         # Authorized via session read: kernel permission records are intentionally
-        # empty, so the owning session is the subject, scope, and target of the
-        # RBAC check; kernel_id bounds the repository query.
+        # empty, so the session is the subject, scope, and target of the RBAC check
+        # in both cases; kernel_id only bounds the repository query.
         assert action.target_element() == RBACElementRef(
-            element_type=RBACElementType.SESSION, element_id=str(session_id)
+            element_type=RBACElementType.SESSION, element_id=str(_SESSION_ID)
         )
         assert action.scope_type() is ScopeType.SESSION
-        assert action.scope_id() == str(session_id)
+        assert action.scope_id() == str(_SESSION_ID)
         assert action.entity_type() is EntityType.SESSION
         mock_repository.search_kernel_scoped_history.assert_awaited_once_with(
             querier=querier,
-            scope=KernelSchedulingHistorySearchScope(kernel_id=kernel_id),
+            scopes=[case.expected_scope],
         )
