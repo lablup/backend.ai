@@ -158,7 +158,7 @@ class SchedulingHistoryService:
             scope = KernelSchedulingHistoryBySessionSearchScope(session_id=action.session_id)
         result = await self._repository.search_kernel_scoped_history(
             querier=action.querier,
-            scope=scope,
+            scopes=[scope],
         )
 
         return SearchKernelScopedHistoryActionResult(

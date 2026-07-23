@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
 from ai.backend.common.metrics.metric import DomainType, LayerType
@@ -107,10 +108,10 @@ class SchedulingHistoryRepository:
     async def search_kernel_scoped_history(
         self,
         querier: BatchQuerier,
-        scope: SearchScope,
+        scopes: Sequence[SearchScope],
     ) -> KernelSchedulingHistoryListResult:
         """Search kernel history whose rows match any of ``scopes`` (OR)."""
-        return await self._db_source.search_kernel_scoped_history(querier, scope)
+        return await self._db_source.search_kernel_scoped_history(querier, scopes)
 
     # ========== Deployment History (Admin) ==========
 
