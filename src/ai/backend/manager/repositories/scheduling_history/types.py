@@ -8,16 +8,12 @@ from uuid import UUID
 
 from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec
 from ai.backend.common.identifier.replica import ReplicaID
-from ai.backend.common.types import KernelId, SessionId
+from ai.backend.common.types import SessionId
 from ai.backend.manager.errors.deployment import EndpointNotFound
-from ai.backend.manager.errors.kernel import (
-    KernelNotFound,
-    SessionNotFound,
-)
+from ai.backend.manager.errors.kernel import SessionNotFound
 from ai.backend.manager.errors.service import RouteNotFound
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.scheduling_history.conditions import (
     DeploymentHistoryConditions,
@@ -30,7 +26,6 @@ from ai.backend.manager.models.session import SessionRow
 
 __all__ = (
     "SessionSchedulingHistorySearchScope",
-    "KernelKernelHistorySearchScope",
     "SessionKernelHistorySearchScope",
     "DeploymentHistorySearchScope",
     "RouteHistorySearchScope",
@@ -74,41 +69,10 @@ class SessionSchedulingHistorySearchScope(SearchScope):
 
 
 @dataclass(frozen=True)
-class KernelKernelHistorySearchScope(SearchScope):
-    """Scope for kernel scheduling history search.
-
-    Used for entity-scoped queries where kernel_id is the scope parameter.
-    """
-
-    kernel_id: KernelId
-    """Required. The kernel to search history for."""
-
-    @override
-    def to_condition(self) -> QueryCondition:
-        """Convert scope to a query condition for KernelSchedulingHistoryRow."""
-        return KernelSchedulingHistoryConditions.by_kernel_id_filter(
-            UUIDEqualMatchSpec(value=self.kernel_id, negated=False)
-        )
-
-    @property
-    @override
-    def existence_checks(self) -> list[ExistenceCheck[Any]]:
-        """Check that the kernel exists."""
-        return [
-            ExistenceCheck(
-                column=KernelRow.id,
-                value=self.kernel_id,
-                error=KernelNotFound(str(self.kernel_id)),
-            ),
-        ]
-
-
-@dataclass(frozen=True)
 class SessionKernelHistorySearchScope(SearchScope):
     """Scope for kernel scheduling history search bounded by the owning session.
 
-    Returns the history of every kernel belonging to the session, as opposed to
-    ``KernelKernelHistorySearchScope`` which bounds the query to one kernel.
+    Returns the history of every kernel belonging to the session.
     """
 
     session_id: SessionId

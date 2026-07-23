@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from uuid import UUID
 
+from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec
 from ai.backend.common.dto.manager.v2.scheduling_history.request import (
     AdminSearchDeploymentHistoriesInput,
     AdminSearchKernelHistoriesInput,
@@ -93,8 +94,6 @@ from ai.backend.manager.services.scheduling_history.actions.search_kernel_histor
     SearchKernelHistoryAction,
 )
 from ai.backend.manager.services.scheduling_history.actions.search_kernel_scoped_history import (
-    KernelHistoryTarget,
-    KernelKernelHistoryTarget,
     SearchKernelScopedHistoryAction,
     SessionKernelHistoryTarget,
 )
@@ -443,6 +442,35 @@ class SchedulingHistoryAdapter(BaseAdapter):
         """Search kernel scheduling histories under a non-admin scope."""
         conditions = self._convert_kernel_filter(input.filter) if input.filter else []
         orders = self._convert_kernel_orders(input.order) if input.order else []
+        kernel_items = input.scope.kernel or []
+        session_items = input.scope.session or []
+        # TODO: Drop this rejection once the scoped search becomes a bulk action.
+        # The scope input is already list-shaped and its items are meant to be
+        # OR'd, but SearchKernelScopedHistoryAction is a single-target
+        # BaseScopeAction, so only one item is dispatchable today.
+        if len(kernel_items) + len(session_items) != 1:
+            raise InvalidAPIParameters(
+                "Kernel scheduling history scope accepts exactly one scope item"
+            )
+        # TODO: Drop the kernel -> session conversion once virtual scopes land and
+        # a kernel becomes a scope of its own. Kernels hold no permission records,
+        # so a kernel scope item is authorized on its owning session and narrowed
+        # back down to that kernel with a query condition.
+        if kernel_items:
+            kernel_id = KernelId(kernel_items[0].value)
+            resolve_result = (
+                await self._processors.scheduling_history.resolve_kernel_session.wait_for_complete(
+                    ResolveKernelSessionAction(kernel_id=kernel_id)
+                )
+            )
+            session_id = resolve_result.session_id
+            conditions.append(
+                KernelSchedulingHistoryConditions.by_kernel_id_filter(
+                    UUIDEqualMatchSpec(value=kernel_id, negated=False)
+                )
+            )
+        else:
+            session_id = SessionId(session_items[0].value)
         querier = self._build_querier(
             conditions=conditions,
             orders=orders,
@@ -454,37 +482,9 @@ class SchedulingHistoryAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        kernel_items = input.scope.kernel or []
-        session_items = input.scope.session or []
-        # TODO: Drop this rejection once the scoped search becomes a bulk action.
-        # The scope input is already list-shaped and its items are meant to be
-        # OR'd, but SearchKernelScopedHistoryAction is a single-target
-        # BaseScopeAction, so only one item is dispatchable today.
-        if len(kernel_items) + len(session_items) != 1:
-            raise InvalidAPIParameters(
-                "Kernel scheduling history scope accepts exactly one scope item"
-            )
-        target: KernelHistoryTarget
-        # TODO: Drop `session_id` and the kernel -> session resolution once
-        # virtual scopes land; the action can then authorize on the target's own
-        # RBAC element ref.
-        session_id: SessionId
-        if kernel_items:
-            kernel_id = KernelId(kernel_items[0].value)
-            target = KernelKernelHistoryTarget(kernel_id=kernel_id)
-            resolve_result = (
-                await self._processors.scheduling_history.resolve_kernel_session.wait_for_complete(
-                    ResolveKernelSessionAction(kernel_id=kernel_id)
-                )
-            )
-            session_id = resolve_result.session_id
-        else:
-            session_id = SessionId(session_items[0].value)
-            target = SessionKernelHistoryTarget(session_id=session_id)
         action_result = await self._processors.scheduling_history.search_kernel_scoped_history.wait_for_complete(
             SearchKernelScopedHistoryAction(
-                target=target,
-                _session_id=session_id,
+                target=SessionKernelHistoryTarget(session_id=session_id),
                 querier=querier,
             )
         )

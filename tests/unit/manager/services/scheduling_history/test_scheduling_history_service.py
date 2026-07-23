@@ -5,7 +5,6 @@ Tests the service layer with mocked repositories.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from datetime import datetime
 from unittest.mock import MagicMock, create_autospec
 from uuid import UUID, uuid4
@@ -36,13 +35,11 @@ from ai.backend.manager.data.session.types import (
     SessionSchedulingHistoryData,
     SessionSchedulingHistoryListResult,
 )
-from ai.backend.manager.models.scopes import SearchScope
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.base.pagination import NoPagination
 from ai.backend.manager.repositories.scheduling_history import SchedulingHistoryRepository
 from ai.backend.manager.repositories.scheduling_history.types import (
     DeploymentHistorySearchScope,
-    KernelKernelHistorySearchScope,
     RouteHistorySearchScope,
     SessionKernelHistorySearchScope,
     SessionSchedulingHistorySearchScope,
@@ -60,8 +57,6 @@ from ai.backend.manager.services.scheduling_history.actions.search_kernel_histor
     SearchKernelHistoryAction,
 )
 from ai.backend.manager.services.scheduling_history.actions.search_kernel_scoped_history import (
-    KernelHistoryTarget,
-    KernelKernelHistoryTarget,
     SearchKernelScopedHistoryAction,
     SessionKernelHistoryTarget,
 )
@@ -80,7 +75,6 @@ from ai.backend.manager.services.scheduling_history.actions.search_session_scope
 from ai.backend.manager.services.scheduling_history.service import SchedulingHistoryService
 
 _NOW = datetime.now(tz=tzutc())
-_KERNEL_ID = KernelId(UUID("fa6a3549-2020-43c5-b451-a9a3d7309732"))
 _SESSION_ID = SessionId(UUID("6ad4b5d1-3a4e-4a1f-9f6a-1c4a3f9d2b70"))
 
 
@@ -387,33 +381,9 @@ class TestResolveKernelSessionAction:
         mock_repository.resolve_session_id.assert_awaited_once_with(kernel_id)
 
 
-@dataclass(frozen=True)
-class _KernelScopedHistoryCase:
-    label: str
-    target: KernelHistoryTarget
-    expected_scope: SearchScope
-
-
 class TestSearchKernelScopedHistoryAction:
-    @pytest.mark.parametrize(
-        "case",
-        [
-            _KernelScopedHistoryCase(
-                label="bound-to-kernel",
-                target=KernelKernelHistoryTarget(kernel_id=_KERNEL_ID),
-                expected_scope=KernelKernelHistorySearchScope(kernel_id=_KERNEL_ID),
-            ),
-            _KernelScopedHistoryCase(
-                label="bound-to-session",
-                target=SessionKernelHistoryTarget(session_id=_SESSION_ID),
-                expected_scope=SessionKernelHistorySearchScope(session_id=_SESSION_ID),
-            ),
-        ],
-        ids=lambda case: case.label,
-    )
-    async def test_scopes_to_the_owning_session_and_narrows_by_the_target(
+    async def test_scopes_to_the_session_owning_the_kernels(
         self,
-        case: _KernelScopedHistoryCase,
         service: SchedulingHistoryService,
         mock_repository: MagicMock,
         querier: BatchQuerier,
@@ -429,14 +399,13 @@ class TestSearchKernelScopedHistoryAction:
         )
 
         action = SearchKernelScopedHistoryAction(
-            target=case.target, _session_id=_SESSION_ID, querier=querier
+            target=SessionKernelHistoryTarget(session_id=_SESSION_ID), querier=querier
         )
         result = await service.search_kernel_scoped_history(action)
 
         assert result.items == [history_item]
         # Authorized via session read: kernel permission records are intentionally
-        # empty, so the RBAC check is redirected to the session for every target
-        # variant; the target only narrows the repository query.
+        # empty, so the session is the subject, scope, and target of the RBAC check.
         assert action.target_element() == RBACElementRef(
             element_type=RBACElementType.SESSION, element_id=str(_SESSION_ID)
         )
@@ -445,5 +414,5 @@ class TestSearchKernelScopedHistoryAction:
         assert action.entity_type() is EntityType.SESSION
         mock_repository.search_kernel_scoped_history.assert_awaited_once_with(
             querier=querier,
-            scopes=[case.expected_scope],
+            scopes=[SessionKernelHistorySearchScope(session_id=_SESSION_ID)],
         )
