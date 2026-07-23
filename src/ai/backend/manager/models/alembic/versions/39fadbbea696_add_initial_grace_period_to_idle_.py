@@ -23,21 +23,9 @@ def upgrade() -> None:
         sa.Column(
             "initial_grace_period_seconds",
             sa.Integer(),
-            nullable=True,
+            server_default=sa.text("0"),
+            nullable=False,
         ),
-    )
-    op.execute(
-        sa.text(
-            """
-            UPDATE idle_checkers
-            SET initial_grace_period_seconds = 0
-            """
-        )
-    )
-    op.alter_column(
-        "idle_checkers",
-        "initial_grace_period_seconds",
-        nullable=False,
     )
     op.create_check_constraint(
         "initial_grace_period_seconds_non_negative",

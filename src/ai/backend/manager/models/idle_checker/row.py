@@ -40,6 +40,7 @@ class IdleCheckerRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
         sa.Integer(),
         nullable=False,
         default=0,
+        server_default=sa.text("0"),
     )
     spec: Mapped[IdleCheckerSpec] = mapped_column(
         "spec", PydanticColumn(IdleCheckerSpec), nullable=False
