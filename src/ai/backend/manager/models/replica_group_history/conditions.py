@@ -11,7 +11,6 @@ import sqlalchemy as sa
 from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec, UUIDInMatchSpec
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.replica_group import ReplicaGroupID
-from ai.backend.common.identifier.replica_group_history import ReplicaGroupHistoryID
 from ai.backend.manager.data.deployment.types import ReplicaGroupHandlerCategory
 from ai.backend.manager.data.session.types import SchedulingResult
 from ai.backend.manager.models.clauses import QueryCondition
@@ -38,13 +37,6 @@ class ReplicaGroupHistoryConditions:
             if spec.negated:
                 return ReplicaGroupHistoryRow.id.notin_(spec.values)
             return ReplicaGroupHistoryRow.id.in_(spec.values)
-
-        return inner
-
-    @staticmethod
-    def by_ids(ids: Collection[ReplicaGroupHistoryID]) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return ReplicaGroupHistoryRow.id.in_(ids)
 
         return inner
 
