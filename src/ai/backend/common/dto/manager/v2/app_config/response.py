@@ -19,9 +19,10 @@ class AppConfigNode(BaseResponseModel):
     """The merged AppConfig view for one config name."""
 
     config_name: str = Field(description="Config name this merged view is for.")
-    merged_config: dict[str, Any] | None = Field(
-        description="Deep-merged config in ascending allow-list rank order; null when no fragment "
-        "contributes (the config name is defined but unconfigured for this scope)."
+    merged_config: dict[str, Any] = Field(
+        description="Deep-merged config in ascending allow-list rank order. At least one fragment "
+        "always contributes (a name nothing contributes to fails the call with a 404), so this is "
+        "never null; an empty object means the contributing fragments were themselves empty."
     )
     fragments: list[AppConfigFragmentNode] = Field(
         description="The fragments that contributed to the merge, in ascending allow-list rank order."

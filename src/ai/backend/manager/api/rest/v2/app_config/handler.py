@@ -22,6 +22,8 @@ log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 class V2AppConfigHandler:
     """REST v2 handler for the merged AppConfig read operations."""
 
+    _adapter: AppConfigAdapter
+
     def __init__(self, *, adapter: AppConfigAdapter) -> None:
         self._adapter = adapter
 
