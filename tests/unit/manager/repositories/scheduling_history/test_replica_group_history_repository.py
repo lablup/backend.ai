@@ -1,14 +1,14 @@
 """
 Tests for the replica-group history search paths on SchedulingHistoryRepository.
 
-The scoped search checks that the replica group exists, so these tests insert a
+The scoped search checks that the deployment exists, so these tests insert a
 real endpoint and replica groups rather than history rows alone.
 """
 
 from __future__ import annotations
 
 import uuid
-from collections.abc import AsyncGenerator, Callable
+from collections.abc import AsyncGenerator
 from dataclasses import dataclass
 
 import pytest
@@ -25,12 +25,11 @@ from ai.backend.common.types import BinarySize, ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.deployment.types import (
     ReplicaGroupHandlerCategory,
-    ReplicaGroupHistoryData,
     ReplicaGroupLifecycle,
     ReplicaGroupScalingStatus,
 )
 from ai.backend.manager.data.session.types import SchedulingResult
-from ai.backend.manager.errors.deployment import EndpointNotFound, ReplicaGroupNotFound
+from ai.backend.manager.errors.deployment import EndpointNotFound
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.group import GroupRow
@@ -51,7 +50,6 @@ from ai.backend.manager.models.resource_policy import (
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
-from ai.backend.manager.models.scopes import SearchScope
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -59,7 +57,6 @@ from ai.backend.manager.repositories.base import BatchQuerier, OffsetPagination
 from ai.backend.manager.repositories.scheduling_history import SchedulingHistoryRepository
 from ai.backend.manager.repositories.scheduling_history.types import (
     DeploymentReplicaGroupHistorySearchScope,
-    ReplicaGroupReplicaGroupHistorySearchScope,
 )
 from ai.backend.testutils.db import with_tables
 
@@ -82,25 +79,6 @@ class _ReplicaGroupHistorySeed:
     @property
     def deployment_count(self) -> int:
         return self.target_count + self.sibling_count
-
-
-@dataclass(frozen=True)
-class _ScopedSearchCase:
-    """A scope dimension the scoped search accepts, plus what it should return."""
-
-    label: str
-    scope: Callable[[_ReplicaGroupHistorySeed], SearchScope]
-    expected_count: Callable[[_ReplicaGroupHistorySeed], int]
-    row_belongs: Callable[[ReplicaGroupHistoryData, _ReplicaGroupHistorySeed], bool]
-
-
-@dataclass(frozen=True)
-class _UnknownScopeCase:
-    """A scope dimension pointed at a non-existent target, and the error it raises."""
-
-    label: str
-    scope: SearchScope
-    error: type[Exception]
 
 
 class TestReplicaGroupHistoryRepository:
@@ -152,7 +130,7 @@ class TestReplicaGroupHistoryRepository:
     ) -> _ReplicaGroupHistorySeed:
         """Seed a deployment, two replica groups, and a fixed set of history rows.
 
-        The scoped search checks the replica group exists, so the rows and the
+        The scoped search checks the deployment exists, so the rows and the
         endpoint they hang off must be real; that in turn needs the domain,
         project, scaling group and user the endpoint points at.
         """
@@ -373,35 +351,12 @@ class TestReplicaGroupHistoryRepository:
         assert result.total_count == replica_group_history_seed.target_scaling_count
         assert all(item.category == ReplicaGroupHandlerCategory.SCALING for item in result.items)
 
-    @pytest.mark.parametrize(
-        "case",
-        [
-            _ScopedSearchCase(
-                label="replica-group",
-                scope=lambda seed: ReplicaGroupReplicaGroupHistorySearchScope(
-                    replica_group_id=seed.replica_group_id
-                ),
-                expected_count=lambda seed: seed.target_count,
-                row_belongs=lambda item, seed: item.replica_group_id == seed.replica_group_id,
-            ),
-            _ScopedSearchCase(
-                label="deployment",
-                scope=lambda seed: DeploymentReplicaGroupHistorySearchScope(
-                    deployment_id=seed.deployment_id
-                ),
-                expected_count=lambda seed: seed.deployment_count,
-                row_belongs=lambda item, seed: item.deployment_id == seed.deployment_id,
-            ),
-        ],
-        ids=lambda case: case.label,
-    )
-    async def test_scoped_search_returns_the_rows_within_the_scope(
+    async def test_scoped_search_returns_the_rows_within_the_deployment(
         self,
-        case: _ScopedSearchCase,
         scheduling_history_repository: SchedulingHistoryRepository,
         replica_group_history_seed: _ReplicaGroupHistorySeed,
     ) -> None:
-        """Test that the scoped search returns exactly the rows under the scope"""
+        """Test that the deployment scope returns every replica group's rows under it"""
         seed = replica_group_history_seed
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=100, offset=0),
@@ -409,11 +364,12 @@ class TestReplicaGroupHistoryRepository:
             orders=[],
         )
         result = await scheduling_history_repository.scoped_search_replica_group_history(
-            querier, [case.scope(seed)]
+            querier,
+            [DeploymentReplicaGroupHistorySearchScope(deployment_id=seed.deployment_id)],
         )
 
-        assert result.total_count == case.expected_count(seed)
-        assert all(case.row_belongs(item, seed) for item in result.items)
+        assert result.total_count == seed.deployment_count
+        assert all(item.deployment_id == seed.deployment_id for item in result.items)
 
     async def test_scoped_search_replica_group_history_narrows_within_the_scope(
         self,
@@ -421,7 +377,7 @@ class TestReplicaGroupHistoryRepository:
         replica_group_history_seed: _ReplicaGroupHistorySeed,
     ) -> None:
         """Test that a querier condition narrows further, still bounded by the scope"""
-        target_group_id = replica_group_history_seed.replica_group_id
+        seed = replica_group_history_seed
 
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=100, offset=0),
@@ -432,13 +388,14 @@ class TestReplicaGroupHistoryRepository:
         )
         result = await scheduling_history_repository.scoped_search_replica_group_history(
             querier,
-            [ReplicaGroupReplicaGroupHistorySearchScope(replica_group_id=target_group_id)],
+            [DeploymentReplicaGroupHistorySearchScope(deployment_id=seed.deployment_id)],
         )
 
-        # Bounded by the scope (target only) and narrowed by the category condition.
-        assert result.total_count == replica_group_history_seed.target_scaling_count
+        # Bounded by the deployment and narrowed by the category condition (only the
+        # target group has SCALING rows).
+        assert result.total_count == seed.target_scaling_count
         assert all(
-            item.replica_group_id == target_group_id
+            item.deployment_id == seed.deployment_id
             and item.category == ReplicaGroupHandlerCategory.SCALING
             for item in result.items
         )
@@ -449,7 +406,7 @@ class TestReplicaGroupHistoryRepository:
         replica_group_history_seed: _ReplicaGroupHistorySeed,
     ) -> None:
         """Test that the requested order reaches the query"""
-        target_group_id = replica_group_history_seed.replica_group_id
+        seed = replica_group_history_seed
 
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=100, offset=0),
@@ -462,73 +419,31 @@ class TestReplicaGroupHistoryRepository:
         )
         result = await scheduling_history_repository.scoped_search_replica_group_history(
             querier,
-            [ReplicaGroupReplicaGroupHistorySearchScope(replica_group_id=target_group_id)],
+            [DeploymentReplicaGroupHistorySearchScope(deployment_id=seed.deployment_id)],
         )
 
         returned_attempts = [item.attempts for item in result.items]
+        assert len(returned_attempts) == seed.deployment_count
         assert returned_attempts == sorted(returned_attempts)
-        assert returned_attempts[0] == min(replica_group_history_seed.target_lifecycle_attempts)
-        assert returned_attempts[-1] == max(replica_group_history_seed.target_lifecycle_attempts)
 
-    @pytest.mark.parametrize(
-        "case",
-        [
-            _UnknownScopeCase(
-                label="replica-group",
-                scope=ReplicaGroupReplicaGroupHistorySearchScope(
-                    replica_group_id=ReplicaGroupID(
-                        uuid.UUID("00000000-0000-0000-0000-0000000000aa")
-                    )
-                ),
-                error=ReplicaGroupNotFound,
-            ),
-            _UnknownScopeCase(
-                label="deployment",
-                scope=DeploymentReplicaGroupHistorySearchScope(
-                    deployment_id=DeploymentID(uuid.UUID("00000000-0000-0000-0000-0000000000bb"))
-                ),
-                error=EndpointNotFound,
-            ),
-        ],
-        ids=lambda case: case.label,
-    )
-    async def test_scoped_search_rejects_an_unknown_scope(
+    async def test_scoped_search_rejects_an_unknown_deployment(
         self,
-        case: _UnknownScopeCase,
         db_with_cleanup: ExtendedAsyncSAEngine,
         scheduling_history_repository: SchedulingHistoryRepository,
     ) -> None:
-        """Test that the scope's existence check rejects a non-existent target"""
+        """Test that the scope's existence check rejects a non-existent deployment"""
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=100, offset=0),
             conditions=[],
             orders=[],
         )
 
-        with pytest.raises(case.error):
+        with pytest.raises(EndpointNotFound):
             await scheduling_history_repository.scoped_search_replica_group_history(
-                querier, [case.scope]
-            )
-
-    async def test_resolve_replica_group_deployment(
-        self,
-        scheduling_history_repository: SchedulingHistoryRepository,
-        replica_group_history_seed: _ReplicaGroupHistorySeed,
-    ) -> None:
-        """Test resolving the deployment owning a replica group"""
-        resolved = await scheduling_history_repository.resolve_replica_group_deployment(
-            replica_group_history_seed.replica_group_id
-        )
-
-        assert resolved == replica_group_history_seed.deployment_id
-
-    async def test_resolve_replica_group_deployment_unknown_group(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        scheduling_history_repository: SchedulingHistoryRepository,
-    ) -> None:
-        """Test that resolving an unknown replica group raises"""
-        with pytest.raises(ReplicaGroupNotFound):
-            await scheduling_history_repository.resolve_replica_group_deployment(
-                ReplicaGroupID(uuid.uuid4())
+                querier,
+                [
+                    DeploymentReplicaGroupHistorySearchScope(
+                        deployment_id=DeploymentID(uuid.uuid4())
+                    )
+                ],
             )

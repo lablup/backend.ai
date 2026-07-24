@@ -59,18 +59,6 @@ class EndpointNotFound(ObjectNotFound):
         )
 
 
-class ReplicaGroupNotFound(ObjectNotFound):
-    object_name = "replica-group"
-
-    @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.MODEL_SERVICE,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.NOT_FOUND,
-        )
-
-
 class DeploymentRevisionNotFound(ObjectNotFound):
     object_name = "deployment-revision"
 

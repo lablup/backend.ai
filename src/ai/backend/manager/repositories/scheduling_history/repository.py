@@ -3,8 +3,6 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
-from ai.backend.common.identifier.deployment import DeploymentID
-from ai.backend.common.identifier.replica_group import ReplicaGroupID
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience import (
     MetricArgs,
@@ -148,13 +146,6 @@ class SchedulingHistoryRepository:
         return await self._db_source.admin_search_replica_group_history(querier)
 
     # ========== Replica Group History (Scoped) ==========
-
-    @scheduling_history_repository_resilience.apply()
-    async def resolve_replica_group_deployment(
-        self, replica_group_id: ReplicaGroupID
-    ) -> DeploymentID:
-        """Return the id of the deployment owning ``replica_group_id``."""
-        return await self._db_source.resolve_replica_group_deployment(replica_group_id)
 
     @scheduling_history_repository_resilience.apply()
     async def scoped_search_replica_group_history(
