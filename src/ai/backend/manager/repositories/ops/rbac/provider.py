@@ -73,6 +73,11 @@ from ai.backend.manager.repositories.base.rbac.entity_purger import (
     execute_rbac_entity_batch_purger,
     execute_rbac_entity_purger,
 )
+from ai.backend.manager.repositories.base.rbac.entity_upserter import (
+    RBACEntityUpserter,
+    RBACEntityUpserterResult,
+    execute_rbac_entity_upserter,
+)
 from ai.backend.manager.repositories.ops.base.provider import DBOpsProvider, WriteOps
 from ai.backend.manager.repositories.permission_controller.creators import (
     PermissionCreatorSpec,
@@ -236,6 +241,17 @@ class RBACWriteOps(WriteOps):
     ) -> RBACEntityCreatorResult[TRow]:
         """Insert one row with its RBAC scope association (the creator carries its scope)."""
         return await execute_rbac_entity_creator(self._sess, creator)
+
+    async def upsert_scoped[TRow: Base](
+        self,
+        upserter: RBACEntityUpserter[TRow],
+    ) -> RBACEntityUpserterResult[TRow]:
+        """Upsert one row (INSERT ON CONFLICT UPDATE) with its RBAC scope association.
+
+        On insert the new row is bound to its scope like :meth:`create_scoped`; on conflict
+        the row is updated in place and its existing binding is left untouched.
+        """
+        return await execute_rbac_entity_upserter(self._sess, upserter)
 
     async def bulk_create_scoped[TRow: Base](
         self,
