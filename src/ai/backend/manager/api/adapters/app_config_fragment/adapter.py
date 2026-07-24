@@ -287,6 +287,10 @@ class AppConfigFragmentAdapter(BaseAdapter):
             selected.append(
                 AppConfigFragmentSearchScope(scope_type=AppConfigScopeType.PUBLIC, scope_id=None)
             )
+        # TODO(BA-7003): temporary single-scope restriction. The underlying
+        # ScopedSearchAppConfigFragmentAction is a single-scope BaseScopeAction, so a request
+        # carrying more than one scope item is rejected here rather than silently dropping the
+        # rest. Multi-scope scoped search will be implemented in BA-7003.
         if len(selected) > 1:
             raise InvalidAPIParameters(
                 "App config fragment scoped search accepts at most one scope item"
