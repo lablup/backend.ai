@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
+from typing import Any, cast
 
 from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.common.dto.manager.v2.app_config_fragment.response import (
@@ -46,7 +47,7 @@ class TestAppConfigFragmentGQL:
         assert gql.config_name == "theme"
         assert gql.scope_type == AppConfigScopeType.DOMAIN
         assert gql.scope_id == scope_id
-        assert gql.config == {"k": "v"}
+        assert cast(dict[str, Any], gql.config) == {"k": "v"}
         assert gql.created_at == created
         assert gql.updated_at == updated
 
