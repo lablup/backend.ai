@@ -7,6 +7,7 @@ from uuid import uuid4
 
 import pytest
 
+from ai.backend.common.data.idle_checker.types import IdleCheckPhase
 from ai.backend.common.identifier.idle_checker import IdleCheckerID
 from ai.backend.common.types import SessionId
 from ai.backend.manager.repositories.idle_checker.repository import IdleCheckerRepository
@@ -210,7 +211,11 @@ class TestIdleCheckInitialGraceApplier:
     ) -> None:
         await applier.apply(ready_apply_input)
 
-        repository.mark_session_idle_checks_ready_to_check.assert_awaited_once_with([ready_pair])
+        repository.batch_update_session_idle_check_phase.assert_awaited_once_with(
+            [ready_pair],
+            from_phase=IdleCheckPhase.NOT_CHECKED,
+            to_phase=IdleCheckPhase.READY_TO_CHECK,
+        )
 
     async def test_skips_empty_result(
         self,
@@ -220,4 +225,4 @@ class TestIdleCheckInitialGraceApplier:
     ) -> None:
         await applier.apply(empty_apply_input)
 
-        repository.mark_session_idle_checks_ready_to_check.assert_not_awaited()
+        repository.batch_update_session_idle_check_phase.assert_not_awaited()

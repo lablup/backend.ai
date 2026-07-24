@@ -50,7 +50,7 @@ from ai.backend.manager.repositories.idle_checker.types import (
     SessionIdleCheckPair,
 )
 from ai.backend.manager.repositories.idle_checker.updaters import (
-    SessionIdleCheckReadyBatchUpdaterSpec,
+    SessionIdleCheckPhaseBatchUpdaterSpec,
 )
 from ai.backend.manager.repositories.ops import DBOpsProvider
 
@@ -276,19 +276,22 @@ class IdleCheckerDBSource:
                         )
                     )
 
-    async def mark_session_idle_checks_ready_to_check(
+    async def batch_update_session_idle_check_phase(
         self,
         pairs: Sequence[SessionIdleCheckPair],
+        *,
+        from_phase: IdleCheckPhase,
+        to_phase: IdleCheckPhase,
     ) -> None:
         async with self._ops.write_ops() as w:
             for pair_batch in batched(pairs, _IDLE_CHECK_UPDATE_BATCH_SIZE):
                 pair_values = [(pair.session_id, pair.checker_id) for pair in pair_batch]
                 await w.batch_update(
                     BatchUpdater(
-                        spec=SessionIdleCheckReadyBatchUpdaterSpec(),
+                        spec=SessionIdleCheckPhaseBatchUpdaterSpec(to_phase=to_phase),
                         conditions=[
                             SessionIdleCheckConditions.by_pairs(pair_values),
-                            SessionIdleCheckConditions.by_status_equals(IdleCheckPhase.NOT_CHECKED),
+                            SessionIdleCheckConditions.by_status_equals(from_phase),
                         ],
                     )
                 )

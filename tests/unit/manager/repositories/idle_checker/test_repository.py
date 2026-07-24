@@ -306,7 +306,11 @@ class TestFetchJudgmentBatch:
             judgment_rows.checker_id,
         )
 
-        await repository.mark_session_idle_checks_ready_to_check([pair])
+        await repository.batch_update_session_idle_check_phase(
+            [pair],
+            from_phase=IdleCheckPhase.NOT_CHECKED,
+            to_phase=IdleCheckPhase.READY_TO_CHECK,
+        )
 
         async with database.begin_readonly_session() as db_sess:
             row = await db_sess.get(
@@ -327,7 +331,11 @@ class TestFetchJudgmentBatch:
             judgment_rows.checker_id,
         )
 
-        await repository.mark_session_idle_checks_ready_to_check([pair])
+        await repository.batch_update_session_idle_check_phase(
+            [pair],
+            from_phase=IdleCheckPhase.NOT_CHECKED,
+            to_phase=IdleCheckPhase.READY_TO_CHECK,
+        )
 
         async with database.begin_readonly_session() as db_sess:
             row = await db_sess.get(
@@ -336,6 +344,31 @@ class TestFetchJudgmentBatch:
             )
         assert row is not None
         assert row.last_status is IdleCheckPhase.ACTIVE
+
+    async def test_transitions_between_injected_phases(
+        self,
+        database: ExtendedAsyncSAEngine,
+        repository: IdleCheckerRepository,
+        judgment_rows: JudgmentRows,
+    ) -> None:
+        pair = SessionIdleCheckPair(
+            judgment_rows.active_session_id,
+            judgment_rows.checker_id,
+        )
+
+        await repository.batch_update_session_idle_check_phase(
+            [pair],
+            from_phase=IdleCheckPhase.ACTIVE,
+            to_phase=IdleCheckPhase.IDLE,
+        )
+
+        async with database.begin_readonly_session() as db_sess:
+            row = await db_sess.get(
+                SessionIdleCheckRow,
+                (pair.session_id, pair.checker_id),
+            )
+        assert row is not None
+        assert row.last_status is IdleCheckPhase.IDLE
 
     async def test_marks_existing_row_when_batch_contains_missing_pair(
         self,
@@ -352,7 +385,11 @@ class TestFetchJudgmentBatch:
             judgment_rows.checker_id,
         )
 
-        await repository.mark_session_idle_checks_ready_to_check([existing_pair, missing_pair])
+        await repository.batch_update_session_idle_check_phase(
+            [existing_pair, missing_pair],
+            from_phase=IdleCheckPhase.NOT_CHECKED,
+            to_phase=IdleCheckPhase.READY_TO_CHECK,
+        )
 
         async with database.begin_readonly_session() as db_sess:
             row = await db_sess.get(

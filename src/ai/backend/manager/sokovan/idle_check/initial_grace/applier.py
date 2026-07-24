@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import override
 
+from ai.backend.common.data.idle_checker.types import IdleCheckPhase
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.repositories.idle_checker.repository import IdleCheckerRepository
 from ai.backend.manager.sokovan.idle_check.initial_grace.types import (
@@ -42,4 +43,8 @@ class IdleCheckInitialGraceApplier(
         pairs = apply_input.result.pairs_to_ready
         if not pairs:
             return
-        await self._repository.mark_session_idle_checks_ready_to_check(pairs)
+        await self._repository.batch_update_session_idle_check_phase(
+            pairs,
+            from_phase=IdleCheckPhase.NOT_CHECKED,
+            to_phase=IdleCheckPhase.READY_TO_CHECK,
+        )
