@@ -110,6 +110,7 @@ async def admin_app_config_fragments(
 async def scoped_app_config_fragments(
     info: Info[StrawberryGQLContext],
     scope: AppConfigFragmentScopeGQL,
+    filter: AppConfigFragmentFilterGQL | None = None,
     order_by: list[AppConfigFragmentOrderByGQL] | None = None,
     first: int | None = None,
     after: str | None = None,
@@ -121,6 +122,7 @@ async def scoped_app_config_fragments(
     payload = await info.context.adapters.app_config_fragment.scoped_search(
         ScopedSearchAppConfigFragmentInput(
             scope=scope.to_pydantic(),
+            filter=filter.to_pydantic() if filter else None,
             order=[o.to_pydantic() for o in order_by] if order_by else None,
             first=first,
             after=after,

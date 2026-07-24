@@ -44,10 +44,11 @@ class BatchLoadAppConfigFragmentsByIdsAction(AppConfigFragmentBulkAction):
 
 @dataclass
 class BatchLoadAppConfigFragmentsByIdsActionResult(BaseBulkActionResult):
-    """The fragments that exist among the requested ids, in query order.
+    """The fragments for the requested ids, in query order.
 
-    Ids with no row are simply absent — a read reports nothing per-item, unlike the
-    partial-success bulk mutations.
+    Not partial-success: the bulk RBAC gate authorizes every requested id, so any id that
+    fails it — missing or unauthorized alike — denies the whole batch with
+    ``PermissionDeniedError`` rather than being dropped from the result.
     """
 
     items: Sequence[AppConfigFragmentData]

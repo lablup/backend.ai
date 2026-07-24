@@ -171,6 +171,7 @@ class ScopedSearchAppConfigFragmentInput(BaseRequestModel):
     """Input for a scoped fragment search, keyed by the scope the fragments are written at."""
 
     scope: AppConfigFragmentScope = Field(description="The scope to search at.")
+    filter: AppConfigFragmentFilter | None = Field(default=None, description="Filter conditions.")
     order: list[AppConfigFragmentOrder] | None = Field(
         default=None, description="Order specifiers, applied in sequence."
     )

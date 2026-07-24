@@ -238,9 +238,10 @@ class AppConfigFragmentAdapter(BaseAdapter):
     async def scoped_search(
         self, input: ScopedSearchAppConfigFragmentInput
     ) -> SearchAppConfigFragmentPayload:
+        conditions = self._convert_filter(input.filter) if input.filter else []
         orders = self._convert_orders(input.order) if input.order else []
         querier = self._build_querier(
-            conditions=[],
+            conditions=conditions,
             orders=orders,
             pagination_spec=_get_app_config_fragment_pagination_spec(),
             first=input.first,
