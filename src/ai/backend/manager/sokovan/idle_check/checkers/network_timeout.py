@@ -5,7 +5,6 @@ import logging
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from decimal import Decimal
 from typing import override
 
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
@@ -23,12 +22,12 @@ from ai.backend.manager.sokovan.idle_check.checkers.base import (
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
-_ONGOING_ACTIVITY_SENTINEL = Decimal(0)
+_ONGOING_ACTIVITY_SENTINEL = 0.0
 
 
 @dataclass(frozen=True)
 class _NetworkIdleState:
-    last_access: Decimal | None
+    last_access: float | None
     active_connections: int
 
 
@@ -102,7 +101,7 @@ class NetworkTimeoutChecker(IdleChecker):
                     f"active_connections={state.active_connections}"
                 ),
             )
-        last_access_at = datetime.fromtimestamp(float(state.last_access), tz=UTC)
+        last_access_at = datetime.fromtimestamp(state.last_access, tz=UTC)
         expire_at = last_access_at + timedelta(seconds=max_inactivity_seconds)
         if current_time >= expire_at:
             status = IdleCheckPhase.IDLE_EXPIRED
@@ -144,7 +143,7 @@ class NetworkTimeoutChecker(IdleChecker):
             if raw_last_access is None:
                 last_access = None
             else:
-                last_access = Decimal(raw_last_access.decode("utf-8"))
+                last_access = float(raw_last_access)
             states[session_id] = _NetworkIdleState(
                 last_access=last_access,
                 active_connections=active_connection_counts[session_id],
