@@ -266,6 +266,35 @@ class ContainerdSessionNetwork:
             return None
         return session_net_meta_from_network_config(session_id, json.loads(raw))
 
+    async def _persist_session_meta(self, meta: SessionNetMeta) -> None:
+        """Write a single-node session's meta to etcd so a restart's recover() can resume it.
+
+        The manager persists meta only for the multi-node overlay (CNINetworkPlugin), so a
+        single-node session would otherwise have none — and recover() reads meta from etcd. The
+        payload mirrors the manager's ``{subnet, vni, backend, mtu}`` so the same reader
+        (`session_net_meta_from_network_config`) parses both identically.
+        """
+        await self._etcd.put(
+            session_meta_key(meta.session_id),
+            json.dumps({
+                "subnet": meta.subnet,
+                "vni": meta.vni,
+                "backend": str(meta.backend),
+                "mtu": meta.mtu,
+            }),
+        )
+
+    async def _forget_session_meta_if_local(self, session_id: str) -> None:
+        """Delete the meta only if it is a single-node one this agent owns.
+
+        Read-check-delete rather than unconditional delete: the manager reads a multi-node
+        session's meta during its own destroy (`destroy_network`), so removing that one here would
+        break it. A single-node meta is the agent's own and must be cleaned up.
+        """
+        meta = await self._read_session_meta(session_id)
+        if meta is not None and meta.backend is NetworkBackendKind.BRIDGE:
+            await self._etcd.delete(session_meta_key(session_id))
+
     async def _read_overlay_ip(self, session_id: str, container_id: str) -> str | None:
         raw = await self._etcd.get(endpoint_key(session_id, container_id))
         if not raw:
@@ -505,6 +534,14 @@ class ContainerdSessionNetwork:
                     # failed detach is exactly what a later pin would collide with (and, since a pin
                     # that cannot be honoured fails its kernel, keep colliding with).
                     await self._purge_local_addresses(session_id)
+                # Persist the meta so a restart's recover() can resume this session. The manager
+                # writes etcd meta only for the multi-node overlay (CNINetworkPlugin); a single-node
+                # session gets none, so without this recover() reads no meta, cannot resume the
+                # session, and silently skips its teardown — leaking the LOCAL bridge, its subnet
+                # block and its IPAM. Inside the try so a write failure unwinds the half-built
+                # session rather than leaving one that can never be recovered or torn down.
+                if meta.backend is NetworkBackendKind.BRIDGE:
+                    await self._persist_session_meta(meta)
             except Exception:
                 # Unwind what WE built, and nothing else. A failed *setup* leaves a coordinator that
                 # may already have published this node's membership and started its watch tasks, and
@@ -636,6 +673,11 @@ class ContainerdSessionNetwork:
             # the next session, and purging it then would wipe *that* session's claims.
             await self._purge_local_addresses(session_id)
             await coordinator.stop(session_id)
+            # The single-node meta this agent persisted (ensure_session) is the agent's to remove;
+            # the manager owns only the multi-node overlay's. Leaving it would have the next
+            # restart's recover() resume a session with no containers — one nothing would ever tear
+            # down, since its removal already happened.
+            await self._forget_session_meta_if_local(session_id)
 
     async def _purge_local_addresses(self, session_id: str) -> None:
         """Drop the IPAM claims in this session's LOCAL block, whose containers are all gone."""

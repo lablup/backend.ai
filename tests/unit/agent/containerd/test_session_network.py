@@ -324,6 +324,49 @@ class TestEnsureSession:
             await facade.teardown_session("s2")
 
 
+class TestSingleNodeMetaPersistence:
+    """A single-node session's meta must live in etcd so a restart's recover() can resume it.
+
+    The manager writes etcd meta only for the multi-node overlay (CNINetworkPlugin), so without
+    this the agent's recover() finds no meta for a single-node session, cannot resume it, and
+    silently skips its teardown -- leaking the LOCAL bridge, its subnet block and its IPAM (BUG7,
+    reproduced live). Multi-node meta stays the manager's, untouched here.
+    """
+
+    async def test_setup_persists_a_single_node_meta_for_recovery(self) -> None:
+        etcd, backend, runner = FakeEtcd(), RecordingBackend(), RecordingRunner()
+        facade = _facade(etcd, backend, runner, vtep_ip=None)
+        await facade.ensure_session("s2", "k1", _BRIDGE_NC)
+        try:
+            raw = etcd.store.get("network/session/s2/meta")
+            assert raw is not None, "single-node meta was not persisted; recover() could not resume"
+            assert json.loads(raw)["backend"] == "bridge"
+        finally:
+            await facade.teardown_session("s2")
+
+    async def test_teardown_removes_the_single_node_meta(self) -> None:
+        etcd, backend, runner = FakeEtcd(), RecordingBackend(), RecordingRunner()
+        facade = _facade(etcd, backend, runner, vtep_ip=None)
+        await facade.ensure_session("s2", "k1", _BRIDGE_NC)
+        await facade.teardown_session("s2")
+        assert "network/session/s2/meta" not in etcd.store, (
+            "a torn-down session's meta lingered; the next restart would resume a container-less "
+            "session and never tear it down"
+        )
+
+    async def test_multi_node_meta_is_left_to_the_manager(self) -> None:
+        """The agent must not write the multi-node overlay's meta: the manager owns that key and
+        reads it during its own destroy, so an agent-written (or agent-deleted) copy would race it.
+        """
+        etcd, backend, runner = FakeEtcd(), RecordingBackend(), RecordingRunner()
+        facade = _facade(etcd, backend, runner)
+        await facade.ensure_session("s1", "k1", _VXLAN_NC)
+        try:
+            assert "network/session/s1/meta" not in etcd.store
+        finally:
+            await facade.teardown_session("s1")
+
+
 class TestFailedSetup:
     async def test_a_failed_setup_leaves_no_claim_and_no_orphan_coordinator(self) -> None:
         # The coordinator can already have published this node's membership and started its watch
