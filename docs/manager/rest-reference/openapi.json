@@ -556,8 +556,8 @@
         "title": "ConflictingSessionCleanupPolicyEnum",
         "type": "string"
       },
-      "UpdateAgentResourceGroupInput": {
-        "description": "Input for changing the resource group of an agent.",
+      "UpdateAgentResourceGroupBody": {
+        "description": "Mutable part of an agent resource-group change.\n\nUsed directly as the REST request body, where the agent ID is supplied as a\nURL path segment instead of a body field. ``UpdateAgentResourceGroupInput``\nextends this with the agent ID for the GQL/adapter call path.",
         "properties": {
           "resource_group_id": {
             "description": "UUID of the target resource group to move the agent into.",
@@ -566,8 +566,16 @@
             "type": "string"
           },
           "policy": {
-            "$ref": "#/components/schemas/ConflictingSessionCleanupPolicyEnum",
-            "description": "How to handle sessions still running on the agent under the old resource group. Currently only 'terminate' is supported."
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ConflictingSessionCleanupPolicyEnum"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "How to handle sessions still running on the agent under the old resource group. Defaults to 'terminate', which is currently the only supported policy."
           },
           "force": {
             "default": false,
@@ -577,10 +585,9 @@
           }
         },
         "required": [
-          "resource_group_id",
-          "policy"
+          "resource_group_id"
         ],
-        "title": "UpdateAgentResourceGroupInput",
+        "title": "UpdateAgentResourceGroupBody",
         "type": "object"
       },
       "AppConfigScopeType": {
@@ -40266,7 +40273,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/UpdateAgentResourceGroupInput"
+                "$ref": "#/components/schemas/UpdateAgentResourceGroupBody"
               }
             }
           }
@@ -40281,7 +40288,7 @@
             }
           }
         ],
-        "description": "Change an agent's resource group (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Change an agent's resource group (superadmin only).\n\nThe agent ID comes from the URL path; the adapter merges it with the body.\n\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/v2/agents/total-resources": {

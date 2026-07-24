@@ -11604,7 +11604,7 @@ type Mutation
   """
   Added in 26.8.0. Change the resource group of an agent (superadmin only). Sessions still running on the agent under the old resource group are cleaned up per the given policy; without force, the change is rejected with a conflict error when such sessions exist.
   """
-  adminUpdateAgentResourceGroup(agentId: String!, input: UpdateAgentResourceGroupInput!): UpdateAgentResourceGroupPayload @join__field(graph: STRAWBERRY)
+  adminUpdateAgentResourceGroup(input: UpdateAgentResourceGroupInput!): UpdateAgentResourceGroupPayload @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.7.0. Register a new app config allow-list entry (super admin only).
@@ -19702,13 +19702,16 @@ type UntagImageFromRegistry
 input UpdateAgentResourceGroupInput
   @join__type(graph: STRAWBERRY)
 {
+  """ID of the agent to move."""
+  agentId: String!
+
   """UUID of the target resource group to move the agent into."""
   resourceGroupId: UUID!
 
   """
-  How to handle sessions still running on the agent under the old resource group. Currently only TERMINATE is supported.
+  How to handle sessions still running on the agent under the old resource group. Defaults to TERMINATE, which is currently the only supported policy.
   """
-  policy: ConflictingSessionCleanupPolicy!
+  policy: ConflictingSessionCleanupPolicy = null
 
   """
   When false, the change is rejected with a conflict error if the agent still has active sessions. When true, the group is changed anyway and the conflicting sessions are cleaned up per the policy.
