@@ -260,7 +260,7 @@ can be configured from ``manager.toml``:
 .. code-block:: console
 
    $ curl bai-m1:8081
-   {"version": "v6.20220615", "manager": "22.09.6"}
+   {"version": "v9.20250722", "manager": "26.4.8"}
 
 Press ``Ctrl-C`` to stop the service.
 
