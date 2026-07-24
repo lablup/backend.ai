@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from uuid import UUID
 
 import click
 
@@ -82,23 +83,36 @@ def search(
 
 
 @user.command()
-@click.option("--resource-group", required=True, help="Scaling group name.")
-@click.option("--project-id", required=True, help="Project UUID.")
-@click.option("--user-uuid", required=True, help="User UUID.")
-def get(resource_group: str, project_id: str, user_uuid: str) -> None:
+@click.option("--resource-group", type=str, help="Resource group name.")
+@click.option("--resource-group-id", type=click.UUID, help="Resource group ID.")
+@click.option("--project-id", required=True, type=click.UUID, help="Project UUID.")
+@click.option("--user-uuid", required=True, type=click.UUID, help="User UUID.")
+def get(
+    resource_group: str | None,
+    resource_group_id: UUID | None,
+    project_id: UUID,
+    user_uuid: UUID,
+) -> None:
     """Get a single user fair share record."""
-    from uuid import UUID
-
     from ai.backend.common.dto.manager.v2.fair_share.request import GetUserFairShareInput
+    from ai.backend.common.identifier.resource_group import ResourceGroupID
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
+            resolved_resource_group_id: ResourceGroupID
+            if resource_group_id is not None:
+                resolved_resource_group_id = ResourceGroupID(resource_group_id)
+            elif resource_group is not None:
+                result = await registry.resource_group.get(resource_group)
+                resolved_resource_group_id = ResourceGroupID(result.resource_group_id)
+            else:
+                raise click.UsageError("--resource-group or --resource-group-id is required.")
             result = await registry.fair_share.get_user(
                 GetUserFairShareInput(
-                    resource_group=resource_group,
-                    project_id=UUID(project_id),
-                    user_uuid=UUID(user_uuid),
+                    resource_group_id=resolved_resource_group_id,
+                    project_id=project_id,
+                    user_uuid=user_uuid,
                 ),
             )
             print_result(result)

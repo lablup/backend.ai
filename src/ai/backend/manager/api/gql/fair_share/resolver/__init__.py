@@ -3,6 +3,7 @@
 from .domain import (
     admin_bulk_upsert_domain_fair_share_weight,
     admin_domain_fair_share,
+    admin_domain_fair_share_v2,
     admin_domain_fair_shares,
     admin_upsert_domain_fair_share_weight,
     bulk_upsert_domain_fair_share_weight,
@@ -15,6 +16,7 @@ from .domain import (
 from .project import (
     admin_bulk_upsert_project_fair_share_weight,
     admin_project_fair_share,
+    admin_project_fair_share_v2,
     admin_project_fair_shares,
     admin_upsert_project_fair_share_weight,
     bulk_upsert_project_fair_share_weight,
@@ -28,6 +30,7 @@ from .user import (
     admin_bulk_upsert_user_fair_share_weight,
     admin_upsert_user_fair_share_weight,
     admin_user_fair_share,
+    admin_user_fair_share_v2,
     admin_user_fair_shares,
     bulk_upsert_user_fair_share_weight,
     rg_user_fair_share,
@@ -40,10 +43,13 @@ from .user import (
 __all__ = [
     # Admin Queries
     "admin_domain_fair_share",
+    "admin_domain_fair_share_v2",
     "admin_domain_fair_shares",
     "admin_project_fair_share",
+    "admin_project_fair_share_v2",
     "admin_project_fair_shares",
     "admin_user_fair_share",
+    "admin_user_fair_share_v2",
     "admin_user_fair_shares",
     # Admin Mutations
     "admin_upsert_domain_fair_share_weight",

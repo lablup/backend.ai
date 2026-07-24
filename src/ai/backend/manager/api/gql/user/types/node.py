@@ -13,8 +13,11 @@ from strawberry.relay import Connection, Edge, NodeID
 from ai.backend.common.dto.manager.v2.user.response import UserNode
 from ai.backend.common.dto.manager.v2.user.types import UserFairShareScope, UserUsageScope
 from ai.backend.common.exception import InvalidAPIParameters
+from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    gql_added_field,
     gql_connection_type,
     gql_federation_type,
     gql_field,
@@ -56,7 +59,18 @@ if TYPE_CHECKING:
 class UserFairShareScopeGQL(PydanticInputMixin[UserFairShareScope]):
     """Scope parameters for filtering user fair shares."""
 
-    resource_group_name: str = gql_field(description="Resource group to filter fair shares by.")
+    resource_group_name: str | None = gql_field(
+        description="Deprecated resource group name.",
+        deprecation_reason="Use resource_group_id instead.",
+        default=None,
+    )
+    resource_group_id: strawberry.ID | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Resource group ID.",
+        ),
+        default=None,
+    )
     project_id: UUID = gql_field(
         description="Project ID that the user belongs to (required for user-level fair shares)."
     )
@@ -122,9 +136,15 @@ class UserV2GQL(PydanticNodeMixin[UserNode]):
         if self.organization.domain_name is None:
             raise InvalidAPIParameters("User must belong to a domain to query fair share")
 
+        resource_group_id = await info.context.adapters.fair_share.resolve_resource_group_id(
+            ResourceGroupID(UUID(str(scope.resource_group_id)))
+            if scope.resource_group_id is not None
+            else None,
+            scope.resource_group_name,
+        )
         payload = await info.context.adapters.fair_share.get_user(
             GetUserFairShareInput(
-                resource_group=scope.resource_group_name,
+                resource_group_id=resource_group_id,
                 project_id=scope.project_id,
                 user_uuid=UUID(str(self.id)),
             )

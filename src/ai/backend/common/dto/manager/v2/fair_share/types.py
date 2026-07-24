@@ -16,6 +16,7 @@ from ai.backend.common.dto.manager.v2.common import (
     ResourceSlotEntryInfo,
     ResourceSlotInfo,
 )
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 
 __all__ = (
     # Enums
@@ -161,19 +162,40 @@ class UsageBucketMetadataInfo(BaseResponseModel):
 class DomainFairShareScopeDTO(BaseRequestModel):
     """Scope for domain fair share queries within a resource group."""
 
-    resource_group_name: str = Field(description="Resource group to filter fair shares by.")
+    resource_group_name: str | None = Field(
+        default=None,
+        description="Resource group name. Deprecated; use resource_group_id.",
+        json_schema_extra={"deprecated": True},
+    )
+    resource_group_id: ResourceGroupID | None = Field(
+        default=None, description="Resource group ID."
+    )
 
 
 class ProjectFairShareScopeDTO(BaseRequestModel):
     """Scope for project fair share queries within a resource group."""
 
-    resource_group_name: str = Field(description="Resource group to filter fair shares by.")
+    resource_group_name: str | None = Field(
+        default=None,
+        description="Resource group name. Deprecated; use resource_group_id.",
+        json_schema_extra={"deprecated": True},
+    )
+    resource_group_id: ResourceGroupID | None = Field(
+        default=None, description="Resource group ID."
+    )
 
 
 class UserFairShareScopeDTO(BaseRequestModel):
     """Scope for user fair share queries within a resource group."""
 
-    resource_group_name: str = Field(description="Resource group to filter fair shares by.")
+    resource_group_name: str | None = Field(
+        default=None,
+        description="Resource group name. Deprecated; use resource_group_id.",
+        json_schema_extra={"deprecated": True},
+    )
+    resource_group_id: ResourceGroupID | None = Field(
+        default=None, description="Resource group ID."
+    )
 
 
 class DomainUsageScopeDTO(BaseRequestModel):

@@ -53,7 +53,8 @@ from ai.backend.common.dto.manager.v2.fair_share.types import (
     ResourceWeightEntryInfo,
     UserFairShareOrderField,
 )
-from ai.backend.common.identifier.resource_group import ResourceGroupName
+from ai.backend.common.exception import InvalidAPIParameters
+from ai.backend.common.identifier.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.types import SlotQuantity
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
@@ -150,16 +151,27 @@ def _user_fair_share_pagination_spec() -> PaginationSpec:
 class FairShareAdapter(BaseAdapter):
     """Adapter for fair share domain operations (domain / project / user)."""
 
+    async def resolve_resource_group_id(
+        self,
+        resource_group_id: ResourceGroupID | None,
+        resource_group_name: str | None,
+    ) -> ResourceGroupID:
+        if resource_group_id is not None:
+            return resource_group_id
+        if resource_group_name is None:
+            raise InvalidAPIParameters("resource_group_id or resource_group_name is required")
+        result = await self._processors.scaling_group.resolve_resource_group_id_by_name.wait_for_complete(
+            ResolveResourceGroupIDByNameAction(name=ResourceGroupName(resource_group_name))
+        )
+        return result.resource_group_id
+
     # ------------------------------------------------------------------ domain
 
     async def get_domain(self, input: GetDomainFairShareInput) -> GetDomainFairSharePayload:
         """Get a single domain fair share record."""
-        resource_group_id_result = await self._processors.scaling_group.resolve_resource_group_id_by_name.wait_for_complete(
-            ResolveResourceGroupIDByNameAction(name=ResourceGroupName(input.resource_group))
-        )
         result = await self._processors.fair_share.get_domain_fair_share.wait_for_complete(
             GetDomainFairShareAction(
-                resource_group_id=resource_group_id_result.resource_group_id,
+                resource_group_id=input.resource_group_id,
                 domain_name=input.domain_name,
             )
         )
@@ -279,12 +291,9 @@ class FairShareAdapter(BaseAdapter):
 
     async def get_project(self, input: GetProjectFairShareInput) -> GetProjectFairSharePayload:
         """Get a single project fair share record."""
-        resource_group_id_result = await self._processors.scaling_group.resolve_resource_group_id_by_name.wait_for_complete(
-            ResolveResourceGroupIDByNameAction(name=ResourceGroupName(input.resource_group))
-        )
         result = await self._processors.fair_share.get_project_fair_share.wait_for_complete(
             GetProjectFairShareAction(
-                resource_group_id=resource_group_id_result.resource_group_id,
+                resource_group_id=input.resource_group_id,
                 project_id=input.project_id,
             )
         )
@@ -409,12 +418,9 @@ class FairShareAdapter(BaseAdapter):
 
     async def get_user(self, input: GetUserFairShareInput) -> GetUserFairSharePayload:
         """Get a single user fair share record."""
-        resource_group_id_result = await self._processors.scaling_group.resolve_resource_group_id_by_name.wait_for_complete(
-            ResolveResourceGroupIDByNameAction(name=ResourceGroupName(input.resource_group))
-        )
         result = await self._processors.fair_share.get_user_fair_share.wait_for_complete(
             GetUserFairShareAction(
-                resource_group_id=resource_group_id_result.resource_group_id,
+                resource_group_id=input.resource_group_id,
                 project_id=input.project_id,
                 user_uuid=input.user_uuid,
             )

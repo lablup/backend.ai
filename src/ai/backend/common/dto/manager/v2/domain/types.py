@@ -11,6 +11,7 @@ from pydantic import Field
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.v2.common import OrderDirection
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 
 __all__ = (
     "DomainFairShareScopeDTO",
@@ -52,7 +53,14 @@ class DomainUserFilter(BaseRequestModel):
 class DomainFairShareScopeDTO(BaseRequestModel):
     """Scope for domain fair share queries."""
 
-    resource_group_name: str = Field(description="Resource group to filter fair shares by.")
+    resource_group_name: str | None = Field(
+        default=None,
+        description="Resource group name. Deprecated; use resource_group_id.",
+        json_schema_extra={"deprecated": True},
+    )
+    resource_group_id: ResourceGroupID | None = Field(
+        default=None, description="Resource group ID."
+    )
 
 
 class DomainUsageScopeDTO(BaseRequestModel):

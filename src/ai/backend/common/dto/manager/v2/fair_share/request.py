@@ -5,12 +5,14 @@ Request DTOs for fair_share DTO v2.
 from __future__ import annotations
 
 from decimal import Decimal
+from typing import Self
 from uuid import UUID
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import DateRangeFilter, StringFilter, UUIDFilter
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 
 from .types import (
     DomainFairShareOrderField,
@@ -42,8 +44,11 @@ __all__ = (
     "ProjectUsageBucketOrder",
     "UserUsageBucketOrder",
     # Get inputs
+    "GetDomainFairShareRequest",
     "GetDomainFairShareInput",
+    "GetProjectFairShareRequest",
     "GetProjectFairShareInput",
+    "GetUserFairShareRequest",
     "GetUserFairShareInput",
     "GetResourceGroupFairShareSpecInput",
     # Search inputs
@@ -71,6 +76,26 @@ __all__ = (
 )
 
 _DEFAULT_PAGE_LIMIT = 50
+
+
+class _RequireResourceGroupIdentifier:
+    @model_validator(mode="after")
+    def _validate_resource_group_identifier(self) -> Self:
+        resource_group_name = getattr(
+            self, "resource_group_name", getattr(self, "resource_group", None)
+        )
+        if getattr(self, "resource_group_id", None) is None and resource_group_name is None:
+            raise ValueError("resource_group_id or resource_group_name is required")
+        return self
+
+
+class _ResourceGroupRequest(_RequireResourceGroupIdentifier, BaseRequestModel):
+    resource_group: str | None = Field(
+        default=None,
+        description="Scaling group name. Deprecated; use resource_group_id.",
+        json_schema_extra={"deprecated": True},
+    )
+    resource_group_id: ResourceGroupID | None = Field(default=None, description="Resource group ID")
 
 
 # Filter nested sub-models
@@ -236,24 +261,43 @@ class UserUsageBucketOrder(BaseRequestModel):
 # Get inputs (path parameters mapped to Input models)
 
 
-class GetDomainFairShareInput(BaseRequestModel):
-    """Input for getting a single domain fair share."""
+class GetDomainFairShareRequest(_ResourceGroupRequest):
+    """Compatibility request for getting a single domain fair share."""
 
-    resource_group: str = Field(description="Scaling group name")
     domain_name: str = Field(description="Domain name")
 
 
-class GetProjectFairShareInput(BaseRequestModel):
-    """Input for getting a single project fair share."""
+class GetDomainFairShareInput(BaseRequestModel):
+    """ID-based input for getting a single domain fair share."""
 
-    resource_group: str = Field(description="Scaling group name")
+    resource_group_id: ResourceGroupID = Field(description="Resource group ID")
+    domain_name: str = Field(description="Domain name")
+
+
+class GetProjectFairShareRequest(_ResourceGroupRequest):
+    """Compatibility request for getting a single project fair share."""
+
     project_id: UUID = Field(description="Project ID")
 
 
-class GetUserFairShareInput(BaseRequestModel):
-    """Input for getting a single user fair share."""
+class GetProjectFairShareInput(BaseRequestModel):
+    """ID-based input for getting a single project fair share."""
 
-    resource_group: str = Field(description="Scaling group name")
+    resource_group_id: ResourceGroupID = Field(description="Resource group ID")
+    project_id: UUID = Field(description="Project ID")
+
+
+class GetUserFairShareRequest(_ResourceGroupRequest):
+    """Compatibility request for getting a single user fair share."""
+
+    project_id: UUID = Field(description="Project ID")
+    user_uuid: UUID = Field(description="User UUID")
+
+
+class GetUserFairShareInput(BaseRequestModel):
+    """ID-based input for getting a single user fair share."""
+
+    resource_group_id: ResourceGroupID = Field(description="Resource group ID")
     project_id: UUID = Field(description="Project ID")
     user_uuid: UUID = Field(description="User UUID")
 

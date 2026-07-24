@@ -16,9 +16,12 @@ from ai.backend.common.dto.manager.v2.fair_share.request import (
     DomainFairShareOrder,
     DomainWeightEntryInput,
     GetDomainFairShareInput,
+    GetDomainFairShareRequest,
     GetProjectFairShareInput,
+    GetProjectFairShareRequest,
     GetResourceGroupFairShareSpecInput,
     GetUserFairShareInput,
+    GetUserFairShareRequest,
     ProjectFairShareFilter,
     ProjectFairShareOrder,
     ProjectWeightEntryInput,
@@ -44,6 +47,7 @@ from ai.backend.common.dto.manager.v2.fair_share.types import (
     UserFairShareOrderField,
 )
 from ai.backend.common.exception import BackendAISchemaValidationFailed
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 
 _SAMPLE_UUID = UUID("550e8400-e29b-41d4-a716-446655440000")
 _SAMPLE_UUID2 = UUID("660e8400-e29b-41d4-a716-446655440001")
@@ -123,9 +127,21 @@ class TestGetDomainFairShareInput:
     """Tests for GetDomainFairShareInput model."""
 
     def test_valid_creation(self) -> None:
-        inp = GetDomainFairShareInput(resource_group="default", domain_name="test-domain")
-        assert inp.resource_group == "default"
+        inp = GetDomainFairShareInput(
+            resource_group_id=ResourceGroupID(_SAMPLE_UUID), domain_name="test-domain"
+        )
+        assert inp.resource_group_id == ResourceGroupID(_SAMPLE_UUID)
         assert inp.domain_name == "test-domain"
+
+    def test_compatibility_request_accepts_deprecated_name(self) -> None:
+        request = GetDomainFairShareRequest(resource_group="default", domain_name="test-domain")
+        assert request.resource_group == "default"
+
+    def test_compatibility_request_accepts_resource_group_id(self) -> None:
+        request = GetDomainFairShareRequest(
+            resource_group_id=ResourceGroupID(_SAMPLE_UUID), domain_name="test-domain"
+        )
+        assert request.resource_group_id == ResourceGroupID(_SAMPLE_UUID)
 
     def test_missing_resource_group_raises_validation_error(self) -> None:
         with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
@@ -133,13 +149,15 @@ class TestGetDomainFairShareInput:
 
     def test_missing_domain_name_raises_validation_error(self) -> None:
         with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
-            GetDomainFairShareInput.model_validate({"resource_group": "default"})
+            GetDomainFairShareInput.model_validate({"resource_group_id": str(_SAMPLE_UUID)})
 
     def test_round_trip_serialization(self) -> None:
-        inp = GetDomainFairShareInput(resource_group="sg1", domain_name="domain1")
+        inp = GetDomainFairShareInput(
+            resource_group_id=ResourceGroupID(_SAMPLE_UUID), domain_name="domain1"
+        )
         json_str = inp.model_dump_json()
         restored = GetDomainFairShareInput.model_validate_json(json_str)
-        assert restored.resource_group == "sg1"
+        assert restored.resource_group_id == ResourceGroupID(_SAMPLE_UUID)
         assert restored.domain_name == "domain1"
 
 
@@ -147,13 +165,19 @@ class TestGetProjectFairShareInput:
     """Tests for GetProjectFairShareInput model."""
 
     def test_valid_creation(self) -> None:
-        inp = GetProjectFairShareInput(resource_group="default", project_id=_SAMPLE_UUID)
-        assert inp.resource_group == "default"
+        inp = GetProjectFairShareInput(
+            resource_group_id=ResourceGroupID(_SAMPLE_UUID2), project_id=_SAMPLE_UUID
+        )
+        assert inp.resource_group_id == ResourceGroupID(_SAMPLE_UUID2)
         assert inp.project_id == _SAMPLE_UUID
+
+    def test_compatibility_request_accepts_deprecated_name(self) -> None:
+        request = GetProjectFairShareRequest(resource_group="default", project_id=_SAMPLE_UUID)
+        assert request.resource_group == "default"
 
     def test_missing_project_id_raises_validation_error(self) -> None:
         with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
-            GetProjectFairShareInput.model_validate({"resource_group": "default"})
+            GetProjectFairShareInput.model_validate({"resource_group_id": str(_SAMPLE_UUID)})
 
 
 class TestGetUserFairShareInput:
@@ -161,18 +185,26 @@ class TestGetUserFairShareInput:
 
     def test_valid_creation(self) -> None:
         inp = GetUserFairShareInput(
+            resource_group_id=ResourceGroupID(_SAMPLE_UUID),
+            project_id=_SAMPLE_UUID,
+            user_uuid=_SAMPLE_UUID2,
+        )
+        assert inp.resource_group_id == ResourceGroupID(_SAMPLE_UUID)
+        assert inp.project_id == _SAMPLE_UUID
+        assert inp.user_uuid == _SAMPLE_UUID2
+
+    def test_compatibility_request_accepts_deprecated_name(self) -> None:
+        request = GetUserFairShareRequest(
             resource_group="default",
             project_id=_SAMPLE_UUID,
             user_uuid=_SAMPLE_UUID2,
         )
-        assert inp.resource_group == "default"
-        assert inp.project_id == _SAMPLE_UUID
-        assert inp.user_uuid == _SAMPLE_UUID2
+        assert request.resource_group == "default"
 
     def test_missing_user_uuid_raises_validation_error(self) -> None:
         with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             GetUserFairShareInput.model_validate({
-                "resource_group": "default",
+                "resource_group_id": str(_SAMPLE_UUID),
                 "project_id": str(_SAMPLE_UUID),
             })
 

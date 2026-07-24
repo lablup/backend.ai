@@ -776,6 +776,7 @@ class ResourceGroupAdapter(BaseAdapter):
         """Convert ScalingGroupData to ResourceGroupDetailNode DTO for GQL layer."""
         return ResourceGroupDetailNode(
             id=data.name,
+            resource_group_id=data.id,
             name=data.name,
             status=ResourceGroupStatusInfo(
                 is_active=data.status.is_active,

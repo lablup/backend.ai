@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import uuid
+
+import strawberry
 from aiohttp import web
 from strawberry import Info
 from strawberry.relay import PageInfo
@@ -11,11 +14,14 @@ from ai.backend.common.dto.manager.v2.fair_share.request import (
     GetDomainFairShareInput,
     SearchDomainFairSharesInput,
 )
+from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_mutation,
     gql_root_field,
+    gql_root_resolver,
 )
 from ai.backend.manager.api.gql.fair_share.types import (
     BulkUpsertDomainFairShareWeightInput,
@@ -35,6 +41,19 @@ from ai.backend.manager.api.gql.utils import check_admin_only
 # Admin APIs
 
 
+async def _resolve_resource_group_id(
+    info: Info[StrawberryGQLContext],
+    resource_group_id: strawberry.ID | ResourceGroupID | None,
+    resource_group_name: str | None,
+) -> ResourceGroupID:
+    return await info.context.adapters.fair_share.resolve_resource_group_id(
+        ResourceGroupID(uuid.UUID(str(resource_group_id)))
+        if resource_group_id is not None
+        else None,
+        resource_group_name,
+    )
+
+
 @gql_root_field(
     BackendAIGQLMeta(added_version="26.2.0", description="Get domain fair share data (admin only).")
 )  # type: ignore[misc]
@@ -46,8 +65,30 @@ async def admin_domain_fair_share(
     """Get a single domain fair share record (admin only)."""
     check_admin_only()
 
+    resource_group_id = await _resolve_resource_group_id(info, None, resource_group_name)
     result = await info.context.adapters.fair_share.get_domain(
-        GetDomainFairShareInput(resource_group=resource_group_name, domain_name=domain_name)
+        GetDomainFairShareInput(resource_group_id=resource_group_id, domain_name=domain_name)
+    )
+    return DomainFairShareGQL.from_pydantic(result.item) if result.item is not None else None
+
+
+@gql_root_resolver(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Get domain fair share data by resource group ID (admin only).",
+    )
+)
+async def admin_domain_fair_share_v2(
+    info: Info[StrawberryGQLContext],
+    resource_group_id: strawberry.ID,
+    domain_name: str,
+) -> DomainFairShareGQL | None:
+    check_admin_only()
+    result = await info.context.adapters.fair_share.get_domain(
+        GetDomainFairShareInput(
+            resource_group_id=ResourceGroupID(uuid.UUID(str(resource_group_id))),
+            domain_name=domain_name,
+        )
     )
     return DomainFairShareGQL.from_pydantic(result.item) if result.item is not None else None
 
@@ -115,8 +156,9 @@ async def rg_domain_fair_share(
     domain_name: str,
 ) -> DomainFairShareGQL | None:
     """Get a single domain fair share record within resource group scope."""
+    resource_group_id = await _resolve_resource_group_id(info, None, scope.resource_group_name)
     result = await info.context.adapters.fair_share.get_domain(
-        GetDomainFairShareInput(resource_group=scope.resource_group_name, domain_name=domain_name)
+        GetDomainFairShareInput(resource_group_id=resource_group_id, domain_name=domain_name)
     )
     return DomainFairShareGQL.from_pydantic(result.item) if result.item is not None else None
 
@@ -190,8 +232,9 @@ async def domain_fair_share(
     if me is None or not me.is_superadmin:
         raise web.HTTPForbidden(reason="Only superadmin can access fair share data.")
 
+    resource_group_id = await _resolve_resource_group_id(info, None, resource_group_name)
     result = await info.context.adapters.fair_share.get_domain(
-        GetDomainFairShareInput(resource_group=resource_group_name, domain_name=domain_name)
+        GetDomainFairShareInput(resource_group_id=resource_group_id, domain_name=domain_name)
     )
     return DomainFairShareGQL.from_pydantic(result.item) if result.item is not None else None
 
