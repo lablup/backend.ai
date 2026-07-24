@@ -1208,6 +1208,19 @@ input AppConfigFragmentScopeTypeFilter
   notIn: [AppConfigScopeType!] = null
 }
 
+"""
+Added in 26.8.0. One (config_name, config) pair to upsert at the request's scope.
+"""
+input AppConfigFragmentUpsertItem
+  @join__type(graph: STRAWBERRY)
+{
+  """Registered config name."""
+  configName: String!
+
+  """The fragment's JSON config document."""
+  config: JSON!
+}
+
 enum AppConfigScopeType
   @join__type(graph: STRAWBERRY)
 {
@@ -11742,6 +11755,16 @@ type Mutation
   adminUpdateAppConfigAllowList(input: UpdateAppConfigAllowListInput!): UpdateAppConfigAllowListPayload @join__field(graph: STRAWBERRY)
 
   """
+  Added in 26.8.0. Upsert many app config fragments at one scope (insert, or replace config on conflict), all-or-nothing. RBAC-authorized at that scope.
+  """
+  upsertAppConfigFragments(input: UpsertAppConfigFragmentsInput!): [AppConfigFragment!]! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.8.0. Upsert many app config fragments at the current user's own user scope, all-or-nothing.
+  """
+  myUpsertAppConfigFragments(input: MyUpsertAppConfigFragmentsInput!): [AppConfigFragment!]! @join__field(graph: STRAWBERRY)
+
+  """
   Added in 25.14.0. Scan external registries to discover available artifacts. Searches HuggingFace or Reservoir registries for artifacts matching the specified criteria and registers them in the system with SCANNED status. The artifacts become available for import but are not downloaded until explicitly imported. This is the first step in the artifact workflow: Scan → Import → Use
   """
   scanArtifacts(input: ScanArtifactsInput!): ScanArtifactsPayload @join__field(graph: STRAWBERRY)
@@ -12526,6 +12549,16 @@ type MyStorageHostPermissionsPayload
 {
   """Storage hosts the current user is allowed to use."""
   items: [StorageHostPermission!]!
+}
+
+"""
+Added in 26.8.0. Upsert many fragments at the current user's own user scope.
+"""
+input MyUpsertAppConfigFragmentsInput
+  @join__type(graph: STRAWBERRY)
+{
+  """The (config_name, config) pairs to upsert."""
+  items: [AppConfigFragmentUpsertItem!]!
 }
 
 """Added in 24.12.0."""
@@ -20924,6 +20957,22 @@ type UpdateVFSStoragePayload
 {
   """Updated VFS storage"""
   vfsStorage: VFSStorage!
+}
+
+"""
+Added in 26.8.0. Upsert many fragments at one scope; the scope is named once for all items.
+"""
+input UpsertAppConfigFragmentsInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Scope the fragments are written at (public | domain | user)."""
+  scopeType: AppConfigScopeType!
+
+  """Scope identifier: the domain id or user id; null for public scope."""
+  scopeId: UUID = null
+
+  """The (config_name, config) pairs to upsert."""
+  items: [AppConfigFragmentUpsertItem!]!
 }
 
 """
