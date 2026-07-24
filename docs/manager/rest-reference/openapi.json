@@ -1111,6 +1111,18 @@
             "$ref": "#/components/schemas/AppConfigFragmentScope",
             "description": "The scope to search at."
           },
+          "filter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AppConfigFragmentFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter conditions."
+          },
           "order": {
             "anyOf": [
               {

@@ -9838,7 +9838,7 @@ type Query {
   """
   Added in 26.8.0. Search the app config fragments written at one scope, with ordering and pagination.
   """
-  scopedAppConfigFragments(scope: AppConfigFragmentScope!, orderBy: [AppConfigFragmentOrderBy!] = null, first: Int = null, after: String = null, last: Int = null, before: String = null, limit: Int = null, offset: Int = null): AppConfigFragmentConnection
+  scopedAppConfigFragments(scope: AppConfigFragmentScope!, filter: AppConfigFragmentFilter = null, orderBy: [AppConfigFragmentOrderBy!] = null, first: Int = null, after: String = null, last: Int = null, before: String = null, limit: Int = null, offset: Int = null): AppConfigFragmentConnection
 
   """
   Added in 25.14.0. Retrieve a specific artifact by its ID. Returns detailed information about the artifact including its metadata, registry information, and availability status.
