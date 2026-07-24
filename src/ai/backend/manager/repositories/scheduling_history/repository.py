@@ -32,7 +32,6 @@ from ai.backend.manager.repositories.base import BatchQuerier
 from .db_source import SchedulingHistoryDBSource
 from .types import (
     DeploymentHistorySearchScope,
-    ReplicaGroupHistorySearchScope,
     RouteHistorySearchScope,
     SessionSchedulingHistorySearchScope,
 )
@@ -161,10 +160,10 @@ class SchedulingHistoryRepository:
     async def scoped_search_replica_group_history(
         self,
         querier: BatchQuerier,
-        scope: ReplicaGroupHistorySearchScope,
+        scopes: Sequence[SearchScope],
     ) -> ReplicaGroupHistoryListResult:
-        """Search replica-group history within scope."""
-        return await self._db_source.scoped_search_replica_group_history(querier, scope)
+        """Search replica-group history whose rows match any of ``scopes`` (OR)."""
+        return await self._db_source.scoped_search_replica_group_history(querier, scopes)
 
     # ========== Route History (Admin) ==========
 
