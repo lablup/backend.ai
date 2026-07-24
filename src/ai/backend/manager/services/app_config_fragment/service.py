@@ -88,6 +88,9 @@ class AppConfigFragmentService:
     async def scoped_search(
         self, action: ScopedSearchAppConfigFragmentAction
     ) -> ScopedSearchAppConfigFragmentActionResult:
+        # TODO(BA-7003): temporary single-scope search. The repository already OR-combines a
+        # sequence of scopes, but ScopedSearchAppConfigFragmentAction is a single-scope
+        # BaseScopeAction, so only one scope is passed here. BA-7003 will carry multiple scopes.
         result = await self._repository.scoped_search(action.querier, [action.scope])
         return ScopedSearchAppConfigFragmentActionResult(
             _scope=action.scope,
