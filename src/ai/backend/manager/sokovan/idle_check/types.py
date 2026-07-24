@@ -28,7 +28,8 @@ from ai.backend.manager.sokovan.reconciler.base import (
 
 
 class IdleCheckCategory(BaseReconcilerCategory):
-    IDLE = "idle"
+    IDLE_CHECK = "idle_check"
+    SESSION_IDLE_CHECK = "session_idle_check"
 
 
 class IdleCheckKind(BaseReconcilerKind):

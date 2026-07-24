@@ -1,10 +1,9 @@
-"""Idle-check reconcile stage spec paired with its no-op source/handler/applier."""
+"""Idle-check initial grace period reconcile stage."""
 
 from __future__ import annotations
 
 from collections.abc import Mapping
 
-from ai.backend.common.data.idle_checker.types import CheckerType
 from ai.backend.common.events.event_types.schedule.anycast import (
     DoReconcileProcessEvent,
     DoReconcileProcessIfNeededEvent,
@@ -12,13 +11,15 @@ from ai.backend.common.events.event_types.schedule.anycast import (
 from ai.backend.manager.data.session.types import SchedulingResult, SessionStatus
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.repositories.idle_checker.repository import IdleCheckerRepository
-from ai.backend.manager.sokovan.idle_check.applier import IdleCheckApplier
-from ai.backend.manager.sokovan.idle_check.checkers.base import IdleChecker
-from ai.backend.manager.sokovan.idle_check.checkers.session_lifetime import (
-    SessionLifetimeChecker,
+from ai.backend.manager.sokovan.idle_check.handlers.initial_grace_period import (
+    IdleCheckInitialGracePeriodHandler,
 )
-from ai.backend.manager.sokovan.idle_check.handlers.reconcile import IdleCheckReconcileHandler
-from ai.backend.manager.sokovan.idle_check.source import IdleCheckSource
+from ai.backend.manager.sokovan.idle_check.initial_grace_period.applier import (
+    IdleCheckInitialGracePeriodApplier,
+)
+from ai.backend.manager.sokovan.idle_check.initial_grace_period.source import (
+    IdleCheckInitialGracePeriodSource,
+)
 from ai.backend.manager.sokovan.idle_check.types import (
     IdleCheckCategory,
     IdleCheckKind,
@@ -32,32 +33,26 @@ from ai.backend.manager.sokovan.reconciler.base import (
 )
 
 
-def build_idle_check_stage(
+def build_idle_check_initial_grace_period_stage(
     idle_checker_repository: IdleCheckerRepository,
 ) -> ReconcilerStageRegistration:
-    reconcile_type = "idle_check"
-    # Termination runs through the scheduler lifecycle (mark_sessions_for_termination in
-    # the applier) — which also terminates kernels, is idempotent for already-terminating/
-    # terminal sessions, and broadcasts — not this per-entity status-transition map.
+    reconcile_type = "idle_check_initial_grace_period"
     transitions: Mapping[SchedulingResult, SessionStatus] = {}
     metadata = ReconcilerStageMetadata(
-        category=IdleCheckCategory.IDLE,
+        category=IdleCheckCategory.SESSION_IDLE_CHECK,
         kind=IdleCheckKind.SESSION,
         target_statuses=IdleCheckTargetStatuses(
             session_statuses=frozenset({SessionStatus.RUNNING}),
         ),
-        name="idle_check_reconcile",
-        phase="idle_check",
-        lock_id=LockID.LOCKID_IDLE_CHECK_RECONCILE,
+        name="idle_check_initial_grace_period_reconcile",
+        phase="initial_grace_period",
+        lock_id=LockID.LOCKID_IDLE_CHECK_INITIAL_GRACE_PERIOD_RECONCILE,
         transitions=transitions,
     )
-    checkers: Mapping[CheckerType, IdleChecker] = {
-        CheckerType.SESSION_LIFETIME: SessionLifetimeChecker(),
-    }
     stage = ReconcilerStage(
-        handler=IdleCheckReconcileHandler(checkers),
-        source=IdleCheckSource(idle_checker_repository),
-        applier=IdleCheckApplier(),
+        handler=IdleCheckInitialGracePeriodHandler(),
+        source=IdleCheckInitialGracePeriodSource(idle_checker_repository),
+        applier=IdleCheckInitialGracePeriodApplier(idle_checker_repository),
         metadata=metadata,
     )
     task_spec = ReconcilerTaskSpec(

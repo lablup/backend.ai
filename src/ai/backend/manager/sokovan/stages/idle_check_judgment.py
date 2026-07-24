@@ -1,9 +1,10 @@
-"""Idle-check expiry sweep reconcile stage."""
+"""Idle-check judgment reconcile stage."""
 
 from __future__ import annotations
 
 from collections.abc import Mapping
 
+from ai.backend.common.data.idle_checker.types import CheckerType
 from ai.backend.common.events.event_types.schedule.anycast import (
     DoReconcileProcessEvent,
     DoReconcileProcessIfNeededEvent,
@@ -11,9 +12,13 @@ from ai.backend.common.events.event_types.schedule.anycast import (
 from ai.backend.manager.data.session.types import SchedulingResult, SessionStatus
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.repositories.idle_checker.repository import IdleCheckerRepository
-from ai.backend.manager.sokovan.idle_check.handlers.sweep import IdleCheckSweepHandler
-from ai.backend.manager.sokovan.idle_check.sweep.applier import IdleCheckSweepApplier
-from ai.backend.manager.sokovan.idle_check.sweep.source import IdleCheckSweepSource
+from ai.backend.manager.sokovan.idle_check.applier import IdleCheckApplier
+from ai.backend.manager.sokovan.idle_check.checkers.base import IdleChecker
+from ai.backend.manager.sokovan.idle_check.checkers.session_lifetime import (
+    SessionLifetimeChecker,
+)
+from ai.backend.manager.sokovan.idle_check.handlers.reconcile import IdleCheckReconcileHandler
+from ai.backend.manager.sokovan.idle_check.source import IdleCheckSource
 from ai.backend.manager.sokovan.idle_check.types import (
     IdleCheckCategory,
     IdleCheckKind,
@@ -25,14 +30,15 @@ from ai.backend.manager.sokovan.reconciler.base import (
     ReconcilerStageRegistration,
     ReconcilerTaskSpec,
 )
-from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 
 
-def build_idle_check_sweep_stage(
+def build_idle_check_judgment_stage(
     idle_checker_repository: IdleCheckerRepository,
-    scheduling_controller: SchedulingController,
 ) -> ReconcilerStageRegistration:
-    reconcile_type = "idle_check_sweep"
+    reconcile_type = "idle_check_judgment"
+    # Termination runs through the scheduler lifecycle (mark_sessions_for_termination in
+    # the applier) — which also terminates kernels, is idempotent for already-terminating/
+    # terminal sessions, and broadcasts — not this per-entity status-transition map.
     transitions: Mapping[SchedulingResult, SessionStatus] = {}
     metadata = ReconcilerStageMetadata(
         category=IdleCheckCategory.SESSION_IDLE_CHECK,
@@ -40,22 +46,26 @@ def build_idle_check_sweep_stage(
         target_statuses=IdleCheckTargetStatuses(
             session_statuses=frozenset({SessionStatus.RUNNING}),
         ),
-        name="idle_check_sweep_reconcile",
-        phase="sweep",
-        lock_id=LockID.LOCKID_IDLE_CHECK_SWEEP_RECONCILE,
+        name="idle_check_judgment_reconcile",
+        phase="judgment",
+        lock_id=LockID.LOCKID_IDLE_CHECK_JUDGMENT_RECONCILE,
         transitions=transitions,
     )
+    checkers: Mapping[CheckerType, IdleChecker] = {
+        CheckerType.SESSION_LIFETIME: SessionLifetimeChecker(),
+    }
     stage = ReconcilerStage(
-        handler=IdleCheckSweepHandler(scheduling_controller),
-        source=IdleCheckSweepSource(idle_checker_repository),
-        applier=IdleCheckSweepApplier(),
+        handler=IdleCheckReconcileHandler(checkers),
+        source=IdleCheckSource(idle_checker_repository),
+        applier=IdleCheckApplier(),
         metadata=metadata,
     )
     task_spec = ReconcilerTaskSpec(
         reconcile_type=reconcile_type,
         if_needed_event_factory=DoReconcileProcessIfNeededEvent,
         process_event_factory=DoReconcileProcessEvent,
-        long_interval=30.0,
+        short_interval=10.0,
+        long_interval=60.0,
     )
     return ReconcilerStageRegistration(
         reconcile_type=reconcile_type,
