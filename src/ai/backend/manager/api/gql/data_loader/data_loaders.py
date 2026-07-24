@@ -8,6 +8,7 @@ from strawberry.dataloader import DataLoader
 
 from ai.backend.common.identifier.app_config_allow_list import AppConfigAllowListID
 from ai.backend.common.identifier.app_config_definition import AppConfigDefinitionID
+from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.kernel_scheduling_history import KernelSchedulingHistoryID
 from ai.backend.common.types import AgentId, ImageID, KernelId, SessionId
@@ -22,6 +23,9 @@ if TYPE_CHECKING:
     )
     from ai.backend.manager.api.gql.app_config_definition.types import (  # pants: no-infer-dep
         AppConfigDefinitionGQL,
+    )
+    from ai.backend.manager.api.gql.app_config_fragment.types import (  # pants: no-infer-dep
+        AppConfigFragmentGQL,
     )
     from ai.backend.manager.api.gql.artifact.types import (  # pants: no-infer-dep
         ArtifactRevision,
@@ -165,6 +169,24 @@ class DataLoaders:
 
             dtos = await adapter.batch_load_by_ids(ids)
             return [ACD.from_pydantic(dto) if dto is not None else None for dto in dtos]
+
+        return DataLoader(load_fn=load_fn)
+
+    @cached_property
+    def app_config_fragment_loader(
+        self,
+    ) -> DataLoader[AppConfigFragmentID, AppConfigFragmentGQL | None]:
+        adapter = self._adapters.app_config_fragment
+
+        async def load_fn(
+            ids: list[AppConfigFragmentID],
+        ) -> list[AppConfigFragmentGQL | None]:
+            from ai.backend.manager.api.gql.app_config_fragment.types import (  # pants: no-infer-dep
+                AppConfigFragmentGQL as ACF,
+            )
+
+            dtos = await adapter.batch_load_by_ids(ids)
+            return [ACF.from_pydantic(dto) if dto is not None else None for dto in dtos]
 
         return DataLoader(load_fn=load_fn)
 
