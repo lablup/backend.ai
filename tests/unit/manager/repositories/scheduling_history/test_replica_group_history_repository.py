@@ -61,14 +61,32 @@ from ai.backend.manager.repositories.scheduling_history.types import (
 )
 from ai.backend.testutils.db import with_tables
 
+# The fixture seeds a fixed history dataset under one deployment that every test
+# asserts against: the target group gets LIFECYCLE rows with these attempts plus
+# this many SCALING rows, and the sibling group gets this many LIFECYCLE rows.
+_TARGET_LIFECYCLE_ATTEMPTS = (1, 2, 3)
+_TARGET_SCALING_COUNT = 2
+_SIBLING_COUNT = 2
+
 
 @dataclass(frozen=True)
-class _ReplicaGroupSeed:
-    """Ids of a seeded deployment and the two replica groups hanging off it."""
+class _ReplicaGroupHistorySeed:
+    """A seeded deployment, its two replica groups, and their history rows."""
 
     deployment_id: DeploymentID
     replica_group_id: ReplicaGroupID
     sibling_replica_group_id: ReplicaGroupID
+    target_lifecycle_attempts: tuple[int, ...]
+    target_scaling_count: int
+    sibling_count: int
+
+    @property
+    def target_count(self) -> int:
+        return len(self.target_lifecycle_attempts) + self.target_scaling_count
+
+    @property
+    def deployment_count(self) -> int:
+        return self.target_count + self.sibling_count
 
 
 class TestReplicaGroupHistoryRepository:
@@ -114,11 +132,11 @@ class TestReplicaGroupHistoryRepository:
         yield repo
 
     @pytest.fixture
-    async def replica_group_seed(
+    async def replica_group_history_seed(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> _ReplicaGroupSeed:
-        """Seed a deployment with two replica groups and return their ids.
+    ) -> _ReplicaGroupHistorySeed:
+        """Seed a deployment, two replica groups, and a fixed set of history rows.
 
         The scoped search checks the replica group exists, so the rows and the
         endpoint they hang off must be real; that in turn needs the domain,
@@ -232,40 +250,60 @@ class TestReplicaGroupHistoryRepository:
                         ),
                     )
                 )
-            await db_sess.commit()
-
-        return _ReplicaGroupSeed(
-            deployment_id=deployment_id,
-            replica_group_id=target_group_id,
-            sibling_replica_group_id=sibling_group_id,
-        )
-
-    async def test_admin_search_replica_group_history_spans_every_group(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        scheduling_history_repository: SchedulingHistoryRepository,
-        replica_group_seed: _ReplicaGroupSeed,
-    ) -> None:
-        """Test that the unscoped admin search returns rows from every replica group"""
-        deployment_id = replica_group_seed.deployment_id
-        target_group_id = replica_group_seed.replica_group_id
-        sibling_group_id = replica_group_seed.sibling_replica_group_id
-
-        async with db_with_cleanup.begin_session() as db_sess:
-            for group_id in (target_group_id, sibling_group_id):
+            await db_sess.flush()
+            for attempts in _TARGET_LIFECYCLE_ATTEMPTS:
                 db_sess.add(
                     ReplicaGroupHistoryRow(
-                        replica_group_id=group_id,
+                        replica_group_id=target_group_id,
                         deployment_id=deployment_id,
                         category=ReplicaGroupHandlerCategory.LIFECYCLE,
                         phase="DEPLOYING",
                         result=str(SchedulingResult.SUCCESS),
-                        message="lifecycle transition",
+                        message=f"target lifecycle {attempts}",
+                        attempts=attempts,
+                    )
+                )
+            for i in range(_TARGET_SCALING_COUNT):
+                db_sess.add(
+                    ReplicaGroupHistoryRow(
+                        replica_group_id=target_group_id,
+                        deployment_id=deployment_id,
+                        category=ReplicaGroupHandlerCategory.SCALING,
+                        phase=f"SCALING_{i}",
+                        result=str(SchedulingResult.SUCCESS),
+                        message=f"target scaling {i}",
                         attempts=1,
                     )
                 )
-            await db_sess.flush()
+            for i in range(_SIBLING_COUNT):
+                db_sess.add(
+                    ReplicaGroupHistoryRow(
+                        replica_group_id=sibling_group_id,
+                        deployment_id=deployment_id,
+                        category=ReplicaGroupHandlerCategory.LIFECYCLE,
+                        phase=f"PHASE_{i}",
+                        result=str(SchedulingResult.SUCCESS),
+                        message=f"sibling {i}",
+                        attempts=1,
+                    )
+                )
+            await db_sess.commit()
 
+        return _ReplicaGroupHistorySeed(
+            deployment_id=deployment_id,
+            replica_group_id=target_group_id,
+            sibling_replica_group_id=sibling_group_id,
+            target_lifecycle_attempts=_TARGET_LIFECYCLE_ATTEMPTS,
+            target_scaling_count=_TARGET_SCALING_COUNT,
+            sibling_count=_SIBLING_COUNT,
+        )
+
+    async def test_admin_search_replica_group_history_spans_every_group(
+        self,
+        scheduling_history_repository: SchedulingHistoryRepository,
+        replica_group_history_seed: _ReplicaGroupHistorySeed,
+    ) -> None:
+        """Test that the unscoped admin search returns rows from every replica group"""
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=100, offset=0),
             conditions=[],
@@ -273,37 +311,18 @@ class TestReplicaGroupHistoryRepository:
         )
         result = await scheduling_history_repository.admin_search_replica_group_history(querier)
 
-        assert result.total_count == 2
+        assert result.total_count == replica_group_history_seed.deployment_count
         assert {item.replica_group_id for item in result.items} == {
-            target_group_id,
-            sibling_group_id,
+            replica_group_history_seed.replica_group_id,
+            replica_group_history_seed.sibling_replica_group_id,
         }
 
     async def test_admin_search_replica_group_history_pagination(
         self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
         scheduling_history_repository: SchedulingHistoryRepository,
-        replica_group_seed: _ReplicaGroupSeed,
+        replica_group_history_seed: _ReplicaGroupHistorySeed,
     ) -> None:
         """Test searching replica-group history with pagination"""
-        deployment_id = replica_group_seed.deployment_id
-        target_group_id = replica_group_seed.replica_group_id
-
-        async with db_with_cleanup.begin_session() as db_sess:
-            for i in range(5):
-                db_sess.add(
-                    ReplicaGroupHistoryRow(
-                        replica_group_id=target_group_id,
-                        deployment_id=deployment_id,
-                        category=ReplicaGroupHandlerCategory.LIFECYCLE,
-                        phase=f"PHASE_{i}",
-                        result=str(SchedulingResult.SUCCESS),
-                        message=f"Message {i}",
-                        attempts=1,
-                    )
-                )
-            await db_sess.flush()
-
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=2, offset=0),
             conditions=[],
@@ -312,47 +331,16 @@ class TestReplicaGroupHistoryRepository:
         result = await scheduling_history_repository.admin_search_replica_group_history(querier)
 
         assert len(result.items) == 2
-        assert result.total_count == 5
+        assert result.total_count == replica_group_history_seed.deployment_count
         assert result.has_next_page is True
         assert result.has_previous_page is False
 
     async def test_admin_search_replica_group_history_by_category(
         self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
         scheduling_history_repository: SchedulingHistoryRepository,
-        replica_group_seed: _ReplicaGroupSeed,
+        replica_group_history_seed: _ReplicaGroupHistorySeed,
     ) -> None:
         """Test searching replica-group history filtered by handler category"""
-        deployment_id = replica_group_seed.deployment_id
-        target_group_id = replica_group_seed.replica_group_id
-
-        async with db_with_cleanup.begin_session() as db_sess:
-            for i in range(3):
-                db_sess.add(
-                    ReplicaGroupHistoryRow(
-                        replica_group_id=target_group_id,
-                        deployment_id=deployment_id,
-                        category=ReplicaGroupHandlerCategory.LIFECYCLE,
-                        phase=f"PHASE_{i}",
-                        result=str(SchedulingResult.SUCCESS),
-                        message=f"Lifecycle - Message {i}",
-                        attempts=1,
-                    )
-                )
-            for i in range(2):
-                db_sess.add(
-                    ReplicaGroupHistoryRow(
-                        replica_group_id=target_group_id,
-                        deployment_id=deployment_id,
-                        category=ReplicaGroupHandlerCategory.SCALING,
-                        phase=f"SCALING_{i}",
-                        result=str(SchedulingResult.SUCCESS),
-                        message=f"Scaling - Message {i}",
-                        attempts=1,
-                    )
-                )
-            await db_sess.flush()
-
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=100, offset=0),
             conditions=[
@@ -362,46 +350,16 @@ class TestReplicaGroupHistoryRepository:
         )
         result = await scheduling_history_repository.admin_search_replica_group_history(querier)
 
-        assert result.total_count == 2
+        assert result.total_count == replica_group_history_seed.target_scaling_count
         assert all(item.category == ReplicaGroupHandlerCategory.SCALING for item in result.items)
 
     async def test_scoped_search_replica_group_history_by_replica_group(
         self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
         scheduling_history_repository: SchedulingHistoryRepository,
-        replica_group_seed: _ReplicaGroupSeed,
+        replica_group_history_seed: _ReplicaGroupHistorySeed,
     ) -> None:
         """Test that the scoped search leaves out the sibling replica group"""
-        deployment_id = replica_group_seed.deployment_id
-        target_group_id = replica_group_seed.replica_group_id
-        sibling_group_id = replica_group_seed.sibling_replica_group_id
-
-        async with db_with_cleanup.begin_session() as db_sess:
-            for i in range(3):
-                db_sess.add(
-                    ReplicaGroupHistoryRow(
-                        replica_group_id=target_group_id,
-                        deployment_id=deployment_id,
-                        category=ReplicaGroupHandlerCategory.LIFECYCLE,
-                        phase=f"PHASE_{i}",
-                        result=str(SchedulingResult.SUCCESS),
-                        message=f"Target - Message {i}",
-                        attempts=1,
-                    )
-                )
-            for i in range(2):
-                db_sess.add(
-                    ReplicaGroupHistoryRow(
-                        replica_group_id=sibling_group_id,
-                        deployment_id=deployment_id,
-                        category=ReplicaGroupHandlerCategory.LIFECYCLE,
-                        phase=f"PHASE_{i}",
-                        result=str(SchedulingResult.SUCCESS),
-                        message=f"Sibling - Message {i}",
-                        attempts=1,
-                    )
-                )
-            await db_sess.flush()
+        target_group_id = replica_group_history_seed.replica_group_id
 
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=100, offset=0),
@@ -413,55 +371,16 @@ class TestReplicaGroupHistoryRepository:
             [ReplicaGroupReplicaGroupHistorySearchScope(replica_group_id=target_group_id)],
         )
 
-        assert result.total_count == 3
+        assert result.total_count == replica_group_history_seed.target_count
         assert all(item.replica_group_id == target_group_id for item in result.items)
 
     async def test_scoped_search_replica_group_history_narrows_within_the_scope(
         self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
         scheduling_history_repository: SchedulingHistoryRepository,
-        replica_group_seed: _ReplicaGroupSeed,
+        replica_group_history_seed: _ReplicaGroupHistorySeed,
     ) -> None:
         """Test that a querier condition narrows further, still bounded by the scope"""
-        deployment_id = replica_group_seed.deployment_id
-        target_group_id = replica_group_seed.replica_group_id
-        sibling_group_id = replica_group_seed.sibling_replica_group_id
-
-        async with db_with_cleanup.begin_session() as db_sess:
-            db_sess.add(
-                ReplicaGroupHistoryRow(
-                    replica_group_id=target_group_id,
-                    deployment_id=deployment_id,
-                    category=ReplicaGroupHandlerCategory.SCALING,
-                    phase="SCALING_OUT",
-                    result=str(SchedulingResult.SUCCESS),
-                    message="Target - scaling",
-                    attempts=1,
-                )
-            )
-            db_sess.add(
-                ReplicaGroupHistoryRow(
-                    replica_group_id=target_group_id,
-                    deployment_id=deployment_id,
-                    category=ReplicaGroupHandlerCategory.LIFECYCLE,
-                    phase="DEPLOYING",
-                    result=str(SchedulingResult.SUCCESS),
-                    message="Target - lifecycle",
-                    attempts=1,
-                )
-            )
-            db_sess.add(
-                ReplicaGroupHistoryRow(
-                    replica_group_id=sibling_group_id,
-                    deployment_id=deployment_id,
-                    category=ReplicaGroupHandlerCategory.SCALING,
-                    phase="SCALING_OUT",
-                    result=str(SchedulingResult.SUCCESS),
-                    message="Sibling - scaling",
-                    attempts=1,
-                )
-            )
-            await db_sess.flush()
+        target_group_id = replica_group_history_seed.replica_group_id
 
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=100, offset=0),
@@ -475,33 +394,21 @@ class TestReplicaGroupHistoryRepository:
             [ReplicaGroupReplicaGroupHistorySearchScope(replica_group_id=target_group_id)],
         )
 
-        assert result.total_count == 1
-        assert result.items[0].message == "Target - scaling"
+        # Bounded by the scope (target only) and narrowed by the category condition.
+        assert result.total_count == replica_group_history_seed.target_scaling_count
+        assert all(
+            item.replica_group_id == target_group_id
+            and item.category == ReplicaGroupHandlerCategory.SCALING
+            for item in result.items
+        )
 
     async def test_scoped_search_replica_group_history_ordering(
         self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
         scheduling_history_repository: SchedulingHistoryRepository,
-        replica_group_seed: _ReplicaGroupSeed,
+        replica_group_history_seed: _ReplicaGroupHistorySeed,
     ) -> None:
         """Test that the requested order reaches the query"""
-        deployment_id = replica_group_seed.deployment_id
-        target_group_id = replica_group_seed.replica_group_id
-
-        async with db_with_cleanup.begin_session() as db_sess:
-            for attempts in (2, 3, 1):
-                db_sess.add(
-                    ReplicaGroupHistoryRow(
-                        replica_group_id=target_group_id,
-                        deployment_id=deployment_id,
-                        category=ReplicaGroupHandlerCategory.LIFECYCLE,
-                        phase="DEPLOYING",
-                        result=str(SchedulingResult.SUCCESS),
-                        message=f"Attempts {attempts}",
-                        attempts=attempts,
-                    )
-                )
-            await db_sess.flush()
+        target_group_id = replica_group_history_seed.replica_group_id
 
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=100, offset=0),
@@ -517,7 +424,10 @@ class TestReplicaGroupHistoryRepository:
             [ReplicaGroupReplicaGroupHistorySearchScope(replica_group_id=target_group_id)],
         )
 
-        assert [item.attempts for item in result.items] == [1, 2, 3]
+        returned_attempts = [item.attempts for item in result.items]
+        assert returned_attempts == sorted(returned_attempts)
+        assert returned_attempts[0] == min(replica_group_history_seed.target_lifecycle_attempts)
+        assert returned_attempts[-1] == max(replica_group_history_seed.target_lifecycle_attempts)
 
     async def test_scoped_search_replica_group_history_unknown_group(
         self,
@@ -543,30 +453,11 @@ class TestReplicaGroupHistoryRepository:
 
     async def test_scoped_search_replica_group_history_by_deployment(
         self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
         scheduling_history_repository: SchedulingHistoryRepository,
-        replica_group_seed: _ReplicaGroupSeed,
+        replica_group_history_seed: _ReplicaGroupHistorySeed,
     ) -> None:
         """Test that the deployment scope returns every replica group's rows under it"""
-        deployment_id = replica_group_seed.deployment_id
-        target_group_id = replica_group_seed.replica_group_id
-        sibling_group_id = replica_group_seed.sibling_replica_group_id
-
-        async with db_with_cleanup.begin_session() as db_sess:
-            for group_id in (target_group_id, sibling_group_id):
-                for i in range(2):
-                    db_sess.add(
-                        ReplicaGroupHistoryRow(
-                            replica_group_id=group_id,
-                            deployment_id=deployment_id,
-                            category=ReplicaGroupHandlerCategory.LIFECYCLE,
-                            phase=f"PHASE_{i}",
-                            result=str(SchedulingResult.SUCCESS),
-                            message=f"{group_id} - Message {i}",
-                            attempts=1,
-                        )
-                    )
-            await db_sess.flush()
+        deployment_id = replica_group_history_seed.deployment_id
 
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=100, offset=0),
@@ -578,7 +469,7 @@ class TestReplicaGroupHistoryRepository:
             [DeploymentReplicaGroupHistorySearchScope(deployment_id=deployment_id)],
         )
 
-        assert result.total_count == 4
+        assert result.total_count == replica_group_history_seed.deployment_count
         assert all(item.deployment_id == deployment_id for item in result.items)
 
     async def test_scoped_search_replica_group_history_unknown_deployment(
@@ -605,19 +496,15 @@ class TestReplicaGroupHistoryRepository:
 
     async def test_resolve_replica_group_deployment(
         self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
         scheduling_history_repository: SchedulingHistoryRepository,
-        replica_group_seed: _ReplicaGroupSeed,
+        replica_group_history_seed: _ReplicaGroupHistorySeed,
     ) -> None:
         """Test resolving the deployment owning a replica group"""
-        deployment_id = replica_group_seed.deployment_id
-        target_group_id = replica_group_seed.replica_group_id
-
         resolved = await scheduling_history_repository.resolve_replica_group_deployment(
-            target_group_id
+            replica_group_history_seed.replica_group_id
         )
 
-        assert resolved == deployment_id
+        assert resolved == replica_group_history_seed.deployment_id
 
     async def test_resolve_replica_group_deployment_unknown_group(
         self,
