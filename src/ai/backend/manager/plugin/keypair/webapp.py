@@ -49,7 +49,7 @@ async def login(request: web.Request) -> web.Response:
         raise InvalidAuthParameters("Invalid JSON data in request body.") from None
 
     db = cast(ExtendedAsyncSAEngine, root_app["_db"])
-    async with db.begin_readonly_session() as db_session:
+    async with db.begin_readonly_session_read_committed() as db_session:
         query = sa.select(KeyPairRow.secret_key, KeyPairRow.is_active).where(
             KeyPairRow.access_key == json_data.access_key
         )

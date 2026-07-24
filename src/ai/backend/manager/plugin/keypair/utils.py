@@ -32,7 +32,11 @@ def encode_jwt_token(token_data: dict[str, Any], secret: str) -> str:
 
 def decode_jwt_token(val: str, secret: str) -> Mapping[str, Any]:
     result: dict[str, Any] = jwt.decode(
-        val, secret, algorithms=["HS256"], leeway=STOKEN_LEEWAY_SECONDS
+        val,
+        secret,
+        algorithms=["HS256"],
+        leeway=STOKEN_LEEWAY_SECONDS,
+        options={"require": ["iat", "exp"]},
     )
     return result
 

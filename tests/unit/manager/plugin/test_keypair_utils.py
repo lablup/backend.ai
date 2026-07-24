@@ -7,6 +7,7 @@ from ai.backend.manager.plugin.keypair.utils import (
     STokenData,
     decode_jwt_token,
     deserialize_stoken,
+    encode_jwt_token,
     serialize_stoken,
 )
 
@@ -32,6 +33,15 @@ class TestSToken:
         assert "iat" in payload
         assert "exp" in payload
         assert payload["exp"] > payload["iat"]
+
+    @pytest.mark.parametrize("missing_claim", ["iat", "exp"])
+    def test_missing_temporal_claim_raises(self, missing_claim: str) -> None:
+        token = serialize_stoken(STokenData(access_key=_ACCESS_KEY), _SECRET)
+        payload = dict(decode_jwt_token(token, _SECRET))
+        payload.pop(missing_claim)
+
+        with pytest.raises(InvalidSToken):
+            deserialize_stoken(encode_jwt_token(payload, _SECRET), _SECRET)
 
     def test_expired_token_raises(self) -> None:
         # Negative TTL beyond the leeway window so the token is already expired on decode.
