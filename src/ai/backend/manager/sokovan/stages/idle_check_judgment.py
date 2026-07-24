@@ -1,4 +1,4 @@
-"""Idle-check reconcile stage spec paired with its no-op source/handler/applier."""
+"""Idle-check judgment reconcile stage."""
 
 from __future__ import annotations
 
@@ -32,23 +32,23 @@ from ai.backend.manager.sokovan.reconciler.base import (
 )
 
 
-def build_idle_check_stage(
+def build_idle_check_judgment_stage(
     idle_checker_repository: IdleCheckerRepository,
 ) -> ReconcilerStageRegistration:
-    reconcile_type = "idle_check"
+    reconcile_type = "idle_check_judgment"
     # Termination runs through the scheduler lifecycle (mark_sessions_for_termination in
     # the applier) — which also terminates kernels, is idempotent for already-terminating/
     # terminal sessions, and broadcasts — not this per-entity status-transition map.
     transitions: Mapping[SchedulingResult, SessionStatus] = {}
     metadata = ReconcilerStageMetadata(
-        category=IdleCheckCategory.IDLE,
+        category=IdleCheckCategory.SESSION_IDLE_CHECK,
         kind=IdleCheckKind.SESSION,
         target_statuses=IdleCheckTargetStatuses(
             session_statuses=frozenset({SessionStatus.RUNNING}),
         ),
-        name="idle_check_reconcile",
-        phase="idle_check",
-        lock_id=LockID.LOCKID_IDLE_CHECK_RECONCILE,
+        name="idle_check_judgment_reconcile",
+        phase="judgment",
+        lock_id=LockID.LOCKID_IDLE_CHECK_JUDGMENT_RECONCILE,
         transitions=transitions,
     )
     checkers: Mapping[CheckerType, IdleChecker] = {
@@ -64,8 +64,7 @@ def build_idle_check_stage(
         reconcile_type=reconcile_type,
         if_needed_event_factory=DoReconcileProcessIfNeededEvent,
         process_event_factory=DoReconcileProcessEvent,
-        short_interval=10.0,
-        long_interval=60.0,
+        long_interval=30.0,
     )
     return ReconcilerStageRegistration(
         reconcile_type=reconcile_type,

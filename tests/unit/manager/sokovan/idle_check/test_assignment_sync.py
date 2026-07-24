@@ -13,12 +13,12 @@ from ai.backend.manager.repositories.idle_checker.types import SessionIdleCheckP
 from ai.backend.manager.sokovan.idle_check.assignment_sync.applier import (
     IdleCheckAssignmentSyncApplier,
 )
-from ai.backend.manager.sokovan.idle_check.assignment_sync.handler import (
-    IdleCheckAssignmentSyncHandler,
-)
 from ai.backend.manager.sokovan.idle_check.assignment_sync.types import (
     IdleCheckAssignmentSyncReconcileInfo,
     IdleCheckAssignmentSyncResult,
+)
+from ai.backend.manager.sokovan.idle_check.handlers.assignment_sync import (
+    IdleCheckAssignmentSyncHandler,
 )
 
 

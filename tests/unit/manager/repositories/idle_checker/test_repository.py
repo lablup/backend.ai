@@ -404,7 +404,7 @@ class TestFetchJudgmentBatch:
         assert row.last_status is IdleCheckPhase.READY_TO_CHECK
         assert missing_row is None
 
-    async def test_fetches_only_not_checked_rows_for_initial_grace(
+    async def test_fetches_only_not_checked_rows_for_initial_grace_period(
         self,
         repository: IdleCheckerRepository,
         judgment_rows: JudgmentRows,

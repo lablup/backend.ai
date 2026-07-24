@@ -1,4 +1,4 @@
-"""Idle-check expiry sweep reconcile stage."""
+"""Idle-check initial grace period reconcile stage."""
 
 from __future__ import annotations
 
@@ -11,9 +11,15 @@ from ai.backend.common.events.event_types.schedule.anycast import (
 from ai.backend.manager.data.session.types import SchedulingResult, SessionStatus
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.repositories.idle_checker.repository import IdleCheckerRepository
-from ai.backend.manager.sokovan.idle_check.handlers.sweep import IdleCheckSweepHandler
-from ai.backend.manager.sokovan.idle_check.sweep.applier import IdleCheckSweepApplier
-from ai.backend.manager.sokovan.idle_check.sweep.source import IdleCheckSweepSource
+from ai.backend.manager.sokovan.idle_check.handlers.initial_grace_period import (
+    IdleCheckInitialGracePeriodHandler,
+)
+from ai.backend.manager.sokovan.idle_check.initial_grace_period.applier import (
+    IdleCheckInitialGracePeriodApplier,
+)
+from ai.backend.manager.sokovan.idle_check.initial_grace_period.source import (
+    IdleCheckInitialGracePeriodSource,
+)
 from ai.backend.manager.sokovan.idle_check.types import (
     IdleCheckCategory,
     IdleCheckKind,
@@ -25,14 +31,12 @@ from ai.backend.manager.sokovan.reconciler.base import (
     ReconcilerStageRegistration,
     ReconcilerTaskSpec,
 )
-from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 
 
-def build_idle_check_sweep_stage(
+def build_idle_check_initial_grace_period_stage(
     idle_checker_repository: IdleCheckerRepository,
-    scheduling_controller: SchedulingController,
 ) -> ReconcilerStageRegistration:
-    reconcile_type = "idle_check_sweep"
+    reconcile_type = "idle_check_initial_grace_period"
     transitions: Mapping[SchedulingResult, SessionStatus] = {}
     metadata = ReconcilerStageMetadata(
         category=IdleCheckCategory.SESSION_IDLE_CHECK,
@@ -40,15 +44,15 @@ def build_idle_check_sweep_stage(
         target_statuses=IdleCheckTargetStatuses(
             session_statuses=frozenset({SessionStatus.RUNNING}),
         ),
-        name="idle_check_sweep_reconcile",
-        phase="sweep",
-        lock_id=LockID.LOCKID_IDLE_CHECK_SWEEP_RECONCILE,
+        name="idle_check_initial_grace_period_reconcile",
+        phase="initial_grace_period",
+        lock_id=LockID.LOCKID_IDLE_CHECK_INITIAL_GRACE_PERIOD_RECONCILE,
         transitions=transitions,
     )
     stage = ReconcilerStage(
-        handler=IdleCheckSweepHandler(scheduling_controller),
-        source=IdleCheckSweepSource(idle_checker_repository),
-        applier=IdleCheckSweepApplier(),
+        handler=IdleCheckInitialGracePeriodHandler(),
+        source=IdleCheckInitialGracePeriodSource(idle_checker_repository),
+        applier=IdleCheckInitialGracePeriodApplier(idle_checker_repository),
         metadata=metadata,
     )
     task_spec = ReconcilerTaskSpec(

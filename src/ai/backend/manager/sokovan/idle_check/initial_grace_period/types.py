@@ -18,7 +18,7 @@ from ai.backend.manager.sokovan.reconciler.base import (
 
 
 @dataclass
-class IdleCheckInitialGraceReconcileInfo(BaseReconcilerInfo):
+class IdleCheckInitialGracePeriodReconcileInfo(BaseReconcilerInfo):
     batch: InitialGracePeriodBatchData
 
     @override
@@ -31,7 +31,7 @@ class IdleCheckInitialGraceReconcileInfo(BaseReconcilerInfo):
 
 
 @dataclass
-class IdleCheckInitialGraceResult(BaseReconcilerResult):
+class IdleCheckInitialGracePeriodResult(BaseReconcilerResult):
     pairs_to_ready: list[SessionIdleCheckPair] = field(default_factory=list)
 
     @override

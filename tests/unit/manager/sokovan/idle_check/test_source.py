@@ -43,7 +43,7 @@ class TestIdleCheckSource:
         )
 
         reconcile_info = await IdleCheckSource(repository).fetch_reconcile_info(
-            IdleCheckCategory.IDLE, target_statuses
+            IdleCheckCategory.SESSION_IDLE_CHECK, target_statuses
         )
 
         assert reconcile_info.batch is batch
@@ -91,7 +91,7 @@ class TestIdleCheckAssignmentSyncSource:
         case = assignment_sync_source_case
 
         reconcile_info = await case.source.fetch_reconcile_info(
-            IdleCheckCategory.IDLE,
+            IdleCheckCategory.IDLE_CHECK,
             case.target_statuses,
         )
 
