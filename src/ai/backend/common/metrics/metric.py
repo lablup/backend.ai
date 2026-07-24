@@ -714,7 +714,17 @@ class EventPropagatorMetricObserver:
         self._propagator_count.dec()
         self._propagator_unregistration_count.inc()
         for domain, alias_id in aliases:
+            # alias_id is a session/kernel/bgtask id (unbounded cardinality). A
+            # bare .dec() leaves the series in the registry forever, so RSS grows
+            # linearly with the cumulative number of aliases ever registered.
+            # .dec() first (keeps the multiprocess livesum correct), then remove
+            # the series to free the in-process child object.
+            # NOTE: in Prometheus multiprocess mode remove() frees the heap-side
+            # child (the dominant cost) but cannot shrink the append-only mmap
+            # .db files; fully eliminating the growth requires dropping the
+            # high-cardinality alias_id label from this gauge.
             self._propagator_alias_count.labels(domain=domain, alias_id=alias_id).dec()
+            self._propagator_alias_count.remove(domain, alias_id)
 
 
 class CommonMetricRegistry:

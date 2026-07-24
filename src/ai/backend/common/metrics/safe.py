@@ -198,6 +198,18 @@ class SafeGauge(Gauge):
         except Exception as e:
             _trip(e)
 
+    @override
+    def remove(self, *labelvalues: Any) -> None:
+        if _metrics_disabled:
+            return
+        try:
+            super().remove(*labelvalues)
+        except KeyError:
+            # Series already removed / never created — benign; do not trip.
+            pass
+        except Exception as e:
+            _trip(e)
+
 
 class SafeHistogram(Histogram):
     """Histogram that becomes no-op on any recording error."""
