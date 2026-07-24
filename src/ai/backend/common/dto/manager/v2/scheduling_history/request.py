@@ -4,6 +4,8 @@ Request DTOs for scheduling history DTO v2.
 
 from __future__ import annotations
 
+from typing import Self
+
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
@@ -228,11 +230,9 @@ class ReplicaGroupHistoryFilter(BaseRequestModel):
     message: StringFilter | None = Field(default=None, description="Filter by message")
     created_at: DateTimeFilter | None = Field(default=None, description="Filter by created_at")
     updated_at: DateTimeFilter | None = Field(default=None, description="Filter by updated_at")
-    AND: list[ReplicaGroupHistoryFilter] | None = Field(
-        default=None, description="AND conjunction."
-    )
-    OR: list[ReplicaGroupHistoryFilter] | None = Field(default=None, description="OR conjunction.")
-    NOT: list[ReplicaGroupHistoryFilter] | None = Field(default=None, description="NOT negation.")
+    AND: list[Self] | None = Field(default=None, description="AND conjunction.")
+    OR: list[Self] | None = Field(default=None, description="OR conjunction.")
+    NOT: list[Self] | None = Field(default=None, description="NOT negation.")
 
 
 ReplicaGroupHistoryFilter.model_rebuild()
