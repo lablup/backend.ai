@@ -3230,6 +3230,16 @@ type ComputeSessionNode implements Node
   graph(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): ComputeSessionConnection @join__field(graph: GRAPHENE)
 }
 
+"""
+Added in 26.8.0. How to clean up sessions that conflict with an agent's resource-group change.
+"""
+enum ConflictingSessionCleanupPolicy
+  @join__type(graph: STRAWBERRY)
+{
+  TERMINATE @join__enumValue(graph: STRAWBERRY)
+  RESCHEDULE @join__enumValue(graph: STRAWBERRY)
+}
+
 """Deprecated since 24.09.0. use `ContainerRegistryNode` instead"""
 type ContainerRegistry implements Node
   @join__implements(graph: GRAPHENE, interface: "Node")
@@ -11592,6 +11602,11 @@ type Mutation
   delete_network(network: String!): DeleteNetwork @join__field(graph: GRAPHENE)
 
   """
+  Added in 26.8.0. Change the resource group of an agent (superadmin only). Sessions still running on the agent under the old resource group are cleaned up per the given policy; without force, the change is rejected with a conflict error when such sessions exist.
+  """
+  adminUpdateAgentResourceGroup(agentId: String!, input: UpdateAgentResourceGroupInput!): UpdateAgentResourceGroupPayload @join__field(graph: STRAWBERRY)
+
+  """
   Added in 26.7.0. Register a new app config allow-list entry (super admin only).
   """
   adminCreateAppConfigAllowList(input: CreateAppConfigAllowListInput!): CreateAppConfigAllowListPayload @join__field(graph: STRAWBERRY)
@@ -19681,6 +19696,48 @@ type UntagImageFromRegistry
 
   """Added since 24.03.1."""
   image: ImageNode
+}
+
+"""Added in 26.8.0. Input for changing the resource group of an agent."""
+input UpdateAgentResourceGroupInput
+  @join__type(graph: STRAWBERRY)
+{
+  """UUID of the target resource group to move the agent into."""
+  resourceGroupId: UUID!
+
+  """
+  How to handle sessions still running on the agent under the old resource group. Currently only TERMINATE is supported.
+  """
+  policy: ConflictingSessionCleanupPolicy!
+
+  """
+  When false, the change is rejected with a conflict error if the agent still has active sessions. When true, the group is changed anyway and the conflicting sessions are cleaned up per the policy.
+  """
+  force: Boolean! = false
+}
+
+"""Added in 26.8.0. Result of changing the resource group of an agent."""
+type UpdateAgentResourceGroupPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """ID of the agent whose resource group was changed."""
+  agentId: String!
+
+  """UUID of the new resource group."""
+  resourceGroupId: UUID!
+
+  """Cleanup policy applied to the conflicting sessions."""
+  policy: ConflictingSessionCleanupPolicy!
+
+  """
+  IDs of the sessions that were still running on the agent under the old resource group at the time of the change.
+  """
+  conflictingSessionIds: [UUID!]!
+
+  """
+  IDs of the conflicting sessions that were actually transitioned to TERMINATING by the applied policy. Their container cleanup proceeds asynchronously.
+  """
+  terminatingSessionIds: [UUID!]!
 }
 
 """

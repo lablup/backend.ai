@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import uuid
 
 import click
 
@@ -90,6 +91,64 @@ def search(
                     order=orders,
                     limit=limit,
                     offset=offset,
+                ),
+            )
+            print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())
+
+
+@agent.command(name="update-resource-group")
+@click.argument("agent_id")
+@click.option(
+    "--resource-group-id",
+    required=True,
+    type=click.UUID,
+    help="UUID of the target resource group to move the agent into.",
+)
+@click.option(
+    "--policy",
+    default="terminate",
+    show_default=True,
+    type=click.Choice(["terminate", "reschedule"], case_sensitive=False),
+    help="How to handle sessions still running on the agent under the old resource group.",
+)
+@click.option(
+    "--force",
+    is_flag=True,
+    default=False,
+    help=(
+        "Change the group even if the agent still has active sessions; "
+        "they are cleaned up per the policy. Without this flag, the change "
+        "is rejected when such sessions exist."
+    ),
+)
+def update_resource_group(
+    agent_id: str,
+    resource_group_id: uuid.UUID,
+    policy: str,
+    force: bool,
+) -> None:
+    """Change an agent's resource group (superadmin only)."""
+    from ai.backend.common.dto.manager.v2.agent.request import (
+        UpdateAgentResourceGroupInput,
+    )
+    from ai.backend.common.dto.manager.v2.agent.types import (
+        ConflictingSessionCleanupPolicyEnum,
+    )
+    from ai.backend.common.identifier.resource_group import ResourceGroupID
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.agent.update_resource_group(
+                agent_id,
+                UpdateAgentResourceGroupInput(
+                    resource_group_id=ResourceGroupID(resource_group_id),
+                    policy=ConflictingSessionCleanupPolicyEnum(policy.lower()),
+                    force=force,
                 ),
             )
             print_result(result)

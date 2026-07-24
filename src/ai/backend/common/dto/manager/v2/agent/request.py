@@ -14,8 +14,10 @@ from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.v2.agent.types import (
     AgentOrderField,
     AgentStatusFilter,
+    ConflictingSessionCleanupPolicyEnum,
     OrderDirection,
 )
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 
 __all__ = (
     "AdminSearchAgentsInput",
@@ -23,6 +25,7 @@ __all__ = (
     "AgentOrder",
     "AgentPathParam",
     "SearchAgentsInput",
+    "UpdateAgentResourceGroupInput",
 )
 
 
@@ -98,6 +101,28 @@ class SearchAgentsInput(BaseRequestModel):
     order: list[AgentOrder] | None = None
     limit: int = Field(default=DEFAULT_PAGE_LIMIT, ge=1, le=MAX_PAGE_LIMIT)
     offset: int = Field(default=0, ge=0)
+
+
+class UpdateAgentResourceGroupInput(BaseRequestModel):
+    """Input for changing the resource group of an agent."""
+
+    resource_group_id: ResourceGroupID = Field(
+        description="UUID of the target resource group to move the agent into.",
+    )
+    policy: ConflictingSessionCleanupPolicyEnum = Field(
+        description=(
+            "How to handle sessions still running on the agent under the old "
+            "resource group. Currently only 'terminate' is supported."
+        ),
+    )
+    force: bool = Field(
+        default=False,
+        description=(
+            "When false, the change is rejected with a conflict error if the agent "
+            "still has active sessions. When true, the group is changed anyway and "
+            "the conflicting sessions are cleaned up per the policy."
+        ),
+    )
 
 
 class AdminSearchAgentsInput(BaseRequestModel):

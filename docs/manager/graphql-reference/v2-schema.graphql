@@ -2201,6 +2201,14 @@ extend type ComputeSessionNode implements Node @key(fields: "id") {
   id: ID!
 }
 
+"""
+Added in 26.8.0. How to clean up sessions that conflict with an agent's resource-group change.
+"""
+enum ConflictingSessionCleanupPolicy {
+  TERMINATE
+  RESCHEDULE
+}
+
 extend type ContainerRegistryNode implements Node @key(fields: "id") {
   """The Globally Unique ID of this object"""
   id: ID!
@@ -7421,6 +7429,11 @@ type MoveFileV2Payload {
 }
 
 type Mutation {
+  """
+  Added in 26.8.0. Change the resource group of an agent (superadmin only). Sessions still running on the agent under the old resource group are cleaned up per the given policy; without force, the change is rejected with a conflict error when such sessions exist.
+  """
+  adminUpdateAgentResourceGroup(agentId: String!, input: UpdateAgentResourceGroupInput!): UpdateAgentResourceGroupPayload
+
   """
   Added in 26.7.0. Register a new app config allow-list entry (super admin only).
   """
@@ -13818,6 +13831,44 @@ Added in 26.8.0. What the caller could change so an unschedulable kernel would f
 type UnschedulableReasonHint {
   """Subtract these slots to fit the best-fitting node."""
   requiredReduction: [ResourceSlotEntry!]
+}
+
+"""Added in 26.8.0. Input for changing the resource group of an agent."""
+input UpdateAgentResourceGroupInput {
+  """UUID of the target resource group to move the agent into."""
+  resourceGroupId: UUID!
+
+  """
+  How to handle sessions still running on the agent under the old resource group. Currently only TERMINATE is supported.
+  """
+  policy: ConflictingSessionCleanupPolicy!
+
+  """
+  When false, the change is rejected with a conflict error if the agent still has active sessions. When true, the group is changed anyway and the conflicting sessions are cleaned up per the policy.
+  """
+  force: Boolean! = false
+}
+
+"""Added in 26.8.0. Result of changing the resource group of an agent."""
+type UpdateAgentResourceGroupPayload {
+  """ID of the agent whose resource group was changed."""
+  agentId: String!
+
+  """UUID of the new resource group."""
+  resourceGroupId: UUID!
+
+  """Cleanup policy applied to the conflicting sessions."""
+  policy: ConflictingSessionCleanupPolicy!
+
+  """
+  IDs of the sessions that were still running on the agent under the old resource group at the time of the change.
+  """
+  conflictingSessionIds: [UUID!]!
+
+  """
+  IDs of the conflicting sessions that were actually transitioned to TERMINATING by the applied policy. Their container cleanup proceeds asynchronously.
+  """
+  terminatingSessionIds: [UUID!]!
 }
 
 """

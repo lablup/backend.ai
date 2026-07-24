@@ -547,6 +547,42 @@
         "title": "AdminSearchAgentsInput",
         "type": "object"
       },
+      "ConflictingSessionCleanupPolicyEnum": {
+        "description": "How to clean up sessions that conflict with an agent's resource group change.",
+        "enum": [
+          "terminate",
+          "reschedule"
+        ],
+        "title": "ConflictingSessionCleanupPolicyEnum",
+        "type": "string"
+      },
+      "UpdateAgentResourceGroupInput": {
+        "description": "Input for changing the resource group of an agent.",
+        "properties": {
+          "resource_group_id": {
+            "description": "UUID of the target resource group to move the agent into.",
+            "format": "uuid",
+            "title": "Resource Group Id",
+            "type": "string"
+          },
+          "policy": {
+            "$ref": "#/components/schemas/ConflictingSessionCleanupPolicyEnum",
+            "description": "How to handle sessions still running on the agent under the old resource group. Currently only 'terminate' is supported."
+          },
+          "force": {
+            "default": false,
+            "description": "When false, the change is rejected with a conflict error if the agent still has active sessions. When true, the group is changed anyway and the conflicting sessions are cleaned up per the policy.",
+            "title": "Force",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "resource_group_id",
+          "policy"
+        ],
+        "title": "UpdateAgentResourceGroupInput",
+        "type": "object"
+      },
       "AppConfigScopeType": {
         "description": "Scope at which an app config fragment is written (BEP-1052).\n\nThe single definition shared across the data, DTO, GraphQL, and API layers.",
         "enum": [
@@ -40208,6 +40244,44 @@
         },
         "parameters": [],
         "description": "Search agents with filters, orders, and pagination (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/agents/{agent_id}/resource-group": {
+      "patch": {
+        "operationId": "v2/agents.update_resource_group",
+        "tags": [
+          "v2/agents"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateAgentResourceGroupInput"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Change an agent's resource group (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/v2/agents/total-resources": {
