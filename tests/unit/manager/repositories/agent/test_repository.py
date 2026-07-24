@@ -43,7 +43,7 @@ from ai.backend.manager.data.agent.types import AgentHeartbeatUpsert, AgentStatu
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.agent import AgentHasConflictingSessions
-from ai.backend.manager.errors.resource import UnresolvableResourceGroup
+from ai.backend.manager.errors.resource import ScalingGroupNotFound, UnresolvableResourceGroup
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
@@ -1590,3 +1590,31 @@ class TestAgentDBSourceKernelFiltering:
         result = await db_source.update_resource_group(agent_id, target_id, force=True)
         assert [kernel.session.session_id for kernel in result] == [str(session_id)]
         assert await self._agent_group(db_with_tables, agent_id) == (target_name, target_id)
+
+    async def test_update_resource_group_nonexistent_agent_raises(
+        self,
+        db_source: AgentDBSource,
+        db_with_tables: ExtendedAsyncSAEngine,
+    ) -> None:
+        _, target_id = await self._seed_target_group(db_with_tables)
+
+        with pytest.raises(AgentNotFound):
+            await db_source.update_resource_group(AgentId(str(uuid4())), target_id, force=False)
+
+    async def test_update_resource_group_nonexistent_group_raises(
+        self,
+        db_source: AgentDBSource,
+        db_with_tables: ExtendedAsyncSAEngine,
+        scaling_group: str,
+        test_scaling_group_id: ResourceGroupID,
+    ) -> None:
+        agent_id = AgentId(str(uuid4()))
+        await self._seed_agent(db_with_tables, agent_id, scaling_group, test_scaling_group_id)
+
+        # An unknown resource group id is rejected before touching the agent
+        with pytest.raises(ScalingGroupNotFound):
+            await db_source.update_resource_group(agent_id, ResourceGroupID(uuid4()), force=False)
+        assert await self._agent_group(db_with_tables, agent_id) == (
+            scaling_group,
+            test_scaling_group_id,
+        )
