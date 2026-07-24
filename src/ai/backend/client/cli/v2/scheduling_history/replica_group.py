@@ -90,12 +90,6 @@ def replica_group() -> None:
     default=None,
     help="Scope to a deployment; covers every replica group under it.",
 )
-@click.option(
-    "--replica-group-id",
-    type=str,
-    default=None,
-    help="Scope to a single replica group.",
-)
 @click.option("--limit", type=int, default=None, help="Maximum items to return.")
 @click.option("--offset", type=int, default=None, help="Number of items to skip.")
 @click.option(
@@ -123,7 +117,6 @@ def replica_group() -> None:
 @click.option("--order-by", multiple=True, help=_ORDER_BY_HELP)
 def search_scoped(
     deployment_id: str | None,
-    replica_group_id: str | None,
     limit: int | None,
     offset: int | None,
     category: tuple[str, ...],
@@ -135,10 +128,10 @@ def search_scoped(
     message: str | None,
     order_by: tuple[str, ...],
 ) -> None:
-    """Search replica-group scheduling history under a deployment or replica group.
+    """Search replica-group scheduling history under a deployment.
 
-    The scope has two axes, so it is given as options rather than a positional
-    argument; give exactly one of them.
+    A replica group is not an RBAC scope of its own, so its history is scoped by
+    the owning deployment.
     """
     from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
     from ai.backend.common.dto.manager.v2.scheduling_history.request import (
@@ -150,8 +143,8 @@ def search_scoped(
         ReplicaGroupHistoryScopeDTO,
     )
 
-    if (deployment_id is None) == (replica_group_id is None):
-        raise click.UsageError("Give exactly one of --deployment-id or --replica-group-id.")
+    if deployment_id is None:
+        raise click.UsageError("Give --deployment-id.")
 
     history_filter = _build_replica_group_history_filter(
         category, phase, from_status, to_status, result, error_code, message
@@ -169,16 +162,7 @@ def search_scoped(
             result_data = await registry.scheduling_history.scoped_search_replica_group_history(
                 ScopedSearchReplicaGroupHistoriesInput(
                     scope=ReplicaGroupHistoryScopeDTO(
-                        deployment=(
-                            [UUIDScope(value=UUID(deployment_id))]
-                            if deployment_id is not None
-                            else None
-                        ),
-                        replica_group=(
-                            [UUIDScope(value=UUID(replica_group_id))]
-                            if replica_group_id is not None
-                            else None
-                        ),
+                        deployment=[UUIDScope(value=UUID(deployment_id))],
                     ),
                     filter=history_filter,
                     order=orders,
