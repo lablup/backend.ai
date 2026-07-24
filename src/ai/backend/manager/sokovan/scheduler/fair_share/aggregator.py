@@ -24,7 +24,6 @@ from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.fair_share import (
-    BucketDelta,
     DomainUsageBucketKey,
     ProjectUsageBucketKey,
     UsageBucketAggregationResult,
@@ -133,9 +132,9 @@ class FairShareAggregator:
         Returns:
             UsageBucketAggregationResult with deltas for each bucket
         """
-        user_deltas: dict[UserUsageBucketKey, BucketDelta] = defaultdict(BucketDelta)
-        project_deltas: dict[ProjectUsageBucketKey, BucketDelta] = defaultdict(BucketDelta)
-        domain_deltas: dict[DomainUsageBucketKey, BucketDelta] = defaultdict(BucketDelta)
+        user_deltas: dict[UserUsageBucketKey, ResourceSlot] = defaultdict(ResourceSlot)
+        project_deltas: dict[ProjectUsageBucketKey, ResourceSlot] = defaultdict(ResourceSlot)
+        domain_deltas: dict[DomainUsageBucketKey, ResourceSlot] = defaultdict(ResourceSlot)
 
         for spec in specs:
             # Split spec across day boundaries and aggregate
@@ -218,16 +217,15 @@ class FairShareAggregator:
         period_date: date,
         raw_slots: ResourceSlot,
         segment_seconds: int,
-        user_deltas: dict[UserUsageBucketKey, BucketDelta],
-        project_deltas: dict[ProjectUsageBucketKey, BucketDelta],
-        domain_deltas: dict[DomainUsageBucketKey, BucketDelta],
+        user_deltas: dict[UserUsageBucketKey, ResourceSlot],
+        project_deltas: dict[ProjectUsageBucketKey, ResourceSlot],
+        domain_deltas: dict[DomainUsageBucketKey, ResourceSlot],
     ) -> None:
         """Add resource usage to bucket deltas for a day.
 
-        Accumulates raw resource amounts and duration separately.
-        Slots are accumulated additively (sum of ``raw_slots`` across all
-        slices within the same bucket key) while ``duration_seconds`` tracks
-        total observation time.
+        The segment is converted to resource-seconds before accumulation.
+        Accumulating the amounts and the durations separately and multiplying
+        afterwards would give a cross product inflated by the slice count.
 
         Args:
             spec: Original spec (for entity identifiers)
@@ -238,6 +236,8 @@ class FairShareAggregator:
             project_deltas: Project deltas to update (mutated)
             domain_deltas: Domain deltas to update (mutated)
         """
+        segment_usage = self._calculate_resource_seconds(raw_slots, segment_seconds)
+
         # User bucket key
         user_key = UserUsageBucketKey(
             user_uuid=spec.user_uuid,
@@ -247,11 +247,7 @@ class FairShareAggregator:
             resource_group_id=spec.resource_group_id,
             period_date=period_date,
         )
-        ud = user_deltas[user_key]
-        user_deltas[user_key] = BucketDelta(
-            slots=ud.slots + raw_slots,
-            duration_seconds=ud.duration_seconds + segment_seconds,
-        )
+        user_deltas[user_key] = user_deltas[user_key] + segment_usage
 
         # Project bucket key
         project_key = ProjectUsageBucketKey(
@@ -261,11 +257,7 @@ class FairShareAggregator:
             resource_group_id=spec.resource_group_id,
             period_date=period_date,
         )
-        pd = project_deltas[project_key]
-        project_deltas[project_key] = BucketDelta(
-            slots=pd.slots + raw_slots,
-            duration_seconds=pd.duration_seconds + segment_seconds,
-        )
+        project_deltas[project_key] = project_deltas[project_key] + segment_usage
 
         # Domain bucket key
         domain_key = DomainUsageBucketKey(
@@ -274,11 +266,7 @@ class FairShareAggregator:
             resource_group_id=spec.resource_group_id,
             period_date=period_date,
         )
-        dd = domain_deltas[domain_key]
-        domain_deltas[domain_key] = BucketDelta(
-            slots=dd.slots + raw_slots,
-            duration_seconds=dd.duration_seconds + segment_seconds,
-        )
+        domain_deltas[domain_key] = domain_deltas[domain_key] + segment_usage
 
     def _prepare_kernel_usage_specs(
         self,

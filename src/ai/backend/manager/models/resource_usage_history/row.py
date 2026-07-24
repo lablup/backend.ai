@@ -443,10 +443,15 @@ class UserUsageBucketRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
 class UsageBucketEntryRow(Base):  # type: ignore[misc]
     """Per-slot normalized entry for usage bucket aggregation (Phase 3).
 
-    Stores amount and duration separately instead of pre-multiplied resource-seconds,
-    eliminating overflow risk for large memory values.
-    The product ``amount * duration_seconds`` is computed at SQL query time
-    where PostgreSQL auto-extends NUMERIC precision.
+    ``resource_usage`` accumulates a kernel's ``occupied_slots`` integrated
+    over the time it held them.  It records an allocation, not a measurement: a
+    kernel holding a GPU idle for an hour counts the same as one saturating it.
+    That is what fair share wants -- holding a resource denies it to others -- but
+    it means "usage" would overstate what this column knows.
+
+    Declared as unconstrained NUMERIC on purpose: a domain-level daily mem bucket
+    runs to ~1e18 byte-seconds on a large cluster, past any fixed precision worth
+    writing down, and PostgreSQL's unconstrained numeric has no such ceiling.
 
     One entry per (bucket_id, slot_name). ``bucket_type`` is a discriminator
     indicating which parent table (domain/project/user_usage_buckets) owns
@@ -458,10 +463,7 @@ class UsageBucketEntryRow(Base):  # type: ignore[misc]
     bucket_id: Mapped[uuid.UUID] = mapped_column("bucket_id", GUID(), nullable=False)
     bucket_type: Mapped[str] = mapped_column("bucket_type", sa.String(length=16), nullable=False)
     slot_name: Mapped[str] = mapped_column("slot_name", sa.String(length=64), nullable=False)
-    amount: Mapped[Decimal] = mapped_column(
-        "amount", sa.Numeric(precision=24, scale=6), nullable=False
-    )
-    duration_seconds: Mapped[int] = mapped_column("duration_seconds", sa.Integer(), nullable=False)
+    resource_usage: Mapped[Decimal] = mapped_column("resource_usage", sa.Numeric(), nullable=False)
     capacity: Mapped[Decimal] = mapped_column(
         "capacity", sa.Numeric(precision=24, scale=6), nullable=False
     )
