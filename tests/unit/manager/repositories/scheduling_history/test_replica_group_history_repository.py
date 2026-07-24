@@ -61,13 +61,6 @@ from ai.backend.manager.repositories.scheduling_history.types import (
 )
 from ai.backend.testutils.db import with_tables
 
-# The fixture seeds a fixed history dataset under one deployment that every test
-# asserts against: the target group gets LIFECYCLE rows with these attempts plus
-# this many SCALING rows, and the sibling group gets this many LIFECYCLE rows.
-_TARGET_LIFECYCLE_ATTEMPTS = (1, 2, 3)
-_TARGET_SCALING_COUNT = 2
-_SIBLING_COUNT = 2
-
 
 @dataclass(frozen=True)
 class _ReplicaGroupHistorySeed:
@@ -151,6 +144,12 @@ class TestReplicaGroupHistoryRepository:
         deployment_id = DeploymentID(uuid.uuid4())
         target_group_id = ReplicaGroupID(uuid.uuid4())
         sibling_group_id = ReplicaGroupID(uuid.uuid4())
+        # The target group gets a LIFECYCLE row per attempt plus this many SCALING
+        # rows; the sibling group gets this many LIFECYCLE rows. Every test asserts
+        # against these counts.
+        target_lifecycle_attempts = (1, 2, 3)
+        target_scaling_count = 2
+        sibling_count = 2
 
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
@@ -251,7 +250,7 @@ class TestReplicaGroupHistoryRepository:
                     )
                 )
             await db_sess.flush()
-            for attempts in _TARGET_LIFECYCLE_ATTEMPTS:
+            for attempts in target_lifecycle_attempts:
                 db_sess.add(
                     ReplicaGroupHistoryRow(
                         replica_group_id=target_group_id,
@@ -263,7 +262,7 @@ class TestReplicaGroupHistoryRepository:
                         attempts=attempts,
                     )
                 )
-            for i in range(_TARGET_SCALING_COUNT):
+            for i in range(target_scaling_count):
                 db_sess.add(
                     ReplicaGroupHistoryRow(
                         replica_group_id=target_group_id,
@@ -275,7 +274,7 @@ class TestReplicaGroupHistoryRepository:
                         attempts=1,
                     )
                 )
-            for i in range(_SIBLING_COUNT):
+            for i in range(sibling_count):
                 db_sess.add(
                     ReplicaGroupHistoryRow(
                         replica_group_id=sibling_group_id,
@@ -293,9 +292,9 @@ class TestReplicaGroupHistoryRepository:
             deployment_id=deployment_id,
             replica_group_id=target_group_id,
             sibling_replica_group_id=sibling_group_id,
-            target_lifecycle_attempts=_TARGET_LIFECYCLE_ATTEMPTS,
-            target_scaling_count=_TARGET_SCALING_COUNT,
-            sibling_count=_SIBLING_COUNT,
+            target_lifecycle_attempts=target_lifecycle_attempts,
+            target_scaling_count=target_scaling_count,
+            sibling_count=sibling_count,
         )
 
     async def test_admin_search_replica_group_history_spans_every_group(
