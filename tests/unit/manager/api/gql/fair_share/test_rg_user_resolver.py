@@ -95,6 +95,9 @@ class TestRGUserFairShare:
         info.context.adapters.fair_share.get_user = AsyncMock(
             return_value=GetUserFairSharePayload(item=user_node)
         )
+        info.context.adapters.fair_share.resolve_resource_group_id = AsyncMock(
+            return_value=user_fair_share_data.resource_group_id
+        )
         return info
 
     async def test_returns_user_fair_share_when_exists(
@@ -145,7 +148,9 @@ class TestRGUserFairShare:
         call_arg = info_with_user_fair_share_exists.context.adapters.fair_share.get_user.call_args[
             0
         ][0]
-        assert call_arg.resource_group == "custom-rg"
+        assert call_arg.resource_group_id == ResourceGroupID(
+            UUID("880e8400-e29b-41d4-a716-446655440003")
+        )
         assert call_arg.project_id == UUID(project_id)
         assert call_arg.user_uuid == user_uuid
 
@@ -154,6 +159,9 @@ class TestRGUserFairShare:
         """Info context where user does not exist."""
         info = MagicMock()
         info.context.adapters.fair_share.get_user = AsyncMock(side_effect=UserNotFound())
+        info.context.adapters.fair_share.resolve_resource_group_id = AsyncMock(
+            return_value=ResourceGroupID(UUID("550e8400-e29b-41d4-a716-446655440000"))
+        )
         return info
 
     async def test_raises_user_not_found_when_user_does_not_exist(

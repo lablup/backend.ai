@@ -184,6 +184,7 @@ class ResourceGroupDetailNode(BaseResponseModel):
     """Detail node DTO for a resource group (GQL-layer representation)."""
 
     id: str = Field(description="Resource group name used as the relay node ID.")
+    resource_group_id: UUID = Field(description="Resource group UUID.")
     name: str = Field(description="Unique name of the resource group.")
     status: ResourceGroupStatusInfo = Field(
         description="Status information including active and public flags."

@@ -6435,8 +6435,11 @@ enum DomainFairShareOrderField
 input DomainFairShareScope
   @join__type(graph: STRAWBERRY)
 {
-  """Resource group to filter fair shares by."""
-  resourceGroupName: String!
+  """Deprecated resource group name."""
+  resourceGroupName: String = null @deprecated(reason: "Use resource_group_id instead.")
+
+  """Added in 26.8.0. Resource group ID."""
+  resourceGroupId: ID = null
 }
 
 input DomainInput
@@ -13513,8 +13516,11 @@ input ProjectFairShareProjectNestedFilter
 input ProjectFairShareScope
   @join__type(graph: STRAWBERRY)
 {
-  """Resource group to filter fair shares by."""
-  resourceGroupName: String!
+  """Deprecated resource group name."""
+  resourceGroupName: String = null @deprecated(reason: "Use resource_group_id instead.")
+
+  """Added in 26.8.0. Resource group ID."""
+  resourceGroupId: ID = null
 }
 
 """Added in 26.2.0. Project type enum for fair share filtering."""
@@ -14859,17 +14865,32 @@ type Query
   """Added in 26.2.0. Get domain fair share data (admin only)."""
   adminDomainFairShare(resourceGroupName: String!, domainName: String!): DomainFairShare @join__field(graph: STRAWBERRY)
 
+  """
+  Added in 26.8.0. Get domain fair share data by resource group ID (admin only).
+  """
+  adminDomainFairShareV2(resourceGroupId: ID!, domainName: String!): DomainFairShare @join__field(graph: STRAWBERRY)
+
   """Added in 26.2.0. List domain fair shares (admin only)."""
   adminDomainFairShares(filter: DomainFairShareFilter = null, orderBy: [DomainFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DomainFairShareConnection @join__field(graph: STRAWBERRY)
 
   """Added in 26.2.0. Get project fair share data (admin only)."""
   adminProjectFairShare(resourceGroupName: String!, projectId: UUID!): ProjectFairShare @join__field(graph: STRAWBERRY)
 
+  """
+  Added in 26.8.0. Get project fair share data by resource group ID (admin only).
+  """
+  adminProjectFairShareV2(resourceGroupId: ID!, projectId: UUID!): ProjectFairShare @join__field(graph: STRAWBERRY)
+
   """Added in 26.2.0. List project fair shares (admin only)."""
   adminProjectFairShares(filter: ProjectFairShareFilter = null, orderBy: [ProjectFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ProjectFairShareConnection @join__field(graph: STRAWBERRY)
 
   """Added in 26.2.0. Get user fair share data (admin only)."""
   adminUserFairShare(resourceGroupName: String!, projectId: UUID!, userUuid: UUID!): UserFairShare @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.8.0. Get user fair share data by resource group ID (admin only).
+  """
+  adminUserFairShareV2(resourceGroupId: ID!, projectId: UUID!, userUuid: UUID!): UserFairShare @join__field(graph: STRAWBERRY)
 
   """Added in 26.2.0. List user fair shares (admin only)."""
   adminUserFairShares(filter: UserFairShareFilter = null, orderBy: [UserFairShareOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): UserFairShareConnection @join__field(graph: STRAWBERRY)
@@ -21099,8 +21120,11 @@ enum UserFairShareOrderField
 input UserFairShareScope
   @join__type(graph: STRAWBERRY)
 {
-  """Resource group to filter fair shares by."""
-  resourceGroupName: String!
+  """Deprecated resource group name."""
+  resourceGroupName: String = null @deprecated(reason: "Use resource_group_id instead.")
+
+  """Added in 26.8.0. Resource group ID."""
+  resourceGroupId: ID = null
 
   """
   Project ID that the user belongs to (required for user-level fair shares).

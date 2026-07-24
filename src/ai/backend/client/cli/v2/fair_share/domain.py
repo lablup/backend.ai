@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from uuid import UUID
 
 import click
 
@@ -82,18 +83,28 @@ def search(
 
 
 @domain.command()
-@click.option("--resource-group", required=True, help="Scaling group name.")
+@click.option("--resource-group", type=str, help="Resource group name.")
+@click.option("--resource-group-id", type=click.UUID, help="Resource group ID.")
 @click.option("--domain-name", required=True, help="Domain name.")
-def get(resource_group: str, domain_name: str) -> None:
+def get(resource_group: str | None, resource_group_id: UUID | None, domain_name: str) -> None:
     """Get a single domain fair share record."""
     from ai.backend.common.dto.manager.v2.fair_share.request import GetDomainFairShareInput
+    from ai.backend.common.identifier.resource_group import ResourceGroupID
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
+            resolved_resource_group_id: ResourceGroupID
+            if resource_group_id is not None:
+                resolved_resource_group_id = ResourceGroupID(resource_group_id)
+            elif resource_group is not None:
+                result = await registry.resource_group.get(resource_group)
+                resolved_resource_group_id = ResourceGroupID(result.resource_group_id)
+            else:
+                raise click.UsageError("--resource-group or --resource-group-id is required.")
             result = await registry.fair_share.get_domain(
                 GetDomainFairShareInput(
-                    resource_group=resource_group,
+                    resource_group_id=resolved_resource_group_id,
                     domain_name=domain_name,
                 ),
             )

@@ -55,6 +55,7 @@ __all__ = (
     "gql_pydantic_interface",
     "gql_pydantic_type",
     "gql_root_field",
+    "gql_root_resolver",
     "gql_subscription",
     "gql_federation_type",
 )
@@ -276,6 +277,28 @@ def gql_root_field(
     )
 
 
+_ResolverFn = TypeVar("_ResolverFn", bound=Callable[..., Any])
+
+
+def gql_root_resolver(
+    meta: BackendAIGQLMeta,
+    *,
+    name: str | None = None,
+    deprecation_reason: str | None = None,
+    directives: Sequence[object] = (),
+) -> Callable[[_ResolverFn], _ResolverFn]:
+    """Typed decorator for root field resolver functions."""
+    return cast(
+        Callable[[_ResolverFn], _ResolverFn],
+        gql_root_field(
+            meta,
+            name=name,
+            deprecation_reason=deprecation_reason,
+            directives=directives,
+        ),
+    )
+
+
 @overload
 def gql_enum[T_enum: enum.Enum](
     meta: BackendAIGQLMeta,
@@ -319,9 +342,6 @@ def gql_enum(
     if name is not None:
         return strawberry.enum(description=description, name=name)
     return strawberry.enum(description=description)
-
-
-_ResolverFn = TypeVar("_ResolverFn", bound=Callable[..., Any])
 
 
 def gql_mutation(

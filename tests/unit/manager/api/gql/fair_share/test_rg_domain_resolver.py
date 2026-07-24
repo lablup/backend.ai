@@ -75,6 +75,9 @@ class TestRGDomainFairShare:
         info.context.adapters.fair_share.get_domain = AsyncMock(
             return_value=GetDomainFairSharePayload(item=domain_node)
         )
+        info.context.adapters.fair_share.resolve_resource_group_id = AsyncMock(
+            return_value=domain_fair_share_data.resource_group_id
+        )
         return info
 
     async def test_returns_domain_fair_share_when_exists(
@@ -115,7 +118,9 @@ class TestRGDomainFairShare:
                 0
             ]
         )
-        assert call_arg.resource_group == "custom-rg"
+        assert call_arg.resource_group_id == ResourceGroupID(
+            UUID("880e8400-e29b-41d4-a716-446655440003")
+        )
         assert call_arg.domain_name == "my-domain"
 
     @pytest.fixture
@@ -123,6 +128,9 @@ class TestRGDomainFairShare:
         """Info context where domain does not exist."""
         info = MagicMock()
         info.context.adapters.fair_share.get_domain = AsyncMock(side_effect=DomainNotFound())
+        info.context.adapters.fair_share.resolve_resource_group_id = AsyncMock(
+            return_value=ResourceGroupID(UUID("550e8400-e29b-41d4-a716-446655440000"))
+        )
         return info
 
     async def test_raises_domain_not_found_when_domain_does_not_exist(

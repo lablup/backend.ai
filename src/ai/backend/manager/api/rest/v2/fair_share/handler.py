@@ -12,8 +12,11 @@ from ai.backend.common.dto.manager.v2.fair_share.request import (
     BulkUpsertProjectFairShareWeightInput,
     BulkUpsertUserFairShareWeightInput,
     GetDomainFairShareInput,
+    GetDomainFairShareRequest,
     GetProjectFairShareInput,
+    GetProjectFairShareRequest,
     GetUserFairShareInput,
+    GetUserFairShareRequest,
     SearchDomainFairSharesInput,
     SearchProjectFairSharesInput,
     SearchUserFairSharesInput,
@@ -39,10 +42,19 @@ class V2FairShareHandler:
 
     async def admin_get_domain(
         self,
-        body: BodyParam[GetDomainFairShareInput],
+        body: BodyParam[GetDomainFairShareRequest],
     ) -> APIResponse:
         """Get a single domain fair share record."""
-        result = await self._adapter.get_domain(body.parsed)
+        request = body.parsed
+        resource_group_id = await self._adapter.resolve_resource_group_id(
+            request.resource_group_id, request.resource_group
+        )
+        result = await self._adapter.get_domain(
+            GetDomainFairShareInput(
+                resource_group_id=resource_group_id,
+                domain_name=request.domain_name,
+            )
+        )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def admin_search_domain(
@@ -73,10 +85,19 @@ class V2FairShareHandler:
 
     async def admin_get_project(
         self,
-        body: BodyParam[GetProjectFairShareInput],
+        body: BodyParam[GetProjectFairShareRequest],
     ) -> APIResponse:
         """Get a single project fair share record."""
-        result = await self._adapter.get_project(body.parsed)
+        request = body.parsed
+        resource_group_id = await self._adapter.resolve_resource_group_id(
+            request.resource_group_id, request.resource_group
+        )
+        result = await self._adapter.get_project(
+            GetProjectFairShareInput(
+                resource_group_id=resource_group_id,
+                project_id=request.project_id,
+            )
+        )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def admin_search_project(
@@ -107,10 +128,20 @@ class V2FairShareHandler:
 
     async def admin_get_user(
         self,
-        body: BodyParam[GetUserFairShareInput],
+        body: BodyParam[GetUserFairShareRequest],
     ) -> APIResponse:
         """Get a single user fair share record."""
-        result = await self._adapter.get_user(body.parsed)
+        request = body.parsed
+        resource_group_id = await self._adapter.resolve_resource_group_id(
+            request.resource_group_id, request.resource_group
+        )
+        result = await self._adapter.get_user(
+            GetUserFairShareInput(
+                resource_group_id=resource_group_id,
+                project_id=request.project_id,
+                user_uuid=request.user_uuid,
+            )
+        )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def admin_search_user(

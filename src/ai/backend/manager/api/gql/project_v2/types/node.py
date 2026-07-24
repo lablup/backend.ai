@@ -15,6 +15,8 @@ from ai.backend.common.dto.manager.v2.fair_share.types import (
     ProjectUsageScopeDTO,
 )
 from ai.backend.common.dto.manager.v2.group.response import ProjectNode
+from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
@@ -55,7 +57,18 @@ if TYPE_CHECKING:
 class ProjectFairShareScopeGQL(PydanticInputMixin[ProjectFairShareScopeDTO]):
     """Scope parameters for filtering project fair shares."""
 
-    resource_group_name: str = gql_field(description="Resource group to filter fair shares by.")
+    resource_group_name: str | None = gql_field(
+        description="Deprecated resource group name.",
+        deprecation_reason="Use resource_group_id instead.",
+        default=None,
+    )
+    resource_group_id: strawberry.ID | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Resource group ID.",
+        ),
+        default=None,
+    )
 
 
 @gql_pydantic_input(
@@ -112,9 +125,15 @@ class ProjectV2GQL(PydanticNodeMixin[ProjectNode]):
     ) -> ProjectFairShareGQL | None:
         from ai.backend.common.dto.manager.v2.fair_share.request import GetProjectFairShareInput
 
+        resource_group_id = await info.context.adapters.fair_share.resolve_resource_group_id(
+            ResourceGroupID(UUID(str(scope.resource_group_id)))
+            if scope.resource_group_id is not None
+            else None,
+            scope.resource_group_name,
+        )
         payload = await info.context.adapters.fair_share.get_project(
             GetProjectFairShareInput(
-                resource_group=scope.resource_group_name,
+                resource_group_id=resource_group_id,
                 project_id=UUID(str(self.id)),
             )
         )

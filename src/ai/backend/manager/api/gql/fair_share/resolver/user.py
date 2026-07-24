@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 
+import strawberry
 from aiohttp import web
 from strawberry import Info
 from strawberry.relay import PageInfo
@@ -13,11 +14,14 @@ from ai.backend.common.dto.manager.v2.fair_share.request import (
     GetUserFairShareInput,
     SearchUserFairSharesInput,
 )
+from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_mutation,
     gql_root_field,
+    gql_root_resolver,
 )
 from ai.backend.manager.api.gql.fair_share.types import (
     BulkUpsertUserFairShareWeightInput,
@@ -37,6 +41,19 @@ from ai.backend.manager.api.gql.utils import check_admin_only
 # Admin APIs
 
 
+async def _resolve_resource_group_id(
+    info: Info[StrawberryGQLContext],
+    resource_group_id: strawberry.ID | ResourceGroupID | None,
+    resource_group_name: str | None,
+) -> ResourceGroupID:
+    return await info.context.adapters.fair_share.resolve_resource_group_id(
+        ResourceGroupID(uuid.UUID(str(resource_group_id)))
+        if resource_group_id is not None
+        else None,
+        resource_group_name,
+    )
+
+
 @gql_root_field(
     BackendAIGQLMeta(added_version="26.2.0", description="Get user fair share data (admin only).")
 )  # type: ignore[misc]
@@ -49,9 +66,33 @@ async def admin_user_fair_share(
     """Get a single user fair share record (admin only)."""
     check_admin_only()
 
+    resource_group_id = await _resolve_resource_group_id(info, None, resource_group_name)
     result = await info.context.adapters.fair_share.get_user(
         GetUserFairShareInput(
-            resource_group=resource_group_name,
+            resource_group_id=resource_group_id,
+            project_id=project_id,
+            user_uuid=user_uuid,
+        )
+    )
+    return UserFairShareGQL.from_pydantic(result.item) if result.item is not None else None
+
+
+@gql_root_resolver(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Get user fair share data by resource group ID (admin only).",
+    )
+)
+async def admin_user_fair_share_v2(
+    info: Info[StrawberryGQLContext],
+    resource_group_id: strawberry.ID,
+    project_id: uuid.UUID,
+    user_uuid: uuid.UUID,
+) -> UserFairShareGQL | None:
+    check_admin_only()
+    result = await info.context.adapters.fair_share.get_user(
+        GetUserFairShareInput(
+            resource_group_id=ResourceGroupID(uuid.UUID(str(resource_group_id))),
             project_id=project_id,
             user_uuid=user_uuid,
         )
@@ -121,9 +162,10 @@ async def rg_user_fair_share(
     user_uuid: uuid.UUID,
 ) -> UserFairShareGQL | None:
     """Get a single user fair share record within resource group scope."""
+    resource_group_id = await _resolve_resource_group_id(info, None, scope.resource_group_name)
     result = await info.context.adapters.fair_share.get_user(
         GetUserFairShareInput(
-            resource_group=scope.resource_group_name,
+            resource_group_id=resource_group_id,
             project_id=uuid.UUID(scope.project_id),
             user_uuid=user_uuid,
         )
@@ -203,9 +245,10 @@ async def user_fair_share(
     if me is None or not me.is_superadmin:
         raise web.HTTPForbidden(reason="Only superadmin can access fair share data.")
 
+    resource_group_id = await _resolve_resource_group_id(info, None, resource_group_name)
     result = await info.context.adapters.fair_share.get_user(
         GetUserFairShareInput(
-            resource_group=resource_group_name,
+            resource_group_id=resource_group_id,
             project_id=project_id,
             user_uuid=user_uuid,
         )

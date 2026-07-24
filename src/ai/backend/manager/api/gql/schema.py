@@ -117,13 +117,16 @@ from .fair_share import (
     admin_bulk_upsert_project_fair_share_weight,
     admin_bulk_upsert_user_fair_share_weight,
     admin_domain_fair_share,
+    admin_domain_fair_share_v2,
     admin_domain_fair_shares,
     admin_project_fair_share,
+    admin_project_fair_share_v2,
     admin_project_fair_shares,
     admin_upsert_domain_fair_share_weight,
     admin_upsert_project_fair_share_weight,
     admin_upsert_user_fair_share_weight,
     admin_user_fair_share,
+    admin_user_fair_share_v2,
     admin_user_fair_shares,
     bulk_upsert_domain_fair_share_weight,
     bulk_upsert_project_fair_share_weight,
@@ -553,10 +556,13 @@ class Query:
     admin_notification_rule = admin_notification_rule
     admin_notification_rules = admin_notification_rules
     admin_domain_fair_share = admin_domain_fair_share
+    admin_domain_fair_share_v2 = admin_domain_fair_share_v2
     admin_domain_fair_shares = admin_domain_fair_shares
     admin_project_fair_share = admin_project_fair_share
+    admin_project_fair_share_v2 = admin_project_fair_share_v2
     admin_project_fair_shares = admin_project_fair_shares
     admin_user_fair_share = admin_user_fair_share
+    admin_user_fair_share_v2 = admin_user_fair_share_v2
     admin_user_fair_shares = admin_user_fair_shares
     admin_domain_usage_buckets = admin_domain_usage_buckets
     admin_project_usage_buckets = admin_project_usage_buckets

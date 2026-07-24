@@ -9130,13 +9130,36 @@
         "title": "PurgeDomainInput",
         "type": "object"
       },
-      "GetDomainFairShareInput": {
-        "description": "Input for getting a single domain fair share.",
+      "GetDomainFairShareRequest": {
+        "description": "Compatibility request for getting a single domain fair share.",
         "properties": {
           "resource_group": {
-            "description": "Scaling group name",
-            "title": "Resource Group",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "deprecated": true,
+            "description": "Scaling group name. Deprecated; use resource_group_id.",
+            "title": "Resource Group"
+          },
+          "resource_group_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Resource group ID",
+            "title": "Resource Group Id"
           },
           "domain_name": {
             "description": "Domain name",
@@ -9145,10 +9168,9 @@
           }
         },
         "required": [
-          "resource_group",
           "domain_name"
         ],
-        "title": "GetDomainFairShareInput",
+        "title": "GetDomainFairShareRequest",
         "type": "object"
       },
       "DomainFairShareDomainNestedFilter": {
@@ -9440,13 +9462,36 @@
         "title": "BulkUpsertDomainFairShareWeightInput",
         "type": "object"
       },
-      "GetProjectFairShareInput": {
-        "description": "Input for getting a single project fair share.",
+      "GetProjectFairShareRequest": {
+        "description": "Compatibility request for getting a single project fair share.",
         "properties": {
           "resource_group": {
-            "description": "Scaling group name",
-            "title": "Resource Group",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "deprecated": true,
+            "description": "Scaling group name. Deprecated; use resource_group_id.",
+            "title": "Resource Group"
+          },
+          "resource_group_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Resource group ID",
+            "title": "Resource Group Id"
           },
           "project_id": {
             "description": "Project ID",
@@ -9456,10 +9501,9 @@
           }
         },
         "required": [
-          "resource_group",
           "project_id"
         ],
-        "title": "GetProjectFairShareInput",
+        "title": "GetProjectFairShareRequest",
         "type": "object"
       },
       "ProjectFairShareFilter": {
@@ -9776,13 +9820,36 @@
         "title": "BulkUpsertProjectFairShareWeightInput",
         "type": "object"
       },
-      "GetUserFairShareInput": {
-        "description": "Input for getting a single user fair share.",
+      "GetUserFairShareRequest": {
+        "description": "Compatibility request for getting a single user fair share.",
         "properties": {
           "resource_group": {
-            "description": "Scaling group name",
-            "title": "Resource Group",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "deprecated": true,
+            "description": "Scaling group name. Deprecated; use resource_group_id.",
+            "title": "Resource Group"
+          },
+          "resource_group_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Resource group ID",
+            "title": "Resource Group Id"
           },
           "project_id": {
             "description": "Project ID",
@@ -9798,11 +9865,10 @@
           }
         },
         "required": [
-          "resource_group",
           "project_id",
           "user_uuid"
         ],
-        "title": "GetUserFairShareInput",
+        "title": "GetUserFairShareRequest",
         "type": "object"
       },
       "UserFairShareFilter": {
@@ -42746,7 +42812,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/GetDomainFairShareInput"
+                "$ref": "#/components/schemas/GetDomainFairShareRequest"
               }
             }
           }
@@ -42862,7 +42928,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/GetProjectFairShareInput"
+                "$ref": "#/components/schemas/GetProjectFairShareRequest"
               }
             }
           }
@@ -42978,7 +43044,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/GetUserFairShareInput"
+                "$ref": "#/components/schemas/GetUserFairShareRequest"
               }
             }
           }
