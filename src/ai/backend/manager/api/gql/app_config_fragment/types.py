@@ -19,6 +19,15 @@ from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
 from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
     AppConfigFragmentOrder as AppConfigFragmentOrderDTO,
 )
+from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
+    AppConfigFragmentUpsertItem as AppConfigFragmentUpsertItemDTO,
+)
+from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
+    MyUpsertAppConfigFragmentsInput as MyUpsertAppConfigFragmentsInputDTO,
+)
+from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
+    UpsertAppConfigFragmentsInput as UpsertAppConfigFragmentsInputDTO,
+)
 from ai.backend.common.dto.manager.v2.app_config_fragment.response import (
     AppConfigFragmentNode,
 )
@@ -47,8 +56,56 @@ __all__ = (
     "AppConfigFragmentGQL",
     "AppConfigFragmentOrderByGQL",
     "AppConfigFragmentOrderFieldGQL",
+    "AppConfigFragmentUpsertItemGQL",
     "AppConfigScopeTypeFilterGQL",
+    "MyUpsertAppConfigFragmentsInputGQL",
+    "UpsertAppConfigFragmentsInputGQL",
 )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="One (config_name, config) pair to upsert at the request's scope.",
+    ),
+    name="AppConfigFragmentUpsertItem",
+)
+class AppConfigFragmentUpsertItemGQL(PydanticInputMixin[AppConfigFragmentUpsertItemDTO]):
+    config_name: str = gql_field(description="Registered config name.")
+    config: JSON = gql_field(description="The fragment's JSON config document.")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Upsert many fragments at one scope; the scope is named once for all items.",
+    ),
+    name="UpsertAppConfigFragmentsInput",
+)
+class UpsertAppConfigFragmentsInputGQL(PydanticInputMixin[UpsertAppConfigFragmentsInputDTO]):
+    scope_type: AppConfigScopeType = gql_field(
+        description="Scope the fragments are written at (public | domain | user)."
+    )
+    scope_id: UUID | None = gql_field(
+        description="Scope identifier: the domain id or user id; null for public scope.",
+        default=None,
+    )
+    items: list[AppConfigFragmentUpsertItemGQL] = gql_field(
+        description="The (config_name, config) pairs to upsert."
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Upsert many fragments at the current user's own user scope.",
+    ),
+    name="MyUpsertAppConfigFragmentsInput",
+)
+class MyUpsertAppConfigFragmentsInputGQL(PydanticInputMixin[MyUpsertAppConfigFragmentsInputDTO]):
+    items: list[AppConfigFragmentUpsertItemGQL] = gql_field(
+        description="The (config_name, config) pairs to upsert."
+    )
 
 
 # ---------------------------------------------------------------------------

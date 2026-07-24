@@ -3,6 +3,8 @@
 from .resolver import (
     admin_app_config_fragments,
     app_config_fragment,
+    my_upsert_app_config_fragments,
+    upsert_app_config_fragments,
 )
 from .types import (
     AppConfigFragmentConnection,
@@ -11,7 +13,10 @@ from .types import (
     AppConfigFragmentGQL,
     AppConfigFragmentOrderByGQL,
     AppConfigFragmentOrderFieldGQL,
+    AppConfigFragmentUpsertItemGQL,
     AppConfigScopeTypeFilterGQL,
+    MyUpsertAppConfigFragmentsInputGQL,
+    UpsertAppConfigFragmentsInputGQL,
 )
 
 __all__ = (
@@ -22,8 +27,14 @@ __all__ = (
     "AppConfigFragmentGQL",
     "AppConfigFragmentOrderByGQL",
     "AppConfigFragmentOrderFieldGQL",
+    "AppConfigFragmentUpsertItemGQL",
     "AppConfigScopeTypeFilterGQL",
+    "MyUpsertAppConfigFragmentsInputGQL",
+    "UpsertAppConfigFragmentsInputGQL",
     # Query resolvers
     "admin_app_config_fragments",
     "app_config_fragment",
+    # Mutation resolvers
+    "my_upsert_app_config_fragments",
+    "upsert_app_config_fragments",
 )

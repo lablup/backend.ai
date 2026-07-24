@@ -41,6 +41,10 @@ from ai.backend.manager.services.app_config_fragment.actions.update import (
     UpdateAppConfigFragmentAction,
     UpdateAppConfigFragmentActionResult,
 )
+from ai.backend.manager.services.app_config_fragment.actions.upsert import (
+    UpsertAppConfigFragmentsAction,
+    UpsertAppConfigFragmentsActionResult,
+)
 from ai.backend.manager.services.app_config_fragment.service import (
     AppConfigFragmentService,
 )
@@ -48,6 +52,9 @@ from ai.backend.manager.services.app_config_fragment.service import (
 
 class AppConfigFragmentProcessors(AbstractProcessorPackage):
     create: ScopeActionProcessor[CreateAppConfigFragmentAction, CreateAppConfigFragmentActionResult]
+    upsert: ScopeActionProcessor[
+        UpsertAppConfigFragmentsAction, UpsertAppConfigFragmentsActionResult
+    ]
     get: SingleEntityActionProcessor[GetAppConfigFragmentAction, GetAppConfigFragmentActionResult]
     admin_search: GlobalActionProcessor[
         AdminSearchAppConfigFragmentAction, AdminSearchAppConfigFragmentActionResult
@@ -81,6 +88,9 @@ class AppConfigFragmentProcessors(AbstractProcessorPackage):
         self.create = ScopeActionProcessor(
             service.create, action_monitors, validators=[validators.rbac.scope]
         )
+        self.upsert = ScopeActionProcessor(
+            service.upsert, action_monitors, validators=[validators.rbac.scope]
+        )
         self.get = SingleEntityActionProcessor(
             service.get, action_monitors, validators=[validators.rbac.single_entity]
         )
@@ -105,6 +115,7 @@ class AppConfigFragmentProcessors(AbstractProcessorPackage):
     def supported_actions(self) -> list[ActionSpec]:
         return [
             CreateAppConfigFragmentAction.spec(),
+            UpsertAppConfigFragmentsAction.spec(),
             GetAppConfigFragmentAction.spec(),
             AdminSearchAppConfigFragmentAction.spec(),
             ScopedSearchAppConfigFragmentAction.spec(),

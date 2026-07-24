@@ -35,6 +35,8 @@ from .app_config_definition import (
 from .app_config_fragment import (
     admin_app_config_fragments,
     app_config_fragment,
+    my_upsert_app_config_fragments,
+    upsert_app_config_fragments,
 )
 from .artifact import (
     approve_artifact_revision,
@@ -735,6 +737,8 @@ class Mutation:
     admin_create_app_config_allow_list = admin_create_app_config_allow_list
     admin_purge_app_config_allow_list = admin_purge_app_config_allow_list
     admin_update_app_config_allow_list = admin_update_app_config_allow_list
+    upsert_app_config_fragments = upsert_app_config_fragments
+    my_upsert_app_config_fragments = my_upsert_app_config_fragments
     scan_artifacts = scan_artifacts
     scan_artifact_models = scan_artifact_models
     import_artifacts = import_artifacts
