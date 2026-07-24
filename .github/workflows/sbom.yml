@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Checkout the revision
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
       with:
         lfs: false
     - name: Install SBOM tool
@@ -29,7 +29,7 @@ jobs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
     - name: Checkout the revision
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
       with:
         lfs: false
 
@@ -75,7 +75,7 @@ jobs:
       matrix: ${{ fromJson(needs.prepare-matrix.outputs.matrix) }}
     steps:
     - name: Checkout the revision
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
       with:
         lfs: false
 

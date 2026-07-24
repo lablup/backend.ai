@@ -21,7 +21,7 @@ jobs:
           echo "GIT_FETCH_DEPTH=2" >> "${GITHUB_ENV}"
         fi
     - name: Checkout the revision with minimal required history
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
       with:
         fetch-depth: ${{ env.GIT_FETCH_DEPTH }}
         ref: ${{ github.head_ref }}
@@ -96,7 +96,7 @@ jobs:
       pull-requests: write
       checks: write
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: graphql-hive/graphql-inspector@v4.0.0
         with:
           schema: '${{ github.base_ref }}:docs/manager/graphql-reference/schema.graphql'
