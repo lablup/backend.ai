@@ -14,7 +14,6 @@ from pydantic import Field, model_validator
 from ai.backend.common.api_handlers import BaseRequestModel, BaseResponseModel
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
-from ai.backend.common.identifier.replica_group import ReplicaGroupID
 
 __all__ = (
     "DeploymentHistoryOrderField",
@@ -154,6 +153,27 @@ class RouteHistoryScopeDTO(BaseRequestModel):
 
 
 class ReplicaGroupHistoryScopeDTO(BaseRequestModel):
-    """Scope for replica-group scheduling history queries."""
+    """Scope for replica-group scheduling history queries.
 
-    replica_group_id: ReplicaGroupID = Field(description="Replica group ID to get history for.")
+    Each list is OR'd internally and across categories. Raises an error if every
+    field is empty. The scoped search is still a single-target scope action, so
+    only one item is dispatchable today; the list shape keeps the wire contract
+    stable for the multi-target case.
+    """
+
+    replica_group: list[UUIDScope] | None = Field(
+        default=None, description="Replica group IDs to get history for."
+    )
+    deployment: list[UUIDScope] | None = Field(
+        default=None,
+        description="Deployment IDs to get the history of every owned replica group for.",
+    )
+
+    @model_validator(mode="after")
+    def _require_non_empty(self) -> Self:
+        if not self.replica_group and not self.deployment:
+            raise ValueError(
+                "ReplicaGroupHistoryScopeDTO requires a non-empty value for "
+                "'replica_group' or 'deployment'"
+            )
+        return self
