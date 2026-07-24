@@ -47,9 +47,13 @@ class ReplicaGroupReplicaGroupHistoryTarget(ReplicaGroupHistoryTarget):
 
     @override
     def to_rbac_element_ref(self) -> RBACElementRef:
-        return RBACElementRef(
-            element_type=RBACElementType.REPLICA_GROUP,
-            element_id=str(self.replica_group_id),
+        # Not dispatchable yet: a replica group is not an RBAC scope of its own, so
+        # the adapter never passes this target (it converts to the owning
+        # deployment). Once virtual scopes make replica groups a scope, return
+        # RBACElementRef(RBACElementType.REPLICA_GROUP, ...).
+        raise NotImplementedError(
+            "ReplicaGroupReplicaGroupHistoryTarget is not authorizable until replica "
+            "groups become RBAC scopes"
         )
 
 

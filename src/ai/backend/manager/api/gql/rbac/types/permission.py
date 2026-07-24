@@ -244,7 +244,6 @@ class PermissionGQL(PydanticNodeMixin[PermissionNodeDTO]):
                 | RBACElementType.NOTIFICATION_RULE
                 | RBACElementType.AGENT
                 | RBACElementType.KERNEL
-                | RBACElementType.REPLICA_GROUP
                 | RBACElementType.ROUTING
                 | RBACElementType.DEPLOYMENT_TOKEN
                 | RBACElementType.DEPLOYMENT_POLICY
