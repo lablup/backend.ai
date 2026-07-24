@@ -6,10 +6,14 @@ from dataclasses import dataclass
 from typing import Any, override
 from uuid import UUID
 
+import sqlalchemy as sa
+
 from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec
+from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.replica import ReplicaID
+from ai.backend.common.identifier.replica_group import ReplicaGroupID
 from ai.backend.common.types import KernelId, SessionId
-from ai.backend.manager.errors.deployment import EndpointNotFound
+from ai.backend.manager.errors.deployment import EndpointNotFound, ReplicaGroupNotFound
 from ai.backend.manager.errors.kernel import (
     KernelNotFound,
     SessionNotFound,
@@ -18,6 +22,8 @@ from ai.backend.manager.errors.service import RouteNotFound
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.endpoint import EndpointRow
 from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
+from ai.backend.manager.models.replica_group_history.row import ReplicaGroupHistoryRow
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.scheduling_history.conditions import (
     DeploymentHistoryConditions,
@@ -33,6 +39,8 @@ __all__ = (
     "KernelKernelHistorySearchScope",
     "SessionKernelHistorySearchScope",
     "DeploymentHistorySearchScope",
+    "ReplicaGroupReplicaGroupHistorySearchScope",
+    "DeploymentReplicaGroupHistorySearchScope",
     "RouteHistorySearchScope",
 )
 
@@ -155,6 +163,70 @@ class DeploymentHistorySearchScope(SearchScope):
         return DeploymentHistoryConditions.by_deployment_id_filter(
             UUIDEqualMatchSpec(value=self.deployment_id, negated=False)
         )
+
+    @property
+    @override
+    def existence_checks(self) -> list[ExistenceCheck[Any]]:
+        """Check that the deployment (endpoint) exists."""
+        return [
+            ExistenceCheck(
+                column=EndpointRow.id,
+                value=self.deployment_id,
+                error=EndpointNotFound(str(self.deployment_id)),
+            ),
+        ]
+
+
+# Replica Group History Scope
+
+
+@dataclass(frozen=True)
+class ReplicaGroupReplicaGroupHistorySearchScope(SearchScope):
+    """Scope for replica-group history search bounded by one replica group."""
+
+    replica_group_id: ReplicaGroupID
+    """Required. The replica group to search history for."""
+
+    @override
+    def to_condition(self) -> QueryCondition:
+        """Convert scope to a query condition for ReplicaGroupHistoryRow."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ReplicaGroupHistoryRow.replica_group_id == self.replica_group_id
+
+        return inner
+
+    @property
+    @override
+    def existence_checks(self) -> list[ExistenceCheck[Any]]:
+        """Check that the replica group exists."""
+        return [
+            ExistenceCheck(
+                column=ReplicaGroupRow.id,
+                value=self.replica_group_id,
+                error=ReplicaGroupNotFound(str(self.replica_group_id)),
+            ),
+        ]
+
+
+@dataclass(frozen=True)
+class DeploymentReplicaGroupHistorySearchScope(SearchScope):
+    """Scope for replica-group history search bounded by the owning deployment.
+
+    Returns the history of every replica group belonging to the deployment.
+    """
+
+    deployment_id: DeploymentID
+    """Required. The deployment whose replica groups' history is searched."""
+
+    @override
+    def to_condition(self) -> QueryCondition:
+        """Convert scope to a query condition for ReplicaGroupHistoryRow."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ReplicaGroupHistoryRow.deployment_id == self.deployment_id
+
+        return inner
 
     @property
     @override
