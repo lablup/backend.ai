@@ -155,6 +155,10 @@ else
     fi
     export SHELL=/bin/bash
   fi
+  if [ "$(getent passwd $USER_NAME | cut -d: -f3-4)" != "$USER_ID:$GROUP_ID" ]; then
+    echo "ERROR: /etc/passwd entry for '$USER_NAME' does not match $USER_ID:$GROUP_ID"
+    exit 1
+  fi
   export LD_LIBRARY_PATH="/opt/backend.ai/lib:$LD_LIBRARY_PATH"
   export HOME="/home/$USER_NAME"
 
