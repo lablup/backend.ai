@@ -62,6 +62,20 @@ def register_v2_scheduling_history_routes(
         middlewares=[superadmin_required],
     )
 
+    # Replica group history
+    registry.add(
+        "POST",
+        "/replica-groups/admin/search",
+        handler.admin_search_replica_group_history,
+        middlewares=[superadmin_required],
+    )
+    registry.add(
+        "POST",
+        "/replica-groups/scoped/search",
+        handler.scoped_search_replica_group_history,
+        middlewares=[auth_required],
+    )
+
     # Route history
     registry.add(
         "POST",

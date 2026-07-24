@@ -9,15 +9,18 @@ from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec
 from ai.backend.common.dto.manager.v2.scheduling_history.request import (
     AdminSearchDeploymentHistoriesInput,
     AdminSearchKernelHistoriesInput,
+    AdminSearchReplicaGroupHistoriesInput,
     AdminSearchRouteHistoriesInput,
     AdminSearchSessionHistoriesInput,
     DeploymentHistoryFilter,
     DeploymentHistoryOrder,
     KernelHistoryFilter,
     KernelHistoryOrder,
+    ReplicaGroupHistoryFilter,
     RouteHistoryFilter,
     RouteHistoryOrder,
     ScopedSearchKernelHistoriesInput,
+    ScopedSearchReplicaGroupHistoriesInput,
     SessionHistoryFilter,
     SessionHistoryOrder,
 )
@@ -27,17 +30,26 @@ from ai.backend.common.dto.manager.v2.scheduling_history.response import (
     AdminSearchSessionHistoriesPayload,
     DeploymentHistoryNode,
     KernelHistoryNode,
+    ReplicaGroupHistoryNode,
     RouteHistoryNode,
     SearchKernelHistoriesPayload,
+    SearchReplicaGroupHistoriesPayload,
     SessionHistoryNode,
 )
 from ai.backend.common.dto.manager.v2.scheduling_history.types import SubStepResultInfo
+from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.kernel_scheduling_history import KernelSchedulingHistoryID
 from ai.backend.common.identifier.replica import ReplicaID
+from ai.backend.common.identifier.replica_group import ReplicaGroupID
 from ai.backend.common.types import KernelId, SessionId
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
-from ai.backend.manager.data.deployment.types import DeploymentHistoryData, RouteHistoryData
+from ai.backend.manager.data.deployment.types import (
+    DeploymentHistoryData,
+    ReplicaGroupHandlerCategory,
+    ReplicaGroupHistoryData,
+    RouteHistoryData,
+)
 from ai.backend.manager.data.kernel.types import KernelSchedulingHistoryData
 from ai.backend.manager.data.session.types import (
     SchedulingResult,
@@ -46,6 +58,15 @@ from ai.backend.manager.data.session.types import (
 )
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
+from ai.backend.manager.models.replica_group_history.conditions import (
+    ReplicaGroupHistoryConditions,
+)
+from ai.backend.manager.models.replica_group_history.orders import (
+    REPLICA_GROUP_DEFAULT_BACKWARD_ORDER,
+    REPLICA_GROUP_DEFAULT_FORWARD_ORDER,
+    REPLICA_GROUP_TIEBREAKER_ORDER,
+    resolve_replica_group_order,
+)
 from ai.backend.manager.models.scheduling_history.conditions import (
     DeploymentHistoryConditions,
     KernelSchedulingHistoryConditions,
@@ -81,8 +102,18 @@ from ai.backend.manager.repositories.scheduling_history.types import (
     RouteHistorySearchScope,
     SessionSchedulingHistorySearchScope,
 )
+from ai.backend.manager.services.scheduling_history.actions.admin_search_replica_group_history import (
+    AdminSearchReplicaGroupHistoryAction,
+)
 from ai.backend.manager.services.scheduling_history.actions.resolve_kernel_session import (
     ResolveKernelSessionAction,
+)
+from ai.backend.manager.services.scheduling_history.actions.resolve_replica_group_deployment import (
+    ResolveReplicaGroupDeploymentAction,
+)
+from ai.backend.manager.services.scheduling_history.actions.scoped_search_replica_group_history import (
+    DeploymentReplicaGroupHistoryTarget,
+    ScopedSearchReplicaGroupHistoryAction,
 )
 from ai.backend.manager.services.scheduling_history.actions.search_deployment_history import (
     SearchDeploymentHistoryAction,
@@ -132,6 +163,14 @@ _DEPLOYMENT_HISTORY_PAGINATION_SPEC = PaginationSpec(
     forward_condition_factory=DeploymentHistoryConditions.by_cursor_forward,
     backward_condition_factory=DeploymentHistoryConditions.by_cursor_backward,
     tiebreaker_order=DEPLOYMENT_TIEBREAKER_ORDER,
+)
+
+_REPLICA_GROUP_HISTORY_PAGINATION_SPEC = PaginationSpec(
+    forward_order=REPLICA_GROUP_DEFAULT_FORWARD_ORDER,
+    backward_order=REPLICA_GROUP_DEFAULT_BACKWARD_ORDER,
+    forward_condition_factory=ReplicaGroupHistoryConditions.by_cursor_forward,
+    backward_condition_factory=ReplicaGroupHistoryConditions.by_cursor_backward,
+    tiebreaker_order=REPLICA_GROUP_TIEBREAKER_ORDER,
 )
 
 _ROUTE_HISTORY_PAGINATION_SPEC = PaginationSpec(
@@ -784,6 +823,211 @@ class SchedulingHistoryAdapter(BaseAdapter):
     def _convert_deployment_orders(order: list[DeploymentHistoryOrder]) -> list[QueryOrder]:
         return [resolve_deployment_order(o.field, o.direction) for o in order]
 
+    # ========== Replica Group History ==========
+
+    async def admin_search_replica_group_history(
+        self,
+        input: AdminSearchReplicaGroupHistoriesInput,
+    ) -> SearchReplicaGroupHistoriesPayload:
+        """Search replica-group scheduling histories (admin, no scope)."""
+        conditions = self._convert_replica_group_filter(input.filter) if input.filter else []
+        orders = (
+            [resolve_replica_group_order(o.field, o.direction) for o in input.order]
+            if input.order
+            else []
+        )
+        querier = self._build_querier(
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=_REPLICA_GROUP_HISTORY_PAGINATION_SPEC,
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+        )
+        action_result = await self._processors.scheduling_history.admin_search_replica_group_history.wait_for_complete(
+            AdminSearchReplicaGroupHistoryAction(querier=querier)
+        )
+        return SearchReplicaGroupHistoriesPayload(
+            items=[self._replica_group_data_to_dto(h) for h in action_result.items],
+            total_count=action_result.total_count,
+            has_next_page=action_result.has_next_page,
+            has_previous_page=action_result.has_previous_page,
+        )
+
+    async def scoped_search_replica_group_history(
+        self,
+        input: ScopedSearchReplicaGroupHistoriesInput,
+    ) -> SearchReplicaGroupHistoriesPayload:
+        """Search replica-group scheduling histories under a non-admin scope."""
+        conditions = self._convert_replica_group_filter(input.filter) if input.filter else []
+        orders = (
+            [resolve_replica_group_order(o.field, o.direction) for o in input.order]
+            if input.order
+            else []
+        )
+        replica_group_items = input.scope.replica_group or []
+        deployment_items = input.scope.deployment or []
+        # TODO: Drop this rejection once the scoped search becomes a bulk action.
+        # The scope input is already list-shaped and its items are meant to be
+        # OR'd, but ScopedSearchReplicaGroupHistoryAction is a single-target
+        # BaseScopeAction, so only one item is dispatchable today.
+        if len(replica_group_items) + len(deployment_items) != 1:
+            raise InvalidAPIParameters(
+                "Replica-group scheduling history scope accepts exactly one scope item"
+            )
+        # TODO: Pass ReplicaGroupReplicaGroupHistoryTarget(replica_group_id=...) once
+        # virtual scopes land and a replica group becomes a scope of its own. Replica
+        # groups hold no permission records today, so a replica-group scope item is
+        # converted to a target on its owning deployment and narrowed back down with a
+        # replica_group_id query condition.
+        if replica_group_items:
+            replica_group_id = ReplicaGroupID(replica_group_items[0].value)
+            resolve_result = await self._processors.scheduling_history.resolve_replica_group_deployment.wait_for_complete(
+                ResolveReplicaGroupDeploymentAction(replica_group_id=replica_group_id)
+            )
+            deployment_id = resolve_result.deployment_id
+            conditions.append(
+                ReplicaGroupHistoryConditions.by_replica_group_ids([replica_group_id])
+            )
+        else:
+            deployment_id = DeploymentID(deployment_items[0].value)
+        querier = self._build_querier(
+            conditions=conditions,
+            orders=orders,
+            pagination_spec=_REPLICA_GROUP_HISTORY_PAGINATION_SPEC,
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+        )
+        action_result = await self._processors.scheduling_history.scoped_search_replica_group_history.wait_for_complete(
+            ScopedSearchReplicaGroupHistoryAction(
+                target=DeploymentReplicaGroupHistoryTarget(deployment_id=deployment_id),
+                querier=querier,
+            )
+        )
+        return SearchReplicaGroupHistoriesPayload(
+            items=[self._replica_group_data_to_dto(h) for h in action_result.items],
+            total_count=action_result.total_count,
+            has_next_page=action_result.has_next_page,
+            has_previous_page=action_result.has_previous_page,
+        )
+
+    def _convert_replica_group_filter(
+        self, filter: ReplicaGroupHistoryFilter
+    ) -> list[QueryCondition]:
+        conditions: list[QueryCondition] = []
+        if filter.id is not None:
+            condition = self.convert_uuid_filter(
+                filter.id,
+                equals_factory=ReplicaGroupHistoryConditions.by_id_filter,
+                in_factory=ReplicaGroupHistoryConditions.by_id_in,
+            )
+            if condition is not None:
+                conditions.append(condition)
+        if filter.category:
+            conditions.append(
+                ReplicaGroupHistoryConditions.by_categories([
+                    ReplicaGroupHandlerCategory(c) for c in filter.category
+                ])
+            )
+        if filter.phase is not None:
+            condition = self.convert_string_filter(
+                filter.phase,
+                contains_factory=ReplicaGroupHistoryConditions.by_phase_contains,
+                equals_factory=ReplicaGroupHistoryConditions.by_phase_equals,
+                starts_with_factory=ReplicaGroupHistoryConditions.by_phase_starts_with,
+                ends_with_factory=ReplicaGroupHistoryConditions.by_phase_ends_with,
+                in_factory=ReplicaGroupHistoryConditions.by_phase_in,
+            )
+            if condition is not None:
+                conditions.append(condition)
+        if filter.from_status:
+            conditions.append(ReplicaGroupHistoryConditions.by_from_statuses(filter.from_status))
+        if filter.to_status:
+            conditions.append(ReplicaGroupHistoryConditions.by_to_statuses(filter.to_status))
+        if filter.result is not None:
+            r = filter.result
+            if r.equals is not None:
+                conditions.append(
+                    ReplicaGroupHistoryConditions.by_result(SchedulingResult(r.equals))
+                )
+            if r.in_:
+                conditions.append(
+                    ReplicaGroupHistoryConditions.by_results([SchedulingResult(v) for v in r.in_])
+                )
+            if r.not_equals is not None:
+                conditions.append(
+                    ReplicaGroupHistoryConditions.by_result_not_equals(
+                        SchedulingResult(r.not_equals)
+                    )
+                )
+            if r.not_in:
+                conditions.append(
+                    ReplicaGroupHistoryConditions.by_result_not_in([
+                        SchedulingResult(v) for v in r.not_in
+                    ])
+                )
+        if filter.error_code is not None:
+            condition = self.convert_string_filter(
+                filter.error_code,
+                contains_factory=ReplicaGroupHistoryConditions.by_error_code_contains,
+                equals_factory=ReplicaGroupHistoryConditions.by_error_code_equals,
+                starts_with_factory=ReplicaGroupHistoryConditions.by_error_code_starts_with,
+                ends_with_factory=ReplicaGroupHistoryConditions.by_error_code_ends_with,
+                in_factory=ReplicaGroupHistoryConditions.by_error_code_in,
+            )
+            if condition is not None:
+                conditions.append(condition)
+        if filter.message is not None:
+            condition = self.convert_string_filter(
+                filter.message,
+                contains_factory=ReplicaGroupHistoryConditions.by_message_contains,
+                equals_factory=ReplicaGroupHistoryConditions.by_message_equals,
+                starts_with_factory=ReplicaGroupHistoryConditions.by_message_starts_with,
+                ends_with_factory=ReplicaGroupHistoryConditions.by_message_ends_with,
+                in_factory=ReplicaGroupHistoryConditions.by_message_in,
+            )
+            if condition is not None:
+                conditions.append(condition)
+        if filter.created_at is not None:
+            condition = filter.created_at.build_query_condition(
+                before_factory=ReplicaGroupHistoryConditions.by_created_at_before,
+                after_factory=ReplicaGroupHistoryConditions.by_created_at_after,
+                equals_factory=ReplicaGroupHistoryConditions.by_created_at_equals,
+            )
+            if condition is not None:
+                conditions.append(condition)
+        if filter.updated_at is not None:
+            condition = filter.updated_at.build_query_condition(
+                before_factory=ReplicaGroupHistoryConditions.by_updated_at_before,
+                after_factory=ReplicaGroupHistoryConditions.by_updated_at_after,
+                equals_factory=ReplicaGroupHistoryConditions.by_updated_at_equals,
+            )
+            if condition is not None:
+                conditions.append(condition)
+        if filter.AND:
+            for sub in filter.AND:
+                conditions.extend(self._convert_replica_group_filter(sub))
+        if filter.OR:
+            or_conds: list[QueryCondition] = []
+            for sub in filter.OR:
+                or_conds.extend(self._convert_replica_group_filter(sub))
+            if or_conds:
+                conditions.append(combine_conditions_or(or_conds))
+        if filter.NOT:
+            not_conds: list[QueryCondition] = []
+            for sub in filter.NOT:
+                not_conds.extend(self._convert_replica_group_filter(sub))
+            if not_conds:
+                conditions.append(negate_conditions(not_conds))
+        return conditions
+
     # ========== Route History ==========
 
     async def admin_search_route_history(
@@ -1021,6 +1265,35 @@ class SchedulingHistoryAdapter(BaseAdapter):
             phase=data.phase,
             from_status=data.from_status.value if data.from_status else None,
             to_status=data.to_status.value if data.to_status else None,
+            result=data.result.value,
+            error_code=data.error_code,
+            message=data.message,
+            sub_steps=[
+                SubStepResultInfo(
+                    step=s.step,
+                    result=s.result.value,
+                    error_code=s.error_code,
+                    message=s.message,
+                    started_at=s.started_at,
+                    ended_at=s.ended_at,
+                )
+                for s in data.sub_steps
+            ],
+            attempts=data.attempts,
+            created_at=data.created_at,
+            updated_at=data.updated_at,
+        )
+
+    @staticmethod
+    def _replica_group_data_to_dto(data: ReplicaGroupHistoryData) -> ReplicaGroupHistoryNode:
+        return ReplicaGroupHistoryNode(
+            id=data.id,
+            replica_group_id=data.replica_group_id,
+            deployment_id=data.deployment_id,
+            category=data.category.value,
+            phase=data.phase,
+            from_status=data.from_status,
+            to_status=data.to_status,
             result=data.result.value,
             error_code=data.error_code,
             message=data.message,
