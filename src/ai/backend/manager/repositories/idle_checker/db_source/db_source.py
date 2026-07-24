@@ -19,6 +19,7 @@ from ai.backend.common.identifier.idle_checker import IdleCheckerID
 from ai.backend.common.types import SessionId, SessionTypes
 from ai.backend.manager.data.idle_checker.types import IdleCheckSession
 from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.models.idle_checker.conditions import SessionIdleCheckConditions
 from ai.backend.manager.models.idle_checker.row import (
     IdleCheckerBindingRow,
     IdleCheckerRow,
@@ -29,6 +30,7 @@ from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.repositories.base import (
     BatchPurger,
     BatchQuerier,
+    BatchUpdater,
     BulkCreator,
     NoPagination,
 )
@@ -47,9 +49,13 @@ from ai.backend.manager.repositories.idle_checker.types import (
     SessionIdleCheckAssignmentData,
     SessionIdleCheckPair,
 )
+from ai.backend.manager.repositories.idle_checker.updaters import (
+    SessionIdleCheckPhaseBatchUpdaterSpec,
+)
 from ai.backend.manager.repositories.ops import DBOpsProvider
 
 _ASSIGNMENT_DELETE_BATCH_SIZE = 1000
+_IDLE_CHECK_UPDATE_BATCH_SIZE = 1000
 
 
 class IdleCheckerDBSource:
@@ -77,7 +83,11 @@ class IdleCheckerDBSource:
             .join(IdleCheckerRow, SessionIdleCheckRow.idle_checker_id == IdleCheckerRow.id)
             .where(
                 SessionRow.status.in_(session_statuses),
-                SessionIdleCheckRow.last_status.in_((IdleCheckPhase.ACTIVE, IdleCheckPhase.IDLE)),
+                SessionIdleCheckRow.last_status.in_((
+                    IdleCheckPhase.READY_TO_CHECK,
+                    IdleCheckPhase.ACTIVE,
+                    IdleCheckPhase.IDLE,
+                )),
             )
         )
         querier = BatchQuerier(pagination=NoPagination())
@@ -265,3 +275,23 @@ class IdleCheckerDBSource:
                             batch_size=_ASSIGNMENT_DELETE_BATCH_SIZE,
                         )
                     )
+
+    async def batch_update_session_idle_check_phase(
+        self,
+        pairs: Sequence[SessionIdleCheckPair],
+        *,
+        from_phase: IdleCheckPhase,
+        to_phase: IdleCheckPhase,
+    ) -> None:
+        async with self._ops.write_ops() as w:
+            for pair_batch in batched(pairs, _IDLE_CHECK_UPDATE_BATCH_SIZE):
+                pair_values = [(pair.session_id, pair.checker_id) for pair in pair_batch]
+                await w.batch_update(
+                    BatchUpdater(
+                        spec=SessionIdleCheckPhaseBatchUpdaterSpec(to_phase=to_phase),
+                        conditions=[
+                            SessionIdleCheckConditions.by_pairs(pair_values),
+                            SessionIdleCheckConditions.by_status_equals(from_phase),
+                        ],
+                    )
+                )
