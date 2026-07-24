@@ -48,7 +48,7 @@ class SchedulingHistoryProcessors(AbstractProcessorPackage):
     search_route_history: ActionProcessor[SearchRouteHistoryAction, SearchRouteHistoryActionResult]
 
     # Scoped processors (added in 26.2.0)
-    search_session_scoped_history: ActionProcessor[
+    search_session_scoped_history: ScopeActionProcessor[
         SearchSessionScopedHistoryAction, SearchSessionScopedHistoryActionResult
     ]
     resolve_kernel_session: ActionProcessor[
@@ -57,10 +57,10 @@ class SchedulingHistoryProcessors(AbstractProcessorPackage):
     search_kernel_scoped_history: ScopeActionProcessor[
         SearchKernelScopedHistoryAction, SearchKernelScopedHistoryActionResult
     ]
-    search_deployment_scoped_history: ActionProcessor[
+    search_deployment_scoped_history: ScopeActionProcessor[
         SearchDeploymentScopedHistoryAction, SearchDeploymentScopedHistoryActionResult
     ]
-    search_route_scoped_history: ActionProcessor[
+    search_route_scoped_history: ScopeActionProcessor[
         SearchRouteScopedHistoryAction, SearchRouteScopedHistoryActionResult
     ]
 
@@ -83,8 +83,10 @@ class SchedulingHistoryProcessors(AbstractProcessorPackage):
         self.search_route_history = ActionProcessor(service.search_route_history, action_monitors)
 
         # Scoped processors (added in 26.2.0)
-        self.search_session_scoped_history = ActionProcessor(
-            service.search_session_scoped_history, action_monitors
+        self.search_session_scoped_history = ScopeActionProcessor(
+            service.search_session_scoped_history,
+            monitors=action_monitors,
+            validators=[validators.rbac.scope],
         )
         self.resolve_kernel_session = ActionProcessor(
             service.resolve_kernel_session, action_monitors
@@ -94,11 +96,15 @@ class SchedulingHistoryProcessors(AbstractProcessorPackage):
             monitors=action_monitors,
             validators=[validators.rbac.scope],
         )
-        self.search_deployment_scoped_history = ActionProcessor(
-            service.search_deployment_scoped_history, action_monitors
+        self.search_deployment_scoped_history = ScopeActionProcessor(
+            service.search_deployment_scoped_history,
+            monitors=action_monitors,
+            validators=[validators.rbac.scope],
         )
-        self.search_route_scoped_history = ActionProcessor(
-            service.search_route_scoped_history, action_monitors
+        self.search_route_scoped_history = ScopeActionProcessor(
+            service.search_route_scoped_history,
+            monitors=action_monitors,
+            validators=[validators.rbac.scope],
         )
 
     @override

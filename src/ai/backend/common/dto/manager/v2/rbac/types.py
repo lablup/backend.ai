@@ -110,6 +110,9 @@ class RBACElementTypeDTO(StrEnum):
     ROLE = "role"
     AUDIT_LOG = "audit_log"
     KERNEL_HISTORY = "kernel:history"
+    SESSION_HISTORY = "session:history"
+    DEPLOYMENT_HISTORY = "deployment:history"
+    ROUTE_HISTORY = "route:history"
     EVENT_LOG = "event_log"
 
     # Admin page access control

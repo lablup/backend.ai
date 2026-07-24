@@ -31,7 +31,7 @@ def register_v2_scheduling_history_routes(
         "POST",
         "/sessions/{session_id}/search",
         handler.admin_session_scoped_search,
-        middlewares=[superadmin_required],
+        middlewares=[auth_required],
     )
 
     # Kernel history
@@ -59,7 +59,7 @@ def register_v2_scheduling_history_routes(
         "POST",
         "/deployments/{deployment_id}/search",
         handler.admin_deployment_scoped_search,
-        middlewares=[superadmin_required],
+        middlewares=[auth_required],
     )
 
     # Route history
@@ -73,7 +73,7 @@ def register_v2_scheduling_history_routes(
         "POST",
         "/routes/{route_id}/search",
         handler.admin_route_scoped_search,
-        middlewares=[superadmin_required],
+        middlewares=[auth_required],
     )
 
     return registry

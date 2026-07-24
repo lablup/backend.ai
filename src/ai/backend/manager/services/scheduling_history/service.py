@@ -1,6 +1,11 @@
 from __future__ import annotations
 
 from ai.backend.manager.repositories.scheduling_history import SchedulingHistoryRepository
+from ai.backend.manager.repositories.scheduling_history.types import (
+    DeploymentHistorySearchScope,
+    RouteHistorySearchScope,
+    SessionSchedulingHistorySearchScope,
+)
 
 from .actions.resolve_kernel_session import (
     ResolveKernelSessionAction,
@@ -123,7 +128,7 @@ class SchedulingHistoryService:
         """Searches session scheduling history within scope."""
         result = await self._repository.search_session_scoped_history(
             querier=action.querier,
-            scope=action.scope,
+            scope=SessionSchedulingHistorySearchScope(session_id=action.session_id),
         )
 
         return SearchSessionScopedHistoryActionResult(
@@ -131,6 +136,7 @@ class SchedulingHistoryService:
             total_count=result.total_count,
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,
+            session_id=action.session_id,
         )
 
     async def resolve_kernel_session(
@@ -166,7 +172,7 @@ class SchedulingHistoryService:
         """Searches deployment history within scope."""
         result = await self._repository.search_deployment_scoped_history(
             querier=action.querier,
-            scope=action.scope,
+            scope=DeploymentHistorySearchScope(deployment_id=action.deployment_id),
         )
 
         return SearchDeploymentScopedHistoryActionResult(
@@ -174,6 +180,7 @@ class SchedulingHistoryService:
             total_count=result.total_count,
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,
+            deployment_id=action.deployment_id,
         )
 
     async def search_route_scoped_history(
@@ -183,7 +190,7 @@ class SchedulingHistoryService:
         """Searches route history within scope."""
         result = await self._repository.search_route_scoped_history(
             querier=action.querier,
-            scope=action.scope,
+            scope=RouteHistorySearchScope(route_id=action.route_id),
         )
 
         return SearchRouteScopedHistoryActionResult(
@@ -191,4 +198,5 @@ class SchedulingHistoryService:
             total_count=result.total_count,
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,
+            route_id=action.route_id,
         )

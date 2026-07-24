@@ -3,33 +3,30 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.permission.types import EntityType
-from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.common.data.permission.types import EntityType, RBACElementType, ScopeType
+from ai.backend.common.types import SessionId
+from ai.backend.manager.actions.action.scope import BaseScopeAction, BaseScopeActionResult
 from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.data.session.types import SessionSchedulingHistoryData
 from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.scheduling_history.types import (
-    SessionSchedulingHistorySearchScope,
-)
-
-from .base import SchedulingHistoryAction
 
 
 @dataclass
-class SearchSessionScopedHistoryAction(SchedulingHistoryAction):
-    """Action to search session scheduling history within a session scope.
+class SearchSessionScopedHistoryAction(BaseScopeAction):
+    """Action to search the scheduling history of one session.
 
-    This is the scoped version used by entity-scoped APIs.
-    Scope is required and specifies which session to query history for.
+    The history is the entity being read and the session is the scope containing it,
+    so the RBAC scope chain authorizes the caller for reading history there.
     """
 
-    scope: SessionSchedulingHistorySearchScope
+    session_id: SessionId
     querier: BatchQuerier
 
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return EntityType.SESSION_SCOPED_HISTORY
+        return EntityType.SESSION_HISTORY
 
     @override
     @classmethod
@@ -37,19 +34,35 @@ class SearchSessionScopedHistoryAction(SchedulingHistoryAction):
         return ActionOperationType.SEARCH
 
     @override
-    def entity_id(self) -> str | None:
-        return str(self.scope.session_id)
+    def scope_type(self) -> ScopeType:
+        return ScopeType.SESSION
+
+    @override
+    def scope_id(self) -> str:
+        return str(self.session_id)
+
+    @override
+    def target_element(self) -> RBACElementRef:
+        return RBACElementRef(
+            element_type=RBACElementType.SESSION,
+            element_id=str(self.session_id),
+        )
 
 
 @dataclass
-class SearchSessionScopedHistoryActionResult(BaseActionResult):
-    """Result of searching session scheduling history within scope."""
+class SearchSessionScopedHistoryActionResult(BaseScopeActionResult):
+    """Result of searching the scheduling history of one session."""
 
     histories: list[SessionSchedulingHistoryData]
     total_count: int
     has_next_page: bool
     has_previous_page: bool
+    session_id: SessionId
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    def scope_type(self) -> ScopeType:
+        return ScopeType.SESSION
+
+    @override
+    def scope_id(self) -> str:
+        return str(self.session_id)
