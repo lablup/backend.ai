@@ -559,10 +559,10 @@
       "UpdateAgentResourceGroupInput": {
         "description": "Input for changing the resource group of an agent.",
         "properties": {
-          "resource_group_name": {
-            "description": "Name of the target resource group to move the agent into.",
-            "minLength": 1,
-            "title": "Resource Group Name",
+          "resource_group_id": {
+            "description": "UUID of the target resource group to move the agent into.",
+            "format": "uuid",
+            "title": "Resource Group Id",
             "type": "string"
           },
           "policy": {
@@ -577,7 +577,7 @@
           }
         },
         "required": [
-          "resource_group_name",
+          "resource_group_id",
           "policy"
         ],
         "title": "UpdateAgentResourceGroupInput",

@@ -19702,8 +19702,8 @@ type UntagImageFromRegistry
 input UpdateAgentResourceGroupInput
   @join__type(graph: STRAWBERRY)
 {
-  """Name of the target resource group to move the agent into."""
-  resourceGroupName: String!
+  """UUID of the target resource group to move the agent into."""
+  resourceGroupId: UUID!
 
   """
   How to handle sessions still running on the agent under the old resource group. Currently only TERMINATE is supported.
@@ -19725,9 +19725,6 @@ type UpdateAgentResourceGroupPayload
 
   """UUID of the new resource group."""
   resourceGroupId: UUID!
-
-  """Name of the new resource group."""
-  resourceGroupName: String!
 
   """Cleanup policy applied to the conflicting sessions."""
   policy: ConflictingSessionCleanupPolicy!
