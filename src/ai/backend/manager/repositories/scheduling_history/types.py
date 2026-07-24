@@ -9,6 +9,7 @@ from uuid import UUID
 import sqlalchemy as sa
 
 from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec
+from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.replica import ReplicaID
 from ai.backend.common.identifier.replica_group import ReplicaGroupID
 from ai.backend.common.types import KernelId, SessionId
@@ -38,7 +39,8 @@ __all__ = (
     "KernelKernelHistorySearchScope",
     "SessionKernelHistorySearchScope",
     "DeploymentHistorySearchScope",
-    "ReplicaGroupHistorySearchScope",
+    "ReplicaGroupReplicaGroupHistorySearchScope",
+    "DeploymentReplicaGroupHistorySearchScope",
     "RouteHistorySearchScope",
 )
 
@@ -179,11 +181,8 @@ class DeploymentHistorySearchScope(SearchScope):
 
 
 @dataclass(frozen=True)
-class ReplicaGroupHistorySearchScope(SearchScope):
-    """Scope for replica-group history search.
-
-    Used for entity-scoped queries where replica_group_id is the scope parameter.
-    """
+class ReplicaGroupReplicaGroupHistorySearchScope(SearchScope):
+    """Scope for replica-group history search bounded by one replica group."""
 
     replica_group_id: ReplicaGroupID
     """Required. The replica group to search history for."""
@@ -206,6 +205,38 @@ class ReplicaGroupHistorySearchScope(SearchScope):
                 column=ReplicaGroupRow.id,
                 value=self.replica_group_id,
                 error=ReplicaGroupNotFound(str(self.replica_group_id)),
+            ),
+        ]
+
+
+@dataclass(frozen=True)
+class DeploymentReplicaGroupHistorySearchScope(SearchScope):
+    """Scope for replica-group history search bounded by the owning deployment.
+
+    Returns the history of every replica group belonging to the deployment.
+    """
+
+    deployment_id: DeploymentID
+    """Required. The deployment whose replica groups' history is searched."""
+
+    @override
+    def to_condition(self) -> QueryCondition:
+        """Convert scope to a query condition for ReplicaGroupHistoryRow."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ReplicaGroupHistoryRow.deployment_id == self.deployment_id
+
+        return inner
+
+    @property
+    @override
+    def existence_checks(self) -> list[ExistenceCheck[Any]]:
+        """Check that the deployment (endpoint) exists."""
+        return [
+            ExistenceCheck(
+                column=EndpointRow.id,
+                value=self.deployment_id,
+                error=EndpointNotFound(str(self.deployment_id)),
             ),
         ]
 
