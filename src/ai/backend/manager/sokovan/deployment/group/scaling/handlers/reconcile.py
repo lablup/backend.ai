@@ -75,21 +75,15 @@ class GroupScalingReconcileHandler(
                                     count=-deficit,
                                 )
                             )
-                    if view.target_revision_id is None:
-                        # Steady-state scaling: converge on count alone. Replicas that cannot
-                        # be scheduled stay PENDING; serving health is judged separately and
-                        # must not block the loop, so a rising/falling goal is always absorbed.
-                        current_matched = (
-                            view.current_live_replica_count == view.desired_current_replica_count
-                        )
-                    else:
-                        # Rollout in flight: require serving so the rolling step waits for the
-                        # new replicas before draining the old (no-downtime invariant).
-                        current_matched = (
-                            view.current_live_replica_count == view.desired_current_replica_count
-                            and view.current_serving_replica_count
-                            == view.desired_current_replica_count
-                        )
+                    # The current revision converges on count alone, both in steady state and
+                    # during a rollout. Replicas that cannot be scheduled stay PENDING (live
+                    # but not serving); requiring serving here would livelock the rollout when
+                    # old-revision replicas can never become serving. The no-downtime invariant
+                    # (new replicas serve before the old side drains) is enforced by
+                    # target_matched below, which does require serving.
+                    current_matched = (
+                        view.current_live_replica_count == view.desired_current_replica_count
+                    )
                     target_matched = (
                         view.target_live_replica_count == view.desired_target_replica_count
                         and view.target_serving_replica_count == view.desired_target_replica_count
