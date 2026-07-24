@@ -39,7 +39,6 @@ class AgentControlConfig:
 
     start_cmd: tuple[str, ...] | None = None
     stop_cmd: tuple[str, ...] | None = None
-    process_pattern: str = "ai.backend.agent"
     rpc_port: int = 6011
     ready_timeout: float = 120.0
     stop_timeout: float = 60.0
@@ -63,27 +62,37 @@ class AgentController:
         return self._node.name
 
     async def pid(self) -> int | None:
-        """The agent's PID, or None when it is not running.
+        """The PID holding the agent's RPC port, or None when nothing does.
 
-        Rows naming `pgrep` are dropped for the same reason the gauge collector drops them: the
-        shell running the query matches the pattern, and counting it would make the agent look
-        alive for as long as the query itself lives.
+        The RPC port is ground truth for "which process is the agent", and it survives two traps a
+        name-based lookup falls into on a real deployment: the agent rewrites its own command line
+        with setproctitle (``backend.ai: agent local``), so a ``pgrep`` for the module name finds
+        nothing; and a stale or empty pidfile makes the supervisor's own bookkeeping lie. `ss`
+        prints ``pid=N`` for the socket's owner, which is neither.
         """
         result = await self._node.run(
-            ["sh", "-c", f"pgrep -f {self._config.process_pattern!r} || true"], check=False
+            [
+                "sh",
+                "-c",
+                f"ss -ltnp 'sport = :{self._config.rpc_port}' 2>/dev/null "
+                "| grep -oE 'pid=[0-9]+' | head -1 || true",
+            ],
+            check=False,
         )
-        for line in result.lines:
-            candidate = line.strip()
-            if not candidate.isdigit():
-                continue
-            cmdline = await self._node.run(
-                ["sh", "-c", f'tr "\\0" " " < /proc/{candidate}/cmdline 2>/dev/null || true'],
-                check=False,
-            )
-            if "pgrep" in cmdline.stdout:
-                continue
-            return int(candidate)
-        return None
+        text = result.stdout.strip()
+        if not text:
+            return None
+        return int(text.split("=", 1)[1])
+
+    async def _process_group_of(self, pid: int) -> int | None:
+        """The process group id of `pid`, so a stop can take down the agent's supervisor and its
+        worker together — they share a group — without touching the tmux/systemd parent that
+        started them, which is in a different group."""
+        result = await self._node.run(
+            ["sh", "-c", f"ps -o pgid= -p {pid} 2>/dev/null || true"], check=False
+        )
+        text = result.stdout.strip()
+        return int(text) if text.isdigit() else None
 
     async def is_ready(self) -> bool:
         """Whether the RPC port is accepting, i.e. the agent finished coming up."""
@@ -114,14 +123,25 @@ class AgentController:
             await asyncio.sleep(self._config.poll_interval)
 
     async def stop(self, *, graceful: bool = True) -> None:
+        signal = "TERM" if graceful else "KILL"
         if self._config.stop_cmd is not None:
+            # A configured stop command is trusted to know the signal it sends; the graceful flag
+            # is the caller's intent and the command's responsibility.
             await self._node.run(list(self._config.stop_cmd))
         else:
             pid = await self.pid()
             if pid is None:
                 return
-            signal = "TERM" if graceful else "KILL"
-            await self._node.run(["kill", f"-{signal}", str(pid)])
+            # Kill the whole process group, not just the port-owning worker: the agent is a
+            # supervisor plus a worker sharing one group, and signalling only the worker would
+            # leave the supervisor to respawn it. A negative pid targets the group, and the ``--``
+            # is load-bearing -- without it ``kill`` parses ``-<pgid>`` as an unknown option and
+            # silently signals nothing (it still exits 0, which is how this hid at first). The tmux
+            # or systemd parent that launched the agent is in a different group and survives, so
+            # `start` can bring the agent back the same way it came up.
+            pgid = await self._process_group_of(pid)
+            target = ["--", f"-{pgid}"] if pgid is not None else [str(pid)]
+            await self._node.run(["kill", f"-{signal}", *target])
         await self.wait_ready(expect=False)
 
     async def start(self) -> None:

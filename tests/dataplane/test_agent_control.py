@@ -20,11 +20,15 @@ from ai.backend.testutils.dataplane.nodes import CommandFailed, CommandResult
 
 PORT = 6011
 _SS = ("sh", "-c", f"ss -ltn 'sport = :{PORT}' | tail -n +2")
-_PGREP = ("sh", "-c", "pgrep -f 'ai.backend.agent' || true")
+_SS_PID = (
+    "sh",
+    "-c",
+    f"ss -ltnp 'sport = :{PORT}' 2>/dev/null | grep -oE 'pid=[0-9]+' | head -1 || true",
+)
 
 
-def _cmdline(pid: str) -> tuple[str, ...]:
-    return ("sh", "-c", f'tr "\\0" " " < /proc/{pid}/cmdline 2>/dev/null || true')
+def _pgid(pid: str) -> tuple[str, ...]:
+    return ("sh", "-c", f"ps -o pgid= -p {pid} 2>/dev/null || true")
 
 
 class ScriptedNode:
@@ -74,25 +78,14 @@ LISTENING = "LISTEN 0 1024 127.0.0.1:6011 0.0.0.0:*"
 
 
 class TestPid:
-    async def test_returns_the_agent_pid(self) -> None:
-        node = ScriptedNode({
-            _PGREP: ["4242\n"],
-            _cmdline("4242"): ["python -m ai.backend.agent.server "],
-        })
+    async def test_returns_the_rpc_port_owner(self) -> None:
+        """The agent is identified by who holds its RPC port, not by a process name — setproctitle
+        rewrites the command line, so a name lookup would find nothing."""
+        node = ScriptedNode({_SS_PID: ["pid=4242\n"]})
         assert await _controller(node).pid() == 4242
 
-    async def test_its_own_pgrep_shell_is_not_the_agent(self) -> None:
-        """`pgrep -f <pattern>` matches the shell running it. Counting that would make the agent
-        look alive for as long as the query lives, so a stop would silently do nothing."""
-        node = ScriptedNode({
-            _PGREP: ["9001\n4242\n"],
-            _cmdline("9001"): ["sh -c pgrep -f 'ai.backend.agent' "],
-            _cmdline("4242"): ["python -m ai.backend.agent.server "],
-        })
-        assert await _controller(node).pid() == 4242
-
-    async def test_none_when_not_running(self) -> None:
-        node = ScriptedNode({_PGREP: [""]})
+    async def test_none_when_the_port_is_unowned(self) -> None:
+        node = ScriptedNode({_SS_PID: [""]})
         assert await _controller(node).pid() is None
 
 
@@ -121,23 +114,35 @@ class TestReadiness:
 
 
 class TestStop:
-    async def test_signals_the_pid_and_waits_for_the_port_to_close(self) -> None:
+    async def test_kills_the_whole_process_group_and_waits_for_close(self) -> None:
+        """The group, not the port-owning worker alone: the agent is a supervisor plus a worker
+        sharing one group, and signalling only the worker leaves the supervisor to respawn it. The
+        negative pid targets the group; the tmux parent is in a different one and survives."""
         node = ScriptedNode({
-            _PGREP: ["4242\n"],
-            _cmdline("4242"): ["python -m ai.backend.agent.server "],
+            _SS_PID: ["pid=4242\n"],
+            _pgid("4242"): ["4200\n"],
             _SS: [LISTENING, ""],
         })
         await _controller(node).stop()
-        assert ("kill", "-TERM", "4242") in node.calls
+        assert ("kill", "-TERM", "--", "-4200") in node.calls
 
     async def test_sigkill_when_not_graceful(self) -> None:
         node = ScriptedNode({
-            _PGREP: ["4242\n"],
-            _cmdline("4242"): ["python -m ai.backend.agent.server "],
+            _SS_PID: ["pid=4242\n"],
+            _pgid("4242"): ["4200\n"],
             _SS: [""],
         })
         await _controller(node).stop(graceful=False)
-        assert ("kill", "-KILL", "4242") in node.calls
+        assert ("kill", "-KILL", "--", "-4200") in node.calls
+
+    async def test_falls_back_to_the_bare_pid_when_the_group_is_unknown(self) -> None:
+        node = ScriptedNode({
+            _SS_PID: ["pid=4242\n"],
+            _pgid("4242"): [""],
+            _SS: [""],
+        })
+        await _controller(node).stop()
+        assert ("kill", "-TERM", "4242") in node.calls
 
     async def test_a_configured_stop_command_wins_over_signalling(self) -> None:
         node = ScriptedNode({_SS: [""]})
@@ -146,7 +151,7 @@ class TestStop:
         assert not any(c[0] == "kill" for c in node.calls)
 
     async def test_stopping_an_absent_agent_is_not_an_error(self) -> None:
-        node = ScriptedNode({_PGREP: [""], _SS: [""]})
+        node = ScriptedNode({_SS_PID: [""], _SS: [""]})
         await _controller(node).stop()
 
 
