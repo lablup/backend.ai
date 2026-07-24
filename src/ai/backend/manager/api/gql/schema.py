@@ -35,6 +35,8 @@ from .app_config_definition import (
 from .app_config_fragment import (
     admin_app_config_fragments,
     app_config_fragment,
+    app_config_fragments_by_names,
+    my_app_config_fragments_by_names,
     my_upsert_app_config_fragments,
     upsert_app_config_fragments,
 )
@@ -520,6 +522,8 @@ class Query:
     admin_app_config_allow_lists = admin_app_config_allow_lists
     app_config_fragment = app_config_fragment
     admin_app_config_fragments = admin_app_config_fragments
+    app_config_fragments_by_names = app_config_fragments_by_names
+    my_app_config_fragments_by_names = my_app_config_fragments_by_names
     artifact = artifact
     artifacts = artifacts
     artifact_revision = artifact_revision

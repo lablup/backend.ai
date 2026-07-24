@@ -12,9 +12,11 @@ from uuid import UUID
 from strawberry import Info
 from strawberry.relay import PageInfo
 
+from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
     AdminSearchAppConfigFragmentInput,
 )
+from ai.backend.common.identifier.app_config import AppConfigScopeID
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
@@ -135,3 +137,44 @@ async def my_upsert_app_config_fragments(
         input.to_pydantic()
     )
     return [AppConfigFragmentGQL.from_pydantic(node) for node in payload.items]
+
+
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Read the fragments written at one scope for the given config names — the current "
+            "values, to inspect before editing them. RBAC-authorized at that scope."
+        ),
+    )
+)  # type: ignore[misc]
+async def app_config_fragments_by_names(
+    info: Info[StrawberryGQLContext],
+    scope_type: AppConfigScopeType,
+    config_names: list[str],
+    scope_id: UUID | None = None,
+) -> list[AppConfigFragmentGQL]:
+    nodes = await info.context.adapters.app_config_fragment.app_config_fragments_by_names(
+        scope_type,
+        AppConfigScopeID(scope_id) if scope_id is not None else None,
+        config_names,
+    )
+    return [AppConfigFragmentGQL.from_pydantic(node) for node in nodes]
+
+
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Read the current user's own user-scope fragments for the given config names."
+        ),
+    )
+)  # type: ignore[misc]
+async def my_app_config_fragments_by_names(
+    info: Info[StrawberryGQLContext],
+    config_names: list[str],
+) -> list[AppConfigFragmentGQL]:
+    nodes = await info.context.adapters.app_config_fragment.my_app_config_fragments_by_names(
+        config_names
+    )
+    return [AppConfigFragmentGQL.from_pydantic(node) for node in nodes]

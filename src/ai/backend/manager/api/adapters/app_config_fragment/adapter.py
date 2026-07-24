@@ -271,6 +271,58 @@ class AppConfigFragmentAdapter(BaseAdapter):
         node_map = {node.id: node for node in map(self._fragment_to_node, action_result.data)}
         return [node_map.get(fragment_id) for fragment_id in fragment_ids]
 
+    # --- read fragments by config name (one scope, RBAC-authorized) ---
+
+    async def app_config_fragments_by_names(
+        self,
+        scope_type: AppConfigScopeType,
+        scope_id: AppConfigScopeID | None,
+        config_names: list[str],
+    ) -> list[AppConfigFragmentNode]:
+        """The fragments written at one scope for the given ``config_names``.
+
+        RBAC-authorized at that scope, so a caller reads only a scope they may read. Meant for
+        fetching the current fragment values before editing them.
+        """
+        return await self._fragments_by_names(
+            AppConfigFragmentSearchScope(scope_type=scope_type, scope_id=scope_id), config_names
+        )
+
+    async def my_app_config_fragments_by_names(
+        self, config_names: list[str]
+    ) -> list[AppConfigFragmentNode]:
+        """The current user's own ``user``-scope fragments for the given ``config_names``.
+
+        Calls ``current_user()`` internally — the caller does not pass a scope.
+        """
+        me = current_user()
+        if me is None:
+            raise UnreachableError("User context is not available")
+        return await self._fragments_by_names(
+            AppConfigFragmentSearchScope(
+                scope_type=AppConfigScopeType.USER, scope_id=AppConfigScopeID(me.user_id)
+            ),
+            config_names,
+        )
+
+    async def _fragments_by_names(
+        self, scope: AppConfigFragmentSearchScope, config_names: list[str]
+    ) -> list[AppConfigFragmentNode]:
+        if not config_names:
+            return []
+        # A scope holds at most one fragment per config name, so the result is bounded by the
+        # number of names requested.
+        querier = self._build_querier(
+            conditions=[AppConfigFragmentConditions.by_config_names(config_names)],
+            orders=[],
+            pagination_spec=_get_app_config_fragment_pagination_spec(),
+            limit=len(config_names),
+        )
+        action_result = await self._processors.app_config_fragment.scoped_search.wait_for_complete(
+            ScopedSearchAppConfigFragmentAction(scope=scope, querier=querier)
+        )
+        return [self._fragment_to_node(item) for item in action_result.data]
+
     # --- admin fragment search ---
 
     async def admin_search(

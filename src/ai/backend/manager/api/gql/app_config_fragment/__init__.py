@@ -3,6 +3,8 @@
 from .resolver import (
     admin_app_config_fragments,
     app_config_fragment,
+    app_config_fragments_by_names,
+    my_app_config_fragments_by_names,
     my_upsert_app_config_fragments,
     upsert_app_config_fragments,
 )
@@ -34,6 +36,8 @@ __all__ = (
     # Query resolvers
     "admin_app_config_fragments",
     "app_config_fragment",
+    "app_config_fragments_by_names",
+    "my_app_config_fragments_by_names",
     # Mutation resolvers
     "my_upsert_app_config_fragments",
     "upsert_app_config_fragments",
