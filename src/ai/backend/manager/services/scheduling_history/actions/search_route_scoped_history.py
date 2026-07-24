@@ -3,31 +3,30 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.common.data.permission.types import EntityType
-from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.common.data.permission.types import EntityType, RBACElementType, ScopeType
+from ai.backend.common.identifier.replica import ReplicaID
+from ai.backend.manager.actions.action.scope import BaseScopeAction, BaseScopeActionResult
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.deployment.types import RouteHistoryData
+from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.scheduling_history.types import RouteHistorySearchScope
-
-from .base import SchedulingHistoryAction
 
 
 @dataclass
-class SearchRouteScopedHistoryAction(SchedulingHistoryAction):
-    """Action to search route history within a route scope.
+class SearchRouteScopedHistoryAction(BaseScopeAction):
+    """Action to search the scheduling history of one route.
 
-    This is the scoped version used by entity-scoped APIs.
-    Scope is required and specifies which route to query history for.
+    The history is the entity being read and the route is the scope containing it,
+    so the RBAC scope chain authorizes the caller for reading history there.
     """
 
-    scope: RouteHistorySearchScope
+    route_id: ReplicaID
     querier: BatchQuerier
 
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return EntityType.ROUTE_SCOPED_HISTORY
+        return EntityType.ROUTE_HISTORY
 
     @override
     @classmethod
@@ -35,19 +34,35 @@ class SearchRouteScopedHistoryAction(SchedulingHistoryAction):
         return ActionOperationType.SEARCH
 
     @override
-    def entity_id(self) -> str | None:
-        return str(self.scope.route_id)
+    def scope_type(self) -> ScopeType:
+        return ScopeType.ROUTING
+
+    @override
+    def scope_id(self) -> str:
+        return str(self.route_id)
+
+    @override
+    def target_element(self) -> RBACElementRef:
+        return RBACElementRef(
+            element_type=RBACElementType.ROUTING,
+            element_id=str(self.route_id),
+        )
 
 
 @dataclass
-class SearchRouteScopedHistoryActionResult(BaseActionResult):
-    """Result of searching route history within scope."""
+class SearchRouteScopedHistoryActionResult(BaseScopeActionResult):
+    """Result of searching the scheduling history of one route."""
 
     histories: list[RouteHistoryData]
     total_count: int
     has_next_page: bool
     has_previous_page: bool
+    route_id: ReplicaID
 
     @override
-    def entity_id(self) -> str | None:
-        return None
+    def scope_type(self) -> ScopeType:
+        return ScopeType.ROUTING
+
+    @override
+    def scope_id(self) -> str:
+        return str(self.route_id)

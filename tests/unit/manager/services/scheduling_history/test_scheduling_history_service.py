@@ -13,6 +13,7 @@ import pytest
 from dateutil.tz import tzutc
 
 from ai.backend.common.data.permission.types import EntityType, RBACElementType, ScopeType
+from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.kernel_scheduling_history import KernelSchedulingHistoryID
 from ai.backend.common.identifier.replica import ReplicaID
 from ai.backend.common.types import KernelId, SessionId
@@ -250,14 +251,20 @@ class TestSearchDeploymentScopedHistoryAction:
             has_next_page=False,
             has_previous_page=False,
         )
-        scope = DeploymentHistorySearchScope(deployment_id=deployment_id)
-
-        action = SearchDeploymentScopedHistoryAction(scope=scope, querier=querier)
+        action = SearchDeploymentScopedHistoryAction(
+            deployment_id=DeploymentID(deployment_id), querier=querier
+        )
         result = await service.search_deployment_scoped_history(action)
 
         assert result.histories == [history_item]
+        assert action.target_element() == RBACElementRef(
+            element_type=RBACElementType.MODEL_DEPLOYMENT, element_id=str(deployment_id)
+        )
+        assert action.entity_type() is EntityType.DEPLOYMENT_HISTORY
+        assert action.scope_type() is ScopeType.MODEL_DEPLOYMENT
         mock_repository.search_deployment_scoped_history.assert_awaited_once_with(
-            querier=querier, scope=scope
+            querier=querier,
+            scope=DeploymentHistorySearchScope(deployment_id=DeploymentID(deployment_id)),
         )
 
 
@@ -278,14 +285,18 @@ class TestSearchSessionScopedHistoryAction:
                 has_previous_page=False,
             )
         )
-        scope = SessionSchedulingHistorySearchScope(session_id=session_id)
-
-        action = SearchSessionScopedHistoryAction(scope=scope, querier=querier)
+        action = SearchSessionScopedHistoryAction(session_id=SessionId(session_id), querier=querier)
         result = await service.search_session_scoped_history(action)
 
         assert result.histories == [history_item]
+        assert action.target_element() == RBACElementRef(
+            element_type=RBACElementType.SESSION, element_id=str(session_id)
+        )
+        assert action.entity_type() is EntityType.SESSION_HISTORY
+        assert action.scope_type() is ScopeType.SESSION
         mock_repository.search_session_scoped_history.assert_awaited_once_with(
-            querier=querier, scope=scope
+            querier=querier,
+            scope=SessionSchedulingHistorySearchScope(session_id=SessionId(session_id)),
         )
 
 
@@ -328,14 +339,17 @@ class TestSearchRouteScopedHistoryAction:
             has_next_page=False,
             has_previous_page=False,
         )
-        scope = RouteHistorySearchScope(route_id=route_id)
-
-        action = SearchRouteScopedHistoryAction(scope=scope, querier=querier)
+        action = SearchRouteScopedHistoryAction(route_id=ReplicaID(route_id), querier=querier)
         result = await service.search_route_scoped_history(action)
 
         assert result.histories == [history_item]
+        assert action.target_element() == RBACElementRef(
+            element_type=RBACElementType.ROUTING, element_id=str(route_id)
+        )
+        assert action.entity_type() is EntityType.ROUTE_HISTORY
+        assert action.scope_type() is ScopeType.ROUTING
         mock_repository.search_route_scoped_history.assert_awaited_once_with(
-            querier=querier, scope=scope
+            querier=querier, scope=RouteHistorySearchScope(route_id=ReplicaID(route_id))
         )
 
 

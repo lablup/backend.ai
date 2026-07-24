@@ -357,6 +357,7 @@ class ScopeType(enum.StrEnum):
     KERNEL = "kernel"
     DEPLOYMENT = "deployment"
     MODEL_DEPLOYMENT = "model_deployment"
+    ROUTING = "routing"
     VFOLDER = "vfolder"
     IMAGE = "image"
     ARTIFACT = "artifact"
@@ -428,6 +429,9 @@ class RBACElementType(enum.StrEnum):
     ROLE = "role"
     AUDIT_LOG = "audit_log"
     KERNEL_HISTORY = "kernel:history"
+    SESSION_HISTORY = "session:history"
+    DEPLOYMENT_HISTORY = "deployment:history"
+    ROUTE_HISTORY = "route:history"
     EVENT_LOG = "event_log"
 
     # === Admin page access control ===

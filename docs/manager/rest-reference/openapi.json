@@ -15561,6 +15561,9 @@
           "role",
           "audit_log",
           "kernel:history",
+          "session:history",
+          "deployment:history",
+          "route:history",
           "event_log",
           "project_admin_page",
           "domain_admin_page",
@@ -49125,7 +49128,7 @@
             }
           }
         ],
-        "description": "Search session scheduling histories scoped to a specific session.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Search session scheduling histories scoped to a specific session.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/scheduling-history/kernels/admin/search": {
@@ -49250,7 +49253,7 @@
             }
           }
         ],
-        "description": "Search deployment histories scoped to a specific deployment.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Search deployment histories scoped to a specific deployment.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/scheduling-history/routes/search": {
@@ -49317,7 +49320,7 @@
             }
           }
         ],
-        "description": "Search route histories scoped to a specific route.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+        "description": "Search route histories scoped to a specific route.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/service-catalogs/search": {
