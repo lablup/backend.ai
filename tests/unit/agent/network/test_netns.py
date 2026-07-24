@@ -22,6 +22,7 @@ from pathlib import Path
 
 import pytest
 
+import ai.backend.agent.network.privnet.netns as netns_mod
 from ai.backend.agent.network.privnet.netns import (
     NetnsError,
     NetnsPinner,
@@ -200,3 +201,48 @@ class TestThePinnerSeam:
     def test_it_refuses_the_host_netns_too(self, host_pid: int) -> None:
         with pytest.raises(NetnsError):
             NetnsPinner().open(host_pid)
+
+
+class TestPidfdOpenFallback:
+    """The fallback for CPython builds without ``os.pidfd_open``.
+
+    Some portable interpreters (python-build-standalone, as shipped by uv) omit the syscall
+    wrapper; without a fallback the privnet raised AttributeError on every attach and no kernel
+    could be wired. Forcing ``_HAS_PIDFD_OPEN`` false drives the signal-0 identity path such an
+    interpreter would take, without needing one — everything else about the pin (the netns fd, the
+    host-netns rejection) must still hold, only the PID-reuse guarantee is given up.
+    """
+
+    @pytest.fixture
+    def no_pidfd(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(netns_mod, "_HAS_PIDFD_OPEN", False)
+
+    def test_pins_the_netns_carrying_no_pidfd(self, no_pidfd: None, container_pid: int) -> None:
+        pinned = open_container_netns(container_pid)
+        try:
+            assert pinned.pidfd == -1, "the fallback path must not open a pidfd"
+            assert pinned.pid == container_pid, "the pid is what liveness falls back to"
+            # The namespace pin itself is unchanged: the fd still points at the container's netns.
+            assert os.fstat(pinned.netns_fd).st_ino == _netns_ident(container_pid)[1]
+        finally:
+            pinned.close()
+
+    def test_still_refuses_the_host_netns(self, no_pidfd: None, host_pid: int) -> None:
+        # The host-netns guard reads the pinned fd, not the pidfd, so it must hold here too.
+        with pytest.raises(NetnsError):
+            open_container_netns(host_pid)
+
+    def test_a_gone_process_is_caught(self, no_pidfd: None, container_pid: int) -> None:
+        _reap(container_pid)
+        with pytest.raises(NetnsError, match="gone"):
+            open_container_netns(container_pid)
+
+    def test_liveness_falls_back_to_the_pid(self, no_pidfd: None, container_pid: int) -> None:
+        pinner = NetnsPinner()
+        pinned = pinner.open(container_pid)
+        try:
+            assert pinner.alive(pinned)
+            _reap(container_pid)
+            assert not pinner.alive(pinned)
+        finally:
+            pinned.close()
