@@ -248,6 +248,14 @@ async def fragments_across_scopes(database: ExtendedAsyncSAEngine) -> list[AppCo
         return [row.to_data() for row in rows]
 
 
+@dataclass(frozen=True)
+class _MissingOwnerCase:
+    """A scope whose owner does not exist, and the error the existence check must raise."""
+
+    scope: AppConfigFragmentSearchScope
+    expected_error: type[BackendAIError]
+
+
 class TestCreateAndGet:
     async def test_create_then_get_by_id(
         self, repository: AppConfigFragmentRepository, theme_registered: None
@@ -284,6 +292,60 @@ class TestCreateAndGet:
             )
 
     @pytest.mark.parametrize(
+        "case",
+        [
+            _MissingOwnerCase(
+                scope=AppConfigFragmentSearchScope(
+                    scope_type=AppConfigScopeType.DOMAIN,
+                    scope_id=AppConfigScopeID(uuid.uuid4()),
+                ),
+                expected_error=DomainNotFound,
+            ),
+            _MissingOwnerCase(
+                scope=AppConfigFragmentSearchScope(
+                    scope_type=AppConfigScopeType.USER,
+                    scope_id=AppConfigScopeID(uuid.uuid4()),
+                ),
+                expected_error=UserNotFound,
+            ),
+        ],
+        ids=lambda case: case.scope.scope_type.value,
+    )
+    async def test_create_at_a_missing_scope_owner_is_not_found(
+        self,
+        repository: AppConfigFragmentRepository,
+        theme_registered: None,
+        case: _MissingOwnerCase,
+    ) -> None:
+        # The scoped search answers 404 for this same scope, so the create must too —
+        # otherwise the write leaves a row bound to an owner no read can reach.
+        with pytest.raises(case.expected_error):
+            await repository.create(
+                AppConfigFragmentCreatorSpec(
+                    config_name="theme",
+                    scope_type=case.scope.scope_type,
+                    scope_id=case.scope.scope_id,
+                    config={"theme": "dark"},
+                )
+            )
+
+    async def test_create_at_an_existing_scope_owner_succeeds(
+        self,
+        repository: AppConfigFragmentRepository,
+        theme_registered: None,
+        scope_owners: None,
+    ) -> None:
+        created = await repository.create(
+            AppConfigFragmentCreatorSpec(
+                config_name="theme",
+                scope_type=AppConfigScopeType.USER,
+                scope_id=_USER_SCOPE_ID,
+                config={"theme": "dark"},
+            )
+        )
+        assert created.scope_id == _USER_SCOPE_ID
+
+    @pytest.mark.parametrize(
         "scope_type",
         [AppConfigScopeType.PUBLIC, AppConfigScopeType.DOMAIN, AppConfigScopeType.USER],
         ids=lambda scope_type: scope_type.value,
@@ -292,6 +354,7 @@ class TestCreateAndGet:
         self,
         repository: AppConfigFragmentRepository,
         fragment_at_every_scope: dict[AppConfigScopeType, AppConfigFragmentData],
+        scope_owners: None,
         scope_type: AppConfigScopeType,
     ) -> None:
         # public is carried by the partial index, domain and user by the unique constraint.
@@ -419,14 +482,6 @@ class _ScopedSearchCase:
     scope: AppConfigFragmentSearchScope
     expected_scope_type: AppConfigScopeType
     expected_scope_id: AppConfigScopeID | None
-
-
-@dataclass(frozen=True)
-class _MissingOwnerCase:
-    """A scope whose owner does not exist, and the error the existence check must raise."""
-
-    scope: AppConfigFragmentSearchScope
-    expected_error: type[BackendAIError]
 
 
 _DOMAIN_NAME = "app-config-fragment-test-domain"
@@ -885,6 +940,7 @@ class TestRBACScopeAssociation:
         repository: AppConfigFragmentRepository,
         database: ExtendedAsyncSAEngine,
         theme_registered: None,
+        scope_owners: None,
         case: _FragmentScopeCase,
     ) -> None:
         created = await repository.create(
@@ -923,6 +979,7 @@ class TestRBACScopeAssociation:
         repository: AppConfigFragmentRepository,
         database: ExtendedAsyncSAEngine,
         theme_registered: None,
+        scope_owners: None,
         case: _FragmentScopeCase,
     ) -> None:
         created = await repository.create(
@@ -943,6 +1000,7 @@ class TestRBACScopeAssociation:
         repository: AppConfigFragmentRepository,
         database: ExtendedAsyncSAEngine,
         theme_registered: None,
+        scope_owners: None,
     ) -> None:
         """A bulk purge unbinds each fragment, like the single purge.
 

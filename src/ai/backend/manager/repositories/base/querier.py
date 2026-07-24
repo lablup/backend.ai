@@ -14,6 +14,7 @@ from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.scopes import ExistenceCheck, SearchScope
 
+from .existence import validate_existence_checks
 from .pagination import PageInfoResult, QueryPagination
 
 if TYPE_CHECKING:
@@ -121,34 +122,6 @@ class _QueryPair:
     count_query: sa.sql.Select[Any]
 
 
-async def _validate_scope(
-    db_sess: SASession,
-    checks: list[ExistenceCheck[Any]],
-) -> None:
-    """Validate scope existence checks in a single query.
-
-    Args:
-        db_sess: Database session
-        checks: List of existence checks to validate
-
-    Raises:
-        The error specified in the first failing ExistenceCheck.
-    """
-    if not checks:
-        return
-
-    select_clauses = [
-        sa.exists().where(check.column == check.value).label(f"check_{i}")
-        for i, check in enumerate(checks)
-    ]
-    result = await db_sess.execute(sa.select(*select_clauses))
-    row = result.mappings().one()
-
-    for i, check in enumerate(checks):
-        if not row[f"check_{i}"]:
-            raise check.error
-
-
 def _apply_batch_querier(
     query: sa.sql.Select[Any],
     querier: BatchQuerier,
@@ -231,7 +204,7 @@ async def execute_batch_querier(
         for scope in scopes:
             aggregated_checks.extend(scope.existence_checks)
             or_conditions.append(scope.to_condition())
-        await _validate_scope(db_sess, aggregated_checks)
+        await validate_existence_checks(db_sess, aggregated_checks)
 
     query_pair = _apply_batch_querier(query, querier, or_conditions)
     count_query = query_pair.count_query
