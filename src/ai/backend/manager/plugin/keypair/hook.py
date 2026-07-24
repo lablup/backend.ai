@@ -31,6 +31,14 @@ plugin_config_checker = t.Dict({
 DEFAULT_STOKEN_COOKIE_VALUE = "BackendAI"
 
 
+def _mask_token(token: str) -> str:
+    """Non-reusable fingerprint of a bearer token for safe logging."""
+    if not token:
+        return "<empty>"
+    digest = hashlib.sha256(token.encode()).hexdigest()[:12]
+    return f"sha256:{digest}...(len={len(token)})"
+
+
 class KeypairAuthHookPlugin(HookPlugin):
     def __init__(self, plugin_config: Mapping[str, Any], local_config: Mapping[str, Any]) -> None:
         super().__init__(plugin_config, local_config)
@@ -161,7 +169,7 @@ class KeypairAuthHookPlugin(HookPlugin):
                     user_id = keypair.user
 
                 except Exception as e:
-                    log.error("AUTHORIZE_KEYPAIR_HOOK: invalid auth token {}", stoken)
+                    log.error("AUTHORIZE_KEYPAIR_HOOK: invalid auth token {}", _mask_token(stoken))
                     log.error(repr(e))
                     raise Reject("Invalid auth token") from None
 

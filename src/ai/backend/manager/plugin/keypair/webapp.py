@@ -1,9 +1,11 @@
 import json
 import logging
+import secrets
 from collections.abc import Mapping, Sequence
-from typing import Any, override
+from typing import Any, cast, override
 
 import aiohttp_cors
+import sqlalchemy as sa
 import yarl
 from aiohttp import web
 from pydantic import ValidationError
@@ -11,6 +13,9 @@ from pydantic import ValidationError
 from ai.backend.common.logging_utils import BraceStyleAdapter
 from ai.backend.common.types import BackendAISchema
 from ai.backend.manager.api.rest.types import CORSOptions, WebMiddleware
+from ai.backend.manager.errors.auth import AuthorizationFailed, InvalidAuthParameters
+from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.plugin.webapp import WebappPlugin
 
 from .utils import (
@@ -41,15 +46,31 @@ async def login(request: web.Request) -> web.Response:
             "Invalid login request data: {}",
             repr(e),
         )
-        raise web.HTTPBadRequest(reason="Invalid JSON data in request body.") from None
+        raise InvalidAuthParameters("Invalid JSON data in request body.") from None
+
+    db = cast(ExtendedAsyncSAEngine, root_app["_db"])
+    async with db.begin_readonly_session() as db_session:
+        query = sa.select(KeyPairRow.secret_key, KeyPairRow.is_active).where(
+            KeyPairRow.access_key == json_data.access_key
+        )
+        keypair = (await db_session.execute(query)).first()
+
+    authenticated = (
+        keypair is not None
+        and keypair.secret_key is not None
+        and keypair.is_active
+        and secrets.compare_digest(
+            keypair.secret_key.encode("utf-8"), json_data.secret_key.encode("utf-8")
+        )
+    )
+    if not authenticated:
+        log.warning("login failed for access_key {}", json_data.access_key)
+        raise AuthorizationFailed("Invalid credentials.")
 
     token_secret = plugin_config["secret"]
     redirect_uri = yarl.URL(plugin_config["login_uri"])
     token = serialize_stoken(
-        data=STokenData(
-            access_key=json_data.access_key,
-            secret_key=json_data.secret_key,
-        ),
+        data=STokenData(access_key=json_data.access_key),
         secret=token_secret,
     )
     redirect_location = redirect_uri.update_query({"sToken": token})
