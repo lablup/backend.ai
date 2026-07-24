@@ -67,6 +67,11 @@ class DataplaneConfig:
     """Whether the agent delegates host networking to a privnet daemon. Single-node cluster peer
     resolution is unimplemented in that mode (the privnet owns the LOCAL pool the addresses are
     computed from), so a scenario that needs it xfails rather than reporting a bug already known."""
+    agent_ids: tuple[str, ...] = ()
+    """The manager's agent id for each node, in the same order as ``BAI_DATAPLANE_NODES``. A
+    scenario pins a session to one of these so it lands on the node it inspects: with a second
+    agent registered in the group the scheduler is free to place a single-node session on either,
+    and a co-location scenario that read the wrong node would find no kernel."""
 
     @property
     def state_dirs(self) -> tuple[str, ...]:
@@ -107,23 +112,53 @@ def dataplane_config() -> DataplaneConfig:
         agent_stop_cmd=tuple(shlex.split(_env("BAI_DATAPLANE_AGENT_STOP_CMD", ""))),
         agent_rpc_port=int(_env("BAI_DATAPLANE_AGENT_RPC_PORT", "6011")),
         privnet_mode=_env("BAI_DATAPLANE_PRIVNET_MODE", "0") != "0",
+        agent_ids=tuple(p for p in _env("BAI_DATAPLANE_AGENT_IDS", "").split(",") if p),
     )
 
 
 @pytest.fixture(scope="session")
-def nodes(dataplane_config: DataplaneConfig) -> Sequence[Node]:
+def raw_nodes(dataplane_config: DataplaneConfig) -> Sequence[Node]:
+    """The nodes without the sudo wrapper.
+
+    Collectors need root (iptables, the containerd socket, other users' /proc), so `nodes` wraps
+    these. But the agent runs as the developer, and its lifecycle commands must NOT be sudo'd:
+    starting it under sudo runs the agent as root, and a root agent is refused by the privnet,
+    which only trusts the developer's uid -- a mismatch that hangs every session at network setup.
+    """
     raw = os.environ.get(ENV_NODES, "").strip()
     if not raw:
         pytest.skip(f"{ENV_NODES} is unset; data-plane tests need a host to run against")
-    parsed = parse_node_specs(raw)
+    return parse_node_specs(raw)
+
+
+@pytest.fixture(scope="session")
+def nodes(raw_nodes: Sequence[Node], dataplane_config: DataplaneConfig) -> Sequence[Node]:
     if dataplane_config.use_sudo:
-        return [SudoNode(node) for node in parsed]
-    return parsed
+        return [SudoNode(node) for node in raw_nodes]
+    return list(raw_nodes)
 
 
 @pytest.fixture(scope="session")
 def node(nodes: Sequence[Node]) -> Node:
     return nodes[0]
+
+
+@pytest.fixture
+def agent_ids(dataplane_config: DataplaneConfig) -> tuple[str, ...]:
+    """The manager's agent id per node, for scenarios that pin a session's placement.
+
+    Skips when unset: a co-location or cross-node scenario cannot control where the scheduler puts
+    a session without it, so it declines rather than silently testing the wrong node.
+    """
+    if not dataplane_config.agent_ids:
+        pytest.skip("BAI_DATAPLANE_AGENT_IDS is unset; placement-pinned scenarios need it")
+    return dataplane_config.agent_ids
+
+
+@pytest.fixture
+def primary_agent_id(agent_ids: tuple[str, ...]) -> str:
+    """The agent id of the first node -- where single-node scenarios pin their sessions."""
+    return agent_ids[0]
 
 
 @pytest.fixture(scope="session")
@@ -248,8 +283,12 @@ def session_spec(dataplane_config: DataplaneConfig) -> SessionSpec:
 
 
 @pytest.fixture
-def agent_control(nodes: Sequence[Node], dataplane_config: DataplaneConfig) -> AgentController:
+def agent_control(raw_nodes: Sequence[Node], dataplane_config: DataplaneConfig) -> AgentController:
     """Restart control for the first node's agent.
+
+    Built on the *unsudo'd* node: the agent runs as the developer, so signalling and starting it
+    must not go through sudo, or the agent comes up as root and the privnet refuses it (see
+    `raw_nodes`). The port and pid lookups work as the developer too, since it owns the process.
 
     Skips unless a start command is configured: how an agent is supervised is a deployment fact,
     and guessing wrong kills the developer's agent without bringing it back.
@@ -257,14 +296,13 @@ def agent_control(nodes: Sequence[Node], dataplane_config: DataplaneConfig) -> A
     config = AgentControlConfig(
         start_cmd=dataplane_config.agent_start_cmd or None,
         stop_cmd=dataplane_config.agent_stop_cmd or None,
-        process_pattern=dataplane_config.agent_process_pattern,
         rpc_port=dataplane_config.agent_rpc_port,
     )
     if not config.configured:
         pytest.skip(
             "BAI_DATAPLANE_AGENT_START_CMD is unset; restart scenarios cannot bring the agent back"
         )
-    return AgentController(nodes[0], config)
+    return AgentController(raw_nodes[0], config)
 
 
 @pytest.fixture

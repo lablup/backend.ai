@@ -71,6 +71,10 @@ class SessionSpec:
     cluster_size: int = 1
     cluster_mode: ClusterModeEnum = ClusterModeEnum.SINGLE_NODE
     """SINGLE_NODE places every kernel on one agent; MULTI_NODE spreads them."""
+    agent_list: tuple[str, ...] = ()
+    """Agents the session is restricted to, empty for the scheduler's own choice. A two-node
+    scenario names both real nodes so a stale agent still registered in the group cannot be
+    scheduled onto; a filler names one so it lands where the scenario needs the pressure."""
 
     def to_enqueue_input(self, name: str) -> EnqueueSessionInput:
         """Build the manager's own request model, never a hand-written dict.
@@ -92,6 +96,7 @@ class SessionSpec:
             ],
             cluster_mode=self.cluster_mode,
             cluster_size=self.cluster_size,
+            agent_list=list(self.agent_list) or None,
         )
 
 
