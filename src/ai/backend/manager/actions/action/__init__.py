@@ -18,6 +18,9 @@ from .rbac import (
     RBACRequiredPermission,
     build_operation_description,
 )
+from .rbac_admin_page import (
+    ProjectAdminPageGetRBACAction,
+)
 from .rbac_model_deployment import (
     ModelDeploymentCreateRBACAction,
     ModelDeploymentGetRBACAction,
@@ -89,6 +92,7 @@ RBAC_ACTION_REGISTRY: tuple[type[BaseRBACAction], ...] = (
     ProjectUpdateRBACAction,
     ProjectSoftDeleteRBACAction,
     ProjectHardDeleteRBACAction,
+    ProjectAdminPageGetRBACAction,
     SessionCreateRBACAction,
     SessionGetRBACAction,
     SessionSearchRBACAction,
