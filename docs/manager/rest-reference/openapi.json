@@ -547,6 +547,65 @@
         "title": "AdminSearchAgentsInput",
         "type": "object"
       },
+      "AppConfigScopeArgumentsDTO": {
+        "description": "The scope a caller supplies for a resolve — the domain, never the user.\n\nThe wire twin of the repository's ``AppConfigScopeArguments``: the adapter fills the\nuser from the session, so a resolve is only ever for the acting user. Grow new\ncaller-supplied scope dimensions here, mirroring the repository type, rather than adding\nflat fields to the request.",
+        "properties": {
+          "domain_id": {
+            "description": "Domain to resolve the domain-scope overlay at.",
+            "format": "uuid",
+            "title": "Domain Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "domain_id"
+        ],
+        "title": "AppConfigScopeArgumentsDTO",
+        "type": "object"
+      },
+      "ResolveAppConfigInput": {
+        "description": "Input for resolving merged AppConfigs at a named scope, for the acting user.",
+        "properties": {
+          "config_names": {
+            "description": "Config names to resolve the merged view for.",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Config Names",
+            "type": "array"
+          },
+          "scope_arguments": {
+            "$ref": "#/components/schemas/AppConfigScopeArgumentsDTO",
+            "description": "Caller-supplied scope for the resolve."
+          }
+        },
+        "required": [
+          "config_names",
+          "scope_arguments"
+        ],
+        "title": "ResolveAppConfigInput",
+        "type": "object"
+      },
+      "ResolvePublicAppConfigInput": {
+        "description": "Input for the anonymous, pre-login read, where only public fragments contribute.\n\nA pre-login screen usually needs several configs at once, so this takes the same batch\nas the authenticated resolve — it just names no principal.",
+        "properties": {
+          "config_names": {
+            "description": "Config names to resolve the merged public view for.",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Config Names",
+            "type": "array"
+          }
+        },
+        "required": [
+          "config_names"
+        ],
+        "title": "ResolvePublicAppConfigInput",
+        "type": "object"
+      },
       "AppConfigScopeType": {
         "description": "Scope at which an app config fragment is written (BEP-1052).\n\nThe single definition shared across the data, DTO, GraphQL, and API layers.",
         "enum": [
@@ -40228,6 +40287,59 @@
         ],
         "parameters": [],
         "description": "Retrieve aggregate resource capacity/usage across all agents (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/app-config/resolve": {
+      "post": {
+        "operationId": "v2/app-config.resolve",
+        "tags": [
+          "v2/app-config"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolveAppConfigInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Resolve merged AppConfigs for the authenticated caller (auth required).\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/app-config/public/resolve": {
+      "post": {
+        "operationId": "v2/app-config.resolve_public",
+        "tags": [
+          "v2/app-config"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolvePublicAppConfigInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Resolve merged AppConfigs from public fragments only (anonymous)."
       }
     },
     "/v2/app-config-fragments/": {
