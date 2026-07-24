@@ -1,9 +1,6 @@
 from __future__ import annotations
 
 from ai.backend.manager.repositories.scheduling_history import SchedulingHistoryRepository
-from ai.backend.manager.repositories.scheduling_history.types import (
-    ReplicaGroupHistorySearchScope,
-)
 
 from .actions.admin_search_replica_group_history import (
     AdminSearchReplicaGroupHistoryAction,
@@ -221,10 +218,10 @@ class SchedulingHistoryService:
         self,
         action: ScopedSearchReplicaGroupHistoryAction,
     ) -> ScopedSearchReplicaGroupHistoryActionResult:
-        """Searches the scheduling history of one replica group."""
+        """Searches replica-group scheduling history within the caller's authorized scope."""
         result = await self._repository.scoped_search_replica_group_history(
             querier=action.querier,
-            scope=ReplicaGroupHistorySearchScope(replica_group_id=action.replica_group_id),
+            scopes=[action.target.to_search_scope()],
         )
 
         return ScopedSearchReplicaGroupHistoryActionResult(
@@ -232,7 +229,7 @@ class SchedulingHistoryService:
             total_count=result.total_count,
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,
-            deployment_id=action.deployment_id,
+            target=action.target,
         )
 
     async def search_route_scoped_history(
