@@ -52,13 +52,16 @@ Each backend satisfies the same control-plane contract (`setup_session_network`,
 
 ## Interface roles (all backends)
 
-Every container always gets a **LOCAL** interface: a host-local bridge whose gateway is
-the host, so it serves BOTH the agent↔container control channel AND external egress via
-NAT. It is **egress-only between containers** (inter-container communication disabled) so
-a shared per-node LOCAL bridge cannot become a cross-session channel (same reason Swarm
-disables ICC on `docker_gwbridge`); host↔container still works. It carries the default
-route. The LOCAL interface is mandatory even for closed sessions (the agent must reach the
-kernel); "closed" only disables its outbound NAT, not the interface.
+Every container always gets a **LOCAL** interface: a **per-session** host-local bridge whose
+gateway is the host, so it serves the agent↔container control channel, intra-session
+inter-kernel traffic (single-node clusters use it in place of an overlay), AND external egress
+via NAT. **Cross-session isolation on it is enforced by explicit Docker-style FORWARD rules**
+(egress→uplink + its conntrack-established return + intra-bridge are accepted; everything else
+destined to the bridge is dropped) — the per-session bridge does **not** isolate by itself,
+because with `ip_forward=1` the host L3-routes between the sessions' LOCAL `/26`s (see Decision
+Log 2026-07-24; the overlay is safe only because nothing routes to another VNI's subnet). It
+carries the default route. The LOCAL interface is mandatory even for closed sessions (the agent
+must reach the kernel); "closed" only disables its outbound NAT, not the interface.
 
 Multi-node sessions additionally get an **OVERLAY** interface (below), which carries
 inter-node isolation and installs only the session-subnet route. Single-node sessions have
@@ -93,9 +96,11 @@ anything those nodes route.
 
 Isolation provided here is **equivalent to Docker Swarm**, no more:
 
-- **In scope:** OVERLAY VNI separation (no direct path between sessions) + LOCAL ICC-off
-  (no direct L2 chatter over the shared per-node bridge). This matches what Swarm provides
-  via separate overlay networks + `docker_gwbridge` with `enable_icc=false`.
+- **In scope:** OVERLAY VNI separation (no direct path between sessions) + LOCAL cross-session
+  isolation. The latter is per-session bridges **plus** explicit Docker-style FORWARD rules —
+  the bridges alone do not isolate, because the host L3-routes between their `/26`s (see
+  Interface roles and Decision Log 2026-07-24). This matches what Swarm provides via separate
+  overlay networks + `docker_gwbridge` with `enable_icc=false`.
 - **Out of scope (recorded, not implemented):** egress network policy to close *indirect*
   paths. These remain open, exactly as they do on Swarm today:
   1. LOCAL egress → **node IP : a sibling's published port** (NAT hairpin).

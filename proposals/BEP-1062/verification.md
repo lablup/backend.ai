@@ -205,6 +205,18 @@ Per-session LOCAL bridges give egress + cross-session isolation on both the over
 the egress path, with no ICC-off firewall and no stretched-L2 gateway conflict —
 confirming option B end to end. ✅
 
+> **Correction (2026-07-24, live two-node run).** The LOCAL row above ("cA1 → cB LOCAL
+> cross session BLOCKED", "no ICC-off firewall") does **not** hold on the real code path.
+> On a real host `ip_forward=1` (on for NAT egress) plus an on-link route per session `/26`
+> makes the host **L3-route between the per-session LOCAL bridges**, so two co-located
+> sessions reach each other over LOCAL. This §10 result came from a lima/netns setup that
+> lacked the agent's actual broad-accept FORWARD rules, so the leak did not surface. The
+> overlay rows are unaffected (nothing routes to another VNI's subnet). Fixed by adding
+> explicit Docker-style FORWARD isolation to the LOCAL bridge (accept egress→uplink + its
+> established return + intra-bridge; drop everything else to the bridge) — see
+> `native_attacher.py` and master Decision Log 2026-07-24. Re-verified live: cross-session
+> LOCAL now BLOCKED while egress, intra-session, and cross-node overlay stay REACHABLE.
+
 ## 11. Real two-host cross-node overlay + VNI isolation (separate VMs)
 
 Two **separate Linux VMs** on a shared L2 (lima socket_vmnet, `192.168.105.20` and
@@ -283,6 +295,47 @@ NOT reimplemented — only its Docker-volume/mount injection is retranslated to 
 bind mounts. The remaining piece is making the krunner content available as a host path
 (Docker builds a named volume via an extractor; containerd binds an extracted host dir) —
 a deployment task, not a code reimplementation. ✅
+
+## 15. Real two-machine session run through the manager (end-to-end, 2026-07-24)
+
+Two **physical machines** on one L2 — `i-node1` (192.168.0.104) and `i-node2` (192.168.0.156)
+— each running the real agent (`mode = "containerd"`), its own privnet, and containerd; the
+manager (`network.inter-container.default-driver = "cni"`) and halfstack on node1. Sessions were
+created through the actual API (`./bai session enqueue`), not by hand. This closes the §11 gap
+(genuine two-host, manager-driven, session-level) and exercises the full stack the product uses.
+
+**Cross-node overlay (MultiNode session, one kernel per node).** A `cluster_size=2` MULTI_NODE
+session's kernels landed on i-node1 (overlay `10.128.2.2`) and i-node2 (`10.128.2.1`), VNI 4098,
+subnet `10.128.2.0/24`. From the i-node1 kernel's netns, `ping 10.128.2.1` = **3/3, 0% loss**.
+`/etc/hosts` resolved peers (`10.128.2.1 main1`, `10.128.2.2 sub1`); the coordinator had
+programmed the unicast MAC→VTEP FDB (`02:42:0a:80:02:01 dst 192.168.0.156`) and the manager had
+assigned disjoint per-endpoint IPs (P9). ✅
+
+**Isolation matrix (2× MultiNode + 1× SingleNode, co-located kernels on i-node1).**
+
+  | from → to | scope | overlay | LOCAL |
+  |---|---|---|---|
+  | same session | intra | REACHABLE | REACHABLE (single-node cluster uses LOCAL) |
+  | different session | cross | **BLOCKED** (VNI) | **BLOCKED** (after fix) |
+
+  egress (kernel → LAN gateway) and cross-node overlay stayed REACHABLE throughout.
+
+**Two defects this run surfaced (both fixed, unit-tested, and re-verified live):**
+
+1. **`os.pidfd_open` portability.** `privnet/netns.py` hard-required `os.pidfd_open`, absent in
+   the uv/python-build-standalone CPython on i-node2, so **every container attach raised
+   `AttributeError`** and multi-node kernels died at attach. Fixed to degrade to a signal-0
+   liveness probe when the syscall wrapper is unavailable (full pidfd pinning kept where present).
+
+2. **LOCAL cross-session leak.** Cross-session traffic over the LOCAL bridge was **REACHABLE**
+   (should be blocked): the FORWARD rules were a blanket `-i/-o bridge ACCEPT`, and the host
+   L3-routes between the per-session `/26`s. Fixed with Docker-style FORWARD isolation (see §10
+   correction and master Decision Log 2026-07-24). The overlay (VNI) isolation was never affected.
+
+Neither defect is visible without a real two-host, same-node-co-location run — the unit tests
+mock the OS/etcd boundary and §8–§11 used netns/lima simulations that lacked the agent's actual
+FORWARD rules and the portable-CPython interpreter. Re-run this exact scenario on the target
+fleet before enabling `default_driver="cni"`.
 
 ## Notes
 
