@@ -11,12 +11,12 @@ from ai.backend.manager.data.idle_checker.types import IdleCheckSession
 from ai.backend.manager.repositories.idle_checker.types import (
     IdleCheckBatchData,
     IdleCheckerDefinitionData,
+    IdleJudgmentData,
 )
 from ai.backend.manager.sokovan.idle_check.checkers.base import (
     CheckerAssignment,
     IdleChecker,
     IdleCheckerContext,
-    IdleJudgment,
 )
 from ai.backend.manager.sokovan.idle_check.types import IdleCheckReconcileInfo, IdleCheckResult
 from ai.backend.manager.sokovan.reconciler.base import ReconcilerHandler
@@ -34,7 +34,7 @@ class IdleCheckReconcileHandler(ReconcilerHandler[IdleCheckReconcileInfo, IdleCh
     async def execute(self, reconcile_info: IdleCheckReconcileInfo) -> IdleCheckResult:
         assignments_by_type = self._assignments_by_type(reconcile_info.batch)
         context = IdleCheckerContext(current_time=reconcile_info.current_time)
-        all_judgments: list[IdleJudgment] = []
+        all_judgments: list[IdleJudgmentData] = []
         for checker_type, assignments in assignments_by_type.items():
             checker = self._checkers.get(checker_type)
             if checker is None:

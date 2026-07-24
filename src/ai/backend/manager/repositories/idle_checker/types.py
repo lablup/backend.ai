@@ -44,6 +44,17 @@ class SessionIdleCheckPair:
 
 
 @dataclass(frozen=True)
+class IdleJudgmentData:
+    """One session's judgment from one checker, persisted onto its session_idle_checks row."""
+
+    session_id: SessionId
+    checker_id: IdleCheckerID
+    status: IdleCheckPhase
+    expire_at: datetime
+    message: str
+
+
+@dataclass(frozen=True)
 class InitialGracePeriodCheckData:
     pair: SessionIdleCheckPair
     initial_grace_period_seconds: int

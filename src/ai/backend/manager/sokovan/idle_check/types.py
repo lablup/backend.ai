@@ -16,8 +16,10 @@ from ai.backend.manager.data.reconciler.types import (
 )
 from ai.backend.manager.data.session.options import HandlerPolicyResolver
 from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.repositories.idle_checker.types import IdleCheckBatchData
-from ai.backend.manager.sokovan.idle_check.checkers.base import IdleJudgment
+from ai.backend.manager.repositories.idle_checker.types import (
+    IdleCheckBatchData,
+    IdleJudgmentData,
+)
 from ai.backend.manager.sokovan.reconciler.base import (
     BaseReconcilerInfo,
     BaseReconcilerKind,
@@ -82,7 +84,7 @@ class IdleCheckDecision(ReconcilerDecision):
 
 @dataclass
 class IdleCheckResult(BaseReconcilerResult):
-    judgments: list[IdleJudgment] = field(default_factory=list)
+    judgments: list[IdleJudgmentData] = field(default_factory=list)
 
     @override
     def processed_count(self) -> int:
