@@ -156,8 +156,8 @@ class ConflictingSessionCleanupPolicyGQL(StrEnum):
     name="UpdateAgentResourceGroupInput",
 )
 class UpdateAgentResourceGroupInputGQL(PydanticInputMixin[UpdateAgentResourceGroupInput]):
-    resource_group_name: str = gql_field(
-        description="Name of the target resource group to move the agent into."
+    resource_group_id: UUID = gql_field(
+        description="UUID of the target resource group to move the agent into."
     )
     policy: ConflictingSessionCleanupPolicyGQL = gql_field(
         description=(
@@ -186,7 +186,6 @@ class UpdateAgentResourceGroupInputGQL(PydanticInputMixin[UpdateAgentResourceGro
 class UpdateAgentResourceGroupPayloadGQL(PydanticOutputMixin[UpdateAgentResourceGroupPayload]):
     agent_id: str = gql_field(description="ID of the agent whose resource group was changed.")
     resource_group_id: UUID = gql_field(description="UUID of the new resource group.")
-    resource_group_name: str = gql_field(description="Name of the new resource group.")
     policy: ConflictingSessionCleanupPolicyGQL = gql_field(
         description="Cleanup policy applied to the conflicting sessions."
     )

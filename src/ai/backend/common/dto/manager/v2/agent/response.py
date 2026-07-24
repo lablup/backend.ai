@@ -15,7 +15,7 @@ from pydantic import Field
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.dto.manager.pagination import PaginationInfo
 from ai.backend.common.dto.manager.v2.agent.types import ConflictingSessionCleanupPolicyEnum
-from ai.backend.common.identifier.resource_group import ResourceGroupID, ResourceGroupName
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.identifier.session import SessionID
 from ai.backend.common.types import AgentId
 
@@ -199,7 +199,6 @@ class UpdateAgentResourceGroupPayload(BaseResponseModel):
 
     agent_id: AgentId = Field(description="ID of the agent whose resource group was changed.")
     resource_group_id: ResourceGroupID = Field(description="UUID of the new resource group.")
-    resource_group_name: ResourceGroupName = Field(description="Name of the new resource group.")
     policy: ConflictingSessionCleanupPolicyEnum = Field(
         description="Cleanup policy applied to the conflicting sessions."
     )

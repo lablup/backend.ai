@@ -17,7 +17,7 @@ from ai.backend.common.dto.manager.v2.agent.types import (
     ConflictingSessionCleanupPolicyEnum,
     OrderDirection,
 )
-from ai.backend.common.identifier.resource_group import ResourceGroupName
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 
 __all__ = (
     "AdminSearchAgentsInput",
@@ -106,9 +106,8 @@ class SearchAgentsInput(BaseRequestModel):
 class UpdateAgentResourceGroupInput(BaseRequestModel):
     """Input for changing the resource group of an agent."""
 
-    resource_group_name: ResourceGroupName = Field(
-        min_length=1,
-        description="Name of the target resource group to move the agent into.",
+    resource_group_id: ResourceGroupID = Field(
+        description="UUID of the target resource group to move the agent into.",
     )
     policy: ConflictingSessionCleanupPolicyEnum = Field(
         description=(

@@ -23,7 +23,7 @@ from ai.backend.manager.data.agent.types import (
 from ai.backend.manager.data.image.types import ImageDataWithDetails, ImageIdentifier
 from ai.backend.manager.data.kernel.types import KernelInfo, KernelStatus
 from ai.backend.manager.errors.agent import AgentHasConflictingSessions
-from ai.backend.manager.errors.resource import UnresolvableResourceGroup
+from ai.backend.manager.errors.resource import ScalingGroupNotFound, UnresolvableResourceGroup
 from ai.backend.manager.models.agent import ADMIN_PERMISSIONS as ADMIN_AGENT_PERMISSIONS
 from ai.backend.manager.models.agent import AgentRow, agents
 from ai.backend.manager.models.image import ImageRow
@@ -209,13 +209,21 @@ class AgentDBSource:
         Finds the active kernels on the agent. If any exist and ``force`` is not
         set, raises without changing anything. Otherwise updates the agent's group
         (name + id columns) and returns those kernels so the caller can transition
-        their sessions. The check and the update run in one transaction.
-        Raises AgentNotFound when no agent row matches ``agent_id``.
+        their sessions. The lookup, the check, and the update run in one transaction.
+        Raises ScalingGroupNotFound when no resource group matches
+        ``resource_group_id``, and AgentNotFound when no agent row matches
+        ``agent_id``.
         """
         active_statuses = (
             KernelStatus.resource_occupied_statuses() | KernelStatus.resource_requested_statuses()
         )
         async with self._db.begin_session_read_committed() as session:
+            resource_group_name = await session.scalar(
+                sa.select(ScalingGroupRow.name).where(ScalingGroupRow.id == resource_group_id)
+            )
+            if resource_group_name is None:
+                raise ScalingGroupNotFound(str(resource_group_id))
+
             rows = (
                 (
                     await session.execute(
@@ -238,9 +246,7 @@ class AgentDBSource:
                 .where(agents.c.id == agent_id)
                 .values(
                     resource_group_id=resource_group_id,
-                    scaling_group=sa.select(ScalingGroupRow.name)
-                    .where(ScalingGroupRow.id == resource_group_id)
-                    .scalar_subquery(),
+                    scaling_group=resource_group_name,
                 )
             )
             if cast(CursorResult[Any], result).rowcount == 0:
