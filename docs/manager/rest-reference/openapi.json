@@ -26599,24 +26599,8 @@
         "type": "object"
       },
       "ReplicaGroupHistoryScopeDTO": {
-        "description": "Scope for replica-group scheduling history queries.\n\nEach list is OR'd internally and across categories. Raises an error if every\nfield is empty. The scoped search is still a single-target scope action, so\nonly one item is dispatchable today; the list shape keeps the wire contract\nstable for the multi-target case.",
+        "description": "Scope for replica-group scheduling history queries.\n\nThe list is OR'd internally. Raises an error if empty. The scoped search is\nstill a single-target scope action, so only one item is dispatchable today;\nthe list shape keeps the wire contract stable for the multi-target case.\n\nA replica group is not an RBAC scope of its own, so the history is scoped by\nthe owning deployment.",
         "properties": {
-          "replica_group": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/UUIDScope"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Replica group IDs to get history for.",
-            "title": "Replica Group"
-          },
           "deployment": {
             "anyOf": [
               {
