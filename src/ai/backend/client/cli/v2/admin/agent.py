@@ -110,10 +110,12 @@ def search(
 )
 @click.option(
     "--policy",
-    default="terminate",
-    show_default=True,
+    default=None,
     type=click.Choice(["terminate", "reschedule"], case_sensitive=False),
-    help="How to handle sessions still running on the agent under the old resource group.",
+    help=(
+        "How to handle sessions still running on the agent under the old resource group. "
+        "Defaults to the server-side default (terminate)."
+    ),
 )
 @click.option(
     "--force",
@@ -128,12 +130,12 @@ def search(
 def update_resource_group(
     agent_id: str,
     resource_group_id: uuid.UUID,
-    policy: str,
+    policy: str | None,
     force: bool,
 ) -> None:
     """Change an agent's resource group (superadmin only)."""
     from ai.backend.common.dto.manager.v2.agent.request import (
-        UpdateAgentResourceGroupInput,
+        UpdateAgentResourceGroupBody,
     )
     from ai.backend.common.dto.manager.v2.agent.types import (
         ConflictingSessionCleanupPolicyEnum,
@@ -145,9 +147,11 @@ def update_resource_group(
         try:
             result = await registry.agent.update_resource_group(
                 agent_id,
-                UpdateAgentResourceGroupInput(
+                UpdateAgentResourceGroupBody(
                     resource_group_id=ResourceGroupID(resource_group_id),
-                    policy=ConflictingSessionCleanupPolicyEnum(policy.lower()),
+                    policy=(
+                        ConflictingSessionCleanupPolicyEnum(policy.lower()) if policy else None
+                    ),
                     force=force,
                 ),
             )

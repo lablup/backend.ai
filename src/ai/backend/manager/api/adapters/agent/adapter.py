@@ -10,6 +10,7 @@ from ai.backend.common.dto.manager.v2.agent.request import (
     AdminSearchAgentsInput,
     AgentFilter,
     AgentOrder,
+    UpdateAgentResourceGroupBody,
     UpdateAgentResourceGroupInput,
 )
 from ai.backend.common.dto.manager.v2.agent.response import (
@@ -23,7 +24,10 @@ from ai.backend.common.dto.manager.v2.agent.response import (
     ComputePluginsGQLDTO,
     UpdateAgentResourceGroupPayload,
 )
-from ai.backend.common.dto.manager.v2.agent.types import AgentStatusFilter
+from ai.backend.common.dto.manager.v2.agent.types import (
+    AgentStatusFilter,
+    ConflictingSessionCleanupPolicyEnum,
+)
 from ai.backend.common.identifier.session import SessionID
 from ai.backend.common.resource.types import TotalResourceData
 from ai.backend.common.types import AgentId
@@ -207,24 +211,43 @@ class AgentAdapter(BaseAdapter):
 
     # ------------------------------------------------------------------ update
 
-    async def update_resource_group(
+    async def update_resource_group_from_body(
         self,
         agent_id: AgentId,
+        body: UpdateAgentResourceGroupBody,
+    ) -> UpdateAgentResourceGroupPayload:
+        """Change the resource group of an agent whose ID is carried separately.
+
+        Used by the REST handler, where the agent ID comes from the URL path
+        while the body only carries the mutable part.
+        """
+        return await self.update_resource_group(
+            UpdateAgentResourceGroupInput(
+                agent_id=agent_id,
+                resource_group_id=body.resource_group_id,
+                policy=body.policy,
+                force=body.force,
+            )
+        )
+
+    async def update_resource_group(
+        self,
         input: UpdateAgentResourceGroupInput,
     ) -> UpdateAgentResourceGroupPayload:
         """Change an agent's resource group, cleaning up conflicting sessions per policy."""
+        applied_policy = input.policy or ConflictingSessionCleanupPolicyEnum.TERMINATE
         action_result = await self._processors.agent.update_resource_group.wait_for_complete(
             UpdateAgentResourceGroupAction(
-                agent_id=agent_id,
+                agent_id=input.agent_id,
                 resource_group_id=input.resource_group_id,
-                policy=ConflictingSessionCleanupPolicy(input.policy.value),
+                policy=ConflictingSessionCleanupPolicy(applied_policy.value),
                 force=input.force,
             )
         )
         return UpdateAgentResourceGroupPayload(
             agent_id=action_result.agent_id,
             resource_group_id=action_result.resource_group_id,
-            policy=input.policy,
+            policy=applied_policy,
             conflicting_session_ids=[
                 SessionID(sid) for sid in action_result.conflicting_session_ids
             ],

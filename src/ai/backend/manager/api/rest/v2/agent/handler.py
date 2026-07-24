@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Final
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
 from ai.backend.common.dto.manager.v2.agent.request import (
     AdminSearchAgentsInput,
-    UpdateAgentResourceGroupInput,
+    UpdateAgentResourceGroupBody,
 )
 from ai.backend.common.dto.manager.v2.agent.response import AgentResourceStatsPayload
 from ai.backend.common.types import AgentId
@@ -39,10 +39,13 @@ class V2AgentHandler:
     async def update_resource_group(
         self,
         path: PathParam[AgentIdPathParam],
-        body: BodyParam[UpdateAgentResourceGroupInput],
+        body: BodyParam[UpdateAgentResourceGroupBody],
     ) -> APIResponse:
-        """Change an agent's resource group (superadmin only)."""
-        result = await self._adapter.update_resource_group(
+        """Change an agent's resource group (superadmin only).
+
+        The agent ID comes from the URL path; the adapter merges it with the body.
+        """
+        result = await self._adapter.update_resource_group_from_body(
             AgentId(path.parsed.agent_id), body.parsed
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)

@@ -5,7 +5,7 @@ from __future__ import annotations
 from ai.backend.client.v2.base_domain import BaseDomainClient
 from ai.backend.common.dto.manager.v2.agent.request import (
     AdminSearchAgentsInput,
-    UpdateAgentResourceGroupInput,
+    UpdateAgentResourceGroupBody,
 )
 from ai.backend.common.dto.manager.v2.agent.response import (
     AdminSearchAgentsPayload,
@@ -34,7 +34,7 @@ class V2AgentClient(BaseDomainClient):
     async def update_resource_group(
         self,
         agent_id: str,
-        request: UpdateAgentResourceGroupInput,
+        request: UpdateAgentResourceGroupBody,
     ) -> UpdateAgentResourceGroupPayload:
         """Change an agent's resource group (superadmin only)."""
         return await self._client.typed_request(

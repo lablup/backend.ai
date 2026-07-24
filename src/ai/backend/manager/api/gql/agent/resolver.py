@@ -8,7 +8,6 @@ from strawberry.scalars import JSON
 
 from ai.backend.common.dto.manager.v2.agent.request import AdminSearchAgentsInput
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
-from ai.backend.common.types import AgentId
 from ai.backend.manager.api.gql.agent.types import (
     AgentFilterGQL,
     AgentOrderByGQL,
@@ -99,12 +98,9 @@ async def agents_v2(
 )
 async def admin_update_agent_resource_group(
     info: Info[StrawberryGQLContext],
-    agent_id: str,
     input: UpdateAgentResourceGroupInputGQL,
 ) -> UpdateAgentResourceGroupPayloadGQL | None:
     """Change an agent's resource group."""
     check_admin_only()
-    payload = await info.context.adapters.agent.update_resource_group(
-        AgentId(agent_id), input.to_pydantic()
-    )
+    payload = await info.context.adapters.agent.update_resource_group(input.to_pydantic())
     return UpdateAgentResourceGroupPayloadGQL.from_pydantic(payload)

@@ -156,14 +156,16 @@ class ConflictingSessionCleanupPolicyGQL(StrEnum):
     name="UpdateAgentResourceGroupInput",
 )
 class UpdateAgentResourceGroupInputGQL(PydanticInputMixin[UpdateAgentResourceGroupInput]):
+    agent_id: str = gql_field(description="ID of the agent to move.")
     resource_group_id: UUID = gql_field(
         description="UUID of the target resource group to move the agent into."
     )
-    policy: ConflictingSessionCleanupPolicyGQL = gql_field(
+    policy: ConflictingSessionCleanupPolicyGQL | None = gql_field(
+        default=None,
         description=(
             "How to handle sessions still running on the agent under the old resource group. "
-            "Currently only TERMINATE is supported."
-        )
+            "Defaults to TERMINATE, which is currently the only supported policy."
+        ),
     )
     force: bool = gql_field(
         default=False,
