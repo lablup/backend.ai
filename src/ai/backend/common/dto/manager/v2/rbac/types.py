@@ -91,7 +91,6 @@ class RBACElementTypeDTO(StrEnum):
     STORAGE_HOST = "storage_host"
     AGENT = "agent"
     KERNEL = "kernel"
-    REPLICA_GROUP = "replica_group"
     ROUTING = "routing"
     IMAGE = "image"
     ARTIFACT = "artifact"
