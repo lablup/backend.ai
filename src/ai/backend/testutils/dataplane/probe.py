@@ -81,6 +81,18 @@ async def _endpoints_on(node: Node, session_name: str, ifname: str) -> list[tupl
     return endpoints
 
 
+async def fdb_has_remote(node: Node, mac: str) -> bool:
+    """Whether the host has a unicast FDB entry sending ``mac`` to a remote VTEP (a ``dst`` on a
+    vxlan device).
+
+    This is the proactive MAC->VTEP programming the coordinator does from the manager's endpoints
+    table, so known unicast reaches its host directly instead of flooding every peer -- Swarm's
+    gossip-programmed neighbour tables, done from etcd.
+    """
+    out = await node.run(["bridge", "fdb", "show"])
+    return any(line.lower().startswith(mac.lower()) and " dst " in line for line in out.lines)
+
+
 async def reaches(node: Node, pid: str, target: str) -> bool:
     """Can the container at ``pid`` reach ``target``? One bounded ping from inside its netns.
 
