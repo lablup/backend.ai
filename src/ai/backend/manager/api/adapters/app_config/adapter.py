@@ -13,13 +13,13 @@ from ai.backend.common.dto.manager.v2.app_config.response import (
     ResolveAppConfigPayload,
 )
 from ai.backend.common.dto.manager.v2.app_config_fragment.response import AppConfigFragmentNode
+from ai.backend.common.exception import UnreachableError
 from ai.backend.common.identifier.user import UserID
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.app_config.types import AppConfigData
 from ai.backend.manager.data.app_config_fragment.types import (
     AppConfigFragmentData,
 )
-from ai.backend.manager.errors.app_config import AppConfigResolveNotAllowed
 from ai.backend.manager.repositories.app_config_fragment.types import AppConfigScopeArguments
 from ai.backend.manager.services.app_config.actions.resolve import ResolveAppConfigsAction
 
@@ -32,7 +32,8 @@ class AppConfigAdapter(BaseAdapter):
     async def resolve(self, input: ResolveAppConfigInput) -> ResolveAppConfigPayload:
         me = current_user()
         if me is None:
-            raise AppConfigResolveNotAllowed("App config resolve requires an authenticated user.")
+            # ``auth_required`` guarantees a session on this route, so this is never hit.
+            raise UnreachableError("User context is not available")
         action_result = await self._processors.app_config.resolve_app_configs.wait_for_complete(
             ResolveAppConfigsAction(
                 config_names=input.config_names,
