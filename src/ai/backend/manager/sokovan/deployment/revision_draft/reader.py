@@ -14,7 +14,6 @@ except ``custom`` at time of writing) skip storage access entirely.
 
 from __future__ import annotations
 
-import logging
 from typing import TYPE_CHECKING
 
 from ai.backend.common.config import ModelConfigDraft, ModelDefinitionDraft
@@ -22,7 +21,6 @@ from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.identifier.deployment_preset import DeploymentPresetID
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
 from ai.backend.common.types import ClusterMode
-from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import (
     ExecutionSpec,
     MountMetadata,
@@ -36,8 +34,6 @@ from ai.backend.manager.data.runtime_variant.types import RuntimeVariantData
 
 if TYPE_CHECKING:
     from ai.backend.manager.repositories.deployment import DeploymentRepository
-
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 __all__ = ("RevisionDraftReader",)
 
@@ -163,24 +159,15 @@ class RevisionDraftReader:
     ) -> list[RevisionDraft]:
         """Read ``deployment-config.yaml`` + ``model-definition.yaml`` when allowed.
 
-        Gated by ``reads_vfolder_config_files`` on the variant. A missing or
-        malformed file is logged and skipped — the merge chain remains valid
-        without the optional overlay.
+        Gated by ``reads_vfolder_config_files`` on the variant. Missing or empty
+        files are skipped, while malformed files fail revision creation.
         """
         if not variant.reads_vfolder_config_files:
             return []
         vfolder_id = mounts.model_vfolder_id
 
         drafts: list[RevisionDraft] = []
-        try:
-            config = await self._deployment_repository.fetch_deployment_config(vfolder_id)
-        except Exception:
-            log.warning(
-                "Failed to read deployment config from vfolder {}, skipping",
-                vfolder_id,
-                exc_info=True,
-            )
-            config = None
+        config = await self._deployment_repository.fetch_deployment_config(vfolder_id)
         if config is not None:
             drafts.append(
                 RevisionDraft(
@@ -191,18 +178,10 @@ class RevisionDraftReader:
                 )
             )
 
-        try:
-            model_def = await self._deployment_repository.fetch_model_definition(
-                vfolder_id=vfolder_id,
-                model_definition_path=mounts.model_definition_path,
-            )
-        except Exception:
-            log.warning(
-                "Failed to read model-definition.yaml from vfolder {}, skipping",
-                vfolder_id,
-                exc_info=True,
-            )
-            model_def = None
+        model_def = await self._deployment_repository.fetch_model_definition(
+            vfolder_id=vfolder_id,
+            model_definition_path=mounts.model_definition_path,
+        )
         if model_def is not None:
             drafts.append(
                 RevisionDraft(

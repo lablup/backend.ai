@@ -9,6 +9,7 @@ from ai.backend.common.exception import (
     ErrorDomain,
     ErrorOperation,
 )
+from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.manager.errors.common import ObjectNotFound
 
 
@@ -21,6 +22,28 @@ class DefinitionFileNotFound(ObjectNotFound):
             domain=ErrorDomain.MODEL_SERVICE,
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class DeploymentDefinitionFileReadError(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/deployment-definition-file-read-error"
+    error_title = "Failed to read deployment definition file."
+
+    def __init__(
+        self,
+        *,
+        vfolder_id: VFolderUUID,
+        filename: str,
+        cause: Exception,
+    ) -> None:
+        super().__init__(f"File '{filename}' in vfolder {vfolder_id}: {cause}")
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.MODEL_DEPLOYMENT,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.INVALID_DATA_FORMAT,
         )
 
 
