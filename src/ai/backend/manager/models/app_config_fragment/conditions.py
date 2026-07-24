@@ -10,6 +10,7 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec
+from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
 from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.user import UserID
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
@@ -73,6 +74,15 @@ class AppConfigFragmentConditions:
         return inner
 
     by_config_name_in = staticmethod(make_string_in_factory(AppConfigFragmentRow.config_name))
+
+    @staticmethod
+    def by_ids(fragment_ids: Sequence[AppConfigFragmentID]) -> QueryCondition:
+        """Fragments whose id is one of ``fragment_ids``, for batch loading by id."""
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return AppConfigFragmentRow.id.in_(list(fragment_ids))
+
+        return inner
 
     @staticmethod
     def by_config_names(config_names: Sequence[str]) -> QueryCondition:

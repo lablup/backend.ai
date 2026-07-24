@@ -7,6 +7,10 @@ from ai.backend.manager.services.app_config_fragment.actions.admin_search import
     AdminSearchAppConfigFragmentAction,
     AdminSearchAppConfigFragmentActionResult,
 )
+from ai.backend.manager.services.app_config_fragment.actions.batch_load_by_ids import (
+    BatchLoadAppConfigFragmentsByIdsAction,
+    BatchLoadAppConfigFragmentsByIdsActionResult,
+)
 from ai.backend.manager.services.app_config_fragment.actions.bulk_purge import (
     BulkPurgeAppConfigFragmentAction,
     BulkPurgeAppConfigFragmentActionResult,
@@ -64,6 +68,12 @@ class AppConfigFragmentService:
         data = await self._repository.get_by_id(action.fragment_id)
         return GetAppConfigFragmentActionResult(fragment=data)
 
+    async def batch_load_by_ids(
+        self, action: BatchLoadAppConfigFragmentsByIdsAction
+    ) -> BatchLoadAppConfigFragmentsByIdsActionResult:
+        items = await self._repository.batch_load_by_ids(action.fragment_ids)
+        return BatchLoadAppConfigFragmentsByIdsActionResult(items=items)
+
     async def admin_search(
         self, action: AdminSearchAppConfigFragmentAction
     ) -> AdminSearchAppConfigFragmentActionResult:
@@ -78,6 +88,9 @@ class AppConfigFragmentService:
     async def scoped_search(
         self, action: ScopedSearchAppConfigFragmentAction
     ) -> ScopedSearchAppConfigFragmentActionResult:
+        # TODO(BA-7003): temporary single-scope search. The repository already OR-combines a
+        # sequence of scopes, but ScopedSearchAppConfigFragmentAction is a single-scope
+        # BaseScopeAction, so only one scope is passed here. BA-7003 will carry multiple scopes.
         result = await self._repository.scoped_search(action.querier, [action.scope])
         return ScopedSearchAppConfigFragmentActionResult(
             _scope=action.scope,

@@ -1088,6 +1088,144 @@ enum AppConfigDefinitionOrderField
   UPDATED_AT @join__enumValue(graph: STRAWBERRY)
 }
 
+"""
+Added in 26.8.0. One config document written at a single scope, merged by rank at resolve time.
+"""
+type AppConfigFragment implements Node
+  @join__implements(graph: STRAWBERRY, interface: "Node")
+  @join__type(graph: STRAWBERRY)
+{
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """Config name the fragment belongs to."""
+  configName: String!
+
+  """Scope the fragment is written at (public | domain | user)."""
+  scopeType: AppConfigScopeType!
+
+  """Scope identifier: the domain id or user id; null for public scope."""
+  scopeId: UUID
+
+  """The fragment's JSON config document."""
+  config: JSON!
+
+  """Creation timestamp (UTC)."""
+  createdAt: DateTime!
+
+  """Last update timestamp (UTC)."""
+  updatedAt: DateTime!
+}
+
+"""Added in 26.8.0. Paginated connection for app config fragments."""
+type AppConfigFragmentConnection
+  @join__type(graph: STRAWBERRY)
+{
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [AppConfigFragmentEdge!]!
+
+  """Total number of app config fragments matching the query criteria."""
+  count: Int!
+}
+
+"""An edge in a connection."""
+type AppConfigFragmentEdge
+  @join__type(graph: STRAWBERRY)
+{
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: AppConfigFragment!
+}
+
+"""Added in 26.8.0. Filter input for querying app config fragments."""
+input AppConfigFragmentFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """Filter by config name."""
+  configName: StringFilter = null
+
+  """Filter by scope type."""
+  scopeType: AppConfigFragmentScopeTypeFilter = null
+
+  """Filter by creation datetime."""
+  createdAt: DateTimeFilter = null
+
+  """Filter by last update datetime."""
+  updatedAt: DateTimeFilter = null
+
+  """Match all of the given sub-filters."""
+  AND: [AppConfigFragmentFilter!] = null
+
+  """Match any of the given sub-filters."""
+  OR: [AppConfigFragmentFilter!] = null
+
+  """Negate the given sub-filters."""
+  NOT: [AppConfigFragmentFilter!] = null
+}
+
+"""Added in 26.8.0. Specifies ordering for app config fragment results."""
+input AppConfigFragmentOrderBy
+  @join__type(graph: STRAWBERRY)
+{
+  """The field to order by."""
+  field: AppConfigFragmentOrderField!
+
+  """Sort direction."""
+  direction: OrderDirection! = ASC
+}
+
+"""
+Added in 26.8.0. Fields available for ordering app config fragment results.
+"""
+enum AppConfigFragmentOrderField
+  @join__type(graph: STRAWBERRY)
+{
+  CONFIG_NAME @join__enumValue(graph: STRAWBERRY)
+  SCOPE_TYPE @join__enumValue(graph: STRAWBERRY)
+  CREATED_AT @join__enumValue(graph: STRAWBERRY)
+  UPDATED_AT @join__enumValue(graph: STRAWBERRY)
+}
+
+"""
+Added in 26.8.0. Scope for a scoped app config fragment search. All items are OR'd; raises an error if every field is empty.
+"""
+input AppConfigFragmentScope
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  Domain ids whose fragments to search. The scoped search is single-target for now, so exactly one scope is accepted across all three fields.
+  """
+  domain: [UUIDScope!] = null
+
+  """User ids whose fragments to search."""
+  user: [UUIDScope!] = null
+
+  """Search the public scope, which has no owner."""
+  public: Boolean = null
+}
+
+"""Added in 26.8.0. Filter input for the fragment scope_type enum field."""
+input AppConfigFragmentScopeTypeFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """Exact scope type match."""
+  equals: AppConfigScopeType = null
+
+  """Match any of the provided scope types."""
+  in: [AppConfigScopeType!] = null
+
+  """Exclude exact scope type match."""
+  notEquals: AppConfigScopeType = null
+
+  """Exclude any of the provided scope types."""
+  notIn: [AppConfigScopeType!] = null
+}
+
 enum AppConfigScopeType
   @join__type(graph: STRAWBERRY)
 {
@@ -14705,6 +14843,19 @@ type Query
   Added in 26.7.0. Search app config allow-list entries with filtering, ordering, and pagination (super admin only).
   """
   adminAppConfigAllowLists(filter: AppConfigAllowListFilter = null, orderBy: [AppConfigAllowListOrderBy!] = null, first: Int = null, after: String = null, last: Int = null, before: String = null, limit: Int = null, offset: Int = null): AppConfigAllowListConnection @join__field(graph: STRAWBERRY)
+
+  """Added in 26.8.0. Get a single app config fragment by id."""
+  appConfigFragment(id: UUID!): AppConfigFragment @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.8.0. Search app config fragments across every scope with filtering, ordering, and pagination (super admin only).
+  """
+  adminAppConfigFragments(filter: AppConfigFragmentFilter = null, orderBy: [AppConfigFragmentOrderBy!] = null, first: Int = null, after: String = null, last: Int = null, before: String = null, limit: Int = null, offset: Int = null): AppConfigFragmentConnection @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.8.0. Search the app config fragments written at one scope, with ordering and pagination.
+  """
+  scopedAppConfigFragments(scope: AppConfigFragmentScope!, filter: AppConfigFragmentFilter = null, orderBy: [AppConfigFragmentOrderBy!] = null, first: Int = null, after: String = null, last: Int = null, before: String = null, limit: Int = null, offset: Int = null): AppConfigFragmentConnection @join__field(graph: STRAWBERRY)
 
   """
   Added in 25.14.0. Retrieve a specific artifact by its ID. Returns detailed information about the artifact including its metadata, registry information, and availability status.

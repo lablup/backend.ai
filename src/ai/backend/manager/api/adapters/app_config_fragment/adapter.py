@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from functools import lru_cache
 
 from ai.backend.common.data.app_config.types import AppConfigScopeType
@@ -10,6 +11,7 @@ from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
     AdminSearchAppConfigFragmentInput,
     AppConfigFragmentFilter,
     AppConfigFragmentOrder,
+    AppConfigFragmentScope,
     BulkPurgeAppConfigFragmentInput,
     BulkUpdateAppConfigFragmentInput,
     CreateAppConfigFragmentInput,
@@ -31,12 +33,14 @@ from ai.backend.common.dto.manager.v2.app_config_fragment.types import (
     AppConfigScopeTypeFilter,
 )
 from ai.backend.common.dto.manager.v2.common import OrderDirection
+from ai.backend.common.identifier.app_config import AppConfigScopeID
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.app_config_fragment.types import (
     AppConfigFragmentData,
 )
+from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.models.app_config_fragment.conditions import AppConfigFragmentConditions
 from ai.backend.manager.models.app_config_fragment.orders import AppConfigFragmentOrders
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
@@ -59,6 +63,9 @@ from ai.backend.manager.repositories.base import (
 )
 from ai.backend.manager.services.app_config_fragment.actions.admin_search import (
     AdminSearchAppConfigFragmentAction,
+)
+from ai.backend.manager.services.app_config_fragment.actions.batch_load_by_ids import (
+    BatchLoadAppConfigFragmentsByIdsAction,
 )
 from ai.backend.manager.services.app_config_fragment.actions.bulk_purge import (
     BulkPurgeAppConfigFragmentAction,
@@ -180,6 +187,24 @@ class AppConfigFragmentAdapter(BaseAdapter):
             ],
         )
 
+    async def batch_load_by_ids(
+        self, fragment_ids: Sequence[AppConfigFragmentID]
+    ) -> list[AppConfigFragmentNode | None]:
+        """Batch load fragments by id for the GraphQL DataLoader.
+
+        Returns nodes in the order of ``fragment_ids``, with ``None`` for ids that no longer
+        exist. Every requested id is RBAC-authorized before the load runs.
+        """
+        if not fragment_ids:
+            return []
+        action_result = (
+            await self._processors.app_config_fragment.batch_load_by_ids.wait_for_complete(
+                BatchLoadAppConfigFragmentsByIdsAction(fragment_ids=list(fragment_ids))
+            )
+        )
+        node_map = {node.id: node for node in map(self._fragment_to_node, action_result.items)}
+        return [node_map.get(fragment_id) for fragment_id in fragment_ids]
+
     # --- admin fragment search ---
 
     async def admin_search(
@@ -213,9 +238,10 @@ class AppConfigFragmentAdapter(BaseAdapter):
     async def scoped_search(
         self, input: ScopedSearchAppConfigFragmentInput
     ) -> SearchAppConfigFragmentPayload:
+        conditions = self._convert_filter(input.filter) if input.filter else []
         orders = self._convert_orders(input.order) if input.order else []
         querier = self._build_querier(
-            conditions=[],
+            conditions=conditions,
             orders=orders,
             pagination_spec=_get_app_config_fragment_pagination_spec(),
             first=input.first,
@@ -225,10 +251,7 @@ class AppConfigFragmentAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        scope = AppConfigFragmentSearchScope(
-            scope_type=input.scope.scope_type,
-            scope_id=input.scope.scope_id,
-        )
+        scope = self._scope_to_search_scope(input.scope)
         action_result = await self._processors.app_config_fragment.scoped_search.wait_for_complete(
             ScopedSearchAppConfigFragmentAction(scope=scope, querier=querier)
         )
@@ -238,6 +261,42 @@ class AppConfigFragmentAdapter(BaseAdapter):
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,
         )
+
+    @staticmethod
+    def _scope_to_search_scope(scope: AppConfigFragmentScope) -> AppConfigFragmentSearchScope:
+        """Reduce the scope item lists to the single scope the scope action takes.
+
+        ``ScopedSearchAppConfigFragmentAction`` is a ``BaseScopeAction``, so it authorizes and
+        queries exactly one scope; reject a multi-scope request instead of silently dropping
+        the rest.
+        """
+        selected = [
+            AppConfigFragmentSearchScope(
+                scope_type=AppConfigScopeType.DOMAIN,
+                scope_id=AppConfigScopeID(item.value),
+            )
+            for item in scope.domain or []
+        ]
+        selected += [
+            AppConfigFragmentSearchScope(
+                scope_type=AppConfigScopeType.USER,
+                scope_id=AppConfigScopeID(item.value),
+            )
+            for item in scope.user or []
+        ]
+        if scope.public:
+            selected.append(
+                AppConfigFragmentSearchScope(scope_type=AppConfigScopeType.PUBLIC, scope_id=None)
+            )
+        # TODO(BA-7003): temporary single-scope restriction. The underlying
+        # ScopedSearchAppConfigFragmentAction is a single-scope BaseScopeAction, so a request
+        # carrying more than one scope item is rejected here rather than silently dropping the
+        # rest. Multi-scope scoped search will be implemented in BA-7003.
+        if len(selected) > 1:
+            raise InvalidAPIParameters(
+                "App config fragment scoped search accepts at most one scope item"
+            )
+        return selected[0]
 
     # --- converters ---
 
