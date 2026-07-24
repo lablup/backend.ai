@@ -21,6 +21,7 @@ __all__ = (
     "PurgeAppConfigFragmentPayload",
     "SearchAppConfigFragmentPayload",
     "UpdateAppConfigFragmentPayload",
+    "UpsertAppConfigFragmentsPayload",
 )
 
 
@@ -36,6 +37,12 @@ class AppConfigFragmentNode(BaseResponseModel):
     config: dict[str, Any] = Field(description="The fragment's JSON config document.")
     created_at: datetime = Field(description="Creation timestamp (UTC).")
     updated_at: datetime = Field(description="Last update timestamp (UTC).")
+
+
+class UpsertAppConfigFragmentsPayload(BaseResponseModel):
+    """Payload for a scoped upsert of many fragments (all-or-nothing)."""
+
+    items: list[AppConfigFragmentNode] = Field(description="The upserted app config fragments.")
 
 
 class CreateAppConfigFragmentPayload(BaseResponseModel):

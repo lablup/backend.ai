@@ -13,11 +13,14 @@ from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
     AppConfigFragmentFilter,
     AppConfigFragmentOrder,
     AppConfigFragmentScope,
+    AppConfigFragmentUpsertItem,
     BulkPurgeAppConfigFragmentInput,
     BulkUpdateAppConfigFragmentInput,
     CreateAppConfigFragmentInput,
+    MyUpsertAppConfigFragmentsInput,
     ScopedSearchAppConfigFragmentInput,
     UpdateAppConfigFragmentInput,
+    UpsertAppConfigFragmentsInput,
 )
 from ai.backend.common.dto.manager.v2.app_config_fragment.response import (
     AppConfigFragmentBulkErrorInfo,
@@ -28,6 +31,7 @@ from ai.backend.common.dto.manager.v2.app_config_fragment.response import (
     PurgeAppConfigFragmentPayload,
     SearchAppConfigFragmentPayload,
     UpdateAppConfigFragmentPayload,
+    UpsertAppConfigFragmentsPayload,
 )
 from ai.backend.common.dto.manager.v2.app_config_fragment.types import (
     AppConfigFragmentOrderField,
@@ -58,6 +62,9 @@ from ai.backend.manager.repositories.app_config_fragment.types import (
 from ai.backend.manager.repositories.app_config_fragment.updaters import (
     AppConfigFragmentUpdaterSpec,
 )
+from ai.backend.manager.repositories.app_config_fragment.upserters import (
+    AppConfigFragmentUpserterSpec,
+)
 from ai.backend.manager.repositories.base import (
     Updater,
     combine_conditions_or,
@@ -86,6 +93,9 @@ from ai.backend.manager.services.app_config_fragment.actions.scoped_search impor
 )
 from ai.backend.manager.services.app_config_fragment.actions.update import (
     UpdateAppConfigFragmentAction,
+)
+from ai.backend.manager.services.app_config_fragment.actions.upsert import (
+    UpsertAppConfigFragmentsAction,
 )
 from ai.backend.manager.types import OptionalState
 
@@ -118,6 +128,51 @@ class AppConfigFragmentAdapter(BaseAdapter):
         )
         return CreateAppConfigFragmentPayload(
             app_config_fragment=self._fragment_to_node(action_result.fragment),
+        )
+
+    async def upsert_app_config_fragments(
+        self, input: UpsertAppConfigFragmentsInput
+    ) -> UpsertAppConfigFragmentsPayload:
+        """Upsert many fragments at the scope named in ``input`` (RBAC-authorized there)."""
+        return await self._upsert(
+            AppConfigFragmentSearchScope(scope_type=input.scope_type, scope_id=input.scope_id),
+            input.items,
+        )
+
+    async def my_upsert_app_config_fragments(
+        self, input: MyUpsertAppConfigFragmentsInput
+    ) -> UpsertAppConfigFragmentsPayload:
+        """Upsert many fragments at the current user's own user scope.
+
+        Calls ``current_user()`` internally — the caller does not pass a scope.
+        """
+        me = current_user()
+        if me is None:
+            raise UnreachableError("User context is not available")
+        scope = AppConfigFragmentSearchScope(
+            scope_type=AppConfigScopeType.USER, scope_id=AppConfigScopeID(me.user_id)
+        )
+        return await self._upsert(scope, input.items)
+
+    async def _upsert(
+        self,
+        scope: AppConfigFragmentSearchScope,
+        items: Sequence[AppConfigFragmentUpsertItem],
+    ) -> UpsertAppConfigFragmentsPayload:
+        specs = [
+            AppConfigFragmentUpserterSpec(
+                config_name=item.config_name,
+                scope_type=scope.scope_type,
+                scope_id=scope.scope_id,
+                config=item.config,
+            )
+            for item in items
+        ]
+        action_result = await self._processors.app_config_fragment.upsert.wait_for_complete(
+            UpsertAppConfigFragmentsAction(scope=scope, upserter_specs=specs)
+        )
+        return UpsertAppConfigFragmentsPayload(
+            items=[self._fragment_to_node(fragment) for fragment in action_result.fragments],
         )
 
     async def get(self, fragment_id: AppConfigFragmentID) -> AppConfigFragmentNode:

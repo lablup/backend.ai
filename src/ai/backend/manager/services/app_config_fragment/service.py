@@ -35,6 +35,10 @@ from ai.backend.manager.services.app_config_fragment.actions.update import (
     UpdateAppConfigFragmentAction,
     UpdateAppConfigFragmentActionResult,
 )
+from ai.backend.manager.services.app_config_fragment.actions.upsert import (
+    UpsertAppConfigFragmentsAction,
+    UpsertAppConfigFragmentsActionResult,
+)
 
 __all__ = ("AppConfigFragmentService",)
 
@@ -63,6 +67,12 @@ class AppConfigFragmentService:
     async def get(self, action: GetAppConfigFragmentAction) -> GetAppConfigFragmentActionResult:
         data = await self._repository.get_by_id(action.fragment_id)
         return GetAppConfigFragmentActionResult(fragment=data)
+
+    async def upsert(
+        self, action: UpsertAppConfigFragmentsAction
+    ) -> UpsertAppConfigFragmentsActionResult:
+        fragments = await self._repository.bulk_upsert(action.upserter_specs)
+        return UpsertAppConfigFragmentsActionResult(fragments=fragments, _scope=action.scope)
 
     async def admin_search(
         self, action: AdminSearchAppConfigFragmentAction

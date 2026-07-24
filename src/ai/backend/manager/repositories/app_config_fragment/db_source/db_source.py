@@ -7,6 +7,7 @@ from typing import cast
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
@@ -37,6 +38,9 @@ from ai.backend.manager.repositories.app_config_fragment.purgers import (
 from ai.backend.manager.repositories.app_config_fragment.types import (
     ResolvedAppConfigScope,
 )
+from ai.backend.manager.repositories.app_config_fragment.upserters import (
+    AppConfigFragmentUpserterSpec,
+)
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     NoPagination,
@@ -45,6 +49,7 @@ from ai.backend.manager.repositories.base import (
 )
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.base.rbac.entity_purger import RBACEntityPurger
+from ai.backend.manager.repositories.base.rbac.entity_upserter import RBACEntityUpserter
 from ai.backend.manager.repositories.ops.rbac.provider import RBACOpsProvider
 
 __all__ = ("AppConfigFragmentDBSource",)
@@ -93,6 +98,41 @@ class AppConfigFragmentDBSource:
         )
         async with self._rbac_ops_provider.write_ops() as w:
             return (await w.create_scoped(rbac_creator)).row.to_data()
+
+    @app_config_fragment_db_source_resilience.apply()
+    async def bulk_upsert(
+        self, specs: Sequence[AppConfigFragmentUpserterSpec]
+    ) -> list[AppConfigFragmentData]:
+        """Upsert each fragment at its scope in one transaction (all-or-nothing).
+
+        Each item inserts-or-updates; a newly inserted row binds to its scope, an updated one
+        keeps its binding. A ``public`` fragment is GLOBAL (no binding) and conflicts on the
+        partial unique index guarded by ``scope_id IS NULL``.
+        """
+        async with self._rbac_ops_provider.write_ops() as w:
+            results: list[AppConfigFragmentData] = []
+            for spec in specs:
+                element_type = spec.scope_type.to_rbac_element_type()
+                if spec.scope_type is AppConfigScopeType.PUBLIC:
+                    index_elements = ["config_name", "scope_type"]
+                    index_where = AppConfigFragmentRow.scope_id.is_(None)
+                else:
+                    index_elements = ["config_name", "scope_type", "scope_id"]
+                    index_where = None
+                upserter = RBACEntityUpserter(
+                    spec=spec,
+                    element_type=RBACElementType.APP_CONFIG_FRAGMENT,
+                    scope_ref=(
+                        RBACElementRef(element_type, str(spec.scope_id))
+                        if element_type is not None
+                        else None
+                    ),
+                    index_elements=index_elements,
+                    index_where=index_where,
+                    integrity_error_checks=spec.integrity_error_checks,
+                )
+                results.append((await w.upsert_scoped(upserter)).row.to_data())
+            return results
 
     @app_config_fragment_db_source_resilience.apply()
     async def get_by_id(self, fragment_id: AppConfigFragmentID) -> AppConfigFragmentData:
