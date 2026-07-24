@@ -59,7 +59,10 @@ from ai.backend.manager.data.permission.types import (
     ScopeListResult,
     ScopeType,
 )
-from ai.backend.manager.data.permission.virtual_scope import VirtualScopePermissionCheckKey
+from ai.backend.manager.data.permission.virtual_scope import (
+    ScopePermissionCheckKey,
+    VirtualScopePermissionCheckKey,
+)
 from ai.backend.manager.data.role_invitation.types import (
     RoleInvitationData,
     RoleInvitationState,
@@ -158,14 +161,16 @@ class _PermissionGroupKey:
 class _VirtualScopePermissionGroupKey:
     """Group key for batching virtual-scope-chain resolution inputs.
 
-    Keys sharing the same ``(user_id, entity_type)`` are resolved by a single
-    SQL round-trip differing only in the per-target ``entity_id`` IN-list.
-    ``entity_type`` is the DB-facing :class:`EntityType` enum (converted from the
-    open ``EntityRef.entity_type``) so it binds against the permission columns.
+    Keys sharing the same field values are resolved by a single SQL round-trip
+    differing only in the per-target ``entity_id`` IN-list. Both types are the
+    DB-facing :class:`EntityType` enum (converted from the open string types):
+    ``entity_type`` matches membership rows, ``subject_entity_type`` matches
+    permission rows.
     """
 
     user_id: uuid.UUID
     entity_type: EntityType
+    subject_entity_type: EntityType
 
 
 class PermissionDBSource:
@@ -1188,7 +1193,7 @@ class PermissionDBSource:
 
     # ------------------------------------------------ virtual-scope-chain checks
 
-    async def check_permission_via_virtual_scope(
+    async def check_single_entity_permission_via_virtual_scope(
         self,
         key: VirtualScopePermissionCheckKey,
         permission: Permission,
@@ -1206,7 +1211,7 @@ class PermissionDBSource:
         keys: Collection[VirtualScopePermissionCheckKey],
         permission: Permission,
     ) -> Mapping[VirtualScopePermissionCheckKey, bool]:
-        """Check *permission* on each target key through the virtual-scope chain in one go.
+        """Check *permission* on each target entity through the virtual-scope chain in one go.
 
         Returns a mapping from each input key to whether the permission is granted.
         """
@@ -1215,43 +1220,91 @@ class PermissionDBSource:
         resolved = await self.resolve_effective_permissions_via_virtual_scope(keys)
         return {key: bool(resolved.get(key, Permission.NONE) & permission) for key in keys}
 
+    async def check_scope_permission_via_virtual_scope(
+        self,
+        keys: Collection[ScopePermissionCheckKey],
+        permission: Permission,
+    ) -> Mapping[ScopePermissionCheckKey, bool]:
+        """Check *permission* on each target scope through the virtual-scope chain in one go.
+
+        Returns a mapping from each input key to whether the permission is granted.
+        """
+        if not keys:
+            return {}
+        resolved = await self._resolve_effective_scope_permissions_via_virtual_scope(keys)
+        return {key: bool(resolved.get(key, Permission.NONE) & permission) for key in keys}
+
     async def resolve_effective_permissions_via_virtual_scope(
         self,
         keys: Collection[VirtualScopePermissionCheckKey],
     ) -> Mapping[VirtualScopePermissionCheckKey, Permission]:
-        """Resolve each target's effective :class:`Permission` through the virtual-scope chain.
+        """Resolve each target entity's effective :class:`Permission` through the
+        virtual-scope chain.
 
         Walks ``entity -> entity_memberships -> scope_bindings -> scope`` and
         OR-combines the granted bitmask at each resolved scope, clipping every
         path by both hop caps (``granted & scope_cap & entity_cap``; ``None`` = no
-        ceiling). Keys sharing ``(user_id, entity_type)`` share one round-trip;
-        keys with no reachable grant map to :attr:`Permission.NONE`.
+        ceiling). Permission rows are matched on the entity's own type. Keys
+        sharing ``(user_id, entity_type)`` share one round-trip; keys with no
+        reachable grant map to :attr:`Permission.NONE`.
         """
         if not keys:
             return {}
-
         groups: defaultdict[
             _VirtualScopePermissionGroupKey, list[VirtualScopePermissionCheckKey]
         ] = defaultdict(list)
         for key in keys:
+            entity_type = EntityType(key.entity.entity_type)
             groups[
                 _VirtualScopePermissionGroupKey(
                     user_id=key.user_id,
-                    entity_type=EntityType(key.entity.entity_type),
+                    entity_type=entity_type,
+                    subject_entity_type=entity_type,
                 )
             ].append(key)
 
         result: dict[VirtualScopePermissionCheckKey, Permission] = {}
         async with self._db.begin_readonly_session_read_committed() as db_session:
             for group_key, members in groups.items():
-                entity_ids = [k.entity.entity_id for k in members]
                 granted = await self._resolve_permissions_for_virtual_scope_group(
                     db_session=db_session,
                     group_key=group_key,
-                    entity_ids=entity_ids,
+                    entity_ids=[k.entity.entity_id for k in members],
                 )
                 for key in members:
                     result[key] = granted.get(key.entity.entity_id, Permission.NONE)
+        return result
+
+    async def _resolve_effective_scope_permissions_via_virtual_scope(
+        self,
+        keys: Collection[ScopePermissionCheckKey],
+    ) -> Mapping[ScopePermissionCheckKey, Permission]:
+        """Resolve each target scope's effective :class:`Permission` through the
+        virtual-scope chain."""
+        if not keys:
+            return {}
+        groups: defaultdict[_VirtualScopePermissionGroupKey, list[ScopePermissionCheckKey]] = (
+            defaultdict(list)
+        )
+        for key in keys:
+            groups[
+                _VirtualScopePermissionGroupKey(
+                    user_id=key.user_id,
+                    entity_type=EntityType(key.scope.scope_type),
+                    subject_entity_type=EntityType(key.subject_entity_type),
+                )
+            ].append(key)
+
+        result: dict[ScopePermissionCheckKey, Permission] = {}
+        async with self._db.begin_readonly_session_read_committed() as db_session:
+            for group_key, members in groups.items():
+                granted = await self._resolve_permissions_for_virtual_scope_group(
+                    db_session=db_session,
+                    group_key=group_key,
+                    entity_ids=[k.scope.scope_id for k in members],
+                )
+                for key in members:
+                    result[key] = granted.get(key.scope.scope_id, Permission.NONE)
         return result
 
     async def _resolve_permissions_for_virtual_scope_group(
@@ -1261,8 +1314,8 @@ class PermissionDBSource:
         group_key: _VirtualScopePermissionGroupKey,
         entity_ids: Sequence[EntityID],
     ) -> Mapping[EntityID, Permission]:
-        """Run the virtual-scope-chain query for a single ``(user_id, entity_type)``
-        group with N entity_ids.
+        """Run the virtual-scope-chain query for a single ``(user_id, entity_type,
+        subject_entity_type)`` group with N entity_ids.
 
         Returns a mapping from entity_id to its effective (cap-clipped, OR-combined)
         :class:`Permission`. Entities with no reachable grant are absent from the map.
@@ -1289,7 +1342,7 @@ class PermissionDBSource:
                         # scope_bindings.scope_id is a native UUID; permissions.scope_id
                         # stores its canonical string form. Cast to compare.
                         perm.c.scope_id == sa.cast(sb.c.scope_id, sa.String),
-                        perm.c.entity_type == group_key.entity_type,
+                        perm.c.entity_type == group_key.subject_entity_type,
                     ),
                 )
                 .join(roles, roles.c.id == perm.c.role_id)
