@@ -23,7 +23,13 @@ class AppConfigScopeArgumentsDTO(BaseRequestModel):
     flat fields to the request.
     """
 
-    domain_id: DomainID = Field(description="Domain to resolve the domain-scope overlay at.")
+    # TODO(BA-7003): domain_ids is a list but only the first element is used. This is a
+    # temporary, strictly-incorrect shape kept for wire compatibility; collapse it to a
+    # single domain once BA-7003 lands.
+    domain_ids: list[DomainID] = Field(
+        min_length=1,
+        description="Domains to resolve the domain-scope overlay at. Only the first is used.",
+    )
 
 
 class ResolveAppConfigInput(BaseRequestModel):

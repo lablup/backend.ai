@@ -113,15 +113,15 @@ class TestResolveAppConfigInput:
 
         parsed = ResolveAppConfigInput.model_validate({
             "config_names": ["theme"],
-            "scope_arguments": {"domain_id": str(domain_id)},
+            "scope_arguments": {"domain_ids": [str(domain_id)]},
         })
 
         assert parsed.config_names == ["theme"]
-        assert parsed.scope_arguments.domain_id == domain_id
+        assert parsed.scope_arguments.domain_ids == [domain_id]
 
     def test_rejects_empty_config_names(self) -> None:
         with pytest.raises(BackendAISchemaValidationFailed):
             ResolveAppConfigInput.model_validate({
                 "config_names": [],
-                "scope_arguments": {"domain_id": str(uuid4())},
+                "scope_arguments": {"domain_ids": [str(uuid4())]},
             })

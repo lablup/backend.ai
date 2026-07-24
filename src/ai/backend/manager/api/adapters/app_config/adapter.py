@@ -37,7 +37,10 @@ class AppConfigAdapter(BaseAdapter):
         action_result = await self._processors.app_config.resolve_app_configs.wait_for_complete(
             ResolveAppConfigsAction(
                 config_names=input.config_names,
-                scope_arguments=AppConfigScopeArguments(domain_id=input.scope_arguments.domain_id),
+                # TODO(BA-7003): only the first domain is used — see AppConfigScopeArgumentsDTO.
+                scope_arguments=AppConfigScopeArguments(
+                    domain_id=input.scope_arguments.domain_ids[0]
+                ),
                 user_id=UserID(me.user_id),
             )
         )

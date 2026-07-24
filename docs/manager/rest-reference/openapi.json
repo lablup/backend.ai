@@ -550,15 +550,19 @@
       "AppConfigScopeArgumentsDTO": {
         "description": "The scope a caller supplies for a resolve — the domain, never the user.\n\nThe wire twin of the repository's ``AppConfigScopeArguments``: the adapter fills the\nuser from the session, so a resolve is only ever for the acting user. Grow new\ncaller-supplied scope dimensions here, mirroring the repository type, rather than adding\nflat fields to the request.",
         "properties": {
-          "domain_id": {
-            "description": "Domain to resolve the domain-scope overlay at.",
-            "format": "uuid",
-            "title": "Domain Id",
-            "type": "string"
+          "domain_ids": {
+            "description": "Domains to resolve the domain-scope overlay at. Only the first is used.",
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Domain Ids",
+            "type": "array"
           }
         },
         "required": [
-          "domain_id"
+          "domain_ids"
         ],
         "title": "AppConfigScopeArgumentsDTO",
         "type": "object"
