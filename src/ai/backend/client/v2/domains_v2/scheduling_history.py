@@ -8,15 +8,18 @@ from ai.backend.client.v2.base_domain import BaseDomainClient
 from ai.backend.common.dto.manager.v2.scheduling_history.request import (
     AdminSearchDeploymentHistoriesInput,
     AdminSearchKernelHistoriesInput,
+    AdminSearchReplicaGroupHistoriesInput,
     AdminSearchRouteHistoriesInput,
     AdminSearchSessionHistoriesInput,
     ScopedSearchKernelHistoriesInput,
+    ScopedSearchReplicaGroupHistoriesInput,
 )
 from ai.backend.common.dto.manager.v2.scheduling_history.response import (
     AdminSearchDeploymentHistoriesPayload,
     AdminSearchRouteHistoriesPayload,
     AdminSearchSessionHistoriesPayload,
     SearchKernelHistoriesPayload,
+    SearchReplicaGroupHistoriesPayload,
 )
 
 _PATH = "/v2/scheduling-history"
@@ -95,6 +98,30 @@ class V2SchedulingHistoryClient(BaseDomainClient):
             f"{_PATH}/deployments/{deployment_id}/search",
             request=request,
             response_model=AdminSearchDeploymentHistoriesPayload,
+        )
+
+    # ========== Replica Group History ==========
+
+    async def admin_search_replica_group_history(
+        self, request: AdminSearchReplicaGroupHistoriesInput
+    ) -> SearchReplicaGroupHistoriesPayload:
+        """Search replica-group scheduling histories with admin scope."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/replica-groups/admin/search",
+            request=request,
+            response_model=SearchReplicaGroupHistoriesPayload,
+        )
+
+    async def scoped_search_replica_group_history(
+        self, request: ScopedSearchReplicaGroupHistoriesInput
+    ) -> SearchReplicaGroupHistoriesPayload:
+        """Search replica-group scheduling histories under a non-admin scope."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/replica-groups/scoped/search",
+            request=request,
+            response_model=SearchReplicaGroupHistoriesPayload,
         )
 
     # ========== Route History ==========
