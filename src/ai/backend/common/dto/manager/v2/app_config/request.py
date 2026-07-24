@@ -8,22 +8,33 @@ from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.identifier.domain import DomainID
 
 __all__ = (
+    "AppConfigScopeArgumentsDTO",
     "ResolveAppConfigInput",
     "ResolvePublicAppConfigInput",
 )
 
 
-class ResolveAppConfigInput(BaseRequestModel):
-    """Input for resolving merged AppConfigs at a named domain, for the acting user.
+class AppConfigScopeArgumentsDTO(BaseRequestModel):
+    """The scope a caller supplies for a resolve — the domain, never the user.
 
-    ``domain_id`` is the caller's to name; the user is not — the adapter takes it from the
-    session, so a resolve is only ever for the acting user.
+    The wire twin of the repository's ``AppConfigScopeArguments``: the adapter fills the
+    user from the session, so a resolve is only ever for the acting user. Grow new
+    caller-supplied scope dimensions here, mirroring the repository type, rather than adding
+    flat fields to the request.
     """
+
+    domain_id: DomainID = Field(description="Domain to resolve the domain-scope overlay at.")
+
+
+class ResolveAppConfigInput(BaseRequestModel):
+    """Input for resolving merged AppConfigs at a named scope, for the acting user."""
 
     config_names: list[str] = Field(
         min_length=1, description="Config names to resolve the merged view for."
     )
-    domain_id: DomainID = Field(description="Domain to resolve the domain-scope overlay at.")
+    scope_arguments: AppConfigScopeArgumentsDTO = Field(
+        description="Caller-supplied scope for the resolve."
+    )
 
 
 class ResolvePublicAppConfigInput(BaseRequestModel):

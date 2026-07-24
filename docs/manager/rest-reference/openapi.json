@@ -547,8 +547,24 @@
         "title": "AdminSearchAgentsInput",
         "type": "object"
       },
+      "AppConfigScopeArgumentsDTO": {
+        "description": "The scope a caller supplies for a resolve — the domain, never the user.\n\nThe wire twin of the repository's ``AppConfigScopeArguments``: the adapter fills the\nuser from the session, so a resolve is only ever for the acting user. Grow new\ncaller-supplied scope dimensions here, mirroring the repository type, rather than adding\nflat fields to the request.",
+        "properties": {
+          "domain_id": {
+            "description": "Domain to resolve the domain-scope overlay at.",
+            "format": "uuid",
+            "title": "Domain Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "domain_id"
+        ],
+        "title": "AppConfigScopeArgumentsDTO",
+        "type": "object"
+      },
       "ResolveAppConfigInput": {
-        "description": "Input for resolving merged AppConfigs at a named domain, for the acting user.\n\n``domain_id`` is the caller's to name; the user is not — the adapter takes it from the\nsession, so a resolve is only ever for the acting user.",
+        "description": "Input for resolving merged AppConfigs at a named scope, for the acting user.",
         "properties": {
           "config_names": {
             "description": "Config names to resolve the merged view for.",
@@ -559,16 +575,14 @@
             "title": "Config Names",
             "type": "array"
           },
-          "domain_id": {
-            "description": "Domain to resolve the domain-scope overlay at.",
-            "format": "uuid",
-            "title": "Domain Id",
-            "type": "string"
+          "scope_arguments": {
+            "$ref": "#/components/schemas/AppConfigScopeArgumentsDTO",
+            "description": "Caller-supplied scope for the resolve."
           }
         },
         "required": [
           "config_names",
-          "domain_id"
+          "scope_arguments"
         ],
         "title": "ResolveAppConfigInput",
         "type": "object"

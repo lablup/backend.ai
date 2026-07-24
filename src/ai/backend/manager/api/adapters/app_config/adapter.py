@@ -37,7 +37,7 @@ class AppConfigAdapter(BaseAdapter):
         action_result = await self._processors.app_config.resolve_app_configs.wait_for_complete(
             ResolveAppConfigsAction(
                 config_names=input.config_names,
-                scope_arguments=AppConfigScopeArguments(domain_id=input.domain_id),
+                scope_arguments=AppConfigScopeArguments(domain_id=input.scope_arguments.domain_id),
                 user_id=UserID(me.user_id),
             )
         )
