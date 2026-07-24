@@ -26520,18 +26520,41 @@
         "type": "object"
       },
       "ReplicaGroupHistoryScopeDTO": {
-        "description": "Scope for replica-group scheduling history queries.",
+        "description": "Scope for replica-group scheduling history queries.\n\nEach list is OR'd internally and across categories. Raises an error if every\nfield is empty. The scoped search is still a single-target scope action, so\nonly one item is dispatchable today; the list shape keeps the wire contract\nstable for the multi-target case.",
         "properties": {
-          "replica_group_id": {
-            "description": "Replica group ID to get history for.",
-            "format": "uuid",
-            "title": "Replica Group Id",
-            "type": "string"
+          "replica_group": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/UUIDScope"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Replica group IDs to get history for.",
+            "title": "Replica Group"
+          },
+          "deployment": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/UUIDScope"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Deployment IDs to get the history of every owned replica group for.",
+            "title": "Deployment"
           }
         },
-        "required": [
-          "replica_group_id"
-        ],
         "title": "ReplicaGroupHistoryScopeDTO",
         "type": "object"
       },
