@@ -15658,6 +15658,7 @@ enum RBACElementType
   STORAGE_HOST @join__enumValue(graph: STRAWBERRY)
   AGENT @join__enumValue(graph: STRAWBERRY)
   KERNEL @join__enumValue(graph: STRAWBERRY)
+  REPLICA_GROUP @join__enumValue(graph: STRAWBERRY)
   ROUTING @join__enumValue(graph: STRAWBERRY)
   IMAGE @join__enumValue(graph: STRAWBERRY)
   ARTIFACT @join__enumValue(graph: STRAWBERRY)
