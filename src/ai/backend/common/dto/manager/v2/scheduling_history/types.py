@@ -21,7 +21,9 @@ __all__ = (
     "KernelHistoryOrderField",
     "KernelHistoryScopeDTO",
     "OrderDirection",
+    "ReplicaGroupHistoryCategoryType",
     "ReplicaGroupHistoryOrderField",
+    "ReplicaGroupHistoryScopeDTO",
     "RouteHistoryOrderField",
     "RouteHistoryScopeDTO",
     "SchedulingResultType",
@@ -74,6 +76,13 @@ class RouteHistoryOrderField(StrEnum):
 
     CREATED_AT = "created_at"
     UPDATED_AT = "updated_at"
+
+
+class ReplicaGroupHistoryCategoryType(StrEnum):
+    """Handler category a replica-group history row was produced by."""
+
+    LIFECYCLE = "lifecycle"
+    SCALING = "scaling"
 
 
 class ReplicaGroupHistoryOrderField(StrEnum):
@@ -141,3 +150,30 @@ class RouteHistoryScopeDTO(BaseRequestModel):
     """Scope for route scheduling history queries."""
 
     route_id: UUID = Field(description="Route ID to get history for.")
+
+
+class ReplicaGroupHistoryScopeDTO(BaseRequestModel):
+    """Scope for replica-group scheduling history queries.
+
+    Each list is OR'd internally and across categories. Raises an error if every
+    field is empty. The scoped search is still a single-target scope action, so
+    only one item is dispatchable today; the list shape keeps the wire contract
+    stable for the multi-target case.
+    """
+
+    replica_group: list[UUIDScope] | None = Field(
+        default=None, description="Replica group IDs to get history for."
+    )
+    deployment: list[UUIDScope] | None = Field(
+        default=None,
+        description="Deployment IDs to get the history of every owned replica group for.",
+    )
+
+    @model_validator(mode="after")
+    def _require_non_empty(self) -> Self:
+        if not self.replica_group and not self.deployment:
+            raise ValueError(
+                "ReplicaGroupHistoryScopeDTO requires a non-empty value for "
+                "'replica_group' or 'deployment'"
+            )
+        return self
