@@ -13,10 +13,6 @@ from ai.backend.manager.services.app_config_fragment.actions.admin_search import
     AdminSearchAppConfigFragmentAction,
     AdminSearchAppConfigFragmentActionResult,
 )
-from ai.backend.manager.services.app_config_fragment.actions.batch_load_by_ids import (
-    BatchLoadAppConfigFragmentsByIdsAction,
-    BatchLoadAppConfigFragmentsByIdsActionResult,
-)
 from ai.backend.manager.services.app_config_fragment.actions.bulk_purge import (
     BulkPurgeAppConfigFragmentAction,
     BulkPurgeAppConfigFragmentActionResult,
@@ -71,9 +67,6 @@ class AppConfigFragmentProcessors(AbstractProcessorPackage):
     bulk_purge: BulkActionProcessor[
         BulkPurgeAppConfigFragmentAction, BulkPurgeAppConfigFragmentActionResult
     ]
-    batch_load_by_ids: BulkActionProcessor[
-        BatchLoadAppConfigFragmentsByIdsAction, BatchLoadAppConfigFragmentsByIdsActionResult
-    ]
 
     def __init__(
         self,
@@ -107,9 +100,6 @@ class AppConfigFragmentProcessors(AbstractProcessorPackage):
         self.bulk_purge = BulkActionProcessor(
             service.bulk_purge, monitors=action_monitors, validators=[validators.rbac.bulk]
         )
-        self.batch_load_by_ids = BulkActionProcessor(
-            service.batch_load_by_ids, monitors=action_monitors, validators=[validators.rbac.bulk]
-        )
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -122,5 +112,4 @@ class AppConfigFragmentProcessors(AbstractProcessorPackage):
             PurgeAppConfigFragmentAction.spec(),
             BulkUpdateAppConfigFragmentAction.spec(),
             BulkPurgeAppConfigFragmentAction.spec(),
-            BatchLoadAppConfigFragmentsByIdsAction.spec(),
         ]

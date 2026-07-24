@@ -7,10 +7,6 @@ from ai.backend.manager.services.app_config_fragment.actions.admin_search import
     AdminSearchAppConfigFragmentAction,
     AdminSearchAppConfigFragmentActionResult,
 )
-from ai.backend.manager.services.app_config_fragment.actions.batch_load_by_ids import (
-    BatchLoadAppConfigFragmentsByIdsAction,
-    BatchLoadAppConfigFragmentsByIdsActionResult,
-)
 from ai.backend.manager.services.app_config_fragment.actions.bulk_purge import (
     BulkPurgeAppConfigFragmentAction,
     BulkPurgeAppConfigFragmentActionResult,
@@ -67,12 +63,6 @@ class AppConfigFragmentService:
     async def get(self, action: GetAppConfigFragmentAction) -> GetAppConfigFragmentActionResult:
         data = await self._repository.get_by_id(action.fragment_id)
         return GetAppConfigFragmentActionResult(fragment=data)
-
-    async def batch_load_by_ids(
-        self, action: BatchLoadAppConfigFragmentsByIdsAction
-    ) -> BatchLoadAppConfigFragmentsByIdsActionResult:
-        items = await self._repository.batch_load_by_ids(action.fragment_ids)
-        return BatchLoadAppConfigFragmentsByIdsActionResult(items=items)
 
     async def admin_search(
         self, action: AdminSearchAppConfigFragmentAction

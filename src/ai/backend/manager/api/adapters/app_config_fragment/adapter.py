@@ -5,8 +5,10 @@ from __future__ import annotations
 from collections.abc import Sequence
 from functools import lru_cache
 
+from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.common.data.app_config.types import AppConfigScopeType as AppConfigScopeTypeDTO
+from ai.backend.common.exception import UnreachableError
 from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
     AdminSearchAppConfigFragmentInput,
     AppConfigFragmentFilter,
@@ -63,9 +65,6 @@ from ai.backend.manager.repositories.base import (
 )
 from ai.backend.manager.services.app_config_fragment.actions.admin_search import (
     AdminSearchAppConfigFragmentAction,
-)
-from ai.backend.manager.services.app_config_fragment.actions.batch_load_by_ids import (
-    BatchLoadAppConfigFragmentsByIdsAction,
 )
 from ai.backend.manager.services.app_config_fragment.actions.bulk_purge import (
     BulkPurgeAppConfigFragmentAction,
@@ -190,19 +189,31 @@ class AppConfigFragmentAdapter(BaseAdapter):
     async def batch_load_by_ids(
         self, fragment_ids: Sequence[AppConfigFragmentID]
     ) -> list[AppConfigFragmentNode | None]:
-        """Batch load fragments by id for the GraphQL DataLoader.
+        """Batch load fragments by id for the GraphQL DataLoader, scoped to the current user.
 
-        Returns nodes in the order of ``fragment_ids``, with ``None`` for ids that no longer
-        exist. Every requested id is RBAC-authorized before the load runs.
+        A scoped search at the caller's own ``user`` scope, narrowed to ``fragment_ids``.
+        Returns nodes in the order of ``fragment_ids``, with ``None`` for ids not visible in
+        that scope. Calls ``current_user()`` internally — the caller does not pass a scope.
         """
         if not fragment_ids:
             return []
-        action_result = (
-            await self._processors.app_config_fragment.batch_load_by_ids.wait_for_complete(
-                BatchLoadAppConfigFragmentsByIdsAction(fragment_ids=list(fragment_ids))
-            )
+        me = current_user()
+        if me is None:
+            raise UnreachableError("User context is not available")
+        querier = self._build_querier(
+            conditions=[AppConfigFragmentConditions.by_ids(list(fragment_ids))],
+            orders=[],
+            pagination_spec=_get_app_config_fragment_pagination_spec(),
+            limit=len(fragment_ids),
         )
-        node_map = {node.id: node for node in map(self._fragment_to_node, action_result.items)}
+        scope = AppConfigFragmentSearchScope(
+            scope_type=AppConfigScopeType.USER,
+            scope_id=AppConfigScopeID(me.user_id),
+        )
+        action_result = await self._processors.app_config_fragment.scoped_search.wait_for_complete(
+            ScopedSearchAppConfigFragmentAction(scope=scope, querier=querier)
+        )
+        node_map = {node.id: node for node in map(self._fragment_to_node, action_result.data)}
         return [node_map.get(fragment_id) for fragment_id in fragment_ids]
 
     # --- admin fragment search ---
