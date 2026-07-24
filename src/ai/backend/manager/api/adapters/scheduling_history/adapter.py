@@ -37,8 +37,10 @@ from ai.backend.common.dto.manager.v2.scheduling_history.response import (
     SessionHistoryNode,
 )
 from ai.backend.common.dto.manager.v2.scheduling_history.types import SubStepResultInfo
+from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.kernel_scheduling_history import KernelSchedulingHistoryID
 from ai.backend.common.identifier.replica import ReplicaID
+from ai.backend.common.identifier.replica_group import ReplicaGroupID
 from ai.backend.common.types import KernelId, SessionId
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
@@ -110,6 +112,7 @@ from ai.backend.manager.services.scheduling_history.actions.resolve_replica_grou
     ResolveReplicaGroupDeploymentAction,
 )
 from ai.backend.manager.services.scheduling_history.actions.scoped_search_replica_group_history import (
+    DeploymentReplicaGroupHistoryTarget,
     ScopedSearchReplicaGroupHistoryAction,
 )
 from ai.backend.manager.services.scheduling_history.actions.search_deployment_history import (
@@ -865,6 +868,32 @@ class SchedulingHistoryAdapter(BaseAdapter):
             if input.order
             else []
         )
+        replica_group_items = input.scope.replica_group or []
+        deployment_items = input.scope.deployment or []
+        # TODO: Drop this rejection once the scoped search becomes a bulk action.
+        # The scope input is already list-shaped and its items are meant to be
+        # OR'd, but ScopedSearchReplicaGroupHistoryAction is a single-target
+        # BaseScopeAction, so only one item is dispatchable today.
+        if len(replica_group_items) + len(deployment_items) != 1:
+            raise InvalidAPIParameters(
+                "Replica-group scheduling history scope accepts exactly one scope item"
+            )
+        # TODO: Pass ReplicaGroupReplicaGroupHistoryTarget(replica_group_id=...) once
+        # virtual scopes land and a replica group becomes a scope of its own. Replica
+        # groups hold no permission records today, so a replica-group scope item is
+        # converted to a target on its owning deployment and narrowed back down with a
+        # replica_group_id query condition.
+        if replica_group_items:
+            replica_group_id = ReplicaGroupID(replica_group_items[0].value)
+            resolve_result = await self._processors.scheduling_history.resolve_replica_group_deployment.wait_for_complete(
+                ResolveReplicaGroupDeploymentAction(replica_group_id=replica_group_id)
+            )
+            deployment_id = resolve_result.deployment_id
+            conditions.append(
+                ReplicaGroupHistoryConditions.by_replica_group_ids([replica_group_id])
+            )
+        else:
+            deployment_id = DeploymentID(deployment_items[0].value)
         querier = self._build_querier(
             conditions=conditions,
             orders=orders,
@@ -876,13 +905,9 @@ class SchedulingHistoryAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        resolve_result = await self._processors.scheduling_history.resolve_replica_group_deployment.wait_for_complete(
-            ResolveReplicaGroupDeploymentAction(replica_group_id=input.scope.replica_group_id)
-        )
         action_result = await self._processors.scheduling_history.scoped_search_replica_group_history.wait_for_complete(
             ScopedSearchReplicaGroupHistoryAction(
-                replica_group_id=input.scope.replica_group_id,
-                deployment_id=resolve_result.deployment_id,
+                target=DeploymentReplicaGroupHistoryTarget(deployment_id=deployment_id),
                 querier=querier,
             )
         )
