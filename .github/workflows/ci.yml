@@ -99,7 +99,7 @@ jobs:
         echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
         echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
     - name: Set up Python as Runtime
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@v7
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
     - name: Set up remote cache backend (if applicable)
@@ -200,7 +200,7 @@ jobs:
         echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
         echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
     - name: Set up Python as Runtime
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@v7
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
     - name: Set up remote cache backend (if applicable)
@@ -302,7 +302,7 @@ jobs:
         echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
     - name: Set up Python as Runtime
       if: env.RUN_ALEMBIC_CHECK == 'true'
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@v7
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
     - name: Check for multiple heads
@@ -389,7 +389,7 @@ jobs:
         echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
         echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
     - name: Set up Python as Runtime
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@v7
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
     - name: Set up remote cache backend (if applicable)
@@ -471,7 +471,7 @@ jobs:
         echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
         echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
     - name: Set up Python as Runtime
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@v7
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
     - name: Set up remote cache backend (if applicable)
@@ -557,7 +557,7 @@ jobs:
         echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
         echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
     - name: Set up Python as Runtime
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@v7
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
     - name: Set up remote cache backend (if applicable)
@@ -681,7 +681,7 @@ jobs:
       if: ${{ startsWith(matrix.os, 'macos') }}
       run: brew install coreutils
     - name: Set up Python as Runtime
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@v7
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
         cache: "pip"
@@ -735,7 +735,7 @@ jobs:
         echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
         echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
     - name: Set up Python as Runtime
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@v7
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
         cache: "pip"
@@ -786,7 +786,7 @@ jobs:
         echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
         echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
     - name: Set up Python as Runtime
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@v7
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
     - name: Bootstrap Pants
@@ -852,7 +852,7 @@ jobs:
         PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
         echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
     - name: Set up Python as Runtime
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@v7
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
     - name: Install local dependencies for packaging
@@ -1041,7 +1041,7 @@ jobs:
         PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
         echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
     - name: Set up Python
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@v7
       with:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
         cache: pip
