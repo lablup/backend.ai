@@ -11,6 +11,7 @@ from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.scheduling_history.request import (
     DeploymentHistoryFilter,
     DeploymentHistoryOrder,
+    ReplicaGroupHistoryFilter,
     RouteHistoryFilter,
     RouteHistoryOrder,
     SchedulingResultFilter,
@@ -246,3 +247,24 @@ class TestSearchRouteHistoryInput:
         restored = SearchRouteHistoryInput.model_validate_json(json_str)
         assert restored.limit == 75
         assert restored.offset == 25
+
+
+class TestReplicaGroupHistoryFilter:
+    """AND/OR/NOT are typed ``list[Self]``, so nested conjunctions parse as the same filter."""
+
+    def test_default_creation_all_none(self) -> None:
+        f = ReplicaGroupHistoryFilter()
+        assert f.AND is None
+        assert f.OR is None
+        assert f.NOT is None
+
+    def test_nested_conjunctions_parse_as_the_same_filter(self) -> None:
+        f = ReplicaGroupHistoryFilter.model_validate({
+            "AND": [{"phase": {"equals": "DEPLOYING"}}],
+            "OR": [{"NOT": [{"result": {"equals": "SUCCESS"}}]}],
+        })
+        assert f.AND is not None
+        assert f.OR is not None
+        assert isinstance(f.AND[0], ReplicaGroupHistoryFilter)
+        assert f.OR[0].NOT is not None
+        assert isinstance(f.OR[0].NOT[0], ReplicaGroupHistoryFilter)
