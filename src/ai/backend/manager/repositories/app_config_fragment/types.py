@@ -22,26 +22,15 @@ from ai.backend.manager.models.user import UserRow
 
 __all__ = (
     "AppConfigFragmentSearchScope",
-    "AppConfigScopeArguments",
     "ResolvedAppConfigScope",
 )
-
-
-@dataclass(frozen=True)
-class AppConfigScopeArguments:
-    """The scope arguments a caller supplies for a resolve — the domain, never the user.
-
-    Add new caller-supplied scope dimensions here rather than growing method signatures.
-    """
-
-    domain_id: DomainID
 
 
 @dataclass(frozen=True)
 class ResolvedAppConfigScope:
     """The principal an ``AppConfig`` is resolved for: the resolving user and its domain.
 
-    :class:`AppConfigScopeArguments` plus the session user. Plain value object — not a
+    Both halves come from the session — never caller-supplied. Plain value object — not a
     :class:`SearchScope`.
     """
 

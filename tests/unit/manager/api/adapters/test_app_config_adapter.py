@@ -108,20 +108,11 @@ class TestAppConfigAdapterConverters:
 
 
 class TestResolveAppConfigInput:
-    def test_parses_nested_scope_arguments(self) -> None:
-        domain_id = uuid4()
+    def test_parses_config_names(self) -> None:
+        parsed = ResolveAppConfigInput.model_validate({"config_names": ["theme", "layout"]})
 
-        parsed = ResolveAppConfigInput.model_validate({
-            "config_names": ["theme"],
-            "scope_arguments": {"domain_ids": [str(domain_id)]},
-        })
-
-        assert parsed.config_names == ["theme"]
-        assert parsed.scope_arguments.domain_ids == [domain_id]
+        assert parsed.config_names == ["theme", "layout"]
 
     def test_rejects_empty_config_names(self) -> None:
         with pytest.raises(BackendAISchemaValidationFailed):
-            ResolveAppConfigInput.model_validate({
-                "config_names": [],
-                "scope_arguments": {"domain_ids": [str(uuid4())]},
-            })
+            ResolveAppConfigInput.model_validate({"config_names": []})

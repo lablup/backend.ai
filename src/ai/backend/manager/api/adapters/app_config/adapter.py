@@ -20,7 +20,6 @@ from ai.backend.manager.data.app_config.types import AppConfigData
 from ai.backend.manager.data.app_config_fragment.types import (
     AppConfigFragmentData,
 )
-from ai.backend.manager.repositories.app_config_fragment.types import AppConfigScopeArguments
 from ai.backend.manager.services.app_config.actions.resolve import ResolveAppConfigsAction
 
 
@@ -37,10 +36,7 @@ class AppConfigAdapter(BaseAdapter):
         action_result = await self._processors.app_config.resolve_app_configs.wait_for_complete(
             ResolveAppConfigsAction(
                 config_names=input.config_names,
-                # TODO(BA-7003): only the first domain is used — see AppConfigScopeArgumentsDTO.
-                scope_arguments=AppConfigScopeArguments(
-                    domain_id=input.scope_arguments.domain_ids[0]
-                ),
+                domain_name=me.domain_name,
                 user_id=UserID(me.user_id),
             )
         )

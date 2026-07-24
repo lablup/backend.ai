@@ -8,7 +8,6 @@ from ai.backend.common.identifier.user import UserID
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.app_config.types import AppConfigData
 from ai.backend.manager.data.permission.types import RBACElementRef
-from ai.backend.manager.repositories.app_config_fragment.types import AppConfigScopeArguments
 from ai.backend.manager.services.app_config.actions.base import (
     AppConfigScopeAction,
     AppConfigScopeActionResult,
@@ -19,13 +18,13 @@ from ai.backend.manager.services.app_config.actions.base import (
 class ResolveAppConfigsAction(AppConfigScopeAction):
     """Resolve the merged ``AppConfig`` for each of ``config_names``.
 
-    ``scope_arguments`` is the caller's to name; ``user_id`` is not — the handler fills it
-    from the session, so a resolve is only ever for the acting user. Either half unset is the
-    anonymous, pre-login read.
+    Neither ``domain_name`` nor ``user_id`` is caller-supplied — the adapter fills both from
+    the session, so a resolve is only ever for the acting user in their own domain. Either
+    half unset is the anonymous, pre-login read.
     """
 
     config_names: list[str]
-    scope_arguments: AppConfigScopeArguments | None = None
+    domain_name: str | None = None
     user_id: UserID | None = None
 
     @override

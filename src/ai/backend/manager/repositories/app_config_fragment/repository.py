@@ -4,6 +4,7 @@ from collections.abc import Sequence
 
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
+from ai.backend.common.identifier.domain import DomainID, DomainName
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
@@ -97,3 +98,7 @@ class AppConfigFragmentRepository:
         self, config_names: list[str], scope: ResolvedAppConfigScope | None = None
     ) -> list[AppConfigFragmentData]:
         return await self._db_source.list_visible_fragments_bulk(config_names, scope)
+
+    @app_config_fragment_repository_resilience.apply()
+    async def get_domain_id_by_name(self, name: DomainName) -> DomainID:
+        return await self._db_source.get_domain_id_by_name(name)

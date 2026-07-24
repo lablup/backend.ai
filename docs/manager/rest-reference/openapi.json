@@ -547,28 +547,8 @@
         "title": "AdminSearchAgentsInput",
         "type": "object"
       },
-      "AppConfigScopeArgumentsDTO": {
-        "description": "The scope a caller supplies for a resolve — the domain, never the user.\n\nThe wire twin of the repository's ``AppConfigScopeArguments``: the adapter fills the\nuser from the session, so a resolve is only ever for the acting user. Grow new\ncaller-supplied scope dimensions here, mirroring the repository type, rather than adding\nflat fields to the request.",
-        "properties": {
-          "domain_ids": {
-            "description": "Domains to resolve the domain-scope overlay at. Only the first is used.",
-            "items": {
-              "format": "uuid",
-              "type": "string"
-            },
-            "minItems": 1,
-            "title": "Domain Ids",
-            "type": "array"
-          }
-        },
-        "required": [
-          "domain_ids"
-        ],
-        "title": "AppConfigScopeArgumentsDTO",
-        "type": "object"
-      },
       "ResolveAppConfigInput": {
-        "description": "Input for resolving merged AppConfigs at a named scope, for the acting user.",
+        "description": "Input for resolving merged AppConfigs for the acting user.\n\nThe scope is never caller-supplied: the adapter takes both the user and the domain from\nthe session, so a resolve is only ever for the acting user in their own domain.",
         "properties": {
           "config_names": {
             "description": "Config names to resolve the merged view for.",
@@ -578,15 +558,10 @@
             "minItems": 1,
             "title": "Config Names",
             "type": "array"
-          },
-          "scope_arguments": {
-            "$ref": "#/components/schemas/AppConfigScopeArgumentsDTO",
-            "description": "Caller-supplied scope for the resolve."
           }
         },
         "required": [
-          "config_names",
-          "scope_arguments"
+          "config_names"
         ],
         "title": "ResolveAppConfigInput",
         "type": "object"

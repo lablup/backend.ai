@@ -13,28 +13,25 @@ import pytest
 from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.common.identifier.app_config import AppConfigScopeID
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
-from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.domain import DomainID, DomainName
 from ai.backend.common.identifier.user import UserID
 from ai.backend.manager.data.app_config_fragment.types import AppConfigFragmentData
 from ai.backend.manager.errors.app_config import AppConfigFragmentNotFound
 from ai.backend.manager.repositories.app_config_fragment.repository import (
     AppConfigFragmentRepository,
 )
-from ai.backend.manager.repositories.app_config_fragment.types import (
-    AppConfigScopeArguments,
-    ResolvedAppConfigScope,
-)
+from ai.backend.manager.repositories.app_config_fragment.types import ResolvedAppConfigScope
 from ai.backend.manager.services.app_config.actions.resolve import ResolveAppConfigsAction
 from ai.backend.manager.services.app_config.service import AppConfigService
 
 _USER_ID = UserID(uuid.uuid4())
 _DOMAIN_ID = DomainID(uuid.uuid4())
+_DOMAIN_NAME = DomainName("default")
 
 # The same owners seen as a fragment's scope_id, which is polymorphic over scope kinds.
 _USER_SCOPE_ID = AppConfigScopeID(_USER_ID)
 _DOMAIN_SCOPE_ID = AppConfigScopeID(_DOMAIN_ID)
 _NOW = datetime.now(UTC)
-_SCOPE_ARGS = AppConfigScopeArguments(domain_id=_DOMAIN_ID)
 
 FragmentFactory = Callable[
     [str, dict[str, Any], AppConfigScopeType, AppConfigScopeID | None],
@@ -71,7 +68,9 @@ def make_fragment() -> FragmentFactory:
 class TestAppConfigService:
     @pytest.fixture
     def mock_fragment_repository(self) -> MagicMock:
-        return MagicMock(spec=AppConfigFragmentRepository)
+        repository = MagicMock(spec=AppConfigFragmentRepository)
+        repository.get_domain_id_by_name = AsyncMock(return_value=_DOMAIN_ID)
+        return repository
 
     @pytest.fixture
     def service(self, mock_fragment_repository: MagicMock) -> AppConfigService:
@@ -174,7 +173,7 @@ class TestAppConfigService:
     ) -> None:
         result = await service.resolve_app_configs(
             ResolveAppConfigsAction(
-                config_names=["theme"], scope_arguments=_SCOPE_ARGS, user_id=_USER_ID
+                config_names=["theme"], domain_name=_DOMAIN_NAME, user_id=_USER_ID
             )
         )
 
@@ -182,20 +181,21 @@ class TestAppConfigService:
         assert result.app_configs[0].fragments == deep_merge_fragments
         assert result.app_configs[0].merged_config == {"theme": "dark", "lang": "en"}
 
-    async def test_resolve_builds_the_scope_from_the_injected_user(
+    async def test_resolve_builds_the_scope_from_the_injected_session(
         self,
         service: AppConfigService,
         mock_fragment_repository: MagicMock,
         deep_merge_fragments: list[AppConfigFragmentData],
     ) -> None:
-        # The caller names only the domain; the handler injects the user half, so there is
-        # no way for a caller to resolve someone else's config.
+        # Both halves come from the session: the domain name is resolved to its id and paired
+        # with the acting user, so there is no way for a caller to resolve someone else's config.
         result = await service.resolve_app_configs(
             ResolveAppConfigsAction(
-                config_names=["theme"], scope_arguments=_SCOPE_ARGS, user_id=_USER_ID
+                config_names=["theme"], domain_name=_DOMAIN_NAME, user_id=_USER_ID
             )
         )
 
+        mock_fragment_repository.get_domain_id_by_name.assert_called_once_with(_DOMAIN_NAME)
         mock_fragment_repository.list_visible_fragments_bulk.assert_called_once_with(
             ["theme"], ResolvedAppConfigScope(domain_id=_DOMAIN_ID, user_id=_USER_ID)
         )
@@ -207,9 +207,7 @@ class TestAppConfigService:
         list_replace_fragments: list[AppConfigFragmentData],
     ) -> None:
         result = await service.resolve_app_configs(
-            ResolveAppConfigsAction(
-                config_names=["ui"], scope_arguments=_SCOPE_ARGS, user_id=_USER_ID
-            )
+            ResolveAppConfigsAction(config_names=["ui"], domain_name=_DOMAIN_NAME, user_id=_USER_ID)
         )
 
         # The user's shorter nav list fully replaces public's — no trailing "about"/"contact".
@@ -225,7 +223,7 @@ class TestAppConfigService:
     ) -> None:
         result = await service.resolve_app_configs(
             ResolveAppConfigsAction(
-                config_names=["theme", "menu"], scope_arguments=_SCOPE_ARGS, user_id=_USER_ID
+                config_names=["theme", "menu"], domain_name=_DOMAIN_NAME, user_id=_USER_ID
             )
         )
 
@@ -243,7 +241,7 @@ class TestAppConfigService:
         # position resolves independently, never collapsed into a single entry.
         result = await service.resolve_app_configs(
             ResolveAppConfigsAction(
-                config_names=["theme", "theme"], scope_arguments=_SCOPE_ARGS, user_id=_USER_ID
+                config_names=["theme", "theme"], domain_name=_DOMAIN_NAME, user_id=_USER_ID
             )
         )
 
@@ -260,7 +258,7 @@ class TestAppConfigService:
         with pytest.raises(AppConfigFragmentNotFound):
             await service.resolve_app_configs(
                 ResolveAppConfigsAction(
-                    config_names=["unknown"], scope_arguments=_SCOPE_ARGS, user_id=_USER_ID
+                    config_names=["unknown"], domain_name=_DOMAIN_NAME, user_id=_USER_ID
                 )
             )
 
@@ -275,7 +273,7 @@ class TestAppConfigService:
             await service.resolve_app_configs(
                 ResolveAppConfigsAction(
                     config_names=["theme", "menu", "unknown"],
-                    scope_arguments=_SCOPE_ARGS,
+                    domain_name=_DOMAIN_NAME,
                     user_id=_USER_ID,
                 )
             )
@@ -286,10 +284,10 @@ class TestAppConfigService:
         mock_fragment_repository: MagicMock,
         public_only_fragments: list[AppConfigFragmentData],
     ) -> None:
-        # Scope arguments but no user_id: the handler had no session to fill it from, so
+        # A domain name but no user_id: the adapter had no session to fill the user from, so
         # this degrades to the anonymous read rather than failing.
         result = await service.resolve_app_configs(
-            ResolveAppConfigsAction(config_names=["theme"], scope_arguments=_SCOPE_ARGS)
+            ResolveAppConfigsAction(config_names=["theme"], domain_name=_DOMAIN_NAME)
         )
 
         assert result.app_configs[0].merged_config == {"theme": "light", "lang": "en"}
@@ -298,7 +296,7 @@ class TestAppConfigService:
             ["theme"], None
         )
 
-    async def test_resolve_without_scope_arguments_merges_public_fragments_only(
+    async def test_resolve_without_domain_or_user_merges_public_fragments_only(
         self,
         service: AppConfigService,
         mock_fragment_repository: MagicMock,
