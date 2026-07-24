@@ -477,8 +477,24 @@ class BackgroundTaskManager:
             total_info=total_info,
             task=task,
         )
+        self._evict_when_done(task_id)
         await self._valkey_client.register_task(total_info, self._task_set_key)
         return task_id
+
+    def _evict_when_done(self, task_id: TaskID) -> None:
+        """Remove the task from `_ongoing_tasks` once all of its async tasks finish."""
+        background_task = self._ongoing_tasks.get(task_id)
+        if background_task is None:
+            return
+        pending = set(background_task.async_tasks())
+
+        def _on_done(finished: asyncio.Task[Any]) -> None:
+            pending.discard(finished)
+            if not pending:
+                self._ongoing_tasks.pop(task_id, None)
+
+        for async_task in background_task.async_tasks():
+            async_task.add_done_callback(_on_done)
 
     @_exception_to_task_result
     async def _try_to_execute_new_task(
@@ -644,4 +660,5 @@ class BackgroundTaskManager:
                 raise InvalidTaskMetadataError(f"Unsupported task type: {task_info.task_type}")
         if task is not None:
             self._ongoing_tasks[task_info.task_id] = task
+            self._evict_when_done(task_info.task_id)
         await self._valkey_client.claim_task(task_info.task_id, self._task_set_key)
