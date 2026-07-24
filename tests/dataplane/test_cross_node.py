@@ -24,8 +24,6 @@ from ai.backend.testutils.dataplane.guard import LeakGuard
 from ai.backend.testutils.dataplane.nodes import Node
 from ai.backend.testutils.dataplane.session import SessionDriver, SessionSpec
 
-OVERLAY_IFNAME = "baimulti0"
-
 
 class TestCrossNodeOverlay:
     @pytest.fixture
@@ -46,7 +44,7 @@ class TestCrossNodeOverlay:
         node_pair: tuple[Node, Node],
     ) -> None:
         async with session_driver.session(cross_node_spec, "dp-g14") as handle:
-            per_node = {n.name: await _overlay_endpoints(n, handle.name) for n in node_pair}
+            per_node = {n.name: await probe.overlay_endpoints(n, handle.name) for n in node_pair}
             occupied = {name: eps for name, eps in per_node.items() if eps}
             if len(occupied) < 2:
                 pytest.skip(
@@ -75,12 +73,3 @@ class TestCrossNodeOverlay:
                 f"the kernel on {name_b} ({ip_b}) cannot reach its peer on {name_a} ({ip_a}) over "
                 "the overlay (reverse direction)"
             )
-
-
-async def _overlay_endpoints(node: Node, session_name: str) -> list[tuple[str, str]]:
-    """``[(pid, overlay ip)]`` for the session's kernels on this node (empty if none landed here)."""
-    endpoints: list[tuple[str, str]] = []
-    for container_id in await probe.session_container_ids(node, session_name):
-        pid = await probe.task_pid(node, container_id)
-        endpoints.append((pid, await probe.interface_address(node, pid, OVERLAY_IFNAME)))
-    return endpoints

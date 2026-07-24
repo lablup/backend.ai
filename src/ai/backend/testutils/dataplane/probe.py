@@ -59,6 +59,28 @@ async def default_gateway(node: Node, pid: str) -> str:
     raise AssertionError(f"no default gateway in pid {pid}: {out.stdout!r}")
 
 
+async def local_endpoints(node: Node, session_name: str) -> list[tuple[str, str]]:
+    """``[(task pid, LOCAL eth0 address)]`` for the session's kernels on this node."""
+    return await _endpoints_on(node, session_name, "eth0")
+
+
+async def overlay_endpoints(node: Node, session_name: str) -> list[tuple[str, str]]:
+    """``[(task pid, OVERLAY baimulti0 address)]`` for the session's kernels on this node.
+
+    Empty when none of the session's kernels landed here -- how a cross-node scenario learns which
+    node each kernel is on without trusting the manager's placement.
+    """
+    return await _endpoints_on(node, session_name, "baimulti0")
+
+
+async def _endpoints_on(node: Node, session_name: str, ifname: str) -> list[tuple[str, str]]:
+    endpoints: list[tuple[str, str]] = []
+    for container_id in await session_container_ids(node, session_name):
+        pid = await task_pid(node, container_id)
+        endpoints.append((pid, await interface_address(node, pid, ifname)))
+    return endpoints
+
+
 async def reaches(node: Node, pid: str, target: str) -> bool:
     """Can the container at ``pid`` reach ``target``? One bounded ping from inside its netns.
 
