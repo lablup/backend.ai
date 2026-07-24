@@ -15638,6 +15638,7 @@
           "storage_host",
           "agent",
           "kernel",
+          "replica_group",
           "routing",
           "image",
           "artifact",
