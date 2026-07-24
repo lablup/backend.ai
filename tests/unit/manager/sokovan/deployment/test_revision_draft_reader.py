@@ -75,6 +75,19 @@ class TestRevisionDraftReaderModelPathDefault:
 
 
 class TestRevisionDraftReaderVFolderDrafts:
+    async def test_missing_definition_files_are_skipped(self) -> None:
+        repository = MagicMock()
+        repository.fetch_deployment_config = AsyncMock(return_value=None)
+        repository.fetch_model_definition = AsyncMock(return_value=None)
+        reader = RevisionDraftReader(deployment_repository=repository)
+
+        drafts = await reader._read_vfolder_drafts(
+            _mounts(),
+            _variant(reads_vfolder_config_files=True),
+        )
+
+        assert drafts == []
+
     async def test_records_resolved_default_model_definition_path(self) -> None:
         repository = MagicMock()
         repository.fetch_deployment_config = AsyncMock(return_value=None)
