@@ -8,7 +8,7 @@ real endpoint and replica groups rather than history rows alone.
 from __future__ import annotations
 
 import uuid
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Callable
 from dataclasses import dataclass
 
 import pytest
@@ -25,6 +25,7 @@ from ai.backend.common.types import BinarySize, ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.deployment.types import (
     ReplicaGroupHandlerCategory,
+    ReplicaGroupHistoryData,
     ReplicaGroupLifecycle,
     ReplicaGroupScalingStatus,
 )
@@ -50,6 +51,7 @@ from ai.backend.manager.models.resource_policy import (
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
+from ai.backend.manager.models.scopes import SearchScope
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -80,6 +82,25 @@ class _ReplicaGroupHistorySeed:
     @property
     def deployment_count(self) -> int:
         return self.target_count + self.sibling_count
+
+
+@dataclass(frozen=True)
+class _ScopedSearchCase:
+    """A scope dimension the scoped search accepts, plus what it should return."""
+
+    label: str
+    scope: Callable[[_ReplicaGroupHistorySeed], SearchScope]
+    expected_count: Callable[[_ReplicaGroupHistorySeed], int]
+    row_belongs: Callable[[ReplicaGroupHistoryData, _ReplicaGroupHistorySeed], bool]
+
+
+@dataclass(frozen=True)
+class _UnknownScopeCase:
+    """A scope dimension pointed at a non-existent target, and the error it raises."""
+
+    label: str
+    scope: SearchScope
+    error: type[Exception]
 
 
 class TestReplicaGroupHistoryRepository:
@@ -352,26 +373,47 @@ class TestReplicaGroupHistoryRepository:
         assert result.total_count == replica_group_history_seed.target_scaling_count
         assert all(item.category == ReplicaGroupHandlerCategory.SCALING for item in result.items)
 
-    async def test_scoped_search_replica_group_history_by_replica_group(
+    @pytest.mark.parametrize(
+        "case",
+        [
+            _ScopedSearchCase(
+                label="replica-group",
+                scope=lambda seed: ReplicaGroupReplicaGroupHistorySearchScope(
+                    replica_group_id=seed.replica_group_id
+                ),
+                expected_count=lambda seed: seed.target_count,
+                row_belongs=lambda item, seed: item.replica_group_id == seed.replica_group_id,
+            ),
+            _ScopedSearchCase(
+                label="deployment",
+                scope=lambda seed: DeploymentReplicaGroupHistorySearchScope(
+                    deployment_id=seed.deployment_id
+                ),
+                expected_count=lambda seed: seed.deployment_count,
+                row_belongs=lambda item, seed: item.deployment_id == seed.deployment_id,
+            ),
+        ],
+        ids=lambda case: case.label,
+    )
+    async def test_scoped_search_returns_the_rows_within_the_scope(
         self,
+        case: _ScopedSearchCase,
         scheduling_history_repository: SchedulingHistoryRepository,
         replica_group_history_seed: _ReplicaGroupHistorySeed,
     ) -> None:
-        """Test that the scoped search leaves out the sibling replica group"""
-        target_group_id = replica_group_history_seed.replica_group_id
-
+        """Test that the scoped search returns exactly the rows under the scope"""
+        seed = replica_group_history_seed
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=100, offset=0),
             conditions=[],
             orders=[],
         )
         result = await scheduling_history_repository.scoped_search_replica_group_history(
-            querier,
-            [ReplicaGroupReplicaGroupHistorySearchScope(replica_group_id=target_group_id)],
+            querier, [case.scope(seed)]
         )
 
-        assert result.total_count == replica_group_history_seed.target_count
-        assert all(item.replica_group_id == target_group_id for item in result.items)
+        assert result.total_count == case.expected_count(seed)
+        assert all(case.row_belongs(item, seed) for item in result.items)
 
     async def test_scoped_search_replica_group_history_narrows_within_the_scope(
         self,
@@ -428,69 +470,44 @@ class TestReplicaGroupHistoryRepository:
         assert returned_attempts[0] == min(replica_group_history_seed.target_lifecycle_attempts)
         assert returned_attempts[-1] == max(replica_group_history_seed.target_lifecycle_attempts)
 
-    async def test_scoped_search_replica_group_history_unknown_group(
+    @pytest.mark.parametrize(
+        "case",
+        [
+            _UnknownScopeCase(
+                label="replica-group",
+                scope=ReplicaGroupReplicaGroupHistorySearchScope(
+                    replica_group_id=ReplicaGroupID(
+                        uuid.UUID("00000000-0000-0000-0000-0000000000aa")
+                    )
+                ),
+                error=ReplicaGroupNotFound,
+            ),
+            _UnknownScopeCase(
+                label="deployment",
+                scope=DeploymentReplicaGroupHistorySearchScope(
+                    deployment_id=DeploymentID(uuid.UUID("00000000-0000-0000-0000-0000000000bb"))
+                ),
+                error=EndpointNotFound,
+            ),
+        ],
+        ids=lambda case: case.label,
+    )
+    async def test_scoped_search_rejects_an_unknown_scope(
         self,
+        case: _UnknownScopeCase,
         db_with_cleanup: ExtendedAsyncSAEngine,
         scheduling_history_repository: SchedulingHistoryRepository,
     ) -> None:
-        """Test that the scope's existence check rejects an unknown replica group"""
+        """Test that the scope's existence check rejects a non-existent target"""
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=100, offset=0),
             conditions=[],
             orders=[],
         )
 
-        with pytest.raises(ReplicaGroupNotFound):
+        with pytest.raises(case.error):
             await scheduling_history_repository.scoped_search_replica_group_history(
-                querier,
-                [
-                    ReplicaGroupReplicaGroupHistorySearchScope(
-                        replica_group_id=ReplicaGroupID(uuid.uuid4())
-                    )
-                ],
-            )
-
-    async def test_scoped_search_replica_group_history_by_deployment(
-        self,
-        scheduling_history_repository: SchedulingHistoryRepository,
-        replica_group_history_seed: _ReplicaGroupHistorySeed,
-    ) -> None:
-        """Test that the deployment scope returns every replica group's rows under it"""
-        deployment_id = replica_group_history_seed.deployment_id
-
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=100, offset=0),
-            conditions=[],
-            orders=[],
-        )
-        result = await scheduling_history_repository.scoped_search_replica_group_history(
-            querier,
-            [DeploymentReplicaGroupHistorySearchScope(deployment_id=deployment_id)],
-        )
-
-        assert result.total_count == replica_group_history_seed.deployment_count
-        assert all(item.deployment_id == deployment_id for item in result.items)
-
-    async def test_scoped_search_replica_group_history_unknown_deployment(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        scheduling_history_repository: SchedulingHistoryRepository,
-    ) -> None:
-        """Test that the scope's existence check rejects an unknown deployment"""
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=100, offset=0),
-            conditions=[],
-            orders=[],
-        )
-
-        with pytest.raises(EndpointNotFound):
-            await scheduling_history_repository.scoped_search_replica_group_history(
-                querier,
-                [
-                    DeploymentReplicaGroupHistorySearchScope(
-                        deployment_id=DeploymentID(uuid.uuid4())
-                    )
-                ],
+                querier, [case.scope]
             )
 
     async def test_resolve_replica_group_deployment(
