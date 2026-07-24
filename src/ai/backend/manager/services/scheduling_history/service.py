@@ -10,10 +10,6 @@ from .actions.resolve_kernel_session import (
     ResolveKernelSessionAction,
     ResolveKernelSessionActionResult,
 )
-from .actions.resolve_replica_group_deployment import (
-    ResolveReplicaGroupDeploymentAction,
-    ResolveReplicaGroupDeploymentActionResult,
-)
 from .actions.scoped_search_replica_group_history import (
     ScopedSearchReplicaGroupHistoryAction,
     ScopedSearchReplicaGroupHistoryActionResult,
@@ -203,16 +199,6 @@ class SchedulingHistoryService:
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,
         )
-
-    async def resolve_replica_group_deployment(
-        self,
-        action: ResolveReplicaGroupDeploymentAction,
-    ) -> ResolveReplicaGroupDeploymentActionResult:
-        """Resolves the deployment owning a replica group; raises ReplicaGroupNotFound if absent."""
-        deployment_id = await self._repository.resolve_replica_group_deployment(
-            action.replica_group_id
-        )
-        return ResolveReplicaGroupDeploymentActionResult(deployment_id=deployment_id)
 
     async def scoped_search_replica_group_history(
         self,

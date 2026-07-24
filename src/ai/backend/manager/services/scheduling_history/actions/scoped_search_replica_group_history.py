@@ -5,7 +5,6 @@ from typing import override
 
 from ai.backend.common.data.permission.types import EntityType, RBACElementType, ScopeType
 from ai.backend.common.identifier.deployment import DeploymentID
-from ai.backend.common.identifier.replica_group import ReplicaGroupID
 from ai.backend.manager.actions.action.scope import BaseScopeAction, BaseScopeActionResult
 from ai.backend.manager.actions.action.types import SearchableActionTarget
 from ai.backend.manager.actions.types import ActionOperationType
@@ -15,7 +14,6 @@ from ai.backend.manager.models.scopes import SearchScope
 from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.scheduling_history.types import (
     DeploymentReplicaGroupHistorySearchScope,
-    ReplicaGroupReplicaGroupHistorySearchScope,
 )
 
 
@@ -26,35 +24,6 @@ class ReplicaGroupHistoryTarget(SearchableActionTarget):
     Each variant carries only the id its own dimension is keyed by and derives
     both the row filter and the RBAC element ref from it.
     """
-
-
-@dataclass(frozen=True)
-class ReplicaGroupReplicaGroupHistoryTarget(ReplicaGroupHistoryTarget):
-    """Scope item narrowing the history to one replica group.
-
-    Not dispatchable yet: replica groups hold no RBAC permission records of
-    their own, so the adapter converts a replica-group scope item into a
-    ``DeploymentReplicaGroupHistoryTarget`` on the owning deployment and narrows
-    the rows back down with a ``replica_group_id`` query condition. This is the
-    target it must pass once virtual scopes land.
-    """
-
-    replica_group_id: ReplicaGroupID
-
-    @override
-    def to_search_scope(self) -> SearchScope:
-        return ReplicaGroupReplicaGroupHistorySearchScope(replica_group_id=self.replica_group_id)
-
-    @override
-    def to_rbac_element_ref(self) -> RBACElementRef:
-        # Not dispatchable yet: a replica group is not an RBAC scope of its own, so
-        # the adapter never passes this target (it converts to the owning
-        # deployment). Once virtual scopes make replica groups a scope, return
-        # RBACElementRef(RBACElementType.REPLICA_GROUP, ...).
-        raise NotImplementedError(
-            "ReplicaGroupReplicaGroupHistoryTarget is not authorizable until replica "
-            "groups become RBAC scopes"
-        )
 
 
 @dataclass(frozen=True)
@@ -97,9 +66,8 @@ class ScopedSearchReplicaGroupHistoryAction(BaseScopeAction):
 
     @override
     def scope_type(self) -> ScopeType:
-        # TODO: Derive from the target once a ReplicaGroupReplicaGroupHistoryTarget
-        # becomes dispatchable; the deployment is the only scope a caller can reach
-        # today.
+        # The deployment is the only scope replica-group history is searched under: a
+        # replica group is not an RBAC scope of its own.
         return ScopeType.MODEL_DEPLOYMENT
 
     @override

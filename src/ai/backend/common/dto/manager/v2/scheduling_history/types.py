@@ -155,15 +155,14 @@ class RouteHistoryScopeDTO(BaseRequestModel):
 class ReplicaGroupHistoryScopeDTO(BaseRequestModel):
     """Scope for replica-group scheduling history queries.
 
-    Each list is OR'd internally and across categories. Raises an error if every
-    field is empty. The scoped search is still a single-target scope action, so
-    only one item is dispatchable today; the list shape keeps the wire contract
-    stable for the multi-target case.
+    The list is OR'd internally. Raises an error if empty. The scoped search is
+    still a single-target scope action, so only one item is dispatchable today;
+    the list shape keeps the wire contract stable for the multi-target case.
+
+    A replica group is not an RBAC scope of its own, so the history is scoped by
+    the owning deployment.
     """
 
-    replica_group: list[UUIDScope] | None = Field(
-        default=None, description="Replica group IDs to get history for."
-    )
     deployment: list[UUIDScope] | None = Field(
         default=None,
         description="Deployment IDs to get the history of every owned replica group for.",
@@ -171,9 +170,8 @@ class ReplicaGroupHistoryScopeDTO(BaseRequestModel):
 
     @model_validator(mode="after")
     def _require_non_empty(self) -> Self:
-        if not self.replica_group and not self.deployment:
+        if not self.deployment:
             raise ValueError(
-                "ReplicaGroupHistoryScopeDTO requires a non-empty value for "
-                "'replica_group' or 'deployment'"
+                "ReplicaGroupHistoryScopeDTO requires a non-empty value for 'deployment'"
             )
         return self

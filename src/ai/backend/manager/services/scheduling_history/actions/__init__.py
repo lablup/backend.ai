@@ -9,10 +9,6 @@ from .resolve_kernel_session import (
     ResolveKernelSessionAction,
     ResolveKernelSessionActionResult,
 )
-from .resolve_replica_group_deployment import (
-    ResolveReplicaGroupDeploymentAction,
-    ResolveReplicaGroupDeploymentActionResult,
-)
 from .scoped_search_replica_group_history import (
     ScopedSearchReplicaGroupHistoryAction,
     ScopedSearchReplicaGroupHistoryActionResult,
@@ -53,8 +49,6 @@ from .search_session_scoped_history import (
 __all__ = (
     "ResolveKernelSessionAction",
     "ResolveKernelSessionActionResult",
-    "ResolveReplicaGroupDeploymentAction",
-    "ResolveReplicaGroupDeploymentActionResult",
     "SchedulingHistoryAction",
     # Admin actions
     "SearchSessionHistoryAction",
