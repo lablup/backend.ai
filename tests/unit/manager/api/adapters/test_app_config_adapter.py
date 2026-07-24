@@ -10,6 +10,7 @@ import pytest
 
 from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.common.dto.manager.v2.app_config.request import ResolveAppConfigInput
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 from ai.backend.common.identifier.app_config import AppConfigScopeID
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
 from ai.backend.manager.api.adapters.app_config.adapter import AppConfigAdapter
@@ -119,7 +120,7 @@ class TestResolveAppConfigInput:
         assert parsed.scope_arguments.domain_id == domain_id
 
     def test_rejects_empty_config_names(self) -> None:
-        with pytest.raises(ValueError):
+        with pytest.raises(BackendAISchemaValidationFailed):
             ResolveAppConfigInput.model_validate({
                 "config_names": [],
                 "scope_arguments": {"domain_id": str(uuid4())},
