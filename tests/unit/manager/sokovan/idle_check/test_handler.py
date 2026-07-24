@@ -41,7 +41,7 @@ _SPECS: Final[dict[CheckerType, IdleCheckerSpec]] = {
     ),
     CheckerType.NETWORK_TIMEOUT: IdleCheckerSpec(
         type=CheckerType.NETWORK_TIMEOUT,
-        network=NetworkTimeoutSpec(),
+        network=NetworkTimeoutSpec(max_network_inactivity_seconds=3600),
     ),
 }
 

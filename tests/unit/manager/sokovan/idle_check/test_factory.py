@@ -11,6 +11,7 @@ class TestFactoryRegistration:
             replica_group_repository=MagicMock(),
             idle_checker_repository=MagicMock(),
             scheduling_controller=MagicMock(),
+            valkey_live=MagicMock(),
             valkey_schedule=MagicMock(),
             lock_factory=MagicMock(),
             config_provider=MagicMock(),

@@ -274,6 +274,7 @@ class ManagerDependencyComposer(DependencyComposer[DependencyInput, DependencyRe
                 distributed_lock_factory=domain.distributed_lock_factory,
                 valkey_profile_target=config.redis.to_valkey_profile_target(),
                 valkey_schedule=infrastructure.valkey.schedule,
+                valkey_live=infrastructure.valkey.live,
                 valkey_stat=infrastructure.valkey.stat,
                 pidx=setup_input.pidx,
                 scheduler_repository=domain.repositories.scheduler.repository,
