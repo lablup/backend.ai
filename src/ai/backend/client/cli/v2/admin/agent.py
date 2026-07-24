@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import uuid
 
 import click
 
@@ -102,9 +103,10 @@ def search(
 @agent.command(name="update-resource-group")
 @click.argument("agent_id")
 @click.option(
-    "--resource-group",
+    "--resource-group-id",
     required=True,
-    help="Name of the target resource group to move the agent into.",
+    type=click.UUID,
+    help="UUID of the target resource group to move the agent into.",
 )
 @click.option(
     "--policy",
@@ -125,7 +127,7 @@ def search(
 )
 def update_resource_group(
     agent_id: str,
-    resource_group: str,
+    resource_group_id: uuid.UUID,
     policy: str,
     force: bool,
 ) -> None:
@@ -136,7 +138,7 @@ def update_resource_group(
     from ai.backend.common.dto.manager.v2.agent.types import (
         ConflictingSessionCleanupPolicyEnum,
     )
-    from ai.backend.common.identifier.resource_group import ResourceGroupName
+    from ai.backend.common.identifier.resource_group import ResourceGroupID
 
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
@@ -144,7 +146,7 @@ def update_resource_group(
             result = await registry.agent.update_resource_group(
                 agent_id,
                 UpdateAgentResourceGroupInput(
-                    resource_group_name=ResourceGroupName(resource_group),
+                    resource_group_id=ResourceGroupID(resource_group_id),
                     policy=ConflictingSessionCleanupPolicyEnum(policy.lower()),
                     force=force,
                 ),

@@ -56,9 +56,6 @@ from ai.backend.manager.services.agent.actions.update_resource_group import (
     UpdateAgentResourceGroupAction,
 )
 from ai.backend.manager.services.agent.types import ConflictingSessionCleanupPolicy
-from ai.backend.manager.services.scaling_group.actions.resolve_resource_group_id_by_name import (
-    ResolveResourceGroupIDByNameAction,
-)
 
 _AGENT_PAGINATION_SPEC = PaginationSpec(
     forward_order=DEFAULT_FORWARD_ORDER,
@@ -216,13 +213,10 @@ class AgentAdapter(BaseAdapter):
         input: UpdateAgentResourceGroupInput,
     ) -> UpdateAgentResourceGroupPayload:
         """Change an agent's resource group, cleaning up conflicting sessions per policy."""
-        resolve_result = await self._processors.scaling_group.resolve_resource_group_id_by_name.wait_for_complete(
-            ResolveResourceGroupIDByNameAction(name=input.resource_group_name)
-        )
         action_result = await self._processors.agent.update_resource_group.wait_for_complete(
             UpdateAgentResourceGroupAction(
                 agent_id=agent_id,
-                resource_group_id=resolve_result.resource_group_id,
+                resource_group_id=input.resource_group_id,
                 policy=ConflictingSessionCleanupPolicy(input.policy.value),
                 force=input.force,
             )
@@ -230,7 +224,6 @@ class AgentAdapter(BaseAdapter):
         return UpdateAgentResourceGroupPayload(
             agent_id=action_result.agent_id,
             resource_group_id=action_result.resource_group_id,
-            resource_group_name=input.resource_group_name,
             policy=input.policy,
             conflicting_session_ids=[
                 SessionID(sid) for sid in action_result.conflicting_session_ids
