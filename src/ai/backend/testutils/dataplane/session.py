@@ -188,8 +188,8 @@ class SessionDriver:
         await self.wait_until(session_id, frozenset({RUNNING}))
         return SessionHandle(session_id=session_id, name=name)
 
-    async def destroy(self, session_id: UUID, *, wait: bool = True) -> None:
-        await self._api.terminate(TerminateSessionsInput(session_ids=[session_id]))
+    async def destroy(self, session_id: UUID, *, wait: bool = True, forced: bool = False) -> None:
+        await self._api.terminate(TerminateSessionsInput(session_ids=[session_id], forced=forced))
         if wait:
             await self.wait_until(session_id, frozenset({TERMINATED, "CANCELLED"}))
 
