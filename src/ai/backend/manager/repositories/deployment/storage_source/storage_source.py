@@ -9,10 +9,11 @@ from ruamel.yaml import YAML
 
 from ai.backend.common.config import ModelDefinitionDraft
 from ai.backend.common.exception import BackendAIError, InvalidAPIParameters
+from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import BackendAISchema, SchemaValidationFailureInfo, VFolderID
 from ai.backend.manager.data.deployment.types import FetchedModelDefinition
 from ai.backend.manager.data.vfolder.types import VFolderLocation
-from ai.backend.manager.models.storage import StorageSessionManager
+from ai.backend.manager.errors.deployment import DeploymentDefinitionFileReadError
 
 
 @dataclass(frozen=True)
@@ -68,7 +69,14 @@ class DeploymentStorageSource:
         raw = await self._fetch_config_file_in_candidates(vfolder_location, candidates)
         if raw is None:
             return None
-        return DeploymentConfigInput.model_validate(dict(raw.payload))
+        try:
+            return DeploymentConfigInput.model_validate(dict(raw.payload))
+        except Exception as e:
+            raise DeploymentDefinitionFileReadError(
+                vfolder_id=VFolderUUID(vfolder_location.id),
+                filename=raw.filename,
+                cause=e,
+            ) from e
 
     async def fetch_model_definition(
         self,
@@ -85,10 +93,17 @@ class DeploymentStorageSource:
         raw = await self._fetch_config_file_in_candidates(vfolder_location, candidates)
         if raw is None:
             return None
-        return FetchedModelDefinition(
-            path=raw.filename,
-            model_definition=ModelDefinitionDraft.from_file_payload(raw.payload),
-        )
+        try:
+            return FetchedModelDefinition(
+                path=raw.filename,
+                model_definition=ModelDefinitionDraft.from_file_payload(raw.payload),
+            )
+        except Exception as e:
+            raise DeploymentDefinitionFileReadError(
+                vfolder_id=VFolderUUID(vfolder_location.id),
+                filename=raw.filename,
+                cause=e,
+            ) from e
 
     async def _fetch_config_file_in_candidates(
         self,
@@ -117,21 +132,28 @@ class DeploymentStorageSource:
                 continue
             if not raw_bytes:
                 continue
-            loaded: Any
-            if filename.endswith(".toml"):
-                loaded = tomli.loads(raw_bytes.decode("utf-8"))
-            elif filename.endswith((".yaml", ".yml")):
-                loaded = YAML().load(raw_bytes)
-            else:
-                raise InvalidAPIParameters(
-                    f"Unsupported config file extension for '{filename}': "
-                    "only .toml, .yaml, .yml are accepted."
-                )
-            if loaded is None:
-                continue
-            if not isinstance(loaded, Mapping):
-                raise InvalidAPIParameters(
-                    f"Invalid config file '{filename}': top-level value must be a mapping."
-                )
+            try:
+                loaded: Any
+                if filename.endswith(".toml"):
+                    loaded = tomli.loads(raw_bytes.decode("utf-8"))
+                elif filename.endswith((".yaml", ".yml")):
+                    loaded = YAML().load(raw_bytes)
+                else:
+                    raise InvalidAPIParameters(
+                        f"Unsupported config file extension for '{filename}': "
+                        "only .toml, .yaml, .yml are accepted."
+                    )
+                if loaded is None:
+                    continue
+                if not isinstance(loaded, Mapping):
+                    raise InvalidAPIParameters(
+                        f"Invalid config file '{filename}': top-level value must be a mapping."
+                    )
+            except Exception as e:
+                raise DeploymentDefinitionFileReadError(
+                    vfolder_id=VFolderUUID(vfolder_location.id),
+                    filename=filename,
+                    cause=e,
+                ) from e
             return FetchedConfigFile(filename=filename, payload=loaded)
         return None
