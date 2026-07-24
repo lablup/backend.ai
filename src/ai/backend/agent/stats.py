@@ -859,18 +859,31 @@ class StatContext:
                 await self.agent.valkey_stat_client.set_multiple_keys(key_value_map)
 
     async def _get_processes(
-        self, container_id: ContainerId, docker: aiodocker.Docker
+        self, container_id: ContainerId, docker: aiodocker.Docker, timeout: float
     ) -> list[PID]:
         """
         Get the list of PIDs for the given container ID.
+
+        The docker "top" query is bounded by ``timeout`` so that a single
+        unresponsive container (e.g. one stuck in D-state on a failing storage
+        backend, for which all docker queries hang) cannot block PID discovery
+        indefinitely. On timeout the container is skipped for this cycle.
         """
         return_val: list[PID] = []
         try:
-            result = await docker._query_json(f"containers/{container_id}/top", method="GET")
+            async with asyncio.timeout(timeout):
+                result = await docker._query_json(f"containers/{container_id}/top", method="GET")
             procs = result["Processes"]
         except (KeyError, aiodocker.exceptions.DockerError):
             log.debug(
                 "collect_per_container_process_stat(): cannot find container {}", container_id
+            )
+            return return_val
+        except TimeoutError:
+            log.warning(
+                "collect_per_container_process_stat(): timeout querying processes for "
+                "container {}; skipping it for this collection cycle",
+                container_id,
             )
             return return_val
 
@@ -911,14 +924,29 @@ class StatContext:
                 kernel_id_map[ContainerId(cid)] = kid
 
         pid_map: dict[PID, ContainerId] = {}
+        top_timeout = self._local_config.agent.utilization_metric.process.interval
         with self._stage_observer.measure_stage(
             stage=CollectionStage.DOCKER_TOP, upper_layer=CollectionLayer.PROCESS
         ):
             async with aiodocker.Docker() as docker:
-                for cid in container_ids:
-                    active_pids = await self._get_processes(cid, docker)
-                    for pid_ in active_pids:
-                        pid_map[pid_] = cid
+                # Query each container concurrently with a per-container timeout so that a
+                # single unresponsive container cannot stall PID discovery for the others.
+                proc_tasks = [
+                    asyncio.create_task(self._get_processes(cid, docker, top_timeout))
+                    for cid in container_ids
+                ]
+                proc_results = await asyncio.gather(*proc_tasks, return_exceptions=True)
+        for cid, active_pids in zip(container_ids, proc_results, strict=True):
+            if isinstance(active_pids, BaseException):
+                log.warning(
+                    "collect_per_container_process_stat(): failed to get processes for "
+                    "container {}",
+                    cid,
+                    exc_info=active_pids,
+                )
+                continue
+            for pid_ in active_pids:
+                pid_map[pid_] = cid
         # Here we use asyncio.gather() instead of aiotools.TaskGroup
         # to keep methods of other plugins running when a plugin raises an error
         # instead of cancelling them.
