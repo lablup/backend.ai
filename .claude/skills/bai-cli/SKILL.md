@@ -42,7 +42,7 @@ Check options with `--help`.
 - **domain**: user(get) · admin(search, create, update, delete, purge)
 - **user**: user(get, create, update, delete, search) · admin(create, delete, search)
 - **project**: user(get, assign-users, unassign-users · sub role: search) · admin(search, create, update, delete, purge)
-- **agent**: user(empty group) · admin(search, total-resources)
+- **agent**: user(empty group) · admin(search, total-resources, update-resource-group)
 - **image**: user(empty group) · admin(search, forget, purge, update · sub alias: create, remove, search)
 - **session**: user(compute-schedule, enqueue, get, logs, project-search, start-service, shutdown-service, terminate, update) · admin(search · sub kernel: search) · my(search)
 
