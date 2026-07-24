@@ -3,8 +3,8 @@ from __future__ import annotations
 from typing import override
 
 from ai.backend.manager.repositories.idle_checker.repository import IdleCheckerRepository
-from ai.backend.manager.sokovan.idle_check.initial_grace.types import (
-    IdleCheckInitialGraceReconcileInfo,
+from ai.backend.manager.sokovan.idle_check.initial_grace_period.types import (
+    IdleCheckInitialGracePeriodReconcileInfo,
 )
 from ai.backend.manager.sokovan.idle_check.types import (
     IdleCheckCategory,
@@ -13,9 +13,9 @@ from ai.backend.manager.sokovan.idle_check.types import (
 from ai.backend.manager.sokovan.reconciler.base import ReconcilerSource
 
 
-class IdleCheckInitialGraceSource(
+class IdleCheckInitialGracePeriodSource(
     ReconcilerSource[
-        IdleCheckInitialGraceReconcileInfo,
+        IdleCheckInitialGracePeriodReconcileInfo,
         IdleCheckCategory,
         IdleCheckTargetStatuses,
     ]
@@ -30,8 +30,8 @@ class IdleCheckInitialGraceSource(
         self,
         category: IdleCheckCategory,
         target_statuses: IdleCheckTargetStatuses,
-    ) -> IdleCheckInitialGraceReconcileInfo:
+    ) -> IdleCheckInitialGracePeriodReconcileInfo:
         batch = await self._repository.fetch_initial_grace_period_checks(
             target_statuses.session_statuses
         )
-        return IdleCheckInitialGraceReconcileInfo(batch=batch)
+        return IdleCheckInitialGracePeriodReconcileInfo(batch=batch)

@@ -101,8 +101,14 @@ class LockID(enum.IntEnum):
     LOCKID_REPLICA_GROUP_AUTOSCALE_RECONCILE = (
         238  # For replica-group steady-state autoscale reconcile
     )
-    LOCKID_IDLE_CHECK_RECONCILE = 239  # For idle-check reconcile
+    LOCKID_IDLE_CHECK_JUDGMENT_RECONCILE = 239  # For idle-check judgment reconcile
     LOCKID_IDLE_CHECK_SWEEP_RECONCILE = 240  # For idle-check expiry sweep reconcile
+    LOCKID_IDLE_CHECK_ASSIGNMENT_SYNC_RECONCILE = (
+        241  # For idle-check assignment synchronization reconcile
+    )
+    LOCKID_IDLE_CHECK_INITIAL_GRACE_PERIOD_RECONCILE = (
+        242  # For idle-check initial grace period reconcile
+    )
 
 
 SERVICE_MAX_RETRIES = 5  # FIXME: make configurable

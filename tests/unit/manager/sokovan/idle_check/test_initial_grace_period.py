@@ -16,15 +16,15 @@ from ai.backend.manager.repositories.idle_checker.types import (
     InitialGracePeriodCheckData,
     SessionIdleCheckPair,
 )
-from ai.backend.manager.sokovan.idle_check.initial_grace.applier import (
-    IdleCheckInitialGraceApplier,
+from ai.backend.manager.sokovan.idle_check.handlers.initial_grace_period import (
+    IdleCheckInitialGracePeriodHandler,
 )
-from ai.backend.manager.sokovan.idle_check.initial_grace.handler import (
-    IdleCheckInitialGraceHandler,
+from ai.backend.manager.sokovan.idle_check.initial_grace_period.applier import (
+    IdleCheckInitialGracePeriodApplier,
 )
-from ai.backend.manager.sokovan.idle_check.initial_grace.types import (
-    IdleCheckInitialGraceReconcileInfo,
-    IdleCheckInitialGraceResult,
+from ai.backend.manager.sokovan.idle_check.initial_grace_period.types import (
+    IdleCheckInitialGracePeriodReconcileInfo,
+    IdleCheckInitialGracePeriodResult,
 )
 
 
@@ -34,30 +34,30 @@ def now() -> datetime:
 
 
 @dataclass(frozen=True)
-class InitialGraceCheckParam:
+class InitialGracePeriodCheckParam:
     initial_grace_period_seconds: int
     elapsed_seconds: int
     expected_ready: bool
 
 
 @dataclass(frozen=True)
-class InitialGraceHandlerCase:
-    reconcile_info: IdleCheckInitialGraceReconcileInfo
+class InitialGracePeriodHandlerCase:
+    reconcile_info: IdleCheckInitialGracePeriodReconcileInfo
     expected_ready_pairs: list[SessionIdleCheckPair]
 
 
-class TestIdleCheckInitialGraceHandler:
+class TestIdleCheckInitialGracePeriodHandler:
     @pytest.fixture
-    def handler(self) -> IdleCheckInitialGraceHandler:
-        return IdleCheckInitialGraceHandler()
+    def handler(self) -> IdleCheckInitialGracePeriodHandler:
+        return IdleCheckInitialGracePeriodHandler()
 
     @pytest.fixture
     def handler_case(
         self,
         request: pytest.FixtureRequest,
         now: datetime,
-    ) -> InitialGraceHandlerCase:
-        param: InitialGraceCheckParam = request.param
+    ) -> InitialGracePeriodHandlerCase:
+        param: InitialGracePeriodCheckParam = request.param
         check = InitialGracePeriodCheckData(
             pair=SessionIdleCheckPair(
                 session_id=SessionId(uuid4()),
@@ -66,17 +66,17 @@ class TestIdleCheckInitialGraceHandler:
             initial_grace_period_seconds=param.initial_grace_period_seconds,
             grace_started_at=now - timedelta(seconds=param.elapsed_seconds),
         )
-        reconcile_info = IdleCheckInitialGraceReconcileInfo(
+        reconcile_info = IdleCheckInitialGracePeriodReconcileInfo(
             batch=InitialGracePeriodBatchData(checks=[check], now=now)
         )
         expected_ready_pairs = [check.pair] if param.expected_ready else []
-        return InitialGraceHandlerCase(
+        return InitialGracePeriodHandlerCase(
             reconcile_info=reconcile_info,
             expected_ready_pairs=expected_ready_pairs,
         )
 
     @pytest.fixture
-    def mixed_reconcile_info(self, now: datetime) -> IdleCheckInitialGraceReconcileInfo:
+    def mixed_reconcile_info(self, now: datetime) -> IdleCheckInitialGracePeriodReconcileInfo:
         elapsed_check = InitialGracePeriodCheckData(
             pair=SessionIdleCheckPair(
                 session_id=SessionId(uuid4()),
@@ -93,7 +93,7 @@ class TestIdleCheckInitialGraceHandler:
             initial_grace_period_seconds=60,
             grace_started_at=now - timedelta(seconds=59),
         )
-        return IdleCheckInitialGraceReconcileInfo(
+        return IdleCheckInitialGracePeriodReconcileInfo(
             batch=InitialGracePeriodBatchData(
                 checks=[elapsed_check, waiting_check],
                 now=now,
@@ -101,8 +101,8 @@ class TestIdleCheckInitialGraceHandler:
         )
 
     @pytest.fixture
-    def empty_reconcile_info(self, now: datetime) -> IdleCheckInitialGraceReconcileInfo:
-        return IdleCheckInitialGraceReconcileInfo(
+    def empty_reconcile_info(self, now: datetime) -> IdleCheckInitialGracePeriodReconcileInfo:
+        return IdleCheckInitialGracePeriodReconcileInfo(
             batch=InitialGracePeriodBatchData(checks=[], now=now)
         )
 
@@ -110,7 +110,7 @@ class TestIdleCheckInitialGraceHandler:
         "handler_case",
         [
             pytest.param(
-                InitialGraceCheckParam(
+                InitialGracePeriodCheckParam(
                     initial_grace_period_seconds=60,
                     elapsed_seconds=61,
                     expected_ready=True,
@@ -118,7 +118,7 @@ class TestIdleCheckInitialGraceHandler:
                 id="elapsed",
             ),
             pytest.param(
-                InitialGraceCheckParam(
+                InitialGracePeriodCheckParam(
                     initial_grace_period_seconds=60,
                     elapsed_seconds=60,
                     expected_ready=True,
@@ -126,7 +126,7 @@ class TestIdleCheckInitialGraceHandler:
                 id="boundary",
             ),
             pytest.param(
-                InitialGraceCheckParam(
+                InitialGracePeriodCheckParam(
                     initial_grace_period_seconds=60,
                     elapsed_seconds=59,
                     expected_ready=False,
@@ -134,7 +134,7 @@ class TestIdleCheckInitialGraceHandler:
                 id="waiting",
             ),
             pytest.param(
-                InitialGraceCheckParam(
+                InitialGracePeriodCheckParam(
                     initial_grace_period_seconds=0,
                     elapsed_seconds=0,
                     expected_ready=True,
@@ -146,8 +146,8 @@ class TestIdleCheckInitialGraceHandler:
     )
     async def test_selects_check_after_grace_period(
         self,
-        handler: IdleCheckInitialGraceHandler,
-        handler_case: InitialGraceHandlerCase,
+        handler: IdleCheckInitialGracePeriodHandler,
+        handler_case: InitialGracePeriodHandlerCase,
     ) -> None:
         result = await handler.execute(handler_case.reconcile_info)
 
@@ -156,8 +156,8 @@ class TestIdleCheckInitialGraceHandler:
 
     async def test_selects_only_elapsed_checks(
         self,
-        handler: IdleCheckInitialGraceHandler,
-        mixed_reconcile_info: IdleCheckInitialGraceReconcileInfo,
+        handler: IdleCheckInitialGracePeriodHandler,
+        mixed_reconcile_info: IdleCheckInitialGracePeriodReconcileInfo,
     ) -> None:
         result = await handler.execute(mixed_reconcile_info)
 
@@ -165,8 +165,8 @@ class TestIdleCheckInitialGraceHandler:
 
     async def test_returns_empty_result_for_empty_batch(
         self,
-        handler: IdleCheckInitialGraceHandler,
-        empty_reconcile_info: IdleCheckInitialGraceReconcileInfo,
+        handler: IdleCheckInitialGracePeriodHandler,
+        empty_reconcile_info: IdleCheckInitialGracePeriodReconcileInfo,
     ) -> None:
         result = await handler.execute(empty_reconcile_info)
 
@@ -174,14 +174,14 @@ class TestIdleCheckInitialGraceHandler:
         assert result.processed_count() == 0
 
 
-class TestIdleCheckInitialGraceApplier:
+class TestIdleCheckInitialGracePeriodApplier:
     @pytest.fixture
     def repository(self) -> AsyncMock:
         return AsyncMock(spec=IdleCheckerRepository)
 
     @pytest.fixture
-    def applier(self, repository: AsyncMock) -> IdleCheckInitialGraceApplier:
-        return IdleCheckInitialGraceApplier(repository)
+    def applier(self, repository: AsyncMock) -> IdleCheckInitialGracePeriodApplier:
+        return IdleCheckInitialGracePeriodApplier(repository)
 
     @pytest.fixture
     def ready_pair(self) -> SessionIdleCheckPair:
@@ -193,18 +193,18 @@ class TestIdleCheckInitialGraceApplier:
     @pytest.fixture
     def ready_apply_input(self, ready_pair: SessionIdleCheckPair) -> MagicMock:
         apply_input = MagicMock()
-        apply_input.result = IdleCheckInitialGraceResult(pairs_to_ready=[ready_pair])
+        apply_input.result = IdleCheckInitialGracePeriodResult(pairs_to_ready=[ready_pair])
         return apply_input
 
     @pytest.fixture
     def empty_apply_input(self) -> MagicMock:
         apply_input = MagicMock()
-        apply_input.result = IdleCheckInitialGraceResult()
+        apply_input.result = IdleCheckInitialGracePeriodResult()
         return apply_input
 
     async def test_marks_ready_pairs(
         self,
-        applier: IdleCheckInitialGraceApplier,
+        applier: IdleCheckInitialGracePeriodApplier,
         repository: AsyncMock,
         ready_pair: SessionIdleCheckPair,
         ready_apply_input: MagicMock,
@@ -219,7 +219,7 @@ class TestIdleCheckInitialGraceApplier:
 
     async def test_skips_empty_result(
         self,
-        applier: IdleCheckInitialGraceApplier,
+        applier: IdleCheckInitialGracePeriodApplier,
         repository: AsyncMock,
         empty_apply_input: MagicMock,
     ) -> None:
