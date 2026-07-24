@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import TypeVar
+from typing import Any, TypeVar
 
 import sqlalchemy as sa
 from sqlalchemy import inspect
@@ -47,6 +47,8 @@ class RBACEntityUpserter[TRow: Base]:
         scope_ref: Primary scope reference (scope_type + scope_id), or ``None`` for a GLOBAL
             entity.
         index_elements: Columns of the unique constraint used as the ON CONFLICT target.
+        index_where: Predicate of a partial unique index, when the conflict target is one
+            (e.g. ``scope_id IS NULL``); ``None`` for a plain unique constraint.
         integrity_error_checks: Checks mapping a raised IntegrityError to a domain error
             (e.g. a FK gate). An unmatched error is re-raised as-is.
         additional_scope_refs: Additional scope references for multi-scope entities. Only
@@ -58,6 +60,7 @@ class RBACEntityUpserter[TRow: Base]:
     element_type: RBACElementType
     scope_ref: RBACElementRef | None
     index_elements: list[str]
+    index_where: Any | None = None
     integrity_error_checks: Sequence[IntegrityErrorCheck] = field(default_factory=tuple)
     additional_scope_refs: Sequence[RBACElementRef] = field(default_factory=list)
     relation_type: RelationType = RelationType.AUTO
@@ -104,6 +107,7 @@ async def execute_rbac_entity_upserter[TRow: Base](
         .values(spec.build_insert_values())
         .on_conflict_do_update(
             index_elements=upserter.index_elements,
+            index_where=upserter.index_where,
             set_=spec.build_update_values(),
         )
         .returning(*table.columns)
