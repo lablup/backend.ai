@@ -19,9 +19,6 @@ from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
 from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
     AppConfigFragmentOrder as AppConfigFragmentOrderDTO,
 )
-from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
-    AppConfigFragmentScope as AppConfigFragmentScopeDTO,
-)
 from ai.backend.common.dto.manager.v2.app_config_fragment.response import (
     AppConfigFragmentNode,
 )
@@ -41,7 +38,6 @@ from ai.backend.manager.api.gql.decorators import (
     gql_pydantic_input,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
-from ai.backend.manager.api.gql.rbac.types.scope import UUIDScopeGQL
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 __all__ = (
@@ -51,7 +47,6 @@ __all__ = (
     "AppConfigFragmentGQL",
     "AppConfigFragmentOrderByGQL",
     "AppConfigFragmentOrderFieldGQL",
-    "AppConfigFragmentScopeGQL",
     "AppConfigScopeTypeFilterGQL",
 )
 
@@ -115,40 +110,6 @@ class AppConfigFragmentConnection(Connection[AppConfigFragmentGQL]):
     def __init__(self, *args: Any, count: int, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self.count = count
-
-
-# ---------------------------------------------------------------------------
-# Scope
-# ---------------------------------------------------------------------------
-
-
-@gql_pydantic_input(
-    BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
-        description=(
-            "Scope for a scoped app config fragment search. "
-            "All items are OR'd; raises an error if every field is empty."
-        ),
-    ),
-    name="AppConfigFragmentScope",
-)
-class AppConfigFragmentScopeGQL(PydanticInputMixin[AppConfigFragmentScopeDTO]):
-    domain: list[UUIDScopeGQL] | None = gql_field(
-        description=(
-            "Domain ids whose fragments to search. "
-            "The scoped search is single-target for now, so exactly one scope is accepted "
-            "across all three fields."
-        ),
-        default=None,
-    )
-    user: list[UUIDScopeGQL] | None = gql_field(
-        description="User ids whose fragments to search.",
-        default=None,
-    )
-    public: bool | None = gql_field(
-        description="Search the public scope, which has no owner.",
-        default=None,
-    )
 
 
 # ---------------------------------------------------------------------------

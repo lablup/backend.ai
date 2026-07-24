@@ -3,7 +3,6 @@
 from .resolver import (
     admin_app_config_fragments,
     app_config_fragment,
-    scoped_app_config_fragments,
 )
 from .types import (
     AppConfigFragmentConnection,
@@ -12,7 +11,6 @@ from .types import (
     AppConfigFragmentGQL,
     AppConfigFragmentOrderByGQL,
     AppConfigFragmentOrderFieldGQL,
-    AppConfigFragmentScopeGQL,
     AppConfigScopeTypeFilterGQL,
 )
 
@@ -24,10 +22,8 @@ __all__ = (
     "AppConfigFragmentGQL",
     "AppConfigFragmentOrderByGQL",
     "AppConfigFragmentOrderFieldGQL",
-    "AppConfigFragmentScopeGQL",
     "AppConfigScopeTypeFilterGQL",
     # Query resolvers
     "admin_app_config_fragments",
     "app_config_fragment",
-    "scoped_app_config_fragments",
 )

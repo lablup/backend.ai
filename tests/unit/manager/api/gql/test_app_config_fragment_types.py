@@ -20,11 +20,9 @@ from ai.backend.manager.api.gql.app_config_fragment.types import (
     AppConfigFragmentGQL,
     AppConfigFragmentOrderByGQL,
     AppConfigFragmentOrderFieldGQL,
-    AppConfigFragmentScopeGQL,
     AppConfigScopeTypeFilterGQL,
 )
 from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection, StringFilter
-from ai.backend.manager.api.gql.rbac.types.scope import UUIDScopeGQL
 
 
 class TestAppConfigFragmentGQL:
@@ -69,26 +67,6 @@ class TestAppConfigFragmentGQL:
 
 
 class TestAppConfigFragmentInputs:
-    def test_scope_to_pydantic_domain(self) -> None:
-        domain_id = uuid.uuid4()
-        scope_gql = AppConfigFragmentScopeGQL(
-            domain=[UUIDScopeGQL(value=domain_id)],
-            user=None,
-            public=None,
-        )
-
-        dto = scope_gql.to_pydantic()
-
-        assert dto.domain is not None
-        assert dto.domain[0].value == domain_id
-
-    def test_scope_to_pydantic_public(self) -> None:
-        scope_gql = AppConfigFragmentScopeGQL(domain=None, user=None, public=True)
-
-        dto = scope_gql.to_pydantic()
-
-        assert dto.public is True
-
     def test_filter_to_pydantic_string(self) -> None:
         filter_gql = AppConfigFragmentFilterGQL(
             config_name=StringFilter(contains="the"),
