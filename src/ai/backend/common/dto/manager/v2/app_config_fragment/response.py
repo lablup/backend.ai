@@ -15,6 +15,7 @@ from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
 __all__ = (
     "AppConfigFragmentBulkErrorInfo",
     "AppConfigFragmentNode",
+    "AppConfigFragmentsByNamesPayload",
     "BulkPurgeAppConfigFragmentPayload",
     "BulkUpdateAppConfigFragmentPayload",
     "CreateAppConfigFragmentPayload",
@@ -37,6 +38,14 @@ class AppConfigFragmentNode(BaseResponseModel):
     config: dict[str, Any] = Field(description="The fragment's JSON config document.")
     created_at: datetime = Field(description="Creation timestamp (UTC).")
     updated_at: datetime = Field(description="Last update timestamp (UTC).")
+
+
+class AppConfigFragmentsByNamesPayload(BaseResponseModel):
+    """Payload for a scoped read of fragments by config name."""
+
+    items: list[AppConfigFragmentNode] = Field(
+        description="The fragments found at the scope for the requested config names."
+    )
 
 
 class UpsertAppConfigFragmentsPayload(BaseResponseModel):

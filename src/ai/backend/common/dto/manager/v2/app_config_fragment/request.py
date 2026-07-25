@@ -25,14 +25,48 @@ __all__ = (
     "AppConfigFragmentScope",
     "AppConfigFragmentUpdateItem",
     "AppConfigFragmentUpsertItem",
+    "AppConfigFragmentsByNamesInput",
     "BulkPurgeAppConfigFragmentInput",
     "BulkUpdateAppConfigFragmentInput",
     "CreateAppConfigFragmentInput",
+    "MyAppConfigFragmentsByNamesInput",
     "MyUpsertAppConfigFragmentsInput",
     "ScopedSearchAppConfigFragmentInput",
     "UpdateAppConfigFragmentInput",
     "UpsertAppConfigFragmentsInput",
 )
+
+
+class AppConfigFragmentsByNamesInput(BaseRequestModel):
+    """Read the fragments written at one scope for the given config names."""
+
+    scope_type: AppConfigScopeType = Field(
+        description="Scope the fragments are written at (public | domain | user)."
+    )
+    scope_id: AppConfigScopeID | None = Field(
+        default=None,
+        description="Scope identifier: the domain id or the user id; null for public scope.",
+    )
+    config_names: list[str] = Field(
+        min_length=1, description="Config names whose fragments to read."
+    )
+
+    @model_validator(mode="after")
+    def _check_scope_id(self) -> Self:
+        if self.scope_type is AppConfigScopeType.PUBLIC:
+            if self.scope_id is not None:
+                raise ValueError("scope_id must be null for public scope.")
+        elif self.scope_id is None:
+            raise ValueError("scope_id is required for domain and user scopes.")
+        return self
+
+
+class MyAppConfigFragmentsByNamesInput(BaseRequestModel):
+    """Read the current user's own user-scope fragments for the given config names."""
+
+    config_names: list[str] = Field(
+        min_length=1, description="Config names whose fragments to read."
+    )
 
 
 class AppConfigFragmentUpsertItem(BaseRequestModel):

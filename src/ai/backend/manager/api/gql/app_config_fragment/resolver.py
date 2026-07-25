@@ -15,6 +15,8 @@ from strawberry.relay import PageInfo
 from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
     AdminSearchAppConfigFragmentInput,
+    AppConfigFragmentsByNamesInput,
+    MyAppConfigFragmentsByNamesInput,
 )
 from ai.backend.common.identifier.app_config import AppConfigScopeID
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
@@ -154,12 +156,14 @@ async def app_config_fragments_by_names(
     config_names: list[str],
     scope_id: UUID | None = None,
 ) -> list[AppConfigFragmentGQL]:
-    nodes = await info.context.adapters.app_config_fragment.app_config_fragments_by_names(
-        scope_type,
-        AppConfigScopeID(scope_id) if scope_id is not None else None,
-        config_names,
+    payload = await info.context.adapters.app_config_fragment.app_config_fragments_by_names(
+        AppConfigFragmentsByNamesInput(
+            scope_type=scope_type,
+            scope_id=AppConfigScopeID(scope_id) if scope_id is not None else None,
+            config_names=config_names,
+        )
     )
-    return [AppConfigFragmentGQL.from_pydantic(node) for node in nodes]
+    return [AppConfigFragmentGQL.from_pydantic(node) for node in payload.items]
 
 
 @gql_root_field(
@@ -174,7 +178,7 @@ async def my_app_config_fragments_by_names(
     info: Info[StrawberryGQLContext],
     config_names: list[str],
 ) -> list[AppConfigFragmentGQL]:
-    nodes = await info.context.adapters.app_config_fragment.my_app_config_fragments_by_names(
-        config_names
+    payload = await info.context.adapters.app_config_fragment.my_app_config_fragments_by_names(
+        MyAppConfigFragmentsByNamesInput(config_names=config_names)
     )
-    return [AppConfigFragmentGQL.from_pydantic(node) for node in nodes]
+    return [AppConfigFragmentGQL.from_pydantic(node) for node in payload.items]

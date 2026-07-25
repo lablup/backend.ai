@@ -12,11 +12,13 @@ from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
     AdminSearchAppConfigFragmentInput,
     AppConfigFragmentFilter,
     AppConfigFragmentOrder,
+    AppConfigFragmentsByNamesInput,
     AppConfigFragmentScope,
     AppConfigFragmentUpsertItem,
     BulkPurgeAppConfigFragmentInput,
     BulkUpdateAppConfigFragmentInput,
     CreateAppConfigFragmentInput,
+    MyAppConfigFragmentsByNamesInput,
     MyUpsertAppConfigFragmentsInput,
     ScopedSearchAppConfigFragmentInput,
     UpdateAppConfigFragmentInput,
@@ -25,6 +27,7 @@ from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
 from ai.backend.common.dto.manager.v2.app_config_fragment.response import (
     AppConfigFragmentBulkErrorInfo,
     AppConfigFragmentNode,
+    AppConfigFragmentsByNamesPayload,
     BulkPurgeAppConfigFragmentPayload,
     BulkUpdateAppConfigFragmentPayload,
     CreateAppConfigFragmentPayload,
@@ -274,24 +277,22 @@ class AppConfigFragmentAdapter(BaseAdapter):
     # --- read fragments by config name (one scope, RBAC-authorized) ---
 
     async def app_config_fragments_by_names(
-        self,
-        scope_type: AppConfigScopeType,
-        scope_id: AppConfigScopeID | None,
-        config_names: list[str],
-    ) -> list[AppConfigFragmentNode]:
-        """The fragments written at one scope for the given ``config_names``.
+        self, input: AppConfigFragmentsByNamesInput
+    ) -> AppConfigFragmentsByNamesPayload:
+        """The fragments written at one scope for the given config names.
 
         RBAC-authorized at that scope, so a caller reads only a scope they may read. Meant for
         fetching the current fragment values before editing them.
         """
         return await self._fragments_by_names(
-            AppConfigFragmentSearchScope(scope_type=scope_type, scope_id=scope_id), config_names
+            AppConfigFragmentSearchScope(scope_type=input.scope_type, scope_id=input.scope_id),
+            input.config_names,
         )
 
     async def my_app_config_fragments_by_names(
-        self, config_names: list[str]
-    ) -> list[AppConfigFragmentNode]:
-        """The current user's own ``user``-scope fragments for the given ``config_names``.
+        self, input: MyAppConfigFragmentsByNamesInput
+    ) -> AppConfigFragmentsByNamesPayload:
+        """The current user's own ``user``-scope fragments for the given config names.
 
         Calls ``current_user()`` internally — the caller does not pass a scope.
         """
@@ -302,14 +303,14 @@ class AppConfigFragmentAdapter(BaseAdapter):
             AppConfigFragmentSearchScope(
                 scope_type=AppConfigScopeType.USER, scope_id=AppConfigScopeID(me.user_id)
             ),
-            config_names,
+            input.config_names,
         )
 
     async def _fragments_by_names(
         self, scope: AppConfigFragmentSearchScope, config_names: list[str]
-    ) -> list[AppConfigFragmentNode]:
+    ) -> AppConfigFragmentsByNamesPayload:
         if not config_names:
-            return []
+            return AppConfigFragmentsByNamesPayload(items=[])
         # A scope holds at most one fragment per config name, so the result is bounded by the
         # number of names requested.
         querier = self._build_querier(
@@ -321,7 +322,9 @@ class AppConfigFragmentAdapter(BaseAdapter):
         action_result = await self._processors.app_config_fragment.scoped_search.wait_for_complete(
             ScopedSearchAppConfigFragmentAction(scope=scope, querier=querier)
         )
-        return [self._fragment_to_node(item) for item in action_result.data]
+        return AppConfigFragmentsByNamesPayload(
+            items=[self._fragment_to_node(item) for item in action_result.data]
+        )
 
     # --- admin fragment search ---
 

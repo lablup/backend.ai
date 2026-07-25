@@ -9,11 +9,15 @@ from typing import TYPE_CHECKING, Final
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
 from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
     AdminSearchAppConfigFragmentInput,
+    AppConfigFragmentsByNamesInput,
     BulkPurgeAppConfigFragmentInput,
     BulkUpdateAppConfigFragmentInput,
     CreateAppConfigFragmentInput,
+    MyAppConfigFragmentsByNamesInput,
+    MyUpsertAppConfigFragmentsInput,
     ScopedSearchAppConfigFragmentInput,
     UpdateAppConfigFragmentInput,
+    UpsertAppConfigFragmentsInput,
 )
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
 from ai.backend.logging import BraceStyleAdapter
@@ -100,4 +104,36 @@ class V2AppConfigFragmentHandler:
     ) -> APIResponse:
         """Search the fragments written at one scope (auth required, RBAC-authorized)."""
         result = await self._adapter.scoped_search(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def fragments_by_names(
+        self,
+        body: BodyParam[AppConfigFragmentsByNamesInput],
+    ) -> APIResponse:
+        """Read one scope's fragments for the given config names (auth, RBAC-authorized)."""
+        result = await self._adapter.app_config_fragments_by_names(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def my_fragments_by_names(
+        self,
+        body: BodyParam[MyAppConfigFragmentsByNamesInput],
+    ) -> APIResponse:
+        """Read the caller's own user-scope fragments for the given config names (auth)."""
+        result = await self._adapter.my_app_config_fragments_by_names(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def upsert(
+        self,
+        body: BodyParam[UpsertAppConfigFragmentsInput],
+    ) -> APIResponse:
+        """Upsert many fragments at one scope, all-or-nothing (auth, RBAC-authorized)."""
+        result = await self._adapter.upsert_app_config_fragments(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def my_upsert(
+        self,
+        body: BodyParam[MyUpsertAppConfigFragmentsInput],
+    ) -> APIResponse:
+        """Upsert many fragments at the caller's own user scope, all-or-nothing (auth)."""
+        result = await self._adapter.my_upsert_app_config_fragments(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
