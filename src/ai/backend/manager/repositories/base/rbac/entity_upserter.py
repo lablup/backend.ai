@@ -22,11 +22,11 @@ from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
 from ai.backend.manager.repositories.base.integrity import (
-    IntegrityErrorCheck,
     match_integrity_error,
     parse_integrity_error,
 )
 from ai.backend.manager.repositories.base.rbac.utils import bulk_insert_on_conflict_do_nothing
+from ai.backend.manager.repositories.base.types import IntegrityErrorCheck
 from ai.backend.manager.repositories.base.upserter import UpserterSpec
 
 TRow = TypeVar("TRow", bound=Base)
