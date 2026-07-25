@@ -19,33 +19,28 @@ def register_v2_app_config_fragment_routes(
 ) -> RouteRegistry:
     """Register all REST v2 app config fragment routes.
 
-    Every route but ``/admin/search`` is open to any authenticated user and gated by RBAC at
-    the processor (a user acts on their own user-scope, a domain admin on their domain's, a
-    superadmin on any; public is superadmin-only). ``/scoped/search`` is no exception: it
-    runs the same scope validator as a write at that scope. Only the system-wide
-    ``/admin/search`` skips RBAC, being superadmin-only at the middleware.
+    Writes go through ``/upsert``: a fragment is addressed by ``(scope, config_name)`` rather
+    than by id, so there is no separate create or update endpoint. The paginated scoped search
+    is not exposed either — ``/by-names`` is the read a client needs before editing. Every
+    route but ``/admin/search`` is open to any authenticated user and gated by RBAC at the
+    processor (a user acts on their own user-scope, a domain admin on their domain's, a
+    superadmin on any; public is superadmin-only). Only the system-wide ``/admin/search``
+    skips RBAC, being superadmin-only at the middleware.
 
     Layout:
-        POST   /                  create a fragment              (auth, RBAC)
-        POST   /bulk-update       update many by id              (auth, RBAC)
         POST   /bulk-delete       purge many by id               (auth, RBAC)
         POST   /admin/search      system-wide paginated search   (superadmin)
-        POST   /scoped/search     search one scope's fragments   (auth, RBAC)
         POST   /scoped/by-names   read one scope's by names      (auth, RBAC)
         POST   /scoped/bulk-upsert  upsert many at one scope     (auth, RBAC)
         POST   /my/by-names       read own scope's by names      (auth)
         POST   /my/bulk-upsert    upsert many at own scope       (auth)
         GET    /{fragment_id}     get by id                      (auth, RBAC)
-        PATCH  /{fragment_id}     update config by id            (auth, RBAC)
         DELETE /{fragment_id}     purge by id                    (auth, RBAC)
     """
     registry = RouteRegistry.create("app-config-fragments", route_deps.cors_options)
 
-    registry.add("POST", "/", handler.create, middlewares=[auth_required])
-    registry.add("POST", "/bulk-update", handler.bulk_update, middlewares=[auth_required])
     registry.add("POST", "/bulk-delete", handler.bulk_purge, middlewares=[auth_required])
     registry.add("POST", "/admin/search", handler.admin_search, middlewares=[superadmin_required])
-    registry.add("POST", "/scoped/search", handler.scoped_search, middlewares=[auth_required])
     registry.add(
         "POST", "/scoped/by-names", handler.scoped_fragments_by_names, middlewares=[auth_required]
     )
@@ -55,7 +50,6 @@ def register_v2_app_config_fragment_routes(
     registry.add("POST", "/my/by-names", handler.my_fragments_by_names, middlewares=[auth_required])
     registry.add("POST", "/my/bulk-upsert", handler.my_bulk_upsert, middlewares=[auth_required])
     registry.add("GET", "/{fragment_id}", handler.get, middlewares=[auth_required])
-    registry.add("PATCH", "/{fragment_id}", handler.update, middlewares=[auth_required])
     registry.add("DELETE", "/{fragment_id}", handler.purge, middlewares=[auth_required])
 
     return registry
