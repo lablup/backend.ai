@@ -108,7 +108,7 @@ async def admin_app_config_fragments(
             "conflict), all-or-nothing. RBAC-authorized at that scope."
         ),
     )
-)  # type: ignore[misc]
+)
 async def upsert_app_config_fragments(
     info: Info[StrawberryGQLContext],
     input: UpsertAppConfigFragmentsInputGQL,
@@ -126,7 +126,7 @@ async def upsert_app_config_fragments(
             "Upsert many app config fragments at the current user's own user scope, all-or-nothing."
         ),
     )
-)  # type: ignore[misc]
+)
 async def my_upsert_app_config_fragments(
     info: Info[StrawberryGQLContext],
     input: MyUpsertAppConfigFragmentsInputGQL,
