@@ -155,9 +155,10 @@ class RouteHistoryScopeDTO(BaseRequestModel):
 class ReplicaGroupHistoryScopeDTO(BaseRequestModel):
     """Scope for replica-group scheduling history queries.
 
-    The list is OR'd internally. Raises an error if empty. The scoped search is
-    still a single-target scope action, so only one item is dispatchable today;
-    the list shape keeps the wire contract stable for the multi-target case.
+    Each category list is OR'd internally and across categories. Raises an error
+    if every field is empty. The scoped search is still a single-target scope
+    action, so only one item is dispatchable today; the list shape keeps the wire
+    contract stable for the multi-target case.
 
     A replica group is not an RBAC scope of its own, so the history is scoped by
     the owning deployment.
