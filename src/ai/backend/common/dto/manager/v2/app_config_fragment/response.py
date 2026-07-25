@@ -16,11 +16,8 @@ __all__ = (
     "AppConfigFragmentBulkErrorInfo",
     "AppConfigFragmentNode",
     "BulkPurgeAppConfigFragmentPayload",
-    "BulkUpdateAppConfigFragmentPayload",
-    "CreateAppConfigFragmentPayload",
     "PurgeAppConfigFragmentPayload",
     "SearchAppConfigFragmentPayload",
-    "UpdateAppConfigFragmentPayload",
     "UpsertAppConfigFragmentsPayload",
 )
 
@@ -45,18 +42,6 @@ class UpsertAppConfigFragmentsPayload(BaseResponseModel):
     items: list[AppConfigFragmentNode] = Field(description="The upserted app config fragments.")
 
 
-class CreateAppConfigFragmentPayload(BaseResponseModel):
-    """Payload for app config fragment creation."""
-
-    app_config_fragment: AppConfigFragmentNode = Field(description="Created app config fragment.")
-
-
-class UpdateAppConfigFragmentPayload(BaseResponseModel):
-    """Payload for app config fragment update."""
-
-    app_config_fragment: AppConfigFragmentNode = Field(description="Updated app config fragment.")
-
-
 class PurgeAppConfigFragmentPayload(BaseResponseModel):
     """Payload for app config fragment purge."""
 
@@ -68,15 +53,6 @@ class AppConfigFragmentBulkErrorInfo(BaseResponseModel):
 
     id: AppConfigFragmentID = Field(description="Id of the fragment the failed item targeted.")
     message: str = Field(description="Reason the item failed.")
-
-
-class BulkUpdateAppConfigFragmentPayload(BaseResponseModel):
-    """Partial-success payload for a bulk fragment update."""
-
-    items: list[AppConfigFragmentNode] = Field(description="Successfully updated fragments.")
-    failed: list[AppConfigFragmentBulkErrorInfo] = Field(
-        description="Per-item failures, each naming the fragment it targeted."
-    )
 
 
 class BulkPurgeAppConfigFragmentPayload(BaseResponseModel):

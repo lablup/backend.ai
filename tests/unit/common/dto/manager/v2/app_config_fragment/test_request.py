@@ -10,11 +10,12 @@ import pytest
 
 from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
-    AppConfigFragmentUpdateItem,
+    AppConfigFragmentUpsertItem,
+    AppConfigScopeRef,
     BulkPurgeAppConfigFragmentInput,
-    BulkUpdateAppConfigFragmentInput,
-    CreateAppConfigFragmentInput,
-    UpdateAppConfigFragmentInput,
+    MyUpsertAppConfigFragmentsInput,
+    ScopedAppConfigFragmentsByNamesInput,
+    ScopedUpsertAppConfigFragmentsInput,
 )
 from ai.backend.common.exception import BackendAISchemaValidationFailed
 from ai.backend.common.identifier.app_config import AppConfigScopeID
@@ -34,8 +35,8 @@ def config_document() -> dict[str, Any]:
     return {"theme": {"mode": "dark"}, "banner": "hello"}
 
 
-class TestCreateAppConfigFragmentInput:
-    """Tests for the scope_id / scope_type agreement enforced by CreateAppConfigFragmentInput."""
+class TestUpsertAppConfigFragmentsInput:
+    """The scope is named once for the whole batch, and its id must agree with its type."""
 
     @pytest.mark.parametrize(
         "case",
@@ -49,15 +50,13 @@ class TestCreateAppConfigFragmentInput:
     def test_scope_id_matching_its_scope_type_is_accepted(
         self, case: _ScopeCase, config_document: dict[str, Any]
     ) -> None:
-        req = CreateAppConfigFragmentInput(
-            config_name="theme",
-            scope_type=case.scope_type,
-            scope_id=case.scope_id,
-            config=config_document,
+        req = ScopedUpsertAppConfigFragmentsInput(
+            scope=AppConfigScopeRef(scope_type=case.scope_type, scope_id=case.scope_id),
+            items=[AppConfigFragmentUpsertItem(config_name="theme", config=config_document)],
         )
 
-        assert req.scope_type is case.scope_type
-        assert req.scope_id == case.scope_id
+        assert req.scope.scope_type is case.scope_type
+        assert req.scope.scope_id == case.scope_id
 
     @pytest.mark.parametrize(
         "case",
@@ -72,11 +71,9 @@ class TestCreateAppConfigFragmentInput:
         self, case: _ScopeCase, config_document: dict[str, Any]
     ) -> None:
         with pytest.raises(BackendAISchemaValidationFailed):
-            CreateAppConfigFragmentInput.model_validate({
-                "config_name": "theme",
-                "scope_type": case.scope_type,
-                "scope_id": case.scope_id,
-                "config": config_document,
+            ScopedUpsertAppConfigFragmentsInput.model_validate({
+                "scope": {"scope_type": case.scope_type, "scope_id": case.scope_id},
+                "items": [{"config_name": "theme", "config": config_document}],
             })
 
     @pytest.mark.parametrize(
@@ -89,81 +86,74 @@ class TestCreateAppConfigFragmentInput:
         self, scope_type: AppConfigScopeType, scope_id: str, config_document: dict[str, Any]
     ) -> None:
         with pytest.raises(BackendAISchemaValidationFailed):
-            CreateAppConfigFragmentInput.model_validate({
-                "config_name": "theme",
-                "scope_type": scope_type,
-                "scope_id": scope_id,
-                "config": config_document,
+            ScopedUpsertAppConfigFragmentsInput.model_validate({
+                "scope": {"scope_type": scope_type, "scope_id": scope_id},
+                "items": [{"config_name": "theme", "config": config_document}],
             })
 
     def test_scope_id_defaults_to_none(self, config_document: dict[str, Any]) -> None:
-        req = CreateAppConfigFragmentInput(
-            config_name="theme",
-            scope_type=AppConfigScopeType.PUBLIC,
-            config=config_document,
+        req = ScopedUpsertAppConfigFragmentsInput(
+            scope=AppConfigScopeRef(scope_type=AppConfigScopeType.PUBLIC),
+            items=[AppConfigFragmentUpsertItem(config_name="theme", config=config_document)],
         )
 
-        assert req.scope_id is None
+        assert req.scope.scope_id is None
+
+    def test_an_empty_batch_is_rejected(self) -> None:
+        with pytest.raises(BackendAISchemaValidationFailed):
+            ScopedUpsertAppConfigFragmentsInput.model_validate({
+                "scope": {"scope_type": AppConfigScopeType.PUBLIC},
+                "items": [],
+            })
 
     @pytest.mark.parametrize("config_name", ["", "x" * 129], ids=["empty", "too-long"])
     def test_config_name_outside_its_length_bounds_is_rejected(
         self, config_name: str, config_document: dict[str, Any]
     ) -> None:
         with pytest.raises(BackendAISchemaValidationFailed):
-            CreateAppConfigFragmentInput.model_validate({
+            AppConfigFragmentUpsertItem.model_validate({
                 "config_name": config_name,
-                "scope_type": AppConfigScopeType.PUBLIC,
                 "config": config_document,
             })
 
 
-class TestUpdateAppConfigFragmentInput:
-    """The single-fragment update body carries no id — the request path identifies the target."""
+class TestMyUpsertAppConfigFragmentsInput:
+    """The self-service body carries no scope — the server resolves the acting user."""
 
-    def test_config_alone_is_a_complete_body(self, config_document: dict[str, Any]) -> None:
-        req = UpdateAppConfigFragmentInput(config=config_document)
-
-        assert req.config == config_document
-        assert not hasattr(req, "id")
-
-    def test_config_is_required(self) -> None:
-        with pytest.raises(BackendAISchemaValidationFailed):
-            UpdateAppConfigFragmentInput.model_validate({})
-
-
-class TestAppConfigFragmentUpdateItem:
-    """The bulk item does carry an id, since one request addresses many fragments."""
-
-    def test_id_and_config_are_both_required(self, config_document: dict[str, Any]) -> None:
-        fragment_id = AppConfigFragmentID(uuid.uuid4())
-
-        item = AppConfigFragmentUpdateItem(id=fragment_id, config=config_document)
-
-        assert item.id == fragment_id
-        assert item.config == config_document
-
-    def test_omitting_id_is_rejected(self, config_document: dict[str, Any]) -> None:
-        with pytest.raises(BackendAISchemaValidationFailed):
-            AppConfigFragmentUpdateItem.model_validate({"config": config_document})
-
-
-class TestBulkAppConfigFragmentInputs:
-    """Both bulk bodies reject an empty batch rather than treating it as a no-op."""
-
-    def test_bulk_update_accepts_items(self, config_document: dict[str, Any]) -> None:
-        req = BulkUpdateAppConfigFragmentInput(
-            items=[
-                AppConfigFragmentUpdateItem(
-                    id=AppConfigFragmentID(uuid.uuid4()), config=config_document
-                )
-            ]
+    def test_items_alone_are_a_complete_body(self, config_document: dict[str, Any]) -> None:
+        req = MyUpsertAppConfigFragmentsInput(
+            items=[AppConfigFragmentUpsertItem(config_name="theme", config=config_document)]
         )
 
         assert len(req.items) == 1
+        assert not hasattr(req, "scope_type")
 
-    def test_bulk_update_rejects_an_empty_batch(self) -> None:
+    def test_an_empty_batch_is_rejected(self) -> None:
         with pytest.raises(BackendAISchemaValidationFailed):
-            BulkUpdateAppConfigFragmentInput.model_validate({"items": []})
+            MyUpsertAppConfigFragmentsInput.model_validate({"items": []})
+
+
+class TestAppConfigFragmentsByNamesInput:
+    """The by-names read names the scope like the upsert does, plus the config names to read."""
+
+    def test_config_names_are_required(self) -> None:
+        with pytest.raises(BackendAISchemaValidationFailed):
+            ScopedAppConfigFragmentsByNamesInput.model_validate({
+                "scope_type": AppConfigScopeType.PUBLIC,
+                "config_names": [],
+            })
+
+    def test_scope_id_disagreeing_with_its_scope_type_is_rejected(self) -> None:
+        with pytest.raises(BackendAISchemaValidationFailed):
+            ScopedAppConfigFragmentsByNamesInput.model_validate({
+                "scope_type": AppConfigScopeType.DOMAIN,
+                "scope_id": None,
+                "config_names": ["theme"],
+            })
+
+
+class TestBulkPurgeAppConfigFragmentInput:
+    """The bulk purge body rejects an empty batch rather than treating it as a no-op."""
 
     def test_bulk_purge_accepts_ids(self) -> None:
         fragment_id = AppConfigFragmentID(uuid.uuid4())

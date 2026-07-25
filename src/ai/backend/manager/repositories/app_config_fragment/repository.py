@@ -13,11 +13,7 @@ from ai.backend.manager.data.app_config_fragment.types import (
     AppConfigFragmentData,
     AppConfigFragmentSearchResult,
 )
-from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
 from ai.backend.manager.models.scopes import SearchScope
-from ai.backend.manager.repositories.app_config_fragment.creators import (
-    AppConfigFragmentCreatorSpec,
-)
 from ai.backend.manager.repositories.app_config_fragment.db_source import (
     AppConfigFragmentDBSource,
 )
@@ -32,7 +28,6 @@ from ai.backend.manager.repositories.app_config_fragment.upserters import (
 )
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
-    Updater,
 )
 from ai.backend.manager.repositories.ops.rbac.provider import RBACOpsProvider
 
@@ -67,10 +62,6 @@ class AppConfigFragmentRepository:
         self._db_source = AppConfigFragmentDBSource(ops_provider)
 
     @app_config_fragment_repository_resilience.apply()
-    async def create(self, spec: AppConfigFragmentCreatorSpec) -> AppConfigFragmentData:
-        return await self._db_source.create(spec)
-
-    @app_config_fragment_repository_resilience.apply()
     async def bulk_upsert(
         self, specs: Sequence[AppConfigFragmentUpserterSpec]
     ) -> list[AppConfigFragmentData]:
@@ -79,10 +70,6 @@ class AppConfigFragmentRepository:
     @app_config_fragment_repository_resilience.apply()
     async def get_by_id(self, fragment_id: AppConfigFragmentID) -> AppConfigFragmentData:
         return await self._db_source.get_by_id(fragment_id)
-
-    @app_config_fragment_repository_resilience.apply()
-    async def update(self, updater: Updater[AppConfigFragmentRow]) -> AppConfigFragmentData:
-        return await self._db_source.update(updater)
 
     @app_config_fragment_repository_resilience.apply()
     async def purge(self, purger_spec: AppConfigFragmentPurgerSpec) -> AppConfigFragmentData:
@@ -97,13 +84,6 @@ class AppConfigFragmentRepository:
         self, querier: BatchQuerier, scopes: Sequence[SearchScope]
     ) -> AppConfigFragmentSearchResult:
         return await self._db_source.scoped_search(querier, scopes)
-
-    @app_config_fragment_repository_resilience.apply()
-    async def bulk_update(
-        self,
-        updaters: Sequence[Updater[AppConfigFragmentRow]],
-    ) -> AppConfigFragmentBulkResult:
-        return await self._db_source.bulk_update(updaters)
 
     @app_config_fragment_repository_resilience.apply()
     async def bulk_purge(

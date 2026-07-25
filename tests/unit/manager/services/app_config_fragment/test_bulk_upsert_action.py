@@ -1,8 +1,8 @@
-"""Unit tests for CreateAppConfigFragmentAction's RBAC target resolution.
+"""Unit tests for BulkUpsertAppConfigFragmentsAction's RBAC target resolution.
 
-``target_element()`` decides the scope the RBAC scope validator authorizes a fragment
-create against (BEP-1052): a user/domain fragment targets its USER/DOMAIN scope, while a
-public fragment is global-scoped (no RBAC scope element) and thus superadmin-only.
+``target_element()`` decides the scope the RBAC scope validator authorizes a fragment write
+against (BEP-1052): a user/domain fragment targets its USER/DOMAIN scope, while a public
+fragment is global-scoped (no RBAC scope element) and thus superadmin-only.
 """
 
 from __future__ import annotations
@@ -18,11 +18,14 @@ from ai.backend.common.identifier.app_config import AppConfigScopeID
 from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.user import UserID
 from ai.backend.manager.data.permission.types import RBACElementRef
-from ai.backend.manager.repositories.app_config_fragment.creators import (
-    AppConfigFragmentCreatorSpec,
+from ai.backend.manager.repositories.app_config_fragment.types import (
+    AppConfigFragmentSearchScope,
 )
-from ai.backend.manager.services.app_config_fragment.actions.create import (
-    CreateAppConfigFragmentAction,
+from ai.backend.manager.repositories.app_config_fragment.upserters import (
+    AppConfigFragmentUpserterSpec,
+)
+from ai.backend.manager.services.app_config_fragment.actions.bulk_upsert import (
+    BulkUpsertAppConfigFragmentsAction,
 )
 
 _VICTIM_USER_ID = UserID(uuid.uuid4())
@@ -31,24 +34,9 @@ _VICTIM_USER_SCOPE_ID = AppConfigScopeID(_VICTIM_USER_ID)
 _DOMAIN_SCOPE_ID = AppConfigScopeID(_DOMAIN_ID)
 
 
-def _make_action(
-    *,
-    scope_type: AppConfigScopeType,
-    scope_id: AppConfigScopeID | None,
-) -> CreateAppConfigFragmentAction:
-    return CreateAppConfigFragmentAction(
-        creator_spec=AppConfigFragmentCreatorSpec(
-            config_name="cfg",
-            scope_type=scope_type,
-            scope_id=scope_id,
-            config={},
-        )
-    )
-
-
 @dataclass(frozen=True)
 class _ScopeTarget:
-    """A fragment scope, and the RBAC scope a create at it must authorize against."""
+    """A fragment scope, and the RBAC scope an upsert at it must authorize against."""
 
     scope_type: AppConfigScopeType
     scope_id: AppConfigScopeID | None
@@ -56,8 +44,8 @@ class _ScopeTarget:
     expected_scope_type: ScopeType
 
 
-class TestCreateTargetElement:
-    """The create action targets the fragment's own scope, taken from its spec."""
+class TestBulkUpsertTargetElement:
+    """The upsert action targets the scope it writes at, taken from the action's scope."""
 
     @pytest.mark.parametrize(
         "case",
@@ -82,13 +70,23 @@ class TestCreateTargetElement:
             ),
         ],
         ids=[
-            "user_scope_targets_the_spec_user",
+            "user_scope_targets_the_scope_user",
             "domain_scope_targets_the_domain",
             "public_scope_has_no_scope_element",
         ],
     )
-    def test_target_element_follows_the_fragment_scope(self, case: _ScopeTarget) -> None:
-        action = _make_action(scope_type=case.scope_type, scope_id=case.scope_id)
+    def test_target_element_follows_the_written_scope(self, case: _ScopeTarget) -> None:
+        action = BulkUpsertAppConfigFragmentsAction(
+            scope=AppConfigFragmentSearchScope(scope_type=case.scope_type, scope_id=case.scope_id),
+            upserter_specs=[
+                AppConfigFragmentUpserterSpec(
+                    config_name="cfg",
+                    scope_type=case.scope_type,
+                    scope_id=case.scope_id,
+                    config={},
+                )
+            ],
+        )
 
         assert action.target_element() == case.expected_element
         assert action.scope_type() == case.expected_scope_type

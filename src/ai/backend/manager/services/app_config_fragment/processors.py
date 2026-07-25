@@ -17,17 +17,9 @@ from ai.backend.manager.services.app_config_fragment.actions.bulk_purge import (
     BulkPurgeAppConfigFragmentAction,
     BulkPurgeAppConfigFragmentActionResult,
 )
-from ai.backend.manager.services.app_config_fragment.actions.bulk_update import (
-    BulkUpdateAppConfigFragmentAction,
-    BulkUpdateAppConfigFragmentActionResult,
-)
 from ai.backend.manager.services.app_config_fragment.actions.bulk_upsert import (
     BulkUpsertAppConfigFragmentsAction,
     BulkUpsertAppConfigFragmentsActionResult,
-)
-from ai.backend.manager.services.app_config_fragment.actions.create import (
-    CreateAppConfigFragmentAction,
-    CreateAppConfigFragmentActionResult,
 )
 from ai.backend.manager.services.app_config_fragment.actions.get import (
     GetAppConfigFragmentAction,
@@ -41,17 +33,12 @@ from ai.backend.manager.services.app_config_fragment.actions.scoped_search impor
     ScopedSearchAppConfigFragmentAction,
     ScopedSearchAppConfigFragmentActionResult,
 )
-from ai.backend.manager.services.app_config_fragment.actions.update import (
-    UpdateAppConfigFragmentAction,
-    UpdateAppConfigFragmentActionResult,
-)
 from ai.backend.manager.services.app_config_fragment.service import (
     AppConfigFragmentService,
 )
 
 
 class AppConfigFragmentProcessors(AbstractProcessorPackage):
-    create: ScopeActionProcessor[CreateAppConfigFragmentAction, CreateAppConfigFragmentActionResult]
     bulk_upsert: ScopeActionProcessor[
         BulkUpsertAppConfigFragmentsAction, BulkUpsertAppConfigFragmentsActionResult
     ]
@@ -62,14 +49,8 @@ class AppConfigFragmentProcessors(AbstractProcessorPackage):
     scoped_search: ScopeActionProcessor[
         ScopedSearchAppConfigFragmentAction, ScopedSearchAppConfigFragmentActionResult
     ]
-    update: SingleEntityActionProcessor[
-        UpdateAppConfigFragmentAction, UpdateAppConfigFragmentActionResult
-    ]
     purge: SingleEntityActionProcessor[
         PurgeAppConfigFragmentAction, PurgeAppConfigFragmentActionResult
-    ]
-    bulk_update: BulkActionProcessor[
-        BulkUpdateAppConfigFragmentAction, BulkUpdateAppConfigFragmentActionResult
     ]
     bulk_purge: BulkActionProcessor[
         BulkPurgeAppConfigFragmentAction, BulkPurgeAppConfigFragmentActionResult
@@ -85,9 +66,6 @@ class AppConfigFragmentProcessors(AbstractProcessorPackage):
         # writes their own user-scope fragment, a domain admin their domain's, a superadmin
         # any (public is superadmin-only). The scope / single-entity / bulk RBAC validators
         # enforce that per operation.
-        self.create = ScopeActionProcessor(
-            service.create, action_monitors, validators=[validators.rbac.scope]
-        )
         self.bulk_upsert = ScopeActionProcessor(
             service.bulk_upsert, action_monitors, validators=[validators.rbac.scope]
         )
@@ -98,14 +76,8 @@ class AppConfigFragmentProcessors(AbstractProcessorPackage):
         self.scoped_search = ScopeActionProcessor(
             service.scoped_search, action_monitors, validators=[validators.rbac.scope]
         )
-        self.update = SingleEntityActionProcessor(
-            service.update, action_monitors, validators=[validators.rbac.single_entity]
-        )
         self.purge = SingleEntityActionProcessor(
             service.purge, action_monitors, validators=[validators.rbac.single_entity]
-        )
-        self.bulk_update = BulkActionProcessor(
-            service.bulk_update, monitors=action_monitors, validators=[validators.rbac.bulk]
         )
         self.bulk_purge = BulkActionProcessor(
             service.bulk_purge, monitors=action_monitors, validators=[validators.rbac.bulk]
@@ -114,13 +86,10 @@ class AppConfigFragmentProcessors(AbstractProcessorPackage):
     @override
     def supported_actions(self) -> list[ActionSpec]:
         return [
-            CreateAppConfigFragmentAction.spec(),
             BulkUpsertAppConfigFragmentsAction.spec(),
             GetAppConfigFragmentAction.spec(),
             AdminSearchAppConfigFragmentAction.spec(),
             ScopedSearchAppConfigFragmentAction.spec(),
-            UpdateAppConfigFragmentAction.spec(),
             PurgeAppConfigFragmentAction.spec(),
-            BulkUpdateAppConfigFragmentAction.spec(),
             BulkPurgeAppConfigFragmentAction.spec(),
         ]
