@@ -24,6 +24,7 @@ from ai.backend.manager.data.app_config_fragment.types import (
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.errors.app_config import (
     AppConfigFragmentNotFound,
+    AppConfigFragmentWriteNotAllowed,
 )
 from ai.backend.manager.errors.resource import DomainNotFound
 from ai.backend.manager.models.app_config_allow_list.row import AppConfigAllowListRow
@@ -839,3 +840,219 @@ class TestRBACScopeAssociation:
         assert await self._scope_bindings(database, str(created.id)) == []
         with pytest.raises(AppConfigFragmentNotFound):
             await repository.get_by_id(created.id)
+
+
+class TestUpsert:
+    """A fragment is addressed by ``(config_name, scope_type, scope_id)``, so an upsert inserts
+    it when absent and replaces its ``config`` when present, in one all-or-nothing transaction.
+    """
+
+    @pytest.mark.parametrize(
+        "case",
+        [
+            _FragmentScopeCase(
+                scope_type=AppConfigScopeType.USER,
+                scope_id=_USER_SCOPE_ID,
+                expected_bindings=[
+                    _ScopeBinding(scope_type=ScopeType.USER, scope_id=str(_USER_ID))
+                ],
+            ),
+            _FragmentScopeCase(
+                scope_type=AppConfigScopeType.DOMAIN,
+                scope_id=_DOMAIN_SCOPE_ID,
+                expected_bindings=[
+                    _ScopeBinding(scope_type=ScopeType.DOMAIN, scope_id=str(_DOMAIN_ID))
+                ],
+            ),
+            _FragmentScopeCase(scope_type=AppConfigScopeType.PUBLIC, scope_id=None),
+        ],
+        ids=lambda case: case.scope_type.value,
+    )
+    async def test_upsert_inserts_the_fragment_and_binds_it_to_its_scope(
+        self,
+        repository: AppConfigFragmentRepository,
+        database: ExtendedAsyncSAEngine,
+        theme_registered: None,
+        case: _FragmentScopeCase,
+    ) -> None:
+        """An insert binds the new row to its RBAC scope, exactly as a create does."""
+        upserted = await repository.bulk_upsert([
+            AppConfigFragmentUpserterSpec(
+                config_name="theme",
+                scope_type=case.scope_type,
+                scope_id=case.scope_id,
+                config={"theme": "dark"},
+            )
+        ])
+
+        assert [(f.config_name, f.scope_type, f.scope_id) for f in upserted] == [
+            ("theme", case.scope_type, case.scope_id)
+        ]
+        assert (await repository.get_by_id(upserted[0].id)).config == {"theme": "dark"}
+        async with database.begin_readonly_session() as db_sess:
+            rows = await db_sess.scalars(
+                sa.select(AssociationScopesEntitiesRow).where(
+                    AssociationScopesEntitiesRow.entity_type == EntityType.APP_CONFIG_FRAGMENT,
+                    AssociationScopesEntitiesRow.entity_id == str(upserted[0].id),
+                )
+            )
+            bindings = [
+                _ScopeBinding(scope_type=row.scope_type, scope_id=row.scope_id) for row in rows
+            ]
+        assert bindings == case.expected_bindings
+
+    @pytest.mark.parametrize(
+        "case",
+        [
+            _FragmentScopeCase(
+                scope_type=AppConfigScopeType.USER,
+                scope_id=_USER_SCOPE_ID,
+                expected_bindings=[
+                    _ScopeBinding(scope_type=ScopeType.USER, scope_id=str(_USER_ID))
+                ],
+            ),
+            _FragmentScopeCase(
+                scope_type=AppConfigScopeType.DOMAIN,
+                scope_id=_DOMAIN_SCOPE_ID,
+                expected_bindings=[
+                    _ScopeBinding(scope_type=ScopeType.DOMAIN, scope_id=str(_DOMAIN_ID))
+                ],
+            ),
+            _FragmentScopeCase(scope_type=AppConfigScopeType.PUBLIC, scope_id=None),
+        ],
+        ids=lambda case: case.scope_type.value,
+    )
+    async def test_upsert_replaces_the_config_of_the_existing_fragment(
+        self,
+        repository: AppConfigFragmentRepository,
+        database: ExtendedAsyncSAEngine,
+        fragment_at_every_scope: dict[AppConfigScopeType, AppConfigFragmentData],
+        case: _FragmentScopeCase,
+    ) -> None:
+        """The conflict updates the row in place — the same id, and its binding is not doubled.
+
+        ``public`` conflicts on the partial unique index (``scope_id IS NULL``), the other
+        scopes on the plain unique constraint.
+        """
+        existing = fragment_at_every_scope[case.scope_type]
+
+        upserted = await repository.bulk_upsert([
+            AppConfigFragmentUpserterSpec(
+                config_name="theme",
+                scope_type=case.scope_type,
+                scope_id=case.scope_id,
+                config={"theme": "light"},
+            )
+        ])
+
+        assert [f.id for f in upserted] == [existing.id]
+        assert upserted[0].config == {"theme": "light"}
+        async with database.begin_readonly_session() as db_sess:
+            stored = (
+                await db_sess.scalars(
+                    sa.select(AppConfigFragmentRow).where(
+                        AppConfigFragmentRow.config_name == "theme"
+                    )
+                )
+            ).all()
+        assert len(stored) == len(fragment_at_every_scope)
+        async with database.begin_readonly_session() as db_sess:
+            rows = await db_sess.scalars(
+                sa.select(AssociationScopesEntitiesRow).where(
+                    AssociationScopesEntitiesRow.entity_type == EntityType.APP_CONFIG_FRAGMENT,
+                    AssociationScopesEntitiesRow.entity_id == str(existing.id),
+                )
+            )
+            bindings = [
+                _ScopeBinding(scope_type=row.scope_type, scope_id=row.scope_id) for row in rows
+            ]
+        assert bindings == case.expected_bindings
+
+    async def test_upsert_writes_every_item_of_the_batch(
+        self,
+        repository: AppConfigFragmentRepository,
+        theme_registered: None,
+    ) -> None:
+        """One call mixing an insert and an update settles both."""
+        await repository.bulk_upsert([
+            AppConfigFragmentUpserterSpec(
+                config_name="theme",
+                scope_type=AppConfigScopeType.PUBLIC,
+                scope_id=None,
+                config={"theme": "dark"},
+            )
+        ])
+
+        upserted = await repository.bulk_upsert([
+            AppConfigFragmentUpserterSpec(
+                config_name="theme",
+                scope_type=AppConfigScopeType.PUBLIC,
+                scope_id=None,
+                config={"theme": "light"},
+            ),
+            AppConfigFragmentUpserterSpec(
+                config_name="theme",
+                scope_type=AppConfigScopeType.USER,
+                scope_id=_USER_SCOPE_ID,
+                config={"theme": "solarized"},
+            ),
+        ])
+
+        assert [(f.scope_type, f.config) for f in upserted] == [
+            (AppConfigScopeType.PUBLIC, {"theme": "light"}),
+            (AppConfigScopeType.USER, {"theme": "solarized"}),
+        ]
+
+    async def test_upsert_rejected_when_not_allow_listed(
+        self,
+        repository: AppConfigFragmentRepository,
+        theme_defined_not_allow_listed: None,
+    ) -> None:
+        """The FK to the allow list gates an upsert as it gates a create."""
+        with pytest.raises(AppConfigFragmentWriteNotAllowed):
+            await repository.bulk_upsert([
+                AppConfigFragmentUpserterSpec(
+                    config_name="theme",
+                    scope_type=AppConfigScopeType.PUBLIC,
+                    scope_id=None,
+                    config={"theme": "dark"},
+                )
+            ])
+
+    async def test_upsert_persists_nothing_when_one_item_is_rejected(
+        self,
+        repository: AppConfigFragmentRepository,
+        database: ExtendedAsyncSAEngine,
+        theme_registered: None,
+    ) -> None:
+        """The batch shares one transaction, so a rejected item rolls the whole call back."""
+        with pytest.raises(AppConfigFragmentWriteNotAllowed):
+            await repository.bulk_upsert([
+                AppConfigFragmentUpserterSpec(
+                    config_name="theme",
+                    scope_type=AppConfigScopeType.PUBLIC,
+                    scope_id=None,
+                    config={"theme": "dark"},
+                ),
+                AppConfigFragmentUpserterSpec(
+                    config_name="menu",  # registered nowhere, so its FK gate rejects it
+                    scope_type=AppConfigScopeType.PUBLIC,
+                    scope_id=None,
+                    config={"menu": "compact"},
+                ),
+            ])
+
+        async with database.begin_readonly_session() as db_sess:
+            stored = (
+                await db_sess.scalars(
+                    sa.select(AppConfigFragmentRow).where(
+                        AppConfigFragmentRow.config_name == "theme"
+                    )
+                )
+            ).all()
+        assert stored == []
+
+    async def test_upsert_of_no_items_writes_nothing(
+        self, repository: AppConfigFragmentRepository, theme_registered: None
+    ) -> None:
+        assert await repository.bulk_upsert([]) == []
