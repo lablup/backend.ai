@@ -112,6 +112,7 @@ def _assignment(
             session_id=session_id,
             created_at=datetime(2026, 1, 1, tzinfo=UTC),
             starts_at=None,
+            expire_at=_NOW,
         ),
         checker=checker,
     )

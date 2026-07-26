@@ -75,6 +75,7 @@ class TestSessionLifetimeChecker:
                 session_id=SessionId(uuid4()),
                 created_at=created_at,
                 starts_at=starts_at,
+                expire_at=_BASE_TIME,
             )
 
         return create_session

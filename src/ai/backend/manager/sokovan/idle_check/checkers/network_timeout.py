@@ -70,6 +70,7 @@ class NetworkTimeoutChecker(IdleChecker):
                 judgment = self._judge_session(
                     checker_id=assignment.definition.checker_id,
                     session_id=session.session_id,
+                    expire_at=session.expire_at,
                     state=states[session.session_id],
                     max_inactivity_seconds=max_inactivity_seconds,
                     current_time=context.current_time,
@@ -83,6 +84,7 @@ class NetworkTimeoutChecker(IdleChecker):
         *,
         checker_id: IdleCheckerID,
         session_id: SessionId,
+        expire_at: datetime,
         state: _NetworkIdleState,
         max_inactivity_seconds: int,
         current_time: datetime,
@@ -102,7 +104,6 @@ class NetworkTimeoutChecker(IdleChecker):
                 ),
             )
         last_access_at = datetime.fromtimestamp(state.last_access, tz=UTC)
-        expire_at = last_access_at + timedelta(seconds=max_inactivity_seconds)
         if current_time >= expire_at:
             status = IdleCheckPhase.IDLE_EXPIRED
             message = "Maximum network inactivity exceeded"

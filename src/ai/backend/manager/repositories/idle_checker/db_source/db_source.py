@@ -73,6 +73,7 @@ class IdleCheckerDBSource:
                 SessionRow.id.label("session_id"),
                 SessionRow.created_at.label("session_created_at"),
                 SessionRow.starts_at.label("session_starts_at"),
+                SessionIdleCheckRow.expire_at.label("session_expire_at"),
                 IdleCheckerRow.id.label("checker_id"),
                 IdleCheckerRow.checker_type,
                 IdleCheckerRow.target_session_types,
@@ -100,6 +101,7 @@ class IdleCheckerDBSource:
                         session_id=SessionId(row.session_id),
                         created_at=row.session_created_at,
                         starts_at=row.session_starts_at,
+                        expire_at=row.session_expire_at,
                     ),
                     checker=IdleCheckerDefinitionData(
                         checker_id=cast(IdleCheckerID, row.checker_id),
