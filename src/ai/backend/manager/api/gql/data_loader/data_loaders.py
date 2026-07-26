@@ -10,6 +10,7 @@ from ai.backend.common.identifier.app_config_allow_list import AppConfigAllowLis
 from ai.backend.common.identifier.app_config_definition import AppConfigDefinitionID
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
 from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.kernel_scheduling_history import KernelSchedulingHistoryID
 from ai.backend.common.types import AgentId, ImageID, KernelId, SessionId
 from ai.backend.manager.data.permission.id import ObjectId
@@ -642,6 +643,22 @@ class DataLoaders:
             )
 
             dtos = await adapter.batch_load_by_names(names)
+            return [D.from_pydantic(dto) if dto is not None else None for dto in dtos]
+
+        return DataLoader(load_fn=load_fn)
+
+    @cached_property
+    def domain_by_id_loader(
+        self,
+    ) -> DataLoader[DomainID, DomainV2GQL | None]:
+        adapter = self._adapters.domain
+
+        async def load_fn(ids: list[DomainID]) -> list[DomainV2GQL | None]:
+            from ai.backend.manager.api.gql.domain_v2.types.node import (  # pants: no-infer-dep
+                DomainV2GQL as D,
+            )
+
+            dtos = await adapter.batch_load_by_ids(ids)
             return [D.from_pydantic(dto) if dto is not None else None for dto in dtos]
 
         return DataLoader(load_fn=load_fn)
