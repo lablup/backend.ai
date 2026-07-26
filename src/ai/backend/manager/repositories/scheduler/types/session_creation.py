@@ -7,6 +7,7 @@ from decimal import Decimal
 from ai.backend.common.identifier.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.identifier.resource_slot import ResourceSlotName
 from ai.backend.common.types import (
+    AgentSelectionStrategy,
     SessionId,
     VFolderMount,
 )
@@ -89,3 +90,5 @@ class ComputeScheduleFetch:
     resource_group: ResourceGroupEnqueueInfo
     global_info: GlobalEnqueueInfo
     agents: list[AgentMeta]
+    # The group's configured selection strategy (the fitting check applies it)
+    agent_selection_strategy: AgentSelectionStrategy

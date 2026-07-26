@@ -1769,6 +1769,7 @@ class ScheduleDBSource:
                 resource_group=resource_group,
                 global_info=global_info,
                 agents=agents,
+                agent_selection_strategy=rg_row.scheduler_opts.agent_selection_strategy,
             )
 
     async def _fetch_session_spec_fetch(

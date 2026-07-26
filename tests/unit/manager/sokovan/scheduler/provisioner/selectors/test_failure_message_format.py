@@ -17,17 +17,17 @@ import pytest
 from ai.backend.common.identifier.architecture import ArchName
 from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.identifier.resource_slot import ResourceSlotName
-from ai.backend.common.types import AgentId, SessionId
+from ai.backend.common.types import AgentId, AgentSelectionStrategy, SessionId
 from ai.backend.manager.data.session.options import AgentSelectionPolicy
-from ai.backend.manager.sokovan.scheduler.provisioner.selectors.concentrated import (
-    ConcentratedAgentSelector,
-)
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.exceptions import (
     BatchAgentSelectionFailedError,
     ContainerLimitExceededError,
     InsufficientResourcesError,
     NoAgentsInResourceGroupError,
     NoAvailableAgentError,
+)
+from ai.backend.manager.sokovan.scheduler.provisioner.selectors.pool import (
+    create_agent_selector,
 )
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import (
     AgentSelectionCriteria,
@@ -113,8 +113,8 @@ def _trackers(agents: list[AgentInfo]) -> list[AgentStateTracker]:
     return [AgentStateTracker(original_agent=agent) for agent in agents]
 
 
-def _concentrated() -> AgentSelector:
-    return AgentSelector(ConcentratedAgentSelector(agent_selection_resource_priority=["cpu"]))
+def _selector() -> AgentSelector:
+    return create_agent_selector(["cpu"])
 
 
 class TestInsufficientResourcesErrorFormat:
@@ -156,7 +156,8 @@ class TestNoAvailableAgentErrorAggregationFormat:
         criteria = _criteria([_req({"cpu": "4", "mem": "8192"})])
 
         with pytest.raises(BatchAgentSelectionFailedError) as exc_info:
-            await _concentrated().select_agents_for_batch_requirements(
+            await _selector().select_agents_for_batch_requirements(
+                AgentSelectionStrategy.CONCENTRATED,
                 _trackers(heterogeneous_failing_agents),
                 criteria,
                 AgentLimit(max_container_count=10),
@@ -305,7 +306,8 @@ class TestGoldenNoAvailableAgentError:
         criteria = _criteria([_req({"cpu": "4"})])
 
         with pytest.raises(BatchAgentSelectionFailedError) as exc_info:
-            await _concentrated().select_agents_for_batch_requirements(
+            await _selector().select_agents_for_batch_requirements(
+                AgentSelectionStrategy.CONCENTRATED,
                 _trackers(agents_with_two_failure_modes),
                 criteria,
                 AgentLimit(max_container_count=10),
@@ -348,7 +350,8 @@ class TestGoldenNoDesignatedAgentCompatible:
         )
 
         with pytest.raises(BatchAgentSelectionFailedError) as exc_info:
-            await _concentrated().select_agents_for_batch_requirements(
+            await _selector().select_agents_for_batch_requirements(
+                AgentSelectionStrategy.CONCENTRATED,
                 _trackers(designated_agents_plus_fallback),
                 criteria,
                 AgentLimit(max_container_count=10),

@@ -7,7 +7,6 @@ from dataclasses import dataclass
 
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
 from ai.backend.common.types import (
-    AgentSelectionStrategy,
     SessionId,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
@@ -31,10 +30,6 @@ from ai.backend.manager.views.sokovan.scheduling import SchedulingData
 from ai.backend.manager.views.sokovan.snapshot import SystemSnapshot
 from ai.backend.manager.views.sokovan.workload import SessionWorkload
 
-from .selectors.concentrated import ConcentratedAgentSelector
-from .selectors.dispersed import DispersedAgentSelector
-from .selectors.legacy import LegacyAgentSelector
-from .selectors.roundrobin import RoundRobinAgentSelector
 from .selectors.selector import (
     AgentSelection,
     AgentSelectionCriteria,
@@ -79,7 +74,8 @@ class SchedulingState:
 class SessionProvisionerArgs:
     validator: SchedulingValidator
     default_sequencer: WorkloadSequencer
-    default_agent_selector: AgentSelector
+    # The strategy-pooled selector shared with the scheduling controller
+    agent_selector: AgentSelector
     repository: SchedulerRepository
     fair_share_repository: FairShareRepository
     config_provider: ManagerConfigProvider
@@ -99,27 +95,23 @@ class SessionProvisioner:
 
     _validator: SchedulingValidator
     _default_sequencer: WorkloadSequencer
-    _default_agent_selector: AgentSelector
+    _agent_selector: AgentSelector
     _repository: SchedulerRepository
     _fair_share_repository: FairShareRepository
     _config_provider: ManagerConfigProvider
     _sequencer: SchedulingSequencer
-    _agent_selector_pool: Mapping[AgentSelectionStrategy, AgentSelector]
     _phase_metrics: SchedulerPhaseMetricObserver
     _valkey_schedule: ValkeyScheduleClient
 
     def __init__(self, args: SessionProvisionerArgs) -> None:
         self._validator = args.validator
         self._default_sequencer = args.default_sequencer
-        self._default_agent_selector = args.default_agent_selector
+        self._agent_selector = args.agent_selector
         self._repository = args.repository
         self._fair_share_repository = args.fair_share_repository
         self._config_provider = args.config_provider
         self._valkey_schedule = args.valkey_schedule
         self._sequencer = SchedulingSequencer(self._make_sequencer_pool())
-        self._agent_selector_pool = self._make_agent_selector_pool(
-            args.config_provider.config.manager.agent_selection_resource_priority
-        )
         self._phase_metrics = SchedulerPhaseMetricObserver.instance()
 
     def _make_sequencer_pool(self) -> Mapping[str, WorkloadSequencer]:
@@ -129,26 +121,6 @@ class SessionProvisioner:
         pool["lifo"] = LIFOSequencer()
         pool["drf"] = DRFSequencer()
         pool["fair-share"] = FairShareSequencer(self._fair_share_repository)
-        return pool
-
-    @classmethod
-    def _make_agent_selector_pool(
-        cls, agent_selection_resource_priority: list[str]
-    ) -> Mapping[AgentSelectionStrategy, AgentSelector]:
-        """Initialize the agent selector pool with default selectors."""
-        pool: dict[AgentSelectionStrategy, AgentSelector] = defaultdict(
-            lambda: AgentSelector(ConcentratedAgentSelector(agent_selection_resource_priority))
-        )
-        pool[AgentSelectionStrategy.CONCENTRATED] = AgentSelector(
-            ConcentratedAgentSelector(agent_selection_resource_priority)
-        )
-        pool[AgentSelectionStrategy.DISPERSED] = AgentSelector(
-            DispersedAgentSelector(agent_selection_resource_priority)
-        )
-        pool[AgentSelectionStrategy.ROUNDROBIN] = AgentSelector(RoundRobinAgentSelector())
-        pool[AgentSelectionStrategy.LEGACY] = AgentSelector(
-            LegacyAgentSelector(agent_selection_resource_priority)
-        )
         return pool
 
     async def schedule_resource_group(
@@ -243,9 +215,7 @@ class SessionProvisioner:
         session_workload: SessionWorkload,
     ) -> SessionAllocation:
         resource_group_id = session_workload.meta.resource_group_id
-        agent_selector = self._agent_selector_pool[
-            state.snapshot.resource_group.policy.agent_selection_strategy
-        ]
+        strategy = state.snapshot.resource_group.policy.agent_selection_strategy
         pool = RecorderContext[SessionId].current_pool()
         recorder = pool.recorder(session_workload.meta.session_id)
 
@@ -257,11 +227,12 @@ class SessionProvisioner:
         # Phase 2: Agent Selection
         with self._phase_metrics.measure_phase("scheduler", resource_group_id, "agent_selection"):
             with recorder.phase(
-                "agent_selection", success_detail=agent_selector.strategy_success_message()
+                "agent_selection",
+                success_detail=self._agent_selector.strategy_success_message(strategy),
             ):
                 with recorder.step(
-                    agent_selector.strategy_name(),
-                    success_detail=agent_selector.strategy_success_message(),
+                    self._agent_selector.strategy_name(strategy),
+                    success_detail=self._agent_selector.strategy_success_message(strategy),
                 ):
                     session_allocation = await self._plan_workload(
                         state,
@@ -321,11 +292,11 @@ class SessionProvisioner:
         criteria = AgentSelectionCriteria.from_workload(session_workload, plan)
 
         # Selection commits state changes into the trackers on full success
-        selector = self._agent_selector_pool[
-            state.snapshot.resource_group.policy.agent_selection_strategy
-        ]
-        selections = await selector.select_agents_for_batch_requirements(
-            state.trackers, criteria, state.snapshot.global_scope.agent_limit
+        selections = await self._agent_selector.select_agents_for_batch_requirements(
+            state.snapshot.resource_group.policy.agent_selection_strategy,
+            state.trackers,
+            criteria,
+            state.snapshot.global_scope.agent_limit,
         )
 
         # Build session allocation from selections

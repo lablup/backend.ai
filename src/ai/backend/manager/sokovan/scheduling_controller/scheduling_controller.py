@@ -394,7 +394,7 @@ class SchedulingController:
             # is likewise a whole-request error, so it propagates too.
             try:
                 await self._agent_selector.select_agents_for_batch_requirements(
-                    trackers, criteria, data.limit
+                    data.agent_selection_strategy, trackers, criteria, data.limit
                 )
             except BatchAgentSelectionFailedError as e:
                 for err in e.errors:

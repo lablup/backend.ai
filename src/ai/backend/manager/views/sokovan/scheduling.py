@@ -2,6 +2,8 @@
 
 from dataclasses import dataclass
 
+from ai.backend.common.types import AgentSelectionStrategy
+
 from .agent import AgentLimit, ResourceGroupResource
 from .resource_group import ResourceGroupMeta
 from .session_creation import SessionSpecContext
@@ -31,3 +33,5 @@ class ComputeScheduleData:
     spec_context: SessionSpecContext
     resources: ResourceGroupResource
     limit: AgentLimit
+    # The group's configured selection strategy (the fitting check applies it)
+    agent_selection_strategy: AgentSelectionStrategy

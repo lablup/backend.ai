@@ -216,6 +216,7 @@ class SchedulerRepository:
             ),
             resources=ResourceGroupResource(agents=fetch.agents),
             limit=AgentLimit(max_container_count=await self._get_max_container_count()),
+            agent_selection_strategy=fetch.agent_selection_strategy,
         )
 
     @scheduler_repository_resilience.apply()

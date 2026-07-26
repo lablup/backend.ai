@@ -119,7 +119,7 @@ def create_default_scheduler_components(
         SessionProvisionerArgs(
             validator=validator,
             default_sequencer=sequencer,
-            default_agent_selector=agent_selector,
+            agent_selector=agent_selector,
             repository=repository,
             fair_share_repository=fair_share_repository,
             config_provider=config_provider,

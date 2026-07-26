@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 
@@ -17,6 +17,7 @@ from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.identifier.resource_slot import ResourceSlotName
 from ai.backend.common.types import (
     AgentId,
+    AgentSelectionStrategy,
     BinarySize,
     ClusterMode,
     SessionId,
@@ -225,31 +226,37 @@ class AbstractAgentSelector(ABC):
 
 class AgentSelector:
     """
-    Base agent selector with common logic.
+    Agent selection over the strategy pool, with the common logic shared by
+    every strategy: designated agent handling, architecture filtering,
+    resource availability checking, and container limit filtering.
 
-    This class handles common concerns like designated agent selection,
-    architecture filtering, resource availability checking, and container limit filtering.
+    Holds one selection object per :class:`AgentSelectionStrategy`; callers
+    name the strategy per invocation, so a single instance (built once via
+    ``pool.create_agent_selector``) serves every resource group.
     """
 
-    _strategy: AbstractAgentSelector
+    _strategy_pool: Mapping[AgentSelectionStrategy, AbstractAgentSelector]
 
-    def __init__(self, strategy: AbstractAgentSelector) -> None:
-        self._strategy = strategy
+    def __init__(
+        self, strategy_pool: Mapping[AgentSelectionStrategy, AbstractAgentSelector]
+    ) -> None:
+        self._strategy_pool = strategy_pool
 
-    def strategy_name(self) -> str:
+    def strategy_name(self, strategy: AgentSelectionStrategy) -> str:
         """
         Return the strategy name for predicates.
         """
-        return self._strategy.name()
+        return self._strategy_pool[strategy].name()
 
-    def strategy_success_message(self) -> str:
+    def strategy_success_message(self, strategy: AgentSelectionStrategy) -> str:
         """
         Return a message describing successful agent selection.
         """
-        return self._strategy.success_message()
+        return self._strategy_pool[strategy].success_message()
 
     async def select_agents_for_batch_requirements(
         self,
+        strategy: AgentSelectionStrategy,
         trackers: Sequence[AgentStateTracker],
         criteria: AgentSelectionCriteria,
         limit: AgentLimit,
@@ -265,6 +272,7 @@ class AgentSelector:
         later sessions of the same scheduling pass observe them.
 
         Args:
+            strategy: Which pooled selection strategy to apply
             trackers: Batch-scoped agent state (created once per scheduling pass)
             criteria: Selection criteria including kernel requirements
             limit: Per-agent cap enforced during selection
@@ -291,6 +299,7 @@ class AgentSelector:
             # requirements so every failure's remediation hint is collected.
             try:
                 selected_tracker = await self._select_agent_tracker_for_requirements(
+                    strategy,
                     trackers,
                     resource_req,
                     requirement_index,
@@ -326,6 +335,7 @@ class AgentSelector:
 
     async def _select_agent_tracker_for_requirements(
         self,
+        strategy: AgentSelectionStrategy,
         state_trackers: Sequence[AgentStateTracker],
         resource_req: ResourceRequirements,
         requirement_index: int,
@@ -420,7 +430,9 @@ class AgentSelector:
                 )
 
         # Use strategy to select from candidates
-        return self._strategy.select_tracker_by_strategy(candidate_trackers, resource_req)
+        return self._strategy_pool[strategy].select_tracker_by_strategy(
+            candidate_trackers, resource_req
+        )
 
     def _check_tracker_compatibility(
         self,
