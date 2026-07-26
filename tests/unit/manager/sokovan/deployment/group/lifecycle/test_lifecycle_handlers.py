@@ -40,14 +40,20 @@ def _view(
     goal: int = 4,
     desired_current: int = 4,
     desired_target: int = 0,
+    current_live: int | None = None,
     current_revision_id: DeploymentRevisionID | None = None,
     target_revision_id: DeploymentRevisionID | None = None,
+    rollout: ReplicaGroupRolloutSpec | None = None,
 ) -> ReplicaGroupLifecycleReconcileView:
-    # surge 50%, unavailable 0% baseline.
-    rollout = ReplicaGroupRolloutSpec(
-        max_surge=IntOrPercent(percent=0.5),
-        max_unavailable=IntOrPercent(percent=0.0),
-    )
+    if rollout is None:
+        # surge 50%, unavailable 0% baseline.
+        rollout = ReplicaGroupRolloutSpec(
+            max_surge=IntOrPercent(percent=0.5),
+            max_unavailable=IntOrPercent(percent=0.0),
+        )
+    if current_live is None:
+        # Healthy current side by default: every desired replica is live.
+        current_live = desired_current if current_revision_id is not None else 0
     return ReplicaGroupLifecycleReconcileView(
         group_id=ReplicaGroupID(uuid.uuid4()),
         deployment_id=DeploymentID(uuid.uuid4()),
@@ -57,6 +63,7 @@ def _view(
         scaling_status=ReplicaGroupScalingStatus.STABLE,
         desired_current_replica_count=desired_current,
         desired_target_replica_count=desired_target,
+        current_live_replica_count=current_live,
         deployment_desired_replica_count=goal,
         rollout=rollout,
         last_history=None,
@@ -162,14 +169,14 @@ async def test_rolling_steps_target_up_and_current_down() -> None:
     with RecorderContext[UUID].scope("group_rolling", [view.group_id]):
         result = await GroupRollingHandler().execute(info)
     decision = result.lifecycle_decisions[0]
-    assert decision.next_desired_target_replica_count == 4  # min(4, 2 + 2)
-    assert decision.next_desired_current_replica_count == 2  # max(0, (4 - 0) - 2)
+    assert decision.next_desired_target_replica_count == 4  # min(4, (4 + 2) - 2)
+    assert decision.next_desired_current_replica_count == 2  # min(4, (4 - 0) - 2)
     assert decision.outcome() is HandlerOutcome.FAILURE
 
 
 async def test_rolling_initial_deploy_keeps_current_at_zero() -> None:
     # Initial deploy: no current revision to keep serving, so current stays at zero
-    # while the target ramps up (no availability floor to maintain).
+    # and there is no old side to hold budget — the target goes straight to the goal.
     view = _view(
         lifecycle=ReplicaGroupLifecycle.ROLLING,
         desired_current=0,
@@ -179,8 +186,109 @@ async def test_rolling_initial_deploy_keeps_current_at_zero() -> None:
     with RecorderContext[UUID].scope("group_rolling", [view.group_id]):
         result = await GroupRollingHandler().execute(_info(view))
     decision = result.lifecycle_decisions[0]
-    assert decision.next_desired_target_replica_count == 4  # min(4, 2 + 2)
+    assert decision.next_desired_target_replica_count == 4  # min(4, (4 + 2) - 0)
     assert decision.next_desired_current_replica_count == 0  # no current revision → no floor
+    assert decision.outcome() is HandlerOutcome.FAILURE
+
+
+async def test_rolling_hands_over_all_freed_count_when_current_dead() -> None:
+    # Every old replica died (e.g. the user terminated them all) after the first
+    # step. Dead replicas are never refilled during a rollout, so they no longer
+    # hold surge budget: the target jumps straight to the goal instead of creeping
+    # up one surge increment per step.
+    rollout = ReplicaGroupRolloutSpec(
+        max_surge=IntOrPercent(count=1),
+        max_unavailable=IntOrPercent(count=0),
+    )
+    view = _view(
+        lifecycle=ReplicaGroupLifecycle.ROLLING,
+        goal=10,
+        desired_current=9,
+        desired_target=1,
+        current_live=0,
+        current_revision_id=DeploymentRevisionID(uuid.uuid4()),
+        target_revision_id=DeploymentRevisionID(uuid.uuid4()),
+        rollout=rollout,
+    )
+    with RecorderContext[UUID].scope("group_rolling", [view.group_id]):
+        result = await GroupRollingHandler().execute(_info(view))
+    decision = result.lifecycle_decisions[0]
+    assert decision.next_desired_current_replica_count == 0
+    assert decision.next_desired_target_replica_count == 10  # min(10, (10 + 1) - 0)
+    assert decision.outcome() is HandlerOutcome.FAILURE
+
+
+async def test_rolling_hands_over_partially_freed_count() -> None:
+    # 4 of 9 old replicas died: the target picks up the freed slots plus the surge
+    # allowance, and the current floor is clamped down to what is actually live.
+    rollout = ReplicaGroupRolloutSpec(
+        max_surge=IntOrPercent(count=1),
+        max_unavailable=IntOrPercent(count=0),
+    )
+    view = _view(
+        lifecycle=ReplicaGroupLifecycle.ROLLING,
+        goal=10,
+        desired_current=9,
+        desired_target=1,
+        current_live=5,
+        current_revision_id=DeploymentRevisionID(uuid.uuid4()),
+        target_revision_id=DeploymentRevisionID(uuid.uuid4()),
+        rollout=rollout,
+    )
+    with RecorderContext[UUID].scope("group_rolling", [view.group_id]):
+        result = await GroupRollingHandler().execute(_info(view))
+    decision = result.lifecycle_decisions[0]
+    assert decision.next_desired_current_replica_count == 5  # min(5, (10 - 0) - 1)
+    assert decision.next_desired_target_replica_count == 6  # min(10, (10 + 1) - 5)
+    assert decision.outcome() is HandlerOutcome.FAILURE
+
+
+async def test_rolling_healthy_current_steps_by_surge() -> None:
+    # With every old replica alive the live-based budget reduces to the classic
+    # step: the target grows by exactly the surge each cycle.
+    rollout = ReplicaGroupRolloutSpec(
+        max_surge=IntOrPercent(count=1),
+        max_unavailable=IntOrPercent(count=0),
+    )
+    view = _view(
+        lifecycle=ReplicaGroupLifecycle.ROLLING,
+        goal=10,
+        desired_current=9,
+        desired_target=1,
+        current_revision_id=DeploymentRevisionID(uuid.uuid4()),
+        target_revision_id=DeploymentRevisionID(uuid.uuid4()),
+        rollout=rollout,
+    )
+    with RecorderContext[UUID].scope("group_rolling", [view.group_id]):
+        result = await GroupRollingHandler().execute(_info(view))
+    decision = result.lifecycle_decisions[0]
+    assert decision.next_desired_current_replica_count == 9  # min(9, (10 - 0) - 1)
+    assert decision.next_desired_target_replica_count == 2  # min(10, (10 + 1) - 9)
+    assert decision.outcome() is HandlerOutcome.FAILURE
+
+
+async def test_rolling_progresses_with_zero_surge() -> None:
+    # surge 0 / unavailable > 0: room is made by draining the current side first,
+    # then the target fills the vacated slots. The desired-based step never grew
+    # the target here (0 + surge == 0); the live-based budget does.
+    rollout = ReplicaGroupRolloutSpec(
+        max_surge=IntOrPercent(count=0),
+        max_unavailable=IntOrPercent(count=2),
+    )
+    view = _view(
+        lifecycle=ReplicaGroupLifecycle.ROLLING,
+        goal=4,
+        desired_current=4,
+        desired_target=0,
+        current_revision_id=DeploymentRevisionID(uuid.uuid4()),
+        target_revision_id=DeploymentRevisionID(uuid.uuid4()),
+        rollout=rollout,
+    )
+    with RecorderContext[UUID].scope("group_rolling", [view.group_id]):
+        result = await GroupRollingHandler().execute(_info(view))
+    decision = result.lifecycle_decisions[0]
+    assert decision.next_desired_current_replica_count == 2  # min(4, (4 - 2) - 0)
+    assert decision.next_desired_target_replica_count == 2  # min(4, (4 + 0) - 2)
     assert decision.outcome() is HandlerOutcome.FAILURE
 
 
