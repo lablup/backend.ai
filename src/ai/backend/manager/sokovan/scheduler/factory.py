@@ -29,6 +29,8 @@ from ai.backend.manager.sokovan.scheduler.fair_share import (
 from ai.backend.manager.sokovan.scheduler.handlers import (
     CheckPreconditionLifecycleHandler,
     DeprioritizeSessionsLifecycleHandler,
+    PreemptSessionsLifecycleHandler,
+    RescheduleSessionsLifecycleHandler,
     ScheduleSessionsLifecycleHandler,
     SessionLifecycleHandler,
     StartSessionsLifecycleHandler,
@@ -236,6 +238,15 @@ def _create_lifecycle_handlers(
         ScheduleType.TERMINATE: TerminateSessionsLifecycleHandler(
             args.terminator,
             args.repository,
+        ),
+        ScheduleType.PREEMPTED: PreemptSessionsLifecycleHandler(
+            args.repository,
+            args.scheduling_controller,
+        ),
+        ScheduleType.RESCHEDULING: RescheduleSessionsLifecycleHandler(
+            args.terminator,
+            args.repository,
+            args.scheduling_controller,
         ),
         ScheduleType.SWEEP: SweepSessionsLifecycleHandler(
             args.repository,

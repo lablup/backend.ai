@@ -29,6 +29,7 @@ from ai.backend.common.resource.types import TotalResourceData
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
+    PreemptionMode,
     SessionId,
     VFolderMount,
     VFolderMountOptions,
@@ -257,6 +258,29 @@ class SchedulerRepository:
             forced=forced,
             message=message,
         )
+
+    @scheduler_repository_resilience.apply()
+    async def mark_sessions_status(
+        self,
+        session_ids: list[SessionId],
+        to_status: SessionStatus,
+        reason: str,
+    ) -> list[SessionId]:
+        """
+        Move sessions to ``to_status``, skipping the sessions whose current
+        status cannot enter it. A move to PENDING re-enqueues the sessions'
+        kernels in the same transaction.
+
+        Returns the IDs of the sessions actually transitioned.
+        """
+        return await self._db_source.mark_sessions_status(session_ids, to_status, reason)
+
+    @scheduler_repository_resilience.apply()
+    async def get_resource_group_preemption_mode(
+        self, resource_group_id: ResourceGroupID
+    ) -> PreemptionMode:
+        """Return the preemption mode configured on a resource group."""
+        return await self._db_source.get_resource_group_preemption_mode(resource_group_id)
 
     @scheduler_repository_resilience.apply()
     async def get_all_resource_groups(self) -> list[ResourceGroupID]:
@@ -599,7 +623,7 @@ class SchedulerRepository:
     async def reset_kernels_to_pending_for_sessions(
         self, session_ids: list[SessionId], reason: str
     ) -> int:
-        """Reset kernels to PENDING for the given sessions when max retries exceeded."""
+        """Reset kernels to PENDING for the given sessions going back to the queue."""
         return await self._db_source.reset_kernels_to_pending_for_sessions(session_ids, reason)
 
     @scheduler_repository_resilience.apply()

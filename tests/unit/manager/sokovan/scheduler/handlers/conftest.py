@@ -17,6 +17,7 @@ from ai.backend.common.types import (
     AgentId,
     ClusterMode,
     KernelId,
+    PreemptionMode,
     ResourceSlot,
     SessionId,
     SessionResult,
@@ -382,7 +383,19 @@ def mock_repository() -> AsyncMock:
         return_value=SessionsForStartWithImages(sessions=[], image_configs={})
     )
     repository.get_terminating_sessions_by_ids = AsyncMock(return_value=[])
+    repository.reset_kernels_to_pending_for_sessions = AsyncMock(return_value=0)
+    repository.get_resource_group_preemption_mode = AsyncMock(return_value=PreemptionMode.TERMINATE)
     return repository
+
+
+@pytest.fixture
+def mock_scheduling_controller() -> AsyncMock:
+    """Mock SchedulingController for PreemptSessionsLifecycleHandler tests."""
+    controller = AsyncMock()
+    controller.mark_sessions_for_termination = AsyncMock(return_value=None)
+    controller.mark_sessions_status = AsyncMock(return_value=[])
+    controller.mark_scheduling_needed = AsyncMock(return_value=None)
+    return controller
 
 
 # =============================================================================
@@ -482,6 +495,43 @@ def terminating_sessions_multiple() -> list[SessionWithKernels]:
         _create_session(status=SessionStatus.TERMINATING, kernel_status=KernelStatus.RUNNING),
         _create_session(status=SessionStatus.TERMINATING, kernel_status=KernelStatus.RUNNING),
     ]
+
+
+# =============================================================================
+# Pre-created Session Fixtures for PreemptSessionsLifecycleHandler
+# =============================================================================
+
+
+@pytest.fixture
+def preempted_sessions_multiple() -> list[SessionWithKernels]:
+    """Multiple PREEMPTED victims with RUNNING kernels."""
+    return [
+        _create_session(status=SessionStatus.PREEMPTED, kernel_status=KernelStatus.RUNNING),
+        _create_session(status=SessionStatus.PREEMPTED, kernel_status=KernelStatus.RUNNING),
+    ]
+
+
+# =============================================================================
+# Pre-created Session Fixtures for RescheduleSessionsLifecycleHandler
+# =============================================================================
+
+
+@pytest.fixture
+def rescheduling_session_live_kernels() -> SessionWithKernels:
+    """RESCHEDULING session whose kernels are still tearing down."""
+    return _create_session(
+        status=SessionStatus.RESCHEDULING,
+        kernel_status=KernelStatus.TERMINATING,
+    )
+
+
+@pytest.fixture
+def rescheduling_session_terminated_kernels() -> SessionWithKernels:
+    """RESCHEDULING session whose kernels are all gone (ready to requeue)."""
+    return _create_session(
+        status=SessionStatus.RESCHEDULING,
+        kernel_status=KernelStatus.TERMINATED,
+    )
 
 
 # =============================================================================
