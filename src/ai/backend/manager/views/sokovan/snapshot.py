@@ -204,16 +204,15 @@ class SessionDependencySnapshot:
 class PreemptionCandidate:
     """One preemption victim candidate (a whole session — the preemption unit).
 
-    Prefiltered at load time (the filter is defined at the load site);
-    min-runtime exemption, per-pending comparison, and victim selection
-    stay in the preemption planner.
+    Prefiltered at load time (the filter, including the minimum runtime,
+    is defined at the load site); per-pending comparison, reclaim ordering,
+    and victim selection stay in the selection layer.
     """
 
     session_id: SessionId
     job_priority: int
     # Execution start time (written at the RUNNING transition); the
-    # min-runtime exemption and oldest/newest tie-break basis. None for
-    # candidates preempted before running — nothing ran, so no exemption
+    # oldest/newest reclaim-order basis. None when the session never ran
     started_at: datetime | None
     # Per-agent live allocations freed by preempting this session
     # (resource_allocations rows, not the legacy kernels.occupied_slots)

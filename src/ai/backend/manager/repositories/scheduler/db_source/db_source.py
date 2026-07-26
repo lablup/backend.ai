@@ -6,7 +6,7 @@ import logging
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any, cast
 from uuid import UUID
@@ -281,10 +281,10 @@ class ScheduleDBSource:
             )
             session_ids = [s.meta.session_id for s in pending_sessions.sessions]
             session_dependencies = await self._fetch_session_dependencies(db_sess, session_ids)
-            preemption_candidates = await self._fetch_preemption_candidates(
-                db_sess, resource_group, pending_sessions
-            )
             observed_at = await self._get_db_now_in_session(db_sess)
+            preemption_candidates = await self._fetch_preemption_candidates(
+                db_sess, resource_group, pending_sessions, observed_at
+            )
 
             return SchedulingFetch(
                 resource_group=resource_group.meta,
@@ -878,6 +878,7 @@ class ScheduleDBSource:
         db_sess: SASession,
         resource_group: ResourceGroupFetch,
         pending_sessions: PendingSessions,
+        observed_at: datetime,
     ) -> PreemptionCandidateSnapshot:
         """Load this resource group's preemption victim candidates per owner.
 
@@ -887,10 +888,11 @@ class ScheduleDBSource:
         as the occupancy scan), owned by a pending owner, with
         ``job_priority`` strictly below that owner's max pending
         ``job_priority`` — a superset of every per-pending comparison, so
-        no valid victim is dropped. Min-runtime exemption and victim
-        selection stay in the planner; only the freed-resource accounting
-        is kept per agent. No query runs when preemption is disabled on
-        the group.
+        no valid victim is dropped. With a minimum runtime configured,
+        sessions below it are dropped too (NULL ``starts_at`` counts as
+        zero runtime). Candidates are unordered — reclaim ordering is
+        per-pending, so it stays in the selection layer. No query runs
+        when preemption is disabled on the group.
         """
         if not resource_group.preemption.enabled:
             return PreemptionCandidateSnapshot.empty()
@@ -952,6 +954,9 @@ class ScheduleDBSource:
                 ra.c.slot_name,
             )
         )
+        min_runtime = resource_group.preemption.preemption_min_runtime
+        if min_runtime > timedelta(0):
+            stmt = stmt.where(s.c.starts_at <= observed_at - min_runtime)
         rows = (await db_sess.execute(stmt)).all()
 
         # One accumulator per session: the session-level values from any of
