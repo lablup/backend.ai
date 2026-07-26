@@ -166,6 +166,8 @@ from ai.backend.manager.views.sokovan.session_creation import (
     ResourceGroupEnqueueInfo,
 )
 from ai.backend.manager.views.sokovan.snapshot import (
+    PreemptionCandidate,
+    PreemptionCandidateSnapshot,
     ResourceAllocation,
     ResourceGroupSchedulingPolicy,
     ResourceLimit,
@@ -175,6 +177,7 @@ from ai.backend.manager.views.sokovan.snapshot import (
     SlotAllocation,
     UserResourceAllocation,
     UserResourceLimit,
+    UserVictimCandidates,
 )
 from ai.backend.manager.views.sokovan.workload import (
     KernelWorkload,
@@ -222,6 +225,16 @@ class _ScalingGroupWithSlotInventory:
     served_slot_names: frozenset[ResourceSlotName]
 
 
+@dataclass
+class _PreemptionCandidateAccumulator:
+    """Per-session build state: the session-level row shared by the
+    session's result rows plus the per-(agent, slot) amounts folded
+    across them."""
+
+    row: sa.Row[Any]
+    slots_by_agent: dict[AgentId, dict[ResourceSlotName, Decimal]]
+
+
 class ScheduleDBSource:
     """
     Database source for schedule-related operations.
@@ -266,6 +279,9 @@ class ScheduleDBSource:
             )
             session_ids = [s.meta.session_id for s in pending_sessions.sessions]
             session_dependencies = await self._fetch_session_dependencies(db_sess, session_ids)
+            preemption_candidates = await self._fetch_preemption_candidates(
+                db_sess, resource_group, pending_sessions
+            )
             observed_at = await self._get_db_now_in_session(db_sess)
 
             return SchedulingFetch(
@@ -277,6 +293,7 @@ class ScheduleDBSource:
                 resource_policy=resource_policy,
                 session_dependencies=SessionDependencySnapshot(by_session=session_dependencies),
                 observed_at=observed_at,
+                preemption_candidates=preemption_candidates,
             )
 
     async def _fetch_resource_group_with_slot_inventory(
@@ -364,6 +381,7 @@ class ScheduleDBSource:
                 scheduler=rg_row.scheduler,
                 agent_selection_strategy=rg_row.scheduler_opts.agent_selection_strategy,
             ),
+            preemption=rg_row.scheduler_opts.preemption,
         )
 
     async def _fetch_pending_sessions(
@@ -852,6 +870,117 @@ class ScheduleDBSource:
             )
 
         return dict(dependencies_by_session)
+
+    async def _fetch_preemption_candidates(
+        self,
+        db_sess: SASession,
+        resource_group: ResourceGroupFetch,
+        pending_sessions: PendingSessions,
+    ) -> PreemptionCandidateSnapshot:
+        """Load this resource group's preemption victim candidates per owner.
+
+        A candidate is one whole session (the preemption unit): a
+        preemptible, non-private session that holds unfreed agent
+        allocations (SCHEDULED onward, terminatable — same hold definition
+        as the occupancy scan), owned by a pending owner, with
+        ``job_priority`` strictly below that owner's max pending
+        ``job_priority`` — a superset of every per-pending comparison, so
+        no valid victim is dropped. Min-runtime exemption and victim
+        selection stay in the planner; only the freed-resource accounting
+        is kept per agent. No query runs when preemption is disabled on
+        the group.
+        """
+        if not resource_group.preemption.enabled:
+            return PreemptionCandidateSnapshot.empty()
+        max_pending_priority: dict[UserID, int] = {}
+        for workload in pending_sessions.sessions:
+            # Private (SFTP/system) sessions never initiate preemption,
+            # just as they are never victims
+            if workload.is_private:
+                continue
+            owner = workload.meta.owner.user_uuid
+            current = max_pending_priority.get(owner)
+            if current is None or workload.job_priority > current:
+                max_pending_priority[owner] = workload.job_priority
+        if not max_pending_priority:
+            return PreemptionCandidateSnapshot.empty()
+
+        ra = ResourceAllocationRow.__table__
+        k = KernelRow.__table__
+        s = SessionRow.__table__
+        # Victim prefilter: owned by a pending owner AND strictly below
+        # that owner's own max pending job_priority
+        candidate_filter = sa.or_(
+            *(
+                sa.and_(s.c.user_uuid == user_uuid, s.c.job_priority < threshold)
+                for user_uuid, threshold in max_pending_priority.items()
+            )
+        )
+        # Per allocation row the agent holds ``used`` once reported, else
+        # the ``requested`` reservation — the amount freed on preemption.
+        allocated_sum = sa.func.sum(sa.func.coalesce(ra.c.used, ra.c.requested)).label("allocated")
+        stmt = (
+            sa.select(
+                s.c.id,
+                s.c.user_uuid,
+                s.c.job_priority,
+                s.c.starts_at,
+                k.c.agent,
+                ra.c.slot_name,
+                allocated_sum,
+            )
+            .select_from(ra.join(k, ra.c.kernel_id == k.c.id).join(s, k.c.session_id == s.c.id))
+            .where(
+                s.c.resource_group_id == resource_group.meta.id,
+                s.c.status.in_(SessionStatus.preemption_victim_statuses()),
+                s.c.is_preemptible == sa.true(),
+                # Private (SFTP/system) sessions are never preemption victims
+                s.c.session_type.not_in(SessionTypes.private_types()),
+                candidate_filter,
+                k.c.status.in_(KernelStatus.resource_holding_statuses()),
+                k.c.agent.is_not(None),
+                ra.c.free_at.is_(None),
+            )
+            .group_by(
+                s.c.id,
+                s.c.user_uuid,
+                s.c.job_priority,
+                s.c.starts_at,
+                k.c.agent,
+                ra.c.slot_name,
+            )
+        )
+        rows = (await db_sess.execute(stmt)).all()
+
+        # One accumulator per session: the session-level values from any of
+        # its rows plus the per-(agent, slot) amounts folded across rows
+        candidates: dict[SessionId, _PreemptionCandidateAccumulator] = {}
+        for row in rows:
+            session_id = SessionId(row.id)
+            accumulator = candidates.get(session_id)
+            if accumulator is None:
+                accumulator = _PreemptionCandidateAccumulator(row=row, slots_by_agent={})
+                candidates[session_id] = accumulator
+            accumulator.slots_by_agent.setdefault(AgentId(row.agent), {})[
+                ResourceSlotName(row.slot_name)
+            ] = row.allocated
+
+        by_user: dict[UserID, list[PreemptionCandidate]] = defaultdict(list)
+        for session_id, accumulator in candidates.items():
+            by_user[UserID(accumulator.row.user_uuid)].append(
+                PreemptionCandidate(
+                    session_id=session_id,
+                    job_priority=accumulator.row.job_priority,
+                    started_at=accumulator.row.starts_at,
+                    allocated_slots_by_agent=accumulator.slots_by_agent,
+                )
+            )
+        return PreemptionCandidateSnapshot(
+            by_user={
+                user_uuid: UserVictimCandidates(candidates=user_candidates)
+                for user_uuid, user_candidates in by_user.items()
+            }
+        )
 
     async def mark_sessions_terminating(
         self,

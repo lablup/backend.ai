@@ -396,26 +396,39 @@ async def create_pending_session_with_kernels(
     user_uuid: uuid.UUID,
     access_key: AccessKey,
     agent_assignments: list[tuple[str, Decimal, Decimal]],
+    job_priority: int = 0,
+    is_preemptible: bool = True,
+    session_type: SessionTypes = SessionTypes.INTERACTIVE,
+    session_status: SessionStatus = SessionStatus.PENDING,
+    kernel_status: KernelStatus = KernelStatus.PENDING,
+    assign_agents: bool = False,
 ) -> tuple[SessionId, list[KernelId]]:
-    """Create a PENDING session with one kernel per agent assignment.
+    """Create a session with one kernel per agent assignment.
 
-    Each entry in ``agent_assignments`` is ``(agent_id, cpu_requested,
-    mem_requested)``. Each kernel is created in PENDING status with pending
-    ``resource_allocations`` rows (``used``/``used_at``/``free_at`` all NULL).
-    Returns the session id and the kernel ids in assignment order.
+    The defaults create the PENDING shape: unassigned kernels with pending
+    ``resource_allocations`` rows (``used``/``used_at``/``free_at`` all
+    NULL). With ``assign_agents`` each kernel is placed on its assigned
+    agent, RUNNING kernels get usage-reported allocation rows, and
+    ``starts_at`` is set only for RUNNING sessions, mirroring the real
+    transitions. Each entry in ``agent_assignments`` is ``(agent_id, cpu,
+    mem)``. Returns the session id and the kernel ids in assignment order.
     """
     session_id = SessionId(uuid.uuid4())
     kernel_ids: list[KernelId] = []
+    now = datetime.now(tzutc())
 
     total_cpu = sum((cpu for _, cpu, _ in agent_assignments), Decimal("0"))
     total_mem = sum((mem for _, _, mem in agent_assignments), Decimal("0"))
+    cluster_mode = (
+        ClusterMode.SINGLE_NODE if len(agent_assignments) == 1 else ClusterMode.MULTI_NODE
+    )
 
     async with db.begin_session() as db_sess:
         db_sess.add(
             SessionRow(
                 id=session_id,
                 name=f"test-session-{uuid.uuid4().hex[:8]}",
-                session_type=SessionTypes.INTERACTIVE,
+                session_type=session_type,
                 domain_id=domain_id,
                 domain_name=domain_name,
                 group_id=group_id,
@@ -423,11 +436,14 @@ async def create_pending_session_with_kernels(
                 access_key=access_key,
                 resource_group_id=resource_group_id,
                 scaling_group_name=scaling_group_name,
-                status=SessionStatus.PENDING,
+                status=session_status,
                 status_info="test",
-                cluster_mode=ClusterMode.SINGLE_NODE,
+                job_priority=job_priority,
+                is_preemptible=is_preemptible,
+                cluster_mode=cluster_mode,
                 requested_slots=ResourceSlot({"cpu": total_cpu, "mem": total_mem}),
-                created_at=datetime.now(tzutc()),
+                created_at=now,
+                starts_at=now if session_status == SessionStatus.RUNNING else None,
                 images=["python:3.8"],
                 vfolder_mounts=[],
                 environ={},
@@ -436,6 +452,7 @@ async def create_pending_session_with_kernels(
         )
         await db_sess.flush()
 
+        usage_reported = kernel_status == KernelStatus.RUNNING
         for idx, (agent_id, cpu_requested, mem_requested) in enumerate(agent_assignments):
             kernel_id = KernelId(uuid.uuid4())
             kernel_ids.append(kernel_id)
@@ -443,8 +460,8 @@ async def create_pending_session_with_kernels(
                 KernelRow(
                     id=kernel_id,
                     session_id=session_id,
-                    agent=None,
-                    agent_addr=None,
+                    agent=agent_id if assign_agents else None,
+                    agent_addr="127.0.0.1:6001" if assign_agents else None,
                     scaling_group=scaling_group_name,
                     resource_group_id=resource_group_id,
                     cluster_idx=idx,
@@ -453,9 +470,13 @@ async def create_pending_session_with_kernels(
                     image="python:3.8",
                     architecture="x86_64",
                     registry="docker.io",
-                    status=KernelStatus.PENDING,
-                    status_changed=datetime.now(tzutc()),
-                    occupied_slots=ResourceSlot(),
+                    status=kernel_status,
+                    status_changed=now,
+                    occupied_slots=(
+                        ResourceSlot({"cpu": cpu_requested, "mem": mem_requested})
+                        if usage_reported
+                        else ResourceSlot()
+                    ),
                     requested_slots=ResourceSlot({"cpu": cpu_requested, "mem": mem_requested}),
                     domain_name=domain_name,
                     group_id=group_id,
@@ -479,6 +500,8 @@ async def create_pending_session_with_kernels(
                         kernel_id=kernel_id,
                         slot_name=slot_name,
                         requested=requested,
+                        used=requested if usage_reported else None,
+                        used_at=now if usage_reported else None,
                     )
                 )
             await db_sess.flush()
