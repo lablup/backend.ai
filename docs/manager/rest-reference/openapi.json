@@ -25893,21 +25893,6 @@
         "title": "KernelHistoryScopeDTO",
         "type": "object"
       },
-      "UUIDScope": {
-        "description": "Single-UUID scope item wrapper.\n\nA thin wrapper around a UUID used as a scope item. The wrapper exists so\nthat scope-input lists stay structurally uniform with other scope item\ntypes and leave room for per-item metadata in the future.",
-        "properties": {
-          "value": {
-            "format": "uuid",
-            "title": "Value",
-            "type": "string"
-          }
-        },
-        "required": [
-          "value"
-        ],
-        "title": "UUIDScope",
-        "type": "object"
-      },
       "ScopedSearchKernelHistoriesInput": {
         "description": "Input for searching kernel scheduling histories under a non-admin scope.",
         "properties": {

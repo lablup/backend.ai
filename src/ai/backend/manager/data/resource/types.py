@@ -85,3 +85,6 @@ class UserEnqueuePolicy:
     max_pending_session_count: int | None
     max_pending_session_resource_slots: Mapping[ResourceSlotName, Decimal] | None
     allowed_vfolder_hosts: VFolderHostPermissionMap
+    # Cap on the global scheduler priority (None = no cap); unrelated to
+    # the self-scoped, uncapped ``job_priority``.
+    max_priority: int | None
