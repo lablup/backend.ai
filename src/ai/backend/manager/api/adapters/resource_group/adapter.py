@@ -57,7 +57,6 @@ from ai.backend.common.dto.manager.v2.resource_group.response import (
 )
 from ai.backend.common.dto.manager.v2.resource_group.types import (
     PreemptionModeDTO,
-    PreemptionOrderDTO,
     ResourceGroupOrderDirection,
     ResourceGroupOrderField,
     SchedulerTypeDTO,
@@ -795,7 +794,7 @@ class ResourceGroupAdapter(BaseAdapter):
                 preemption=PreemptionConfigInfo(
                     enabled=data.scheduler.options.preemption.enabled,
                     preemptible_priority=data.scheduler.options.preemption.preemptible_priority,
-                    order=PreemptionOrderDTO(data.scheduler.options.preemption.order.value),
+                    order=data.scheduler.options.preemption.order,
                     mode=PreemptionModeDTO(data.scheduler.options.preemption.mode.value),
                     preemption_min_runtime=data.scheduler.options.preemption.preemption_min_runtime.total_seconds(),
                 ),

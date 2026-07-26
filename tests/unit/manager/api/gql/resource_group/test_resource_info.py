@@ -22,10 +22,9 @@ from ai.backend.common.dto.manager.v2.resource_group.response import (
 )
 from ai.backend.common.dto.manager.v2.resource_group.types import (
     PreemptionModeDTO,
-    PreemptionOrderDTO,
     SchedulerTypeDTO,
 )
-from ai.backend.common.types import SlotQuantity
+from ai.backend.common.types import PreemptionOrder, SlotQuantity
 from ai.backend.manager.api.adapters.resource_group.adapter import (
     _normalize_quantity,
     _slot_quantities_to_resource_slot_info,
@@ -262,7 +261,7 @@ class TestResourceGroupGQLResourceInfoResolver:
                     preemption=PreemptionConfigInfo(
                         enabled=False,
                         preemptible_priority=5,
-                        order=PreemptionOrderDTO.OLDEST,
+                        order=PreemptionOrder.OLDEST,
                         mode=PreemptionModeDTO.TERMINATE,
                         preemption_min_runtime=0.0,
                     ),

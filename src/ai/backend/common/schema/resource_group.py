@@ -26,7 +26,7 @@ class PreemptionConfig(BackendAISchema):
     """Sessions with priority <= this value are preemptible"""
 
     order: PreemptionOrder = PreemptionOrder.OLDEST
-    """Tie-breaking order for same-priority sessions"""
+    """Victim selection order for preemption"""
 
     mode: PreemptionMode = PreemptionMode.TERMINATE
     """How to preempt sessions"""

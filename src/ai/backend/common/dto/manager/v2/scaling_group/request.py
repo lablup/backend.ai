@@ -7,8 +7,9 @@ from __future__ import annotations
 from pydantic import Field
 
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
+from ai.backend.common.types import PreemptionOrder
 
-from .types import PreemptionMode, PreemptionOrder, SchedulerType
+from .types import PreemptionMode, SchedulerType
 
 __all__ = (
     "PreemptionConfigInput",

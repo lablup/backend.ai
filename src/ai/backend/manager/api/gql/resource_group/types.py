@@ -81,6 +81,7 @@ from ai.backend.common.dto.manager.v2.resource_group.response import (
     ReplaceResourceGroupDefaultSessionOptionsPayload as ReplaceResourceGroupDefaultSessionOptionsPayloadDTO,
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.common.types import PreemptionOrder
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -161,18 +162,18 @@ class PreemptionModeGQL(StrEnum):
     RESCHEDULE = "reschedule"
 
 
-@gql_enum(
+PreemptionOrderGQL: type[PreemptionOrder] = gql_enum(
     BackendAIGQLMeta(
         added_version="26.3.0",
-        description="Tie-breaking order for same-priority sessions during preemption.",
+        description=(
+            "Victim selection order for preemption. OLDEST/NEWEST break "
+            "same-priority ties by start time; FEWEST_SESSIONS evicts the "
+            "fewest sessions; SMALLEST_RESOURCES reclaims the least resources."
+        ),
     ),
+    PreemptionOrder,
     name="PreemptionOrder",
 )
-class PreemptionOrderGQL(StrEnum):
-    """Preemption order enumeration for GraphQL."""
-
-    OLDEST = "oldest"
-    NEWEST = "newest"
 
 
 @gql_pydantic_type(
@@ -195,9 +196,7 @@ class PreemptionConfigGQL(PydanticOutputMixin[PreemptionConfigInfo]):
     preemptible_priority: int = gql_field(
         description="Sessions with priority <= this value are eligible for preemption."
     )
-    order: PreemptionOrderGQL = gql_field(
-        description="Tie-breaking order for same-priority sessions during preemption."
-    )
+    order: PreemptionOrderGQL = gql_field(description="Victim selection order for preemption.")
     mode: PreemptionModeGQL = gql_field(
         description="How to preempt a session when preemption is triggered."
     )
@@ -475,7 +474,7 @@ class PreemptionConfigInput(PydanticInputMixin[PreemptionConfigInputDTO]):
         description="Sessions with priority <= this value are preemptible. Default is 5.", default=5
     )
     order: PreemptionOrderGQL = gql_field(
-        description="Tie-breaking order for same-priority sessions (OLDEST, NEWEST). Default is OLDEST.",
+        description="Victim selection order for preemption. Default is OLDEST.",
         default=PreemptionOrderGQL.OLDEST,
     )
     mode: PreemptionModeGQL = gql_field(
