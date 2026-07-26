@@ -151,6 +151,7 @@ class SchedulerRepository:
                 ),
                 session_dependencies=fetch.session_dependencies,
                 policy=fetch.policy,
+                preemption_candidates=fetch.preemption_candidates,
             ),
             global_scope=GlobalScopeSnapshot(
                 occupancy=fetch.occupancy,

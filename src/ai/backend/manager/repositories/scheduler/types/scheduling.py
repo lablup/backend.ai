@@ -6,6 +6,7 @@ from datetime import datetime
 from ai.backend.manager.views.sokovan.agent import AgentMeta
 from ai.backend.manager.views.sokovan.resource_group import ResourceGroupMeta
 from ai.backend.manager.views.sokovan.snapshot import (
+    PreemptionCandidateSnapshot,
     ResourceGroupSchedulingPolicy,
     ResourceOccupancySnapshot,
     ResourcePolicySnapshot,
@@ -31,3 +32,5 @@ class SchedulingFetch:
     session_dependencies: SessionDependencySnapshot
     # DB-sourced time the fetch ran (single time authority across managers)
     observed_at: datetime
+    # Preemption victim candidates per owner (empty when preemption disabled)
+    preemption_candidates: PreemptionCandidateSnapshot

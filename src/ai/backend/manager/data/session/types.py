@@ -76,6 +76,7 @@ class SessionStatus(CIStrEnum):
                 cls.PREEMPTED,
                 cls.TERMINATED,
                 cls.CANCELLED,
+                cls.ERROR,
             )
         )
 
@@ -120,6 +121,16 @@ class SessionStatus(CIStrEnum):
         marked PREEMPTED, so those source statuses are rejected.
         """
         return frozenset((cls.RUNNING,))
+
+    @classmethod
+    @lru_cache(maxsize=1)
+    def preemption_victim_statuses(cls) -> frozenset[SessionStatus]:
+        """Return statuses eligible as preemption victim candidates (BEP-1055).
+
+        Still occupying resources and able to transition to termination —
+        strips TERMINATING, whose resources free without preemption.
+        """
+        return cls.resource_occupied_statuses() & cls.terminatable_statuses()
 
     @classmethod
     @lru_cache(maxsize=1)

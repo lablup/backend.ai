@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, MutableMapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
+from functools import cached_property
 from typing import override
 
 from ai.backend.common.identifier.domain import DomainID
@@ -13,6 +14,7 @@ from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.identifier.resource_slot import ResourceSlotName
 from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import (
+    AgentId,
     AgentSelectionStrategy,
     SessionId,
 )
@@ -198,6 +200,80 @@ class SessionDependencySnapshot:
     by_session: Mapping[SessionId, list[SessionDependencyInfo]]
 
 
+@dataclass(frozen=True)
+class PreemptionCandidate:
+    """One preemption victim candidate (a whole session — the preemption unit).
+
+    Prefiltered at load time (the filter is defined at the load site);
+    min-runtime exemption, per-pending comparison, and victim selection
+    stay in the preemption planner.
+    """
+
+    session_id: SessionId
+    job_priority: int
+    # Execution start time (written at the RUNNING transition); the
+    # min-runtime exemption and oldest/newest tie-break basis. None for
+    # candidates preempted before running — nothing ran, so no exemption
+    started_at: datetime | None
+    # Per-agent live allocations freed by preempting this session
+    # (resource_allocations rows, not the legacy kernels.occupied_slots)
+    allocated_slots_by_agent: Mapping[AgentId, Mapping[ResourceSlotName, Decimal]]
+
+
+@dataclass(frozen=True)
+class AgentVictimCandidates:
+    """Victim candidates holding allocations on one agent."""
+
+    agent_id: AgentId
+    # Candidates with a portion on this agent (shared with the owner's list)
+    candidates: list[PreemptionCandidate]
+
+    @cached_property
+    def total_reclaimable(self) -> Mapping[ResourceSlotName, Decimal]:
+        """Upper bound freed on this agent if every candidate is preempted."""
+        totals: dict[ResourceSlotName, Decimal] = {}
+        for candidate in self.candidates:
+            for slot_name, amount in candidate.allocated_slots_by_agent[self.agent_id].items():
+                totals[slot_name] = totals.get(slot_name, Decimal(0)) + amount
+        return totals
+
+
+@dataclass(frozen=True)
+class UserVictimCandidates:
+    """One owner's victim candidates with the per-agent decomposition derived.
+
+    ``candidates`` is the stored form (one entry per session — the
+    preemption unit); the per-agent grouping and reclaimable totals are
+    computed on construction-time reads, so re-instantiating with a
+    filtered subset (e.g. the planner's per-pending eligible set) yields
+    consistent sums for free.
+    """
+
+    candidates: list[PreemptionCandidate]
+
+    @cached_property
+    def by_agent(self) -> Mapping[AgentId, AgentVictimCandidates]:
+        grouped: dict[AgentId, list[PreemptionCandidate]] = {}
+        for candidate in self.candidates:
+            for agent_id in candidate.allocated_slots_by_agent:
+                grouped.setdefault(agent_id, []).append(candidate)
+        return {
+            agent_id: AgentVictimCandidates(agent_id=agent_id, candidates=agent_candidates)
+            for agent_id, agent_candidates in grouped.items()
+        }
+
+
+@dataclass(frozen=True)
+class PreemptionCandidateSnapshot:
+    """Preemption victim candidates of the resource group, grouped per owner."""
+
+    by_user: Mapping[UserID, UserVictimCandidates]
+
+    @classmethod
+    def empty(cls) -> PreemptionCandidateSnapshot:
+        return PreemptionCandidateSnapshot(by_user={})
+
+
 @dataclass
 class ResourceGroupSchedulingPolicy:
     """How the resource group schedules: pool keys for sequencer/selector."""
@@ -218,6 +294,10 @@ class ResourceGroupScopeSnapshot:
     session_dependencies: SessionDependencySnapshot
     # Scheduling policy configured on the resource group
     policy: ResourceGroupSchedulingPolicy
+    # Preemption victim candidates per owner (empty when preemption disabled)
+    preemption_candidates: PreemptionCandidateSnapshot = field(
+        default_factory=PreemptionCandidateSnapshot.empty
+    )
 
 
 @dataclass

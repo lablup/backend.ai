@@ -48,3 +48,17 @@ class TestPreemptedStatus:
         occupied = SessionStatus.resource_occupied_statuses()
         assert SessionStatus.PREEMPTED not in occupied
         assert SessionStatus.DEPRIORITIZING not in occupied
+
+    def test_error_is_not_resource_occupying(self) -> None:
+        """ERROR sessions do not count toward resource occupancy."""
+        assert SessionStatus.ERROR not in SessionStatus.resource_occupied_statuses()
+
+    def test_preemption_victim_statuses_strip_terminating(self) -> None:
+        """Victim candidates occupy resources and can still be terminated."""
+        victims = SessionStatus.preemption_victim_statuses()
+        assert victims == (
+            SessionStatus.resource_occupied_statuses() & SessionStatus.terminatable_statuses()
+        )
+        assert SessionStatus.SCHEDULED in victims
+        assert SessionStatus.RUNNING in victims
+        assert SessionStatus.TERMINATING not in victims
