@@ -1815,6 +1815,7 @@ class ScheduleDBSource:
                         KeyPairResourcePolicyRow.max_containers_per_session,
                         KeyPairResourcePolicyRow.max_pending_session_count,
                         KeyPairResourcePolicyRow.max_pending_session_resource_slots,
+                        KeyPairResourcePolicyRow.max_priority,
                         KeyPairResourcePolicyRow.allowed_vfolder_hosts,
                     )
                     .select_from(UserRow)
@@ -1836,6 +1837,7 @@ class ScheduleDBSource:
                         else None
                     ),
                     allowed_vfolder_hosts=policy_row.allowed_vfolder_hosts,
+                    max_priority=policy_row.max_priority,
                 )
 
         dotfile_bundle = DotfileBundle()

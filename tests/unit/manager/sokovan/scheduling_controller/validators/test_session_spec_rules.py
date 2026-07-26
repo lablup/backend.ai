@@ -10,6 +10,7 @@ from typing import Any
 
 import pytest
 
+from ai.backend.common.defs.session import SESSION_PRIORITY_DEFAULT
 from ai.backend.common.identifier.domain import DomainID, DomainName
 from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.project import ProjectID
@@ -74,6 +75,9 @@ from ai.backend.manager.sokovan.scheduling_controller.validators.pending_session
 )
 from ai.backend.manager.sokovan.scheduling_controller.validators.pending_session_resource_limit_rule import (
     PendingSessionResourceLimitRule,
+)
+from ai.backend.manager.sokovan.scheduling_controller.validators.priority_limit_rule import (
+    PriorityLimitRule,
 )
 from ai.backend.manager.sokovan.scheduling_controller.validators.requested_slot_type_rule import (
     RequestedSlotTypeRule,
@@ -148,6 +152,7 @@ def _spec(
     *,
     session_type: SessionTypes = SessionTypes.INTERACTIVE,
     vfolder_mounts: tuple[VFolderMount, ...] = (),
+    priority: int = 10,
 ) -> SessionSpec:
     # SessionSpec no longer carries session-level vfolder_mounts — they live
     # per-kernel on KernelSpec.vfolder_mounts. Mirror the supplied mounts onto
@@ -167,7 +172,7 @@ def _spec(
             classification=SessionClassification(session_type=session_type),
             network=SessionNetwork(network_type=NetworkType.VOLATILE),
             options=SessionOptions(
-                priority=10,
+                priority=priority,
                 is_preemptible=True,
                 cluster_mode=ClusterMode.SINGLE_NODE,
                 cluster_size=len(kernel_specs),
@@ -252,12 +257,14 @@ def _policy(
     max_containers: int = 4,
     max_pending: int | None = None,
     max_pending_slots: Mapping[ResourceSlotName, Decimal] | None = None,
+    max_priority: int | None = None,
 ) -> UserEnqueuePolicy:
     return UserEnqueuePolicy(
         max_containers_per_session=max_containers,
         max_pending_session_count=max_pending,
         max_pending_session_resource_slots=max_pending_slots,
         allowed_vfolder_hosts=VFolderHostPermissionMap(),
+        max_priority=max_priority,
     )
 
 
@@ -306,6 +313,55 @@ class TestPendingSessionCountLimitRule:
             _spec((_kernel(img),)),
             _ctx(policy=_policy(max_pending=None), pending_session_count=100),
         )
+
+
+class TestPriorityLimitRule:
+    def test_within_limit(self) -> None:
+        img = ImageID(uuid.uuid4())
+        spec = _spec((_kernel(img),), priority=5)
+        PriorityLimitRule().validate(spec, _ctx(policy=_policy(max_priority=5)))
+
+    def test_allows_default_priority_at_default_cap(self) -> None:
+        # The finalized priority defaults to SESSION_PRIORITY_DEFAULT (10),
+        # so a cap of 10 must admit a request that declared nothing.
+        img = ImageID(uuid.uuid4())
+        spec = _spec((_kernel(img),), priority=SESSION_PRIORITY_DEFAULT)
+        PriorityLimitRule().validate(
+            spec, _ctx(policy=_policy(max_priority=SESSION_PRIORITY_DEFAULT))
+        )
+
+    def test_rejects_above_limit(self) -> None:
+        img = ImageID(uuid.uuid4())
+        spec = _spec((_kernel(img),), priority=50)
+        with pytest.raises(QuotaExceeded):
+            PriorityLimitRule().validate(spec, _ctx(policy=_policy(max_priority=10)))
+
+    def test_noop_without_policy(self) -> None:
+        img = ImageID(uuid.uuid4())
+        PriorityLimitRule().validate(_spec((_kernel(img),), priority=100), _ctx())
+
+    def test_noop_when_limit_unset(self) -> None:
+        img = ImageID(uuid.uuid4())
+        PriorityLimitRule().validate(
+            _spec((_kernel(img),), priority=100),
+            _ctx(policy=_policy(max_priority=None)),
+        )
+
+    def test_ignores_job_priority(self) -> None:
+        img = ImageID(uuid.uuid4())
+        spec = _spec((_kernel(img),), priority=5)
+        spec = spec.model_copy(
+            update={
+                "resource_spec": spec.resource_spec.model_copy(
+                    update={
+                        "options": spec.resource_spec.options.model_copy(
+                            update={"job_priority": 100}
+                        )
+                    }
+                )
+            }
+        )
+        PriorityLimitRule().validate(spec, _ctx(policy=_policy(max_priority=5)))
 
 
 class TestPendingSessionResourceLimitRule:

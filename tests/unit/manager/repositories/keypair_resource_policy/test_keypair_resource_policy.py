@@ -6,6 +6,7 @@ from uuid import uuid4
 
 import pytest
 import sqlalchemy as sa
+from sqlalchemy.exc import IntegrityError
 
 from ai.backend.common.exception import KeypairResourcePolicyNotFound
 from ai.backend.common.types import (
@@ -452,3 +453,40 @@ class TestKeypairResourcePolicyRepository:
         updater = Updater(spec=allowed_vfolder_updater_spec, pk_value=sample_policy_name)
         result = await repository.update_keypair_resource_policy(updater)
         assert result.allowed_vfolder_hosts == sample_allowed_vfolder_hosts
+
+    @pytest.mark.parametrize("max_priority", [None, 0, 10, 100])
+    async def test_max_priority_accepts_values_within_range(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        sample_creator: KeyPairResourcePolicyCreatorSpec,
+        max_priority: int | None,
+    ) -> None:
+        row = sample_creator.build_row()
+        row.max_priority = max_priority
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(row)
+            await db_sess.commit()
+
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            stored = await db_sess.scalar(
+                sa.select(KeyPairResourcePolicyRow.max_priority).where(
+                    KeyPairResourcePolicyRow.name == sample_creator.name
+                )
+            )
+        assert stored == max_priority
+
+    @pytest.mark.parametrize("max_priority", [-1, 101])
+    async def test_max_priority_outside_range_is_rejected(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        sample_creator: KeyPairResourcePolicyCreatorSpec,
+        max_priority: int,
+    ) -> None:
+        # A cap outside the requestable priority range is unsatisfiable —
+        # a negative one would reject every session create for the keypair.
+        row = sample_creator.build_row()
+        row.max_priority = max_priority
+        with pytest.raises(IntegrityError):
+            async with db_with_cleanup.begin_session() as db_sess:
+                db_sess.add(row)
+                await db_sess.commit()
