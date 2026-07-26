@@ -98,6 +98,7 @@ def _criteria(
         ],
         agent_selection_policy=AgentSelectionPolicy.STRICT,
         designated_agent_ids=designated_agent_ids,
+        job_priority=0,
     )
 
 

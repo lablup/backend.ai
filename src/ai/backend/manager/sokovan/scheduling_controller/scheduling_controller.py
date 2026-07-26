@@ -384,6 +384,8 @@ class SchedulingController:
                 requirements=plan.requirements(),
                 agent_selection_policy=scheduling_target.agent_selection_policy,
                 designated_agent_ids=list(scheduling_target.designated_agents) or None,
+                # The fitting check has no preemption context
+                job_priority=0,
             )
             # Trackers are throwaway here: the fitting check only needs the
             # immutable observations, never the committed batch state. The

@@ -59,6 +59,7 @@ def _criteria(
         requirements=requirements,
         agent_selection_policy=policy,
         designated_agent_ids=designated_agent_ids,
+        job_priority=0,
     )
 
 

@@ -63,6 +63,7 @@ def _criteria(requirements: list[ResourceRequirements]) -> AgentSelectionCriteri
         requirements=requirements,
         agent_selection_policy=AgentSelectionPolicy.STRICT,
         designated_agent_ids=None,
+        job_priority=0,
     )
 
 

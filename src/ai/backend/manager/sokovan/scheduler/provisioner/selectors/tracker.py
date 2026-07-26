@@ -6,6 +6,7 @@ scheduling pass and the compute-schedule fitting check.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from decimal import Decimal
 
@@ -32,6 +33,9 @@ class AgentStateTracker:
     committed_containers: int = 0
     pending_slots: dict[ResourceSlotName, Decimal] = field(default_factory=dict)
     pending_containers: int = 0
+    # Provisional victim reclaims of the preemption probe; always cleared
+    # before real placements continue (see apply_reclaim)
+    reclaimed_slots: dict[ResourceSlotName, Decimal] = field(default_factory=dict)
 
     def remaining_slots(self) -> dict[ResourceSlotName, Decimal]:
         """Per-slot remaining = capacity - reserved - used - in-batch allocations."""
@@ -43,6 +47,7 @@ class AgentStateTracker:
                 - resource.used
                 - self.committed_slots.get(slot_name, Decimal(0))
                 - self.pending_slots.get(slot_name, Decimal(0))
+                + self.reclaimed_slots.get(slot_name, Decimal(0))
             )
         return remaining
 
@@ -73,6 +78,22 @@ class AgentStateTracker:
         """Discard the in-flight allocation (session placement failed)."""
         self.pending_slots = {}
         self.pending_containers = 0
+
+    def apply_reclaim(self, slots: Mapping[ResourceSlotName, Decimal]) -> None:
+        """Provisionally reclaim a preemption victim's allocation back onto
+        this agent, adding into ``remaining_slots``.
+
+        Probe-only: the caller must ``clear_reclaim()`` before any real
+        placement runs against this tracker again.
+        """
+        for slot_name, amount in slots.items():
+            self.reclaimed_slots[slot_name] = (
+                self.reclaimed_slots.get(slot_name, Decimal(0)) + amount
+            )
+
+    def clear_reclaim(self) -> None:
+        """Drop every provisional reclaim (the probe is over)."""
+        self.reclaimed_slots = {}
 
 
 def build_agent_trackers(resources: ResourceGroupResource) -> list[AgentStateTracker]:

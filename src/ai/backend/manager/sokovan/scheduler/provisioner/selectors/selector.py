@@ -76,6 +76,9 @@ class AgentSelectionCriteria:
     agent_selection_policy: AgentSelectionPolicy
     # Manually designated agents (user's explicit choice takes precedence)
     designated_agent_ids: list[AgentId] | None
+    # Scope-local preemption priority: only strictly lower victims may be
+    # reclaimed for this session (the neutral 0 reclaims nothing)
+    job_priority: int
 
     @classmethod
     def from_workload(
@@ -90,6 +93,7 @@ class AgentSelectionCriteria:
             requirements=plan.requirements(),
             agent_selection_policy=workload.placement.agent_selection_policy,
             designated_agent_ids=workload.placement.designated_agent_ids,
+            job_priority=workload.job_priority,
         )
 
 
