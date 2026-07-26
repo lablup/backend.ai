@@ -201,9 +201,11 @@ class ReplicaGroupDBSource:
             group_rows: list[ReplicaGroupRow] = [row.ReplicaGroupRow for row in group_result.rows]
             group_ids = [group_row.id for group_row in group_rows]
             deployment_ids = [group_row.deployment_id for group_row in group_rows]
+            counts = await self._count_live_serving_by_revision(db_sess, group_ids)
             last_histories = await self._latest_history_by_group(db_sess, group_ids, category)
             handler_options = await self._handler_options_by_deployment(db_sess, deployment_ids)
             deployment_desired = await self._replicas_by_deployment(db_sess, deployment_ids)
+            empty = RevisionReplicaCount(live=0, serving=0)
             views = [
                 ReplicaGroupLifecycleReconcileView(
                     group_id=group_row.id,
@@ -214,6 +216,11 @@ class ReplicaGroupDBSource:
                     scaling_status=group_row.scaling_status,
                     desired_current_replica_count=group_row.desired_current_replica_count,
                     desired_target_replica_count=group_row.desired_target_replica_count,
+                    current_live_replica_count=(
+                        counts.get(group_row.id, {}).get(group_row.current_revision_id, empty).live
+                        if group_row.current_revision_id is not None
+                        else 0
+                    ),
                     deployment_desired_replica_count=deployment_desired.get(
                         group_row.deployment_id, 0
                     ),
