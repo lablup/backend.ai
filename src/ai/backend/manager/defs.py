@@ -109,6 +109,8 @@ class LockID(enum.IntEnum):
     LOCKID_IDLE_CHECK_INITIAL_GRACE_PERIOD_RECONCILE = (
         242  # For idle-check initial grace period reconcile
     )
+    LOCKID_SOKOVAN_TARGET_PREEMPTED = 243  # For operations targeting PREEMPTED sessions
+    LOCKID_SOKOVAN_TARGET_RESCHEDULING = 244  # For operations targeting RESCHEDULING sessions
 
 
 SERVICE_MAX_RETRIES = 5  # FIXME: make configurable

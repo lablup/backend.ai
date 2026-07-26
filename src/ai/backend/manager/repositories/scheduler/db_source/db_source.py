@@ -41,6 +41,7 @@ from ai.backend.common.types import (
     AgentId,
     ClusterMode,
     KernelId,
+    PreemptionMode,
     ResourceSlot,
     SessionId,
     SessionTypes,
@@ -125,6 +126,7 @@ from ai.backend.manager.repositories.scheduler.types.session_creation import (
     SessionSpecFetch,
     UserEnqueueFetch,
 )
+from ai.backend.manager.repositories.scheduler.updaters import SessionStatusBatchUpdaterSpec
 from ai.backend.manager.repositories.scheduling_history import (
     SessionSchedulingHistoryCreatorSpec,
 )
@@ -1031,6 +1033,80 @@ class ScheduleDBSource:
                 force_terminated_sessions=force_terminated_sessions,
                 skipped_sessions=skipped_sessions,
             )
+
+    async def mark_sessions_status(
+        self,
+        session_ids: list[SessionId],
+        to_status: SessionStatus,
+        reason: str,
+    ) -> list[SessionId]:
+        """
+        Move sessions to ``to_status`` and record the transition in the
+        scheduling history, as every status transition does.
+
+        Only the session status moves; what the new status means happens later,
+        in the handler that owns it. Sessions already in a terminal status are
+        skipped.
+
+        :param session_ids: Sessions to transition
+        :param to_status: Target session status
+        :param reason: Status reason recorded on the transitioned sessions
+        :return: IDs of the sessions actually transitioned
+        """
+        if not session_ids:
+            return []
+
+        async with self._db.begin_session_read_committed() as db_sess:
+            now = await self._get_db_now_in_session(db_sess)
+            markable = sa.and_(
+                SessionRow.id.in_(session_ids),
+                SessionRow.status.not_in(SessionStatus.terminal_statuses()),
+            )
+            status_result = await db_sess.execute(
+                sa.select(SessionRow.id, SessionRow.status).where(markable)
+            )
+            source_statuses: dict[SessionId, SessionStatus] = {
+                cast(SessionId, row.id): SessionStatus(row.status) for row in status_result
+            }
+            values = SessionStatusBatchUpdaterSpec(
+                to_status=to_status,
+                status_changed_at=now,
+                reason=reason,
+            ).build_values()
+            mark_result = await db_sess.execute(
+                sa.update(SessionRow).values(**values).where(markable).returning(SessionRow.id)
+            )
+            marked_sessions = [cast(SessionId, row.id) for row in mark_result]
+            if not marked_sessions:
+                return []
+
+            phase = f"mark_{to_status.name.lower()}"
+            history_specs = [
+                SessionSchedulingHistoryCreatorSpec(
+                    session_id=session_id,
+                    phase=phase,
+                    result=SchedulingResult.SUCCESS,
+                    message=f"{phase} success",
+                    from_status=source_statuses.get(session_id),
+                    to_status=to_status,
+                )
+                for session_id in marked_sessions
+            ]
+            await self._record_scheduling_history(db_sess, BulkCreator(specs=history_specs))
+
+            return marked_sessions
+
+    async def get_resource_group_preemption_mode(
+        self, resource_group_id: ResourceGroupID
+    ) -> PreemptionMode:
+        """Return the preemption mode configured on a resource group.
+
+        Raises:
+            ScalingGroupNotFound: when the resource group does not exist.
+        """
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
+            resource_group = await self._fetch_resource_group(db_sess, resource_group_id)
+        return resource_group.preemption.mode
 
     async def _free_kernel_allocations(
         self,
@@ -2626,8 +2702,11 @@ class ScheduleDBSource:
         """
         Reset kernels to PENDING status for the given sessions.
 
-        This is used when sessions exceed max retries and need to be rescheduled.
-        Clears agent assignments and resets retry count in status_data.
+        Used when a session goes back to the queue — after exceeding max retries,
+        or after a reschedule teardown. Clears the placement (agent, container),
+        resets the retry count, and restores the ``resource_allocations`` rows to
+        their enqueue-time shape so the next scheduling pass reads the original
+        request again; kernels that already terminated are covered too.
 
         :param session_ids: List of session IDs whose kernels should be reset
         :param reason: The reason for the reset
@@ -2642,18 +2721,15 @@ class ScheduleDBSource:
             now = await self._get_db_now_in_session(db_sess)
             stmt = (
                 sa.update(KernelRow)
-                .where(
-                    sa.and_(
-                        KernelRow.session_id.in_(session_ids),
-                        KernelRow.status.in_(KernelStatus.retriable_statuses()),
-                    )
-                )
+                .where(KernelRow.session_id.in_(session_ids))
                 .values(
                     agent=None,
                     agent_addr=None,
+                    container_id=None,
                     status=KernelStatus.PENDING,
                     status_info=reason,
                     status_changed=now,
+                    terminated_at=None,
                     status_data=sql_json_merge(
                         KernelRow.__table__.c.status_data,
                         ("scheduler",),
@@ -2665,9 +2741,15 @@ class ScheduleDBSource:
                         {KernelStatus.PENDING.name: now.isoformat()},
                     ),
                 )
+                .returning(KernelRow.id)
             )
-            result = await db_sess.execute(stmt)
-            return cast(CursorResult[Any], result).rowcount
+            kernel_ids = [row.id for row in await db_sess.execute(stmt)]
+            await db_sess.execute(
+                sa.update(ResourceAllocationRow)
+                .where(ResourceAllocationRow.kernel_id.in_(kernel_ids))
+                .values(used=None, used_at=None, free_at=None)
+            )
+            return len(kernel_ids)
 
     async def get_agent_ids_for_sessions(
         self, session_ids: list[SessionId]

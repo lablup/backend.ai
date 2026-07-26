@@ -45,9 +45,12 @@ class SessionStatus(CIStrEnum):
     RUNNING = "RUNNING"
     RESTARTING = "RESTARTING"
     RUNNING_DEGRADED = "RUNNING_DEGRADED"
-    # transient: confirmed preemption victim; after kernel cleanup it
-    # branches by PreemptionMode to TERMINATED (terminate) or PENDING (reschedule)
+    # transient: confirmed preemption victim; branches by PreemptionMode to
+    # TERMINATING (terminate) or RESCHEDULING (reschedule)
     PREEMPTED = "PREEMPTED"
+    # transient: kernels are being torn down to put the session back in the
+    # queue; becomes PENDING once they are all gone
+    RESCHEDULING = "RESCHEDULING"
     # ---
     TERMINATING = "TERMINATING"
     TERMINATED = "TERMINATED"
@@ -74,6 +77,7 @@ class SessionStatus(CIStrEnum):
                 cls.PENDING,
                 cls.DEPRIORITIZING,
                 cls.PREEMPTED,
+                cls.RESCHEDULING,
                 cls.TERMINATED,
                 cls.CANCELLED,
                 cls.ERROR,

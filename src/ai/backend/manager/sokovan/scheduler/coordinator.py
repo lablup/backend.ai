@@ -1715,6 +1715,20 @@ class ScheduleCoordinator:
                 long_interval=60.0,
                 initial_delay=30.0,
             ),
+            # Branch preemption victims by the resource group's preemption mode
+            SchedulerTaskSpec(
+                ScheduleType.PREEMPTED,
+                short_interval=2.0,
+                long_interval=60.0,
+                initial_delay=30.0,
+            ),
+            # Put sessions whose kernels are gone back in the queue
+            SchedulerTaskSpec(
+                ScheduleType.RESCHEDULING,
+                short_interval=2.0,
+                long_interval=60.0,
+                initial_delay=30.0,
+            ),
             # Sweep is a maintenance task - only needs long cycle task
             SchedulerTaskSpec(
                 ScheduleType.SWEEP,

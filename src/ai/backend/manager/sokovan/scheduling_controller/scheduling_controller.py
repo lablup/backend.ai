@@ -561,6 +561,49 @@ class SchedulingController:
 
         return result
 
+    async def mark_sessions_status(
+        self,
+        session_ids: list[SessionId],
+        to_status: SessionStatus,
+        reason: str,
+    ) -> list[SessionId]:
+        """
+        Move sessions to ``to_status`` and broadcast the transition.
+
+        Terminal sessions are skipped. Used by the preemption path (BEP-1055):
+        RUNNING -> PREEMPTED when a victim is confirmed, and PREEMPTED -> PENDING
+        when a reschedule victim is re-enqueued.
+
+        Args:
+            session_ids: Sessions to transition
+            to_status: Target session status
+            reason: Status reason recorded on the transitioned sessions
+
+        Returns:
+            IDs of the sessions actually transitioned.
+        """
+        marked_sessions = await self._repository.mark_sessions_status(
+            session_ids, to_status, reason
+        )
+        if not marked_sessions:
+            return marked_sessions
+
+        log.info("Marked {} sessions as {}", len(marked_sessions), to_status)
+        await self._event_producer.broadcast_events_batch([
+            SchedulingBroadcastEvent(
+                session_id=session_id,
+                creation_id="",
+                status_transition=str(to_status),
+                reason=reason,
+            )
+            for session_id in marked_sessions
+        ])
+        self._operation_metrics.observe_success(
+            operation="mark_sessions_status",
+            count=len(marked_sessions),
+        )
+        return marked_sessions
+
     async def validate_session_spec(self, spec: SessionValidationSpec) -> None:
         # TODO: Refactor to use ValidationRule
         alias_destinations = [

@@ -57,8 +57,11 @@ class TestSessionStatusEnum:
     def test_preempted_value(self) -> None:
         assert SessionStatusEnum.PREEMPTED.value == "PREEMPTED"
 
+    def test_rescheduling_value(self) -> None:
+        assert SessionStatusEnum.RESCHEDULING.value == "RESCHEDULING"
+
     def test_all_members_count(self) -> None:
-        assert len(list(SessionStatusEnum)) == 15
+        assert len(list(SessionStatusEnum)) == 16
 
     def test_from_string(self) -> None:
         assert SessionStatusEnum("RUNNING") is SessionStatusEnum.RUNNING
