@@ -40,22 +40,26 @@ log = logging.getLogger("alembic.runtime.migration")
 
 def upgrade() -> None:
     # Schema change: amount -> resource_usage (now the product, so no fixed
-    # precision), and duration_seconds is no longer needed.
-    op.alter_column(
-        "usage_bucket_entries",
-        "amount",
-        new_column_name="resource_usage",
-        existing_type=sa.Numeric(precision=24, scale=6),
-        type_=sa.Numeric(),
-        existing_nullable=False,
-    )
-    op.drop_column("usage_bucket_entries", "duration_seconds")
+    # precision), and duration_seconds is no longer needed.  Guarded with existence
+    # checks so the migration stays idempotent when backported (safe to re-apply).
+    conn = op.get_bind()
+    columns = {c["name"] for c in sa.inspect(conn).get_columns("usage_bucket_entries")}
+    if "amount" in columns and "resource_usage" not in columns:
+        op.alter_column(
+            "usage_bucket_entries",
+            "amount",
+            new_column_name="resource_usage",
+            existing_type=sa.Numeric(precision=24, scale=6),
+            type_=sa.Numeric(),
+            existing_nullable=False,
+        )
+    if "duration_seconds" in columns:
+        op.drop_column("usage_bucket_entries", "duration_seconds")
 
     # Data change: rebuild the corrupted values from kernel_usage_records.
     # Delete every corrupted entry first (all levels at once), then rebuild each
     # level.  Each level writes its own entries (their join keys genuinely differ),
     # then hands the shared JSONB-mirror step to _sync_jsonb_mirror.
-    conn = op.get_bind()
     window = _rebuildable_date_range(conn)
     if window is None:
         # No usage records to rebuild from (fresh install, or everything purged).
@@ -68,29 +72,34 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.add_column(
-        "usage_bucket_entries",
-        sa.Column("duration_seconds", sa.Integer(), nullable=False, server_default="0"),
-    )
+    # Guarded for idempotency (both directions must be safe to re-apply when backported).
+    conn = op.get_bind()
+    columns = {c["name"] for c in sa.inspect(conn).get_columns("usage_bucket_entries")}
+    if "duration_seconds" not in columns:
+        op.add_column(
+            "usage_bucket_entries",
+            sa.Column("duration_seconds", sa.Integer(), nullable=False, server_default="0"),
+        )
     # The rebuilt values are the correct ones and the inflated originals cannot
     # be reconstructed, so only the column definition is reverted.  Values that
     # exceed the restored precision will fail the cast, which is the honest
     # outcome: they do not fit the old column.
-    op.alter_column(
-        "usage_bucket_entries",
-        "resource_usage",
-        new_column_name="amount",
-        existing_type=sa.Numeric(),
-        type_=sa.Numeric(precision=24, scale=6),
-        existing_nullable=False,
-    )
-    log.warning(
-        "usage_bucket_entries is left corrupt by this downgrade: the column restored to "
-        "'amount' now holds resource-seconds products, not raw amounts, and "
-        "duration_seconds is reset to 0. Re-apply revision %s to rebuild the correct "
-        "values from kernel_usage_records.",
-        revision,
-    )
+    if "resource_usage" in columns:
+        op.alter_column(
+            "usage_bucket_entries",
+            "resource_usage",
+            new_column_name="amount",
+            existing_type=sa.Numeric(),
+            type_=sa.Numeric(precision=24, scale=6),
+            existing_nullable=False,
+        )
+        log.warning(
+            "usage_bucket_entries is left corrupt by this downgrade: the column restored to "
+            "'amount' now holds resource-seconds products, not raw amounts, and "
+            "duration_seconds is reset to 0. Re-apply revision %s to rebuild the correct "
+            "values from kernel_usage_records.",
+            revision,
+        )
 
 
 def _rebuildable_date_range(conn: sa.engine.Connection) -> tuple[date, date] | None:
@@ -155,32 +164,46 @@ def _sync_jsonb_mirror(
 ) -> None:
     """Rebuild one bucket table's JSONB mirror from its freshly rebuilt entries.
 
-    The mirror is just the slot map of the bucket's entries, or an empty object
-    when the bucket has no kernel records left to rebuild from.  This step is
-    identical for every level once the entries exist, so all three call it.
+    Set-based (one aggregation of the entries, not a per-bucket correlated subquery):
+    buckets with entries get their slot map; in-window buckets left without entries
+    are reset to an empty object so no stale inflated value survives.
     """
+    params = {"rebuild_from": rebuild_from, "rebuild_to": rebuild_to, "bucket_type": bucket_type}
+    # Buckets that have rebuilt entries: set the slot map.  ResourceSlotColumn stores
+    # JSONB values as strings, so cast to text; a JSON number would be read back as a
+    # float and lose precision.
     conn.execute(
         sa.text(
             f"""
-            UPDATE {bucket_table}
-            SET resource_usage = COALESCE(
-                (
-                    -- ResourceSlotColumn stores JSONB values as strings, so cast to
-                    -- text; a JSON number would be read back as a float and lose precision.
-                    SELECT jsonb_object_agg(
-                               usage_bucket_entries.slot_name,
-                               usage_bucket_entries.resource_usage::text
-                           )
-                    FROM usage_bucket_entries
-                    WHERE usage_bucket_entries.bucket_id = {bucket_table}.id
-                      AND usage_bucket_entries.bucket_type = :bucket_type
-                ),
-                jsonb_build_object()
-            )
-            WHERE {bucket_table}.period_start BETWEEN :rebuild_from AND :rebuild_to
+            UPDATE {bucket_table} AS b
+            SET resource_usage = agg.usage
+            FROM (
+                SELECT bucket_id,
+                       jsonb_object_agg(slot_name, resource_usage::text) AS usage
+                FROM usage_bucket_entries
+                WHERE bucket_type = :bucket_type
+                GROUP BY bucket_id
+            ) AS agg
+            WHERE b.id = agg.bucket_id
+              AND b.period_start BETWEEN :rebuild_from AND :rebuild_to
             """
         ),
-        {"rebuild_from": rebuild_from, "rebuild_to": rebuild_to, "bucket_type": bucket_type},
+        params,
+    )
+    # In-window buckets left without entries: clear the stale (inflated) mirror.
+    conn.execute(
+        sa.text(
+            f"""
+            UPDATE {bucket_table} AS b
+            SET resource_usage = '{{}}'::jsonb
+            WHERE b.period_start BETWEEN :rebuild_from AND :rebuild_to
+              AND NOT EXISTS (
+                  SELECT 1 FROM usage_bucket_entries e
+                  WHERE e.bucket_id = b.id AND e.bucket_type = :bucket_type
+              )
+            """
+        ),
+        params,
     )
 
 
