@@ -52,6 +52,7 @@ class AppConfigFragmentUpserterSpec(UpserterSpec[AppConfigFragmentRow]):
         return {"config": self.config, "updated_at": sa.func.now()}
 
     @property
+    @override
     def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
         # The FK to app_config_allow_list is the gate: an upsert of a config with no
         # allow-list row for (config_name, scope_type) surfaces as write-not-allowed.

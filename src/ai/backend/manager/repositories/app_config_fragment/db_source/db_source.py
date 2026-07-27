@@ -129,7 +129,6 @@ class AppConfigFragmentDBSource:
                     ),
                     index_elements=index_elements,
                     index_where=index_where,
-                    integrity_error_checks=spec.integrity_error_checks,
                 )
                 results.append((await w.upsert_scoped(upserter)).row.to_data())
             return results
