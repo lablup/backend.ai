@@ -84,7 +84,12 @@ def replica_group() -> None:
 
 
 @replica_group.command(name="search-scoped")
-@click.argument("deployment_id", type=str)
+@click.option(
+    "--deployment-id",
+    type=str,
+    default=None,
+    help="Scope to a deployment; covers every replica group under it.",
+)
 @click.option("--limit", type=int, default=None, help="Maximum items to return.")
 @click.option("--offset", type=int, default=None, help="Number of items to skip.")
 @click.option(
@@ -111,7 +116,7 @@ def replica_group() -> None:
 @click.option("--message", type=str, default=None, help="Filter by message (contains).")
 @click.option("--order-by", multiple=True, help=_ORDER_BY_HELP)
 def search_scoped(
-    deployment_id: str,
+    deployment_id: str | None,
     limit: int | None,
     offset: int | None,
     category: tuple[str, ...],
@@ -123,7 +128,7 @@ def search_scoped(
     message: str | None,
     order_by: tuple[str, ...],
 ) -> None:
-    """Search replica-group scheduling history scoped to DEPLOYMENT_ID.
+    """Search replica-group scheduling history under a deployment.
 
     A replica group is not an RBAC scope of its own, so the scope is the owning
     deployment: this returns the history of every replica group under it.
@@ -137,6 +142,11 @@ def search_scoped(
         ReplicaGroupHistoryOrderField,
         ReplicaGroupHistoryScopeDTO,
     )
+
+    # The scope DTO rejects an empty deployment list, so catch it here for a
+    # usage error instead of a validation traceback.
+    if deployment_id is None:
+        raise click.UsageError("Give --deployment-id.")
 
     history_filter = _build_replica_group_history_filter(
         category, phase, from_status, to_status, result, error_code, message
