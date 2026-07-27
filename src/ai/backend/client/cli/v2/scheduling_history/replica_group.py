@@ -84,12 +84,7 @@ def replica_group() -> None:
 
 
 @replica_group.command(name="search-scoped")
-@click.option(
-    "--deployment-id",
-    type=str,
-    required=True,
-    help="Scope to a deployment; covers every replica group under it.",
-)
+@click.argument("deployment_id", type=str)
 @click.option("--limit", type=int, default=None, help="Maximum items to return.")
 @click.option("--offset", type=int, default=None, help="Number of items to skip.")
 @click.option(
@@ -128,10 +123,10 @@ def search_scoped(
     message: str | None,
     order_by: tuple[str, ...],
 ) -> None:
-    """Search replica-group scheduling history under a deployment.
+    """Search replica-group scheduling history scoped to DEPLOYMENT_ID.
 
-    A replica group is not an RBAC scope of its own, so its history is scoped by
-    the owning deployment.
+    A replica group is not an RBAC scope of its own, so the scope is the owning
+    deployment: this returns the history of every replica group under it.
     """
     from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
     from ai.backend.common.dto.manager.v2.scheduling_history.request import (
@@ -156,7 +151,7 @@ def search_scoped(
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
-            result_data = await registry.scheduling_history.scoped_search_replica_group_history(
+            result_data = await registry.scheduling_history.replica_group_scoped_search(
                 ScopedSearchReplicaGroupHistoriesInput(
                     scope=ReplicaGroupHistoryScopeDTO(
                         deployment=[UUIDScope(value=UUID(deployment_id))],
@@ -234,7 +229,7 @@ def search(
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
-            result_data = await registry.scheduling_history.admin_search_replica_group_history(
+            result_data = await registry.scheduling_history.search_replica_group_history(
                 AdminSearchReplicaGroupHistoriesInput(
                     filter=history_filter,
                     order=orders,

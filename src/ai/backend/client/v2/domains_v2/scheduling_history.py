@@ -102,7 +102,7 @@ class V2SchedulingHistoryClient(BaseDomainClient):
 
     # ========== Replica Group History ==========
 
-    async def admin_search_replica_group_history(
+    async def search_replica_group_history(
         self, request: AdminSearchReplicaGroupHistoriesInput
     ) -> SearchReplicaGroupHistoriesPayload:
         """Search replica-group scheduling histories with admin scope."""
@@ -113,10 +113,10 @@ class V2SchedulingHistoryClient(BaseDomainClient):
             response_model=SearchReplicaGroupHistoriesPayload,
         )
 
-    async def scoped_search_replica_group_history(
+    async def replica_group_scoped_search(
         self, request: ScopedSearchReplicaGroupHistoriesInput
     ) -> SearchReplicaGroupHistoriesPayload:
-        """Search replica-group scheduling histories under a non-admin scope."""
+        """Search replica-group scheduling histories within a deployment scope."""
         return await self._client.typed_request(
             "POST",
             f"{_PATH}/replica-groups/scoped/search",
