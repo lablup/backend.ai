@@ -217,15 +217,6 @@ def scheduling_handler() -> None:
 
 @admin.group(
     cls=LazyGroup,
-    import_name="ai.backend.client.cli.v2.admin.scheduling_history:scheduling_history",
-    name="scheduling-history",
-)
-def scheduling_history() -> None:
-    """Admin scheduling history commands."""
-
-
-@admin.group(
-    cls=LazyGroup,
     import_name="ai.backend.client.cli.v2.admin.invitation:invitation",
 )
 def invitation() -> None:
