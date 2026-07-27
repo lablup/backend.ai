@@ -338,6 +338,10 @@ class TestNativeAttachLocal:
             "iptables -I FORWARD -o bailo4097 -i eth0 "
             "-m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT" in flat  # egress return
         )
+        assert (
+            "iptables -I FORWARD -o bailo4097 -i eth0 "
+            "-m conntrack --ctstate DNAT -j ACCEPT" in flat  # published-port ingress
+        )
         assert "iptables -I FORWARD -o bailo4097 -j DROP" in flat  # cross-session / unsolicited
         # the old blanket accept that leaked across sessions must be gone
         assert "iptables -I FORWARD -i bailo4097 -j ACCEPT" not in flat
@@ -430,6 +434,11 @@ class TestNativeAttachLocal:
         assert (
             "iptables -D FORWARD -o bailo4097 -i eth0 "
             "-m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT" in flat
+        )
+        assert (
+            "iptables -D FORWARD -o bailo4097 -i eth0 "
+            "-m conntrack --ctstate DNAT -j ACCEPT"
+            in flat  # published-port ingress, same lifecycle
         )
         assert "MASQUERADE" in flat  # removed alongside
 

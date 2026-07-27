@@ -417,13 +417,23 @@ class NativeBridgeAttachRunner:
         # only because nothing routes to another VNI's subnet; the LOCAL bridge is not.)
         #
         # Mirror what Docker does for its own networks: allow only egress (to the uplink), its
-        # established return, and intra-bridge (same session -- single-node clusters need it), and
-        # drop everything else destined to this bridge. Scoping egress to the uplink (not a blanket
-        # ``-i bridge``) keeps it order-independent: no rule ever accepts bridge -> other-bridge, so
-        # the destination bridge's own ``-o bridge -j DROP`` always catches it.
+        # established return, published-port ingress, and intra-bridge (same session -- single-node
+        # clusters need it), and drop everything else destined to this bridge. Scoping egress to the
+        # uplink (not a blanket ``-i bridge``) keeps it order-independent: no rule ever accepts
+        # bridge -> other-bridge, so the destination bridge's own ``-o bridge -j DROP`` always
+        # catches it.
+        #
+        # The ``--ctstate DNAT`` accept is the ingress half: a container's published service port
+        # (port_forward.py installs a PREROUTING DNAT for it) is reached from off the node, so the
+        # first inbound packet is a NEW connection the established-return rule does not cover, and
+        # without this it dies on the ``-o bridge -j DROP`` -- the port then works only from the node
+        # itself, never from the manager/AppProxy that tunnels to the advertised address. Matching
+        # ``DNAT`` (not blanket NEW) keeps it exactly as tight as Docker's per-published-port rule:
+        # only a flow that actually hit a DNAT rule is let in, so an *un*published container port
+        # stays unreachable, and cross-session is untouched (that is bridge -> bridge, not -i uplink).
         #
         # Ordered DROP-first because _ensure_forward_accept inserts with ``-I`` (prepend): the DROP
-        # ends up last, evaluated only after the three accepts. Torn down on the same owner path.
+        # ends up last, evaluated only after the accepts. Torn down on the same owner path.
         return [
             ["FORWARD", "-o", bridge, "-j", "DROP"],
             ["FORWARD", "-i", bridge, "-o", uplink, "-j", "ACCEPT"],
@@ -438,6 +448,19 @@ class NativeBridgeAttachRunner:
                 "conntrack",
                 "--ctstate",
                 "RELATED,ESTABLISHED",
+                "-j",
+                "ACCEPT",
+            ],
+            [
+                "FORWARD",
+                "-o",
+                bridge,
+                "-i",
+                uplink,
+                "-m",
+                "conntrack",
+                "--ctstate",
+                "DNAT",
                 "-j",
                 "ACCEPT",
             ],
