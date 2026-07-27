@@ -493,7 +493,56 @@ class TestPrivNetRpc:
                 )
 
 
-class TestRestartRecovery:
+class TestSessionLock:
+    """The per-session lock is refcounted, so it is never dropped from the registry while a holder
+    or waiter still references it. Popping it mid-hold (the old ``_teardown`` behaviour) would let
+    the next arrival mint a fresh lock and enter the critical section alongside the current holder --
+    e.g. a SETUP_SESSION racing a TEARDOWN_SESSION of the same session, building and deleting the
+    same-named bridge at once (BEP-1062)."""
+
+    def _server(self, tmp_path: Path) -> PrivNetServer:
+        return _Harness(state_dir=tmp_path).server
+
+    async def test_same_session_ops_serialize_on_one_shared_lock(self, tmp_path: Path) -> None:
+        server = self._server(tmp_path)
+        order: list[str] = []
+        release_first = asyncio.Event()
+
+        async def first() -> None:
+            async with server._session_locked("s1"):
+                order.append("first-enter")
+                await release_first.wait()
+                order.append("first-exit")
+
+        async def second() -> None:
+            async with server._session_locked("s1"):
+                order.append("second-enter")
+
+        t1 = asyncio.create_task(first())
+        await asyncio.sleep(0)  # let `first` acquire the lock
+        held = server._locks["s1"]
+        t2 = asyncio.create_task(second())
+        await asyncio.sleep(0.02)  # give `second` every chance to (wrongly) run concurrently
+        # `second` is blocked behind `first`, on the SAME lock object -- not a freshly minted one.
+        assert order == ["first-enter"]
+        assert server._locks["s1"] is held
+        assert server._lock_users["s1"] == 2
+        release_first.set()
+        await asyncio.gather(t1, t2)
+        assert order == ["first-enter", "first-exit", "second-enter"]
+        # The registry shrinks back to empty once the last user leaves.
+        assert "s1" not in server._locks
+        assert "s1" not in server._lock_users
+
+    async def test_lock_survives_a_holder_that_pops_no_entry(self, tmp_path: Path) -> None:
+        # Even if the body does teardown-like work, the lock entry stays until the context exits.
+        server = self._server(tmp_path)
+        async with server._session_locked("s1"):
+            assert "s1" in server._locks
+            server._sessions.pop("s1", None)  # what _teardown does; must not touch _locks
+            assert "s1" in server._locks
+        assert "s1" not in server._locks
+
     """The privnet outlives the agent, but not every crash. Its session registry is memory while the
     node's bridges, veths and DNAT rules are not — so a restarted privnet that did not rebuild it
     would hold a node it refuses to talk about: a new kernel could not join a running session, and

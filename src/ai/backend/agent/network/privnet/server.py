@@ -28,10 +28,12 @@ contain.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 import os
 import socket
 import struct
+from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
@@ -122,6 +124,9 @@ class PrivNetServer:
     _backends: dict[str, AbstractNetworkAgentPluginV2[Any]]
     _sessions: dict[str, _SessionEntry]
     _locks: dict[str, asyncio.Lock]
+    # How many in-flight ops hold or wait on each session's lock, so the lock is dropped from
+    # `_locks` only when the last one leaves (see `_session_locked`) — never while it is still held.
+    _lock_users: dict[str, int]
     _journal: PrivNetJournal
     _netns: netns_mod.NetnsPinner
     # The store the attach path allocates LOCAL addresses from. Read on recovery to find the
@@ -163,17 +168,41 @@ class PrivNetServer:
         self._backends = backends
         self._sessions = {}
         self._locks = {}
+        self._lock_users = {}
         self._journal = journal or PrivNetJournal()
         self._ipam = ipam or get_host_local_ipam()
         self._local_subnets = local_subnets or get_local_subnet_allocator()
         self._netns = netns_pinner or netns_mod.NetnsPinner()
 
-    def _lock(self, session_id: str) -> asyncio.Lock:
+    @contextlib.asynccontextmanager
+    async def _session_locked(self, session_id: str) -> AsyncIterator[None]:
+        """Hold this session's per-session lock across one operation.
+
+        The lock is refcounted rather than popped on teardown, because its *identity* must stay
+        stable for as long as anyone holds or waits on it. ``Lock.release()`` only schedules the
+        first waiter -- the releasing task runs on to its next await -- so a teardown that dropped
+        the lock from the dict right after releasing it would leave the woken waiter holding an
+        orphan, while the next arrival minted a fresh lock and entered the critical section alongside
+        it: the very concurrent op this lock exists to prevent (a SETUP racing a TEARDOWN of the same
+        session would then build and delete the same-named bridge at once). Registering as a user
+        before the first await and dropping the entry only when the last user leaves keeps one lock
+        per in-flight session and still lets the dict shrink back to empty.
+        """
         lock = self._locks.get(session_id)
         if lock is None:
             lock = asyncio.Lock()
             self._locks[session_id] = lock
-        return lock
+        self._lock_users[session_id] = self._lock_users.get(session_id, 0) + 1
+        try:
+            async with lock:
+                yield
+        finally:
+            remaining = self._lock_users[session_id] - 1
+            if remaining:
+                self._lock_users[session_id] = remaining
+            else:
+                del self._lock_users[session_id]
+                self._locks.pop(session_id, None)
 
     async def serve_forever(self) -> None:
         await self._runtime.open()
@@ -310,7 +339,6 @@ class PrivNetServer:
         backend = self._resolve_backend(meta.backend)
         await backend.teardown_session_network(session_id)
         await self._journal.forget_session(session_id)
-        self._locks.pop(session_id, None)
         log.info("reclaimed the network of dead session {}", session_id)
 
     async def _reclaim_dead_container(
@@ -428,7 +456,7 @@ class PrivNetServer:
             session_id = policy.validate_session_id(req.session_id)
         except (ProtocolError, policy.PolicyViolation) as e:
             return PrivNetResponse(ok=False, error=str(e))
-        async with self._lock(session_id):
+        async with self._session_locked(session_id):
             try:
                 match req.op:
                     case PrivNetOp.SETUP_SESSION:
@@ -488,8 +516,10 @@ class PrivNetServer:
         self._sessions[session_id] = _SessionEntry(meta, backend)
 
     async def _teardown(self, session_id: str) -> None:
+        # The lock is NOT popped here: `_session_locked` owns its lifecycle (dropping it only when
+        # the last holder/waiter leaves). Popping it mid-hold is exactly the race this call runs
+        # under the lock to avoid.
         entry = self._sessions.pop(session_id, None)
-        self._locks.pop(session_id, None)
         if entry is not None:
             await entry.backend.teardown_session_network(session_id)
         elif (raw_config := (await self._journal.sessions()).get(session_id)) is not None:
