@@ -34,7 +34,7 @@ class TestAdminSearchReplicaGroupHistories:
         admin_v2_registry: V2ClientRegistry,
         replica_group_history_seed: ReplicaGroupHistorySeed,
     ) -> None:
-        result = await admin_v2_registry.scheduling_history.admin_search_replica_group_history(
+        result = await admin_v2_registry.scheduling_history.search_replica_group_history(
             AdminSearchReplicaGroupHistoriesInput()
         )
 
@@ -50,7 +50,7 @@ class TestAdminSearchReplicaGroupHistories:
         replica_group_history_seed: ReplicaGroupHistorySeed,
     ) -> None:
         with pytest.raises(PermissionDeniedError):
-            await user_v2_registry.scheduling_history.admin_search_replica_group_history(
+            await user_v2_registry.scheduling_history.search_replica_group_history(
                 AdminSearchReplicaGroupHistoriesInput()
             )
 
@@ -63,7 +63,7 @@ class TestScopedSearchReplicaGroupHistories:
         admin_v2_registry: V2ClientRegistry,
         replica_group_history_seed: ReplicaGroupHistorySeed,
     ) -> None:
-        result = await admin_v2_registry.scheduling_history.scoped_search_replica_group_history(
+        result = await admin_v2_registry.scheduling_history.replica_group_scoped_search(
             ScopedSearchReplicaGroupHistoriesInput(
                 scope=ReplicaGroupHistoryScopeDTO(
                     deployment=[UUIDScope(value=replica_group_history_seed.deployment_id)]
@@ -85,7 +85,7 @@ class TestScopedSearchReplicaGroupHistories:
         replica_group_history_seed: ReplicaGroupHistorySeed,
     ) -> None:
         with pytest.raises(NotFoundError):
-            await admin_v2_registry.scheduling_history.scoped_search_replica_group_history(
+            await admin_v2_registry.scheduling_history.replica_group_scoped_search(
                 ScopedSearchReplicaGroupHistoriesInput(
                     scope=ReplicaGroupHistoryScopeDTO(
                         deployment=[UUIDScope(value=DeploymentID(uuid.uuid4()))]
@@ -98,7 +98,7 @@ class TestScopedSearchReplicaGroupHistories:
         admin_v2_registry: V2ClientRegistry,
         replica_group_history_seed: ReplicaGroupHistorySeed,
     ) -> None:
-        result = await admin_v2_registry.scheduling_history.scoped_search_replica_group_history(
+        result = await admin_v2_registry.scheduling_history.replica_group_scoped_search(
             ScopedSearchReplicaGroupHistoriesInput(
                 scope=ReplicaGroupHistoryScopeDTO(
                     deployment=[UUIDScope(value=replica_group_history_seed.deployment_id)]
