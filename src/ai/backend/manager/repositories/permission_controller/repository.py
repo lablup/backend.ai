@@ -481,8 +481,8 @@ class PermissionControllerRepository:
         """Permission check on target scopes through the virtual-scope chain.
 
         Each scope is walked as an entity while permission rows are matched on
-        the key's ``subject_entity_type``, batched per
-        ``(user_id, scope_type, subject_entity_type)`` group.
+        the key's ``entity_type``, batched per
+        ``(user_id, scope_type, entity_type)`` group.
         """
         return await self._db_source.check_scope_permission_via_virtual_scope(keys, permission)
 

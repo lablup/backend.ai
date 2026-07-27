@@ -19,7 +19,7 @@ class VirtualScopeScopeActionRBACValidator(ScopeActionValidator):
 
     Each target scope is checked as an entity (reachable through its own and its
     ancestors' virtual scopes), while permission rows are matched on the
-    acted-on entity type (``subject_entity_type``). Every target scope must be
+    acted-on entity type (``entity_type``). Every target scope must be
     authorized for the action to pass.
     """
 
@@ -49,7 +49,7 @@ class VirtualScopeScopeActionRBACValidator(ScopeActionValidator):
             ScopePermissionCheckKey(
                 user_id=UserID(user.user_id),
                 scope=scope,
-                subject_entity_type=action.entity_type(),
+                entity_type=action.entity_type(),
             )
             for scope in action.scope_targets()
         ]

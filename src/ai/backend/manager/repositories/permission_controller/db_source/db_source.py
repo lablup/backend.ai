@@ -1292,7 +1292,7 @@ class PermissionDBSource:
                 _VirtualScopePermissionGroupKey(
                     user_id=key.user_id,
                     entity_type=EntityType(key.scope.scope_type),
-                    subject_entity_type=key.subject_entity_type,
+                    subject_entity_type=key.entity_type,
                 )
             ].append(key)
 

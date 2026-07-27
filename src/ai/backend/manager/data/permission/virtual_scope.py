@@ -23,9 +23,9 @@ class ScopePermissionCheckKey:
 
     The scope itself is walked as an entity (reachable through its own and its
     ancestors' virtual scopes), while permission rows are matched on
-    ``subject_entity_type`` — the type of entity acted on within the scope.
+    ``entity_type`` — the type of entity acted on within the scope.
     """
 
     user_id: UserID
     scope: ScopeRef
-    subject_entity_type: EntityType
+    entity_type: EntityType
