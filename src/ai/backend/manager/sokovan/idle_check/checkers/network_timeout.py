@@ -100,7 +100,7 @@ class NetworkTimeoutChecker(IdleChecker):
                     f"active_connections={state.active_connections}"
                 ),
             )
-        effective_expire_at = expire_at or refreshed_expire_at
+        effective_expire_at = expire_at if expire_at is not None else refreshed_expire_at
         if state.last_access is None:
             last_access_message = "last_access_at=None"
         else:
