@@ -2902,6 +2902,10 @@ class ScheduleDBSource:
         Also frees normalized resource allocations and releases the kernel's
         reserved/used hold on agent_resources.
 
+        The status guard keeps a late or duplicate termination event from
+        overwriting a kernel that already reached a terminal status, which would
+        replace its recorded reason and timestamps.
+
         :param kernel_id: Kernel ID to update
         :param reason: Termination reason
         :param exit_code: Process exit code
@@ -2912,7 +2916,10 @@ class ScheduleDBSource:
             stmt = (
                 sa.update(KernelRow)
                 .where(
-                    KernelRow.id == kernel_id,
+                    sa.and_(
+                        KernelRow.id == kernel_id,
+                        KernelRow.status.in_(KernelStatus.force_terminatable_statuses()),
+                    ),
                 )
                 .values(
                     status=KernelStatus.TERMINATED,
@@ -2933,13 +2940,13 @@ class ScheduleDBSource:
                 .returning(KernelRow.id)
             )
             result = await db_sess.execute(stmt)
-            row = result.first()
-            if row is None:
-                return False
+            updated = result.first() is not None
 
-            # Free allocations and release the kernel's reserved/used hold.
+            # Free allocations and release the kernel's reserved/used hold. This
+            # runs even when the status guard blocked the update so that a kernel
+            # already in a terminal status never keeps its hold; it is idempotent.
             await self._free_allocations_and_release(db_sess, [kernel_id], now)
-        return True
+        return updated
 
     async def reset_kernels_to_pending_for_sessions(
         self, session_ids: list[SessionId], reason: str
@@ -3091,6 +3098,9 @@ class ScheduleDBSource:
         """
         Update multiple kernels to TERMINATED status.
 
+        Kernels that already reached a terminal status are left untouched so
+        their recorded reason and timestamps survive a late termination event.
+
         :param kernel_ids: List of kernel ID strings to update
         :param reason: Termination reason
         :return: Number of kernels updated
@@ -3105,7 +3115,12 @@ class ScheduleDBSource:
 
             stmt = (
                 sa.update(KernelRow)
-                .where(KernelRow.id.in_(kernel_uuids))
+                .where(
+                    sa.and_(
+                        KernelRow.id.in_(kernel_uuids),
+                        KernelRow.status.in_(KernelStatus.force_terminatable_statuses()),
+                    )
+                )
                 .values(
                     status=KernelStatus.TERMINATED,
                     status_info=reason,

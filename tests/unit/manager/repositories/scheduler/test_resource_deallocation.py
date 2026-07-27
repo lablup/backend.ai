@@ -1482,10 +1482,10 @@ class TestNegativeValueGuard:
         result1 = await db_source.update_kernel_status_terminated(kernel_id, "first-terminate")
         assert result1 is True
 
-        # Second terminate - free_at already set, so no allocations to free;
-        # agent_resources.used should remain at 0, not go negative
+        # Second terminate - blocked by the terminal-status guard, and free_at is
+        # already set, so agent_resources.used should remain at 0, not go negative
         result2 = await db_source.update_kernel_status_terminated(kernel_id, "second-terminate")
-        assert result2 is True
+        assert result2 is False
 
         async with db_with_cleanup.begin_readonly_session() as db_sess:
             agent_resources = (
