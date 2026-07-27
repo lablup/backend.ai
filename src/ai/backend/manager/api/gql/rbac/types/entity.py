@@ -21,6 +21,7 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
 from ai.backend.common.dto.manager.v2.rbac.response import (
     AssociationScopesEntitiesNode,
 )
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
 from ai.backend.manager.api.gql.decorators import (
@@ -67,7 +68,7 @@ async def _load_rbac_element(
         case RBACElementType.PROJECT:
             return await data_loaders.project_loader.load(uuid.UUID(element_id))
         case RBACElementType.DOMAIN:
-            return await data_loaders.domain_loader.load(element_id)
+            return await data_loaders.domain_by_id_loader.load(DomainID(uuid.UUID(element_id)))
         case RBACElementType.ROLE:
             return await data_loaders.role_loader.load(uuid.UUID(element_id))
         case RBACElementType.IMAGE:

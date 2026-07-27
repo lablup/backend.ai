@@ -6,6 +6,7 @@ from typing import override
 from uuid import UUID
 
 from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.models.scaling_group import (
     ScalingGroupForDomainRow,
@@ -36,6 +37,7 @@ class ResourceGroupDomainEntityUnbinder(RBACScopeEntityUnbinder[ScalingGroupForD
 
     scaling_groups: Sequence[str] | None
     domain: str
+    domain_id: DomainID
 
     @override
     def build_purger_spec(self) -> BatchPurgerSpec[ScalingGroupForDomainRow]:
@@ -54,7 +56,7 @@ class ResourceGroupDomainEntityUnbinder(RBACScopeEntityUnbinder[ScalingGroupForD
     @property
     @override
     def scope_ref(self) -> RBACElementRef:
-        return RBACElementRef(RBACElementType.DOMAIN, self.domain)
+        return RBACElementRef(RBACElementType.DOMAIN, str(self.domain_id))
 
     @property
     @override

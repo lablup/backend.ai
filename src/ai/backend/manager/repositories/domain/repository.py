@@ -1,11 +1,15 @@
 from __future__ import annotations
 
-from collections.abc import Iterable
-from typing import cast
+from collections.abc import Collection, Iterable
+from dataclasses import dataclass
+from typing import cast, override
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
+from ai.backend.common.data.entity.types import ScopeRef
+from ai.backend.common.data.entity.types import ScopeType as VirtualScopeType
+from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.exception import BackendAIError, DomainNotFound, InvalidAPIParameters
 from ai.backend.common.identifier.domain import DomainID, DomainName
 from ai.backend.common.metrics.metric import DomainType, LayerType
@@ -36,14 +40,14 @@ from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.resource_policy import keypair_resource_policies
 from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow, get_scaling_groups
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base.creator import Creator, execute_creator
+from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.purger import (
     BatchPurger,
-    Purger,
     execute_batch_purger,
-    execute_purger,
 )
 from ai.backend.manager.repositories.base.querier import BatchQuerier
+from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
+from ai.backend.manager.repositories.base.rbac.entity_purger import RBACEntityPurger
 from ai.backend.manager.repositories.base.updater import Updater, execute_updater
 from ai.backend.manager.repositories.domain.creators import DomainCreatorSpec
 from ai.backend.manager.repositories.domain.db_source import DomainDBSource
@@ -52,7 +56,40 @@ from ai.backend.manager.repositories.domain.purgers import (
     DomainPurgerSpec,
 )
 from ai.backend.manager.repositories.domain.types import DomainSearchResult, DomainSearchScope
-from ai.backend.manager.repositories.permission_controller.role_manager import RoleManager
+from ai.backend.manager.repositories.ops.rbac.provider import (
+    RBACWriteOps,
+    ScopeCreation,
+    ScopeDeletion,
+)
+from ai.backend.manager.repositories.permission_controller.role_manager import (
+    ScopeSystemRoleData,
+)
+
+_DOMAIN_SCOPE_TYPE = VirtualScopeType(RBACElementType.DOMAIN.value)
+
+
+@dataclass
+class DomainScopeCreation(ScopeCreation[DomainRow]):
+    """Creates a domain row and the top-level scope the domain becomes."""
+
+    spec: DomainCreatorSpec
+
+    @override
+    def creator(self) -> RBACEntityCreator[DomainRow]:
+        return RBACEntityCreator(
+            spec=self.spec,
+            element_type=RBACElementType.DOMAIN,
+            scope_ref=None,
+        )
+
+    @override
+    def scope_of(self, row: DomainRow) -> ScopeRef:
+        return ScopeRef(scope_type=_DOMAIN_SCOPE_TYPE, scope_id=row.id)
+
+    @override
+    def system_roles_of(self, row: DomainRow) -> Collection[ScopeSystemRoleData]:
+        return (row.to_data(),)
+
 
 domain_repository_resilience = Resilience(
     policies=[
@@ -71,12 +108,10 @@ domain_repository_resilience = Resilience(
 
 class DomainRepository:
     _db: ExtendedAsyncSAEngine
-    _role_manager: RoleManager
     _db_source: DomainDBSource
 
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
-        self._role_manager = RoleManager()
         self._db_source = DomainDBSource(db)
 
     @domain_repository_resilience.apply()
@@ -92,11 +127,9 @@ class DomainRepository:
             if existing_domain is not None:
                 raise InvalidAPIParameters(f"Domain with name '{spec.name}' already exists")
 
-            creator_result = await execute_creator(db_session, creator)
-            domain = creator_result.row
-
-            data = domain.to_data()
-            await self._role_manager.create_system_role(db_session, data)
+            rbac_write_ops = RBACWriteOps(db_session)
+            creation_result = await rbac_write_ops.create_scope(DomainScopeCreation(spec=spec))
+            data = creation_result.row.to_data()
 
             # Create model-store group for the domain
             await self._create_model_store_group(db_session, spec.name)
@@ -145,9 +178,20 @@ class DomainRepository:
 
             await self._delete_kernels(session, domain_name)
 
-            result = await execute_purger(
-                session,
-                Purger(spec=DomainPurgerSpec(domain_name=domain_name)),
+            domain_id = await session.scalar(
+                sa.select(DomainRow.id).where(DomainRow.name == domain_name)
+            )
+            if domain_id is None:
+                raise DomainNotFound(f"Domain not found: {domain_name}")
+
+            rbac_write_ops = RBACWriteOps(session)
+            result = await rbac_write_ops.delete_scope(
+                ScopeDeletion(
+                    purger=RBACEntityPurger(
+                        spec=DomainPurgerSpec(domain_name=domain_name, domain_id=domain_id)
+                    ),
+                    scope=ScopeRef(scope_type=_DOMAIN_SCOPE_TYPE, scope_id=domain_id),
+                )
             )
             if result is None:
                 raise DomainDeletionFailed(f"Failed to delete domain: {domain_name}")
@@ -167,8 +211,9 @@ class DomainRepository:
             if existing_domain is not None:
                 raise InvalidAPIParameters(f"Domain with name '{spec.name}' already exists")
 
-            creator_result = await execute_creator(session, creator)
-            domain_row = creator_result.row
+            rbac_write_ops = RBACWriteOps(session)
+            creation_result = await rbac_write_ops.create_scope(DomainScopeCreation(spec=spec))
+            domain_row = creation_result.row
 
             if scaling_groups is not None:
                 await session.execute(

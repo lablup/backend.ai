@@ -784,7 +784,7 @@ class PermissionDBSource:
     ) -> ScopeListResult:
         """Search all domains using BatchQuerier."""
         async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(DomainRow.name)
+            query = sa.select(DomainRow.id, DomainRow.name)
 
             result = await execute_batch_querier(
                 db_sess,
@@ -794,7 +794,7 @@ class PermissionDBSource:
 
             items = [
                 ScopeData(
-                    id=ScopeId(scope_type=LegacyScopeType.DOMAIN, scope_id=row.name),
+                    id=ScopeId(scope_type=LegacyScopeType.DOMAIN, scope_id=str(row.id)),
                     name=row.name,
                 )
                 for row in result.rows
@@ -1049,8 +1049,9 @@ class PermissionDBSource:
 
         result: dict[PermissionResolutionKey, frozenset[OperationType]] = {}
         async with self._db.begin_readonly_session_read_committed() as db_session:
+            domain_ids_by_name = await self._resolve_domain_names_in_keys(db_session, keys)
             for group_key, members in groups.items():
-                entity_ids = [k.entity_id for k in members]
+                entity_ids = [self._canonical_entity_id(k, domain_ids_by_name) for k in members]
                 granted = await self._resolve_permissions_for_group(
                     db_session=db_session,
                     group_key=group_key,
@@ -1058,8 +1059,43 @@ class PermissionDBSource:
                     operation_filter=operation_filter,
                 )
                 for key in members:
-                    result[key] = frozenset(granted.get(key.entity_id, ()))
+                    result[key] = frozenset(
+                        granted.get(self._canonical_entity_id(key, domain_ids_by_name), ())
+                    )
         return result
+
+    @staticmethod
+    def _canonical_entity_id(
+        key: PermissionResolutionKey,
+        domain_ids_by_name: Mapping[str, str],
+    ) -> str:
+        return domain_ids_by_name.get(key.entity_id, key.entity_id)
+
+    async def _resolve_domain_names_in_keys(
+        self,
+        db_session: SASession,
+        keys: Collection[PermissionResolutionKey],
+    ) -> Mapping[str, str]:
+        """Map domain names found in DOMAIN-typed keys to their canonical UUID strings.
+
+        RBAC rows key domain scopes by the domain UUID, but request contexts still
+        address domains by name; names that resolve to no domain are left untouched
+        (they simply match no rows downstream).
+        """
+        names: set[str] = set()
+        for key in keys:
+            if key.element_type is not RBACElementType.DOMAIN:
+                continue
+            try:
+                uuid.UUID(key.entity_id)
+            except ValueError:
+                names.add(key.entity_id)
+        if not names:
+            return {}
+        rows = await db_session.execute(
+            sa.select(DomainRow.name, DomainRow.id).where(DomainRow.name.in_(names))
+        )
+        return {row.name: str(row.id) for row in rows}
 
     async def _resolve_permissions_for_group(
         self,

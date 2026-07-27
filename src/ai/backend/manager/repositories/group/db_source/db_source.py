@@ -21,7 +21,8 @@ from ai.backend.common.data.entity.types import (
     EntityType as VirtualScopeEntityType,
 )
 from ai.backend.common.data.permission.types import RBACElementType
-from ai.backend.common.exception import InvalidAPIParameters
+from ai.backend.common.exception import DomainNotFound, InvalidAPIParameters
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import SlotName, VFolderID
@@ -48,6 +49,7 @@ from ai.backend.manager.errors.resource import (
     ProjectHasVFoldersMountedError,
     ProjectNotFound,
 )
+from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointLifecycle, EndpointRow
 from ai.backend.manager.models.group import groups
 from ai.backend.manager.models.group.row import (
@@ -111,7 +113,7 @@ from ai.backend.manager.repositories.ops.rbac.provider import (
     RBACWriteOps,
     ScopeCreation,
     ScopeDeletion,
-    ScopeMember,
+    ScopeUserMember,
 )
 from ai.backend.manager.repositories.permission_controller.creators import UserRoleCreatorSpec
 from ai.backend.manager.repositories.permission_controller.role_manager import (
@@ -123,24 +125,8 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 _PROJECT_SCOPE_TYPE = ScopeType(RBACElementType.PROJECT.value)
+_DOMAIN_SCOPE_TYPE = ScopeType(RBACElementType.DOMAIN.value)
 _USER_ENTITY_TYPE = VirtualScopeEntityType(RBACElementType.USER.value)
-
-
-@dataclass
-class ProjectUserMember(ScopeMember):
-    """A user joining or leaving a project scope; ``manage_roles`` controls whether the
-    membership change also grants/revokes the user's roles at the project scope."""
-
-    user_id: UserID
-    manage_roles: bool = True
-
-    @override
-    def entity_ref(self) -> EntityRef:
-        return EntityRef(entity_type=_USER_ENTITY_TYPE, entity_id=self.user_id)
-
-    @override
-    def assign_role_on(self) -> UserID | None:
-        return self.user_id if self.manage_roles else None
 
 
 @dataclass
@@ -148,6 +134,7 @@ class ProjectScopeCreation(ScopeCreation[GroupRow]):
     """Creates a project row under its domain, and the scope the project becomes."""
 
     spec: GroupCreatorSpec
+    domain_id: DomainID
 
     @override
     def creator(self) -> RBACEntityCreator[GroupRow]:
@@ -155,7 +142,7 @@ class ProjectScopeCreation(ScopeCreation[GroupRow]):
             spec=self.spec,
             element_type=RBACElementType.PROJECT,
             scope_ref=RBACElementRef(
-                element_type=RBACElementType.DOMAIN, element_id=self.spec.domain_name
+                element_type=RBACElementType.DOMAIN, element_id=str(self.domain_id)
             ),
         )
 
@@ -184,11 +171,24 @@ class GroupDBSource:
 
         Domain/resource-policy existence and name-uniqueness are enforced by the group
         row's DB constraints, mapped to domain errors via the spec's
-        integrity_error_checks.
+        integrity_error_checks. The domain scope is bound to the new project's virtual
+        scope so domain-scoped permissions reach the project's entities.
         """
-        creation = ProjectScopeCreation(spec=cast(GroupCreatorSpec, creator.spec))
+        spec = cast(GroupCreatorSpec, creator.spec)
         async with self._rbac_ops_provider.write_ops() as w:
-            return (await w.create_scope(creation)).row.to_data()
+            domain_id = await self._get_domain_id(w, spec.domain_name)
+            creation = ProjectScopeCreation(spec=spec, domain_id=domain_id)
+            domain_scope = ScopeRef(scope_type=_DOMAIN_SCOPE_TYPE, scope_id=domain_id)
+            return (await w.create_scope(creation, bound_scope=domain_scope)).row.to_data()
+
+    async def _get_domain_id(self, w: RBACWriteOps, domain_name: str) -> DomainID:
+        result = await w.batch_query_in_global(
+            sa.select(DomainRow.id).where(DomainRow.name == domain_name),
+            BatchQuerier(pagination=NoPagination()),
+        )
+        if not result.rows:
+            raise DomainNotFound(f"Domain '{domain_name}' not found")
+        return DomainID(result.rows[0].id)
 
     async def modify_validated(
         self,
@@ -270,7 +270,7 @@ class GroupDBSource:
         await w.add_entity_members(
             EntityMembersAddition(
                 scope=ScopeRef(scope_type=_PROJECT_SCOPE_TYPE, scope_id=project_id),
-                members=[ProjectUserMember(user_id=UserID(row.uuid)) for row in new_user_rows],
+                members=[ScopeUserMember(user_id=UserID(row.uuid)) for row in new_user_rows],
             )
         )
 
@@ -645,10 +645,7 @@ class GroupDBSource:
             await w.add_entity_members(
                 EntityMembersAddition(
                     scope=ScopeRef(scope_type=_PROJECT_SCOPE_TYPE, scope_id=project_id),
-                    members=[
-                        ProjectUserMember(user_id=UserID(row.uuid), manage_roles=False)
-                        for row in new_user_rows
-                    ],
+                    members=[ScopeUserMember(user_id=UserID(row.uuid)) for row in new_user_rows],
                 )
             )
             user_role_specs = [
@@ -719,7 +716,8 @@ class GroupDBSource:
             )
 
     async def bind_user_to_project(self, user_id: UserID, project_id: ProjectID) -> None:
-        """Add a user to a project as a scope member (membership writes only).
+        """Add a user to a project as a scope member, granting the project's
+        ``auto_assign`` roles.
 
         Idempotent: adding an existing member is a no-op.
         """
@@ -727,7 +725,7 @@ class GroupDBSource:
             await w.add_entity_members(
                 EntityMembersAddition(
                     scope=ScopeRef(scope_type=_PROJECT_SCOPE_TYPE, scope_id=project_id),
-                    members=[ProjectUserMember(user_id=user_id, manage_roles=False)],
+                    members=[ScopeUserMember(user_id=user_id)],
                 )
             )
 

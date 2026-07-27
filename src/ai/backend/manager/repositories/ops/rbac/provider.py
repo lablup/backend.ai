@@ -15,6 +15,9 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.data.entity.types import EntityRef, ScopeRef
+from ai.backend.common.data.entity.types import (
+    EntityType as VirtualScopeEntityType,
+)
 from ai.backend.common.data.permission.types import (
     Permission,
     RBACElementType,
@@ -118,6 +121,26 @@ class ScopeMember(ABC):
     @abstractmethod
     def assign_role_on(self) -> UserID | None:
         raise NotImplementedError
+
+
+_USER_ENTITY_TYPE = VirtualScopeEntityType(RBACElementType.USER.value)
+
+
+@dataclass
+class ScopeUserMember(ScopeMember):
+    """A user joining a scope; membership always grants the scope's
+    ``auto_assign`` roles (idempotently), so membership and role state
+    cannot drift apart."""
+
+    user_id: UserID
+
+    @override
+    def entity_ref(self) -> EntityRef:
+        return EntityRef(entity_type=_USER_ENTITY_TYPE, entity_id=self.user_id)
+
+    @override
+    def assign_role_on(self) -> UserID:
+        return self.user_id
 
 
 @dataclass

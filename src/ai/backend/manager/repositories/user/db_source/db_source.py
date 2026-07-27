@@ -16,7 +16,10 @@ from sqlalchemy.orm import joinedload, load_only, noload
 from sqlalchemy.sql.expression import bindparam
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+from ai.backend.common.data.entity.types import ScopeRef
+from ai.backend.common.data.entity.types import ScopeType as VirtualScopeType
 from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import AccessKey, VFolderID
@@ -120,7 +123,11 @@ from ai.backend.manager.repositories.keypair.types import (
     KeypairResourcePolicyKeypairSearchScope,
     UserKeypairSearchScope,
 )
-from ai.backend.manager.repositories.ops.rbac.provider import RBACOpsProvider
+from ai.backend.manager.repositories.ops.rbac.provider import (
+    EntityMembersAddition,
+    RBACOpsProvider,
+    ScopeUserMember,
+)
 from ai.backend.manager.repositories.permission_controller.creators import UserRoleCreatorSpec
 from ai.backend.manager.repositories.permission_controller.role_manager import RoleManager
 from ai.backend.manager.repositories.user.creators import UserCreateSpec, UserCreatorSpec
@@ -140,6 +147,8 @@ from ai.backend.manager.repositories.user.updaters import UserUpdaterSpec, UserU
 from ai.backend.manager.repositories.vfolder.deletion import initiate_vfolder_deletion
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+_DOMAIN_SCOPE_TYPE = VirtualScopeType(RBACElementType.DOMAIN.value)
 
 
 class UserDBSource:
@@ -187,8 +196,8 @@ class UserDBSource:
 
         async with self._db.begin_session() as db_session:
             # Check if domain exists before creating user
-            domain_exists = await self._check_domain_exists(db_session, domain_name)
-            if not domain_exists:
+            domain_id = await self._get_domain_id(db_session, domain_name)
+            if domain_id is None:
                 raise UserCreationBadRequest(f"Domain '{domain_name}' does not exist.")
 
             # Check if user with the same email or username already exists
@@ -212,7 +221,7 @@ class UserDBSource:
             rbac_creator = RBACEntityCreator(
                 spec=creator.spec,
                 element_type=RBACElementType.USER,
-                scope_ref=RBACElementRef(RBACElementType.DOMAIN, domain_name),
+                scope_ref=RBACElementRef(RBACElementType.DOMAIN, str(domain_id)),
                 additional_scope_refs=project_scope_refs,
             )
             result = await execute_rbac_entity_creator(db_session, rbac_creator)
@@ -294,7 +303,8 @@ class UserDBSource:
         spec = cast(UserCreatorSpec, item.creator.spec)
 
         # Validate domain
-        if not await self._check_domain_exists(db_session, spec.domain_name):
+        domain_id = await self._get_domain_id(db_session, spec.domain_name)
+        if domain_id is None:
             raise UserCreationBadRequest(f"Domain '{spec.domain_name}' does not exist")
 
         # Validate no duplicate
@@ -315,7 +325,7 @@ class UserDBSource:
         rbac_creator = RBACEntityCreator(
             spec=item.creator.spec,
             element_type=RBACElementType.USER,
-            scope_ref=RBACElementRef(RBACElementType.DOMAIN, spec.domain_name),
+            scope_ref=RBACElementRef(RBACElementType.DOMAIN, str(domain_id)),
             additional_scope_refs=project_scope_refs,
         )
         result = await execute_rbac_entity_creator(db_session, rbac_creator)
@@ -383,11 +393,19 @@ class UserDBSource:
         by :meth:`assign_user_to_model_store`. Idempotent, so it is safe to run
         after user creation.
         """
+        domain_id: DomainID | None = None
+        if domain_name is not None:
+            async with self._db.begin_readonly_session_read_committed() as db_session:
+                domain_id = await self._get_domain_id(db_session, domain_name)
+            if domain_id is None:
+                raise UserCreationBadRequest(f"Domain '{domain_name}' does not exist.")
         async with self._rbac_ops_provider.write_ops() as rbac_write_ops:
-            if domain_name is not None:
-                await rbac_write_ops.add_users_to_scope(
-                    ScopeId(scope_type=ScopeType.DOMAIN, scope_id=domain_name),
-                    [user_uuid],
+            if domain_id is not None:
+                await rbac_write_ops.add_entity_members(
+                    EntityMembersAddition(
+                        scope=ScopeRef(scope_type=_DOMAIN_SCOPE_TYPE, scope_id=domain_id),
+                        members=[ScopeUserMember(user_id=user_uuid)],
+                    )
                 )
             for project_id in project_ids:
                 await rbac_write_ops.add_users_to_scope(
@@ -862,6 +880,13 @@ class UserDBSource:
         query = sa.select(DomainRow.name).where(DomainRow.name == domain_name)
         result = await session.scalar(query)
         return result is not None
+
+    async def _get_domain_id(
+        self, session: SASession | AsyncConnection, domain_name: str
+    ) -> DomainID | None:
+        query = sa.select(DomainRow.id).where(DomainRow.name == domain_name)
+        domain_id: DomainID | None = await session.scalar(query)
+        return domain_id
 
     async def _check_resource_policy_exists(
         self, session: SASession | AsyncConnection, policy_name: str
