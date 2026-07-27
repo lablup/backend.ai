@@ -13,3 +13,4 @@ class IdleCheckSession:
     session_id: SessionId
     created_at: datetime
     starts_at: datetime | None
+    expire_at: datetime

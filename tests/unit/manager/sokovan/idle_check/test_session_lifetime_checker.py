@@ -75,6 +75,7 @@ class TestSessionLifetimeChecker:
                 session_id=SessionId(uuid4()),
                 created_at=created_at,
                 starts_at=starts_at,
+                expire_at=_BASE_TIME,
             )
 
         return create_session
@@ -274,7 +275,7 @@ class TestSessionLifetimeChecker:
                 target_session_types=frozenset({SessionTypes.INTERACTIVE}),
                 spec=IdleCheckerSpec(
                     type=CheckerType.NETWORK_TIMEOUT,
-                    network=NetworkTimeoutSpec(),
+                    network=NetworkTimeoutSpec(max_network_inactivity_seconds=30),
                 ),
             ),
             sessions=(session_factory(),),

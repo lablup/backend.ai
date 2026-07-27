@@ -41,7 +41,7 @@ _SPECS: Final[dict[CheckerType, IdleCheckerSpec]] = {
     ),
     CheckerType.NETWORK_TIMEOUT: IdleCheckerSpec(
         type=CheckerType.NETWORK_TIMEOUT,
-        network=NetworkTimeoutSpec(),
+        network=NetworkTimeoutSpec(max_network_inactivity_seconds=3600),
     ),
 }
 
@@ -112,6 +112,7 @@ def _assignment(
             session_id=session_id,
             created_at=datetime(2026, 1, 1, tzinfo=UTC),
             starts_at=None,
+            expire_at=_NOW,
         ),
         checker=checker,
     )

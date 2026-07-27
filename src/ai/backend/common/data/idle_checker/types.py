@@ -38,10 +38,15 @@ class SessionLifetimeSpec(BackendAISchema):
 
 
 class NetworkTimeoutSpec(BackendAISchema):
-    """Config for ``CheckerType.NETWORK_TIMEOUT``.
+    """Config for ``CheckerType.NETWORK_TIMEOUT``."""
 
-    Concrete fields land with the checker-logic stories.
-    """
+    max_network_inactivity_seconds: int = Field(
+        ge=0,
+        description=(
+            "Maximum time in seconds that an interactive session may have neither recent "
+            "network access nor an active connection. Zero disables this checker definition."
+        ),
+    )
 
 
 class UtilizationSpec(BackendAISchema):

@@ -291,6 +291,10 @@ class TestFetchJudgmentBatch:
             (judgment_rows.active_session_id, judgment_rows.checker_id),
             (judgment_rows.idle_session_id, judgment_rows.checker_id),
         }
+        assert all(
+            assignment.session.expire_at == datetime(2026, 2, 1, tzinfo=UTC)
+            for assignment in batch.assignments
+        )
 
     async def test_excludes_non_judgment_phases(
         self,
