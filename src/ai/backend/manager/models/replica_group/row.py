@@ -9,6 +9,7 @@ from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.identifier.replica_group import ReplicaGroupID
+from ai.backend.common.identifier.session_group import SessionGroupID
 from ai.backend.common.schema.deployment import ReplicaGroupRolloutSpec
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.deployment.types import (
@@ -118,6 +119,20 @@ class ReplicaGroupRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
         nullable=False,
         default=100,
         server_default=sa.text("100"),
+    )
+
+    # The placement group shared by this group's route sessions (1:1 — a
+    # replica group always owns exactly one). `use_alter` keeps the FK out of
+    # the CREATE TABLE so table subsets that omit ``session_groups`` still build.
+    session_group_id: Mapped[SessionGroupID] = mapped_column(
+        "session_group_id",
+        GUID(SessionGroupID),
+        sa.ForeignKey(
+            "session_groups.id",
+            use_alter=True,
+            name="fk_replica_groups_session_group_id_session_groups",
+        ),
+        nullable=False,
     )
 
     lifecycle: Mapped[ReplicaGroupLifecycle] = mapped_column(

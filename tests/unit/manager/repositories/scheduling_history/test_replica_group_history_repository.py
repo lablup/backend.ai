@@ -21,6 +21,7 @@ from ai.backend.common.dto.manager.v2.scheduling_history.types import (
 )
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.replica_group import ReplicaGroupID
+from ai.backend.common.identifier.session_group import SessionGroupID
 from ai.backend.common.schema.deployment import IntOrPercent, ReplicaGroupRolloutSpec
 from ai.backend.common.types import BinarySize, ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
@@ -247,6 +248,7 @@ class TestReplicaGroupHistoryRepository:
             for group_id in (target_group_id, sibling_group_id):
                 db_sess.add(
                     ReplicaGroupRow(
+                        session_group_id=SessionGroupID(uuid.uuid4()),
                         id=group_id,
                         deployment_id=deployment_id,
                         desired_current_replica_count=1,

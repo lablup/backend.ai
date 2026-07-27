@@ -39,6 +39,7 @@ from ai.backend.common.defs.session import JOB_PRIORITY_DEFAULT, SESSION_PRIORIT
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.identifier.session_group import SessionGroupID
 from ai.backend.common.types import (
     AccessKey,
     ClusterMode,
@@ -432,6 +433,24 @@ class SessionRow(Base):  # type: ignore[misc]
     )
     designated_agent_ids: Mapped[list[str] | None] = mapped_column(
         "designated_agent_ids", sa.ARRAY(sa.String), nullable=True
+    )
+    # The placement group this session belongs to. NULL (the default) means no
+    # placement constraint. ON DELETE SET NULL: a group may be swept before its
+    # members, and a placement already made is never revisited.
+    # `use_alter` keeps the FK out of the CREATE TABLE so table subsets that
+    # omit ``session_groups`` still build.
+    session_group_id: Mapped[SessionGroupID | None] = mapped_column(
+        "session_group_id",
+        GUID(SessionGroupID),
+        sa.ForeignKey(
+            "session_groups.id",
+            ondelete="SET NULL",
+            use_alter=True,
+            name="fk_sessions_session_group_id_session_groups",
+        ),
+        index=True,
+        nullable=True,
+        default=None,
     )
     kernels: Mapped[list[KernelRow]] = relationship("KernelRow", back_populates="session")
 

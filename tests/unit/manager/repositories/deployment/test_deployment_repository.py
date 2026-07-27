@@ -27,6 +27,7 @@ from ai.backend.common.identifier.replica import ReplicaID
 from ai.backend.common.identifier.replica_group import ReplicaGroupID
 from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
+from ai.backend.common.identifier.session_group import SessionGroupID
 from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.schema.deployment import BlueGreenSpec, IntOrPercent, RollingUpdateSpec
 from ai.backend.common.types import (
@@ -169,6 +170,7 @@ def attach_primary_replica_group(
     """
     group_id = uuid.uuid4()
     group = ReplicaGroupRow(
+        session_group_id=SessionGroupID(uuid.uuid4()),
         id=ReplicaGroupID(group_id),
         deployment_id=endpoint.id,
         current_revision_id=current_revision_id,
@@ -2154,6 +2156,7 @@ class TestDeploymentRevisionOperations:
             # A second group that has already finished draining.
             db_sess.add(
                 ReplicaGroupRow(
+                    session_group_id=SessionGroupID(uuid.uuid4()),
                     id=drained_group_id,
                     deployment_id=test_endpoint_id,
                     lifecycle=ReplicaGroupLifecycle.DRAINED,
@@ -3144,6 +3147,7 @@ class TestRouteOperations:
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 ReplicaGroupRow(
+                    session_group_id=SessionGroupID(uuid.uuid4()),
                     id=group_id,
                     deployment_id=test_endpoint_id,
                 )

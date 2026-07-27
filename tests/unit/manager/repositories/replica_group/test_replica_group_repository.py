@@ -13,6 +13,7 @@ from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.identifier.replica_group import ReplicaGroupID
+from ai.backend.common.identifier.session_group import SessionGroupID
 from ai.backend.common.types import BinarySize, ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.deployment.types import (
@@ -255,6 +256,7 @@ class TestReplicaGroupRepository:
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 ReplicaGroupRow(
+                    session_group_id=SessionGroupID(uuid.uuid4()),
                     id=first,
                     deployment_id=test_endpoint_id,
                     desired_current_replica_count=1,
@@ -265,6 +267,7 @@ class TestReplicaGroupRepository:
             )
             db_sess.add(
                 ReplicaGroupRow(
+                    session_group_id=SessionGroupID(uuid.uuid4()),
                     id=second,
                     deployment_id=test_endpoint_id,
                     desired_current_replica_count=2,
@@ -380,6 +383,7 @@ class TestReplicaGroupRepository:
             ).scalar_one()
             db_sess.add(
                 ReplicaGroupRow(
+                    session_group_id=SessionGroupID(uuid.uuid4()),
                     id=group_id,
                     deployment_id=test_endpoint_id,
                     current_revision_id=current_revision_id,
@@ -481,6 +485,7 @@ class TestReplicaGroupRepository:
             ).scalar_one()
             db_sess.add(
                 ReplicaGroupRow(
+                    session_group_id=SessionGroupID(uuid.uuid4()),
                     id=group_id,
                     deployment_id=test_endpoint_id,
                     current_revision_id=revision_id,
@@ -583,6 +588,7 @@ class TestReplicaGroupRepository:
             ).scalar_one()
             db_sess.add(
                 ReplicaGroupRow(
+                    session_group_id=SessionGroupID(uuid.uuid4()),
                     id=group_id,
                     deployment_id=test_endpoint_id,
                     current_revision_id=revision_id,
@@ -656,6 +662,7 @@ class TestReplicaGroupRepository:
             ).scalar_one()
             db_sess.add(
                 ReplicaGroupRow(
+                    session_group_id=SessionGroupID(uuid.uuid4()),
                     id=group_id,
                     deployment_id=test_endpoint_id,
                     current_revision_id=revision_id,
