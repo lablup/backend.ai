@@ -11,8 +11,17 @@ from ai.backend.common.dto.manager.v2.idle_checker.types import (
     CheckerTypeFilter,
     IdleCheckerInputTypeDTO,
     IdleCheckerOrderField,
+    IdleCheckerScopeTypeDTO,
 )
 from ai.backend.common.types import SessionTypes
+
+
+class IdleCheckerScope(BaseRequestModel):
+    scope_type: IdleCheckerScopeTypeDTO = Field(description="Idle checker binding scope type.")
+    scope_id: str = Field(
+        min_length=1,
+        description="Domain name, project UUID, or resource group name.",
+    )
 
 
 class SessionLifetimeSpecInputDTO(BaseRequestModel):
@@ -28,7 +37,7 @@ class IdleCheckerSpecInputDTO(BaseRequestModel):
 
 class CreateIdleCheckerInput(BaseRequestModel):
     name: str = Field(min_length=1, max_length=128)
-    description: str | None = Field(default=None)
+    description: str = Field(description="Idle checker description.")
     checker_type: IdleCheckerInputTypeDTO
     target_session_types: list[SessionTypes] = Field(min_length=1)
     initial_grace_period_seconds: int = Field(default=0, ge=0)

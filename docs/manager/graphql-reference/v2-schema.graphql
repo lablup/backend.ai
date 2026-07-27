@@ -2706,14 +2706,14 @@ type CreateHuggingFaceRegistryPayload {
 }
 
 """
-Added in 26.8.0. Defines a new idle checker and the sessions it evaluates. The checker type must match the type declared by its specification.
+Added in 26.8.0. Defines a reusable idle checker specification. The create mutation separately receives the scope where it is managed and applied.
 """
 input CreateIdleCheckerInput {
   """Idle checker name."""
   name: String!
 
-  """Optional description."""
-  description: String = null
+  """Idle checker description."""
+  description: String!
 
   """Checker implementation type."""
   checkerType: IdleCheckerInputType!
@@ -2729,7 +2729,7 @@ input CreateIdleCheckerInput {
 }
 
 """
-Added in 26.8.0. Returns the idle checker created by the mutation. The node contains the server-assigned identifier and timestamps.
+Added in 26.8.0. Returns the idle checker created and bound to the requested scope. The node contains the server-assigned identifier and timestamps.
 """
 type CreateIdleCheckerPayload {
   idleChecker: IdleChecker!
@@ -5356,7 +5356,7 @@ type HuggingFaceRegistryEdge {
 }
 
 """
-Added in 26.8.0. Represents a registered rule for determining when sessions become idle. It includes the target session types, grace period, and typed checker settings.
+Added in 26.8.0. Represents a reusable idle checker definition independent of its bindings. It includes target session types, a grace period, and typed checker settings.
 """
 type IdleChecker implements Node {
   """The Globally Unique ID of this object"""
@@ -5388,7 +5388,7 @@ type IdleChecker implements Node {
 }
 
 """
-Added in 26.8.0. Provides a paginated collection of idle checker definitions. The count reports all records matching the supplied filter.
+Added in 26.8.0. Provides a paginated collection of idle checker definitions available in a scope. The count reports all records matching the supplied filter.
 """
 type IdleCheckerConnection {
   """Pagination data for this connection"""
@@ -5462,6 +5462,26 @@ enum IdleCheckerOrderField {
   CHECKER_TYPE
   CREATED_AT
   UPDATED_AT
+}
+
+"""
+Added in 26.8.0. Identifies a scope where an idle checker is managed and applied.
+"""
+input IdleCheckerScope {
+  """Binding scope type."""
+  scopeType: IdleCheckerScopeType!
+
+  """Domain name, project UUID, or resource group name."""
+  scopeId: String!
+}
+
+"""
+Added in 26.8.0. Identifies the kind of scope to which an idle checker is bound.
+"""
+enum IdleCheckerScopeType {
+  DOMAIN
+  PROJECT
+  RESOURCE_GROUP
 }
 
 """
@@ -7718,19 +7738,19 @@ type Mutation {
   adminUpdateAgentResourceGroup(input: UpdateAgentResourceGroupInput!): UpdateAgentResourceGroupPayload
 
   """
-  Added in 26.8.0. Registers a new idle checker using a supported typed specification. Only superadministrators can perform this global operation.
+  Added in 26.8.0. Creates an idle checker and binds it to the requested management and application scope.
   """
-  adminCreateIdleChecker(input: CreateIdleCheckerInput!): CreateIdleCheckerPayload!
+  createIdleChecker(scope: IdleCheckerScope!, input: CreateIdleCheckerInput!): CreateIdleCheckerPayload!
 
   """
-  Added in 26.8.0. Updates selected fields of an existing idle checker. Only superadministrators can modify these global definitions.
+  Added in 26.8.0. Updates selected fields of an idle checker when the caller has management permission on that checker.
   """
-  adminUpdateIdleChecker(id: UUID!, input: UpdateIdleCheckerInput!): UpdateIdleCheckerPayload!
+  updateIdleChecker(id: UUID!, input: UpdateIdleCheckerInput!): UpdateIdleCheckerPayload!
 
   """
-  Added in 26.8.0. Permanently removes an idle checker and returns its identifier. Only superadministrators can perform this irreversible global operation.
+  Added in 26.8.0. Permanently removes an unbound idle checker when the caller has management permission on that checker.
   """
-  adminPurgeIdleChecker(id: UUID!): PurgeIdleCheckerPayload!
+  purgeIdleChecker(id: UUID!): PurgeIdleCheckerPayload!
 
   """
   Added in 26.7.0. Register a new app config allow-list entry (super admin only).
@@ -10057,9 +10077,9 @@ type Query {
   adminAppConfigFragments(filter: AppConfigFragmentFilter = null, orderBy: [AppConfigFragmentOrderBy!] = null, first: Int = null, after: String = null, last: Int = null, before: String = null, limit: Int = null, offset: Int = null): AppConfigFragmentConnection
 
   """
-  Added in 26.8.0. Searches all registered idle checkers with filtering, ordering, and pagination. Only superadministrators can access this global collection.
+  Added in 26.8.0. Searches idle checkers available in the requested scope with filtering, ordering, and pagination.
   """
-  adminIdleCheckers(filter: IdleCheckerFilter = null, orderBy: [IdleCheckerOrderBy!] = null, first: Int = null, after: String = null, last: Int = null, before: String = null, limit: Int = null, offset: Int = null): IdleCheckerConnection!
+  scopedIdleCheckers(scope: IdleCheckerScope!, filter: IdleCheckerFilter = null, orderBy: [IdleCheckerOrderBy!] = null, first: Int = null, after: String = null, last: Int = null, before: String = null, limit: Int = null, offset: Int = null): IdleCheckerConnection!
 
   """
   Added in 25.14.0. Retrieve a specific artifact by its ID. Returns detailed information about the artifact including its metadata, registry information, and availability status.
@@ -14526,7 +14546,7 @@ type UpdateHuggingFaceRegistryPayload {
 }
 
 """
-Added in 26.8.0. Applies a partial update to an existing idle checker. Omitted or null fields remain unchanged, while supplied values are replaced.
+Added in 26.8.0. Applies a partial update to an existing idle checker. Only fields supplied with non-null values are replaced.
 """
 input UpdateIdleCheckerInput {
   """New name."""

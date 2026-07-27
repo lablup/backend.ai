@@ -19,6 +19,9 @@ from ai.backend.common.dto.manager.v2.idle_checker.request import (
     IdleCheckerOrder as IdleCheckerOrderDTO,
 )
 from ai.backend.common.dto.manager.v2.idle_checker.request import (
+    IdleCheckerScope as IdleCheckerScopeDTO,
+)
+from ai.backend.common.dto.manager.v2.idle_checker.request import (
     IdleCheckerSpecInputDTO,
     SessionLifetimeSpecInputDTO,
 )
@@ -42,10 +45,6 @@ from ai.backend.common.dto.manager.v2.idle_checker.response import (
 from ai.backend.common.dto.manager.v2.idle_checker.types import (
     CheckerTypeFilter as CheckerTypeFilterDTO,
 )
-from ai.backend.common.dto.manager.v2.idle_checker.types import (
-    IdleCheckerInputTypeDTO,
-    IdleCheckerTypeDTO,
-)
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import SessionTypes
 from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection, StringFilter
@@ -62,7 +61,8 @@ from ai.backend.manager.api.gql.decorators import (
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
 from ai.backend.manager.errors.api import NotImplementedAPI
 
-CheckerTypeGQL: type[IdleCheckerTypeDTO] = gql_enum(
+
+@gql_enum(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
         description=(
@@ -70,11 +70,15 @@ CheckerTypeGQL: type[IdleCheckerTypeDTO] = gql_enum(
             "The value determines how the checker specification is interpreted."
         ),
     ),
-    IdleCheckerTypeDTO,
     name="IdleCheckerType",
 )
+class CheckerTypeGQL(StrEnum):
+    SESSION_LIFETIME = "session_lifetime"
+    NETWORK_TIMEOUT = "network_timeout"
+    UTILIZATION = "utilization"
 
-CheckerInputTypeGQL: type[IdleCheckerInputTypeDTO] = gql_enum(
+
+@gql_enum(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
         description=(
@@ -82,9 +86,39 @@ CheckerInputTypeGQL: type[IdleCheckerInputTypeDTO] = gql_enum(
             "Only implementations fully supported by this API version are exposed."
         ),
     ),
-    IdleCheckerInputTypeDTO,
     name="IdleCheckerInputType",
 )
+class CheckerInputTypeGQL(StrEnum):
+    SESSION_LIFETIME = "session_lifetime"
+
+
+@gql_enum(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Identifies the kind of scope to which an idle checker is bound.",
+    ),
+    name="IdleCheckerScopeType",
+)
+class IdleCheckerScopeTypeGQL(StrEnum):
+    DOMAIN = "domain"
+    PROJECT = "project"
+    RESOURCE_GROUP = "resource_group"
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Identifies a scope where an idle checker is managed and applied.",
+    ),
+    name="IdleCheckerScope",
+)
+class IdleCheckerScopeGQL(PydanticInputMixin[IdleCheckerScopeDTO]):
+    scope_type: IdleCheckerScopeTypeGQL = gql_field(
+        description="Binding scope type.",
+    )
+    scope_id: str = gql_field(
+        description="Domain name, project UUID, or resource group name.",
+    )
 
 
 @gql_pydantic_type(
@@ -124,8 +158,8 @@ class IdleCheckerSpecGQL(PydanticOutputMixin[IdleCheckerSpecInfo]):
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
         description=(
-            "Represents a registered rule for determining when sessions become idle. "
-            "It includes the target session types, grace period, and typed checker settings."
+            "Represents a reusable idle checker definition independent of its bindings. "
+            "It includes target session types, a grace period, and typed checker settings."
         ),
     ),
     name="IdleChecker",
@@ -164,7 +198,7 @@ IdleCheckerEdgeGQL = Edge[IdleCheckerGQL]
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
         description=(
-            "Provides a paginated collection of idle checker definitions. "
+            "Provides a paginated collection of idle checker definitions available in a scope. "
             "The count reports all records matching the supplied filter."
         ),
     ),
@@ -295,15 +329,15 @@ class IdleCheckerOrderGQL(PydanticInputMixin[IdleCheckerOrderDTO]):
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
         description=(
-            "Defines a new idle checker and the sessions it evaluates. "
-            "The checker type must match the type declared by its specification."
+            "Defines a reusable idle checker specification. "
+            "The create mutation separately receives the scope where it is managed and applied."
         ),
     ),
     name="CreateIdleCheckerInput",
 )
 class CreateIdleCheckerInputGQL(PydanticInputMixin[CreateIdleCheckerInputDTO]):
     name: str = gql_field(description="Idle checker name.")
-    description: str | None = gql_field(description="Optional description.", default=None)
+    description: str = gql_field(description="Idle checker description.")
     checker_type: CheckerInputTypeGQL = gql_field(description="Checker implementation type.")
     target_session_types: list[SessionTypes] = gql_field(description="Target session types.")
     initial_grace_period_seconds: int = gql_field(
@@ -318,7 +352,7 @@ class CreateIdleCheckerInputGQL(PydanticInputMixin[CreateIdleCheckerInputDTO]):
         added_version=NEXT_RELEASE_VERSION,
         description=(
             "Applies a partial update to an existing idle checker. "
-            "Omitted or null fields remain unchanged, while supplied values are replaced."
+            "Only fields supplied with non-null values are replaced."
         ),
     ),
     name="UpdateIdleCheckerInput",
@@ -347,7 +381,7 @@ class UpdateIdleCheckerInputGQL(PydanticInputMixin[UpdateIdleCheckerInputDTO]):
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
         description=(
-            "Returns the idle checker created by the mutation. "
+            "Returns the idle checker created and bound to the requested scope. "
             "The node contains the server-assigned identifier and timestamps."
         ),
     ),
