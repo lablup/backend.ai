@@ -1,4 +1,4 @@
-"""Repository result types for the idle-check reconciler batch."""
+"""Repository result types for idle checkers."""
 
 from __future__ import annotations
 

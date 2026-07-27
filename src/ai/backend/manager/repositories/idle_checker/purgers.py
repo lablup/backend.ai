@@ -7,10 +7,29 @@ from typing import override
 import sqlalchemy as sa
 
 from ai.backend.common.data.idle_checker.types import IdleCheckPhase
-from ai.backend.manager.models.idle_checker.row import SessionIdleCheckRow
+from ai.backend.common.identifier.idle_checker import IdleCheckerID
+from ai.backend.manager.models.idle_checker.row import IdleCheckerRow, SessionIdleCheckRow
 from ai.backend.manager.repositories.base import BatchPurgerSpec
+from ai.backend.manager.repositories.base.purger import PurgerSpec
 from ai.backend.manager.repositories.base.types import ConflictCheck
 from ai.backend.manager.repositories.idle_checker.types import SessionIdleCheckPair
+
+
+@dataclass
+class IdleCheckerPurgerSpec(PurgerSpec[IdleCheckerRow]):
+    checker_id: IdleCheckerID
+
+    @override
+    def row_class(self) -> type[IdleCheckerRow]:
+        return IdleCheckerRow
+
+    @override
+    def pk_value(self) -> IdleCheckerID:
+        return self.checker_id
+
+    @override
+    def conflict_checks(self) -> Sequence[ConflictCheck]:
+        return ()
 
 
 @dataclass
