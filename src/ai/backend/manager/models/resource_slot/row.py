@@ -113,6 +113,12 @@ class AgentResourceRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
     reserved: Mapped[Decimal] = mapped_column(
         "reserved", sa.Numeric(precision=24, scale=6), nullable=False, server_default=sa.text("0")
     )
+    prereserved: Mapped[Decimal] = mapped_column(
+        "prereserved",
+        sa.Numeric(precision=24, scale=6),
+        nullable=False,
+        server_default=sa.text("0"),
+    )
     used: Mapped[Decimal] = mapped_column(
         "used", sa.Numeric(precision=24, scale=6), nullable=False, server_default=sa.text("0")
     )
