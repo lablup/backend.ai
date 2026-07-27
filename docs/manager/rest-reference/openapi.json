@@ -26280,6 +26280,30 @@
             "default": null,
             "description": "Filter by history record ID"
           },
+          "replica_group_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by replica group ID"
+          },
+          "deployment_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by owning deployment ID"
+          },
           "category": {
             "anyOf": [
               {
@@ -26599,7 +26623,7 @@
         "type": "object"
       },
       "ReplicaGroupHistoryScopeDTO": {
-        "description": "Scope for replica-group scheduling history queries.\n\nThe list is OR'd internally. Raises an error if empty. The scoped search is\nstill a single-target scope action, so only one item is dispatchable today;\nthe list shape keeps the wire contract stable for the multi-target case.\n\nA replica group is not an RBAC scope of its own, so the history is scoped by\nthe owning deployment.",
+        "description": "Scope for replica-group scheduling history queries.\n\nEach category list is OR'd internally and across categories. Raises an error\nif every field is empty. The scoped search is still a single-target scope\naction, so only one item is dispatchable today; the list shape keeps the wire\ncontract stable for the multi-target case.\n\nA replica group is not an RBAC scope of its own, so the history is scoped by\nthe owning deployment.",
         "properties": {
           "deployment": {
             "anyOf": [
