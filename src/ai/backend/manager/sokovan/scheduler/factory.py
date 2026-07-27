@@ -224,6 +224,7 @@ def _create_lifecycle_handlers(
         ScheduleType.SCHEDULE: ScheduleSessionsLifecycleHandler(
             args.provisioner,
             args.repository,
+            args.scheduling_controller,
         ),
         ScheduleType.DEPRIORITIZE: DeprioritizeSessionsLifecycleHandler(
             args.repository,

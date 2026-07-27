@@ -285,6 +285,11 @@ class SchedulerRepository:
         return await self._db_source.get_resource_group_preemption_mode(resource_group_id)
 
     @scheduler_repository_resilience.apply()
+    async def reserve_sessions(self, allocations: list[SessionAllocation]) -> list[SessionId]:
+        """Prereserve the sessions backed by a preemption plan."""
+        return await self._db_source.reserve_sessions(allocations)
+
+    @scheduler_repository_resilience.apply()
     async def admit_prereserved_kernels(self, session_ids: Sequence[SessionId]) -> list[KernelId]:
         """Admit prereserved kernels that fit now, first reserved first."""
         return await self._db_source.admit_prereserved_kernels(session_ids)

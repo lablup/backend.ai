@@ -19,7 +19,7 @@ from ai.backend.manager.repositories.scheduler import SchedulerRepository
 from ai.backend.manager.sokovan.recorder import (
     RecorderContext,
 )
-from ai.backend.manager.sokovan.scheduler.results import ScheduleResult
+from ai.backend.manager.sokovan.scheduler.results import PreemptionPlanEntry, ScheduleResult
 from ai.backend.manager.views.sokovan.allocation import (
     KernelAllocation,
     SchedulingFailure,
@@ -27,7 +27,7 @@ from ai.backend.manager.views.sokovan.allocation import (
 )
 from ai.backend.manager.views.sokovan.resource_group import ResourceGroupMeta
 from ai.backend.manager.views.sokovan.scheduling import SchedulingData
-from ai.backend.manager.views.sokovan.snapshot import SystemSnapshot
+from ai.backend.manager.views.sokovan.snapshot import SystemSnapshot, UserVictimCandidates
 from ai.backend.manager.views.sokovan.workload import SessionWorkload
 
 from .selectors.selector import (
@@ -169,6 +169,8 @@ class SessionProvisioner:
                 scheduler, resource_group_id, state.snapshot, base_workloads
             )
         session_allocations: list[SessionAllocation] = []
+        reserved_allocations: list[SessionAllocation] = []
+        claimed_victim_ids: set[SessionId] = set()
         scheduling_failures: list[SchedulingFailure] = []
 
         for session_workload in sequenced_workloads:
@@ -177,8 +179,13 @@ class SessionProvisioner:
                 session_allocation = await self._schedule_workload(
                     state,
                     session_workload,
+                    claimed_victim_ids,
                 )
-                session_allocations.append(session_allocation)
+                if session_allocation.preempting_session_ids:
+                    reserved_allocations.append(session_allocation)
+                    claimed_victim_ids.update(session_allocation.preempting_session_ids)
+                else:
+                    session_allocations.append(session_allocation)
             except Exception as e:
                 log.debug(
                     "Scheduling failed for workload {}: {}",
@@ -194,25 +201,38 @@ class SessionProvisioner:
                 continue
 
         log.info(
-            "Processing {} allocations and {} failures in resource group {}",
+            "Processing {} allocations, {} reservations and {} failures in resource group {}",
             len(session_allocations),
+            len(reserved_allocations),
             len(scheduling_failures),
             resource_group_id,
         )
         with self._phase_metrics.measure_phase("scheduler", resource_group_id, "allocation"):
             scheduled_session_ids = await self._repository.allocate_sessions(session_allocations)
+            reserved_session_ids = await self._repository.reserve_sessions(reserved_allocations)
 
         failure_ids = [f.session_id for f in scheduling_failures]
         await self._valkey_schedule.set_pending_queue(state.resource_group.name, failure_ids)
+        reserved_ids = set(reserved_session_ids)
         return ScheduleResult(
             scheduled_session_ids=scheduled_session_ids,
             scheduling_failures=scheduling_failures,
+            reserved_session_ids=reserved_session_ids,
+            preemption_plan=[
+                PreemptionPlanEntry(
+                    session_id=allocation.session_id,
+                    victim_session_ids=allocation.preempting_session_ids,
+                )
+                for allocation in reserved_allocations
+                if allocation.session_id in reserved_ids
+            ],
         )
 
     async def _schedule_workload(
         self,
         state: SchedulingState,
         session_workload: SessionWorkload,
+        claimed_victim_ids: set[SessionId],
     ) -> SessionAllocation:
         resource_group_id = session_workload.meta.resource_group_id
         strategy = state.snapshot.resource_group.policy.agent_selection_strategy
@@ -237,6 +257,7 @@ class SessionProvisioner:
                     session_allocation = await self._plan_workload(
                         state,
                         session_workload,
+                        claimed_victim_ids,
                     )
 
         # Phase 3: Allocation (prepare)
@@ -277,6 +298,7 @@ class SessionProvisioner:
         self,
         state: SchedulingState,
         session_workload: SessionWorkload,
+        claimed_victim_ids: set[SessionId],
     ) -> SessionAllocation:
         """
         Plan the agent placement of a single session workload.
@@ -289,10 +311,12 @@ class SessionProvisioner:
         # Project the workload's placement into the plan (requirement +
         # kernel pairs) and the agent selection criteria.
         plan = PlacementPlan.from_placement(session_workload.placement)
-        # The preemption path stays disabled (None) until the provisioner
-        # records and executes preemption plans instead of allocating them.
         criteria = AgentSelectionCriteria.from_workload(
-            session_workload, plan, victim_candidates=None
+            session_workload,
+            plan,
+            victim_candidates=self._victim_candidates_for(
+                state, session_workload, claimed_victim_ids
+            ),
         )
 
         # Selection commits state changes into the trackers on full success
@@ -306,6 +330,28 @@ class SessionProvisioner:
 
         # Build session allocation from selections
         return self._build_session_allocation(session_workload, selections, plan)
+
+    def _victim_candidates_for(
+        self,
+        state: SchedulingState,
+        session_workload: SessionWorkload,
+        claimed_victim_ids: set[SessionId],
+    ) -> UserVictimCandidates | None:
+        """The owner's victim candidates still unclaimed by this pass's
+        earlier preemption plans (None when nothing is reclaimable)."""
+        owner_candidates = state.snapshot.resource_group.preemption_candidates.by_user.get(
+            session_workload.meta.owner.user_uuid
+        )
+        if owner_candidates is None:
+            return None
+        remaining = [
+            candidate
+            for candidate in owner_candidates.candidates
+            if candidate.session_id not in claimed_victim_ids
+        ]
+        if not remaining:
+            return None
+        return UserVictimCandidates(candidates=remaining)
 
     @staticmethod
     def _build_session_allocation(
@@ -331,7 +377,13 @@ class SessionProvisioner:
                     )
                 )
 
+        victim_ids: list[SessionId] = []
+        for selection in selections:
+            for victim_id in selection.preempting_session_ids:
+                if victim_id not in victim_ids:
+                    victim_ids.append(victim_id)
         return SessionAllocation(
             session_id=session_workload.meta.session_id,
             kernel_allocations=kernel_allocations,
+            preempting_session_ids=tuple(victim_ids),
         )

@@ -2325,6 +2325,75 @@ class ScheduleDBSource:
 
         return scheduled_session_ids
 
+    async def reserve_sessions(self, allocations: list[SessionAllocation]) -> list[SessionId]:
+        """Prereserve the sessions backed by a preemption plan.
+
+        Mirrors :meth:`allocate_sessions` for reservations: each kernel is
+        assigned its agent, advanced PENDING -> RESERVED, and its slots are
+        prereserved (``prereserved`` hold, ``used`` excluded from the
+        guard). Session status is NOT changed here — the caller marks the
+        returned sessions RESERVED. A failed capacity gate rolls the whole
+        batch back and the sessions stay PENDING for the next tick.
+        """
+        reserved_session_ids: list[SessionId] = []
+        try:
+            async with self._db.begin_session_read_committed() as db_sess:
+                now = await self._get_db_now_in_session(db_sess)
+                for allocation in allocations:
+                    await self._reserve_single_session(db_sess, allocation, now)
+                    reserved_session_ids.append(allocation.session_id)
+        except AgentResourceCapacityExceeded as e:
+            log.warning("Reservation batch rolled back on capacity gate: {}", e)
+            return []
+
+        return reserved_session_ids
+
+    async def _reserve_single_session(
+        self,
+        db_sess: SASession,
+        allocation: SessionAllocation,
+        now: datetime,
+    ) -> None:
+        """Prereserve and assign each kernel of a session to its chosen agent.
+
+        The PENDING -> RESERVED update doubles as the idempotency gate,
+        exactly like :meth:`_allocate_single_session`.
+        """
+        for kernel_alloc in allocation.kernel_allocations:
+            promoted = await db_sess.execute(
+                sa.update(KernelRow)
+                .where(
+                    sa.and_(
+                        KernelRow.id == kernel_alloc.kernel_id,
+                        KernelRow.status == KernelStatus.PENDING,
+                    )
+                )
+                .values(
+                    status=KernelStatus.RESERVED,
+                    status_info="reserved",
+                    status_data={},
+                    status_changed=now,
+                    status_history=sql_json_merge(
+                        KernelRow.__table__.c.status_history,
+                        (),
+                        {KernelStatus.RESERVED.name: now.isoformat()},
+                    ),
+                    agent=kernel_alloc.agent_id,
+                    agent_addr=kernel_alloc.agent_addr,
+                )
+            )
+            if cast(CursorResult[Any], promoted).rowcount == 0:
+                continue
+            await self._prereserve_kernel_resources(
+                db_sess, KernelId(kernel_alloc.kernel_id), kernel_alloc.agent_id
+            )
+
+        await db_sess.execute(
+            sa.update(SessionRow)
+            .where(SessionRow.id == allocation.session_id)
+            .values(agent_ids=allocation.unique_agent_ids())
+        )
+
     async def _allocate_single_session(
         self,
         db_sess: SASession,

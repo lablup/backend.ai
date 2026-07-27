@@ -64,6 +64,7 @@ class TestScheduleSessionsLifecycleHandler:
         return ScheduleSessionsLifecycleHandler(
             provisioner=mock_provisioner,
             repository=mock_repository,
+            scheduling_controller=AsyncMock(),
         )
 
     async def test_all_sessions_scheduled_successfully(
@@ -118,6 +119,8 @@ class TestScheduleSessionsLifecycleHandler:
         mock_provisioner.schedule_resource_group.return_value = ScheduleResult(
             scheduled_session_ids=[first_session.session_info.identity.id],
             scheduling_failures=[],
+            reserved_session_ids=[],
+            preemption_plan=[],
         )
 
         # Act
@@ -152,6 +155,8 @@ class TestScheduleSessionsLifecycleHandler:
         mock_provisioner.schedule_resource_group.return_value = ScheduleResult(
             scheduled_session_ids=[],
             scheduling_failures=[],
+            reserved_session_ids=[],
+            preemption_plan=[],
         )
 
         # Act
@@ -191,6 +196,8 @@ class TestScheduleSessionsLifecycleHandler:
                 )
                 for session in pending_sessions_multiple
             ],
+            reserved_session_ids=[],
+            preemption_plan=[],
         )
 
         # Act
@@ -228,6 +235,8 @@ class TestScheduleSessionsLifecycleHandler:
                     msg="resource quota exceeded",
                 )
             ],
+            reserved_session_ids=[],
+            preemption_plan=[],
         )
 
         # Act

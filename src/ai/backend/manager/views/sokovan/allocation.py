@@ -28,10 +28,16 @@ class KernelAllocation:
 
 @dataclass
 class SessionAllocation:
-    """Allocation decision for a session: its kernel-to-agent bindings."""
+    """Allocation decision for a session: its kernel-to-agent bindings.
+
+    A non-empty ``preempting_session_ids`` marks a reservation: the listed
+    sessions must be preempted before this one can start, so its resources
+    are prereserved instead of allocated.
+    """
 
     session_id: SessionId
     kernel_allocations: list[KernelAllocation]
+    preempting_session_ids: tuple[SessionId, ...]
 
     def unique_agent_ids(self) -> list[AgentId]:
         """Distinct agents this session lands on (``sessions.agent_ids``)."""

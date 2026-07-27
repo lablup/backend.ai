@@ -364,12 +364,15 @@ class AgentSelector:
             self._discard_session_state(trackers)
             raise
 
-        is_proposal = any(selection.preempting_session_ids for selection in computation.selections)
-        if computation.failures or is_proposal:
+        if computation.failures:
             self._discard_session_state(trackers)
         else:
+            # A session with preemption reserves its resources for real, so
+            # its diffs commit like any placement; only the victims' credit
+            # (not actual resources yet) is dropped.
             for tracker in trackers:
                 tracker.commit()
+                tracker.clear_reclaim()
 
         return computation
 

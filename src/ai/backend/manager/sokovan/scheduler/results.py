@@ -19,6 +19,15 @@ __all__ = ["ScheduleResult"]
 
 
 @dataclass
+class PreemptionPlanEntry:
+    """One session's preemption plan: it reserved its resources and the
+    listed victims must be preempted before it can start."""
+
+    session_id: SessionId
+    victim_session_ids: tuple[SessionId, ...]
+
+
+@dataclass
 class ScheduleResult:
     """Result of a scheduling operation."""
 
@@ -27,6 +36,10 @@ class ScheduleResult:
     # Sessions whose scheduling attempt failed this pass (predicate failure,
     # no suitable agent, etc.), as reported by the provisioner.
     scheduling_failures: list[SchedulingFailure]
+    # Sessions that reserved their resources via a preemption plan this pass.
+    reserved_session_ids: list[SessionId]
+    # The preemption plans backing those reservations.
+    preemption_plan: list[PreemptionPlanEntry]
 
     def success_count(self) -> int:
         """Get the count of successfully scheduled sessions."""

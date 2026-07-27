@@ -318,11 +318,13 @@ class TestPreemptionPath:
             assert tracker.reclaimed_slots == {}
             assert tracker.pending_slots == {}
 
-    async def test_preemption_session_state_is_discarded_not_committed(
+    async def test_preemption_session_commits_its_reservation(
         self,
         full_agent: list[AgentInfo],
     ) -> None:
-        """A proposal leaves no committed diffs for later sessions."""
+        """A session with preemption reserves its resources for real: the
+        diffs commit so later sessions see the paper occupancy, while the
+        victims' credit is dropped (their resources are not free yet)."""
         victims = UserVictimCandidates(
             candidates=[_victim(OLD_SESSION, 1, 2020, {"agent-a": {"cpu": "4"}})]
         )
@@ -337,8 +339,8 @@ class TestPreemptionPath:
             PreemptionOrder.OLDEST,
         )
 
-        for tracker in trackers:
-            assert tracker.committed_slots == {}
+        assert trackers[0].committed_slots == _slots({"cpu": "2"})
+        assert trackers[0].reclaimed_slots == {}
 
 
 class TestMultiNodePreemption:
@@ -369,10 +371,10 @@ class TestMultiNodePreemption:
         # The first kernel claims the victim; the second fits on the credit
         assert computation.selections[0].preempting_session_ids == (OLD_SESSION,)
         assert computation.selections[1].preempting_session_ids == ()
-        for tracker in trackers:
-            assert tracker.pending_slots == {}
-            assert tracker.reclaimed_slots == {}
-            assert tracker.committed_slots == {}
+        # Both kernels' reservations commit; the victim credit is dropped
+        assert trackers[0].committed_slots == _slots({"cpu": "4"})
+        assert trackers[0].pending_slots == {}
+        assert trackers[0].reclaimed_slots == {}
 
     async def test_claimed_victim_is_not_counted_twice(self) -> None:
         """A victim already claimed by an earlier kernel cannot admit a
