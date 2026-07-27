@@ -194,7 +194,7 @@ class TestSessionUtilizationQueryBuilder:
         )
 
         assert (
-            "max_over_time((avg by (session_id)(backendai_container_utilization" in preset.render()
+            "avg_over_time((avg by (session_id)(backendai_container_utilization" in preset.render()
         )
         assert ")[300s:])" in preset.render()
 

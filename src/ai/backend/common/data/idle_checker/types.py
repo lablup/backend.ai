@@ -40,7 +40,7 @@ class UtilizationThresholdEntry(BackendAISchema):
         default=None,
         gt=0,
         description=(
-            "Optional recent interval over which the maximum session utilization is evaluated. "
+            "Optional recent interval over which the average session utilization is evaluated. "
             "When omitted, the current value is used."
         ),
     )

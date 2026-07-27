@@ -85,7 +85,7 @@ class TestQuerySessionUtilization:
         result = await service.query_session_utilization(
             SessionUtilizationAction(
                 thresholds=[threshold],
-                session_ids=[first_session_id, second_session_id, first_session_id],
+                session_ids=[first_session_id, second_session_id],
                 evaluation_time=_NOW,
             )
         )

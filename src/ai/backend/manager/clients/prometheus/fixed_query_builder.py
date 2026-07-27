@@ -43,6 +43,7 @@ _ALL_KERNEL_UTILIZATION_TEMPLATE: Final[str] = (
 _AVERAGE_KERNEL_UTILIZATION_TEMPLATE: Final[str] = (
     f"avg by (session_id)({CONTAINER_UTILIZATION_METRIC_NAME}{{{{{{labels}}}}}})"
 )
+_SESSION_UTILIZATION_AVG_TEMPLATE: Final[str] = "avg_over_time(({template})[{{window}}:])"
 
 _INSTANT_GROUP_BY: Final[frozenset[str]] = frozenset({
     "kernel_id",
@@ -155,7 +156,7 @@ class SessionUtilizationQueryBuilder:
         template = self._template(kernel_aggregation)
         window = ""
         if time_window_seconds is not None:
-            template = f"max_over_time(({template})[{{window}}:])"
+            template = _SESSION_UTILIZATION_AVG_TEMPLATE.format(template=template)
             window = f"{time_window_seconds}s"
 
         return MetricPreset(

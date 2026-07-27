@@ -61,13 +61,14 @@ class MetricService:
         resources_by_session: dict[SessionId, set[str]],
     ) -> list[SessionId]:
         resource_name = threshold.metric_name
+        # TODO: Manage resource or resource metric names in the database
         for suffix in _RESOURCE_METRIC_SUFFIXES:
             if resource_name.endswith(suffix):
                 resource_name = resource_name.removesuffix(suffix)
                 break
 
         applicable_session_ids: list[SessionId] = []
-        for session_id in dict.fromkeys(session_ids):
+        for session_id in session_ids:
             allocated_resource_names = resources_by_session.get(session_id)
             if allocated_resource_names is None:
                 continue
@@ -80,12 +81,11 @@ class MetricService:
         self,
         action: SessionUtilizationAction,
     ) -> SessionUtilizationActionResult:
-        session_ids = list(dict.fromkeys(action.session_ids))
-        if not session_ids:
+        if not action.session_ids:
             return SessionUtilizationActionResult(observations_by_session={})
 
         allocations = await self._session_repository.batch_get_resource_allocation_by_session(
-            session_ids
+            action.session_ids
         )
         resources_by_session: dict[SessionId, set[str]] = {}
         for session_id, allocation in allocations.items():
@@ -101,9 +101,10 @@ class MetricService:
         )
         unknown_session_ids: set[SessionId] = set()
         for threshold in action.thresholds:
+            # Filter out sessions that do not have the resource corresponding to the metric.
             applicable_session_ids = self._get_applicable_session_ids(
                 threshold,
-                session_ids,
+                action.session_ids,
                 resources_by_session,
             )
             if not applicable_session_ids:
@@ -123,6 +124,7 @@ class MetricService:
                 if value is None:
                     unknown_session_ids.add(session_id)
                     continue
+                # mem metrics are converted to utilization percentage based on the allocated memory for the session.
                 value = self._to_utilization_percentage(
                     threshold.metric_name,
                     value,
