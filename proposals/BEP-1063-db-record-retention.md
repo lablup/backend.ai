@@ -1,10 +1,10 @@
 ---
 Author: HyeokJin Kim (hyeokjin@lablup.com)
-Status: Draft
+Status: Implemented
 Created: 2026-07-17
 Created-Version: 26.7.0
 Target-Version:
-Implemented-Version:
+Implemented-Version: 26.8.0
 ---
 
 # DB Record Retention Management

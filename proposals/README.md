@@ -74,11 +74,11 @@ BEP numbers start from 1000.
 | [1001](BEP-1001-app-injection.md) | App Injection | Joongi Kim | Draft |
 | [1002](BEP-1002-agent-architecture.md) | Agent Architecture | HyeokJin Kim | Draft |
 | [1003](BEP-1003-define-test-scenario-verifying-agent-functionality.md) | Test Scenario for Agent Functionality | Bokeum Kim | Draft |
-| [1004](BEP-1004-scenario-tester.md) | Scenario Tester | HyeokJin Kim | Draft |
+| [1004](BEP-1004-scenario-tester.md) | Scenario Tester | HyeokJin Kim | Superseded |
 | [1005](BEP-1005-unified-appproxy.md) | Unified AppProxy | Kyujin Cho | Draft |
 | [1006](BEP-1006-service-deployment-strategy.md) | Service Deployment Strategy | Jeongseok Kang | Accepted |
 | [1007](BEP-1007-storage-agent.md) | Storage Agent | Joongi Kim | Draft |
-| [1008](BEP-1008-RBAC.md) | RBAC | HyeokJin Kim | Draft |
+| [1008](BEP-1008-RBAC.md) | RBAC | HyeokJin Kim | Superseded |
 | [1009](BEP-1009-model-serving-registry.md) | Model Serving Registry | HyeokJin Kim | Draft |
 | [1010](BEP-1010-new-gql.md) | New GQL | - | Accepted |
 | 1011 | _(skipped)_ | | |
@@ -95,15 +95,15 @@ BEP numbers start from 1000.
 | [1022](BEP-1022-pydantic-field-annotations.md) | Pydantic Field Metadata Annotation | HyeokJin Kim | Implemented |
 | [1023](BEP-1023-unified-config-consolidation.md) | UnifiedConfig Consolidation & Loader/CLI | HyeokJin Kim | Draft |
 | [1024](BEP-1024-agent-rpc-connection-pooling.md) | Agent RPC Connection Pooling | HyeokJin Kim | Implemented |
-| [1025](BEP-1025-server-side-csv-export.md) | Server-Side CSV Export API | HyeokJin Kim | Draft |
-| [1026](BEP-1026-fair-share-scheduler.md) | Fair Share Scheduler | HyeokJin Kim | Draft |
+| [1025](BEP-1025-server-side-csv-export.md) | Server-Side CSV Export API | HyeokJin Kim | Implemented |
+| [1026](BEP-1026-fair-share-scheduler.md) | Fair Share Scheduler | HyeokJin Kim | Implemented |
 | 1027 | Docker Relay in Compute Sessions | Joongi Kim | Draft |
 | [1028](BEP-1028-kubernetes-bridge.md) | Kubernetes Bridge | Daemyung Kang, Hyunhoi Koo | Draft |
-| [1029](BEP-1029-sokovan-observer-handler.md) | Sokovan ObserverHandler Pattern | HyeokJin Kim | Draft |
-| [1030](BEP-1030-sokovan-scheduler-status-transition.md) | Sokovan Scheduler Status Transition Design | HyeokJin Kim | Draft |
+| [1029](BEP-1029-sokovan-observer-handler.md) | Sokovan ObserverHandler Pattern | HyeokJin Kim | Implemented |
+| [1030](BEP-1030-sokovan-scheduler-status-transition.md) | Sokovan Scheduler Status Transition Design | HyeokJin Kim | Implemented |
 | [1031](BEP-1031-graphql-field-metadata.md) | GraphQL API Field Metadata Extension | HyeokJin Kim | Draft |
-| [1032](BEP-1032-unified-input-validation.md) | Unified Input Validation for REST and GraphQL | HyeokJin Kim | Draft |
-| [1033](BEP-1033-sokovan-handler-test-scenarios.md) | Sokovan Handler Test Scenarios | HyeokJin Kim | Draft |
+| [1032](BEP-1032-unified-input-validation.md) | Unified Input Validation for REST and GraphQL | HyeokJin Kim | Implemented |
+| [1033](BEP-1033-sokovan-handler-test-scenarios.md) | Sokovan Handler Test Scenarios | HyeokJin Kim | Implemented |
 | [1034](BEP-1034-kernel-v2-gql-implementation.md) | KernelV2 GQL Implementation | Gyubong Lee | Draft |
 | [1035](BEP-1035-request-id-tracing.md) | Distributed Request ID Propagation | Gyubong Lee | Draft |
 | [1036](BEP-1036-artifact-storage-quota.md) | Artifact Storage Usage Tracking and Quota Enforcement | Gyubong Lee | Draft |
@@ -111,13 +111,13 @@ BEP numbers start from 1000.
 | [1038](BEP-1038-image-v2-gql-implementation.md) | ImageV2 GQL Implementation | Gyubong Lee | Draft |
 | [1039](BEP-1039-image-id-based-service-logic-migration.md) | Image ID Based Service Logic Migration | Gyubong Lee | Draft |
 | [1040](BEP-1040-multiple-path-zip-download-implementation.md) | Multiple Files Download in ZIP | TaekYoung Kwon | Draft |
-| [1041](BEP-1041-scope-based-graphql-api-naming.md) | Scope-Based GraphQL API Naming Convention | HyeokJin Kim | Draft |
-| [1042](BEP-1042-mypy-strict-mode-migration.md) | MyPy Strict Mode Migration | HyeokJin Kim | Draft |
+| [1041](BEP-1041-scope-based-graphql-api-naming.md) | Scope-Based GraphQL API Naming Convention | HyeokJin Kim | Implemented |
+| [1042](BEP-1042-mypy-strict-mode-migration.md) | MyPy Strict Mode Migration | HyeokJin Kim | Implemented |
 | [1043](BEP-1043-scope-types.md) | Scope Types Description | Sanghun Lee | Draft |
 | [1044](BEP-1044-multi-agent-device-split.md) | Multi-Agent Device Split | Hyunhoi Koo | Draft |
 | [1045](BEP-1045-prometheus-client-extraction-and-querier-interface-abstraction.md) | Prometheus Client Extraction and Querier Interface Abstraction | BoKeum Kim | Draft |
 | [1046](BEP-1046-unified-service-discovery.md) | Unified Service Discovery with DB-backed Service Catalog | HyeokJin Kim | Draft |
-| [1047](BEP-1047-resource-slot-db-normalization.md) | Resource Slot DB Normalization | HyeokJin Kim | Draft |
+| [1047](BEP-1047-resource-slot-db-normalization.md) | Resource Slot DB Normalization | HyeokJin Kim | Implemented |
 | [1048](BEP-1048-RBAC-entity-relationship-model.md) | RBAC Entity Relationship Model | Sanghun Lee | Draft |
 | [1049](BEP-1049-zero-downtime-deployment.md) | Model Service Zero-downtime deployment architecture | Gyubong Lee | Draft |
 | [1050](BEP-1050-prometheus-query-preset-system.md) | Prometheus Query Preset System | BoKeum Kim | Draft |
@@ -125,15 +125,23 @@ BEP numbers start from 1000.
 | [1052](BEP-1052-scoped-app-config-redesign.md) | Scoped App Config Redesign | Gyubong Lee | Draft |
 | [1053](BEP-1053-router-frontend-mode.md) | Router Frontend Mode | Gyubong Lee | Draft |
 | [1054](BEP-1054-reconciler-based-idle-checker.md) | Reconciler Based Idle Checker | BoKeum Kim | Draft |
-| [1055](BEP-1055-preemption-scheduler-mechanics.md) | Preemption Scheduler Mechanics | HyeokJin Kim | Draft |
+| [1055](BEP-1055-preemption-scheduler-mechanics.md) | Preemption Scheduler Mechanics | HyeokJin Kim | Implemented |
 | [1056](BEP-1056-scope-linked-metric-catalog.md) | Scope-Linked Metric Catalog & Dashboards | HyeokJin Kim | Draft |
 | [1057](BEP-1057-agent-re-architecture.md) | Agent Re-architecture | HyeokJin Kim | Draft |
-| [1058](BEP-1058-super-admin-impersonation.md) | Super-Admin User Impersonation | HyeokJin Kim | Draft |
-| [1059](BEP-1059-agent-resource-group-source-of-truth.md) | Agent↔Resource Group Source of Truth | HyeokJin Kim | Draft |
+| [1058](BEP-1058-super-admin-impersonation.md) | Super-Admin User Impersonation | HyeokJin Kim | Implemented |
+| [1059](BEP-1059-agent-resource-group-source-of-truth.md) | Agent↔Resource Group Source of Truth | HyeokJin Kim | Implemented |
 | [1060](BEP-1060-v2-connection-type-nested-filters.md) | Standardizing v2 Connection-Type Nested Filters | HyeokJin Kim | Draft |
 | [1061](BEP-1061-agent-kernel-lifecycle.md) | Agent Kernel Lifecycle Structuring | HyeokJin Kim | Draft |
 | [1062](BEP-1062-virtual-scope-rbac.md) | Virtual Scope RBAC Ownership Model | HyeokJin Kim | Draft |
-| [1063](BEP-1063-db-record-retention.md) | DB Record Retention Management | HyeokJin Kim | Draft |
+| [1063](BEP-1063-db-record-retention.md) | DB Record Retention Management | HyeokJin Kim | Implemented |
+| [1064](BEP-1064-session-group-placement.md) | SessionGroup Placement for Grouped Sessions | HyeokJin Kim | Draft |
+| [1065](BEP-1065-encrypted-secret-key-storage.md) | Encrypted Secret-Key Storage | HyeokJin Kim | Draft |
+| [1066](BEP-1066-structured-logging.md) | Structured Logging Across Components | HyeokJin Kim | Draft |
+| [1067](BEP-1067-e2e-integration-test-framework.md) | Full-Stack E2E Integration Test Framework | HyeokJin Kim | Draft |
+| [1068](BEP-1068-login-session.md) | Login Session Improvements | HyeokJin Kim | Draft |
+| [1069](BEP-1069-entity-lifecycle-deletion.md) | Entity Lifecycle Deletion Management | HyeokJin Kim | Draft |
+| [1070](BEP-1070-cpu-unit.md) | CPU Unit Resource Specification | HyeokJin Kim | Draft |
+| [1071](BEP-1071-keypair-user-resource-policy.md) | Keypair to User Resource Policy Merge | HyeokJin Kim | Draft |
 | _next_ | _(reserve your number here)_ | | |
 
 ## File Structure
