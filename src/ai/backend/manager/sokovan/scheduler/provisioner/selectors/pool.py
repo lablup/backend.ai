@@ -12,7 +12,13 @@ from ai.backend.common.types import AgentSelectionStrategy
 
 from .concentrated import ConcentratedAgentSelector
 from .dispersed import DispersedAgentSelector
+from .filters.exclusion.architecture import ArchitectureTrackerFilter
+from .filters.exclusion.designated_strict import DesignatedStrictTrackerFilter
+from .filters.stateful.container_limit import ContainerLimitTrackerFilter
+from .filters.stateful.resource import ResourceTrackerFilter
 from .legacy import LegacyAgentSelector
+from .orders.designated_preferred import DesignatedPreferredOrder
+from .orders.failed_session import FailedSessionOrder
 from .roundrobin import RoundRobinAgentSelector
 from .selector import AbstractAgentSelector, AgentSelector
 
@@ -33,4 +39,9 @@ def create_agent_selector(agent_selection_resource_priority: list[str]) -> Agent
     strategy_pool[AgentSelectionStrategy.LEGACY] = LegacyAgentSelector(
         agent_selection_resource_priority
     )
-    return AgentSelector(strategy_pool)
+    return AgentSelector(
+        strategy_pool,
+        exclusion_filters=[ArchitectureTrackerFilter(), DesignatedStrictTrackerFilter()],
+        stateful_filters=[ResourceTrackerFilter(), ContainerLimitTrackerFilter()],
+        orders=[DesignatedPreferredOrder(), FailedSessionOrder()],
+    )

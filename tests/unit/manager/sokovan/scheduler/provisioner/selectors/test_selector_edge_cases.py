@@ -21,7 +21,6 @@ from ai.backend.manager.sokovan.scheduler.provisioner.selectors.dispersed import
 )
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.exceptions import (
     BatchAgentSelectionFailedError,
-    NoAvailableAgentError,
     NoCompatibleAgentError,
 )
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.legacy import LegacyAgentSelector
@@ -102,26 +101,25 @@ class TestSelectorEdgeCases:
                 criteria,
                 NO_LIMIT,
             )
-        assert isinstance(exc_info.value.errors[0], NoAvailableAgentError)
+        assert exc_info.value.failures[0].filter_name == "resource"
 
-    async def test_unknown_architecture_fails_with_arch_error(
+    async def test_unknown_architecture_propagates_as_absolute_failure(
         self,
         agents_with_varied_occupancy: list[AgentInfo],
     ) -> None:
-        """An architecture no agent provides raises NoCompatibleAgentError."""
+        """An architecture no agent provides empties the architecture filter;
+        the absolute failure propagates instead of becoming a batch result."""
         criteria = _criteria([_req({"cpu": "1"}, arch="riscv64")])
         selector = create_agent_selector(["cpu", "mem"])
 
-        with pytest.raises(BatchAgentSelectionFailedError) as exc_info:
+        with pytest.raises(NoCompatibleAgentError) as exc_info:
             await selector.select_agents_for_batch_requirements(
                 AgentSelectionStrategy.CONCENTRATED,
                 _trackers(agents_with_varied_occupancy),
                 criteria,
                 NO_LIMIT,
             )
-        error = exc_info.value.errors[0]
-        assert isinstance(error, NoCompatibleAgentError)
-        assert error.build_remediation_hint().available_archs == ["x86_64"]
+        assert exc_info.value.filter_name == "architecture"
 
     def test_extremely_large_resource_values(
         self,

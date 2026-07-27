@@ -10,6 +10,7 @@ from __future__ import annotations
 import logging
 from abc import ABC, abstractmethod
 from collections.abc import Mapping, Sequence
+from contextlib import nullcontext
 from dataclasses import dataclass
 from decimal import Decimal
 
@@ -18,12 +19,13 @@ from ai.backend.common.identifier.resource_slot import ResourceSlotName
 from ai.backend.common.types import (
     AgentId,
     AgentSelectionStrategy,
-    BinarySize,
     ClusterMode,
     SessionId,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.session.options import AgentSelectionPolicy
+from ai.backend.manager.sokovan.recorder.context import RecorderContext
+from ai.backend.manager.sokovan.recorder.recorder import TransitionRecorder
 from ai.backend.manager.views.sokovan.agent import AgentInfo, AgentLimit
 from ai.backend.manager.views.sokovan.workload import (
     ResourceRequest,
@@ -33,16 +35,15 @@ from ai.backend.manager.views.sokovan.workload import (
 
 from .exceptions import (
     BatchAgentSelectionFailedError,
-    ContainerLimitExceededError,
-    InsufficientResourcesError,
     NoAgentsInResourceGroupError,
     NoAvailableAgentError,
     NoCompatibleAgentError,
-    RequirementSelectionError,
-    TrackerCompatibilityError,
 )
+from .filters.exclusion.filter import AbstractExclusionTrackerFilter
+from .filters.stateful.filter import AbstractStatefulTrackerFilter
+from .orders.order import AbstractTrackerOrder
 from .tracker import AgentStateTracker
-from .types import ResourceRequirements
+from .types import PlacementFailure, ResourceRequirements
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -53,6 +54,15 @@ class AgentSelection:
 
     resource_requirements: ResourceRequirements
     selected_agent: AgentInfo
+
+
+@dataclass
+class PlacementComputation:
+    """The whole batch's computed placements: successes and the
+    requirements that cannot be placed. Never expressed as an exception."""
+
+    selections: list[AgentSelection]
+    failures: list[PlacementFailure]
 
 
 @dataclass
@@ -230,21 +240,31 @@ class AbstractAgentSelector(ABC):
 
 class AgentSelector:
     """
-    Agent selection over the strategy pool, with the common logic shared by
-    every strategy: designated agent handling, architecture filtering,
-    resource availability checking, and container limit filtering.
+    Agent selection pipeline: filters -> orders -> strategy pick.
 
-    Holds one selection object per :class:`AgentSelectionStrategy`; callers
-    name the strategy per invocation, so a single instance (built once via
-    ``pool.create_agent_selector``) serves every resource group.
+    Exclusion filters drop agents no state change can save, stateful
+    filters drop agents whose current resources fall short, orders narrow
+    the survivors to the preferred tier, and the pooled strategy picks one.
+    A single instance (built once via ``pool.create_agent_selector``)
+    serves every resource group.
     """
 
     _strategy_pool: Mapping[AgentSelectionStrategy, AbstractAgentSelector]
+    _exclusion_filters: Sequence[AbstractExclusionTrackerFilter]
+    _stateful_filters: Sequence[AbstractStatefulTrackerFilter]
+    _orders: Sequence[AbstractTrackerOrder]
 
     def __init__(
-        self, strategy_pool: Mapping[AgentSelectionStrategy, AbstractAgentSelector]
+        self,
+        strategy_pool: Mapping[AgentSelectionStrategy, AbstractAgentSelector],
+        exclusion_filters: Sequence[AbstractExclusionTrackerFilter],
+        stateful_filters: Sequence[AbstractStatefulTrackerFilter],
+        orders: Sequence[AbstractTrackerOrder],
     ) -> None:
         self._strategy_pool = strategy_pool
+        self._exclusion_filters = exclusion_filters
+        self._stateful_filters = stateful_filters
+        self._orders = orders
 
     def strategy_name(self, strategy: AgentSelectionStrategy) -> str:
         """
@@ -258,6 +278,157 @@ class AgentSelector:
         """
         return self._strategy_pool[strategy].success_message()
 
+    async def compute_placements(
+        self,
+        strategy: AgentSelectionStrategy,
+        trackers: Sequence[AgentStateTracker],
+        criteria: AgentSelectionCriteria,
+        limit: AgentLimit,
+    ) -> PlacementComputation:
+        """Compute placements for every resource requirement in the criteria.
+
+        The computation core: resolvable placement failures are results, not
+        exceptions. Each requirement runs the exclusion chain, the stateful
+        chain, the order tiers, and the pooled strategy pick; when a stateful
+        filter leaves no candidates the requirement is recorded as a
+        :class:`PlacementFailure` (with the per-slot shortfall) and the
+        remaining requirements are still evaluated.
+
+        All-or-nothing batch semantics: with any failure the in-flight
+        allocations are rolled back; on full success they are committed so
+        later sessions of the same scheduling pass observe them.
+
+        Raises:
+            NoAgentsInResourceGroupError: If the resource group has no agents
+                at all (a precondition, not a placement outcome)
+            NoCompatibleAgentError: If an exclusion filter leaves no
+                candidates (absolute failure — no state change can fix it)
+        """
+        if not criteria.requirements:
+            # Empty computation for sessions with no kernels
+            return PlacementComputation(selections=[], failures=[])
+        if not trackers:
+            raise NoAgentsInResourceGroupError(criteria.resource_group_id)
+
+        recorder = self._current_recorder(criteria.session_id)
+        computation = PlacementComputation(selections=[], failures=[])
+
+        try:
+            for requirement_index, resource_req in enumerate(criteria.requirements):
+                try:
+                    selection = self._place_requirement(
+                        strategy, trackers, criteria, resource_req, limit, recorder
+                    )
+                except NoAvailableAgentError as e:
+                    computation.failures.append(
+                        PlacementFailure(
+                            requirement_index=requirement_index,
+                            resource_requirement=resource_req,
+                            filter_name=e.filter_name,
+                            missing_slots=e.missing_slots,
+                            missing_containers=e.missing_containers,
+                        )
+                    )
+                    continue
+                computation.selections.append(selection)
+        except Exception:
+            # Any propagating error (absolute failures included) aborts the
+            # batch; roll back so the shared trackers stay all-or-nothing.
+            for tracker in trackers:
+                tracker.rollback()
+            raise
+
+        if computation.failures:
+            for tracker in trackers:
+                tracker.rollback()
+        else:
+            for tracker in trackers:
+                tracker.commit()
+
+        return computation
+
+    def _place_requirement(
+        self,
+        strategy: AgentSelectionStrategy,
+        trackers: Sequence[AgentStateTracker],
+        criteria: AgentSelectionCriteria,
+        resource_req: ResourceRequirements,
+        limit: AgentLimit,
+        recorder: TransitionRecorder[SessionId] | None,
+    ) -> AgentSelection:
+        """Place one requirement: filter chains, order tiers, strategy pick.
+
+        Raises:
+            NoCompatibleAgentError: When an exclusion filter leaves no
+                candidates (absolute failure)
+            NoAvailableAgentError: When a stateful filter leaves no
+                candidates (resolvable failure)
+        """
+        candidates = self._run_exclusion_filters(trackers, criteria, resource_req, recorder)
+        candidates = self._run_stateful_filters(candidates, criteria, resource_req, limit, recorder)
+
+        for order in self._orders:
+            best = min(order.rank(tracker, criteria) for tracker in candidates)
+            candidates = [
+                tracker for tracker in candidates if order.rank(tracker, criteria) == best
+            ]
+
+        selected_tracker = self._strategy_pool[strategy].select_tracker_by_strategy(
+            candidates, resource_req
+        )
+        # Track the in-flight allocation for the selected agent
+        selected_tracker.apply_diff(resource_req.requested_slots, resource_req.container_count)
+        return AgentSelection(
+            resource_requirements=resource_req,
+            selected_agent=selected_tracker.original_agent,
+        )
+
+    def _run_exclusion_filters(
+        self,
+        candidates: Sequence[AgentStateTracker],
+        criteria: AgentSelectionCriteria,
+        resource_req: ResourceRequirements,
+        recorder: TransitionRecorder[SessionId] | None,
+    ) -> Sequence[AgentStateTracker]:
+        for exclusion in self._exclusion_filters:
+            step = (
+                recorder.step(exclusion.name(), success_detail=exclusion.success_message())
+                if recorder is not None
+                else nullcontext()
+            )
+            with step:
+                candidates = exclusion.filter(candidates, criteria, resource_req)
+                if not candidates:
+                    # Raised inside the step so the record names the filter.
+                    raise NoCompatibleAgentError(exclusion.name())
+        return candidates
+
+    def _run_stateful_filters(
+        self,
+        candidates: Sequence[AgentStateTracker],
+        criteria: AgentSelectionCriteria,
+        resource_req: ResourceRequirements,
+        limit: AgentLimit,
+        recorder: TransitionRecorder[SessionId] | None,
+    ) -> Sequence[AgentStateTracker]:
+        entrants = candidates
+        for stateful in self._stateful_filters:
+            step = (
+                recorder.step(stateful.name(), success_detail=stateful.success_message())
+                if recorder is not None
+                else nullcontext()
+            )
+            with step:
+                candidates = stateful.filter(candidates, criteria, resource_req, limit)
+                if not candidates:
+                    # Raised inside the step so the record names the filter.
+                    raise NoAvailableAgentError(
+                        stateful.name(),
+                        self._missing_slots(entrants, resource_req),
+                        self._missing_containers(entrants, limit),
+                    )
+        return candidates
+
     async def select_agents_for_batch_requirements(
         self,
         strategy: AgentSelectionStrategy,
@@ -265,230 +436,61 @@ class AgentSelector:
         criteria: AgentSelectionCriteria,
         limit: AgentLimit,
     ) -> list[AgentSelection]:
-        """
-        Select agents for every resource requirement in the criteria.
-
-        Every requirement is evaluated (a placement failure does not abort the
-        batch early); if any requirement could not be placed, the whole batch
-        fails and a :class:`BatchAgentSelectionFailedError` carrying every
-        per-requirement failure (with its remediation hint) is raised. On full
-        success the in-flight allocations are committed into the trackers so
-        later sessions of the same scheduling pass observe them.
-
-        Args:
-            strategy: Which pooled selection strategy to apply
-            trackers: Batch-scoped agent state (created once per scheduling pass)
-            criteria: Selection criteria including kernel requirements
-            limit: Per-agent cap enforced during selection
-
-        Returns:
-            The list of AgentSelection objects pairing requirements with agents.
+        """The exception wrapper over :meth:`compute_placements` for the
+        scheduling path: any computed failure fails the whole batch. This is
+        the single place a placement failure becomes an error.
 
         Raises:
             NoAgentsInResourceGroupError: If the resource group has no agents at all
             BatchAgentSelectionFailedError: If any requirement could not be placed
-            ValueError: If architecture mismatch in single-node session
         """
-        if not criteria.requirements:
-            # Empty list for sessions with no kernels
-            return []
-        if not trackers:
-            raise NoAgentsInResourceGroupError(criteria.resource_group_id)
+        computation = await self.compute_placements(strategy, trackers, criteria, limit)
+        if computation.failures:
+            raise BatchAgentSelectionFailedError(computation.failures)
+        return computation.selections
 
-        selections: list[AgentSelection] = []
-        errors: list[RequirementSelectionError] = []
+    def _current_recorder(self, session_id: SessionId) -> TransitionRecorder[SessionId] | None:
+        """The active recorder, or None outside a recording scope (the
+        compute-schedule fitting check records nothing)."""
+        try:
+            pool = RecorderContext[SessionId].current_pool()
+        except LookupError:
+            return None
+        return pool.recorder(session_id)
 
-        for requirement_index, resource_req in enumerate(criteria.requirements):
-            # Capture a placement failure and continue evaluating the remaining
-            # requirements so every failure's remediation hint is collected.
-            try:
-                selected_tracker = await self._select_agent_tracker_for_requirements(
-                    strategy,
-                    trackers,
-                    resource_req,
-                    requirement_index,
-                    criteria,
-                    limit,
-                )
-            except (NoAvailableAgentError, NoCompatibleAgentError) as e:
-                errors.append(e)
-                continue
-
-            # Track the in-flight allocation for the selected agent
-            selected_tracker.apply_diff(resource_req.requested_slots, resource_req.container_count)
-
-            # Store the selection with the original agent
-            selections.append(
-                AgentSelection(
-                    resource_requirements=resource_req,
-                    selected_agent=selected_tracker.original_agent,
-                )
-            )
-
-        if errors:
-            # All-or-nothing per session: surface every requirement's failure.
-            for tracker in trackers:
-                tracker.rollback()
-            raise BatchAgentSelectionFailedError(errors)
-
-        # Full success: fold the session's allocations into the batch state
-        for tracker in trackers:
-            tracker.commit()
-
-        return selections
-
-    async def _select_agent_tracker_for_requirements(
+    def _missing_slots(
         self,
-        strategy: AgentSelectionStrategy,
-        state_trackers: Sequence[AgentStateTracker],
+        candidates: Sequence[AgentStateTracker],
         resource_req: ResourceRequirements,
-        requirement_index: int,
-        criteria: AgentSelectionCriteria,
+    ) -> Mapping[ResourceSlotName, Decimal]:
+        """Per-slot shortfall against the best-fitting candidate (the one
+        with the smallest total shortage). Empty when no slot is short
+        (e.g. the pool was emptied by the container limit)."""
+        best: dict[ResourceSlotName, Decimal] = {}
+        best_total: Decimal | None = None
+        for tracker in candidates:
+            remaining = tracker.remaining_slots()
+            shortfall = {
+                slot_name: shortage
+                for slot_name, requested in resource_req.requested_slots.slots.items()
+                if (shortage := requested - remaining.get(slot_name, Decimal(0))) > Decimal(0)
+            }
+            total = sum(shortfall.values(), Decimal(0))
+            if best_total is None or total < best_total:
+                best = shortfall
+                best_total = total
+        return best
+
+    def _missing_containers(
+        self,
+        candidates: Sequence[AgentStateTracker],
         limit: AgentLimit,
-    ) -> AgentStateTracker:
-        # First pass: filter by architecture (binary compatibility check)
-        arch_compatible_trackers: list[AgentStateTracker] = []
-        for tracker in state_trackers:
-            agent = tracker.original_agent
-            if agent.architecture == resource_req.required_architecture:
-                arch_compatible_trackers.append(tracker)
-
-        if not arch_compatible_trackers:
-            # No agents with matching architecture
-            available_archs = {t.original_agent.architecture for t in state_trackers}
-            raise NoCompatibleAgentError(
-                resource_requirement=resource_req,
-                requirement_index=requirement_index,
-                available_architectures=sorted(available_archs),
-            )
-
-        # Second pass: filter by resource availability (quantitative check)
-        compatible_trackers: list[AgentStateTracker] = []
-        agent_errors: dict[AgentId, TrackerCompatibilityError] = {}
-        for tracker in arch_compatible_trackers:
-            try:
-                self._check_tracker_compatibility(
-                    tracker,
-                    resource_req,
-                    limit,
-                )
-                compatible_trackers.append(tracker)
-            except TrackerCompatibilityError as e:
-                agent_errors[tracker.original_agent.agent_id] = e
-
-        if not compatible_trackers:
-            raise NoAvailableAgentError(
-                resource_requirement=resource_req,
-                requirement_index=requirement_index,
-                agent_errors=agent_errors,
-            )
-
-        # Handle designated agents first (user's explicit choice takes precedence)
-        if criteria.designated_agent_ids:
-            for tracker in compatible_trackers:
-                if tracker.original_agent.agent_id in criteria.designated_agent_ids:
-                    return tracker
-
-            if criteria.agent_selection_policy == AgentSelectionPolicy.STRICT:
-                raise NoAvailableAgentError(
-                    resource_requirement=resource_req,
-                    requirement_index=requirement_index,
-                    agent_errors=agent_errors,
-                    available_agent_ids=[
-                        tracker.original_agent.agent_id for tracker in compatible_trackers
-                    ],
-                    designated_agent_ids=criteria.designated_agent_ids,
-                )
-            # PREFERRED: designated agents have no capacity - fall back to
-            # the normal candidate path below
-
-        # Third pass: deprioritize agents where this session previously failed
-        session_id = criteria.session_id
-        candidate_trackers = compatible_trackers
-        non_failed = [
-            tracker
-            for tracker in compatible_trackers
-            if session_id not in tracker.failed_session_ids
-        ]
-        if len(non_failed) < len(compatible_trackers):
-            if non_failed:
-                excluded = [
-                    tracker.original_agent.agent_id
-                    for tracker in compatible_trackers
-                    if session_id in tracker.failed_session_ids
-                ]
-                log.debug(
-                    "failed-agent filter(session:{}): excluding {} → candidates: {}",
-                    session_id,
-                    excluded,
-                    [tracker.original_agent.agent_id for tracker in non_failed],
-                )
-                candidate_trackers = non_failed
-            else:
-                # If ALL compatible agents have failed, keep all of them to avoid blocking
-                log.debug(
-                    "failed-agent filter(session:{}): all {} compatible agents have failed, "
-                    "skipping filter to avoid blocking",
-                    session_id,
-                    len(compatible_trackers),
-                )
-
-        # Use strategy to select from candidates
-        return self._strategy_pool[strategy].select_tracker_by_strategy(
-            candidate_trackers, resource_req
+    ) -> int:
+        """How many containers the best candidate must free to admit one
+        more (0 when some candidate is below the limit, or no limit)."""
+        if limit.max_container_count is None:
+            return 0
+        return min(
+            max(0, tracker.current_container_count() - limit.max_container_count + 1)
+            for tracker in candidates
         )
-
-    def _check_tracker_compatibility(
-        self,
-        tracker: AgentStateTracker,
-        resource_req: ResourceRequirements,
-        limit: AgentLimit,
-    ) -> None:
-        """Check if an agent tracker is compatible with the resource requirements.
-
-        Note: Architecture compatibility is checked separately before this method.
-
-        Raises:
-            InsufficientResourcesError: If agent doesn't have enough resources
-            ContainerLimitExceededError: If agent has reached container limit
-        """
-        agent = tracker.original_agent
-
-        # Get current state with tracked changes
-        remaining_slots = tracker.remaining_slots()
-        container_count = tracker.current_container_count()
-
-        # Check resource availability on the requested slots (missing = 0)
-        insufficient_details: dict[ResourceSlotName, tuple[str, str]] = {}
-        for slot_name, requested in resource_req.requested_slots.slots.items():
-            available = remaining_slots.get(slot_name, Decimal(0))
-            if requested > available:
-                # Format mem as human readable (e.g., "2 GiB" instead of raw bytes)
-                if slot_name == "mem":
-                    insufficient_details[slot_name] = (
-                        str(BinarySize(requested)),
-                        str(BinarySize(available)),
-                    )
-                else:
-                    # Store raw values for other resources
-                    insufficient_details[slot_name] = (
-                        str(requested),
-                        str(available),
-                    )
-
-        if insufficient_details:
-            raise InsufficientResourcesError(
-                agent_id=agent.agent_id,
-                requested_slots=resource_req.requested_slots.slots,
-                available_slots=remaining_slots,
-                insufficient_resources=insufficient_details,
-            )
-
-        # Check container limit if specified
-        if limit.max_container_count is not None:
-            if container_count >= limit.max_container_count:
-                raise ContainerLimitExceededError(
-                    agent_id=agent.agent_id,
-                    current_count=container_count,
-                    max_count=limit.max_container_count,
-                )

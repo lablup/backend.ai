@@ -127,7 +127,8 @@ class TestAgentSelectionWithResources:
         self,
         agents_for_designated_agent_test: list[AgentInfo],
     ) -> None:
-        """STRICT designation fails when the designated agent lacks resources."""
+        """STRICT designation narrows the pool first, so the failure reports
+        the designated agent's own resource shortfall."""
         criteria = _criteria(
             [_req({"cpu": "4", "mem": "8192"})],
             policy=AgentSelectionPolicy.STRICT,
@@ -142,14 +143,13 @@ class TestAgentSelectionWithResources:
                 NO_LIMIT,
             )
 
-        assert len(exc_info.value.errors) == 1
-        message = exc_info.value.errors[0].extra_msg or ""
-        assert "no designated agent is compatible" in message
-        assert "designated agent 'designated'" in message
-        assert "insufficient resources" in message
-        # Aggregated detail lines must be split with newlines, not "; ".
-        assert "; " not in message
-        assert "\n" in message
+        assert len(exc_info.value.failures) == 1
+        failure = exc_info.value.failures[0]
+        # The designated agent survived the exclusion stage but ran out of
+        # resources; the shortfall is measured against it, not "other".
+        assert failure.filter_name == "resource"
+        assert failure.missing_slots
+        assert all(amount > 0 for amount in failure.missing_slots.values())
 
     async def test_designated_agent_preferred_falls_back(
         self,
