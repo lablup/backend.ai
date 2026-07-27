@@ -38,8 +38,6 @@ class SessionLifetimeChecker(IdleChecker):
                     assignment.definition.spec.type,
                 )
                 continue
-            if lifetime_spec.max_lifetime_seconds == 0:
-                continue
             max_lifetime_seconds = Decimal(lifetime_spec.max_lifetime_seconds)
             for session in assignment.sessions:
                 if session.starts_at is None:

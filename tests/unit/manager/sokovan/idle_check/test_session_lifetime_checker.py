@@ -49,10 +49,9 @@ class AssignmentFactory(Protocol):
 
 
 class TestSessionLifetimeSpec:
-    def test_accepts_zero_as_disabled_lifetime(self) -> None:
-        spec = SessionLifetimeSpec(max_lifetime_seconds=0)
-
-        assert spec.max_lifetime_seconds == 0
+    def test_rejects_zero_lifetime(self) -> None:
+        with pytest.raises(ValidationError):
+            SessionLifetimeSpec(max_lifetime_seconds=0)
 
     def test_rejects_negative_lifetime(self) -> None:
         with pytest.raises(ValidationError):
@@ -173,24 +172,6 @@ class TestSessionLifetimeChecker:
         assert judgments[0].message == (
             "Session lifetime check: max_lifetime_seconds=30, running_seconds=31.2"
         )
-
-    async def test_disabled_lifetime_skips_assignment(
-        self,
-        checker: SessionLifetimeChecker,
-        session_factory: SessionFactory,
-        assignment_factory: AssignmentFactory,
-    ) -> None:
-        assignment = assignment_factory(
-            max_lifetime_seconds=0,
-            sessions=(session_factory(),),
-        )
-
-        judgments = await checker.judge(
-            (assignment,),
-            context=IdleCheckerContext(current_time=_BASE_TIME + timedelta(days=1)),
-        )
-
-        assert judgments == []
 
     async def test_excludes_session_when_starts_at_is_missing(
         self,

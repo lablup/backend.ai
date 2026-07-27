@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from collections.abc import Collection, Sequence
-from datetime import datetime
 
 from ai.backend.common.data.idle_checker.types import IdleCheckPhase
 from ai.backend.manager.data.session.types import SessionStatus
@@ -53,12 +52,10 @@ class IdleCheckerRepository:
         self,
         pairs_to_create: Sequence[SessionIdleCheckPair],
         pairs_to_delete: Sequence[SessionIdleCheckPair],
-        now: datetime,
     ) -> None:
         await self._db_source.sync_session_idle_check_assignments(
             pairs_to_create,
             pairs_to_delete,
-            now,
         )
 
     async def batch_update_session_idle_check_phase(

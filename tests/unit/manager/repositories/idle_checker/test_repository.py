@@ -258,7 +258,11 @@ class TestFetchJudgmentBatch:
                     SessionIdleCheckRow(
                         session_id=session_id,
                         idle_checker_id=checker_id,
-                        expire_at=datetime(2026, 2, 1, tzinfo=UTC),
+                        expire_at=(
+                            None
+                            if phase in (IdleCheckPhase.NOT_CHECKED, IdleCheckPhase.READY_TO_CHECK)
+                            else datetime(2026, 2, 1, tzinfo=UTC)
+                        ),
                         last_status=phase,
                         last_message=f"{phase.value} judgment",
                     )
@@ -291,9 +295,16 @@ class TestFetchJudgmentBatch:
             (judgment_rows.active_session_id, judgment_rows.checker_id),
             (judgment_rows.idle_session_id, judgment_rows.checker_id),
         }
-        assert all(
-            assignment.session.expire_at == datetime(2026, 2, 1, tzinfo=UTC)
+        expire_at_by_session = {
+            assignment.session.session_id: assignment.session.expire_at
             for assignment in batch.assignments
+        }
+        assert expire_at_by_session[judgment_rows.ready_to_check_session_id] is None
+        assert expire_at_by_session[judgment_rows.active_session_id] == datetime(
+            2026, 2, 1, tzinfo=UTC
+        )
+        assert expire_at_by_session[judgment_rows.idle_session_id] == datetime(
+            2026, 2, 1, tzinfo=UTC
         )
 
     async def test_excludes_non_judgment_phases(
@@ -331,6 +342,7 @@ class TestFetchJudgmentBatch:
             )
         assert row is not None
         assert row.last_status is IdleCheckPhase.READY_TO_CHECK
+        assert row.expire_at is None
 
     async def test_does_not_overwrite_row_that_is_no_longer_not_checked(
         self,
@@ -614,13 +626,12 @@ class TestFetchJudgmentBatch:
         repository: IdleCheckerRepository,
         judgment_rows: JudgmentRows,
     ) -> None:
-        assignments = await repository.fetch_session_idle_check_assignments([SessionStatus.RUNNING])
         pair = SessionIdleCheckPair(
             judgment_rows.session_without_row_id,
             judgment_rows.checker_id,
         )
 
-        await repository.sync_session_idle_check_assignments([pair], [], assignments.now)
+        await repository.sync_session_idle_check_assignments([pair], [])
 
         async with database.begin_readonly_session() as db_sess:
             row = await db_sess.get(
@@ -628,7 +639,7 @@ class TestFetchJudgmentBatch:
                 (pair.session_id, pair.checker_id),
             )
         assert row is not None
-        assert row.expire_at == assignments.now
+        assert row.expire_at is None
         assert row.last_status is IdleCheckPhase.NOT_CHECKED
         assert row.last_message == "Not checked yet."
 
@@ -647,9 +658,7 @@ class TestFetchJudgmentBatch:
             assignment_snapshot.desired_pairs
         )
 
-        await repository.sync_session_idle_check_assignments(
-            [], list(obsolete_pairs), assignment_snapshot.now
-        )
+        await repository.sync_session_idle_check_assignments([], list(obsolete_pairs))
 
         async with database.begin_readonly_session() as db_sess:
             non_expired_rows = (
@@ -680,9 +689,7 @@ class TestFetchJudgmentBatch:
             assignment_snapshot.desired_pairs
         )
 
-        await repository.sync_session_idle_check_assignments(
-            [], list(obsolete_pairs), assignment_snapshot.now
-        )
+        await repository.sync_session_idle_check_assignments([], list(obsolete_pairs))
 
         async with database.begin_readonly_session() as db_sess:
             expired_row = await db_sess.get(
@@ -709,9 +716,7 @@ class TestFetchJudgmentBatch:
         obsolete_pairs = set(assignment_snapshot.current_pairs) - set(
             assignment_snapshot.desired_pairs
         )
-        await repository.sync_session_idle_check_assignments(
-            [], list(obsolete_pairs), assignment_snapshot.now
-        )
+        await repository.sync_session_idle_check_assignments([], list(obsolete_pairs))
 
         async with database.begin_session() as db_sess:
             await db_sess.execute(sa.update(IdleCheckerBindingRow).values(enabled=True))
@@ -722,9 +727,7 @@ class TestFetchJudgmentBatch:
             assignment_snapshot.current_pairs
         )
 
-        await repository.sync_session_idle_check_assignments(
-            list(missing_pairs), [], assignment_snapshot.now
-        )
+        await repository.sync_session_idle_check_assignments(list(missing_pairs), [])
 
         async with database.begin_readonly_session() as db_sess:
             recreated_row = await db_sess.get(
@@ -736,7 +739,7 @@ class TestFetchJudgmentBatch:
             )
         assert recreated_row is not None
         assert recreated_row.last_status is IdleCheckPhase.NOT_CHECKED
-        assert recreated_row.expire_at == assignment_snapshot.now
+        assert recreated_row.expire_at is None
 
     async def test_delete_rechecks_expired_status_after_assignment_fetch(
         self,
@@ -760,7 +763,7 @@ class TestFetchJudgmentBatch:
                 .values(last_status=IdleCheckPhase.IDLE_EXPIRED)
             )
 
-        await repository.sync_session_idle_check_assignments([], [pair], assignments.now)
+        await repository.sync_session_idle_check_assignments([], [pair])
 
         async with database.begin_readonly_session() as db_sess:
             row = await db_sess.get(
@@ -789,7 +792,7 @@ class TestFetchJudgmentBatch:
         ]
         pairs_to_delete.append(pair_to_delete)
 
-        await repository.sync_session_idle_check_assignments([], pairs_to_delete, datetime.now(UTC))
+        await repository.sync_session_idle_check_assignments([], pairs_to_delete)
 
         async with database.begin_readonly_session() as db_sess:
             row = await db_sess.get(
