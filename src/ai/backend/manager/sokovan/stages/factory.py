@@ -6,8 +6,8 @@ from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiv
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.repositories.idle_checker.repository import IdleCheckerRepository
-from ai.backend.manager.repositories.metric.repository import MetricRepository
 from ai.backend.manager.repositories.replica_group.repository import ReplicaGroupRepository
+from ai.backend.manager.services.metric.service import MetricService
 from ai.backend.manager.sokovan.reconciler.base import ReconcilerStageRunner, ReconcilerTaskSpec
 from ai.backend.manager.sokovan.reconciler.coordinator import ReconcilerCoordinator
 from ai.backend.manager.sokovan.reconciler.flag import ValkeyReconcilerFlag
@@ -33,7 +33,7 @@ def build_reconciler_coordinator(
     *,
     replica_group_repository: ReplicaGroupRepository,
     idle_checker_repository: IdleCheckerRepository,
-    metric_repository: MetricRepository,
+    metric_service: MetricService,
     scheduling_controller: SchedulingController,
     valkey_live: ValkeyLiveClient,
     valkey_schedule: ValkeyScheduleClient,
@@ -50,7 +50,7 @@ def build_reconciler_coordinator(
         build_idle_check_judgment_stage(
             idle_checker_repository,
             valkey_live,
-            metric_repository,
+            metric_service,
         ),
         build_idle_check_sweep_stage(idle_checker_repository, scheduling_controller),
     ]

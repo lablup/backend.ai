@@ -13,7 +13,6 @@ from ai.backend.common.events.event_types.schedule.anycast import (
 from ai.backend.manager.data.session.types import SchedulingResult, SessionStatus
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.repositories.idle_checker.repository import IdleCheckerRepository
-from ai.backend.manager.repositories.metric.repository import MetricRepository
 from ai.backend.manager.services.metric.service import MetricService
 from ai.backend.manager.sokovan.idle_check.applier import IdleCheckApplier
 from ai.backend.manager.sokovan.idle_check.checkers.base import IdleChecker
@@ -40,7 +39,7 @@ from ai.backend.manager.sokovan.reconciler.base import (
 def build_idle_check_judgment_stage(
     idle_checker_repository: IdleCheckerRepository,
     valkey_live: ValkeyLiveClient,
-    metric_repository: MetricRepository,
+    metric_service: MetricService,
 ) -> ReconcilerStageRegistration:
     reconcile_type = "idle_check_judgment"
     # Termination runs through the scheduler lifecycle (mark_sessions_for_termination in
@@ -62,7 +61,7 @@ def build_idle_check_judgment_stage(
     checkers: Mapping[CheckerType, IdleChecker] = {
         CheckerType.SESSION_LIFETIME: SessionLifetimeChecker(),
         CheckerType.NETWORK_TIMEOUT: NetworkTimeoutChecker(valkey_live),
-        CheckerType.UTILIZATION: UtilizationChecker(MetricService(metric_repository)),
+        CheckerType.UTILIZATION: UtilizationChecker(metric_service),
     }
     stage = ReconcilerStage(
         handler=IdleCheckReconcileHandler(checkers),

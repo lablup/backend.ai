@@ -5,15 +5,12 @@ from collections.abc import Sequence
 from datetime import timedelta
 from typing import override
 
-from ai.backend.common.data.idle_checker.types import (
-    IdleCheckPhase,
-    UtilizationThresholdOperator,
-)
+from ai.backend.common.data.idle_checker.types import IdleCheckPhase, UtilizationSpec
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.metric.types import SessionUtilizationMetricThreshold
 from ai.backend.manager.repositories.idle_checker.types import IdleJudgmentData
 from ai.backend.manager.services.metric.actions.session_utilization import (
     SessionUtilizationAction,
+    SessionUtilizationQuery,
 )
 from ai.backend.manager.services.metric.service import MetricService
 from ai.backend.manager.sokovan.idle_check.checkers.base import (
@@ -41,7 +38,8 @@ class UtilizationChecker(IdleChecker):
         context: IdleCheckerContext,
     ) -> Sequence[IdleJudgmentData]:
         # Unknown sessions are ignored because their utilization status cannot be determined.
-        judgments: list[IdleJudgmentData] = []
+        valid_assignments: list[tuple[CheckerAssignment, UtilizationSpec]] = []
+        queries: list[SessionUtilizationQuery] = []
         for assignment in assignments:
             spec = assignment.definition.spec.utilization
             if spec is None:
@@ -51,31 +49,31 @@ class UtilizationChecker(IdleChecker):
                     assignment.definition.spec.type,
                 )
                 continue
-            result = await self._metric_service.query_session_utilization(
-                SessionUtilizationAction(
-                    thresholds=[
-                        SessionUtilizationMetricThreshold(
-                            metric_name=entry.metric_name,
-                            time_window_seconds=entry.time_window_seconds,
-                            threshold=entry.threshold,
-                            kernel_aggregation=entry.kernel_aggregation,
-                        )
-                        for entry in spec.thresholds
-                    ],
+            valid_assignments.append((assignment, spec))
+            queries.append(
+                SessionUtilizationQuery(
+                    preset_id=spec.threshold.preset_id,
                     session_ids=[session.session_id for session in assignment.sessions],
-                    evaluation_time=context.current_time,
                 )
             )
+        if not queries:
+            return []
+
+        result = await self._metric_service.query_session_utilization(
+            SessionUtilizationAction(
+                queries=queries,
+                evaluation_time=context.current_time,
+            )
+        )
+        judgments: list[IdleJudgmentData] = []
+        for assignment, spec in valid_assignments:
+            threshold = spec.threshold
+            observations = result.observations_by_preset.get(threshold.preset_id, {})
             for session in assignment.sessions:
-                observations = result.observations_by_session.get(session.session_id)
-                if not observations:
+                observation = observations.get(session.session_id)
+                if observation is None:
                     continue
-                underutilized = [observation.is_underutilized for observation in observations]
-                is_idle = (
-                    all(underutilized)
-                    if spec.thresholds_check_operator is UtilizationThresholdOperator.AND
-                    else any(underutilized)
-                )
+                is_idle = observation.value < threshold.threshold
                 if is_idle:
                     expire_at = session.expire_at
                     status = (
@@ -88,7 +86,6 @@ class UtilizationChecker(IdleChecker):
                         seconds=spec.max_underutilized_duration_seconds
                     )
                     status = IdleCheckPhase.ACTIVE
-                details = ", ".join(observation.render() for observation in observations)
                 judgments.append(
                     IdleJudgmentData(
                         checker_id=assignment.definition.checker_id,
@@ -99,9 +96,8 @@ class UtilizationChecker(IdleChecker):
                             "Utilization check: "
                             f"max_underutilized_duration_seconds="
                             f"{spec.max_underutilized_duration_seconds}, "
-                            f"thresholds_check_operator="
-                            f"{spec.thresholds_check_operator.value}, "
-                            f"metrics=[{details}]"
+                            f"metric=[preset_id={observation.preset_id}, "
+                            f"value={observation.value:f}/{threshold.threshold:f}]"
                         ),
                     )
                 )
