@@ -9,13 +9,12 @@ from typing import cast
 
 import sqlalchemy as sa
 
-from ai.backend.common.data.entity.types import ScopeRef
 from ai.backend.common.data.idle_checker.types import (
     CheckerType,
     IdleCheckerSpec,
     IdleCheckPhase,
 )
-from ai.backend.common.data.permission.types import EntityType, ScopeType
+from ai.backend.common.data.permission.types import ScopeType
 from ai.backend.common.identifier.idle_checker import IdleCheckerID
 from ai.backend.common.types import SessionId, SessionTypes
 from ai.backend.manager.data.common.types import SearchResult
@@ -31,12 +30,8 @@ from ai.backend.manager.models.idle_checker.row import (
     IdleCheckerRow,
     SessionIdleCheckRow,
 )
-from ai.backend.manager.models.rbac_models.association_scopes_entities import (
-    AssociationScopesEntitiesRow,
-)
 from ai.backend.manager.models.session.conditions import SessionConditions
 from ai.backend.manager.models.session.row import SessionRow
-from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
 from ai.backend.manager.repositories.base import (
     BatchPurger,
     BatchQuerier,
@@ -60,8 +55,6 @@ from ai.backend.manager.repositories.idle_checker.types import (
     IdleCheckAssignmentData,
     IdleCheckBatchData,
     IdleCheckerDefinitionData,
-    IdleCheckerScopeMember,
-    IdleCheckerSearchScope,
     IdleJudgmentData,
     InitialGracePeriodBatchData,
     InitialGracePeriodCheckData,
@@ -73,35 +66,21 @@ from ai.backend.manager.repositories.idle_checker.updaters import (
     SessionIdleCheckJudgmentBatchUpdaterSpec,
     SessionIdleCheckPhaseBatchUpdaterSpec,
 )
-from ai.backend.manager.repositories.ops.rbac.provider import (
-    EntityMembersAddition,
-    RBACOpsProvider,
-)
+from ai.backend.manager.repositories.ops import DBOpsProvider
 
 _ASSIGNMENT_DELETE_BATCH_SIZE = 1000
 _IDLE_CHECK_UPDATE_BATCH_SIZE = 1000
 
 
 class IdleCheckerDBSource:
-    _ops: RBACOpsProvider
+    _ops: DBOpsProvider
 
-    def __init__(self, ops_provider: RBACOpsProvider) -> None:
+    def __init__(self, ops_provider: DBOpsProvider) -> None:
         self._ops = ops_provider
 
-    async def create(
-        self,
-        creator: Creator[IdleCheckerRow],
-        owner_scope: ScopeRef,
-    ) -> IdleCheckerData:
+    async def create(self, creator: Creator[IdleCheckerRow]) -> IdleCheckerData:
         async with self._ops.write_ops() as w:
-            await w.ensure_scope(owner_scope)
             checker = (await w.create(creator)).row
-            await w.add_entity_members(
-                EntityMembersAddition(
-                    scope=owner_scope,
-                    members=[IdleCheckerScopeMember(checker.id)],
-                )
-            )
             return checker.to_data()
 
     async def update(
@@ -123,38 +102,16 @@ class IdleCheckerDBSource:
                 raise IdleCheckerNotFound(str(querier.pk_value))
             return result.row.to_data()
 
-    async def purge(
-        self,
-        purger: Purger[IdleCheckerRow],
-        scope_association_purger: BatchPurger[AssociationScopesEntitiesRow],
-        entity_membership_purger: BatchPurger[EntityMembershipRow],
-    ) -> IdleCheckerData:
+    async def purge(self, purger: Purger[IdleCheckerRow]) -> IdleCheckerData:
         async with self._ops.write_ops() as w:
             result = await w.purge(purger)
             if result is None:
                 raise IdleCheckerNotFound(str(purger.spec.pk_value()))
-            await w.batch_purge(scope_association_purger)
-            await w.batch_purge(entity_membership_purger)
             return result.row.to_data()
 
-    async def search(
-        self,
-        querier: BatchQuerier,
-        scopes: Sequence[IdleCheckerSearchScope],
-    ) -> SearchResult[IdleCheckerData]:
-        selector = (
-            sa.select(IdleCheckerRow, AssociationScopesEntitiesRow)
-            .select_from(IdleCheckerRow)
-            .join(
-                AssociationScopesEntitiesRow,
-                sa.and_(
-                    AssociationScopesEntitiesRow.entity_type == EntityType.IDLE_CHECKER,
-                    AssociationScopesEntitiesRow.entity_id == sa.cast(IdleCheckerRow.id, sa.String),
-                ),
-            )
-        )
+    async def search(self, querier: BatchQuerier) -> SearchResult[IdleCheckerData]:
         async with self._ops.read_ops() as r:
-            result = await r.batch_query_with_scopes(selector, querier, scopes)
+            result = await r.batch_query_in_global(sa.select(IdleCheckerRow), querier)
         return SearchResult(
             items=[row.IdleCheckerRow.to_data() for row in result.rows],
             total_count=result.total_count,

@@ -105,7 +105,6 @@ class EntityType(enum.StrEnum):
     APP_CONFIG_DEFINITION = "app_config_definition"
     APP_CONFIG_ALLOW_LIST = "app_config_allow_list"
     APP_CONFIG_FRAGMENT = "app_config_fragment"
-    IDLE_CHECKER = "idle_checker"
     AUTH = "auth"
     PROJECT_ADMIN_PAGE = "project_admin_page"
     DOMAIN_ADMIN_PAGE = "domain_admin_page"

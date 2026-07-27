@@ -5,7 +5,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Self
 
-from ai.backend.manager.repositories.ops.rbac.provider import RBACOpsProvider
 from ai.backend.manager.repositories.types import RepositoryArgs
 
 from .repository import IdleCheckerRepository
@@ -19,7 +18,7 @@ class IdleCheckerRepositories:
 
     @classmethod
     def create(cls, args: RepositoryArgs) -> Self:
-        repository = IdleCheckerRepository(RBACOpsProvider(args.db))
+        repository = IdleCheckerRepository(args.ops_provider)
 
         return cls(
             repository=repository,

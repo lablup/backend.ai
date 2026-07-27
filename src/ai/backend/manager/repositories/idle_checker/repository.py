@@ -1,17 +1,13 @@
 from __future__ import annotations
 
 from collections.abc import Collection, Sequence
-from typing import cast
 
-from ai.backend.common.data.entity.types import ScopeRef
 from ai.backend.common.data.idle_checker.types import IdleCheckPhase
-from ai.backend.common.identifier.idle_checker import IdleCheckerID
 from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.idle_checker.types import IdleCheckerData
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.models.idle_checker.row import IdleCheckerRow
 from ai.backend.manager.repositories.base import (
-    BatchPurger,
     BatchQuerier,
     Creator,
     Purger,
@@ -19,20 +15,15 @@ from ai.backend.manager.repositories.base import (
     Updater,
 )
 from ai.backend.manager.repositories.idle_checker.db_source.db_source import IdleCheckerDBSource
-from ai.backend.manager.repositories.idle_checker.purgers import (
-    IdleCheckerEntityMembershipPurgerSpec,
-    IdleCheckerScopeAssociationPurgerSpec,
-)
 from ai.backend.manager.repositories.idle_checker.types import (
     ExpiredIdleCheckBatchData,
     IdleCheckBatchData,
-    IdleCheckerSearchScope,
     IdleJudgmentData,
     InitialGracePeriodBatchData,
     SessionIdleCheckAssignmentData,
     SessionIdleCheckPair,
 )
-from ai.backend.manager.repositories.ops.rbac.provider import RBACOpsProvider
+from ai.backend.manager.repositories.ops import DBOpsProvider
 
 __all__ = ("IdleCheckerRepository",)
 
@@ -42,40 +33,21 @@ class IdleCheckerRepository:
 
     _db_source: IdleCheckerDBSource
 
-    def __init__(self, ops_provider: RBACOpsProvider) -> None:
+    def __init__(self, ops_provider: DBOpsProvider) -> None:
         self._db_source = IdleCheckerDBSource(ops_provider)
 
-    async def create(
-        self,
-        creator: Creator[IdleCheckerRow],
-        owner_scope: ScopeRef,
-    ) -> IdleCheckerData:
-        return await self._db_source.create(creator, owner_scope)
+    async def create(self, creator: Creator[IdleCheckerRow]) -> IdleCheckerData:
+        return await self._db_source.create(creator)
 
     async def update(self, updater: Updater[IdleCheckerRow]) -> IdleCheckerData:
         querier = Querier(row_class=IdleCheckerRow, pk_value=updater.pk_value)
         return await self._db_source.update(querier, updater)
 
     async def purge(self, purger: Purger[IdleCheckerRow]) -> IdleCheckerData:
-        checker_id = cast(IdleCheckerID, purger.spec.pk_value())
-        scope_association_purger = BatchPurger(
-            spec=IdleCheckerScopeAssociationPurgerSpec(checker_id=checker_id)
-        )
-        entity_membership_purger = BatchPurger(
-            spec=IdleCheckerEntityMembershipPurgerSpec(checker_id=checker_id)
-        )
-        return await self._db_source.purge(
-            purger,
-            scope_association_purger,
-            entity_membership_purger,
-        )
+        return await self._db_source.purge(purger)
 
-    async def search(
-        self,
-        querier: BatchQuerier,
-        scopes: Sequence[IdleCheckerSearchScope],
-    ) -> SearchResult[IdleCheckerData]:
-        return await self._db_source.search(querier, scopes)
+    async def search(self, querier: BatchQuerier) -> SearchResult[IdleCheckerData]:
+        return await self._db_source.search(querier)
 
     async def fetch_judgment_batch(
         self, session_statuses: Collection[SessionStatus]

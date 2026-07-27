@@ -42,7 +42,7 @@ from ai.backend.manager.repositories.idle_checker.types import (
     IdleJudgmentData,
     SessionIdleCheckPair,
 )
-from ai.backend.manager.repositories.ops.rbac.provider import RBACOpsProvider
+from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.testutils.db import with_tables
 
 
@@ -202,7 +202,7 @@ class TestFetchJudgmentBatch:
 
     @pytest.fixture
     def repository(self, database: ExtendedAsyncSAEngine) -> IdleCheckerRepository:
-        return IdleCheckerRepository(RBACOpsProvider(database))
+        return IdleCheckerRepository(DBOpsProvider(database))
 
     @pytest.fixture
     async def judgment_rows(
@@ -824,7 +824,7 @@ class TestFetchExpiredIdleChecks:
 
     @pytest.fixture
     def repository(self, database: ExtendedAsyncSAEngine) -> IdleCheckerRepository:
-        return IdleCheckerRepository(RBACOpsProvider(database))
+        return IdleCheckerRepository(DBOpsProvider(database))
 
     @pytest.fixture
     async def expired_check_session(
