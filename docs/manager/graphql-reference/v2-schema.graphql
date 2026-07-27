@@ -2706,6 +2706,36 @@ type CreateHuggingFaceRegistryPayload {
 }
 
 """
+Added in 26.8.0. Defines a new idle checker and the sessions it evaluates. The checker type must match the type declared by its specification.
+"""
+input CreateIdleCheckerInput {
+  """Idle checker name."""
+  name: String!
+
+  """Optional description."""
+  description: String = null
+
+  """Checker implementation type."""
+  checkerType: IdleCheckerInputType!
+
+  """Target session types."""
+  targetSessionTypes: [SessionTypes!]!
+
+  """Initial grace period in seconds."""
+  initialGracePeriodSeconds: Int! = 0
+
+  """Typed checker specification."""
+  checkerSpec: IdleCheckerSpecInput!
+}
+
+"""
+Added in 26.8.0. Returns the idle checker created by the mutation. The node contains the server-assigned identifier and timestamps.
+"""
+type CreateIdleCheckerPayload {
+  idleChecker: IdleChecker!
+}
+
+"""
 Added in 26.4.4. A keypair returned at creation time, including its one-time secret key.
 """
 type CreateKeypairPayload {
@@ -5326,6 +5356,154 @@ type HuggingFaceRegistryEdge {
 }
 
 """
+Added in 26.8.0. Represents a registered rule for determining when sessions become idle. It includes the target session types, grace period, and typed checker settings.
+"""
+type IdleChecker implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """Idle checker name."""
+  name: String!
+
+  """Optional description."""
+  description: String
+
+  """Checker implementation type."""
+  checkerType: IdleCheckerType!
+
+  """Session types evaluated by this checker."""
+  targetSessionTypes: [SessionTypes!]!
+
+  """Initial grace period in seconds."""
+  initialGracePeriodSeconds: Int!
+
+  """Typed idle checker specification."""
+  spec: IdleCheckerSpec!
+
+  """Creation timestamp."""
+  createdAt: DateTime!
+
+  """Last update timestamp."""
+  updatedAt: DateTime!
+}
+
+"""
+Added in 26.8.0. Provides a paginated collection of idle checker definitions. The count reports all records matching the supplied filter.
+"""
+type IdleCheckerConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [IdleCheckerEdge!]!
+
+  """Total number of matching idle checkers."""
+  count: Int!
+}
+
+"""An edge in a connection."""
+type IdleCheckerEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: IdleChecker!
+}
+
+"""
+Added in 26.8.0. Defines criteria for searching registered idle checkers. Nested logical fields can combine or negate multiple criteria.
+"""
+input IdleCheckerFilter {
+  """Name filter."""
+  name: StringFilter = null
+
+  """Checker type filter."""
+  checkerType: IdleCheckerTypeFilter = null
+
+  """Creation timestamp filter."""
+  createdAt: DateTimeFilter = null
+
+  """Update timestamp filter."""
+  updatedAt: DateTimeFilter = null
+
+  """Match all nested filters."""
+  AND: [IdleCheckerFilter!] = null
+
+  """Match any nested filter."""
+  OR: [IdleCheckerFilter!] = null
+
+  """Negate nested filters."""
+  NOT: [IdleCheckerFilter!] = null
+}
+
+"""
+Added in 26.8.0. Lists checker implementations accepted by create and update operations. Only implementations fully supported by this API version are exposed.
+"""
+enum IdleCheckerInputType {
+  SESSION_LIFETIME
+}
+
+"""
+Added in 26.8.0. Defines one ordering rule for an idle checker search. Multiple rules are applied in the order they are supplied.
+"""
+input IdleCheckerOrderBy {
+  """Order field."""
+  field: IdleCheckerOrderField!
+
+  """Order direction."""
+  direction: OrderDirection! = ASC
+}
+
+"""
+Added in 26.8.0. Lists fields that can determine idle checker result order. Each field is paired with an ascending or descending direction.
+"""
+enum IdleCheckerOrderField {
+  NAME
+  CHECKER_TYPE
+  CREATED_AT
+  UPDATED_AT
+}
+
+"""
+Added in 26.8.0. Contains the settings used by an idle checker implementation. This API version exposes session-lifetime settings only.
+"""
+type IdleCheckerSpec {
+  type: IdleCheckerType!
+  sessionLifetime: SessionLifetimeIdleCheckerSpec!
+}
+
+"""
+Added in 26.8.0. Supplies the implementation-specific settings for an idle checker. This API version accepts session-lifetime settings only.
+"""
+input IdleCheckerSpecInput {
+  """Checker implementation type."""
+  type: IdleCheckerInputType!
+
+  """Session-lifetime checker settings."""
+  sessionLifetime: SessionLifetimeIdleCheckerSpecInput!
+}
+
+"""
+Added in 26.8.0. Identifies the implementation used to evaluate an idle condition. The value determines how the checker specification is interpreted.
+"""
+enum IdleCheckerType {
+  SESSION_LIFETIME
+  NETWORK_TIMEOUT
+  UTILIZATION
+}
+
+"""
+Added in 26.8.0. Filters idle checkers by their implementation type. Use either an exact value or a list of accepted values.
+"""
+input IdleCheckerTypeFilter {
+  """Exact checker type."""
+  equals: IdleCheckerType = null
+
+  """Allowed checker types."""
+  in: [IdleCheckerType!] = null
+}
+
+"""
 Added in 26.3.0. Nested filter for aliases belonging to an image. Filters images that have at least one alias matching all specified conditions.
 """
 input ImageAliasNestedFilter {
@@ -7540,6 +7718,21 @@ type Mutation {
   adminUpdateAgentResourceGroup(input: UpdateAgentResourceGroupInput!): UpdateAgentResourceGroupPayload
 
   """
+  Added in 26.8.0. Registers a new idle checker using a supported typed specification. Only superadministrators can perform this global operation.
+  """
+  adminCreateIdleChecker(input: CreateIdleCheckerInput!): CreateIdleCheckerPayload!
+
+  """
+  Added in 26.8.0. Updates selected fields of an existing idle checker. Only superadministrators can modify these global definitions.
+  """
+  adminUpdateIdleChecker(id: UUID!, input: UpdateIdleCheckerInput!): UpdateIdleCheckerPayload!
+
+  """
+  Added in 26.8.0. Permanently removes an idle checker and returns its identifier. Only superadministrators can perform this irreversible global operation.
+  """
+  adminPurgeIdleChecker(id: UUID!): PurgeIdleCheckerPayload!
+
+  """
   Added in 26.7.0. Register a new app config allow-list entry (super admin only).
   """
   adminCreateAppConfigAllowList(input: CreateAppConfigAllowListInput!): CreateAppConfigAllowListPayload
@@ -9751,6 +9944,13 @@ type PurgeDomainPayload {
   purged: Boolean!
 }
 
+"""
+Added in 26.8.0. Confirms that an idle checker was permanently removed. The returned identifier refers to the deleted checker.
+"""
+type PurgeIdleCheckerPayload {
+  id: UUID!
+}
+
 """Added in 26.4.2. Payload for project permanent deletion mutation."""
 type PurgeProjectPayload {
   """Whether the purge was successful."""
@@ -9855,6 +10055,11 @@ type Query {
   Added in 26.8.0. Search app config fragments across every scope with filtering, ordering, and pagination (super admin only).
   """
   adminAppConfigFragments(filter: AppConfigFragmentFilter = null, orderBy: [AppConfigFragmentOrderBy!] = null, first: Int = null, after: String = null, last: Int = null, before: String = null, limit: Int = null, offset: Int = null): AppConfigFragmentConnection
+
+  """
+  Added in 26.8.0. Searches all registered idle checkers with filtering, ordering, and pagination. Only superadministrators can access this global collection.
+  """
+  adminIdleCheckers(filter: IdleCheckerFilter = null, orderBy: [IdleCheckerOrderBy!] = null, first: Int = null, after: String = null, last: Int = null, before: String = null, limit: Int = null, offset: Int = null): IdleCheckerConnection!
 
   """
   Added in 25.14.0. Retrieve a specific artifact by its ID. Returns detailed information about the artifact including its metadata, registry information, and availability status.
@@ -13260,6 +13465,21 @@ enum SessionFailurePolicy {
   TOLERANT
 }
 
+"""
+Added in 26.8.0. Configures the maximum lifetime of a running session. The checker expires a session after the configured duration is reached.
+"""
+type SessionLifetimeIdleCheckerSpec {
+  maxLifetimeSeconds: Int!
+}
+
+"""
+Added in 26.8.0. Supplies settings for a session-lifetime checker. The lifetime is measured in seconds from the session's effective start.
+"""
+input SessionLifetimeIdleCheckerSpecInput {
+  """Maximum session lifetime in seconds."""
+  maxLifetimeSeconds: Int!
+}
+
 """Added in 26.4.2. A virtual folder mount specification."""
 input SessionMountItemInput {
   """Virtual folder UUID."""
@@ -14302,6 +14522,33 @@ input UpdateHuggingFaceRegistryInput {
 type UpdateHuggingFaceRegistryPayload {
   """Updated HuggingFace registry"""
   huggingfaceRegistry: HuggingFaceRegistry!
+}
+
+"""
+Added in 26.8.0. Applies a partial update to an existing idle checker. Omitted or null fields remain unchanged, while supplied values are replaced.
+"""
+input UpdateIdleCheckerInput {
+  """New name."""
+  name: String
+
+  """New description; omit it or pass null to keep the current value."""
+  description: String
+
+  """New target session types."""
+  targetSessionTypes: [SessionTypes!]
+
+  """New initial grace period."""
+  initialGracePeriodSeconds: Int
+
+  """New checker specification."""
+  checkerSpec: IdleCheckerSpecInput
+}
+
+"""
+Added in 26.8.0. Returns the idle checker after an update is applied. The node reflects the complete persisted state, including unchanged fields.
+"""
+type UpdateIdleCheckerPayload {
+  idleChecker: IdleChecker!
 }
 
 """

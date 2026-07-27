@@ -156,6 +156,12 @@ from .huggingface_registry import (
     huggingface_registry,
     update_huggingface_registry,
 )
+from .idle_checker import (
+    admin_create_idle_checker,
+    admin_idle_checkers,
+    admin_purge_idle_checker,
+    admin_update_idle_checker,
+)
 from .image import (
     admin_image_aliases,
     admin_images_v2,
@@ -518,6 +524,7 @@ class Query:
     admin_app_config_allow_lists = admin_app_config_allow_lists
     app_config_fragment = app_config_fragment
     admin_app_config_fragments = admin_app_config_fragments
+    admin_idle_checkers = admin_idle_checkers
     artifact = artifact
     artifacts = artifacts
     artifact_revision = artifact_revision
@@ -732,6 +739,9 @@ class Query:
 @strawberry.type
 class Mutation:
     admin_update_agent_resource_group = admin_update_agent_resource_group
+    admin_create_idle_checker = admin_create_idle_checker
+    admin_update_idle_checker = admin_update_idle_checker
+    admin_purge_idle_checker = admin_purge_idle_checker
     admin_create_app_config_allow_list = admin_create_app_config_allow_list
     admin_purge_app_config_allow_list = admin_purge_app_config_allow_list
     admin_update_app_config_allow_list = admin_update_app_config_allow_list
