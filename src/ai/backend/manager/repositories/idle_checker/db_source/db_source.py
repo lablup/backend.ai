@@ -44,12 +44,14 @@ from ai.backend.manager.repositories.idle_checker.types import (
     IdleCheckAssignmentData,
     IdleCheckBatchData,
     IdleCheckerDefinitionData,
+    IdleJudgmentData,
     InitialGracePeriodBatchData,
     InitialGracePeriodCheckData,
     SessionIdleCheckAssignmentData,
     SessionIdleCheckPair,
 )
 from ai.backend.manager.repositories.idle_checker.updaters import (
+    SessionIdleCheckJudgmentBatchUpdaterSpec,
     SessionIdleCheckPhaseBatchUpdaterSpec,
 )
 from ai.backend.manager.repositories.ops import DBOpsProvider
@@ -292,6 +294,25 @@ class IdleCheckerDBSource:
                         conditions=[
                             SessionIdleCheckConditions.by_pairs(pair_values),
                             SessionIdleCheckConditions.by_status_equals(from_phase),
+                        ],
+                    )
+                )
+
+    async def batch_apply_session_idle_check_judgments(
+        self,
+        judgments: Sequence[IdleJudgmentData],
+    ) -> None:
+        pairs = [(judgment.session_id, judgment.checker_id) for judgment in judgments]
+        async with self._ops.write_ops() as w:
+            if pairs:
+                await w.batch_update(
+                    BatchUpdater(
+                        spec=SessionIdleCheckJudgmentBatchUpdaterSpec(judgments),
+                        conditions=[
+                            SessionIdleCheckConditions.by_pairs(pairs),
+                            SessionIdleCheckConditions.by_status_not_equals(
+                                IdleCheckPhase.IDLE_EXPIRED
+                            ),
                         ],
                     )
                 )

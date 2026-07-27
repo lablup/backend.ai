@@ -37,8 +37,9 @@ def build_idle_check_judgment_stage(
 ) -> ReconcilerStageRegistration:
     reconcile_type = "idle_check_judgment"
     # Termination runs through the scheduler lifecycle (mark_sessions_for_termination in
-    # the applier) — which also terminates kernels, is idempotent for already-terminating/
-    # terminal sessions, and broadcasts — not this per-entity status-transition map.
+    # the sweep stage handler) — which also terminates kernels, is idempotent for
+    # already-terminating/terminal sessions, and broadcasts — not this per-entity
+    # status-transition map.
     transitions: Mapping[SchedulingResult, SessionStatus] = {}
     metadata = ReconcilerStageMetadata(
         category=IdleCheckCategory.SESSION_IDLE_CHECK,
@@ -57,7 +58,7 @@ def build_idle_check_judgment_stage(
     stage = ReconcilerStage(
         handler=IdleCheckReconcileHandler(checkers),
         source=IdleCheckSource(idle_checker_repository),
-        applier=IdleCheckApplier(),
+        applier=IdleCheckApplier(idle_checker_repository),
         metadata=metadata,
     )
     task_spec = ReconcilerTaskSpec(

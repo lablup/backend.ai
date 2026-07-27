@@ -38,7 +38,10 @@ from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.idle_checker.repository import IdleCheckerRepository
-from ai.backend.manager.repositories.idle_checker.types import SessionIdleCheckPair
+from ai.backend.manager.repositories.idle_checker.types import (
+    IdleJudgmentData,
+    SessionIdleCheckPair,
+)
 from ai.backend.manager.repositories.ops import DBOpsProvider
 from ai.backend.testutils.db import with_tables
 
@@ -70,6 +73,7 @@ class JudgmentRows:
     idle_expired_session_id: SessionId
     session_without_row_id: SessionId
     terminated_session_id: SessionId
+    second_terminated_session_id: SessionId
     checker_id: IdleCheckerID
 
 
@@ -213,6 +217,7 @@ class TestFetchJudgmentBatch:
         idle_expired_session_id = SessionId(uuid.uuid4())
         session_without_row_id = SessionId(uuid.uuid4())
         terminated_session_id = SessionId(uuid.uuid4())
+        second_terminated_session_id = SessionId(uuid.uuid4())
         checker_id = IdleCheckerID(uuid.uuid4())
         session_specs = (
             (active_session_id, SessionStatus.RUNNING),
@@ -222,6 +227,7 @@ class TestFetchJudgmentBatch:
             (idle_expired_session_id, SessionStatus.RUNNING),
             (session_without_row_id, SessionStatus.RUNNING),
             (terminated_session_id, SessionStatus.TERMINATED),
+            (second_terminated_session_id, SessionStatus.TERMINATED),
         )
         check_specs = (
             (active_session_id, IdleCheckPhase.ACTIVE),
@@ -230,6 +236,7 @@ class TestFetchJudgmentBatch:
             (ready_to_check_session_id, IdleCheckPhase.READY_TO_CHECK),
             (idle_expired_session_id, IdleCheckPhase.IDLE_EXPIRED),
             (terminated_session_id, IdleCheckPhase.ACTIVE),
+            (second_terminated_session_id, IdleCheckPhase.ACTIVE),
         )
         async with database.begin_session() as db_sess:
             for scope_row in _expired_check_scope_rows(scope):
@@ -264,6 +271,7 @@ class TestFetchJudgmentBatch:
             idle_expired_session_id=idle_expired_session_id,
             session_without_row_id=session_without_row_id,
             terminated_session_id=terminated_session_id,
+            second_terminated_session_id=second_terminated_session_id,
             checker_id=checker_id,
         )
 
@@ -418,6 +426,133 @@ class TestFetchJudgmentBatch:
             )
         ]
         assert batch.checks[0].initial_grace_period_seconds == 45
+
+    async def test_applies_all_judgment_batches_with_distinct_messages(
+        self,
+        database: ExtendedAsyncSAEngine,
+        repository: IdleCheckerRepository,
+        judgment_rows: JudgmentRows,
+    ) -> None:
+        expire_at = datetime(2026, 3, 1, tzinfo=UTC)
+        idle_expired = [
+            IdleJudgmentData(
+                session_id=judgment_rows.active_session_id,
+                checker_id=judgment_rows.checker_id,
+                status=IdleCheckPhase.IDLE_EXPIRED,
+                expire_at=expire_at,
+                message="idle expired 1",
+            ),
+            IdleJudgmentData(
+                session_id=judgment_rows.not_checked_session_id,
+                checker_id=judgment_rows.checker_id,
+                status=IdleCheckPhase.IDLE_EXPIRED,
+                expire_at=expire_at,
+                message="idle expired 2",
+            ),
+            IdleJudgmentData(
+                session_id=judgment_rows.terminated_session_id,
+                checker_id=judgment_rows.checker_id,
+                status=IdleCheckPhase.IDLE_EXPIRED,
+                expire_at=expire_at,
+                message="idle expired 3",
+            ),
+        ]
+        idle = [
+            IdleJudgmentData(
+                session_id=judgment_rows.idle_session_id,
+                checker_id=judgment_rows.checker_id,
+                status=IdleCheckPhase.IDLE,
+                expire_at=expire_at,
+                message="idle 1",
+            ),
+            IdleJudgmentData(
+                session_id=judgment_rows.ready_to_check_session_id,
+                checker_id=judgment_rows.checker_id,
+                status=IdleCheckPhase.IDLE,
+                expire_at=expire_at,
+                message="idle 2",
+            ),
+        ]
+        active = [
+            IdleJudgmentData(
+                session_id=judgment_rows.second_terminated_session_id,
+                checker_id=judgment_rows.checker_id,
+                status=IdleCheckPhase.ACTIVE,
+                expire_at=expire_at,
+                message="active 1",
+            ),
+        ]
+
+        judgments = [*idle_expired, *idle, *active]
+        await repository.batch_apply_session_idle_check_judgments(judgments)
+
+        async with database.begin_readonly_session() as db_sess:
+            for judgment in judgments:
+                row = await db_sess.get(
+                    SessionIdleCheckRow,
+                    (judgment.session_id, judgment.checker_id),
+                )
+                assert row is not None
+                assert row.last_status is judgment.status
+                assert row.expire_at == judgment.expire_at
+                assert row.last_message == judgment.message
+
+    async def test_accepts_empty_judgment_batch(
+        self,
+        repository: IdleCheckerRepository,
+    ) -> None:
+        await repository.batch_apply_session_idle_check_judgments([])
+
+    async def test_never_touches_idle_expired_row(
+        self,
+        database: ExtendedAsyncSAEngine,
+        repository: IdleCheckerRepository,
+        judgment_rows: JudgmentRows,
+    ) -> None:
+        await repository.batch_apply_session_idle_check_judgments([
+            IdleJudgmentData(
+                session_id=judgment_rows.idle_expired_session_id,
+                checker_id=judgment_rows.checker_id,
+                status=IdleCheckPhase.ACTIVE,
+                expire_at=datetime(2026, 3, 1, tzinfo=UTC),
+                message="activity detected",
+            )
+        ])
+
+        async with database.begin_readonly_session() as db_sess:
+            row = await db_sess.get(
+                SessionIdleCheckRow,
+                (judgment_rows.idle_expired_session_id, judgment_rows.checker_id),
+            )
+        assert row is not None
+        assert row.last_status is IdleCheckPhase.IDLE_EXPIRED
+        assert row.last_message == f"{IdleCheckPhase.IDLE_EXPIRED.value} judgment"
+        assert row.expire_at == datetime(2026, 2, 1, tzinfo=UTC)
+
+    async def test_ignores_missing_pair_without_insert(
+        self,
+        database: ExtendedAsyncSAEngine,
+        repository: IdleCheckerRepository,
+        judgment_rows: JudgmentRows,
+    ) -> None:
+        missing_session_id = SessionId(uuid.uuid4())
+
+        await repository.batch_apply_session_idle_check_judgments([
+            IdleJudgmentData(
+                session_id=missing_session_id,
+                checker_id=judgment_rows.checker_id,
+                status=IdleCheckPhase.ACTIVE,
+                expire_at=datetime(2026, 3, 1, tzinfo=UTC),
+                message="activity detected",
+            )
+        ])
+
+        async with database.begin_readonly_session() as db_sess:
+            row = await db_sess.get(
+                SessionIdleCheckRow,
+                (missing_session_id, judgment_rows.checker_id),
+            )
+        assert row is None
 
     async def test_excludes_session_without_idle_check_row(
         self,

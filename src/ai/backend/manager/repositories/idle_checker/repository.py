@@ -9,6 +9,7 @@ from ai.backend.manager.repositories.idle_checker.db_source.db_source import Idl
 from ai.backend.manager.repositories.idle_checker.types import (
     ExpiredIdleCheckBatchData,
     IdleCheckBatchData,
+    IdleJudgmentData,
     InitialGracePeriodBatchData,
     SessionIdleCheckAssignmentData,
     SessionIdleCheckPair,
@@ -72,3 +73,9 @@ class IdleCheckerRepository:
             from_phase=from_phase,
             to_phase=to_phase,
         )
+
+    async def batch_apply_session_idle_check_judgments(
+        self,
+        judgments: Sequence[IdleJudgmentData],
+    ) -> None:
+        await self._db_source.batch_apply_session_idle_check_judgments(judgments)

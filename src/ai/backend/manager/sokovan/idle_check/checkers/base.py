@@ -7,11 +7,11 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
 
-from ai.backend.common.data.idle_checker.types import IdleCheckPhase
-from ai.backend.common.identifier.idle_checker import IdleCheckerID
-from ai.backend.common.types import SessionId
 from ai.backend.manager.data.idle_checker.types import IdleCheckSession
-from ai.backend.manager.repositories.idle_checker.types import IdleCheckerDefinitionData
+from ai.backend.manager.repositories.idle_checker.types import (
+    IdleCheckerDefinitionData,
+    IdleJudgmentData,
+)
 
 
 @dataclass(frozen=True)
@@ -29,17 +29,6 @@ class CheckerAssignment:
     sessions: Sequence[IdleCheckSession]
 
 
-@dataclass(frozen=True)
-class IdleJudgment:
-    """One session's judgment from one checker definition."""
-
-    checker_id: IdleCheckerID
-    session_id: SessionId
-    expire_at: datetime
-    status: IdleCheckPhase
-    message: str
-
-
 class IdleChecker(ABC):
     """Per-``CheckerType`` behavior with constructor-injected I/O clients."""
 
@@ -49,7 +38,7 @@ class IdleChecker(ABC):
         assignments: Sequence[CheckerAssignment],
         *,
         context: IdleCheckerContext,
-    ) -> Sequence[IdleJudgment]:
+    ) -> Sequence[IdleJudgmentData]:
         """Evaluate every assignment of this type in one batched call.
 
         Implementations may batch external I/O but must not retain per-call state.

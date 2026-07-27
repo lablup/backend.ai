@@ -8,11 +8,11 @@ from typing import override
 
 from ai.backend.common.data.idle_checker.types import IdleCheckPhase
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.repositories.idle_checker.types import IdleJudgmentData
 from ai.backend.manager.sokovan.idle_check.checkers.base import (
     CheckerAssignment,
     IdleChecker,
     IdleCheckerContext,
-    IdleJudgment,
 )
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
@@ -27,8 +27,8 @@ class SessionLifetimeChecker(IdleChecker):
         assignments: Sequence[CheckerAssignment],
         *,
         context: IdleCheckerContext,
-    ) -> Sequence[IdleJudgment]:
-        judgments: list[IdleJudgment] = []
+    ) -> Sequence[IdleJudgmentData]:
+        judgments: list[IdleJudgmentData] = []
         for assignment in assignments:
             lifetime_spec = assignment.definition.spec.session_lifetime
             if lifetime_spec is None:
@@ -51,7 +51,7 @@ class SessionLifetimeChecker(IdleChecker):
                     seconds=lifetime_spec.max_lifetime_seconds
                 )
                 judgments.append(
-                    IdleJudgment(
+                    IdleJudgmentData(
                         checker_id=assignment.definition.checker_id,
                         session_id=session.session_id,
                         expire_at=expires_at,
