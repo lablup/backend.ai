@@ -58,7 +58,7 @@ from ai.backend.manager.api.gql.decorators import (
     gql_pydantic_input,
     gql_pydantic_type,
 )
-from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
+from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.errors.api import NotImplementedAPI
 
 
@@ -72,10 +72,8 @@ from ai.backend.manager.errors.api import NotImplementedAPI
     ),
     name="IdleCheckerType",
 )
-class CheckerTypeGQL(StrEnum):
+class IdleCheckerTypeGQL(StrEnum):
     SESSION_LIFETIME = "session_lifetime"
-    NETWORK_TIMEOUT = "network_timeout"
-    UTILIZATION = "utilization"
 
 
 @gql_enum(
@@ -88,7 +86,7 @@ class CheckerTypeGQL(StrEnum):
     ),
     name="IdleCheckerInputType",
 )
-class CheckerInputTypeGQL(StrEnum):
+class IdleCheckerInputTypeGQL(StrEnum):
     SESSION_LIFETIME = "session_lifetime"
 
 
@@ -132,7 +130,7 @@ class IdleCheckerScopeGQL(PydanticInputMixin[IdleCheckerScopeDTO]):
     model=SessionLifetimeSpecInfo,
     name="SessionLifetimeIdleCheckerSpec",
 )
-class SessionLifetimeSpecGQL(PydanticOutputMixin[SessionLifetimeSpecInfo]):
+class SessionLifetimeIdleCheckerSpecGQL:
     max_lifetime_seconds: int = gql_field(description="Maximum session lifetime in seconds.")
 
 
@@ -147,9 +145,9 @@ class SessionLifetimeSpecGQL(PydanticOutputMixin[SessionLifetimeSpecInfo]):
     model=IdleCheckerSpecInfo,
     name="IdleCheckerSpec",
 )
-class IdleCheckerSpecGQL(PydanticOutputMixin[IdleCheckerSpecInfo]):
-    type: CheckerTypeGQL = gql_field(description="Checker implementation type.")
-    session_lifetime: SessionLifetimeSpecGQL = gql_field(
+class IdleCheckerSpecGQL:
+    type: IdleCheckerTypeGQL = gql_field(description="Checker implementation type.")
+    session_lifetime: SessionLifetimeIdleCheckerSpecGQL = gql_field(
         description="Settings that define the maximum lifetime of a session.",
     )
 
@@ -170,7 +168,7 @@ class IdleCheckerGQL(PydanticNodeMixin[IdleCheckerNode]):
     )
     name: str = gql_field(description="Idle checker name.")
     description: str | None = gql_field(description="Optional description.")
-    checker_type: CheckerTypeGQL = gql_field(description="Checker implementation type.")
+    checker_type: IdleCheckerTypeGQL = gql_field(description="Checker implementation type.")
     target_session_types: list[SessionTypes] = gql_field(
         description="Session types evaluated by this checker."
     )
@@ -222,7 +220,7 @@ class IdleCheckerConnectionGQL(Connection[IdleCheckerGQL]):
     ),
     name="SessionLifetimeIdleCheckerSpecInput",
 )
-class SessionLifetimeSpecInputGQL(PydanticInputMixin[SessionLifetimeSpecInputDTO]):
+class SessionLifetimeIdleCheckerSpecInputGQL(PydanticInputMixin[SessionLifetimeSpecInputDTO]):
     max_lifetime_seconds: int = gql_field(description="Maximum session lifetime in seconds.")
 
 
@@ -237,8 +235,8 @@ class SessionLifetimeSpecInputGQL(PydanticInputMixin[SessionLifetimeSpecInputDTO
     name="IdleCheckerSpecInput",
 )
 class IdleCheckerSpecInputGQL(PydanticInputMixin[IdleCheckerSpecInputDTO]):
-    type: CheckerInputTypeGQL = gql_field(description="Checker implementation type.")
-    session_lifetime: SessionLifetimeSpecInputGQL = gql_field(
+    type: IdleCheckerInputTypeGQL = gql_field(description="Checker implementation type.")
+    session_lifetime: SessionLifetimeIdleCheckerSpecInputGQL = gql_field(
         description="Session-lifetime checker settings.",
     )
 
@@ -253,9 +251,9 @@ class IdleCheckerSpecInputGQL(PydanticInputMixin[IdleCheckerSpecInputDTO]):
     ),
     name="IdleCheckerTypeFilter",
 )
-class CheckerTypeFilterGQL(PydanticInputMixin[CheckerTypeFilterDTO]):
-    equals: CheckerTypeGQL | None = gql_field(description="Exact checker type.", default=None)
-    in_: list[CheckerTypeGQL] | None = gql_field(
+class IdleCheckerTypeFilterGQL(PydanticInputMixin[CheckerTypeFilterDTO]):
+    equals: IdleCheckerTypeGQL | None = gql_field(description="Exact checker type.", default=None)
+    in_: list[IdleCheckerTypeGQL] | None = gql_field(
         description="Allowed checker types.",
         name="in",
         default=None,
@@ -274,7 +272,7 @@ class CheckerTypeFilterGQL(PydanticInputMixin[CheckerTypeFilterDTO]):
 )
 class IdleCheckerFilterGQL(PydanticInputMixin[IdleCheckerFilterDTO]):
     name: StringFilter | None = gql_field(description="Name filter.", default=None)
-    checker_type: CheckerTypeFilterGQL | None = gql_field(
+    checker_type: IdleCheckerTypeFilterGQL | None = gql_field(
         description="Checker type filter.",
         default=None,
     )
@@ -318,7 +316,7 @@ class IdleCheckerOrderFieldGQL(StrEnum):
     ),
     name="IdleCheckerOrderBy",
 )
-class IdleCheckerOrderGQL(PydanticInputMixin[IdleCheckerOrderDTO]):
+class IdleCheckerOrderByGQL(PydanticInputMixin[IdleCheckerOrderDTO]):
     field: IdleCheckerOrderFieldGQL = gql_field(description="Order field.")
     direction: OrderDirection = gql_field(
         description="Order direction.", default=OrderDirection.ASC
@@ -338,7 +336,7 @@ class IdleCheckerOrderGQL(PydanticInputMixin[IdleCheckerOrderDTO]):
 class CreateIdleCheckerInputGQL(PydanticInputMixin[CreateIdleCheckerInputDTO]):
     name: str = gql_field(description="Idle checker name.")
     description: str = gql_field(description="Idle checker description.")
-    checker_type: CheckerInputTypeGQL = gql_field(description="Checker implementation type.")
+    checker_type: IdleCheckerInputTypeGQL = gql_field(description="Checker implementation type.")
     target_session_types: list[SessionTypes] = gql_field(description="Target session types.")
     initial_grace_period_seconds: int = gql_field(
         description="Initial grace period in seconds.",
@@ -388,7 +386,7 @@ class UpdateIdleCheckerInputGQL(PydanticInputMixin[UpdateIdleCheckerInputDTO]):
     model=CreateIdleCheckerPayloadDTO,
     name="CreateIdleCheckerPayload",
 )
-class CreateIdleCheckerPayloadGQL(PydanticOutputMixin[CreateIdleCheckerPayloadDTO]):
+class CreateIdleCheckerPayloadGQL:
     idle_checker: IdleCheckerGQL = gql_field(description="Created idle checker.")
 
 
@@ -403,7 +401,7 @@ class CreateIdleCheckerPayloadGQL(PydanticOutputMixin[CreateIdleCheckerPayloadDT
     model=UpdateIdleCheckerPayloadDTO,
     name="UpdateIdleCheckerPayload",
 )
-class UpdateIdleCheckerPayloadGQL(PydanticOutputMixin[UpdateIdleCheckerPayloadDTO]):
+class UpdateIdleCheckerPayloadGQL:
     idle_checker: IdleCheckerGQL = gql_field(description="Updated idle checker.")
 
 
@@ -418,5 +416,5 @@ class UpdateIdleCheckerPayloadGQL(PydanticOutputMixin[UpdateIdleCheckerPayloadDT
     model=PurgeIdleCheckerPayloadDTO,
     name="PurgeIdleCheckerPayload",
 )
-class PurgeIdleCheckerPayloadGQL(PydanticOutputMixin[PurgeIdleCheckerPayloadDTO]):
+class PurgeIdleCheckerPayloadGQL:
     id: UUID = gql_field(description="Purged idle checker ID.")

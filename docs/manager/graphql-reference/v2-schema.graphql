@@ -5508,8 +5508,6 @@ Added in 26.8.0. Identifies the implementation used to evaluate an idle conditio
 """
 enum IdleCheckerType {
   SESSION_LIFETIME
-  NETWORK_TIMEOUT
-  UTILIZATION
 }
 
 """

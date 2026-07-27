@@ -8099,8 +8099,6 @@ enum IdleCheckerType
   @join__type(graph: STRAWBERRY)
 {
   SESSION_LIFETIME @join__enumValue(graph: STRAWBERRY)
-  NETWORK_TIMEOUT @join__enumValue(graph: STRAWBERRY)
-  UTILIZATION @join__enumValue(graph: STRAWBERRY)
 }
 
 """
