@@ -103,6 +103,30 @@ class TestSessionLastAccessMarker:
 
         assert await test_valkey_live.get_live_data(marker_key) is None
 
+    async def test_get_batch_returns_timestamps_by_session(
+        self,
+        test_valkey_live: ValkeyLiveClient,
+        session_id: SessionId,
+    ) -> None:
+        missing_session_id = SessionId(uuid4())
+        await test_valkey_live.update_session_last_access(session_id)
+
+        result = await test_valkey_live.get_session_last_access_batch([
+            session_id,
+            missing_session_id,
+        ])
+
+        timestamp = result[session_id]
+        assert timestamp is not None
+        assert timestamp > 0
+        assert result[missing_session_id] is None
+
+    async def test_get_batch_returns_empty_mapping(
+        self,
+        test_valkey_live: ValkeyLiveClient,
+    ) -> None:
+        assert await test_valkey_live.get_session_last_access_batch([]) == {}
+
 
 class TestActiveAppConnections:
     @pytest.fixture()

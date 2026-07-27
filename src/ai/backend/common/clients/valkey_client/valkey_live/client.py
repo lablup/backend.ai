@@ -199,6 +199,19 @@ class ValkeyLiveClient:
     def _session_last_access_key(self, session_id: SessionId) -> str:
         return f"session.{session_id}.last_access"
 
+    async def get_session_last_access_batch(
+        self,
+        session_ids: Sequence[SessionId],
+    ) -> dict[SessionId, float | None]:
+        """Get the last network access timestamps for multiple sessions."""
+        values = await self.get_multiple_live_data([
+            self._session_last_access_key(session_id) for session_id in session_ids
+        ])
+        return {
+            session_id: None if value is None else float(value)
+            for session_id, value in zip(session_ids, values, strict=True)
+        }
+
     async def update_session_last_access(self, session_id: SessionId) -> None:
         """Refresh the session's last network access marker with the server time."""
         timestamp = await self.get_server_time()

@@ -29,7 +29,7 @@ from ai.backend.manager.sokovan.idle_check.checkers.network_timeout import (
 )
 
 _BASE_TIME = datetime(2026, 1, 1, tzinfo=UTC)
-_BASE_TIMESTAMP = str(_BASE_TIME.timestamp()).encode("utf-8")
+_BASE_TIMESTAMP = _BASE_TIME.timestamp()
 _EXISTING_EXPIRE_AT = _BASE_TIME + timedelta(seconds=15)
 
 
@@ -49,7 +49,9 @@ class TestNetworkTimeoutChecker:
             return dict.fromkeys(session_ids, 0)
 
         client = AsyncMock(spec=ValkeyLiveClient)
-        client.get_multiple_live_data.return_value = [_BASE_TIMESTAMP]
+        client.get_session_last_access_batch.side_effect = lambda session_ids: dict.fromkeys(
+            session_ids, _BASE_TIMESTAMP
+        )
         client.count_active_connections_batch.side_effect = count_active_connections
         return client
 
@@ -114,7 +116,9 @@ class TestNetworkTimeoutChecker:
         self,
         valkey_live: AsyncMock,
     ) -> AsyncMock:
-        valkey_live.get_multiple_live_data.return_value = [b"0"]
+        valkey_live.get_session_last_access_batch.side_effect = lambda session_ids: dict.fromkeys(
+            session_ids, 0.0
+        )
         return valkey_live
 
     @pytest.fixture()
@@ -122,7 +126,9 @@ class TestNetworkTimeoutChecker:
         self,
         valkey_live: AsyncMock,
     ) -> AsyncMock:
-        valkey_live.get_multiple_live_data.return_value = [None]
+        valkey_live.get_session_last_access_batch.side_effect = lambda session_ids: dict.fromkeys(
+            session_ids
+        )
         return valkey_live
 
     @pytest.fixture()

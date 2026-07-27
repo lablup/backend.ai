@@ -134,23 +134,13 @@ class NetworkTimeoutChecker(IdleChecker):
     ) -> dict[SessionId, _NetworkIdleState]:
         session_ids = list(dict.fromkeys(session.session_id for session in sessions))
         last_access_values, active_connection_counts = await asyncio.gather(
-            self._valkey_live.get_multiple_live_data([
-                f"session.{session_id}.last_access" for session_id in session_ids
-            ]),
+            self._valkey_live.get_session_last_access_batch(session_ids),
             self._valkey_live.count_active_connections_batch(session_ids),
         )
         states: dict[SessionId, _NetworkIdleState] = {}
-        for session_id, raw_last_access in zip(
-            session_ids,
-            last_access_values,
-            strict=True,
-        ):
-            if raw_last_access is None:
-                last_access = None
-            else:
-                last_access = float(raw_last_access)
+        for session_id in session_ids:
             states[session_id] = _NetworkIdleState(
-                last_access=last_access,
+                last_access=last_access_values[session_id],
                 active_connections=active_connection_counts[session_id],
             )
         return states
