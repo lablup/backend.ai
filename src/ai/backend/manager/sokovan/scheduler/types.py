@@ -10,6 +10,10 @@ class ScheduleType(StrEnum):
     DEPRIORITIZE = "deprioritize"  # Lower priority and return to PENDING
     PREEMPTED = "preempted"  # Branch preemption victims by the resource group's mode
     RESCHEDULING = "rescheduling"  # Put sessions whose kernels are gone back in the queue
+    RELEASE_RESERVED = "release_reserved"  # Advance RESERVED sessions whose victims freed up
+    CHECK_RESERVED_PROGRESS = (
+        "check_reserved_progress"  # Promote RESERVED sessions whose kernels are all admitted
+    )
     SWEEP = "sweep"  # Sweep stale sessions (maintenance operation)
     CHECK_PRECONDITION = "check_precondition"  # Check preconditions for scheduled sessions
     START = "start"  # Start prepared sessions

@@ -30,6 +30,7 @@ from ai.backend.manager.sokovan.scheduler.handlers import (
     CheckPreconditionLifecycleHandler,
     DeprioritizeSessionsLifecycleHandler,
     PreemptSessionsLifecycleHandler,
+    ReleaseReservedSessionsLifecycleHandler,
     RescheduleSessionsLifecycleHandler,
     ScheduleSessionsLifecycleHandler,
     SessionLifecycleHandler,
@@ -239,6 +240,9 @@ def _create_lifecycle_handlers(
             args.terminator,
             args.repository,
         ),
+        ScheduleType.RELEASE_RESERVED: ReleaseReservedSessionsLifecycleHandler(
+            args.repository,
+        ),
         ScheduleType.PREEMPTED: PreemptSessionsLifecycleHandler(
             args.repository,
             args.scheduling_controller,
@@ -266,6 +270,16 @@ def _create_promotion_specs() -> Mapping[ScheduleType, PromotionSpec]:
         # Promote to PREPARED when no kernel is in pre-prepared states.
         # Includes SCHEDULED to handle cases where kernels advance to PREPARED
         # while the session status update to PREPARING hasn't happened yet.
+        # Promote to SCHEDULED when no kernel still holds an unadmitted
+        # reservation (kernel admission is the RELEASE_RESERVED cycle's job)
+        ScheduleType.CHECK_RESERVED_PROGRESS: PromotionSpec(
+            name="promote-to-scheduled",
+            target_statuses=[SessionStatus.RESERVED],
+            target_kernel_statuses=[KernelStatus.RESERVED],
+            kernel_match_type=KernelMatchType.NOT_ANY,
+            success_status=SessionStatus.SCHEDULED,
+            reason="triggered-by-scheduler",
+        ),
         ScheduleType.CHECK_PULLING_PROGRESS: PromotionSpec(
             name="promote-to-prepared",
             target_statuses=[

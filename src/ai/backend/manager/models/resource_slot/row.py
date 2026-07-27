@@ -164,8 +164,25 @@ class ResourceAllocationRow(CreatedAtMixin, Base):  # type: ignore[misc]
     requested: Mapped[Decimal] = mapped_column(
         "requested", sa.Numeric(precision=24, scale=6), nullable=False
     )
+    prereserved: Mapped[Decimal] = mapped_column(
+        "prereserved",
+        sa.Numeric(precision=24, scale=6),
+        nullable=False,
+        server_default=sa.text("0"),
+    )
+    reserved: Mapped[Decimal] = mapped_column(
+        "reserved",
+        sa.Numeric(precision=24, scale=6),
+        nullable=False,
+        server_default=sa.text("0"),
+    )
     used: Mapped[Decimal | None] = mapped_column(
         "used", sa.Numeric(precision=24, scale=6), nullable=True
+    )
+    prereserved_at: Mapped[datetime | None] = mapped_column(
+        "prereserved_at",
+        sa.DateTime(timezone=True),
+        nullable=True,
     )
     reserved_at: Mapped[datetime | None] = mapped_column(
         "reserved_at",

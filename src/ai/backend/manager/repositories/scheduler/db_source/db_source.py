@@ -538,7 +538,8 @@ class ScheduleDBSource:
             slots = {
                 ResourceSlotName(ar.slot_name): SlotResource(
                     capacity=ar.capacity,
-                    reserved=ar.reserved,
+                    # Advance reservations occupy capacity for scheduling
+                    reserved=ar.reserved + ar.prereserved,
                     used=ar.used,
                 )
                 for ar in agent_row.agent_resource_rows
@@ -1113,6 +1114,136 @@ class ScheduleDBSource:
         async with self._db.begin_readonly_session_read_committed() as db_sess:
             resource_group = await self._fetch_resource_group(db_sess, resource_group_id)
         return resource_group.preemption.mode
+
+    async def admit_prereserved_kernels(
+        self,
+        session_ids: Sequence[SessionId],
+    ) -> list[KernelId]:
+        """Admit prereserved kernels whose agents can now host them.
+
+        Per agent, kernels are tried in ``prereserved_at`` order (first
+        reserved, first admitted). Admission moves the kernel's row buckets
+        from ``prereserved`` into ``reserved`` and mirrors the same amounts
+        on the agent under the normal invariant (``used + reserved + amount
+        <= capacity``), then advances the kernel to SCHEDULED. A kernel
+        that does not fit stops its agent for this cycle so a later
+        reservation never overtakes an earlier one.
+        """
+        if not session_ids:
+            return []
+        k = KernelRow.__table__
+        ra = ResourceAllocationRow.__table__
+        admitted: list[KernelId] = []
+        async with self._db.begin_session_read_committed() as db_sess:
+            waiting_rows = (
+                await db_sess.execute(
+                    sa.select(
+                        k.c.id.label("kernel_id"),
+                        k.c.agent,
+                    )
+                    .select_from(k.join(ra, ra.c.kernel_id == k.c.id))
+                    .where(
+                        k.c.session_id.in_(session_ids),
+                        k.c.status == KernelStatus.RESERVED,
+                        k.c.agent.is_not(None),
+                        ra.c.free_at.is_(None),
+                        ra.c.reserved_at.is_(None),
+                    )
+                    .group_by(k.c.id, k.c.agent)
+                    # First reserved, first admitted: the walk below relies
+                    # on this per-agent ordering.
+                    .order_by(k.c.agent, sa.func.min(ra.c.prereserved_at), k.c.id)
+                )
+            ).all()
+
+            by_agent: dict[AgentId, list[KernelId]] = {}
+            for row in waiting_rows:
+                by_agent.setdefault(AgentId(row.agent), []).append(KernelId(row.kernel_id))
+
+            now = await self._get_db_now_in_session(db_sess)
+            for agent_id, kernel_ids in by_agent.items():
+                for kernel_id in kernel_ids:
+                    if not await self._admit_kernel_hold(db_sess, agent_id, kernel_id, now):
+                        # First reserved, first admitted: later reservations
+                        # on this agent wait for the next cycle.
+                        break
+                    await db_sess.execute(
+                        sa.update(KernelRow)
+                        .where(
+                            KernelRow.id == kernel_id,
+                            KernelRow.status == KernelStatus.RESERVED,
+                        )
+                        .values(
+                            status=KernelStatus.SCHEDULED,
+                            status_info="prereservation-admitted",
+                            status_changed=now,
+                            status_history=sql_json_merge(
+                                KernelRow.__table__.c.status_history,
+                                (),
+                                {KernelStatus.SCHEDULED.name: now.isoformat()},
+                            ),
+                        )
+                    )
+                    admitted.append(kernel_id)
+        return admitted
+
+    async def _admit_kernel_hold(
+        self,
+        db_sess: SASession,
+        agent_id: AgentId,
+        kernel_id: KernelId,
+        now: datetime,
+    ) -> bool:
+        """Move one kernel's holds from ``prereserved`` into ``reserved``.
+
+        The rows move first (``reserved = prereserved, prereserved = 0``
+        with the ``reserved_at`` stamp) and their returned amounts drive
+        the agent mirror under the admission guard; False rolls the whole
+        move back when any slot does not fit yet.
+        """
+        ar = AgentResourceRow.__table__
+        savepoint = await db_sess.begin_nested()
+        moved_rows = (
+            await db_sess.execute(
+                sa.update(ResourceAllocationRow)
+                .where(
+                    ResourceAllocationRow.kernel_id == kernel_id,
+                    ResourceAllocationRow.free_at.is_(None),
+                    ResourceAllocationRow.reserved_at.is_(None),
+                )
+                .values(
+                    reserved=ResourceAllocationRow.prereserved,
+                    prereserved=0,
+                    reserved_at=now,
+                )
+                .returning(ResourceAllocationRow.slot_name, ResourceAllocationRow.reserved)
+            )
+        ).all()
+        if not moved_rows:
+            await savepoint.rollback()
+            return False
+        amounts = sa.values(
+            sa.column("slot_name", sa.String),
+            sa.column("amount", sa.Numeric),
+            name="admit_amounts",
+        ).data([(row.slot_name, row.reserved) for row in moved_rows])
+        result = await db_sess.execute(
+            sa.update(ar)
+            .where(
+                ar.c.agent_id == agent_id,
+                ar.c.slot_name == amounts.c.slot_name,
+                ar.c.used + ar.c.reserved + amounts.c.amount <= ar.c.capacity,
+            )
+            .values(
+                reserved=ar.c.reserved + amounts.c.amount,
+                prereserved=ar.c.prereserved - amounts.c.amount,
+            )
+        )
+        if cast(CursorResult[Any], result).rowcount != len(moved_rows):
+            await savepoint.rollback()
+            return False
+        await savepoint.commit()
+        return True
 
     async def _free_kernel_allocations(
         self,
@@ -2433,6 +2564,8 @@ class ScheduleDBSource:
         ar = AgentResourceRow.__table__
         slots = sorted(resource_slot_to_quantities(occupied_slots), key=lambda s: s.slot_name)
         for s in slots:
+            # ``reserved`` is not SET here, so RETURNING yields the amount the
+            # row still held; it is zeroed right after the move.
             alloc_result = await db_sess.execute(
                 sa.update(ResourceAllocationRow)
                 .where(
@@ -2442,16 +2575,24 @@ class ScheduleDBSource:
                     ResourceAllocationRow.used_at.is_(None),
                 )
                 .values(used=s.quantity, used_at=sa.func.now())
-                .returning(ResourceAllocationRow.requested)
+                .returning(ResourceAllocationRow.reserved)
             )
             alloc_row = alloc_result.first()
             if alloc_row is None:
                 continue
             await db_sess.execute(
+                sa.update(ResourceAllocationRow)
+                .where(
+                    ResourceAllocationRow.kernel_id == kernel_id,
+                    ResourceAllocationRow.slot_name == s.slot_name,
+                )
+                .values(reserved=0)
+            )
+            await db_sess.execute(
                 sa.update(ar)
                 .where(ar.c.agent_id == agent_id, ar.c.slot_name == s.slot_name)
                 .values(
-                    reserved=sa.func.greatest(ar.c.reserved - alloc_row.requested, 0),
+                    reserved=sa.func.greatest(ar.c.reserved - alloc_row.reserved, 0),
                     used=ar.c.used + s.quantity,
                 )
             )
@@ -2497,7 +2638,7 @@ class ScheduleDBSource:
                 .where(
                     ar.c.agent_id == agent_id,
                     ar.c.slot_name == r.slot_name,
-                    new_reserved + ar.c.used <= ar.c.capacity,
+                    new_reserved + ar.c.prereserved + ar.c.used <= ar.c.capacity,
                 )
                 .values(reserved=new_reserved)
             )
@@ -2507,56 +2648,70 @@ class ScheduleDBSource:
                 )
         await self._stamp_allocations_reserved(db_sess, kernel_id)
 
-    async def _reserve_kernel_resources_for_preemption(
+    async def _prereserve_kernel_resources(
         self,
         db_sess: SASession,
         kernel_id: KernelId,
         agent_id: AgentId,
     ) -> None:
-        """Reserve a kernel's requested slots ahead of the victims' release.
+        """Prereserve a kernel's requested slots ahead of the victims' release.
 
-        Same shape as :meth:`_reserve_kernel_resources`, but the guard
-        excludes ``used``: the victims still hold their allocations, so
-        ``reserved + used`` may transiently exceed ``capacity``. Only
-        ``reserved + requested <= capacity`` is enforced — a reservation
-        the agent could never satisfy is rejected.
+        Targets the kernel's allocation rows that never held anything yet
+        (``prereserved_at``, ``used_at`` and ``free_at`` all unset): stamps
+        ``prereserved_at`` and adds their amounts into the agent's
+        ``prereserved`` in one pass. The guard excludes ``used``: the
+        victims still hold their allocations, so the future holds may
+        transiently overlap them. ``reserved + prereserved + requested <=
+        capacity`` is enforced — a prereservation the agent could never
+        satisfy is rejected, rolling back the stamp with the rest of the
+        transaction.
         """
         ar = AgentResourceRow.__table__
-        requested_rows = (
+        stamped_rows = (
             await db_sess.execute(
-                sa.select(ResourceAllocationRow.slot_name, ResourceAllocationRow.requested)
+                sa.update(ResourceAllocationRow)
                 .where(
                     ResourceAllocationRow.kernel_id == kernel_id,
-                    ResourceAllocationRow.free_at.is_(None),
+                    ResourceAllocationRow.prereserved_at.is_(None),
                     ResourceAllocationRow.used_at.is_(None),
+                    ResourceAllocationRow.free_at.is_(None),
                 )
-                .order_by(ResourceAllocationRow.slot_name)
+                .values(
+                    prereserved_at=sa.func.now(),
+                    prereserved=ResourceAllocationRow.requested,
+                )
+                .returning(ResourceAllocationRow.slot_name, ResourceAllocationRow.prereserved)
             )
         ).all()
-        for r in requested_rows:
-            new_reserved = ar.c.reserved + r.requested
-            result = await db_sess.execute(
-                sa.update(ar)
-                .where(
-                    ar.c.agent_id == agent_id,
-                    ar.c.slot_name == r.slot_name,
-                    new_reserved <= ar.c.capacity,
-                )
-                .values(reserved=new_reserved)
+        if not stamped_rows:
+            return
+        amounts = sa.values(
+            sa.column("slot_name", sa.String),
+            sa.column("requested", sa.Numeric),
+            name="prereserve_amounts",
+        ).data([(row.slot_name, row.prereserved) for row in stamped_rows])
+        result = await db_sess.execute(
+            sa.update(ar)
+            .where(
+                ar.c.agent_id == agent_id,
+                ar.c.slot_name == amounts.c.slot_name,
+                ar.c.reserved + ar.c.prereserved + amounts.c.requested <= ar.c.capacity,
             )
-            if cast(CursorResult[Any], result).rowcount == 0:
-                raise AgentResourceCapacityExceeded(
-                    f"Agent {agent_id}: reservation exceeds capacity for slot '{r.slot_name}'"
-                )
-        await self._stamp_allocations_reserved(db_sess, kernel_id)
+            .values(prereserved=ar.c.prereserved + amounts.c.requested)
+        )
+        if cast(CursorResult[Any], result).rowcount != len(stamped_rows):
+            raise AgentResourceCapacityExceeded(
+                f"Agent {agent_id}: prereservation exceeds capacity"
+            )
 
     async def _stamp_allocations_reserved(
         self,
         db_sess: SASession,
         kernel_id: KernelId,
     ) -> None:
-        """Record the hold-established time on the kernel's active
-        allocation rows (idempotent via the ``reserved_at IS NULL`` guard)."""
+        """Record the admitted hold on the kernel's active allocation rows:
+        the amount into the row's ``reserved`` bucket and the time into
+        ``reserved_at`` (idempotent via the ``reserved_at IS NULL`` guard)."""
         await db_sess.execute(
             sa.update(ResourceAllocationRow)
             .where(
@@ -2565,7 +2720,10 @@ class ScheduleDBSource:
                 ResourceAllocationRow.used_at.is_(None),
                 ResourceAllocationRow.reserved_at.is_(None),
             )
-            .values(reserved_at=sa.func.now())
+            .values(
+                reserved_at=sa.func.now(),
+                reserved=ResourceAllocationRow.requested,
+            )
         )
 
     async def _free_allocations_and_release(
@@ -2577,11 +2735,12 @@ class ScheduleDBSource:
         """Free the given kernels' active allocations and release their hold on
         ``agent_resources``.
 
-        Rows that were only reserved (``used_at IS NULL``) decrement the agent's
-        ``reserved`` by ``requested``; rows that were running (``used_at`` set)
-        decrement ``used`` by the recorded amount. ``greatest(…, 0)`` guards
-        against drift-induced negatives. Idempotent via the ``free_at IS NULL``
-        guard. Returns the number of allocation rows freed.
+        The row's bucket values are the ledger: each agent counter is
+        decremented by the row's own ``prereserved`` / ``reserved`` /
+        ``used`` amounts unconditionally — no interpretation happens here.
+        ``greatest(…, 0)`` guards against drift-induced negatives. Idempotent
+        via the ``free_at IS NULL`` guard. Returns the number of allocation
+        rows freed.
         """
         if not kernel_ids:
             return 0
@@ -2604,9 +2763,9 @@ class ScheduleDBSource:
                 .returning(
                     ResourceAllocationRow.kernel_id,
                     ResourceAllocationRow.slot_name,
-                    ResourceAllocationRow.requested,
+                    ResourceAllocationRow.prereserved,
+                    ResourceAllocationRow.reserved,
                     ResourceAllocationRow.used,
-                    ResourceAllocationRow.used_at,
                 )
             )
         ).all()
@@ -2614,24 +2773,26 @@ class ScheduleDBSource:
             return 0
 
         reserved_delta: dict[tuple[str, str], Decimal] = defaultdict(Decimal)
+        prereserved_delta: dict[tuple[str, str], Decimal] = defaultdict(Decimal)
         used_delta: dict[tuple[str, str], Decimal] = defaultdict(Decimal)
         for r in freed:
             agent_id = agent_by_kernel.get(r.kernel_id)
             if not agent_id:
                 continue
             key = (agent_id, r.slot_name)
-            if r.used_at is None:
-                reserved_delta[key] += r.requested
-            elif r.used is not None:
+            prereserved_delta[key] += r.prereserved
+            reserved_delta[key] += r.reserved
+            if r.used is not None:
                 used_delta[key] += r.used
 
-        for key in sorted(set(reserved_delta) | set(used_delta)):
+        for key in sorted(set(reserved_delta) | set(prereserved_delta) | set(used_delta)):
             agent_id, slot_name = key
             await db_sess.execute(
                 sa.update(ar)
                 .where(ar.c.agent_id == agent_id, ar.c.slot_name == slot_name)
                 .values(
                     reserved=sa.func.greatest(ar.c.reserved - reserved_delta[key], 0),
+                    prereserved=sa.func.greatest(ar.c.prereserved - prereserved_delta[key], 0),
                     used=sa.func.greatest(ar.c.used - used_delta[key], 0),
                 )
             )

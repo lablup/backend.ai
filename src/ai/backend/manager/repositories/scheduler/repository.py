@@ -29,6 +29,7 @@ from ai.backend.common.resource.types import TotalResourceData
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
+    KernelId,
     PreemptionMode,
     SessionId,
     VFolderMount,
@@ -282,6 +283,11 @@ class SchedulerRepository:
     ) -> PreemptionMode:
         """Return the preemption mode configured on a resource group."""
         return await self._db_source.get_resource_group_preemption_mode(resource_group_id)
+
+    @scheduler_repository_resilience.apply()
+    async def admit_prereserved_kernels(self, session_ids: Sequence[SessionId]) -> list[KernelId]:
+        """Admit prereserved kernels that fit now, first reserved first."""
+        return await self._db_source.admit_prereserved_kernels(session_ids)
 
     @scheduler_repository_resilience.apply()
     async def get_all_resource_groups(self) -> list[ResourceGroupID]:
