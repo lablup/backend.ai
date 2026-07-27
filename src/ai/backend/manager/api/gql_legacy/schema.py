@@ -3341,26 +3341,48 @@ class GQLExceptionMiddleware:
     ) -> Any:
         try:
             res = next(root, info, **args)
+        except GraphQLError:
+            raise
         except BackendAIError as e:
-            if e.status_code // 100 == 4:
-                log.debug("GraphQL client error: {}", e)
-            elif e.status_code // 100 == 5:
-                log.exception("GraphQL Server error: {}", e)
-            raise GraphQLError(
-                message=str(e),
-                extensions={
-                    "code": str(e.error_code()),
-                },
-            ) from e
+            raise self._wrap_backend_error(e) from e
         except Exception as e:
-            log.exception("GraphQL unexpected error: {}", e)
-            raise GraphQLError(
-                message=str(e),
-                extensions={
-                    "code": str(ErrorCode.default()),
-                },
-            ) from e
+            raise self._wrap_unexpected_error(e) from e
+        if asyncio.iscoroutine(res):
+            # Async resolvers raise while being awaited by graphql-core,
+            # outside this try block; wrap the coroutine to catch them.
+            return self._resolve_async(res)
         return res
+
+    async def _resolve_async(self, coro: Awaitable[Any]) -> Any:
+        try:
+            return await coro
+        except GraphQLError:
+            raise
+        except BackendAIError as e:
+            raise self._wrap_backend_error(e) from e
+        except BaseException as e:
+            raise self._wrap_unexpected_error(e) from e
+
+    def _wrap_backend_error(self, e: BackendAIError) -> GraphQLError:
+        if e.status_code // 100 == 4:
+            log.debug("GraphQL client error: {}", e)
+        elif e.status_code // 100 == 5:
+            log.exception("GraphQL Server error: {}", e)
+        return GraphQLError(
+            message=str(e),
+            extensions={
+                "code": str(e.error_code()),
+            },
+        )
+
+    def _wrap_unexpected_error(self, e: BaseException) -> GraphQLError:
+        log.exception("GraphQL unexpected error: {}", e)
+        return GraphQLError(
+            message=str(e),
+            extensions={
+                "code": str(ErrorCode.default()),
+            },
+        )
 
 
 class GQLMetricMiddleware:
