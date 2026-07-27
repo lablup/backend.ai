@@ -67,16 +67,16 @@ class NetworkTimeoutChecker(IdleChecker):
             if max_inactivity_seconds == 0:
                 continue
             for session in assignment.sessions:
-                judgment = self._judge_session(
-                    checker_id=assignment.definition.checker_id,
-                    session_id=session.session_id,
-                    expire_at=session.expire_at,
-                    state=states[session.session_id],
-                    max_inactivity_seconds=max_inactivity_seconds,
-                    current_time=context.current_time,
+                judgments.append(
+                    self._judge_session(
+                        checker_id=assignment.definition.checker_id,
+                        session_id=session.session_id,
+                        expire_at=session.expire_at,
+                        state=states[session.session_id],
+                        max_inactivity_seconds=max_inactivity_seconds,
+                        current_time=context.current_time,
+                    )
                 )
-                if judgment is not None:
-                    judgments.append(judgment)
         return judgments
 
     def _judge_session(
@@ -88,9 +88,7 @@ class NetworkTimeoutChecker(IdleChecker):
         state: _NetworkIdleState,
         max_inactivity_seconds: int,
         current_time: datetime,
-    ) -> IdleJudgment | None:
-        if state.last_access is None:
-            return None
+    ) -> IdleJudgment:
         if state.last_access == _ONGOING_ACTIVITY_SENTINEL or state.active_connections > 0:
             return IdleJudgment(
                 checker_id=checker_id,
@@ -103,7 +101,14 @@ class NetworkTimeoutChecker(IdleChecker):
                     f"active_connections={state.active_connections}"
                 ),
             )
-        last_access_at = datetime.fromtimestamp(state.last_access, tz=UTC)
+        if state.last_access is None:
+            last_access_message = "last_access_at=None"
+        else:
+            last_access_at = datetime.fromtimestamp(state.last_access, tz=UTC)
+            last_access_message = (
+                f"last_access_at={last_access_at:%Y-%m-%d %H:%M:%S} UTC, "
+                f"inactive_seconds={(current_time - last_access_at).total_seconds():f}"
+            )
         if current_time >= expire_at:
             status = IdleCheckPhase.IDLE_EXPIRED
             message = "Maximum network inactivity exceeded"
@@ -119,8 +124,7 @@ class NetworkTimeoutChecker(IdleChecker):
                 f"{message}: "
                 f"max_network_inactivity_seconds={max_inactivity_seconds}, "
                 f"active_connections={state.active_connections}, "
-                f"last_access_at={last_access_at:%Y-%m-%d %H:%M:%S} UTC, "
-                f"inactive_seconds={(current_time - last_access_at).total_seconds():f}"
+                f"{last_access_message}"
             ),
         )
 

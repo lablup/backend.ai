@@ -118,6 +118,25 @@ class TestNetworkTimeoutChecker:
         return valkey_live
 
     @pytest.fixture()
+    def missing_last_access_valkey(
+        self,
+        valkey_live: AsyncMock,
+    ) -> AsyncMock:
+        valkey_live.get_multiple_live_data.return_value = [None]
+        return valkey_live
+
+    @pytest.fixture()
+    def missing_last_access_with_active_connection_valkey(
+        self,
+        missing_last_access_valkey: AsyncMock,
+        session: IdleCheckSession,
+    ) -> AsyncMock:
+        missing_last_access_valkey.count_active_connections_batch.side_effect = (
+            lambda _session_ids: {session.session_id: 1}
+        )
+        return missing_last_access_valkey
+
+    @pytest.fixture()
     def disabled_assignment(
         self,
         session: IdleCheckSession,
@@ -173,6 +192,50 @@ class TestNetworkTimeoutChecker:
         assert judgments[0].expire_at == _EXISTING_EXPIRE_AT
         assert judgments[0].message.startswith("Maximum network inactivity exceeded:")
         assert "last_access_at=2026-01-01 00:00:00 UTC" in judgments[0].message
+
+    async def test_missing_last_access_before_expiration_is_idle(
+        self,
+        checker: NetworkTimeoutChecker,
+        assignment: CheckerAssignment,
+        missing_last_access_valkey: AsyncMock,
+    ) -> None:
+        judgments = await checker.judge(
+            (assignment,),
+            context=IdleCheckerContext(current_time=_BASE_TIME + timedelta(seconds=10)),
+        )
+
+        assert judgments[0].status is IdleCheckPhase.IDLE
+        assert judgments[0].expire_at == _EXISTING_EXPIRE_AT
+        assert "last_access_at=None" in judgments[0].message
+
+    async def test_missing_last_access_after_expiration_is_idle_expired(
+        self,
+        checker: NetworkTimeoutChecker,
+        assignment: CheckerAssignment,
+        missing_last_access_valkey: AsyncMock,
+    ) -> None:
+        judgments = await checker.judge(
+            (assignment,),
+            context=IdleCheckerContext(current_time=_BASE_TIME + timedelta(seconds=20)),
+        )
+
+        assert judgments[0].status is IdleCheckPhase.IDLE_EXPIRED
+        assert judgments[0].expire_at == _EXISTING_EXPIRE_AT
+        assert "last_access_at=None" in judgments[0].message
+
+    async def test_missing_last_access_with_active_connection_is_active(
+        self,
+        checker: NetworkTimeoutChecker,
+        assignment: CheckerAssignment,
+        missing_last_access_with_active_connection_valkey: AsyncMock,
+    ) -> None:
+        judgments = await checker.judge(
+            (assignment,),
+            context=IdleCheckerContext(current_time=_BASE_TIME + timedelta(seconds=60)),
+        )
+
+        assert judgments[0].status is IdleCheckPhase.ACTIVE
+        assert judgments[0].expire_at == _BASE_TIME + timedelta(seconds=90)
 
     async def test_active_connection_refreshes_expiration(
         self,
