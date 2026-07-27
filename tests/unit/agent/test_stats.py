@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from decimal import Decimal
 from unittest.mock import patch
 
 import pytest
 
-from ai.backend.agent.stats import MovingStatistics
+from ai.backend.agent.stats import Measurement, Metric, MetricTypes, MovingStatistics
 
 
 class TestMovingStatistics:
@@ -84,3 +85,74 @@ class TestMovingStatistics:
             stats.update(case.second_value)
 
         assert stats.rate == case.expected_rate
+
+
+class TestMetric:
+    """Tests for Metric class, focusing on current_hook application."""
+
+    @dataclass(frozen=True)
+    class CreationTestCase:
+        id: str
+        initial_value: Decimal
+        current_hook: Callable[[Metric], Decimal] | None
+        expected_current: Decimal
+        expected_pct: str
+
+    @pytest.mark.parametrize(
+        "case",
+        [
+            CreationTestCase(
+                id="rate_hook_applied_to_first_observation",
+                initial_value=Decimal("744400.000"),
+                current_hook=lambda metric: metric.stats.rate,
+                expected_current=Decimal(0),
+                expected_pct="0",
+            ),
+            CreationTestCase(
+                id="no_hook_keeps_raw_value",
+                initial_value=Decimal("744400.000"),
+                current_hook=None,
+                expected_current=Decimal("744400.000"),
+                expected_pct="74440",
+            ),
+        ],
+        ids=lambda case: case.id,
+    )
+    def test_creation_applies_current_hook(self, case: CreationTestCase) -> None:
+        """Test that a hook-derived metric does not expose the raw cumulative counter
+        as current/pct on the first observation."""
+        metric = Metric(
+            key="cpu_util",
+            type=MetricTypes.UTILIZATION,
+            unit_hint="percent",
+            stats=MovingStatistics(case.initial_value),
+            stats_filter=frozenset({"avg", "max"}),
+            current=case.initial_value,
+            capacity=Decimal(1000),
+            current_hook=case.current_hook,
+        )
+
+        assert metric.current == case.expected_current
+        assert metric.to_serializable_dict()["pct"] == case.expected_pct
+
+    @pytest.fixture
+    def cpu_util_metric(self) -> Metric:
+        with patch("time.perf_counter", return_value=1.0):
+            return Metric(
+                key="cpu_util",
+                type=MetricTypes.UTILIZATION,
+                unit_hint="percent",
+                stats=MovingStatistics(Decimal("1000.000")),
+                stats_filter=frozenset({"avg", "max"}),
+                current=Decimal("1000.000"),
+                capacity=Decimal(1000),
+                current_hook=lambda metric: metric.stats.rate,
+            )
+
+    def test_update_applies_current_hook(self, cpu_util_metric: Metric) -> None:
+        """Test that subsequent observations report the rate derived from the counter delta."""
+        with patch("time.perf_counter", return_value=2.0):
+            cpu_util_metric.update(Measurement(Decimal("1660.000")))
+
+        assert cpu_util_metric.current == Decimal(660)
+        assert cpu_util_metric.to_serializable_dict()["pct"] == "66"
