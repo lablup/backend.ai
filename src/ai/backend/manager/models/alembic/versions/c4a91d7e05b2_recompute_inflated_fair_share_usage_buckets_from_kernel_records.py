@@ -5,16 +5,11 @@ afterwards, so both the JSONB ``resource_usage`` mirror and the normalized
 entries hold a cross product.  Neither can be corrected in place, so both are
 rebuilt from ``kernel_usage_records``, which was never affected.
 
-``usage_bucket_entries.amount`` becomes ``resource_usage``, matching what the
-JSONB mirror on ``kernel_usage_records`` and the three bucket tables already call
-this quantity, and drops its precision limit.  It now holds the product directly
-rather than a factor readers had to multiply back out: a domain-level daily mem
-bucket runs past any fixed precision, and unconstrained NUMERIC has no ceiling.
-
-``duration_seconds`` goes with it.  It only ever existed to reconstitute that
-product, no reader consulted it on its own, and it counted kernel-seconds rather
-than wall-clock, so leaving it would leave a column that invites the same
-misreading the product form did.
+``usage_bucket_entries.amount`` becomes ``resource_usage`` (the name the JSONB
+mirror and the three bucket tables already use) and drops its precision limit,
+now holding the product directly instead of a factor to multiply back out.
+``duration_seconds`` is dropped: nothing read it on its own once the product is
+stored directly.
 
 Revision ID: c4a91d7e05b2
 Revises: c4e1a7f9b26d
@@ -57,15 +52,16 @@ def upgrade() -> None:
         op.drop_column("usage_bucket_entries", "duration_seconds")
 
     # Data change: rebuild the corrupted values from kernel_usage_records.
-    # Delete every corrupted entry first (all levels at once), then rebuild each
-    # level.  Each level writes its own entries (their join keys genuinely differ),
-    # then hands the shared JSONB-mirror step to _sync_jsonb_mirror.
+    # kernel_usage_records is by far the largest table, so it is scanned once into a
+    # per-entity-per-day temp table; the three bucket levels then roll up from that
+    # small intermediate instead of each re-scanning the raw records.
     window = _rebuildable_date_range(conn)
     if window is None:
         # No usage records to rebuild from (fresh install, or everything purged).
         return
     rebuild_from, rebuild_to = window
     _purge_corrupted_usage(conn, rebuild_from, rebuild_to)
+    _aggregate_kernel_records(conn, rebuild_from, rebuild_to)
     _rebuild_user_buckets(conn, rebuild_from, rebuild_to)
     _rebuild_project_buckets(conn, rebuild_from, rebuild_to)
     _rebuild_domain_buckets(conn, rebuild_from, rebuild_to)
@@ -155,6 +151,35 @@ def _purge_corrupted_usage(
     )
 
 
+def _aggregate_kernel_records(
+    conn: sa.engine.Connection, rebuild_from: date, rebuild_to: date
+) -> None:
+    """Scan kernel_usage_records once into a per-(entity, day, slot) temp table.
+
+    kernel_usage_records is the largest table and cannot be indexed for the
+    per-day rebuild (the day is a functional expression on ``period_start``), so it
+    is scanned a single time here.  The three bucket levels roll up from ``_rebuilt``
+    (roughly entities * days * slots rows) instead of re-scanning the raw records.
+    ``_rebuilt`` holds the finest grain that carries every level's key columns.
+    """
+    conn.execute(
+        sa.text(
+            """
+            CREATE TEMP TABLE _rebuilt ON COMMIT DROP AS
+            SELECT user_uuid, project_id, domain_name, resource_group_id,
+                   (period_start AT TIME ZONE 'UTC')::date AS period_date,
+                   kv.key AS slot_name,
+                   SUM(kv.value::numeric) AS resource_usage
+            FROM kernel_usage_records, LATERAL jsonb_each_text(resource_usage) AS kv
+            WHERE (period_start AT TIME ZONE 'UTC')::date BETWEEN :rebuild_from AND :rebuild_to
+            GROUP BY user_uuid, project_id, domain_name, resource_group_id, period_date, kv.key
+            """
+        ),
+        {"rebuild_from": rebuild_from, "rebuild_to": rebuild_to},
+    )
+    conn.execute(sa.text("ANALYZE _rebuilt"))
+
+
 def _sync_jsonb_mirror(
     conn: sa.engine.Connection,
     bucket_table: str,
@@ -208,29 +233,23 @@ def _sync_jsonb_mirror(
 
 
 def _rebuild_user_buckets(conn: sa.engine.Connection, rebuild_from: date, rebuild_to: date) -> None:
-    """Recompute user bucket entries, then rebuild their JSONB mirror."""
-    # Insert one entry per (bucket, slot), summing the per-slice resource-seconds
-    # that kernel_usage_records already stores correctly.  capacity is refilled by
-    # the next observation tick, so 0 here is safe.
+    """Roll _rebuilt up to user buckets (sum over domain), then sync the JSONB mirror."""
     conn.execute(
         sa.text(
             """
             INSERT INTO usage_bucket_entries
                 (bucket_id, bucket_type, slot_name, resource_usage, capacity)
-            SELECT user_usage_buckets.id, 'user', slot.key, SUM(slot.value::numeric), 0
+            SELECT user_usage_buckets.id, 'user', _rebuilt.slot_name,
+                   SUM(_rebuilt.resource_usage), 0
             FROM user_usage_buckets
-            JOIN kernel_usage_records
-              ON kernel_usage_records.user_uuid = user_usage_buckets.user_uuid
-             AND kernel_usage_records.project_id = user_usage_buckets.project_id
-             AND kernel_usage_records.resource_group_id = user_usage_buckets.resource_group_id
-             AND (kernel_usage_records.period_start AT TIME ZONE 'UTC')::date
-                 = user_usage_buckets.period_start
-            CROSS JOIN LATERAL jsonb_each_text(kernel_usage_records.resource_usage) AS slot
-            WHERE user_usage_buckets.period_start BETWEEN :rebuild_from AND :rebuild_to
-            GROUP BY user_usage_buckets.id, slot.key
+            JOIN _rebuilt
+              ON _rebuilt.user_uuid = user_usage_buckets.user_uuid
+             AND _rebuilt.project_id = user_usage_buckets.project_id
+             AND _rebuilt.resource_group_id = user_usage_buckets.resource_group_id
+             AND _rebuilt.period_date = user_usage_buckets.period_start
+            GROUP BY user_usage_buckets.id, _rebuilt.slot_name
             """
-        ),
-        {"rebuild_from": rebuild_from, "rebuild_to": rebuild_to},
+        )
     )
     _sync_jsonb_mirror(conn, "user_usage_buckets", "user", rebuild_from, rebuild_to)
 
@@ -238,25 +257,22 @@ def _rebuild_user_buckets(conn: sa.engine.Connection, rebuild_from: date, rebuil
 def _rebuild_project_buckets(
     conn: sa.engine.Connection, rebuild_from: date, rebuild_to: date
 ) -> None:
-    """Recompute project bucket entries, then rebuild their JSONB mirror."""
+    """Roll _rebuilt up to project buckets (sum over user), then sync the JSONB mirror."""
     conn.execute(
         sa.text(
             """
             INSERT INTO usage_bucket_entries
                 (bucket_id, bucket_type, slot_name, resource_usage, capacity)
-            SELECT project_usage_buckets.id, 'project', slot.key, SUM(slot.value::numeric), 0
+            SELECT project_usage_buckets.id, 'project', _rebuilt.slot_name,
+                   SUM(_rebuilt.resource_usage), 0
             FROM project_usage_buckets
-            JOIN kernel_usage_records
-              ON kernel_usage_records.project_id = project_usage_buckets.project_id
-             AND kernel_usage_records.resource_group_id = project_usage_buckets.resource_group_id
-             AND (kernel_usage_records.period_start AT TIME ZONE 'UTC')::date
-                 = project_usage_buckets.period_start
-            CROSS JOIN LATERAL jsonb_each_text(kernel_usage_records.resource_usage) AS slot
-            WHERE project_usage_buckets.period_start BETWEEN :rebuild_from AND :rebuild_to
-            GROUP BY project_usage_buckets.id, slot.key
+            JOIN _rebuilt
+              ON _rebuilt.project_id = project_usage_buckets.project_id
+             AND _rebuilt.resource_group_id = project_usage_buckets.resource_group_id
+             AND _rebuilt.period_date = project_usage_buckets.period_start
+            GROUP BY project_usage_buckets.id, _rebuilt.slot_name
             """
-        ),
-        {"rebuild_from": rebuild_from, "rebuild_to": rebuild_to},
+        )
     )
     _sync_jsonb_mirror(conn, "project_usage_buckets", "project", rebuild_from, rebuild_to)
 
@@ -264,24 +280,21 @@ def _rebuild_project_buckets(
 def _rebuild_domain_buckets(
     conn: sa.engine.Connection, rebuild_from: date, rebuild_to: date
 ) -> None:
-    """Recompute domain bucket entries, then rebuild their JSONB mirror."""
+    """Roll _rebuilt up to domain buckets (sum over user and project), then sync JSONB."""
     conn.execute(
         sa.text(
             """
             INSERT INTO usage_bucket_entries
                 (bucket_id, bucket_type, slot_name, resource_usage, capacity)
-            SELECT domain_usage_buckets.id, 'domain', slot.key, SUM(slot.value::numeric), 0
+            SELECT domain_usage_buckets.id, 'domain', _rebuilt.slot_name,
+                   SUM(_rebuilt.resource_usage), 0
             FROM domain_usage_buckets
-            JOIN kernel_usage_records
-              ON kernel_usage_records.domain_name = domain_usage_buckets.domain_name
-             AND kernel_usage_records.resource_group_id = domain_usage_buckets.resource_group_id
-             AND (kernel_usage_records.period_start AT TIME ZONE 'UTC')::date
-                 = domain_usage_buckets.period_start
-            CROSS JOIN LATERAL jsonb_each_text(kernel_usage_records.resource_usage) AS slot
-            WHERE domain_usage_buckets.period_start BETWEEN :rebuild_from AND :rebuild_to
-            GROUP BY domain_usage_buckets.id, slot.key
+            JOIN _rebuilt
+              ON _rebuilt.domain_name = domain_usage_buckets.domain_name
+             AND _rebuilt.resource_group_id = domain_usage_buckets.resource_group_id
+             AND _rebuilt.period_date = domain_usage_buckets.period_start
+            GROUP BY domain_usage_buckets.id, _rebuilt.slot_name
             """
-        ),
-        {"rebuild_from": rebuild_from, "rebuild_to": rebuild_to},
+        )
     )
     _sync_jsonb_mirror(conn, "domain_usage_buckets", "domain", rebuild_from, rebuild_to)
