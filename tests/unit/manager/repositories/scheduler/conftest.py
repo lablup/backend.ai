@@ -494,12 +494,25 @@ async def create_pending_session_with_kernels(
             )
             await db_sess.flush()
 
+            # Mirror the production ledger: the row's bucket matches the
+            # kernel's lifecycle interval (RESERVED -> prereserved,
+            # SCHEDULED..CREATING -> reserved, RUNNING -> used).
+            prereserving = kernel_status == KernelStatus.RESERVED
+            reserving = (
+                not prereserving
+                and not usage_reported
+                and kernel_status in KernelStatus.resource_requested_statuses()
+            )
             for slot_name, requested in [("cpu", cpu_requested), ("mem", mem_requested)]:
                 db_sess.add(
                     ResourceAllocationRow(
                         kernel_id=kernel_id,
                         slot_name=slot_name,
                         requested=requested,
+                        prereserved=requested if prereserving else Decimal(0),
+                        reserved=requested if reserving else Decimal(0),
+                        prereserved_at=now if prereserving else None,
+                        reserved_at=now if (reserving or usage_reported) else None,
                         used=requested if usage_reported else None,
                         used_at=now if usage_reported else None,
                     )
@@ -532,6 +545,7 @@ def make_session_allocations(
         SessionAllocation(
             session_id=session_id,
             kernel_allocations=kernel_allocations,
+            preempting_session_ids=(),
         )
     ]
 
