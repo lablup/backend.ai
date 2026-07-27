@@ -1715,6 +1715,20 @@ class ScheduleCoordinator:
                 long_interval=60.0,
                 initial_delay=30.0,
             ),
+            # Promote RESERVED sessions whose kernels are all admitted
+            SchedulerTaskSpec(
+                ScheduleType.CHECK_RESERVED_PROGRESS,
+                short_interval=2.0,
+                long_interval=60.0,
+                initial_delay=30.0,
+            ),
+            # Advance RESERVED sessions once their victims' resources freed
+            SchedulerTaskSpec(
+                ScheduleType.RELEASE_RESERVED,
+                short_interval=2.0,
+                long_interval=60.0,
+                initial_delay=30.0,
+            ),
             # Branch preemption victims by the resource group's preemption mode
             SchedulerTaskSpec(
                 ScheduleType.PREEMPTED,

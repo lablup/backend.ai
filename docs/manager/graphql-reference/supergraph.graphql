@@ -13063,7 +13063,7 @@ type PreemptionConfig
   """Sessions with priority <= this value are eligible for preemption."""
   preemptiblePriority: Int!
 
-  """Tie-breaking order for same-priority sessions during preemption."""
+  """Victim selection order for preemption."""
   order: PreemptionOrder!
 
   """How to preempt a session when preemption is triggered."""
@@ -13087,9 +13087,7 @@ input PreemptionConfigInput
   """Sessions with priority <= this value are preemptible. Default is 5."""
   preemptiblePriority: Int! = 5
 
-  """
-  Tie-breaking order for same-priority sessions (OLDEST, NEWEST). Default is OLDEST.
-  """
+  """Victim selection order for preemption. Default is OLDEST."""
   order: PreemptionOrder! = OLDEST
 
   """How to preempt sessions (TERMINATE, RESCHEDULE). Default is TERMINATE."""
@@ -13112,13 +13110,15 @@ enum PreemptionMode
 }
 
 """
-Added in 26.3.0. Tie-breaking order for same-priority sessions during preemption.
+Added in 26.3.0. Victim selection order for preemption. OLDEST/NEWEST break same-priority ties by start time; FEWEST_SESSIONS evicts the fewest sessions; SMALLEST_RESOURCES reclaims the least resources.
 """
 enum PreemptionOrder
   @join__type(graph: STRAWBERRY)
 {
   OLDEST @join__enumValue(graph: STRAWBERRY)
   NEWEST @join__enumValue(graph: STRAWBERRY)
+  FEWEST_SESSIONS @join__enumValue(graph: STRAWBERRY)
+  SMALLEST_RESOURCES @join__enumValue(graph: STRAWBERRY)
 }
 
 type PreloadImage
@@ -14759,7 +14759,7 @@ type Query
   """Added in 25.5.0."""
   total_resource_slot(
     """
-    `statuses` argument is an array of session statuses. Only sessions with the specified statuses will be queried to calculate the sum of total resource slots. The argument should be an array of the following valid status values: ['PENDING', 'DEPRIORITIZING', 'SCHEDULED', 'PREPARING', 'PULLING', 'PREPARED', 'CREATING', 'RUNNING', 'RESTARTING', 'RUNNING_DEGRADED', 'PREEMPTED', 'RESCHEDULING', 'TERMINATING', 'TERMINATED', 'ERROR', 'CANCELLED'].
+    Added in 25.5.0. `statuses` argument is an array of session statuses. Only sessions with the specified statuses will be queried to calculate the sum of total resource slots. The argument should be an array of the following valid status values: ['PENDING', 'DEPRIORITIZING', 'RESERVED', 'SCHEDULED', 'PREPARING', 'PULLING', 'PREPARED', 'CREATING', 'RUNNING', 'RESTARTING', 'RUNNING_DEGRADED', 'PREEMPTED', 'RESCHEDULING', 'TERMINATING', 'TERMINATED', 'ERROR', 'CANCELLED'].
     Default value is null.
     """
     statuses: [String] = null

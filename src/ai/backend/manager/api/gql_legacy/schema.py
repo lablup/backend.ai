@@ -1108,6 +1108,7 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
             graphene.String,
             default_value=None,
             description=(
+                "Added in 25.5.0. "
                 "`statuses` argument is an array of session statuses. "
                 "Only sessions with the specified statuses will be queried to calculate the sum of total resource slots. "
                 f"The argument should be an array of the following valid status values: {[s.name for s in SessionStatus]}.\n"

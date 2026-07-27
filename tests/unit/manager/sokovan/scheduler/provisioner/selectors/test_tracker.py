@@ -114,6 +114,41 @@ class TestAgentStateTracker:
 
         assert tracker.current_container_count() == 5
 
+    def test_apply_reclaim_adds_into_remaining(self) -> None:
+        tracker = AgentStateTracker(
+            original_agent=_agent_info(
+                {"cpu": "8", "mem": "8192"}, used={"cpu": "8", "mem": "8192"}
+            )
+        )
+
+        tracker.apply_reclaim({CPU: Decimal("2"), MEM: Decimal("2048")})
+        tracker.apply_reclaim({CPU: Decimal("1")})
+
+        remaining = tracker.remaining_slots()
+        assert remaining[CPU] == Decimal("3")
+        assert remaining[MEM] == Decimal("2048")
+
+    def test_clear_reclaim_restores_remaining(self) -> None:
+        tracker = AgentStateTracker(original_agent=_agent_info({"cpu": "8"}, used={"cpu": "8"}))
+        tracker.apply_reclaim({CPU: Decimal("4")})
+
+        tracker.clear_reclaim()
+
+        assert tracker.reclaimed_slots == {}
+        assert tracker.remaining_slots()[CPU] == Decimal("0")
+
+    def test_reclaim_is_independent_of_pending_and_committed(self) -> None:
+        tracker = AgentStateTracker(original_agent=_agent_info({"cpu": "8"}))
+        tracker.apply_diff(_request({"cpu": "2"}), containers=1)
+        tracker.commit()
+        tracker.apply_reclaim({CPU: Decimal("3")})
+
+        assert tracker.remaining_slots()[CPU] == Decimal("9")
+
+        tracker.clear_reclaim()
+        assert tracker.remaining_slots()[CPU] == Decimal("6")
+        assert tracker.committed_slots[CPU] == Decimal("2")
+
 
 class TestBuildAgentTrackers:
     def test_builds_one_tracker_per_agent_with_failed_sessions(self) -> None:

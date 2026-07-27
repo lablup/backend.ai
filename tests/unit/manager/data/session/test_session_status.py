@@ -54,11 +54,13 @@ class TestPreemptedStatus:
         assert SessionStatus.ERROR not in SessionStatus.resource_occupied_statuses()
 
     def test_preemption_victim_statuses_strip_terminating(self) -> None:
-        """Victim candidates occupy resources and can still be terminated."""
+        """Victim candidates occupy resources and can still be terminated;
+        RESERVED is stripped — its hold belongs to another preemption plan."""
         victims = SessionStatus.preemption_victim_statuses()
         assert victims == (
             SessionStatus.resource_occupied_statuses() & SessionStatus.terminatable_statuses()
-        )
+        ) - {SessionStatus.RESERVED}
         assert SessionStatus.SCHEDULED in victims
         assert SessionStatus.RUNNING in victims
         assert SessionStatus.TERMINATING not in victims
+        assert SessionStatus.RESERVED not in victims

@@ -111,6 +111,7 @@ class LockID(enum.IntEnum):
     )
     LOCKID_SOKOVAN_TARGET_PREEMPTED = 243  # For operations targeting PREEMPTED sessions
     LOCKID_SOKOVAN_TARGET_RESCHEDULING = 244  # For operations targeting RESCHEDULING sessions
+    LOCKID_SOKOVAN_TARGET_RESERVED = 245  # For operations targeting RESERVED sessions
 
 
 SERVICE_MAX_RETRIES = 5  # FIXME: make configurable

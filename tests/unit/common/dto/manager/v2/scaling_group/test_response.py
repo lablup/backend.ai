@@ -15,9 +15,9 @@ from ai.backend.common.dto.manager.v2.scaling_group.response import (
 )
 from ai.backend.common.dto.manager.v2.scaling_group.types import (
     PreemptionMode,
-    PreemptionOrder,
     SchedulerType,
 )
+from ai.backend.common.types import PreemptionOrder
 
 
 def _make_preemption_config() -> PreemptionConfigInfo:

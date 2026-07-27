@@ -19,11 +19,11 @@ from ai.backend.common.dto.manager.v2.fair_share.types import (
 )
 from ai.backend.common.dto.manager.v2.resource_group.types import (
     PreemptionModeDTO,
-    PreemptionOrderDTO,
     SchedulerTypeDTO,
 )
 from ai.backend.common.dto.manager.v2.session_options import DefaultSessionOptionsInfo
 from ai.backend.common.identifier.resource_group import ResourceGroupName
+from ai.backend.common.types import PreemptionOrder
 
 __all__ = (
     "AdminSearchResourceGroupsPayload",
@@ -123,9 +123,7 @@ class PreemptionConfigInfo(BaseResponseModel):
     preemptible_priority: int = Field(
         description="Sessions with priority <= this value are eligible for preemption."
     )
-    order: PreemptionOrderDTO = Field(
-        description="Tie-breaking order for same-priority sessions during preemption."
-    )
+    order: PreemptionOrder = Field(description="Victim selection order for preemption.")
     mode: PreemptionModeDTO = Field(
         description="How to preempt a session when preemption is triggered."
     )

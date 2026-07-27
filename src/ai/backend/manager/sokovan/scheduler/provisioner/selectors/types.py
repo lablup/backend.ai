@@ -1,8 +1,7 @@
-"""Value types for agent-selection remediation suggestions.
+"""Value types shared by the agent-selection pipeline.
 
 Kept separate from ``selector.py`` (selection logic) and ``exceptions.py``
-(error classes) so the error classes can return a RemediationHint without
-importing the selection logic. These types depend only on common value types.
+(error classes) so both can share these without importing each other.
 """
 
 from __future__ import annotations
@@ -13,7 +12,6 @@ from decimal import Decimal
 
 from ai.backend.common.identifier.architecture import ArchName
 from ai.backend.common.identifier.resource_slot import ResourceSlotName
-from ai.backend.common.types import AgentId
 from ai.backend.manager.views.sokovan.workload import ResourceRequest
 
 
@@ -35,19 +33,21 @@ class ResourceRequirements:
 
 
 @dataclass
-class RemediationHint:
-    """A structured remediation hint for a failed agent selection.
+class PlacementFailure:
+    """A computed "this requirement cannot be placed right now" outcome.
 
-    There is no discriminator: any subset of fields may be populated, and each
-    non-None field is an independently actionable remediation the caller can take.
-
-    - ``available_archs`` — architectures that actually exist (change the request arch)
-    - ``available_agent_ids`` — agents that are actually available (revise designation)
-    - ``required_reduction`` — subtract these slots to fit the best-fitting node
-    - ``required_container_reduction`` — free this many containers to admit the kernel
+    Built only from stateful-filter failures (exclusion failures are
+    absolute and propagate as errors). ``requirement_index`` maps the
+    failure back to its position in the criteria; ``filter_name`` names the
+    filter that left no candidates; ``missing_slots`` is the per-slot
+    shortfall against the best-fitting candidate (empty when no slot is
+    short); ``missing_containers`` is how many containers the best
+    candidate must free to admit one more (0 when the limit is not the
+    problem).
     """
 
-    available_archs: list[str] | None = None
-    available_agent_ids: list[AgentId] | None = None
-    required_reduction: Mapping[ResourceSlotName, Decimal] | None = None
-    required_container_reduction: int | None = None
+    requirement_index: int
+    resource_requirement: ResourceRequirements
+    filter_name: str
+    missing_slots: Mapping[ResourceSlotName, Decimal]
+    missing_containers: int

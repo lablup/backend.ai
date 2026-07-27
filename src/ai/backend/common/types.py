@@ -2260,8 +2260,18 @@ class PreemptionMode(enum.StrEnum):
 
 
 class PreemptionOrder(enum.StrEnum):
+    """Victim selection order for preemption.
+
+    OLDEST/NEWEST break same-priority ties by start time; FEWEST_SESSIONS
+    evicts the fewest sessions; SMALLEST_RESOURCES reclaims the least
+    resources. The deficit-aware orders are computed against the pending
+    session being placed.
+    """
+
     OLDEST = "oldest"
     NEWEST = "newest"
+    FEWEST_SESSIONS = "fewest-sessions"
+    SMALLEST_RESOURCES = "smallest-resources"
 
 
 class SchedulerStatus(TypedDict):

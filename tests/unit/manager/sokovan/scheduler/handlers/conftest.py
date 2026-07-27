@@ -348,7 +348,12 @@ def mock_provisioner() -> AsyncMock:
     """Mock SessionProvisioner for ScheduleSessionsLifecycleHandler tests."""
     provisioner = AsyncMock()
     provisioner.schedule_resource_group = AsyncMock(
-        return_value=ScheduleResult(scheduled_session_ids=[], scheduling_failures=[])
+        return_value=ScheduleResult(
+            scheduled_session_ids=[],
+            scheduling_failures=[],
+            reserved_session_ids=[],
+            preemption_plan=[],
+        )
     )
     return provisioner
 
@@ -611,6 +616,8 @@ def schedule_result_success_factory() -> Callable[..., ScheduleResult]:
         return ScheduleResult(
             scheduled_session_ids=[s.session_info.identity.id for s in sessions],
             scheduling_failures=[],
+            reserved_session_ids=[],
+            preemption_plan=[],
         )
 
     return _create

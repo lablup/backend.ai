@@ -11,17 +11,20 @@ import pytest
 from ai.backend.common.identifier.architecture import ArchName
 from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.identifier.resource_slot import ResourceSlotName
-from ai.backend.common.types import AgentId, ClusterMode, SessionId
+from ai.backend.common.types import (
+    AgentId,
+    AgentSelectionStrategy,
+    ClusterMode,
+    PreemptionOrder,
+    SessionId,
+)
 from ai.backend.manager.data.session.options import AgentSelectionPolicy
-from ai.backend.manager.sokovan.scheduler.provisioner.selectors.concentrated import (
-    ConcentratedAgentSelector,
-)
-from ai.backend.manager.sokovan.scheduler.provisioner.selectors.dispersed import (
-    DispersedAgentSelector,
-)
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.exceptions import (
     BatchAgentSelectionFailedError,
     NoAgentsInResourceGroupError,
+)
+from ai.backend.manager.sokovan.scheduler.provisioner.selectors.pool import (
+    create_agent_selector,
 )
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import (
     AgentSelectionCriteria,
@@ -62,6 +65,8 @@ def _criteria(
         requirements=requirements,
         agent_selection_policy=policy,
         designated_agent_ids=designated_agent_ids,
+        job_priority=0,
+        victim_candidates=None,
     )
 
 
@@ -69,10 +74,8 @@ def _trackers(agents: list[AgentInfo]) -> list[AgentStateTracker]:
     return [AgentStateTracker(original_agent=agent) for agent in agents]
 
 
-def _concentrated() -> AgentSelector:
-    return AgentSelector(
-        ConcentratedAgentSelector(agent_selection_resource_priority=["cpu", "mem"])
-    )
+def _selector() -> AgentSelector:
+    return create_agent_selector(["cpu", "mem"])
 
 
 class TestAgentSelectionWithResources:
@@ -93,8 +96,12 @@ class TestAgentSelectionWithResources:
         criteria = _criteria(plan.requirements())
 
         # Total requested: 6 CPU, 12288 mem -> only agent-high fits
-        selections = await _concentrated().select_agents_for_batch_requirements(
-            _trackers(agents_for_resource_requirements_test), criteria, NO_LIMIT
+        selections = await _selector().select_agents_for_batch_requirements(
+            AgentSelectionStrategy.CONCENTRATED,
+            _trackers(agents_for_resource_requirements_test),
+            criteria,
+            NO_LIMIT,
+            PreemptionOrder.OLDEST,
         )
 
         assert len(selections) == 1
@@ -113,12 +120,13 @@ class TestAgentSelectionWithResources:
             ClusterMode.MULTI_NODE,
         )
         criteria = _criteria(plan.requirements())
-        selector = AgentSelector(
-            DispersedAgentSelector(agent_selection_resource_priority=["cpu", "mem"])
-        )
 
-        selections = await selector.select_agents_for_batch_requirements(
-            _trackers(agents_for_resource_requirements_test), criteria, NO_LIMIT
+        selections = await _selector().select_agents_for_batch_requirements(
+            AgentSelectionStrategy.DISPERSED,
+            _trackers(agents_for_resource_requirements_test),
+            criteria,
+            NO_LIMIT,
+            PreemptionOrder.OLDEST,
         )
 
         assert len(selections) == 2
@@ -128,7 +136,8 @@ class TestAgentSelectionWithResources:
         self,
         agents_for_designated_agent_test: list[AgentInfo],
     ) -> None:
-        """STRICT designation fails when the designated agent lacks resources."""
+        """STRICT designation narrows the pool first, so the failure reports
+        the designated agent's own resource shortfall."""
         criteria = _criteria(
             [_req({"cpu": "4", "mem": "8192"})],
             policy=AgentSelectionPolicy.STRICT,
@@ -136,18 +145,21 @@ class TestAgentSelectionWithResources:
         )
 
         with pytest.raises(BatchAgentSelectionFailedError) as exc_info:
-            await _concentrated().select_agents_for_batch_requirements(
-                _trackers(agents_for_designated_agent_test), criteria, NO_LIMIT
+            await _selector().select_agents_for_batch_requirements(
+                AgentSelectionStrategy.CONCENTRATED,
+                _trackers(agents_for_designated_agent_test),
+                criteria,
+                NO_LIMIT,
+                PreemptionOrder.OLDEST,
             )
 
-        assert len(exc_info.value.errors) == 1
-        message = exc_info.value.errors[0].extra_msg or ""
-        assert "no designated agent is compatible" in message
-        assert "designated agent 'designated'" in message
-        assert "insufficient resources" in message
-        # Aggregated detail lines must be split with newlines, not "; ".
-        assert "; " not in message
-        assert "\n" in message
+        assert len(exc_info.value.failures) == 1
+        failure = exc_info.value.failures[0]
+        # The designated agent survived the exclusion stage but ran out of
+        # resources; the shortfall is measured against it, not "other".
+        assert failure.filter_name == "resource"
+        assert failure.missing_slots
+        assert all(amount > 0 for amount in failure.missing_slots.values())
 
     async def test_designated_agent_preferred_falls_back(
         self,
@@ -160,8 +172,12 @@ class TestAgentSelectionWithResources:
             designated_agent_ids=[AgentId("designated")],
         )
 
-        selections = await _concentrated().select_agents_for_batch_requirements(
-            _trackers(agents_for_designated_agent_test), criteria, NO_LIMIT
+        selections = await _selector().select_agents_for_batch_requirements(
+            AgentSelectionStrategy.CONCENTRATED,
+            _trackers(agents_for_designated_agent_test),
+            criteria,
+            NO_LIMIT,
+            PreemptionOrder.OLDEST,
         )
 
         assert len(selections) == 1
@@ -178,8 +194,12 @@ class TestAgentSelectionWithResources:
             designated_agent_ids=[AgentId("designated")],
         )
 
-        selections = await _concentrated().select_agents_for_batch_requirements(
-            _trackers(agents_for_designated_agent_test), criteria, NO_LIMIT
+        selections = await _selector().select_agents_for_batch_requirements(
+            AgentSelectionStrategy.CONCENTRATED,
+            _trackers(agents_for_designated_agent_test),
+            criteria,
+            NO_LIMIT,
+            PreemptionOrder.OLDEST,
         )
 
         assert len(selections) == 1
@@ -192,10 +212,12 @@ class TestAgentSelectionWithResources:
         """Agents at the container limit are excluded from selection."""
         criteria = _criteria([_req({"cpu": "2", "mem": "4096"})])
 
-        selections = await _concentrated().select_agents_for_batch_requirements(
+        selections = await _selector().select_agents_for_batch_requirements(
+            AgentSelectionStrategy.CONCENTRATED,
             _trackers(agents_for_container_limit_test),
             criteria,
             AgentLimit(max_container_count=10),
+            PreemptionOrder.OLDEST,
         )
 
         assert len(selections) == 1
@@ -208,8 +230,12 @@ class TestAgentSelectionWithResources:
         """Only agents matching the required architecture are considered."""
         criteria = _criteria([_req({"cpu": "2", "mem": "4096"}, arch="aarch64")])
 
-        selections = await _concentrated().select_agents_for_batch_requirements(
-            _trackers(agents_for_architecture_test), criteria, NO_LIMIT
+        selections = await _selector().select_agents_for_batch_requirements(
+            AgentSelectionStrategy.CONCENTRATED,
+            _trackers(agents_for_architecture_test),
+            criteria,
+            NO_LIMIT,
+            PreemptionOrder.OLDEST,
         )
 
         assert len(selections) == 1
@@ -222,8 +248,12 @@ class TestAgentSelectionWithResources:
         """A session with no kernels yields an empty selection list."""
         criteria = _criteria([])
 
-        selections = await _concentrated().select_agents_for_batch_requirements(
-            _trackers(agents_for_resource_requirements_test), criteria, NO_LIMIT
+        selections = await _selector().select_agents_for_batch_requirements(
+            AgentSelectionStrategy.CONCENTRATED,
+            _trackers(agents_for_resource_requirements_test),
+            criteria,
+            NO_LIMIT,
+            PreemptionOrder.OLDEST,
         )
 
         assert selections == []
@@ -233,7 +263,9 @@ class TestAgentSelectionWithResources:
         criteria = _criteria([_req({"cpu": "1", "mem": "1024"})])
 
         with pytest.raises(NoAgentsInResourceGroupError):
-            await _concentrated().select_agents_for_batch_requirements([], criteria, NO_LIMIT)
+            await _selector().select_agents_for_batch_requirements(
+                AgentSelectionStrategy.CONCENTRATED, [], criteria, NO_LIMIT, PreemptionOrder.OLDEST
+            )
 
     async def test_success_commits_allocations_into_trackers(
         self,
@@ -243,8 +275,12 @@ class TestAgentSelectionWithResources:
         trackers = _trackers(agents_for_designated_agent_test)
         criteria = _criteria([_req({"cpu": "4", "mem": "8192"})])
 
-        selections = await _concentrated().select_agents_for_batch_requirements(
-            trackers, criteria, NO_LIMIT
+        selections = await _selector().select_agents_for_batch_requirements(
+            AgentSelectionStrategy.CONCENTRATED,
+            trackers,
+            criteria,
+            NO_LIMIT,
+            PreemptionOrder.OLDEST,
         )
 
         selected_id = selections[0].selected_agent.agent_id
@@ -265,7 +301,13 @@ class TestAgentSelectionWithResources:
         ])
 
         with pytest.raises(BatchAgentSelectionFailedError):
-            await _concentrated().select_agents_for_batch_requirements(trackers, criteria, NO_LIMIT)
+            await _selector().select_agents_for_batch_requirements(
+                AgentSelectionStrategy.CONCENTRATED,
+                trackers,
+                criteria,
+                NO_LIMIT,
+                PreemptionOrder.OLDEST,
+            )
 
         for tracker in trackers:
             assert tracker.pending_slots == {}

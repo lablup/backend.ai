@@ -8,7 +8,7 @@ against a real database.
 from __future__ import annotations
 
 import uuid
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 import pytest
@@ -34,6 +34,7 @@ from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
+from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.scheduler.db_source.db_source import ScheduleDBSource
@@ -145,6 +146,37 @@ async def _create_extra_agent(
         )
         await db_sess.flush()
     return agent_id
+
+
+async def _set_preemption_config(
+    db: ExtendedAsyncSAEngine,
+    resource_group_id: ResourceGroupID,
+    preemption: PreemptionConfig,
+) -> None:
+    async with db.begin_session() as db_sess:
+        await db_sess.execute(
+            sa.update(ScalingGroupRow)
+            .where(ScalingGroupRow.id == resource_group_id)
+            .values(
+                scheduler_opts=ScalingGroupOpts(
+                    allowed_session_types=[],
+                    pending_timeout=timedelta(hours=1),
+                    config={},
+                    preemption=preemption,
+                )
+            )
+        )
+
+
+async def _set_session_starts_at(
+    db: ExtendedAsyncSAEngine,
+    session_id: SessionId,
+    starts_at: datetime,
+) -> None:
+    async with db.begin_session() as db_sess:
+        await db_sess.execute(
+            sa.update(SessionRow).where(SessionRow.id == session_id).values(starts_at=starts_at)
+        )
 
 
 @pytest.fixture
@@ -719,3 +751,88 @@ class TestFetchPreemptionCandidates:
             "cpu": Decimal("2"),
             "mem": Decimal("2048"),
         }
+
+    async def test_min_runtime_excludes_recent_victims(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_id: DomainID,
+        test_domain_name: str,
+        test_scaling_group_id: ResourceGroupID,
+        test_scaling_group_name: str,
+        test_group_id: uuid.UUID,
+        test_user_uuid: uuid.UUID,
+        test_access_key: AccessKey,
+        test_agent_id: str,
+        resource_slot_types: None,
+    ) -> None:
+        """With a minimum runtime configured, victims below it are dropped
+        at load — including never-started ones (zero runtime)."""
+        await _set_preemption_config(
+            db_with_cleanup,
+            test_scaling_group_id,
+            PreemptionConfig(enabled=True, preemption_min_runtime=timedelta(minutes=30)),
+        )
+        await create_pending_session_with_kernels(
+            db_with_cleanup,
+            agent_assignments=[(test_agent_id, Decimal("1"), Decimal("1024"))],
+            job_priority=10,
+            domain_id=test_domain_id,
+            domain_name=test_domain_name,
+            resource_group_id=test_scaling_group_id,
+            scaling_group_name=test_scaling_group_name,
+            group_id=test_group_id,
+            user_uuid=test_user_uuid,
+            access_key=test_access_key,
+        )
+        # Excluded: RUNNING with starts_at=now (inside the 30m window)
+        await _create_allocated_session(
+            db_with_cleanup,
+            agent_assignments=[(test_agent_id, Decimal("1"), Decimal("1024"))],
+            job_priority=0,
+            domain_id=test_domain_id,
+            domain_name=test_domain_name,
+            resource_group_id=test_scaling_group_id,
+            scaling_group_name=test_scaling_group_name,
+            group_id=test_group_id,
+            user_uuid=test_user_uuid,
+            access_key=test_access_key,
+        )
+        # Included: RUNNING for longer than the window
+        old_victim_id = await _create_allocated_session(
+            db_with_cleanup,
+            agent_assignments=[(test_agent_id, Decimal("2"), Decimal("2048"))],
+            job_priority=0,
+            domain_id=test_domain_id,
+            domain_name=test_domain_name,
+            resource_group_id=test_scaling_group_id,
+            scaling_group_name=test_scaling_group_name,
+            group_id=test_group_id,
+            user_uuid=test_user_uuid,
+            access_key=test_access_key,
+        )
+        await _set_session_starts_at(
+            db_with_cleanup, old_victim_id, datetime.now(UTC) - timedelta(hours=2)
+        )
+        # Excluded: SCHEDULED never started (NULL starts_at, zero runtime)
+        await _create_allocated_session(
+            db_with_cleanup,
+            agent_assignments=[(test_agent_id, Decimal("1"), Decimal("1024"))],
+            job_priority=0,
+            session_status=SessionStatus.SCHEDULED,
+            kernel_status=KernelStatus.SCHEDULED,
+            domain_id=test_domain_id,
+            domain_name=test_domain_name,
+            resource_group_id=test_scaling_group_id,
+            scaling_group_name=test_scaling_group_name,
+            group_id=test_group_id,
+            user_uuid=test_user_uuid,
+            access_key=test_access_key,
+        )
+
+        fetch = await ScheduleDBSource(db_with_cleanup).fetch_scheduling_fetch(
+            test_scaling_group_id
+        )
+
+        assert fetch is not None
+        candidates = fetch.preemption_candidates.by_user[UserID(test_user_uuid)].candidates
+        assert [c.session_id for c in candidates] == [old_victim_id]

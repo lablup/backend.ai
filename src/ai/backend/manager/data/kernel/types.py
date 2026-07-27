@@ -27,6 +27,8 @@ if TYPE_CHECKING:
 class KernelStatus(CIStrEnum):
     # values are only meaningful inside the manager
     PENDING = "PENDING"
+    # holds a resource reservation on its bound agent (preemption plan)
+    RESERVED = "RESERVED"
     # ---
     SCHEDULED = "SCHEDULED"
     PREPARING = "PREPARING"
@@ -78,6 +80,7 @@ class KernelStatus(CIStrEnum):
         Returns a set of kernel statuses that are considered as resource-occupying.
         """
         return frozenset((
+            cls.RESERVED,
             cls.SCHEDULED,
             cls.PREPARING,
             cls.PULLING,
@@ -146,6 +149,7 @@ class KernelStatus(CIStrEnum):
         """
         return frozenset((
             cls.PENDING,
+            cls.RESERVED,
             cls.SCHEDULED,
             cls.PREPARING,
             cls.BUILDING,
@@ -161,6 +165,7 @@ class KernelStatus(CIStrEnum):
         """
         return frozenset((
             cls.PENDING,
+            cls.RESERVED,
             cls.SCHEDULED,
             cls.PREPARING,
             cls.BUILDING,

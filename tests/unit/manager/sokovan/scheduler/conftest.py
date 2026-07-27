@@ -22,6 +22,7 @@ from ai.backend.common.types import (
     AgentSelectionStrategy,
     ClusterMode,
     KernelId,
+    PreemptionOrder,
     SessionId,
     SessionTypes,
 )
@@ -147,6 +148,7 @@ def create_system_snapshot(
             policy=ResourceGroupSchedulingPolicy(
                 scheduler=scheduler,
                 agent_selection_strategy=agent_selection_strategy,
+                preemption_order=PreemptionOrder.OLDEST,
             ),
         ),
         global_scope=GlobalScopeSnapshot(
