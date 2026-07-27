@@ -8,6 +8,7 @@ from datetime import datetime
 import sqlalchemy as sa
 
 from ai.backend.common.data.filter_specs import StringMatchSpec
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.condition_utils import (
@@ -25,6 +26,15 @@ __all__ = ("DomainConditions",)
 
 class DomainConditions:
     """Query conditions for filtering domains."""
+
+    # ==================== ID Filters ====================
+
+    @staticmethod
+    def by_ids(ids: Collection[DomainID]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return DomainRow.id.in_(ids)
+
+        return inner
 
     # ==================== Name Filters ====================
 
