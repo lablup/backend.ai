@@ -11,6 +11,9 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.dto.manager.pagination import PaginationInfo
+from ai.backend.common.identifier.deployment import DeploymentID
+from ai.backend.common.identifier.replica_group import ReplicaGroupID
+from ai.backend.common.identifier.replica_group_history import ReplicaGroupHistoryID
 
 from .types import SubStepResultInfo
 
@@ -23,8 +26,10 @@ __all__ = (
     "ListDeploymentHistoryPayload",
     "ListRouteHistoryPayload",
     "ListSessionHistoryPayload",
+    "ReplicaGroupHistoryNode",
     "RouteHistoryNode",
     "SearchKernelHistoriesPayload",
+    "SearchReplicaGroupHistoriesPayload",
     "SessionHistoryNode",
 )
 
@@ -119,6 +124,27 @@ class RouteHistoryNode(BaseResponseModel):
     updated_at: datetime = Field(description="Timestamp when the history record was last updated")
 
 
+class ReplicaGroupHistoryNode(BaseResponseModel):
+    """Node model representing a replica-group scheduling history record."""
+
+    id: ReplicaGroupHistoryID = Field(description="History record ID")
+    replica_group_id: ReplicaGroupID = Field(description="Replica group this history belongs to")
+    deployment_id: DeploymentID = Field(description="Deployment the replica group belongs to")
+    category: str = Field(description="Handler category: 'lifecycle' or 'scaling'")
+    phase: str = Field(description="Scheduling phase")
+    from_status: str | None = Field(default=None, description="Status before transition")
+    to_status: str | None = Field(default=None, description="Status after transition")
+    result: str = Field(description="Result of the scheduling attempt")
+    error_code: str | None = Field(default=None, description="Error code if scheduling failed")
+    message: str | None = Field(default=None, description="Human-readable message or error detail")
+    sub_steps: list[SubStepResultInfo] = Field(
+        default_factory=list, description="Sub-step results within this scheduling attempt"
+    )
+    attempts: int = Field(description="Number of scheduling attempts made")
+    created_at: datetime = Field(description="Timestamp when the history record was created")
+    updated_at: datetime = Field(description="Timestamp when the history record was last updated")
+
+
 class ListSessionHistoryPayload(BaseResponseModel):
     """Payload for listing session scheduling history."""
 
@@ -171,6 +197,15 @@ class AdminSearchRouteHistoriesPayload(BaseResponseModel):
     """Payload for admin search of route histories."""
 
     items: list[RouteHistoryNode] = Field(description="List of route history nodes.")
+    total_count: int = Field(description="Total number of records matching the filter.")
+    has_next_page: bool = Field(description="Whether there is a next page.")
+    has_previous_page: bool = Field(description="Whether there is a previous page.")
+
+
+class SearchReplicaGroupHistoriesPayload(BaseResponseModel):
+    """Payload for admin and scoped search of replica-group scheduling histories."""
+
+    items: list[ReplicaGroupHistoryNode] = Field(description="List of replica-group history nodes.")
     total_count: int = Field(description="Total number of records matching the filter.")
     has_next_page: bool = Field(description="Whether there is a next page.")
     has_previous_page: bool = Field(description="Whether there is a previous page.")
