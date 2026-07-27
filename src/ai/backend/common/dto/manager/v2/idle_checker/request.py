@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Self
+from uuid import UUID
 
 from pydantic import ConfigDict, Field, model_validator
 
@@ -18,10 +19,7 @@ from ai.backend.common.types import SessionTypes
 
 class IdleCheckerScope(BaseRequestModel):
     scope_type: IdleCheckerScopeTypeDTO = Field(description="Idle checker binding scope type.")
-    scope_id: str = Field(
-        min_length=1,
-        description="Domain name, project UUID, or resource group name.",
-    )
+    scope_id: UUID = Field(description="UUID of the scope.")
 
 
 class SessionLifetimeSpecInputDTO(BaseRequestModel):

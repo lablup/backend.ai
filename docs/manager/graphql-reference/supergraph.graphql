@@ -8054,8 +8054,8 @@ input IdleCheckerScope
   """Binding scope type."""
   scopeType: IdleCheckerScopeType!
 
-  """Domain name, project UUID, or resource group name."""
-  scopeId: String!
+  """UUID of the scope."""
+  scopeId: UUID!
 }
 
 """

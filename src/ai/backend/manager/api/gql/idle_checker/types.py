@@ -116,8 +116,8 @@ class IdleCheckerScopeGQL(PydanticInputMixin[IdleCheckerScopeDTO]):
     scope_type: IdleCheckerScopeTypeGQL = gql_field(
         description="Binding scope type.",
     )
-    scope_id: str = gql_field(
-        description="Domain name, project UUID, or resource group name.",
+    scope_id: UUID = gql_field(
+        description="UUID of the scope.",
     )
 
 
