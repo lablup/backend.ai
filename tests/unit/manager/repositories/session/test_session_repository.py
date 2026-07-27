@@ -821,7 +821,11 @@ class TestBatchPopulateSessionOccupiedSlots:
             await db_sess.flush()
 
             # Seed resource_slot_types (required FK for resource_allocations)
-            for slot_name, slot_type in [("cpu", "count"), ("mem", "bytes")]:
+            for slot_name, slot_type in [
+                ("cpu", "count"),
+                ("mem", "bytes"),
+                ("cuda.device", "count"),
+            ]:
                 db_sess.add(ResourceSlotTypeRow(slot_name=slot_name, slot_type=slot_type))
             await db_sess.flush()
 
@@ -840,6 +844,15 @@ class TestBatchPopulateSessionOccupiedSlots:
                     slot_name="mem",
                     requested=Decimal("2147483648"),
                     used=None,  # NULL used -> falls back to requested
+                )
+            )
+            db_sess.add(
+                ResourceAllocationRow(
+                    kernel_id=kernel_id,
+                    slot_name="cuda.device",
+                    requested=Decimal(1),
+                    used=Decimal(1),
+                    free_at=now,
                 )
             )
             await db_sess.commit()
@@ -893,6 +906,28 @@ class TestBatchPopulateSessionOccupiedSlots:
         """Verify that batch_populate handles empty list gracefully."""
         async with db_with_resource_tables.begin_readonly_session() as db_sess:
             await batch_populate_session_occupied_slots(db_sess, [])
+
+    async def test_batch_get_resource_allocation_by_session(
+        self,
+        db_with_resource_tables: ExtendedAsyncSAEngine,
+        session_with_allocations: SessionTestData,
+    ) -> None:
+        repository = SessionRepository(db_with_resource_tables)
+
+        allocations = await repository.batch_get_resource_allocation_by_session([
+            session_with_allocations.session_id
+        ])
+
+        allocation = allocations[session_with_allocations.session_id]
+        assert allocation.requested == ResourceSlot({
+            "cpu": "2",
+            "mem": "2147483648",
+            "cuda.device": "1",
+        })
+        assert allocation.used == ResourceSlot({
+            "cpu": "1.5",
+            "mem": "2147483648",
+        })
 
     async def test_search_returns_computed_occupied_slots(
         self,

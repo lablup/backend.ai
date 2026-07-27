@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import enum
+from decimal import Decimal
 from typing import Self
 
 from pydantic import Field, model_validator
@@ -22,6 +23,43 @@ class IdleCheckPhase(enum.StrEnum):
     ACTIVE = "active"
     IDLE = "idle"
     IDLE_EXPIRED = "idle_expired"
+
+
+class UtilizationKernelPolicy(enum.StrEnum):
+    """How per-kernel utilization becomes one session-level value."""
+
+    ANY = "any"
+    ALL = "all"
+    AVERAGE = "average"
+
+
+class UtilizationThresholdOperator(enum.StrEnum):
+    """How multiple utilization threshold results are combined."""
+
+    AND = "and"
+    OR = "or"
+
+
+class UtilizationThresholdEntry(BackendAISchema):
+    """One server-supported container utilization metric threshold."""
+
+    metric_name: str = Field(min_length=1, description="Server-supported utilization metric name.")
+    time_window_seconds: int | None = Field(
+        default=None,
+        gt=0,
+        description=(
+            "Optional recent interval over which the maximum session utilization is evaluated. "
+            "When omitted, the current value is used."
+        ),
+    )
+    threshold: Decimal = Field(
+        ge=0,
+        le=100,
+        description="Underutilization threshold as a percentage.",
+    )
+    kernel_policy: UtilizationKernelPolicy = Field(
+        description="How kernel values are aggregated into a session-level result."
+    )
 
 
 class SessionLifetimeSpec(BackendAISchema):
@@ -49,10 +87,29 @@ class NetworkTimeoutSpec(BackendAISchema):
 
 
 class UtilizationSpec(BackendAISchema):
-    """Config for ``CheckerType.UTILIZATION``.
+    """Config for ``CheckerType.UTILIZATION``."""
 
-    Concrete fields land with the checker-logic stories.
-    """
+    max_underutilized_duration_seconds: int = Field(
+        gt=0,
+        description=(
+            "Maximum duration that the configured utilization conditions may remain satisfied."
+        ),
+    )
+    thresholds_check_operator: UtilizationThresholdOperator = Field(
+        default=UtilizationThresholdOperator.AND,
+        description="How per-metric underutilization results are combined.",
+    )
+    thresholds: list[UtilizationThresholdEntry] = Field(
+        min_length=1,
+        description="Utilization thresholds evaluated for allocated resources.",
+    )
+
+    @model_validator(mode="after")
+    def validate_unique_metrics(self) -> Self:
+        metrics = [entry.metric_name for entry in self.thresholds]
+        if len(metrics) != len(set(metrics)):
+            raise ValueError("Utilization threshold metrics must be unique.")
+        return self
 
 
 class IdleCheckerSpec(BackendAISchema):

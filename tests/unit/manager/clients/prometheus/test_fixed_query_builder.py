@@ -7,10 +7,12 @@ from uuid import UUID
 
 import pytest
 
-from ai.backend.common.types import KernelId
+from ai.backend.common.data.idle_checker.types import UtilizationKernelPolicy
+from ai.backend.common.types import KernelId, SessionId
 from ai.backend.manager.clients.prometheus import (
     ContainerLiveStatQueryBuilder,
     ContainerMetricQueryBuilder,
+    SessionUtilizationQueryBuilder,
 )
 from ai.backend.manager.clients.prometheus.fixed_query_builder import _regex_union
 from ai.backend.manager.clients.prometheus.metric_types import (
@@ -150,6 +152,52 @@ class TestGetContainerLiveStatQueries:
         assert 'container_metric_name=~"cpu_util|net_rx|net_tx"' in result.rate_avg.render()
         assert 'value_type="current"' in result.rate_max.render()
         assert 'value_type="current"' in result.rate_avg.render()
+
+
+class TestSessionUtilizationQueryBuilder:
+    @pytest.fixture
+    def session_id(self) -> SessionId:
+        return SessionId(UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"))
+
+    @pytest.mark.parametrize(
+        ("policy", "aggregation"),
+        [
+            (UtilizationKernelPolicy.ANY, "min by (session_id)"),
+            (UtilizationKernelPolicy.ALL, "max by (session_id)"),
+            (UtilizationKernelPolicy.AVERAGE, "avg by (session_id)"),
+        ],
+    )
+    def test_builds_current_session_level_query(
+        self,
+        session_id: SessionId,
+        policy: UtilizationKernelPolicy,
+        aggregation: str,
+    ) -> None:
+        preset = SessionUtilizationQueryBuilder().build(
+            metric_name="cpu_util",
+            kernel_policy=policy,
+            time_window_seconds=None,
+            session_ids=[session_id],
+        )
+        rendered = preset.render()
+
+        assert aggregation in rendered
+        assert 'container_metric_name="cpu_util"' in rendered
+        assert 'value_type="pct"' in rendered
+        assert f'session_id=~"{session_id}"' in rendered
+
+    def test_builds_windowed_session_level_query(self, session_id: SessionId) -> None:
+        preset = SessionUtilizationQueryBuilder().build(
+            metric_name="cpu_util",
+            kernel_policy=UtilizationKernelPolicy.AVERAGE,
+            time_window_seconds=300,
+            session_ids=[session_id],
+        )
+
+        assert (
+            "max_over_time((avg by (session_id)(backendai_container_utilization" in preset.render()
+        )
+        assert ")[300s:])" in preset.render()
 
 
 class TestRegexUnion:

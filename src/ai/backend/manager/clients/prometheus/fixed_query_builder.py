@@ -3,11 +3,12 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Final
 
+from ai.backend.common.data.idle_checker.types import UtilizationKernelPolicy
 from ai.backend.common.metrics.types import (
     CONTAINER_UTILIZATION_METRIC_LABEL_NAME,
     CONTAINER_UTILIZATION_METRIC_NAME,
 )
-from ai.backend.common.types import KernelId
+from ai.backend.common.types import KernelId, SessionId
 from ai.backend.manager.clients.prometheus.metric_types import (
     DIFF_METRICS,
     RATE_METRICS,
@@ -34,6 +35,15 @@ _LIVE_STAT_MAX_TEMPLATE: Final[str] = f"max_over_time(({_GAUGE_TEMPLATE})[{{wind
 _LIVE_STAT_AVG_TEMPLATE: Final[str] = f"avg_over_time(({_GAUGE_TEMPLATE})[{{window}}:])"
 _LIVE_STAT_RATE_MAX_TEMPLATE: Final[str] = f"max_over_time(({_RATE_TEMPLATE})[{{window}}:])"
 _LIVE_STAT_RATE_AVG_TEMPLATE: Final[str] = f"avg_over_time(({_RATE_TEMPLATE})[{{window}}:])"
+_ANY_KERNEL_UTILIZATION_TEMPLATE: Final[str] = (
+    f"min by (session_id)({CONTAINER_UTILIZATION_METRIC_NAME}{{{{{{labels}}}}}})"
+)
+_ALL_KERNEL_UTILIZATION_TEMPLATE: Final[str] = (
+    f"max by (session_id)({CONTAINER_UTILIZATION_METRIC_NAME}{{{{{{labels}}}}}})"
+)
+_AVERAGE_KERNEL_UTILIZATION_TEMPLATE: Final[str] = (
+    f"avg by (session_id)({CONTAINER_UTILIZATION_METRIC_NAME}{{{{{{labels}}}}}})"
+)
 
 _INSTANT_GROUP_BY: Final[frozenset[str]] = frozenset({
     "kernel_id",
@@ -123,6 +133,46 @@ class ContainerMetricQueryBuilder:
                 return _RATE_TEMPLATE
             case MetricType.DIFF:
                 return _DIFF_TEMPLATE
+
+
+class SessionUtilizationQueryBuilder:
+    """Build session-level queries from safe utilization policy inputs."""
+
+    def build(
+        self,
+        *,
+        metric_name: str,
+        kernel_policy: UtilizationKernelPolicy,
+        time_window_seconds: int | None,
+        session_ids: Sequence[SessionId],
+    ) -> MetricPreset:
+        value_type = ValueType.CURRENT if metric_name == "mem" else ValueType.PCT
+        session_id_pattern = _regex_union([str(session_id) for session_id in session_ids])
+        labels = {
+            CONTAINER_UTILIZATION_METRIC_LABEL_NAME: LabelMatcher.exact(metric_name),
+            "value_type": LabelMatcher.exact(value_type.value),
+            "session_id": LabelMatcher.regex(session_id_pattern),
+        }
+        template = self._template(kernel_policy)
+        window = ""
+        if time_window_seconds is not None:
+            template = f"max_over_time(({template})[{{window}}:])"
+            window = f"{time_window_seconds}s"
+
+        return MetricPreset(
+            template=template,
+            labels=labels,
+            window=window,
+        )
+
+    def _template(self, kernel_policy: UtilizationKernelPolicy) -> str:
+        match kernel_policy:
+            case UtilizationKernelPolicy.ANY:
+                return _ANY_KERNEL_UTILIZATION_TEMPLATE
+            case UtilizationKernelPolicy.ALL:
+                return _ALL_KERNEL_UTILIZATION_TEMPLATE
+            case UtilizationKernelPolicy.AVERAGE:
+                return _AVERAGE_KERNEL_UTILIZATION_TEMPLATE
 
 
 class ContainerLiveStatQueryBuilder:

@@ -333,6 +333,7 @@ def create_services(args: ServiceArgs) -> Services:
         ),
         metric=MetricService(
             metric_repository=repositories.metric.repository,
+            session_repository=repositories.session.repository,
         ),
         model_serving=ModelServingService(
             agent_registry=args.agent_registry,

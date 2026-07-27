@@ -8,6 +8,7 @@ from ai.backend.common.clients.http_client.client_pool import (
     ClientKey,
     ClientPool,
 )
+from ai.backend.common.data.idle_checker.types import UtilizationKernelPolicy
 from ai.backend.common.dto.clients.prometheus.request import QueryTimeRange
 from ai.backend.common.dto.clients.prometheus.response import (
     LabelValueResponse,
@@ -17,10 +18,11 @@ from ai.backend.common.exception import (
     FailedToGetMetric,
     PrometheusConnectionError,
 )
-from ai.backend.common.types import KernelId
+from ai.backend.common.types import KernelId, SessionId
 from ai.backend.manager.clients.prometheus.fixed_query_builder import (
     ContainerLiveStatQueryBuilder,
     ContainerMetricQueryBuilder,
+    SessionUtilizationQueryBuilder,
 )
 from ai.backend.manager.clients.prometheus.metric_types import (
     ContainerMetricOptionalLabel,
@@ -42,6 +44,7 @@ class PrometheusClient:
     _timeout: aiohttp.ClientTimeout
     _container_metric_query_builder: ContainerMetricQueryBuilder
     _container_live_stat_query_builder: ContainerLiveStatQueryBuilder
+    _session_utilization_query_builder: SessionUtilizationQueryBuilder
 
     def __init__(
         self,
@@ -57,6 +60,7 @@ class PrometheusClient:
         self._timeout = aiohttp.ClientTimeout(total=timeout)
         self._container_metric_query_builder = container_metric_query_builder
         self._container_live_stat_query_builder = container_live_stat_query_builder
+        self._session_utilization_query_builder = SessionUtilizationQueryBuilder()
 
     async def fetch_available_container_metric_names(self) -> list[str]:
         query = self._container_metric_query_builder.get_container_metric_metadata_query()
@@ -132,6 +136,23 @@ class PrometheusClient:
             preset=metric_preset,
             time_range=time_range,
         )
+
+    async def fetch_session_utilization(
+        self,
+        *,
+        metric_name: str,
+        kernel_policy: UtilizationKernelPolicy,
+        time_window_seconds: int | None,
+        session_ids: Sequence[SessionId],
+        evaluation_time: str,
+    ) -> PrometheusResponse:
+        preset = self._session_utilization_query_builder.build(
+            metric_name=metric_name,
+            kernel_policy=kernel_policy,
+            time_window_seconds=time_window_seconds,
+            session_ids=session_ids,
+        )
+        return await self._query_instant(preset, time=evaluation_time)
 
     async def preview_query_template(
         self,

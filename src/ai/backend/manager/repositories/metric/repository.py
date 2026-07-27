@@ -1,5 +1,7 @@
 import logging
 from collections.abc import Sequence
+from decimal import Decimal, InvalidOperation
+from uuid import UUID
 
 from ai.backend.common.dto.clients.prometheus.request import QueryTimeRange
 from ai.backend.common.exception import (
@@ -11,7 +13,7 @@ from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
-from ai.backend.common.types import KernelId
+from ai.backend.common.types import KernelId, SessionId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.clients.prometheus.client import PrometheusClient
 from ai.backend.manager.clients.prometheus.metric_types import (
@@ -19,7 +21,10 @@ from ai.backend.manager.clients.prometheus.metric_types import (
     ContainerMetricResult,
     KernelLiveStatBatchResult,
 )
+from ai.backend.manager.data.metric.types import SessionUtilizationMetricResult
+from ai.backend.manager.errors.common import InternalServerError
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.metric.types import SessionUtilizationMetricQuery
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -73,3 +78,41 @@ class MetricRepository:
         except (PrometheusConnectionError, FailedToGetMetric) as e:
             log.warning("Failed to query metrics for kernel live stats: {!r}", e)
             return KernelLiveStatBatchResult.empty(kernel_ids)
+
+    async def query_session_utilization_metrics(
+        self,
+        query: SessionUtilizationMetricQuery,
+    ) -> SessionUtilizationMetricResult:
+        try:
+            response = await self._prometheus_client.fetch_session_utilization(
+                metric_name=query.metric_name,
+                kernel_policy=query.kernel_policy,
+                time_window_seconds=query.time_window_seconds,
+                session_ids=query.session_ids,
+                evaluation_time=query.evaluation_time.isoformat(),
+            )
+        except (PrometheusConnectionError, FailedToGetMetric) as e:
+            log.warning(
+                "Utilization query failed for metric {} and policy {}: {}",
+                query.metric_name,
+                query.kernel_policy,
+                e,
+            )
+            return SessionUtilizationMetricResult(by_session={})
+        values: dict[SessionId, Decimal] = {}
+        for result in response.data.result:
+            if result.metric.session_id is None or not result.values:
+                continue
+            try:
+                session_id = SessionId(UUID(result.metric.session_id))
+                value = Decimal(result.values[-1][1])
+            except (ValueError, InvalidOperation):
+                continue
+            if not value.is_finite():
+                continue
+            if session_id in values:
+                raise InternalServerError(
+                    f"Utilization query returned multiple values for session {session_id}"
+                )
+            values[session_id] = value
+        return SessionUtilizationMetricResult(by_session=values)
