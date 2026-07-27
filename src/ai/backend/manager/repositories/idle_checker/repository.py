@@ -4,7 +4,17 @@ from collections.abc import Collection, Sequence
 from datetime import datetime
 
 from ai.backend.common.data.idle_checker.types import IdleCheckPhase
+from ai.backend.manager.data.common.types import SearchResult
+from ai.backend.manager.data.idle_checker.types import IdleCheckerData
 from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.models.idle_checker.row import IdleCheckerRow
+from ai.backend.manager.repositories.base import (
+    BatchQuerier,
+    Creator,
+    Purger,
+    Querier,
+    Updater,
+)
 from ai.backend.manager.repositories.idle_checker.db_source.db_source import IdleCheckerDBSource
 from ai.backend.manager.repositories.idle_checker.types import (
     ExpiredIdleCheckBatchData,
@@ -25,6 +35,22 @@ class IdleCheckerRepository:
 
     def __init__(self, ops_provider: DBOpsProvider) -> None:
         self._db_source = IdleCheckerDBSource(ops_provider)
+
+    async def create(self, creator: Creator[IdleCheckerRow]) -> IdleCheckerData:
+        return await self._db_source.create(creator)
+
+    async def get(self, querier: Querier[IdleCheckerRow]) -> IdleCheckerData:
+        return await self._db_source.get(querier)
+
+    async def update(self, updater: Updater[IdleCheckerRow]) -> IdleCheckerData:
+        querier = Querier(row_class=IdleCheckerRow, pk_value=updater.pk_value)
+        return await self._db_source.update(querier, updater)
+
+    async def purge(self, purger: Purger[IdleCheckerRow]) -> IdleCheckerData:
+        return await self._db_source.purge(purger)
+
+    async def search(self, querier: BatchQuerier) -> SearchResult[IdleCheckerData]:
+        return await self._db_source.search(querier)
 
     async def fetch_judgment_batch(
         self, session_statuses: Collection[SessionStatus]

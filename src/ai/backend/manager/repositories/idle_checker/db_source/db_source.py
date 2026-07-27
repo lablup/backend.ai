@@ -17,8 +17,13 @@ from ai.backend.common.data.idle_checker.types import (
 from ai.backend.common.data.permission.types import ScopeType
 from ai.backend.common.identifier.idle_checker import IdleCheckerID
 from ai.backend.common.types import SessionId, SessionTypes
-from ai.backend.manager.data.idle_checker.types import IdleCheckSession
+from ai.backend.manager.data.common.types import SearchResult
+from ai.backend.manager.data.idle_checker.types import IdleCheckerData, IdleCheckSession
 from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.errors.idle_checker import (
+    IdleCheckerNotFound,
+    IdleCheckerTypeChangeNotAllowed,
+)
 from ai.backend.manager.models.idle_checker.conditions import SessionIdleCheckConditions
 from ai.backend.manager.models.idle_checker.row import (
     IdleCheckerBindingRow,
@@ -32,9 +37,15 @@ from ai.backend.manager.repositories.base import (
     BatchQuerier,
     BatchUpdater,
     BulkCreator,
+    Creator,
     NoPagination,
+    Purger,
+    Querier,
+    Updater,
 )
-from ai.backend.manager.repositories.idle_checker.creators import SessionIdleCheckCreatorSpec
+from ai.backend.manager.repositories.idle_checker.creators import (
+    SessionIdleCheckCreatorSpec,
+)
 from ai.backend.manager.repositories.idle_checker.purgers import (
     SessionIdleCheckBatchPurgerSpec,
 )
@@ -50,6 +61,7 @@ from ai.backend.manager.repositories.idle_checker.types import (
     SessionIdleCheckPair,
 )
 from ai.backend.manager.repositories.idle_checker.updaters import (
+    IdleCheckerUpdaterSpec,
     SessionIdleCheckPhaseBatchUpdaterSpec,
 )
 from ai.backend.manager.repositories.ops import DBOpsProvider
@@ -63,6 +75,54 @@ class IdleCheckerDBSource:
 
     def __init__(self, ops_provider: DBOpsProvider) -> None:
         self._ops = ops_provider
+
+    async def create(self, creator: Creator[IdleCheckerRow]) -> IdleCheckerData:
+        async with self._ops.write_ops() as w:
+            checker = (await w.create(creator)).row
+            return checker.to_data()
+
+    async def get(self, querier: Querier[IdleCheckerRow]) -> IdleCheckerData:
+        async with self._ops.read_ops() as r:
+            checker_result = await r.query(querier)
+        if checker_result is None:
+            raise IdleCheckerNotFound(str(querier.pk_value))
+        return checker_result.row.to_data()
+
+    async def update(
+        self,
+        querier: Querier[IdleCheckerRow],
+        updater: Updater[IdleCheckerRow],
+    ) -> IdleCheckerData:
+        async with self._ops.write_ops() as w:
+            checker_result = await w.query(querier)
+            if checker_result is None:
+                raise IdleCheckerNotFound(str(querier.pk_value))
+            spec = cast(IdleCheckerUpdaterSpec, updater.spec).spec.optional_value()
+            if spec is not None and spec.type != checker_result.row.checker_type:
+                raise IdleCheckerTypeChangeNotAllowed(
+                    f"{checker_result.row.checker_type.value} cannot be changed to {spec.type.value}"
+                )
+            result = await w.update(updater)
+            if result is None:
+                raise IdleCheckerNotFound(str(querier.pk_value))
+            return result.row.to_data()
+
+    async def purge(self, purger: Purger[IdleCheckerRow]) -> IdleCheckerData:
+        async with self._ops.write_ops() as w:
+            result = await w.purge(purger)
+            if result is None:
+                raise IdleCheckerNotFound(str(purger.spec.pk_value()))
+            return result.row.to_data()
+
+    async def search(self, querier: BatchQuerier) -> SearchResult[IdleCheckerData]:
+        async with self._ops.read_ops() as r:
+            result = await r.batch_query_in_global(sa.select(IdleCheckerRow), querier)
+        return SearchResult(
+            items=[row.IdleCheckerRow.to_data() for row in result.rows],
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
 
     async def fetch_judgment_batch(
         self,
