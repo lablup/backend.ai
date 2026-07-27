@@ -37,6 +37,9 @@ from ai.backend.manager.clients.prometheus.metric_types import (
 )
 from ai.backend.manager.clients.prometheus.types import ValueType
 from ai.backend.manager.repositories.metric.repository import MetricRepository
+from ai.backend.manager.repositories.prometheus_query_preset.db_source import (
+    PrometheusQueryPresetDBSource,
+)
 from ai.backend.manager.services.metric.actions.container import (
     ContainerMetricAction,
 )
@@ -71,8 +74,8 @@ def _make_metric_repository(
         timewindow
     )
     return MetricRepository(
-        db=MagicMock(),
         prometheus_client=mock_prometheus_client,
+        prometheus_query_preset_db_source=MagicMock(spec=PrometheusQueryPresetDBSource),
     )
 
 

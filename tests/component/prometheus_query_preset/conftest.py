@@ -38,6 +38,9 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.prometheus_query_preset import (
     PrometheusQueryPresetRepository,
 )
+from ai.backend.manager.repositories.prometheus_query_preset.db_source import (
+    PrometheusQueryPresetDBSource,
+)
 from ai.backend.manager.services.processors import Processors
 from ai.backend.manager.services.prometheus_query_preset.processors import (
     PrometheusQueryPresetProcessors,
@@ -76,7 +79,10 @@ def prometheus_query_preset_processors(
     database_engine: ExtendedAsyncSAEngine,
     prometheus_client_mock: MagicMock,
 ) -> PrometheusQueryPresetProcessors:
-    repo = PrometheusQueryPresetRepository(database_engine, prometheus_client_mock)
+    repo = PrometheusQueryPresetRepository(
+        PrometheusQueryPresetDBSource(database_engine),
+        prometheus_client_mock,
+    )
     service = PrometheusQueryPresetService(
         repository=repo,
         prometheus_client=prometheus_client_mock,

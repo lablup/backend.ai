@@ -82,9 +82,10 @@ class TestQuerySessionUtilizationMetrics:
         prometheus_client: MagicMock,
         preset_db_source: MagicMock,
     ) -> MetricRepository:
-        repository = MetricRepository(MagicMock(), prometheus_client)
-        repository._prometheus_query_preset_db_source = preset_db_source
-        return repository
+        return MetricRepository(
+            prometheus_client=prometheus_client,
+            prometheus_query_preset_db_source=preset_db_source,
+        )
 
     def _query(
         self,

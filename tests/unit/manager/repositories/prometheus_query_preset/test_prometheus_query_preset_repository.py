@@ -38,6 +38,9 @@ from ai.backend.manager.repositories.prometheus_query_preset import (
     PrometheusQueryPresetCreatorSpec,
     PrometheusQueryPresetRepository,
 )
+from ai.backend.manager.repositories.prometheus_query_preset.db_source import (
+    PrometheusQueryPresetDBSource,
+)
 from ai.backend.manager.repositories.prometheus_query_preset.updaters import (
     PrometheusQueryPresetUpdaterSpec,
 )
@@ -65,7 +68,7 @@ class TestPrometheusQueryPresetRepository:
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> PrometheusQueryPresetRepository:
         return PrometheusQueryPresetRepository(
-            db=db_with_cleanup,
+            db_source=PrometheusQueryPresetDBSource(db_with_cleanup),
             prometheus_client=MagicMock(spec=PrometheusClient),
         )
 
@@ -291,7 +294,7 @@ class TestPrometheusQueryPresetRepositoryPreview:
         prometheus_client: MagicMock,
     ) -> PrometheusQueryPresetRepository:
         return PrometheusQueryPresetRepository(
-            db=MagicMock(),
+            db_source=MagicMock(spec=PrometheusQueryPresetDBSource),
             prometheus_client=prometheus_client,
         )
 

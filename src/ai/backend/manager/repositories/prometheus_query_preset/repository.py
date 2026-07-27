@@ -29,10 +29,7 @@ from ai.backend.manager.repositories.base.updater import Updater
 from .db_source import PrometheusQueryPresetDBSource
 
 if TYPE_CHECKING:
-    from ai.backend.manager.models.prometheus_query_preset import (
-        PrometheusQueryPresetRow,
-    )
-    from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+    from ai.backend.manager.models.prometheus_query_preset import PrometheusQueryPresetRow
 
 __all__ = ("PrometheusQueryPresetRepository",)
 
@@ -65,10 +62,10 @@ class PrometheusQueryPresetRepository:
 
     def __init__(
         self,
-        db: ExtendedAsyncSAEngine,
+        db_source: PrometheusQueryPresetDBSource,
         prometheus_client: PrometheusClient,
     ) -> None:
-        self._db_source = PrometheusQueryPresetDBSource(db)
+        self._db_source = db_source
         self._prometheus_client = prometheus_client
 
     @prometheus_query_preset_repository_resilience.apply()

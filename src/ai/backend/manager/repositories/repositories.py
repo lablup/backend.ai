@@ -55,6 +55,9 @@ from ai.backend.manager.repositories.project_resource_policy.repositories import
 from ai.backend.manager.repositories.prometheus_query_preset import (
     PrometheusQueryPresetRepositories,
 )
+from ai.backend.manager.repositories.prometheus_query_preset.db_source import (
+    PrometheusQueryPresetDBSource,
+)
 from ai.backend.manager.repositories.prometheus_query_preset_category.repositories import (
     PrometheusQueryPresetCategoryRepositories,
 )
@@ -173,12 +176,19 @@ class Repositories:
         image_repositories = ImageRepositories.create(args)
         keypair_resource_policy_repositories = KeypairResourcePolicyRepositories.create(args)
         manager_admin_repositories = ManagerAdminRepositories.create(args)
-        metric_repositories = MetricRepositories.create(args)
+        prometheus_query_preset_db_source = PrometheusQueryPresetDBSource(args.db)
+        metric_repositories = MetricRepositories.create(
+            args,
+            prometheus_query_preset_db_source,
+        )
         model_serving_repositories = ModelServingRepositories.create(args)
         notification_repositories = NotificationRepositories.create(args)
         permission_controller_repositories = PermissionControllerRepositories.create(args)
         project_resource_policy_repositories = ProjectResourcePolicyRepositories.create(args)
-        prometheus_query_preset_repositories = PrometheusQueryPresetRepositories.create(args)
+        prometheus_query_preset_repositories = PrometheusQueryPresetRepositories.create(
+            args,
+            prometheus_query_preset_db_source,
+        )
         prometheus_query_preset_category_repositories = (
             PrometheusQueryPresetCategoryRepositories.create(args)
         )
