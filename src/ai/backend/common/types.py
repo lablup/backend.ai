@@ -24,6 +24,7 @@ from typing import (
     Annotated,
     Any,
     Dict,
+    Final,
     Generic,
     List,
     Literal,
@@ -147,11 +148,12 @@ __all__ = (
     "ItemResult",
     "ResultSet",
     "safe_print_redis_config",
+    "REDIS_PASSWORD_MASK",
 )
 
 
 if TYPE_CHECKING:
-    from ai.backend.common.configs.redis import RedisConfig
+    from ai.backend.common.configs.redis import RedisConfig, SingleRedisConfig
     from ai.backend.common.data.vfolder.types import VFolderMountData
 
     from .docker import ImageRef
@@ -1680,10 +1682,18 @@ class RedisProfileTarget:
         )
 
 
+REDIS_PASSWORD_MASK: Final = "********"
+
+
 def safe_print_redis_config(config: RedisConfig) -> str:
     safe_config = copy.deepcopy(config)
-    if config.password:
-        safe_config.password = "********"
+    overrides = safe_config.override_configs or {}
+    # The parent config and each override are both SingleRedisConfig, so the same
+    # credential field gets masked on all of them.
+    masking_targets: list[SingleRedisConfig] = [safe_config, *overrides.values()]
+    for target in masking_targets:
+        if target.password is not None:
+            target.password = REDIS_PASSWORD_MASK
     return str(safe_config)
 
 

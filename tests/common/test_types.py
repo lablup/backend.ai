@@ -1,10 +1,14 @@
 import asyncio
+from dataclasses import dataclass, field
 from decimal import Decimal
+from typing import Any
 
 import pytest
 from typeguard import TypeCheckError
 
+from ai.backend.common.configs.redis import RedisConfig
 from ai.backend.common.types import (
+    REDIS_PASSWORD_MASK,
     BinarySize,
     DefaultForUnspecified,
     HardwareMetadata,
@@ -13,6 +17,7 @@ from ai.backend.common.types import (
     SlotTypes,
     aobject,
     check_typed_dict,
+    safe_print_redis_config,
 )
 
 
@@ -332,3 +337,50 @@ def test_resource_slot_calc_with_infinity():
     r5 = r1 + r4
     assert r5["a"] == Decimal("Infinity")
     assert r5["b"] == 5
+
+
+@dataclass(frozen=True)
+class _RedisMaskingCase:
+    label: str
+    raw_config: dict[str, Any]
+    leaked_secrets: list[str] = field(default_factory=list)
+    expected_mask_count: int = 0
+
+
+class TestSafePrintRedisConfig:
+    @pytest.mark.parametrize(
+        "case",
+        [
+            _RedisMaskingCase(
+                label="no-credentials",
+                raw_config={"addr": "127.0.0.1:6379"},
+            ),
+            _RedisMaskingCase(
+                label="password",
+                raw_config={"addr": "127.0.0.1:6379", "password": "s3cr3t"},
+                leaked_secrets=["s3cr3t"],
+                expected_mask_count=1,
+            ),
+            _RedisMaskingCase(
+                label="override-configs",
+                raw_config={
+                    "addr": "127.0.0.1:6379",
+                    "password": "s3cr3t",
+                    "override_configs": {
+                        "stream": {"addr": "127.0.0.1:6380", "password": "0verr1de"},
+                    },
+                },
+                leaked_secrets=["s3cr3t", "0verr1de"],
+                expected_mask_count=2,
+            ),
+        ],
+        ids=lambda case: case.label,
+    )
+    def test_passwords_are_masked(self, case: _RedisMaskingCase) -> None:
+        redis_config = RedisConfig.model_validate(case.raw_config)
+        printed = safe_print_redis_config(redis_config)
+        for secret in case.leaked_secrets:
+            assert secret not in printed
+            # The helper masks a copy; the caller's config keeps its credentials.
+            assert secret in str(redis_config)
+        assert printed.count(REDIS_PASSWORD_MASK) == case.expected_mask_count
