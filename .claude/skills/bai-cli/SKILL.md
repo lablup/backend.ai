@@ -55,7 +55,7 @@ Check options with `--help`.
 - **service-catalog**: user(empty group) · admin(search)
 - **runtime-variant**: user(get, search) · admin(get, search, create, update, delete, bulk-delete)
 - **runtime-variant-preset**: user(get, search) · admin(get, search, create, update, delete)
-- **scheduling-history**: sub session / kernel / deployment / route / replica-group — each (search, search-scoped) · replica-group's search-scoped takes `--deployment-id`, not a replica group id
+- **scheduling-history**: sub session / kernel / deployment / route / replica-group — each (search, search-scoped)
 - **scheduling-handler**: admin(list)
 
 ### Storage
