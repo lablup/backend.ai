@@ -65,8 +65,8 @@ from ai.backend.manager.data.permission.types import (
     ScopeType as LegacyScopeType,
 )
 from ai.backend.manager.data.permission.virtual_scope import (
+    EntityPermissionCheckKey,
     ScopePermissionCheckKey,
-    VirtualScopePermissionCheckKey,
 )
 from ai.backend.manager.data.role_invitation.types import (
     RoleInvitationData,
@@ -1197,7 +1197,7 @@ class PermissionDBSource:
 
     async def check_single_entity_permission_via_virtual_scope(
         self,
-        key: VirtualScopePermissionCheckKey,
+        key: EntityPermissionCheckKey,
         permission: Permission,
     ) -> bool:
         """Return whether the user holds *permission* on the key's entity via a virtual scope.
@@ -1210,9 +1210,9 @@ class PermissionDBSource:
 
     async def check_bulk_permission_via_virtual_scope(
         self,
-        keys: Collection[VirtualScopePermissionCheckKey],
+        keys: Collection[EntityPermissionCheckKey],
         permission: Permission,
-    ) -> Mapping[VirtualScopePermissionCheckKey, bool]:
+    ) -> Mapping[EntityPermissionCheckKey, bool]:
         """Check *permission* on each target entity through the virtual-scope chain in one go.
 
         Returns a mapping from each input key to whether the permission is granted.
@@ -1238,8 +1238,8 @@ class PermissionDBSource:
 
     async def resolve_effective_permissions_via_virtual_scope(
         self,
-        keys: Collection[VirtualScopePermissionCheckKey],
-    ) -> Mapping[VirtualScopePermissionCheckKey, Permission]:
+        keys: Collection[EntityPermissionCheckKey],
+    ) -> Mapping[EntityPermissionCheckKey, Permission]:
         """Resolve each target entity's effective :class:`Permission` through the
         virtual-scope chain.
 
@@ -1252,9 +1252,9 @@ class PermissionDBSource:
         """
         if not keys:
             return {}
-        groups: defaultdict[
-            _VirtualScopePermissionGroupKey, list[VirtualScopePermissionCheckKey]
-        ] = defaultdict(list)
+        groups: defaultdict[_VirtualScopePermissionGroupKey, list[EntityPermissionCheckKey]] = (
+            defaultdict(list)
+        )
         for key in keys:
             groups[
                 _VirtualScopePermissionGroupKey(
@@ -1264,7 +1264,7 @@ class PermissionDBSource:
                 )
             ].append(key)
 
-        result: dict[VirtualScopePermissionCheckKey, Permission] = {}
+        result: dict[EntityPermissionCheckKey, Permission] = {}
         async with self._db.begin_readonly_session_read_committed() as db_session:
             for group_key, members in groups.items():
                 granted = await self._resolve_permissions_for_virtual_scope_group(

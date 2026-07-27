@@ -28,7 +28,7 @@ from ai.backend.manager.data.permission.types import (
 from ai.backend.manager.data.permission.types import (
     ScopeType as PermScopeType,
 )
-from ai.backend.manager.data.permission.virtual_scope import VirtualScopePermissionCheckKey
+from ai.backend.manager.data.permission.virtual_scope import EntityPermissionCheckKey
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.agent import AgentRow
 
@@ -305,7 +305,7 @@ class TestCheckPermissionViaVirtualScope:
         permission: Permission,
         expected: bool,
     ) -> None:
-        key = VirtualScopePermissionCheckKey(
+        key = EntityPermissionCheckKey(
             user_id=chain.user_id,
             entity=EntityRef(entity_type=_TARGET_ENTITY_TYPE, entity_id=chain.entity_id),
         )
@@ -338,7 +338,7 @@ class TestCheckPermissionViaVirtualScope:
         chain: VSChainFixture,
         expected: Permission,
     ) -> None:
-        key = VirtualScopePermissionCheckKey(
+        key = EntityPermissionCheckKey(
             user_id=chain.user_id,
             entity=EntityRef(entity_type=_TARGET_ENTITY_TYPE, entity_id=chain.entity_id),
         )
@@ -355,11 +355,11 @@ class TestCheckPermissionViaVirtualScope:
         db_source: PermissionDBSource,
         chain: VSChainFixture,
     ) -> None:
-        reachable = VirtualScopePermissionCheckKey(
+        reachable = EntityPermissionCheckKey(
             user_id=chain.user_id,
             entity=EntityRef(entity_type=_TARGET_ENTITY_TYPE, entity_id=chain.entity_id),
         )
-        unreachable = VirtualScopePermissionCheckKey(
+        unreachable = EntityPermissionCheckKey(
             user_id=chain.user_id,
             entity=EntityRef(entity_type=_TARGET_ENTITY_TYPE, entity_id=uuid.uuid4()),
         )
@@ -378,7 +378,7 @@ class TestCheckPermissionViaVirtualScope:
         db_source: PermissionDBSource,
         chain: VSChainFixture,
     ) -> None:
-        key = VirtualScopePermissionCheckKey(
+        key = EntityPermissionCheckKey(
             user_id=UserID(uuid.uuid4()),
             entity=EntityRef(entity_type=_TARGET_ENTITY_TYPE, entity_id=chain.entity_id),
         )

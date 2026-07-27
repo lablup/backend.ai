@@ -7,7 +7,7 @@ from ai.backend.common.identifier.user import UserID
 
 
 @dataclass(frozen=True)
-class VirtualScopePermissionCheckKey:
+class EntityPermissionCheckKey:
     """Identifies a ``(user, entity)`` target for virtual-scope-chain
     permission resolution.
     """
