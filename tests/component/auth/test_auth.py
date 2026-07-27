@@ -54,6 +54,8 @@ from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
 from ai.backend.manager.models.user import UserRole, users
+from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.testutils.fixtures import DomainFixtureData
 
@@ -141,10 +143,28 @@ async def signup_default_project(
                 resource_policy=resource_policy_fixture,
             )
         )
+        virtual_scope_id = uuid.uuid4()
         await conn.execute(
             sa.insert(VirtualScopeRow.__table__).values(
+                id=virtual_scope_id,
                 scope_type=ScopeType.PROJECT,
                 scope_id=data.project_id,
+            )
+        )
+        await conn.execute(
+            sa.insert(EntityMembershipRow.__table__).values(
+                virtual_scope_id=virtual_scope_id,
+                entity_type=EntityType.PROJECT,
+                entity_id=data.project_id,
+                permission_cap=None,
+            )
+        )
+        await conn.execute(
+            sa.insert(ScopeBindingRow.__table__).values(
+                virtual_scope_id=virtual_scope_id,
+                scope_type=ScopeType.PROJECT,
+                scope_id=data.project_id,
+                permission_cap=None,
             )
         )
     yield data
@@ -294,10 +314,28 @@ async def cross_domain_fixture(
                 resource_policy=resource_policy_fixture,
             )
         )
+        virtual_scope_id = uuid.uuid4()
         await conn.execute(
             sa.insert(VirtualScopeRow.__table__).values(
+                id=virtual_scope_id,
                 scope_type=ScopeType.PROJECT,
                 scope_id=group_id,
+            )
+        )
+        await conn.execute(
+            sa.insert(EntityMembershipRow.__table__).values(
+                virtual_scope_id=virtual_scope_id,
+                entity_type=EntityType.PROJECT,
+                entity_id=group_id,
+                permission_cap=None,
+            )
+        )
+        await conn.execute(
+            sa.insert(ScopeBindingRow.__table__).values(
+                virtual_scope_id=virtual_scope_id,
+                scope_type=ScopeType.PROJECT,
+                scope_id=group_id,
+                permission_cap=None,
             )
         )
         await conn.execute(

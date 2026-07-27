@@ -30,7 +30,7 @@ from authlib.jose import JsonWebKey  # pants: no-infer-dep
 from authlib.jose import jwt as jose_jwt  # pants: no-infer-dep
 from sqlalchemy.ext.asyncio import create_async_engine
 
-from ai.backend.common.data.permission.types import ScopeType
+from ai.backend.common.data.permission.types import EntityType, ScopeType
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import (
     ResourceSlot,
@@ -60,6 +60,8 @@ from ai.backend.manager.models.resource_policy import (
 )
 from ai.backend.manager.models.user import UserRole, UserStatus, users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.manager.plugin.openid.hook import OIDCHookPlugin
 from ai.backend.manager.plugin.openid.valkey_client import ValkeyOpenIDClient
@@ -450,10 +452,28 @@ async def seed_data(
         )
         sess.add(project)
         await sess.flush()
+        virtual_scope_id = uuid.uuid4()
         await conn.execute(
             sa.insert(VirtualScopeRow.__table__).values(
+                id=virtual_scope_id,
                 scope_type=ScopeType.PROJECT,
                 scope_id=project.id,
+            )
+        )
+        await conn.execute(
+            sa.insert(EntityMembershipRow.__table__).values(
+                virtual_scope_id=virtual_scope_id,
+                entity_type=EntityType.PROJECT,
+                entity_id=project.id,
+                permission_cap=None,
+            )
+        )
+        await conn.execute(
+            sa.insert(ScopeBindingRow.__table__).values(
+                virtual_scope_id=virtual_scope_id,
+                scope_type=ScopeType.PROJECT,
+                scope_id=project.id,
+                permission_cap=None,
             )
         )
 

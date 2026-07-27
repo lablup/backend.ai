@@ -132,6 +132,8 @@ from ai.backend.manager.models.session_template import session_templates
 from ai.backend.manager.models.user import users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import vfolders
+from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.manager.notification.notification_center import NotificationCenter
 from ai.backend.manager.plugin.network import NetworkPluginContext
@@ -739,10 +741,28 @@ async def group_fixture(
                 resource_policy=resource_policy_fixture,
             )
         )
+        virtual_scope_id = uuid.uuid4()
         await conn.execute(
             sa.insert(VirtualScopeRow.__table__).values(
+                id=virtual_scope_id,
                 scope_type=ScopeType.PROJECT,
                 scope_id=group_id,
+            )
+        )
+        await conn.execute(
+            sa.insert(EntityMembershipRow.__table__).values(
+                virtual_scope_id=virtual_scope_id,
+                entity_type=EntityType.PROJECT,
+                entity_id=group_id,
+                permission_cap=None,
+            )
+        )
+        await conn.execute(
+            sa.insert(ScopeBindingRow.__table__).values(
+                virtual_scope_id=virtual_scope_id,
+                scope_type=ScopeType.PROJECT,
+                scope_id=group_id,
+                permission_cap=None,
             )
         )
     yield group_id

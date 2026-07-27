@@ -25,7 +25,7 @@ from ai.backend.client.v2.exceptions import (
 )
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.container_registry import ContainerRegistryType
-from ai.backend.common.data.permission.types import ScopeType
+from ai.backend.common.data.permission.types import EntityType, ScopeType
 from ai.backend.common.dto.manager.deployment.types import OrderDirection
 from ai.backend.common.dto.manager.group.request import GroupFilter, SearchGroupsRequest
 from ai.backend.common.dto.manager.group.response import (
@@ -51,6 +51,8 @@ from ai.backend.manager.models.image import ImageRow, ImageType
 from ai.backend.manager.models.kernel import KernelRow, KernelStatus
 from ai.backend.manager.models.session import SessionRow, SessionStatus
 from ai.backend.manager.models.vfolder import VFolderRow
+from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.testutils.fixtures import DomainFixtureData
 
@@ -75,10 +77,28 @@ async def test_group_for_deletion(
                 resource_policy=resource_policy_fixture,
             )
         )
+        virtual_scope_id = uuid.uuid4()
         await conn.execute(
             sa.insert(VirtualScopeRow.__table__).values(
+                id=virtual_scope_id,
                 scope_type=ScopeType.PROJECT,
                 scope_id=group_id,
+            )
+        )
+        await conn.execute(
+            sa.insert(EntityMembershipRow.__table__).values(
+                virtual_scope_id=virtual_scope_id,
+                entity_type=EntityType.PROJECT,
+                entity_id=group_id,
+                permission_cap=None,
+            )
+        )
+        await conn.execute(
+            sa.insert(ScopeBindingRow.__table__).values(
+                virtual_scope_id=virtual_scope_id,
+                scope_type=ScopeType.PROJECT,
+                scope_id=group_id,
+                permission_cap=None,
             )
         )
     yield group_id
@@ -123,10 +143,28 @@ async def group_with_vfolder_mounted(
                 resource_policy=resource_policy_fixture,
             )
         )
+        virtual_scope_id = uuid.uuid4()
         await conn.execute(
             sa.insert(VirtualScopeRow.__table__).values(
+                id=virtual_scope_id,
                 scope_type=ScopeType.PROJECT,
                 scope_id=group_id,
+            )
+        )
+        await conn.execute(
+            sa.insert(EntityMembershipRow.__table__).values(
+                virtual_scope_id=virtual_scope_id,
+                entity_type=EntityType.PROJECT,
+                entity_id=group_id,
+                permission_cap=None,
+            )
+        )
+        await conn.execute(
+            sa.insert(ScopeBindingRow.__table__).values(
+                virtual_scope_id=virtual_scope_id,
+                scope_type=ScopeType.PROJECT,
+                scope_id=group_id,
+                permission_cap=None,
             )
         )
         # Create vfolder
@@ -242,10 +280,28 @@ async def group_with_active_kernel(
                 resource_policy=resource_policy_fixture,
             )
         )
+        virtual_scope_id = uuid.uuid4()
         await conn.execute(
             sa.insert(VirtualScopeRow.__table__).values(
+                id=virtual_scope_id,
                 scope_type=ScopeType.PROJECT,
                 scope_id=group_id,
+            )
+        )
+        await conn.execute(
+            sa.insert(EntityMembershipRow.__table__).values(
+                virtual_scope_id=virtual_scope_id,
+                entity_type=EntityType.PROJECT,
+                entity_id=group_id,
+                permission_cap=None,
+            )
+        )
+        await conn.execute(
+            sa.insert(ScopeBindingRow.__table__).values(
+                virtual_scope_id=virtual_scope_id,
+                scope_type=ScopeType.PROJECT,
+                scope_id=group_id,
+                permission_cap=None,
             )
         )
         # Create session (required FK for kernel)
@@ -344,10 +400,28 @@ async def group_with_active_endpoint(
                 resource_policy=resource_policy_fixture,
             )
         )
+        virtual_scope_id = uuid.uuid4()
         await conn.execute(
             sa.insert(VirtualScopeRow.__table__).values(
+                id=virtual_scope_id,
                 scope_type=ScopeType.PROJECT,
                 scope_id=group_id,
+            )
+        )
+        await conn.execute(
+            sa.insert(EntityMembershipRow.__table__).values(
+                virtual_scope_id=virtual_scope_id,
+                entity_type=EntityType.PROJECT,
+                entity_id=group_id,
+                permission_cap=None,
+            )
+        )
+        await conn.execute(
+            sa.insert(ScopeBindingRow.__table__).values(
+                virtual_scope_id=virtual_scope_id,
+                scope_type=ScopeType.PROJECT,
+                scope_id=group_id,
+                permission_cap=None,
             )
         )
         # Create container registry (required by image)
@@ -440,10 +514,28 @@ async def multiple_test_groups(
                     resource_policy=resource_policy_fixture,
                 )
             )
+            virtual_scope_id = uuid.uuid4()
             await conn.execute(
                 sa.insert(VirtualScopeRow.__table__).values(
+                    id=virtual_scope_id,
                     scope_type=ScopeType.PROJECT,
                     scope_id=group_id,
+                )
+            )
+            await conn.execute(
+                sa.insert(EntityMembershipRow.__table__).values(
+                    virtual_scope_id=virtual_scope_id,
+                    entity_type=EntityType.PROJECT,
+                    entity_id=group_id,
+                    permission_cap=None,
+                )
+            )
+            await conn.execute(
+                sa.insert(ScopeBindingRow.__table__).values(
+                    virtual_scope_id=virtual_scope_id,
+                    scope_type=ScopeType.PROJECT,
+                    scope_id=group_id,
+                    permission_cap=None,
                 )
             )
             group_ids.append(group_id)
