@@ -49,16 +49,6 @@ def upgrade() -> None:
         type_=sa.Numeric(),
         existing_nullable=False,
     )
-    # Fold the old (amount, duration_seconds) pair into the product for every row.
-    # In-window rows are rebuilt below, but out-of-window rows are not; without this
-    # they would keep a raw amount that the new read path misreads as resource-seconds.
-    # amount * duration_seconds equals the value the JSONB mirror already holds, so the
-    # two representations stay consistent.  The duration_seconds <> 0 guard keeps a
-    # downgrade -> upgrade rerun a no-op (downgrade restores duration_seconds to 0).
-    op.execute(
-        "UPDATE usage_bucket_entries SET resource_usage = resource_usage * duration_seconds "
-        "WHERE duration_seconds <> 0"
-    )
     op.drop_column("usage_bucket_entries", "duration_seconds")
 
     # Data change: rebuild the corrupted values from kernel_usage_records.
