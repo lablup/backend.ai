@@ -209,6 +209,15 @@ class TestBindAddress:
             assert argv[argv.index("--dst-type") + 1] == "LOCAL"
             assert "-d" not in argv
 
+    def test_0_0_0_0_binds_every_local_address_like_docker(self) -> None:
+        # Docker treats HostIp "0.0.0.0" and "" identically (bind to all); the config's prod example
+        # sets bind-host to "0.0.0.0". A literal ``-d 0.0.0.0/32`` matches no packet, so it must map
+        # to the every-local-address form instead, or the published port is silently unreachable.
+        for host_ip in ("0.0.0.0", ""):
+            for argv in install_args(self._bound(host_ip)):
+                assert argv[argv.index("--dst-type") + 1] == "LOCAL"
+                assert "-d" not in argv
+
     def test_remove_of_a_bound_rule_mirrors_install(self) -> None:
         # A -D that dropped the -d would fail to delete the installed -d rule and leak it.
         fwd = self._bound("127.0.0.1")

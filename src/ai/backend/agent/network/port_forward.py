@@ -36,12 +36,24 @@ class PortForward:
     host_port: int
     container_ip: str
     container_port: int
-    # The host address the service is published on. None means "every local address" (the LOCAL
-    # addrtype match). A concrete address confines the DNAT to that interface — 127.0.0.1 for a
-    # protected service (a storage node's ttyd shell must not be remotely reachable), or the
-    # operator's configured bind-host to keep service ports off the public interface. Docker
+    # The host address the service is published on. None, "" and "0.0.0.0" all mean "every local
+    # address" (the LOCAL addrtype match). A concrete address confines the DNAT to that interface —
+    # 127.0.0.1 for a protected service (a storage node's ttyd shell must not be remotely reachable),
+    # or the operator's configured bind-host to keep service ports off the public interface. Docker
     # applies exactly the same per-port host-IP binding.
     host_ip: str | None = None
+
+
+# Host addresses that mean "bind to every local interface" rather than one specific address. Docker
+# treats an empty HostIp and "0.0.0.0" identically (bind to all), so we must too — and 0.0.0.0 is
+# what the config's ``prod`` example sets bind-host to. A literal ``-d 0.0.0.0/32`` would match no
+# inbound packet at all (0.0.0.0 is never a real packet destination), silently making the published
+# port unreachable; the wildcard must become the ``--dst-type LOCAL`` match instead.
+_WILDCARD_HOST_IPS = frozenset({"0.0.0.0"})
+
+
+def _binds_every_local_address(host_ip: str | None) -> bool:
+    return not host_ip or host_ip in _WILDCARD_HOST_IPS
 
 
 def _comment(container_id: str) -> list[str]:
@@ -51,17 +63,18 @@ def _comment(container_id: str) -> list[str]:
 def dnat_rule(chain: str, forward: PortForward) -> list[str]:
     """The DNAT rule body, shared by -A (install), -D (remove) and -C (probe).
 
-    A concrete ``host_ip`` binds the rule to one address with ``-d``; otherwise ``--dst-type LOCAL``
-    matches every local address. That guard is not optional in the fallback case: without it the
-    rule matches on the port alone, and this node both forwards overlay traffic for other nodes and
-    originates its own connections — so a packet merely *transiting* the host, or an outbound
-    connection to some remote host's port 30001, would be redirected into a local container.
-    Docker's published-port rules carry the same guard for the same reason.
+    A concrete ``host_ip`` binds the rule to one address with ``-d``; a wildcard (None, "" or
+    "0.0.0.0" — see ``_binds_every_local_address``) uses ``--dst-type LOCAL`` to match every local
+    address. That guard is not optional in the wildcard case: without it the rule matches on the
+    port alone, and this node both forwards overlay traffic for other nodes and originates its own
+    connections — so a packet merely *transiting* the host, or an outbound connection to some remote
+    host's port 30001, would be redirected into a local container. Docker's published-port rules
+    carry the same guard for the same reason.
     """
     dst_match = (
-        ["-d", f"{forward.host_ip}/32"]
-        if forward.host_ip
-        else ["-m", "addrtype", "--dst-type", "LOCAL"]
+        ["-m", "addrtype", "--dst-type", "LOCAL"]
+        if _binds_every_local_address(forward.host_ip)
+        else ["-d", f"{forward.host_ip}/32"]
     )
     return [
         chain,
