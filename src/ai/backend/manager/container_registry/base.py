@@ -21,6 +21,9 @@ import trafaret as t
 import yarl
 
 from ai.backend.common.bgtask.reporter import ProgressReporter
+from ai.backend.common.data.entity.types import EntityRef, ScopeRef
+from ai.backend.common.data.entity.types import EntityType as VirtualScopeEntityType
+from ai.backend.common.data.entity.types import ScopeType as VirtualScopeType
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.docker import (
     ImageRef,
@@ -49,13 +52,20 @@ from ai.backend.manager.defs import INTRINSIC_SLOTS_MIN
 from ai.backend.manager.exceptions import ScanImageError, ScanTagError
 from ai.backend.manager.models.image import ImageIdentifier, ImageRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base.rbac.entity_creator import (
-    RBACEntityCreator,
-    execute_rbac_entity_creators,
-)
+from ai.backend.manager.repositories.base.pagination import NoPagination
+from ai.backend.manager.repositories.base.querier import BatchQuerier
+from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.image.creators import ImageRowCreatorSpec
+from ai.backend.manager.repositories.ops.rbac.provider import (
+    EntityMembersAddition,
+    RBACOpsProvider,
+    ScopeEntityMember,
+)
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+_CONTAINER_REGISTRY_SCOPE_TYPE = VirtualScopeType(RBACElementType.CONTAINER_REGISTRY.value)
+_IMAGE_ENTITY_TYPE = VirtualScopeEntityType(RBACElementType.IMAGE.value)
 concurrency_sema: ContextVar[asyncio.Semaphore] = ContextVar("concurrency_sema")
 progress_reporter: ContextVar[ProgressReporter | None] = ContextVar(
     "progress_reporter", default=None
@@ -75,6 +85,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
     base_hdrs: dict[str, str]
     credentials: dict[str, str]
     ssl_verify: bool
+    _rbac_ops_provider: RBACOpsProvider
 
     MEDIA_TYPE_OCI_INDEX: Final[str] = "application/vnd.oci.image.index.v1+json"
     MEDIA_TYPE_OCI_MANIFEST: Final[str] = "application/vnd.oci.image.manifest.v1+json"
@@ -101,6 +112,7 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         ssl_verify: bool = True,
     ) -> None:
         self.db = db
+        self._rbac_ops_provider = RBACOpsProvider(db)
         self.registry_name = registry_name
         self.registry_info = registry_info
         self.registry_url = yarl.URL(registry_info.url)
@@ -181,15 +193,17 @@ class BaseContainerRegistry(metaclass=ABCMeta):
             log.info("No images found in registry {0}", self.registry_url)
         else:
             image_identifiers = [(k.canonical, k.architecture) for k in _all_updates.keys()]
-            async with self.db.begin_session_read_committed() as session:
-                existing_images = await session.scalars(
+            async with self._rbac_ops_provider.write_ops() as w:
+                existing_result = await w.batch_query_in_global(
                     sa.select(ImageRow).where(
                         sa.func.ROW(ImageRow.name, ImageRow.architecture).in_(image_identifiers),
-                    )
+                    ),
+                    BatchQuerier(pagination=NoPagination()),
                 )
                 is_local = self.registry_name == "local"
 
-                for image_row in existing_images:
+                for existing_row in existing_result.rows:
+                    image_row = existing_row.ImageRow
                     image_ref = image_row.image_ref
                     update_key = ImageIdentifier(image_ref.canonical, image_ref.architecture)
                     if update := _all_updates.pop(update_key, None):
@@ -255,7 +269,27 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                         ),
                     )
 
-                bulk_result = await execute_rbac_entity_creators(session, rbac_creators)
+                bulk_result = await w.bulk_create_scoped(rbac_creators)
+                if bulk_result.rows:
+                    # Register the new images on the registry's virtual scope so
+                    # ownership resolves through the scope chain. ensure_scope
+                    # covers registries created before the chain existed.
+                    registry_scope = ScopeRef(
+                        scope_type=_CONTAINER_REGISTRY_SCOPE_TYPE,
+                        scope_id=self.registry_info.id,
+                    )
+                    await w.ensure_scope(registry_scope)
+                    await w.add_entity_members(
+                        EntityMembersAddition(
+                            scope=registry_scope,
+                            members=[
+                                ScopeEntityMember(
+                                    ref=EntityRef(entity_type=_IMAGE_ENTITY_TYPE, entity_id=row.id)
+                                )
+                                for row in bulk_result.rows
+                            ],
+                        )
+                    )
                 for row in bulk_result.rows:
                     scanned_images.append(row.to_dataclass())
                     progress_msg = (
@@ -264,8 +298,6 @@ class BaseContainerRegistry(metaclass=ABCMeta):
                     log.info(progress_msg)
                     if (reporter := progress_reporter.get()) is not None:
                         await reporter.update(1, message=progress_msg)
-
-                await session.flush()
         return scanned_images
 
     async def scan_single_ref(self, image: str) -> RescanImagesResult:

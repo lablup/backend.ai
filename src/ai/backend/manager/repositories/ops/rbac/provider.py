@@ -144,6 +144,22 @@ class ScopeUserMember(ScopeMember):
 
 
 @dataclass
+class ScopeEntityMember(ScopeMember):
+    """A non-user entity joining a scope (e.g. a registry associated with a
+    project, an image owned by a registry); grants no auto_assign roles."""
+
+    ref: EntityRef
+
+    @override
+    def entity_ref(self) -> EntityRef:
+        return self.ref
+
+    @override
+    def assign_role_on(self) -> UserID | None:
+        return None
+
+
+@dataclass
 class EntityMembersAddition:
     scope: ScopeRef
     members: Collection[ScopeMember]

@@ -1,11 +1,16 @@
 import logging
 import uuid
-from typing import cast
+from collections.abc import Collection
+from dataclasses import dataclass
+from typing import cast, override
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.container_registry import AllowedGroupsModel, ContainerRegistryType
+from ai.backend.common.data.entity.types import EntityRef, ScopeRef
+from ai.backend.common.data.entity.types import EntityType as VirtualScopeEntityType
+from ai.backend.common.data.entity.types import ScopeType as VirtualScopeType
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
@@ -18,7 +23,6 @@ from ai.backend.manager.data.container_registry.types import (
     ContainerRegistrySearchResult,
 )
 from ai.backend.manager.data.image.types import ImageStatus
-from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.image import (
     ContainerRegistryGroupsAssociationNotFound,
     ContainerRegistryNotFound,
@@ -33,33 +37,85 @@ from ai.backend.manager.models.container_registry import (
 )
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base.creator import (
-    Creator,
-    execute_creator,
+from ai.backend.manager.repositories.base.creator import Creator
+from ai.backend.manager.repositories.base.pagination import NoPagination
+from ai.backend.manager.repositories.base.purger import BatchPurger, Purger
+from ai.backend.manager.repositories.base.querier import (
+    BatchQuerier,
+    Querier,
+    execute_batch_querier,
 )
-from ai.backend.manager.repositories.base.purger import Purger, execute_purger
-from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
-from ai.backend.manager.repositories.base.rbac.scope_binder import (
-    RBACScopeBinder,
-    RBACScopeBindingPair,
-    execute_rbac_scope_binder,
-)
-from ai.backend.manager.repositories.base.rbac.scope_unbinder import (
-    execute_rbac_scope_entity_unbinder,
-)
-from ai.backend.manager.repositories.base.updater import Updater, execute_updater
+from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
+from ai.backend.manager.repositories.base.rbac.entity_purger import RBACEntityPurger
+from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.container_registry.creators import (
     ContainerRegistryCreatorSpec,
     ContainerRegistryGroupCreatorSpec,
 )
-from ai.backend.manager.repositories.container_registry.scope_binders import (
-    ContainerRegistryProjectEntityUnbinder,
+from ai.backend.manager.repositories.container_registry.purgers import (
+    ContainerRegistryGroupPurgerSpec,
+    ContainerRegistryPurgerSpec,
 )
 from ai.backend.manager.repositories.container_registry.updaters import (
     ContainerRegistryUpdaterSpec,
 )
+from ai.backend.manager.repositories.ops.rbac.provider import (
+    EntityMembersAddition,
+    RBACOpsProvider,
+    RBACWriteOps,
+    ScopeCreation,
+    ScopeDeletion,
+    ScopeEntityMember,
+)
+from ai.backend.manager.repositories.permission_controller.role_manager import (
+    ScopeSystemRoleData,
+)
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+_CONTAINER_REGISTRY_SCOPE_TYPE = VirtualScopeType(RBACElementType.CONTAINER_REGISTRY.value)
+_CONTAINER_REGISTRY_ENTITY_TYPE = VirtualScopeEntityType(RBACElementType.CONTAINER_REGISTRY.value)
+_PROJECT_SCOPE_TYPE = VirtualScopeType(RBACElementType.PROJECT.value)
+
+
+def _registry_scope(registry_id: uuid.UUID) -> ScopeRef:
+    return ScopeRef(scope_type=_CONTAINER_REGISTRY_SCOPE_TYPE, scope_id=registry_id)
+
+
+def _registry_entity(registry_id: uuid.UUID) -> EntityRef:
+    return EntityRef(entity_type=_CONTAINER_REGISTRY_ENTITY_TYPE, entity_id=registry_id)
+
+
+def _project_scope(group_id: uuid.UUID) -> ScopeRef:
+    return ScopeRef(scope_type=_PROJECT_SCOPE_TYPE, scope_id=group_id)
+
+
+@dataclass
+class ContainerRegistryScopeCreation(ScopeCreation[ContainerRegistryRow]):
+    """Creates a container registry row and the scope the registry becomes.
+
+    A registry has no owning scope of its own (``scope_ref=None``); projects
+    reach it and its images through allowed-group bindings instead.
+    """
+
+    spec: ContainerRegistryCreatorSpec
+
+    @override
+    def creator(self) -> RBACEntityCreator[ContainerRegistryRow]:
+        return RBACEntityCreator(
+            spec=self.spec,
+            element_type=RBACElementType.CONTAINER_REGISTRY,
+            scope_ref=None,
+        )
+
+    @override
+    def scope_of(self, row: ContainerRegistryRow) -> ScopeRef:
+        return _registry_scope(row.id)
+
+    @override
+    def system_roles_of(self, row: ContainerRegistryRow) -> Collection[ScopeSystemRoleData]:
+        return ()
+
 
 container_registry_repository_resilience = Resilience(
     policies=[
@@ -80,23 +136,27 @@ container_registry_repository_resilience = Resilience(
 
 class ContainerRegistryRepository:
     _db: ExtendedAsyncSAEngine
+    _rbac_ops_provider: RBACOpsProvider
 
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
+        self._rbac_ops_provider = RBACOpsProvider(db)
 
     async def create_registry(
         self,
         creator: Creator[ContainerRegistryRow],
     ) -> ContainerRegistryData:
+        """Create a registry with its virtual scope, so it can own the images
+        scanned from it; allowed groups are bound into that scope."""
         spec = cast(ContainerRegistryCreatorSpec, creator.spec)
-        async with self._db.begin_session() as session:
-            creator_result = await execute_creator(session, creator)
-            container_registry_row: ContainerRegistryRow = creator_result.row
+        async with self._rbac_ops_provider.write_ops() as w:
+            creation_result = await w.create_scope(ContainerRegistryScopeCreation(spec=spec))
+            container_registry_row = creation_result.row
 
             if spec.has_allowed_groups:
                 allowed_groups = cast(AllowedGroupsModel, spec.allowed_groups)
                 await self._handle_allowed_groups_update(
-                    session, container_registry_row.id, allowed_groups
+                    w, container_registry_row.id, allowed_groups
                 )
 
             return container_registry_row.to_dataclass()
@@ -105,31 +165,28 @@ class ContainerRegistryRepository:
         self,
         updater: Updater[ContainerRegistryRow],
     ) -> ContainerRegistryData:
-        async with self._db.begin_session() as session:
+        async with self._rbac_ops_provider.write_ops() as w:
             updater.spec = cast(ContainerRegistryUpdaterSpec, updater.spec)
             registry_id = cast(uuid.UUID, updater.pk_value)
 
-            stmt = sa.select(ContainerRegistryRow).where(ContainerRegistryRow.id == registry_id)
-            result = await session.execute(stmt)
-            reg_row = result.scalar_one_or_none()
-
-            if reg_row is None:
+            existing = await w.query(Querier(row_class=ContainerRegistryRow, pk_value=registry_id))
+            if existing is None:
                 raise ContainerRegistryNotFound(f"Container registry not found (id:{registry_id})")
+            reg_row = existing.row
 
             is_global_value = updater.spec.is_global.optional_value()
             if is_global_value is True:
-                await self._clear_all_allowed_groups(session, registry_id)
+                await self._clear_all_allowed_groups(w, registry_id)
             elif updater.spec.has_allowed_groups_update is True:
                 await self._handle_allowed_groups_update(
-                    session, registry_id, updater.spec.allowed_groups.value()
+                    w, registry_id, updater.spec.allowed_groups.value()
                 )
 
             to_update = updater.spec.build_values()
             if to_update == {}:  # means no fields to update or only allowed_groups updated
                 return reg_row.to_dataclass()
 
-            session.expire(reg_row)  # Expire to get updated values after update
-            update_result = await execute_updater(session, updater)
+            update_result = await w.update(updater)
             if update_result is None:
                 raise ContainerRegistryNotFound(f"Container registry not found (id:{registry_id})")
 
@@ -146,16 +203,22 @@ class ContainerRegistryRepository:
 
     async def delete_registry(self, purger: Purger[ContainerRegistryRow]) -> ContainerRegistryData:
         """
-        Delete a container registry using a purger.
+        Delete a container registry with its RBAC entries and virtual scope.
         Returns the deleted registry data.
         Raises ContainerRegistryNotFound if registry doesn't exist.
         """
-        async with self._db.begin_session() as session:
-            result = await execute_purger(session, purger)
+        spec = cast(ContainerRegistryPurgerSpec, purger.spec)
+        async with self._rbac_ops_provider.write_ops() as w:
+            result = await w.delete_scope(
+                ScopeDeletion(
+                    purger=RBACEntityPurger(spec=spec),
+                    scope=_registry_scope(spec.registry_id),
+                )
+            )
 
             if result is None:
                 raise ContainerRegistryNotFound(
-                    f"Container registry not found (id:{purger.spec.pk_value()})"
+                    f"Container registry not found (id:{spec.registry_id})"
                 )
 
             return result.row.to_dataclass()
@@ -300,15 +363,21 @@ class ContainerRegistryRepository:
 
     async def _handle_allowed_groups_update(
         self,
-        session: SASession,
+        w: RBACWriteOps,
         registry_id: uuid.UUID,
         allowed_group_updates: AllowedGroupsModel,
     ) -> None:
         """
         Handle adding/removing group associations for a container registry.
 
+        An allowed group is expressed on the virtual-scope chain in both
+        directions: the registry becomes an entity member of the project's
+        virtual scope (the project sees the registry itself), and the project
+        scope is bound into the registry's virtual scope (project-scoped
+        permissions reach the registry's images).
+
         Args:
-            session: Database session
+            w: RBAC write ops bound to the current transaction
             registry_id: Container registry UUID
             allowed_group_updates: Groups to add or remove
 
@@ -316,35 +385,36 @@ class ContainerRegistryRepository:
             ContainerRegistryGroupsAlreadyAssociated: If groups are already associated
             ContainerRegistryGroupsAssociationNotFound: If trying to remove non-existing associations
         """
+        registry_scope = _registry_scope(registry_id)
+
         if allowed_group_updates.add:
-            pairs = [
-                RBACScopeBindingPair(
-                    spec=ContainerRegistryGroupCreatorSpec(
-                        registry_id=registry_id,
-                        group_id=uuid.UUID(group_id),
-                    ),
-                    entity_ref=RBACElementRef(
-                        element_type=RBACElementType.CONTAINER_REGISTRY,
-                        element_id=str(registry_id),
-                    ),
-                    scope_ref=RBACElementRef(
-                        element_type=RBACElementType.PROJECT,
-                        element_id=str(group_id),
-                    ),
+            # Registries created before the virtual-scope chain have no node yet.
+            await w.ensure_scope(registry_scope)
+            for raw_group_id in allowed_group_updates.add:
+                group_id = uuid.UUID(raw_group_id)
+                await w.create(
+                    Creator(
+                        spec=ContainerRegistryGroupCreatorSpec(
+                            registry_id=registry_id,
+                            group_id=group_id,
+                        )
+                    )
                 )
-                for group_id in allowed_group_updates.add
-            ]
-            await execute_rbac_scope_binder(session, RBACScopeBinder(pairs=pairs))
+                project_scope = _project_scope(group_id)
+                await w.add_entity_members(
+                    EntityMembersAddition(
+                        scope=project_scope,
+                        members=[ScopeEntityMember(ref=_registry_entity(registry_id))],
+                    )
+                )
+                await w.bind_scope(project_scope, registry_scope, permission_cap=None)
 
         if allowed_group_updates.remove:
+            await w.ensure_scope(registry_scope)
             total_deleted = 0
-            for group_id in allowed_group_updates.remove:
-                unbinder = ContainerRegistryProjectEntityUnbinder(
-                    registry_id=registry_id,
-                    group_id=uuid.UUID(group_id),
-                )
-                result = await execute_rbac_scope_entity_unbinder(session, unbinder)
-                total_deleted += result.deleted_count
+            for raw_group_id in allowed_group_updates.remove:
+                group_id = uuid.UUID(raw_group_id)
+                total_deleted += await self._remove_allowed_group(w, registry_id, group_id)
             if total_deleted == 0:
                 raise ContainerRegistryGroupsAssociationNotFound(
                     f"Tried to remove non-existing associations for registry_id: {registry_id}, group_ids: {allowed_group_updates.remove}"
@@ -352,20 +422,40 @@ class ContainerRegistryRepository:
 
     async def _clear_all_allowed_groups(
         self,
-        session: SASession,
+        w: RBACWriteOps,
         registry_id: uuid.UUID,
     ) -> None:
         stmt = sa.select(AssociationContainerRegistriesGroupsRow.group_id).where(
             AssociationContainerRegistriesGroupsRow.registry_id == registry_id
         )
-        result = await session.execute(stmt)
-        group_ids = list(result.scalars().all())
+        result = await w.batch_query_in_global(stmt, BatchQuerier(pagination=NoPagination()))
+        group_ids = [row.group_id for row in result.rows]
+        if not group_ids:
+            return
+        await w.ensure_scope(_registry_scope(registry_id))
         for group_id in group_ids:
-            unbinder = ContainerRegistryProjectEntityUnbinder(
-                registry_id=registry_id,
-                group_id=group_id,
+            await self._remove_allowed_group(w, registry_id, group_id)
+
+    async def _remove_allowed_group(
+        self,
+        w: RBACWriteOps,
+        registry_id: uuid.UUID,
+        group_id: uuid.UUID,
+    ) -> int:
+        """Drop an allowed-group association: the N:N mapping row and both
+        virtual-scope edges. Returns the number of mapping rows deleted."""
+        purge_result = await w.batch_purge(
+            BatchPurger(
+                spec=ContainerRegistryGroupPurgerSpec(
+                    registry_id=registry_id,
+                    group_id=group_id,
+                )
             )
-            await execute_rbac_scope_entity_unbinder(session, unbinder)
+        )
+        project_scope = _project_scope(group_id)
+        await w.remove_entity_members(project_scope, [_registry_entity(registry_id)])
+        await w.unbind_scope(project_scope, _registry_scope(registry_id))
+        return purge_result.deleted_count
 
     async def _get_by_registry_and_project(
         self,
