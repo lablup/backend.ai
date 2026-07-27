@@ -101,8 +101,8 @@ from ai.backend.manager.repositories.scheduling_history.types import (
     RouteHistorySearchScope,
     SessionSchedulingHistorySearchScope,
 )
-from ai.backend.manager.services.scheduling_history.actions.admin_search_replica_group_history import (
-    AdminSearchReplicaGroupHistoryAction,
+from ai.backend.manager.services.scheduling_history.actions.global_search_replica_group_history import (
+    GlobalSearchReplicaGroupHistoryAction,
 )
 from ai.backend.manager.services.scheduling_history.actions.resolve_kernel_session import (
     ResolveKernelSessionAction,
@@ -843,8 +843,8 @@ class SchedulingHistoryAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        action_result = await self._processors.scheduling_history.admin_search_replica_group_history.wait_for_complete(
-            AdminSearchReplicaGroupHistoryAction(querier=querier)
+        action_result = await self._processors.scheduling_history.global_search_replica_group_history.wait_for_complete(
+            GlobalSearchReplicaGroupHistoryAction(querier=querier)
         )
         return SearchReplicaGroupHistoriesPayload(
             items=[self._replica_group_data_to_dto(h) for h in action_result.items],
