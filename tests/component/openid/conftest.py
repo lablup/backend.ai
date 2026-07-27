@@ -30,6 +30,7 @@ from authlib.jose import JsonWebKey  # pants: no-infer-dep
 from authlib.jose import jwt as jose_jwt  # pants: no-infer-dep
 from sqlalchemy.ext.asyncio import create_async_engine
 
+from ai.backend.common.data.permission.types import EntityType, ScopeType
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import (
     ResourceSlot,
@@ -59,6 +60,9 @@ from ai.backend.manager.models.resource_policy import (
 )
 from ai.backend.manager.models.user import UserRole, UserStatus, users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.manager.plugin.openid.hook import OIDCHookPlugin
 from ai.backend.manager.plugin.openid.valkey_client import ValkeyOpenIDClient
 from ai.backend.manager.plugin.openid.webapp import OIDCWebAppPlugin
@@ -440,15 +444,38 @@ async def seed_data(
                 allowed_vfolder_hosts=VFolderHostPermissionMap({}),
             )
         )
-        sess.add(
-            GroupRow(
-                name="default",
-                domain_name="default",
-                total_resource_slots=ResourceSlot({}),
-                resource_policy="default",
+        project = GroupRow(
+            name="default",
+            domain_name="default",
+            total_resource_slots=ResourceSlot({}),
+            resource_policy="default",
+        )
+        sess.add(project)
+        await sess.flush()
+        virtual_scope_id = uuid.uuid4()
+        await conn.execute(
+            sa.insert(VirtualScopeRow.__table__).values(
+                id=virtual_scope_id,
+                scope_type=ScopeType.PROJECT,
+                scope_id=project.id,
             )
         )
-        await sess.flush()
+        await conn.execute(
+            sa.insert(EntityMembershipRow.__table__).values(
+                virtual_scope_id=virtual_scope_id,
+                entity_type=EntityType.PROJECT,
+                entity_id=project.id,
+                permission_cap=None,
+            )
+        )
+        await conn.execute(
+            sa.insert(ScopeBindingRow.__table__).values(
+                virtual_scope_id=virtual_scope_id,
+                scope_type=ScopeType.PROJECT,
+                scope_id=project.id,
+                permission_cap=None,
+            )
+        )
 
     yield database_engine
 
@@ -458,6 +485,12 @@ async def seed_data(
         await conn.execute(association_groups_users.delete())
         await conn.execute(keypairs.delete())
         await conn.execute(users.delete())
+        await conn.execute(
+            VirtualScopeRow.__table__.delete().where(
+                VirtualScopeRow.__table__.c.scope_type == ScopeType.PROJECT,
+                VirtualScopeRow.__table__.c.scope_id == project.id,
+            )
+        )
         await conn.execute(groups.delete())
         await conn.execute(keypair_resource_policies.delete())
         await conn.execute(project_resource_policies.delete())
