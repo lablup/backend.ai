@@ -143,7 +143,7 @@ class TestUsageBucketEntries:
 
         await db_source.increment_usage_buckets(result)
 
-        # Verify entries were created with resource-seconds and duration
+        # Verify entries were created with resource-seconds
         async with db_with_cleanup.begin_readonly_session() as db_sess:
             entry_rows = (
                 (
@@ -257,7 +257,7 @@ class TestUsageBucketEntries:
 
         await db_source.increment_usage_buckets(result)
 
-        # Verify entries were created with resource-seconds and duration
+        # Verify entries were created with resource-seconds
         async with db_with_cleanup.begin_readonly_session() as db_sess:
             entry_rows = (
                 (
