@@ -7,13 +7,12 @@ from typing import override
 
 from ai.backend.common.data.idle_checker.types import (
     IdleCheckPhase,
-    UtilizationSpec,
     UtilizationThresholdOperator,
 )
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.data.metric.types import SessionUtilizationMetricThreshold
 from ai.backend.manager.services.metric.actions.session_utilization import (
-    SessionUtilizationBatchAction,
-    SessionUtilizationCheck,
+    SessionUtilizationAction,
 )
 from ai.backend.manager.services.metric.service import MetricService
 from ai.backend.manager.sokovan.idle_check.checkers.base import (
@@ -42,8 +41,7 @@ class UtilizationChecker(IdleChecker):
         context: IdleCheckerContext,
     ) -> Sequence[IdleJudgment]:
         # Unknown sessions are ignored because their utilization status cannot be determined.
-        assignment_specs: list[tuple[CheckerAssignment, UtilizationSpec]] = []
-        checks: list[SessionUtilizationCheck] = []
+        judgments: list[IdleJudgment] = []
         for assignment in assignments:
             spec = assignment.definition.spec.utilization
             if spec is None:
@@ -53,29 +51,23 @@ class UtilizationChecker(IdleChecker):
                     assignment.definition.spec.type,
                 )
                 continue
-            assignment_specs.append((assignment, spec))
-            checks.append(
-                SessionUtilizationCheck(
-                    spec=spec,
+            result = await self._metric_service.query_session_utilization(
+                SessionUtilizationAction(
+                    thresholds=[
+                        SessionUtilizationMetricThreshold(
+                            metric_name=entry.metric_name,
+                            time_window_seconds=entry.time_window_seconds,
+                            threshold=entry.threshold,
+                            kernel_aggregation=entry.kernel_aggregation,
+                        )
+                        for entry in spec.thresholds
+                    ],
                     session_ids=[session.session_id for session in assignment.sessions],
+                    evaluation_time=context.current_time,
                 )
             )
-        if not checks:
-            return []
-        result = await self._metric_service.query_session_utilization_batch(
-            SessionUtilizationBatchAction(
-                checks=checks,
-                evaluation_time=context.current_time,
-            )
-        )
-        judgments: list[IdleJudgment] = []
-        for (assignment, spec), observations_by_session in zip(
-            assignment_specs,
-            result.observations_by_check,
-            strict=True,
-        ):
             for session in assignment.sessions:
-                observations = observations_by_session.get(session.session_id)
+                observations = result.observations_by_session.get(session.session_id)
                 if not observations:
                     continue
                 underutilized = [observation.is_underutilized for observation in observations]
