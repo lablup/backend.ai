@@ -87,6 +87,11 @@ class TestMovingStatistics:
         assert stats.rate == case.expected_rate
 
 
+# Large enough that leaking it into `current` reads as an unmistakable spike
+# (pct would be 1,000,000%), never as a plausible utilization value.
+_HUGE_CPU_USED_MSEC = Decimal(10_000_000)
+
+
 class TestMetric:
     """Tests for Metric class, focusing on current_hook application."""
 
@@ -103,17 +108,17 @@ class TestMetric:
         [
             CreationTestCase(
                 id="rate_hook_applied_to_first_observation",
-                initial_value=Decimal(5000),
+                initial_value=_HUGE_CPU_USED_MSEC,
                 current_hook=lambda metric: metric.stats.rate,
                 expected_current=Decimal(0),
                 expected_pct="0",
             ),
             CreationTestCase(
                 id="no_hook_keeps_raw_value",
-                initial_value=Decimal(5000),
+                initial_value=_HUGE_CPU_USED_MSEC,
                 current_hook=None,
-                expected_current=Decimal(5000),
-                expected_pct="500",
+                expected_current=_HUGE_CPU_USED_MSEC,
+                expected_pct="1000000",
             ),
         ],
         ids=lambda case: case.id,
