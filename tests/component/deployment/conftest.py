@@ -59,10 +59,9 @@ from ai.backend.manager.sokovan.deployment.deployment_controller import (
     DeploymentControllerArgs,
 )
 from ai.backend.manager.sokovan.deployment.revision_draft import RevisionDraftReader
-from ai.backend.manager.sokovan.scheduler.provisioner.selectors.concentrated import (
-    ConcentratedAgentSelector,
+from ai.backend.manager.sokovan.scheduler.provisioner.selectors.pool import (
+    create_agent_selector,
 )
-from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import AgentSelector
 from ai.backend.manager.sokovan.scheduling_controller import (
     SchedulingController,
     SchedulingControllerArgs,
@@ -128,10 +127,8 @@ def deployment_processors(
             valkey_schedule=valkey_clients.schedule,
             network_plugin_ctx=network_plugin_ctx,
             hook_plugin_ctx=hook_plugin_ctx,
-            agent_selector=AgentSelector(
-                ConcentratedAgentSelector(
-                    config_provider.config.manager.agent_selection_resource_priority
-                )
+            agent_selector=create_agent_selector(
+                config_provider.config.manager.agent_selection_resource_priority
             ),
         )
     )

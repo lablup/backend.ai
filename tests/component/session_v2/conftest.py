@@ -76,10 +76,9 @@ from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.services.processors import Processors
 from ai.backend.manager.services.session.processors import SessionProcessors
 from ai.backend.manager.services.session.service import SessionService, SessionServiceArgs
-from ai.backend.manager.sokovan.scheduler.provisioner.selectors.concentrated import (
-    ConcentratedAgentSelector,
+from ai.backend.manager.sokovan.scheduler.provisioner.selectors.pool import (
+    create_agent_selector,
 )
-from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import AgentSelector
 from ai.backend.manager.sokovan.scheduling_controller import (
     SchedulingController,
     SchedulingControllerArgs,
@@ -684,10 +683,8 @@ async def compute_session_processors(
             valkey_schedule=valkey_clients.schedule,
             network_plugin_ctx=network_plugin_ctx,
             hook_plugin_ctx=hook_plugin_ctx,
-            agent_selector=AgentSelector(
-                ConcentratedAgentSelector(
-                    config_provider.config.manager.agent_selection_resource_priority
-                )
+            agent_selector=create_agent_selector(
+                config_provider.config.manager.agent_selection_resource_priority
             ),
         )
     )
