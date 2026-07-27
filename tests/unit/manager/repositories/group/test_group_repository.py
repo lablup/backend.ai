@@ -11,7 +11,7 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.data.permission.types import EntityType, RoleSource, ScopeType
-from ai.backend.common.exception import InvalidAPIParameters
+from ai.backend.common.exception import DomainNotFound, InvalidAPIParameters
 from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.identifier.resource_group import ResourceGroupID
@@ -879,7 +879,7 @@ class TestGroupRepository:
         )
         creator = Creator(spec=creator_spec)
 
-        with pytest.raises(InvalidAPIParameters):
+        with pytest.raises(DomainNotFound):
             await group_repository.create(creator)
 
     async def test_create_duplicate_name_in_domain(
@@ -921,22 +921,25 @@ class TestGroupRepository:
 
         result = await group_repository.create(creator)
 
-        # Verify AssociationScopesEntitiesRow was created
+        # Verify AssociationScopesEntitiesRow was created, keyed by the domain UUID
         async with db_with_cleanup.begin_readonly_session() as session:
+            domain_id = await session.scalar(
+                sa.select(DomainRow.id).where(DomainRow.name == test_domain)
+            )
             scope_assoc = await session.scalar(
                 sa.select(AssociationScopesEntitiesRow).where(
                     sa.and_(
                         AssociationScopesEntitiesRow.entity_type == EntityType.PROJECT,
                         AssociationScopesEntitiesRow.entity_id == str(result.id),
                         AssociationScopesEntitiesRow.scope_type == ScopeType.DOMAIN,
-                        AssociationScopesEntitiesRow.scope_id == test_domain,
+                        AssociationScopesEntitiesRow.scope_id == str(domain_id),
                     )
                 )
             )
             assert scope_assoc is not None
             assert scope_assoc.entity_type == EntityType.PROJECT
             assert scope_assoc.scope_type == ScopeType.DOMAIN
-            assert scope_assoc.scope_id == test_domain
+            assert scope_assoc.scope_id == str(domain_id)
             assert scope_assoc.entity_id == str(result.id)
 
     async def test_create_creates_admin_and_member_system_roles(

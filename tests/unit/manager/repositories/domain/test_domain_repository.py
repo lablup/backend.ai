@@ -6,7 +6,6 @@ Tests the repository layer with real database operations.
 import uuid
 from collections.abc import AsyncGenerator
 from datetime import UTC, datetime
-from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 import sqlalchemy as sa
@@ -23,7 +22,6 @@ from ai.backend.common.types import (
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.domain.types import DomainData, UserInfo
 from ai.backend.manager.errors.resource import (
-    DomainDeletionFailed,
     DomainHasActiveKernels,
     DomainHasGroups,
     DomainHasUsers,
@@ -43,6 +41,14 @@ from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow, KernelStatus
 from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
+from ai.backend.manager.models.rbac_models.association_scopes_entities import (
+    AssociationScopesEntitiesRow,
+)
+from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
+from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
+    RolePermissionPresetRow,
+)
+from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
 from ai.backend.manager.models.replica_group import ReplicaGroupRow
 from ai.backend.manager.models.resource_policy import (
     KeyPairResourcePolicyRow,
@@ -57,6 +63,9 @@ from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
+from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.manager.repositories.base.creator import Creator
 from ai.backend.manager.repositories.base.updater import Updater
 from ai.backend.manager.repositories.domain.creators import DomainCreatorSpec
@@ -84,6 +93,13 @@ class TestDomainRepository:
                 KeyPairResourcePolicyRow,
                 RoleRow,
                 UserRoleRow,
+                AssociationScopesEntitiesRow,
+                PermissionRow,
+                RolePresetRow,
+                RolePermissionPresetRow,
+                VirtualScopeRow,
+                EntityMembershipRow,
+                ScopeBindingRow,
                 UserRow,
                 KeyPairRow,
                 GroupRow,
@@ -152,14 +168,7 @@ class TestDomainRepository:
         self, db_with_default_resource_policies: ExtendedAsyncSAEngine
     ) -> DomainRepository:
         """Create DomainRepository instance with real database"""
-        repo = DomainRepository(db=db_with_default_resource_policies)
-
-        # Create mock for _role_manager
-        mock_role_manager = MagicMock()
-        mock_role_manager.create_system_role = AsyncMock(return_value=None)
-        repo._role_manager = mock_role_manager
-
-        return repo
+        return DomainRepository(db=db_with_default_resource_policies)
 
     @pytest.fixture
     def sample_domain_creator(self) -> DomainCreatorSpec:
@@ -636,7 +645,7 @@ class TestDomainRepository:
         domain_repository: DomainRepository,
     ) -> None:
         """Test domain purging when domain not found"""
-        with pytest.raises(DomainDeletionFailed):
+        with pytest.raises(DomainNotFound):
             await domain_repository.purge_domain("nonexistent-domain")
 
     async def test_create_domain_with_all_fields(

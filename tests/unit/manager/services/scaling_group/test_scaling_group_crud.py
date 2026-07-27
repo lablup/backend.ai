@@ -314,7 +314,7 @@ class TestScalingGroupDomainAssociation:
                         ),
                         entity_ref=RBACElementRef(RBACElementType.RESOURCE_GROUP, name),
                         scope_ref=RBACElementRef(
-                            RBACElementType.DOMAIN, domain_fixture.domain_name
+                            RBACElementType.DOMAIN, str(domain_fixture.domain_id)
                         ),
                     )
                 ]
@@ -356,7 +356,7 @@ class TestScalingGroupDomainAssociation:
                         ),
                         entity_ref=RBACElementRef(RBACElementType.RESOURCE_GROUP, name),
                         scope_ref=RBACElementRef(
-                            RBACElementType.DOMAIN, domain_fixture.domain_name
+                            RBACElementType.DOMAIN, str(domain_fixture.domain_id)
                         ),
                     )
                 ]
@@ -377,6 +377,7 @@ class TestScalingGroupDomainAssociation:
             unbinder = ResourceGroupDomainEntityUnbinder(
                 scaling_groups=[name],
                 domain=domain_fixture.domain_name,
+                domain_id=domain_fixture.domain_id,
             )
             await (
                 scaling_group_processors.disassociate_scaling_group_with_domains.wait_for_complete(
@@ -426,7 +427,7 @@ class TestScalingGroupDomainAssociation:
                         ),
                         entity_ref=RBACElementRef(RBACElementType.RESOURCE_GROUP, name),
                         scope_ref=RBACElementRef(
-                            RBACElementType.DOMAIN, domain_fixture.domain_name
+                            RBACElementType.DOMAIN, str(domain_fixture.domain_id)
                         ),
                     )
                 ]
