@@ -51,8 +51,8 @@ from ai.backend.manager.repositories.scheduling_history.types import (
     SessionKernelHistorySearchScope,
     SessionSchedulingHistorySearchScope,
 )
-from ai.backend.manager.services.scheduling_history.actions.admin_search_replica_group_history import (
-    AdminSearchReplicaGroupHistoryAction,
+from ai.backend.manager.services.scheduling_history.actions.global_search_replica_group_history import (
+    GlobalSearchReplicaGroupHistoryAction,
 )
 from ai.backend.manager.services.scheduling_history.actions.resolve_kernel_session import (
     ResolveKernelSessionAction,
@@ -453,7 +453,7 @@ class TestSearchKernelScopedHistoryAction:
         )
 
 
-class TestAdminSearchReplicaGroupHistoryAction:
+class TestGlobalSearchReplicaGroupHistoryAction:
     async def test_returns_histories(
         self,
         service: SchedulingHistoryService,
@@ -470,8 +470,8 @@ class TestAdminSearchReplicaGroupHistoryAction:
             )
         )
 
-        action = AdminSearchReplicaGroupHistoryAction(querier=querier)
-        result = await service.admin_search_replica_group_history(action)
+        action = GlobalSearchReplicaGroupHistoryAction(querier=querier)
+        result = await service.global_search_replica_group_history(action)
 
         assert result.items == [replica_group_history]
         assert result.total_count == 1

@@ -10,8 +10,8 @@ from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpe
 from ai.backend.manager.actions.validators import ActionValidators
 
 from .actions import (
-    AdminSearchReplicaGroupHistoryAction,
-    AdminSearchReplicaGroupHistoryActionResult,
+    GlobalSearchReplicaGroupHistoryAction,
+    GlobalSearchReplicaGroupHistoryActionResult,
     ResolveKernelSessionAction,
     ResolveKernelSessionActionResult,
     ScopedSearchReplicaGroupHistoryAction,
@@ -49,8 +49,8 @@ class SchedulingHistoryProcessors(AbstractProcessorPackage):
     search_deployment_history: ActionProcessor[
         SearchDeploymentHistoryAction, SearchDeploymentHistoryActionResult
     ]
-    admin_search_replica_group_history: GlobalActionProcessor[
-        AdminSearchReplicaGroupHistoryAction, AdminSearchReplicaGroupHistoryActionResult
+    global_search_replica_group_history: GlobalActionProcessor[
+        GlobalSearchReplicaGroupHistoryAction, GlobalSearchReplicaGroupHistoryActionResult
     ]
     search_route_history: ActionProcessor[SearchRouteHistoryAction, SearchRouteHistoryActionResult]
 
@@ -90,8 +90,8 @@ class SchedulingHistoryProcessors(AbstractProcessorPackage):
         self.search_deployment_history = ActionProcessor(
             service.search_deployment_history, action_monitors
         )
-        self.admin_search_replica_group_history = GlobalActionProcessor(
-            service.admin_search_replica_group_history, action_monitors
+        self.global_search_replica_group_history = GlobalActionProcessor(
+            service.global_search_replica_group_history, action_monitors
         )
         self.search_route_history = ActionProcessor(service.search_route_history, action_monitors)
 
@@ -126,7 +126,7 @@ class SchedulingHistoryProcessors(AbstractProcessorPackage):
             SearchSessionHistoryAction.spec(),
             SearchKernelHistoryAction.spec(),
             SearchDeploymentHistoryAction.spec(),
-            AdminSearchReplicaGroupHistoryAction.spec(),
+            GlobalSearchReplicaGroupHistoryAction.spec(),
             SearchRouteHistoryAction.spec(),
             # Scoped actions (added in 26.2.0)
             SearchSessionScopedHistoryAction.spec(),

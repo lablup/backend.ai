@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from .admin_search_replica_group_history import (
-    AdminSearchReplicaGroupHistoryAction,
-    AdminSearchReplicaGroupHistoryActionResult,
-)
 from .base import SchedulingHistoryAction
+from .global_search_replica_group_history import (
+    GlobalSearchReplicaGroupHistoryAction,
+    GlobalSearchReplicaGroupHistoryActionResult,
+)
 from .resolve_kernel_session import (
     ResolveKernelSessionAction,
     ResolveKernelSessionActionResult,
@@ -57,8 +57,8 @@ __all__ = (
     "SearchKernelHistoryActionResult",
     "SearchDeploymentHistoryAction",
     "SearchDeploymentHistoryActionResult",
-    "AdminSearchReplicaGroupHistoryAction",
-    "AdminSearchReplicaGroupHistoryActionResult",
+    "GlobalSearchReplicaGroupHistoryAction",
+    "GlobalSearchReplicaGroupHistoryActionResult",
     "SearchRouteHistoryAction",
     "SearchRouteHistoryActionResult",
     # Scoped actions (added in 26.2.0)

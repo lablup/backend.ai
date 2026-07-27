@@ -12,8 +12,8 @@ from ai.backend.manager.repositories.base import BatchQuerier
 
 
 @dataclass
-class AdminSearchReplicaGroupHistoryAction(BaseGlobalAction):
-    """Action to search replica-group scheduling history (admin API)."""
+class GlobalSearchReplicaGroupHistoryAction(BaseGlobalAction):
+    """Action to search replica-group scheduling history across every scope."""
 
     querier: BatchQuerier
 
@@ -33,7 +33,7 @@ class AdminSearchReplicaGroupHistoryAction(BaseGlobalAction):
 
 
 @dataclass
-class AdminSearchReplicaGroupHistoryActionResult(BaseActionResult):
+class GlobalSearchReplicaGroupHistoryActionResult(BaseActionResult):
     """Result of searching replica-group scheduling history."""
 
     items: list[ReplicaGroupHistoryData]
