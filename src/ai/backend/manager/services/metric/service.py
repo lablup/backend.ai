@@ -1,13 +1,11 @@
 import logging
 from collections import defaultdict
+from collections.abc import Sequence
 from decimal import Decimal
 
-from ai.backend.common.data.idle_checker.types import (
-    UtilizationKernelPolicy,
-    UtilizationThresholdEntry,
-)
 from ai.backend.common.types import SessionId
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.data.metric.types import SessionUtilizationMetricThreshold
 from ai.backend.manager.data.resource_slot.types import ResourceAllocationAggregate
 from ai.backend.manager.repositories.metric.repository import MetricRepository
 from ai.backend.manager.repositories.metric.types import SessionUtilizationMetricQuery
@@ -21,17 +19,14 @@ from .actions.container import (
 )
 from .actions.live_stat import ContainerLiveStatAction, ContainerLiveStatActionResult
 from .actions.session_utilization import (
-    SessionUtilizationBatchAction,
-    SessionUtilizationBatchActionResult,
+    SessionUtilizationAction,
+    SessionUtilizationActionResult,
     SessionUtilizationObservation,
 )
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 _RESOURCE_METRIC_SUFFIXES = ("_util", "_mem", "_used")
-
-type _QueryKey = tuple[str, UtilizationKernelPolicy, int | None]
-type _ObservationTarget = tuple[int, SessionId, UtilizationThresholdEntry]
 
 
 class MetricService:
@@ -59,18 +54,38 @@ class MetricService:
             return None
         return value / occupied_memory * 100
 
-    async def query_session_utilization_batch(
+    def _get_applicable_session_ids(
         self,
-        action: SessionUtilizationBatchAction,
-    ) -> SessionUtilizationBatchActionResult:
-        session_ids = {session_id for check in action.checks for session_id in check.session_ids}
+        threshold: SessionUtilizationMetricThreshold,
+        session_ids: Sequence[SessionId],
+        resources_by_session: dict[SessionId, set[str]],
+    ) -> list[SessionId]:
+        resource_name = threshold.metric_name
+        for suffix in _RESOURCE_METRIC_SUFFIXES:
+            if resource_name.endswith(suffix):
+                resource_name = resource_name.removesuffix(suffix)
+                break
+
+        applicable_session_ids: list[SessionId] = []
+        for session_id in dict.fromkeys(session_ids):
+            allocated_resource_names = resources_by_session.get(session_id)
+            if allocated_resource_names is None:
+                continue
+            if resource_name not in allocated_resource_names:
+                continue
+            applicable_session_ids.append(session_id)
+        return applicable_session_ids
+
+    async def query_session_utilization(
+        self,
+        action: SessionUtilizationAction,
+    ) -> SessionUtilizationActionResult:
+        session_ids = list(dict.fromkeys(action.session_ids))
         if not session_ids:
-            return SessionUtilizationBatchActionResult(
-                observations_by_check=[{} for _ in action.checks]
-            )
+            return SessionUtilizationActionResult(observations_by_session={})
 
         allocations = await self._session_repository.batch_get_resource_allocation_by_session(
-            list(session_ids)
+            session_ids
         )
         resources_by_session: dict[SessionId, set[str]] = {}
         for session_id, allocation in allocations.items():
@@ -81,69 +96,48 @@ class MetricService:
                 resource_names.add(str(slot_name).partition(".")[0])
             resources_by_session[session_id] = resource_names
 
-        targets_by_query: defaultdict[_QueryKey, list[_ObservationTarget]] = defaultdict(list)
-        # Filter sessions without resource allocations for each metric.
-        for check_index, check in enumerate(action.checks):
-            for entry in check.spec.thresholds:
-                resource_name = entry.metric_name
-                for suffix in _RESOURCE_METRIC_SUFFIXES:
-                    if resource_name.endswith(suffix):
-                        resource_name = resource_name.removesuffix(suffix)
-                        break
-                query_key = (
-                    entry.metric_name,
-                    entry.kernel_policy,
-                    entry.time_window_seconds,
-                )
-                for session_id in check.session_ids:
-                    allocated_resource_names = resources_by_session.get(session_id)
-                    if allocated_resource_names is None:
-                        continue
-                    if resource_name not in allocated_resource_names:
-                        continue
-                    targets_by_query[query_key].append((check_index, session_id, entry))
-
-        observations_by_check: list[defaultdict[SessionId, list[SessionUtilizationObservation]]] = [
-            defaultdict(list) for _ in action.checks
-        ]
-        unknown_sessions: set[tuple[int, SessionId]] = set()
-        for query_key, targets in targets_by_query.items():
-            metric_name, kernel_policy, time_window_seconds = query_key
-            query_session_ids = list(dict.fromkeys(session_id for _, session_id, _ in targets))
+        observations_by_session: defaultdict[SessionId, list[SessionUtilizationObservation]] = (
+            defaultdict(list)
+        )
+        unknown_session_ids: set[SessionId] = set()
+        for threshold in action.thresholds:
+            applicable_session_ids = self._get_applicable_session_ids(
+                threshold,
+                session_ids,
+                resources_by_session,
+            )
+            if not applicable_session_ids:
+                continue
             # Sessions without metric values remain unknown.
             result = await self._metric_repository.query_session_utilization_metrics(
                 SessionUtilizationMetricQuery(
-                    metric_name=metric_name,
-                    kernel_policy=kernel_policy,
-                    time_window_seconds=time_window_seconds,
-                    session_ids=query_session_ids,
+                    metric_name=threshold.metric_name,
+                    kernel_aggregation=threshold.kernel_aggregation,
+                    time_window_seconds=threshold.time_window_seconds,
+                    session_ids=applicable_session_ids,
                     evaluation_time=action.evaluation_time,
                 )
             )
-            for check_index, session_id, entry in targets:
+            for session_id in applicable_session_ids:
                 value = result.by_session.get(session_id)
                 if value is None:
-                    unknown_sessions.add((check_index, session_id))
+                    unknown_session_ids.add(session_id)
                     continue
                 value = self._to_utilization_percentage(
-                    entry.metric_name,
+                    threshold.metric_name,
                     value,
                     allocations[session_id],
                 )
                 if value is None:
-                    unknown_sessions.add((check_index, session_id))
+                    unknown_session_ids.add(session_id)
                     continue
-                observations_by_check[check_index][session_id].append(
-                    SessionUtilizationObservation(entry=entry, value=value)
+                observations_by_session[session_id].append(
+                    SessionUtilizationObservation(entry=threshold, value=value)
                 )
 
-        for check_index, session_id in unknown_sessions:
-            observations_by_check[check_index].pop(session_id, None)
-        return SessionUtilizationBatchActionResult(
-            observations_by_check=[
-                dict(observations_by_session) for observations_by_session in observations_by_check
-            ]
-        )
+        for session_id in unknown_session_ids:
+            observations_by_session.pop(session_id, None)
+        return SessionUtilizationActionResult(observations_by_session=dict(observations_by_session))
 
     async def query_container_metric_metadata(
         self,

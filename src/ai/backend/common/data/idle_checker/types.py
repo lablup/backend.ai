@@ -6,7 +6,7 @@ from typing import Self
 
 from pydantic import Field, model_validator
 
-from ai.backend.common.types import BackendAISchema
+from ai.backend.common.types import BackendAISchema, KernelAggregationMode
 
 
 class CheckerType(enum.StrEnum):
@@ -23,14 +23,6 @@ class IdleCheckPhase(enum.StrEnum):
     ACTIVE = "active"
     IDLE = "idle"
     IDLE_EXPIRED = "idle_expired"
-
-
-class UtilizationKernelPolicy(enum.StrEnum):
-    """How per-kernel utilization becomes one session-level value."""
-
-    ANY = "any"
-    ALL = "all"
-    AVERAGE = "average"
 
 
 class UtilizationThresholdOperator(enum.StrEnum):
@@ -57,7 +49,7 @@ class UtilizationThresholdEntry(BackendAISchema):
         le=100,
         description="Underutilization threshold as a percentage.",
     )
-    kernel_policy: UtilizationKernelPolicy = Field(
+    kernel_aggregation: KernelAggregationMode = Field(
         description="How kernel values are aggregated into a session-level result."
     )
 

@@ -7,10 +7,9 @@ from uuid import uuid4
 
 import pytest
 
-from ai.backend.common.data.idle_checker.types import UtilizationKernelPolicy
 from ai.backend.common.dto.clients.prometheus.response import PrometheusResponse
 from ai.backend.common.exception import PrometheusConnectionError
-from ai.backend.common.types import SessionId
+from ai.backend.common.types import KernelAggregationMode, SessionId
 from ai.backend.manager.clients.prometheus.client import PrometheusClient
 from ai.backend.manager.data.metric.types import SessionUtilizationMetricResult
 from ai.backend.manager.errors.common import InternalServerError
@@ -39,7 +38,7 @@ def _response(values: list[tuple[str, str]]) -> PrometheusResponse:
 def _query(session_id: SessionId) -> SessionUtilizationMetricQuery:
     return SessionUtilizationMetricQuery(
         metric_name="cpu_util",
-        kernel_policy=UtilizationKernelPolicy.AVERAGE,
+        kernel_aggregation=KernelAggregationMode.AVERAGE,
         time_window_seconds=None,
         session_ids=(session_id,),
         evaluation_time=_EVALUATION_TIME,
@@ -72,7 +71,7 @@ class TestQuerySessionUtilizationMetrics:
         assert result == SessionUtilizationMetricResult(by_session={session_id: Decimal("9.9")})
         prometheus_client.fetch_session_utilization.assert_awaited_once_with(
             metric_name="cpu_util",
-            kernel_policy=UtilizationKernelPolicy.AVERAGE,
+            kernel_aggregation=KernelAggregationMode.AVERAGE,
             time_window_seconds=None,
             session_ids=(session_id,),
             evaluation_time=_EVALUATION_TIME.isoformat(),

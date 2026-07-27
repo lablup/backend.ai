@@ -86,7 +86,7 @@ class MetricRepository:
         try:
             response = await self._prometheus_client.fetch_session_utilization(
                 metric_name=query.metric_name,
-                kernel_policy=query.kernel_policy,
+                kernel_aggregation=query.kernel_aggregation,
                 time_window_seconds=query.time_window_seconds,
                 session_ids=query.session_ids,
                 evaluation_time=query.evaluation_time.isoformat(),
@@ -95,7 +95,7 @@ class MetricRepository:
             log.warning(
                 "Utilization query failed for metric {} and policy {}: {}",
                 query.metric_name,
-                query.kernel_policy,
+                query.kernel_aggregation,
                 e,
             )
             return SessionUtilizationMetricResult(by_session={})

@@ -7,8 +7,7 @@ from uuid import UUID
 
 import pytest
 
-from ai.backend.common.data.idle_checker.types import UtilizationKernelPolicy
-from ai.backend.common.types import KernelId, SessionId
+from ai.backend.common.types import KernelAggregationMode, KernelId, SessionId
 from ai.backend.manager.clients.prometheus import (
     ContainerLiveStatQueryBuilder,
     ContainerMetricQueryBuilder,
@@ -160,28 +159,28 @@ class TestSessionUtilizationQueryBuilder:
         return SessionId(UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"))
 
     @pytest.mark.parametrize(
-        ("policy", "aggregation"),
+        ("kernel_aggregation", "query_aggregation"),
         [
-            (UtilizationKernelPolicy.ANY, "min by (session_id)"),
-            (UtilizationKernelPolicy.ALL, "max by (session_id)"),
-            (UtilizationKernelPolicy.AVERAGE, "avg by (session_id)"),
+            (KernelAggregationMode.ANY, "min by (session_id)"),
+            (KernelAggregationMode.ALL, "max by (session_id)"),
+            (KernelAggregationMode.AVERAGE, "avg by (session_id)"),
         ],
     )
     def test_builds_current_session_level_query(
         self,
         session_id: SessionId,
-        policy: UtilizationKernelPolicy,
-        aggregation: str,
+        kernel_aggregation: KernelAggregationMode,
+        query_aggregation: str,
     ) -> None:
         preset = SessionUtilizationQueryBuilder().build(
             metric_name="cpu_util",
-            kernel_policy=policy,
+            kernel_aggregation=kernel_aggregation,
             time_window_seconds=None,
             session_ids=[session_id],
         )
         rendered = preset.render()
 
-        assert aggregation in rendered
+        assert query_aggregation in rendered
         assert 'container_metric_name="cpu_util"' in rendered
         assert 'value_type="pct"' in rendered
         assert f'session_id=~"{session_id}"' in rendered
@@ -189,7 +188,7 @@ class TestSessionUtilizationQueryBuilder:
     def test_builds_windowed_session_level_query(self, session_id: SessionId) -> None:
         preset = SessionUtilizationQueryBuilder().build(
             metric_name="cpu_util",
-            kernel_policy=UtilizationKernelPolicy.AVERAGE,
+            kernel_aggregation=KernelAggregationMode.AVERAGE,
             time_window_seconds=300,
             session_ids=[session_id],
         )

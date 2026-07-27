@@ -8,7 +8,6 @@ from ai.backend.common.clients.http_client.client_pool import (
     ClientKey,
     ClientPool,
 )
-from ai.backend.common.data.idle_checker.types import UtilizationKernelPolicy
 from ai.backend.common.dto.clients.prometheus.request import QueryTimeRange
 from ai.backend.common.dto.clients.prometheus.response import (
     LabelValueResponse,
@@ -18,7 +17,7 @@ from ai.backend.common.exception import (
     FailedToGetMetric,
     PrometheusConnectionError,
 )
-from ai.backend.common.types import KernelId, SessionId
+from ai.backend.common.types import KernelAggregationMode, KernelId, SessionId
 from ai.backend.manager.clients.prometheus.fixed_query_builder import (
     ContainerLiveStatQueryBuilder,
     ContainerMetricQueryBuilder,
@@ -141,14 +140,14 @@ class PrometheusClient:
         self,
         *,
         metric_name: str,
-        kernel_policy: UtilizationKernelPolicy,
+        kernel_aggregation: KernelAggregationMode,
         time_window_seconds: int | None,
         session_ids: Sequence[SessionId],
         evaluation_time: str,
     ) -> PrometheusResponse:
         preset = self._session_utilization_query_builder.build(
             metric_name=metric_name,
-            kernel_policy=kernel_policy,
+            kernel_aggregation=kernel_aggregation,
             time_window_seconds=time_window_seconds,
             session_ids=session_ids,
         )

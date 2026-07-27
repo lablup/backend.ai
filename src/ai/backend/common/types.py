@@ -113,6 +113,7 @@ __all__ = (
     "IntrinsicSlotNames",
     "ItemResult",
     "JSONSerializableMixin",
+    "KernelAggregationMode",
     "KernelCreationConfig",
     "KernelCreationResult",
     "KernelEnqueueingConfig",
@@ -602,6 +603,14 @@ class SessionTypes(CIStrEnum):
         Private session types are INTERACTIVE and BATCH.
         """
         return self in self.private_types()
+
+
+class KernelAggregationMode(enum.StrEnum):
+    """How per-kernel utilization becomes one session-level value."""
+
+    ANY = "any"
+    ALL = "all"
+    AVERAGE = "average"
 
 
 class SessionResult(CIStrEnum):

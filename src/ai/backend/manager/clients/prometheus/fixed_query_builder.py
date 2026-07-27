@@ -3,12 +3,11 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Final
 
-from ai.backend.common.data.idle_checker.types import UtilizationKernelPolicy
 from ai.backend.common.metrics.types import (
     CONTAINER_UTILIZATION_METRIC_LABEL_NAME,
     CONTAINER_UTILIZATION_METRIC_NAME,
 )
-from ai.backend.common.types import KernelId, SessionId
+from ai.backend.common.types import KernelAggregationMode, KernelId, SessionId
 from ai.backend.manager.clients.prometheus.metric_types import (
     DIFF_METRICS,
     RATE_METRICS,
@@ -142,7 +141,7 @@ class SessionUtilizationQueryBuilder:
         self,
         *,
         metric_name: str,
-        kernel_policy: UtilizationKernelPolicy,
+        kernel_aggregation: KernelAggregationMode,
         time_window_seconds: int | None,
         session_ids: Sequence[SessionId],
     ) -> MetricPreset:
@@ -153,7 +152,7 @@ class SessionUtilizationQueryBuilder:
             "value_type": LabelMatcher.exact(value_type.value),
             "session_id": LabelMatcher.regex(session_id_pattern),
         }
-        template = self._template(kernel_policy)
+        template = self._template(kernel_aggregation)
         window = ""
         if time_window_seconds is not None:
             template = f"max_over_time(({template})[{{window}}:])"
@@ -165,13 +164,13 @@ class SessionUtilizationQueryBuilder:
             window=window,
         )
 
-    def _template(self, kernel_policy: UtilizationKernelPolicy) -> str:
-        match kernel_policy:
-            case UtilizationKernelPolicy.ANY:
+    def _template(self, kernel_aggregation: KernelAggregationMode) -> str:
+        match kernel_aggregation:
+            case KernelAggregationMode.ANY:
                 return _ANY_KERNEL_UTILIZATION_TEMPLATE
-            case UtilizationKernelPolicy.ALL:
+            case KernelAggregationMode.ALL:
                 return _ALL_KERNEL_UTILIZATION_TEMPLATE
-            case UtilizationKernelPolicy.AVERAGE:
+            case KernelAggregationMode.AVERAGE:
                 return _AVERAGE_KERNEL_UTILIZATION_TEMPLATE
 
 

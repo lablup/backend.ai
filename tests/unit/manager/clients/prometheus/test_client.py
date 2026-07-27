@@ -5,14 +5,13 @@ from uuid import uuid4
 import aiohttp
 import pytest
 
-from ai.backend.common.data.idle_checker.types import UtilizationKernelPolicy
 from ai.backend.common.dto.clients.prometheus import (
     LabelValueResponse,
     PrometheusResponse,
     QueryTimeRange,
 )
 from ai.backend.common.exception import FailedToGetMetric, PrometheusConnectionError
-from ai.backend.common.types import SessionId
+from ai.backend.common.types import KernelAggregationMode, SessionId
 from ai.backend.manager.clients.prometheus import (
     ContainerLiveStatQueryBuilder,
     ContainerMetricQueryBuilder,
@@ -253,7 +252,7 @@ class TestQueryInstant:
 
         await prometheus_client.fetch_session_utilization(
             metric_name="cpu_util",
-            kernel_policy=UtilizationKernelPolicy.AVERAGE,
+            kernel_aggregation=KernelAggregationMode.AVERAGE,
             time_window_seconds=300,
             session_ids=[session_id],
             evaluation_time="1704067200.123",
