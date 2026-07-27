@@ -17,7 +17,7 @@ import pytest
 from ai.backend.common.identifier.architecture import ArchName
 from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.identifier.resource_slot import ResourceSlotName
-from ai.backend.common.types import AgentId, AgentSelectionStrategy, SessionId
+from ai.backend.common.types import AgentId, AgentSelectionStrategy, PreemptionOrder, SessionId
 from ai.backend.manager.data.session.options import AgentSelectionPolicy
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.pool import (
     create_agent_selector,
@@ -99,6 +99,7 @@ def _criteria(
         agent_selection_policy=AgentSelectionPolicy.STRICT,
         designated_agent_ids=designated_agent_ids,
         job_priority=0,
+        victim_candidates=None,
     )
 
 
@@ -118,7 +119,11 @@ class TestFailedAgentFiltering:
         trackers = _trackers({"agent-a": frozenset({SESSION_ID})})
 
         selections = await selector.select_agents_for_batch_requirements(
-            AgentSelectionStrategy.CONCENTRATED, trackers, _criteria(), NO_LIMIT
+            AgentSelectionStrategy.CONCENTRATED,
+            trackers,
+            _criteria(),
+            NO_LIMIT,
+            PreemptionOrder.OLDEST,
         )
 
         assert len(selections) == 1
@@ -136,7 +141,11 @@ class TestFailedAgentFiltering:
         })
 
         selections = await selector.select_agents_for_batch_requirements(
-            AgentSelectionStrategy.CONCENTRATED, trackers, _criteria(), NO_LIMIT
+            AgentSelectionStrategy.CONCENTRATED,
+            trackers,
+            _criteria(),
+            NO_LIMIT,
+            PreemptionOrder.OLDEST,
         )
 
         assert len(selections) == 1
@@ -152,7 +161,11 @@ class TestFailedAgentFiltering:
         })
 
         selections = await selector.select_agents_for_batch_requirements(
-            AgentSelectionStrategy.CONCENTRATED, trackers, _criteria(), NO_LIMIT
+            AgentSelectionStrategy.CONCENTRATED,
+            trackers,
+            _criteria(),
+            NO_LIMIT,
+            PreemptionOrder.OLDEST,
         )
 
         assert len(selections) == 1
@@ -166,7 +179,11 @@ class TestFailedAgentFiltering:
         trackers = _trackers()
 
         selections = await selector.select_agents_for_batch_requirements(
-            AgentSelectionStrategy.CONCENTRATED, trackers, _criteria(), NO_LIMIT
+            AgentSelectionStrategy.CONCENTRATED,
+            trackers,
+            _criteria(),
+            NO_LIMIT,
+            PreemptionOrder.OLDEST,
         )
 
         assert len(selections) == 1
@@ -183,6 +200,7 @@ class TestFailedAgentFiltering:
             trackers,
             _criteria(designated_agent_ids=[AGENT_A]),
             NO_LIMIT,
+            PreemptionOrder.OLDEST,
         )
 
         assert len(selections) == 1
@@ -196,7 +214,11 @@ class TestFailedAgentFiltering:
         trackers = _trackers({"agent-a": frozenset({SESSION_ID})})
 
         selections = await selector.select_agents_for_batch_requirements(
-            AgentSelectionStrategy.DISPERSED, trackers, _criteria(), NO_LIMIT
+            AgentSelectionStrategy.DISPERSED,
+            trackers,
+            _criteria(),
+            NO_LIMIT,
+            PreemptionOrder.OLDEST,
         )
 
         assert len(selections) == 1
@@ -210,7 +232,11 @@ class TestFailedAgentFiltering:
         trackers = _trackers({"agent-nonexistent": frozenset({SESSION_ID})})
 
         selections = await selector.select_agents_for_batch_requirements(
-            AgentSelectionStrategy.CONCENTRATED, trackers, _criteria(), NO_LIMIT
+            AgentSelectionStrategy.CONCENTRATED,
+            trackers,
+            _criteria(),
+            NO_LIMIT,
+            PreemptionOrder.OLDEST,
         )
 
         assert len(selections) == 1

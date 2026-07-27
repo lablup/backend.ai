@@ -21,6 +21,7 @@ from .orders.designated_preferred import DesignatedPreferredOrder
 from .orders.failed_session import FailedSessionOrder
 from .roundrobin import RoundRobinAgentSelector
 from .selector import AbstractAgentSelector, AgentSelector
+from .victims.pool import create_victim_selector
 
 
 def create_agent_selector(agent_selection_resource_priority: list[str]) -> AgentSelector:
@@ -44,4 +45,5 @@ def create_agent_selector(agent_selection_resource_priority: list[str]) -> Agent
         exclusion_filters=[ArchitectureTrackerFilter(), DesignatedStrictTrackerFilter()],
         stateful_filters=[ResourceTrackerFilter(), ContainerLimitTrackerFilter()],
         orders=[DesignatedPreferredOrder(), FailedSessionOrder()],
+        victim_selector=create_victim_selector(),
     )

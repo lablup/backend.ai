@@ -17,7 +17,7 @@ from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.identifier.resource_slot import ResourceSlotName
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
-from ai.backend.common.types import ResourceSlot, ResourceSlotEntry, SessionId
+from ai.backend.common.types import PreemptionOrder, ResourceSlot, ResourceSlotEntry, SessionId
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -383,6 +383,7 @@ class SchedulingController:
                 designated_agent_ids=list(scheduling_target.designated_agents) or None,
                 # The fitting check has no preemption context
                 job_priority=0,
+                victim_candidates=None,
             )
             # Trackers are throwaway here: the fitting check only needs the
             # immutable observations, never the committed batch state. The
@@ -393,8 +394,14 @@ class SchedulingController:
             # computed results; absolute failures (no candidate agents at all,
             # an exclusion filter leaving none) propagate as whole-request
             # errors.
+            # The victim-less criteria never enter the preemption path, so
+            # the order is only a pool key placeholder here.
             computation = await self._agent_selector.compute_placements(
-                data.agent_selection_strategy, trackers, criteria, data.limit
+                data.agent_selection_strategy,
+                trackers,
+                criteria,
+                data.limit,
+                PreemptionOrder.OLDEST,
             )
             for failure in computation.failures:
                 reason = UnschedulableReasonHint(

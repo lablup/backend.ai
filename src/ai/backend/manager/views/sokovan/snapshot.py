@@ -16,6 +16,7 @@ from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import (
     AgentId,
     AgentSelectionStrategy,
+    PreemptionOrder,
     SessionId,
 )
 
@@ -281,6 +282,8 @@ class ResourceGroupSchedulingPolicy:
     scheduler: str
     # Agent selection strategy (selector pool key)
     agent_selection_strategy: AgentSelectionStrategy
+    # Victim ordering for preemption (victim-order pool key)
+    preemption_order: PreemptionOrder
 
 
 @dataclass

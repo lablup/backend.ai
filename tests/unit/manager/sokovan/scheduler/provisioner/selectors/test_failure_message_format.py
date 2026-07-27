@@ -17,7 +17,7 @@ import pytest
 from ai.backend.common.identifier.architecture import ArchName
 from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.identifier.resource_slot import ResourceSlotName
-from ai.backend.common.types import AgentId, AgentSelectionStrategy, SessionId
+from ai.backend.common.types import AgentId, AgentSelectionStrategy, PreemptionOrder, SessionId
 from ai.backend.manager.data.session.options import AgentSelectionPolicy
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.exceptions import (
     BatchAgentSelectionFailedError,
@@ -95,6 +95,7 @@ def _criteria(requirements: list[ResourceRequirements]) -> AgentSelectionCriteri
         agent_selection_policy=AgentSelectionPolicy.STRICT,
         designated_agent_ids=None,
         job_priority=0,
+        victim_candidates=None,
     )
 
 
@@ -109,6 +110,7 @@ def _designated_criteria(
         agent_selection_policy=AgentSelectionPolicy.STRICT,
         designated_agent_ids=designated_agent_ids,
         job_priority=0,
+        victim_candidates=None,
     )
 
 
@@ -210,6 +212,7 @@ class TestGoldenResourceShortfall:
                 _trackers(agents_too_small),
                 criteria,
                 AgentLimit(max_container_count=10),
+                PreemptionOrder.OLDEST,
             )
 
         # The shortfall is measured against the best-fitting agent (agent-b).
@@ -246,6 +249,7 @@ class TestGoldenDesignatedAgentAbsent:
                 _trackers(pool_without_designated_agents),
                 criteria,
                 AgentLimit(max_container_count=10),
+                PreemptionOrder.OLDEST,
             )
 
         assert exc_info.value.filter_name == "designated-strict"

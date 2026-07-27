@@ -11,7 +11,7 @@ import pytest
 from ai.backend.common.identifier.architecture import ArchName
 from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.identifier.resource_slot import ResourceSlotName
-from ai.backend.common.types import AgentId, AgentSelectionStrategy, SessionId
+from ai.backend.common.types import AgentId, AgentSelectionStrategy, PreemptionOrder, SessionId
 from ai.backend.manager.data.session.options import AgentSelectionPolicy
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.exceptions import (
     NoCompatibleAgentError,
@@ -81,6 +81,7 @@ def _criteria(requirements: list[ResourceRequirements]) -> AgentSelectionCriteri
         agent_selection_policy=AgentSelectionPolicy.STRICT,
         designated_agent_ids=None,
         job_priority=0,
+        victim_candidates=None,
     )
 
 
@@ -101,6 +102,7 @@ class TestComputePlacements:
             _trackers([_agent("agent-a", {"cpu": "1"})]),
             _criteria([_req({"cpu": "4"})]),
             NO_LIMIT,
+            PreemptionOrder.OLDEST,
         )
         assert computation.selections == []
         assert len(computation.failures) == 1
@@ -115,6 +117,7 @@ class TestComputePlacements:
                 _req({"cpu": "1"}),  # placeable
             ]),
             NO_LIMIT,
+            PreemptionOrder.OLDEST,
         )
         assert len(computation.failures) == 1
         assert computation.failures[0].requirement_index == 0
@@ -128,6 +131,7 @@ class TestComputePlacements:
             trackers,
             _criteria([_req({"cpu": "1"}), _req({"cpu": "8"})]),
             NO_LIMIT,
+            PreemptionOrder.OLDEST,
         )
         for tracker in trackers:
             assert tracker.pending_slots == {}
@@ -142,6 +146,7 @@ class TestComputePlacements:
                 trackers,
                 _criteria([_req({"cpu": "1"}), _req({"cpu": "1"}, arch="aarch64")]),
                 NO_LIMIT,
+                PreemptionOrder.OLDEST,
             )
         for tracker in trackers:
             assert tracker.pending_slots == {}
@@ -160,6 +165,7 @@ class TestMissingSlots:
             ]),
             _criteria([_req({"cpu": "4"})]),
             NO_LIMIT,
+            PreemptionOrder.OLDEST,
         )
         failure = computation.failures[0]
         assert failure.missing_slots == _slots({"cpu": "1"})
@@ -171,6 +177,7 @@ class TestMissingSlots:
             _trackers([_agent("agent-a", {"cpu": "1", "mem": "10000"})]),
             _criteria([_req({"cpu": "4", "mem": "8192"})]),  # mem is sufficient
             NO_LIMIT,
+            PreemptionOrder.OLDEST,
         )
         assert computation.failures[0].missing_slots == _slots({"cpu": "3"})
 
@@ -183,6 +190,7 @@ class TestMissingSlots:
                 _trackers([_agent("agent-a", {"cpu": "8"})]),
                 _criteria([_req({"cpu": "1"}, arch="aarch64")]),
                 NO_LIMIT,
+                PreemptionOrder.OLDEST,
             )
         assert exc_info.value.filter_name == "architecture"
 
@@ -192,6 +200,7 @@ class TestMissingSlots:
             _trackers([_agent("agent-a", {"cpu": "8"}, container_count=10)]),
             _criteria([_req({"cpu": "1"})]),
             AgentLimit(max_container_count=10),
+            PreemptionOrder.OLDEST,
         )
         failure = computation.failures[0]
         assert failure.filter_name == "container-limit"

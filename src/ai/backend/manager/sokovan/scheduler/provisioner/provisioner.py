@@ -289,7 +289,11 @@ class SessionProvisioner:
         # Project the workload's placement into the plan (requirement +
         # kernel pairs) and the agent selection criteria.
         plan = PlacementPlan.from_placement(session_workload.placement)
-        criteria = AgentSelectionCriteria.from_workload(session_workload, plan)
+        # The preemption path stays disabled (None) until the provisioner
+        # records and executes preemption plans instead of allocating them.
+        criteria = AgentSelectionCriteria.from_workload(
+            session_workload, plan, victim_candidates=None
+        )
 
         # Selection commits state changes into the trackers on full success
         selections = await self._agent_selector.select_agents_for_batch_requirements(
@@ -297,6 +301,7 @@ class SessionProvisioner:
             state.trackers,
             criteria,
             state.snapshot.global_scope.agent_limit,
+            state.snapshot.resource_group.policy.preemption_order,
         )
 
         # Build session allocation from selections

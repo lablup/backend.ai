@@ -11,7 +11,7 @@ import pytest
 from ai.backend.common.identifier.architecture import ArchName
 from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.identifier.resource_slot import ResourceSlotName
-from ai.backend.common.types import AgentId, AgentSelectionStrategy, SessionId
+from ai.backend.common.types import AgentId, AgentSelectionStrategy, PreemptionOrder, SessionId
 from ai.backend.manager.data.session.options import AgentSelectionPolicy
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.concentrated import (
     ConcentratedAgentSelector,
@@ -63,6 +63,7 @@ def _criteria(requirements: list[ResourceRequirements]) -> AgentSelectionCriteri
         agent_selection_policy=AgentSelectionPolicy.STRICT,
         designated_agent_ids=None,
         job_priority=0,
+        victim_candidates=None,
     )
 
 
@@ -100,6 +101,7 @@ class TestSelectorEdgeCases:
                 _trackers(agents_with_varied_occupancy),
                 criteria,
                 NO_LIMIT,
+                PreemptionOrder.OLDEST,
             )
         assert exc_info.value.failures[0].filter_name == "resource"
 
@@ -118,6 +120,7 @@ class TestSelectorEdgeCases:
                 _trackers(agents_with_varied_occupancy),
                 criteria,
                 NO_LIMIT,
+                PreemptionOrder.OLDEST,
             )
         assert exc_info.value.filter_name == "architecture"
 
@@ -165,6 +168,7 @@ class TestSelectorEdgeCases:
                 _trackers(agents_all_fully_occupied),
                 criteria,
                 NO_LIMIT,
+                PreemptionOrder.OLDEST,
             )
 
     def test_priority_with_nonexistent_resources(

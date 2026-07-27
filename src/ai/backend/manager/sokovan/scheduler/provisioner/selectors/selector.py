@@ -20,6 +20,7 @@ from ai.backend.common.types import (
     AgentId,
     AgentSelectionStrategy,
     ClusterMode,
+    PreemptionOrder,
     SessionId,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
@@ -27,6 +28,7 @@ from ai.backend.manager.data.session.options import AgentSelectionPolicy
 from ai.backend.manager.sokovan.recorder.context import RecorderContext
 from ai.backend.manager.sokovan.recorder.recorder import TransitionRecorder
 from ai.backend.manager.views.sokovan.agent import AgentInfo, AgentLimit
+from ai.backend.manager.views.sokovan.snapshot import PreemptionCandidate, UserVictimCandidates
 from ai.backend.manager.views.sokovan.workload import (
     ResourceRequest,
     SessionPlacement,
@@ -44,6 +46,7 @@ from .filters.stateful.filter import AbstractStatefulTrackerFilter
 from .orders.order import AbstractTrackerOrder
 from .tracker import AgentStateTracker
 from .types import PlacementFailure, ResourceRequirements
+from .victims.selector import VictimSelector
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -54,6 +57,9 @@ class AgentSelection:
 
     resource_requirements: ResourceRequirements
     selected_agent: AgentInfo
+    # Sessions that must be preempted for this placement to fit (empty for
+    # a normal placement; a non-empty tuple marks a preemption proposal)
+    preempting_session_ids: tuple[SessionId, ...]
 
 
 @dataclass
@@ -89,12 +95,16 @@ class AgentSelectionCriteria:
     # Scope-local preemption priority: only strictly lower victims may be
     # reclaimed for this session (the neutral 0 reclaims nothing)
     job_priority: int
+    # The owner's preemption victim candidates (None disables the
+    # preemption path, e.g. the fitting check)
+    victim_candidates: UserVictimCandidates | None
 
     @classmethod
     def from_workload(
         cls,
         workload: SessionWorkload,
         plan: PlacementPlan,
+        victim_candidates: UserVictimCandidates | None,
     ) -> AgentSelectionCriteria:
         """Project a session workload (and its grouped plan) into criteria."""
         return cls(
@@ -104,6 +114,7 @@ class AgentSelectionCriteria:
             agent_selection_policy=workload.placement.agent_selection_policy,
             designated_agent_ids=workload.placement.designated_agent_ids,
             job_priority=workload.job_priority,
+            victim_candidates=victim_candidates,
         )
 
 
@@ -253,6 +264,7 @@ class AgentSelector:
     _exclusion_filters: Sequence[AbstractExclusionTrackerFilter]
     _stateful_filters: Sequence[AbstractStatefulTrackerFilter]
     _orders: Sequence[AbstractTrackerOrder]
+    _victim_selector: VictimSelector
 
     def __init__(
         self,
@@ -260,11 +272,13 @@ class AgentSelector:
         exclusion_filters: Sequence[AbstractExclusionTrackerFilter],
         stateful_filters: Sequence[AbstractStatefulTrackerFilter],
         orders: Sequence[AbstractTrackerOrder],
+        victim_selector: VictimSelector,
     ) -> None:
         self._strategy_pool = strategy_pool
         self._exclusion_filters = exclusion_filters
         self._stateful_filters = stateful_filters
         self._orders = orders
+        self._victim_selector = victim_selector
 
     def strategy_name(self, strategy: AgentSelectionStrategy) -> str:
         """
@@ -284,6 +298,7 @@ class AgentSelector:
         trackers: Sequence[AgentStateTracker],
         criteria: AgentSelectionCriteria,
         limit: AgentLimit,
+        preemption_order: PreemptionOrder,
     ) -> PlacementComputation:
         """Compute placements for every resource requirement in the criteria.
 
@@ -295,8 +310,12 @@ class AgentSelector:
         remaining requirements are still evaluated.
 
         All-or-nothing batch semantics: with any failure the in-flight
-        allocations are rolled back; on full success they are committed so
-        later sessions of the same scheduling pass observe them.
+        allocations are rolled back. On full success without preemption they
+        are committed so later sessions of the same scheduling pass observe
+        them; a session with any preemption is a proposal, so its state
+        (diffs and victim reclaims, kept only while its own requirements are
+        being placed) is rolled back too — the plan lives in the selections,
+        never in the trackers.
 
         Raises:
             NoAgentsInResourceGroupError: If the resource group has no agents
@@ -312,12 +331,20 @@ class AgentSelector:
 
         recorder = self._current_recorder(criteria.session_id)
         computation = PlacementComputation(selections=[], failures=[])
+        claimed_victims: list[PreemptionCandidate] = []
 
         try:
             for requirement_index, resource_req in enumerate(criteria.requirements):
                 try:
                     selection = self._place_requirement(
-                        strategy, trackers, criteria, resource_req, limit, recorder
+                        strategy,
+                        trackers,
+                        criteria,
+                        resource_req,
+                        limit,
+                        preemption_order,
+                        claimed_victims,
+                        recorder,
                     )
                 except NoAvailableAgentError as e:
                     computation.failures.append(
@@ -334,18 +361,23 @@ class AgentSelector:
         except Exception:
             # Any propagating error (absolute failures included) aborts the
             # batch; roll back so the shared trackers stay all-or-nothing.
-            for tracker in trackers:
-                tracker.rollback()
+            self._discard_session_state(trackers)
             raise
 
-        if computation.failures:
-            for tracker in trackers:
-                tracker.rollback()
+        is_proposal = any(selection.preempting_session_ids for selection in computation.selections)
+        if computation.failures or is_proposal:
+            self._discard_session_state(trackers)
         else:
             for tracker in trackers:
                 tracker.commit()
 
         return computation
+
+    def _discard_session_state(self, trackers: Sequence[AgentStateTracker]) -> None:
+        """Drop the session's in-flight diffs and victim reclaims."""
+        for tracker in trackers:
+            tracker.rollback()
+            tracker.clear_reclaim()
 
     def _place_requirement(
         self,
@@ -354,25 +386,43 @@ class AgentSelector:
         criteria: AgentSelectionCriteria,
         resource_req: ResourceRequirements,
         limit: AgentLimit,
+        preemption_order: PreemptionOrder,
+        claimed_victims: list[PreemptionCandidate],
         recorder: TransitionRecorder[SessionId] | None,
     ) -> AgentSelection:
         """Place one requirement: filter chains, order tiers, strategy pick.
+        When the stateful chain empties, retry with the owner's preemption
+        victims reclaimed before giving up.
 
         Raises:
             NoCompatibleAgentError: When an exclusion filter leaves no
                 candidates (absolute failure)
             NoAvailableAgentError: When a stateful filter leaves no
-                candidates (resolvable failure)
+                candidates and preemption cannot help either
         """
         candidates = self._run_exclusion_filters(trackers, criteria, resource_req, recorder)
-        candidates = self._run_stateful_filters(candidates, criteria, resource_req, limit, recorder)
+        try:
+            candidates = self._run_stateful_filters(
+                candidates, criteria, resource_req, limit, recorder
+            )
+        except NoAvailableAgentError:
+            victims = self._reclaimable_victims(criteria, claimed_victims)
+            if victims is None:
+                raise
+            return self._place_with_preemption(
+                strategy,
+                trackers,
+                candidates,
+                victims,
+                criteria,
+                resource_req,
+                limit,
+                preemption_order,
+                claimed_victims,
+                recorder,
+            )
 
-        for order in self._orders:
-            best = min(order.rank(tracker, criteria) for tracker in candidates)
-            candidates = [
-                tracker for tracker in candidates if order.rank(tracker, criteria) == best
-            ]
-
+        candidates = self._narrow_by_orders(candidates, criteria)
         selected_tracker = self._strategy_pool[strategy].select_tracker_by_strategy(
             candidates, resource_req
         )
@@ -381,7 +431,150 @@ class AgentSelector:
         return AgentSelection(
             resource_requirements=resource_req,
             selected_agent=selected_tracker.original_agent,
+            preempting_session_ids=(),
         )
+
+    def _place_with_preemption(
+        self,
+        strategy: AgentSelectionStrategy,
+        trackers: Sequence[AgentStateTracker],
+        candidates: Sequence[AgentStateTracker],
+        victims: UserVictimCandidates,
+        criteria: AgentSelectionCriteria,
+        resource_req: ResourceRequirements,
+        limit: AgentLimit,
+        preemption_order: PreemptionOrder,
+        claimed_victims: list[PreemptionCandidate],
+        recorder: TransitionRecorder[SessionId] | None,
+    ) -> AgentSelection:
+        """Retry the stateful chain with the owner's unclaimed victims
+        provisionally reclaimed; on success propose (not execute) the
+        preemption.
+
+        ``candidates`` are the exclusion survivors of this requirement and
+        ``victims`` the unclaimed reclaimable set. The chosen victims join
+        ``claimed_victims``: their allocations stay reclaimed on every agent
+        they touch (a victim dies once, freeing everywhere) and the
+        requirement's allocation is applied, so the session's remaining
+        requirements compute against the proposed state. The whole session
+        state is discarded after the batch — proposals never leak into the
+        trackers other sessions see.
+
+        Raises:
+            NoAvailableAgentError: When preemption cannot make any agent fit.
+        """
+        victims_by_agent = victims.by_agent
+        shortfalls = {
+            tracker.original_agent.agent_id: self._shortfall(tracker, resource_req)
+            for tracker in candidates
+        }
+        # Probe: credit every unclaimed victim in full, on top of the state
+        # already carrying the session's previous claims and allocations.
+        for tracker in candidates:
+            agent_victims = victims_by_agent.get(tracker.original_agent.agent_id)
+            if agent_victims is not None:
+                tracker.apply_reclaim(agent_victims.total_reclaimable)
+        try:
+            feasible = self._run_stateful_filters(
+                candidates, criteria, resource_req, limit, recorder
+            )
+            feasible = self._narrow_by_orders(feasible, criteria)
+            feasible = self._victim_selector.narrow_agents(
+                preemption_order, feasible, victims_by_agent, shortfalls
+            )
+            selected_tracker = self._strategy_pool[strategy].select_tracker_by_strategy(
+                feasible, resource_req
+            )
+            selected_agent_id = selected_tracker.original_agent.agent_id
+            chosen = self._victim_selector.collect_victims(
+                preemption_order,
+                victims_by_agent[selected_agent_id],
+                shortfalls[selected_agent_id],
+            )
+        finally:
+            # Drop the probe surplus: back to exactly the claims made so far.
+            self._reset_reclaims(trackers, claimed_victims)
+        claimed_victims.extend(chosen)
+        # The new claims reclaim on every agent they touch (a victim dies
+        # once, freeing everywhere); the requirement consumes from the
+        # chosen agent.
+        self._apply_victim_reclaims(trackers, chosen)
+        selected_tracker.apply_diff(resource_req.requested_slots, resource_req.container_count)
+        return AgentSelection(
+            resource_requirements=resource_req,
+            selected_agent=selected_tracker.original_agent,
+            preempting_session_ids=tuple(candidate.session_id for candidate in chosen),
+        )
+
+    def _reclaimable_victims(
+        self,
+        criteria: AgentSelectionCriteria,
+        claimed_victims: Sequence[PreemptionCandidate],
+    ) -> UserVictimCandidates | None:
+        """The owner's victims this session may still reclaim (strictly
+        lower job_priority, not already claimed), or None when the
+        preemption path does not apply."""
+        if criteria.victim_candidates is None:
+            return None
+        claimed_ids = {candidate.session_id for candidate in claimed_victims}
+        reclaimable = [
+            candidate
+            for candidate in criteria.victim_candidates.candidates
+            if candidate.job_priority < criteria.job_priority
+            and candidate.session_id not in claimed_ids
+        ]
+        if not reclaimable:
+            return None
+        return UserVictimCandidates(candidates=reclaimable)
+
+    def _reset_reclaims(
+        self,
+        trackers: Sequence[AgentStateTracker],
+        claimed_victims: Sequence[PreemptionCandidate],
+    ) -> None:
+        """Rebuild every tracker's reclaim to exactly the claimed victims'
+        allocations (dropping any probe surplus)."""
+        for tracker in trackers:
+            tracker.clear_reclaim()
+        self._apply_victim_reclaims(trackers, claimed_victims)
+
+    def _apply_victim_reclaims(
+        self,
+        trackers: Sequence[AgentStateTracker],
+        victims: Sequence[PreemptionCandidate],
+    ) -> None:
+        """Reclaim the victims' allocations on every agent they touch."""
+        for tracker in trackers:
+            agent_id = tracker.original_agent.agent_id
+            for candidate in victims:
+                portion = candidate.allocated_slots_by_agent.get(agent_id)
+                if portion:
+                    tracker.apply_reclaim(portion)
+
+    def _shortfall(
+        self,
+        tracker: AgentStateTracker,
+        resource_req: ResourceRequirements,
+    ) -> Mapping[ResourceSlotName, Decimal]:
+        """Per-slot shortage of one agent against the requirement."""
+        remaining = tracker.remaining_slots()
+        return {
+            slot_name: shortage
+            for slot_name, requested in resource_req.requested_slots.slots.items()
+            if (shortage := requested - remaining.get(slot_name, Decimal(0))) > Decimal(0)
+        }
+
+    def _narrow_by_orders(
+        self,
+        candidates: Sequence[AgentStateTracker],
+        criteria: AgentSelectionCriteria,
+    ) -> Sequence[AgentStateTracker]:
+        for order in self._orders:
+            best = min(order.rank(tracker, criteria) for tracker in candidates)
+            candidates = [
+                tracker for tracker in candidates if order.rank(tracker, criteria) == best
+            ]
+        return candidates
 
     def _run_exclusion_filters(
         self,
@@ -435,6 +628,7 @@ class AgentSelector:
         trackers: Sequence[AgentStateTracker],
         criteria: AgentSelectionCriteria,
         limit: AgentLimit,
+        preemption_order: PreemptionOrder,
     ) -> list[AgentSelection]:
         """The exception wrapper over :meth:`compute_placements` for the
         scheduling path: any computed failure fails the whole batch. This is
@@ -444,7 +638,9 @@ class AgentSelector:
             NoAgentsInResourceGroupError: If the resource group has no agents at all
             BatchAgentSelectionFailedError: If any requirement could not be placed
         """
-        computation = await self.compute_placements(strategy, trackers, criteria, limit)
+        computation = await self.compute_placements(
+            strategy, trackers, criteria, limit, preemption_order
+        )
         if computation.failures:
             raise BatchAgentSelectionFailedError(computation.failures)
         return computation.selections

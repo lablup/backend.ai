@@ -11,7 +11,13 @@ import pytest
 from ai.backend.common.identifier.architecture import ArchName
 from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.identifier.resource_slot import ResourceSlotName
-from ai.backend.common.types import AgentId, AgentSelectionStrategy, ClusterMode, SessionId
+from ai.backend.common.types import (
+    AgentId,
+    AgentSelectionStrategy,
+    ClusterMode,
+    PreemptionOrder,
+    SessionId,
+)
 from ai.backend.manager.data.session.options import AgentSelectionPolicy
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.exceptions import (
     BatchAgentSelectionFailedError,
@@ -60,6 +66,7 @@ def _criteria(
         agent_selection_policy=policy,
         designated_agent_ids=designated_agent_ids,
         job_priority=0,
+        victim_candidates=None,
     )
 
 
@@ -94,6 +101,7 @@ class TestAgentSelectionWithResources:
             _trackers(agents_for_resource_requirements_test),
             criteria,
             NO_LIMIT,
+            PreemptionOrder.OLDEST,
         )
 
         assert len(selections) == 1
@@ -118,6 +126,7 @@ class TestAgentSelectionWithResources:
             _trackers(agents_for_resource_requirements_test),
             criteria,
             NO_LIMIT,
+            PreemptionOrder.OLDEST,
         )
 
         assert len(selections) == 2
@@ -141,6 +150,7 @@ class TestAgentSelectionWithResources:
                 _trackers(agents_for_designated_agent_test),
                 criteria,
                 NO_LIMIT,
+                PreemptionOrder.OLDEST,
             )
 
         assert len(exc_info.value.failures) == 1
@@ -167,6 +177,7 @@ class TestAgentSelectionWithResources:
             _trackers(agents_for_designated_agent_test),
             criteria,
             NO_LIMIT,
+            PreemptionOrder.OLDEST,
         )
 
         assert len(selections) == 1
@@ -188,6 +199,7 @@ class TestAgentSelectionWithResources:
             _trackers(agents_for_designated_agent_test),
             criteria,
             NO_LIMIT,
+            PreemptionOrder.OLDEST,
         )
 
         assert len(selections) == 1
@@ -205,6 +217,7 @@ class TestAgentSelectionWithResources:
             _trackers(agents_for_container_limit_test),
             criteria,
             AgentLimit(max_container_count=10),
+            PreemptionOrder.OLDEST,
         )
 
         assert len(selections) == 1
@@ -222,6 +235,7 @@ class TestAgentSelectionWithResources:
             _trackers(agents_for_architecture_test),
             criteria,
             NO_LIMIT,
+            PreemptionOrder.OLDEST,
         )
 
         assert len(selections) == 1
@@ -239,6 +253,7 @@ class TestAgentSelectionWithResources:
             _trackers(agents_for_resource_requirements_test),
             criteria,
             NO_LIMIT,
+            PreemptionOrder.OLDEST,
         )
 
         assert selections == []
@@ -249,7 +264,7 @@ class TestAgentSelectionWithResources:
 
         with pytest.raises(NoAgentsInResourceGroupError):
             await _selector().select_agents_for_batch_requirements(
-                AgentSelectionStrategy.CONCENTRATED, [], criteria, NO_LIMIT
+                AgentSelectionStrategy.CONCENTRATED, [], criteria, NO_LIMIT, PreemptionOrder.OLDEST
             )
 
     async def test_success_commits_allocations_into_trackers(
@@ -261,7 +276,11 @@ class TestAgentSelectionWithResources:
         criteria = _criteria([_req({"cpu": "4", "mem": "8192"})])
 
         selections = await _selector().select_agents_for_batch_requirements(
-            AgentSelectionStrategy.CONCENTRATED, trackers, criteria, NO_LIMIT
+            AgentSelectionStrategy.CONCENTRATED,
+            trackers,
+            criteria,
+            NO_LIMIT,
+            PreemptionOrder.OLDEST,
         )
 
         selected_id = selections[0].selected_agent.agent_id
@@ -283,7 +302,11 @@ class TestAgentSelectionWithResources:
 
         with pytest.raises(BatchAgentSelectionFailedError):
             await _selector().select_agents_for_batch_requirements(
-                AgentSelectionStrategy.CONCENTRATED, trackers, criteria, NO_LIMIT
+                AgentSelectionStrategy.CONCENTRATED,
+                trackers,
+                criteria,
+                NO_LIMIT,
+                PreemptionOrder.OLDEST,
             )
 
         for tracker in trackers:

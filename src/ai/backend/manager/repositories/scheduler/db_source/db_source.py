@@ -382,6 +382,7 @@ class ScheduleDBSource:
             policy=ResourceGroupSchedulingPolicy(
                 scheduler=rg_row.scheduler,
                 agent_selection_strategy=rg_row.scheduler_opts.agent_selection_strategy,
+                preemption_order=rg_row.scheduler_opts.preemption.order,
             ),
             preemption=rg_row.scheduler_opts.preemption,
         )
