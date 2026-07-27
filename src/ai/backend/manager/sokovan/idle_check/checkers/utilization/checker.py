@@ -11,6 +11,7 @@ from ai.backend.common.data.idle_checker.types import (
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.metric.types import SessionUtilizationMetricThreshold
+from ai.backend.manager.repositories.idle_checker.types import IdleJudgmentData
 from ai.backend.manager.services.metric.actions.session_utilization import (
     SessionUtilizationAction,
 )
@@ -19,7 +20,6 @@ from ai.backend.manager.sokovan.idle_check.checkers.base import (
     CheckerAssignment,
     IdleChecker,
     IdleCheckerContext,
-    IdleJudgment,
 )
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
@@ -39,9 +39,9 @@ class UtilizationChecker(IdleChecker):
         assignments: Sequence[CheckerAssignment],
         *,
         context: IdleCheckerContext,
-    ) -> Sequence[IdleJudgment]:
+    ) -> Sequence[IdleJudgmentData]:
         # Unknown sessions are ignored because their utilization status cannot be determined.
-        judgments: list[IdleJudgment] = []
+        judgments: list[IdleJudgmentData] = []
         for assignment in assignments:
             spec = assignment.definition.spec.utilization
             if spec is None:
@@ -90,7 +90,7 @@ class UtilizationChecker(IdleChecker):
                     status = IdleCheckPhase.ACTIVE
                 details = ", ".join(observation.render() for observation in observations)
                 judgments.append(
-                    IdleJudgment(
+                    IdleJudgmentData(
                         checker_id=assignment.definition.checker_id,
                         session_id=session.session_id,
                         expire_at=expire_at,
