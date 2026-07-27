@@ -103,17 +103,17 @@ class TestMetric:
         [
             CreationTestCase(
                 id="rate_hook_applied_to_first_observation",
-                initial_value=Decimal("744400.000"),
+                initial_value=Decimal(5000),
                 current_hook=lambda metric: metric.stats.rate,
                 expected_current=Decimal(0),
                 expected_pct="0",
             ),
             CreationTestCase(
                 id="no_hook_keeps_raw_value",
-                initial_value=Decimal("744400.000"),
+                initial_value=Decimal(5000),
                 current_hook=None,
-                expected_current=Decimal("744400.000"),
-                expected_pct="74440",
+                expected_current=Decimal(5000),
+                expected_pct="500",
             ),
         ],
         ids=lambda case: case.id,
@@ -142,9 +142,9 @@ class TestMetric:
                 key="cpu_util",
                 type=MetricTypes.UTILIZATION,
                 unit_hint="percent",
-                stats=MovingStatistics(Decimal("1000.000")),
+                stats=MovingStatistics(Decimal(1000)),
                 stats_filter=frozenset({"avg", "max"}),
-                current=Decimal("1000.000"),
+                current=Decimal(1000),
                 capacity=Decimal(1000),
                 current_hook=lambda metric: metric.stats.rate,
             )
@@ -152,7 +152,7 @@ class TestMetric:
     def test_update_applies_current_hook(self, cpu_util_metric: Metric) -> None:
         """Test that subsequent observations report the rate derived from the counter delta."""
         with patch("time.perf_counter", return_value=2.0):
-            cpu_util_metric.update(Measurement(Decimal("1660.000")))
+            cpu_util_metric.update(Measurement(Decimal(1500)))
 
-        assert cpu_util_metric.current == Decimal(660)
-        assert cpu_util_metric.to_serializable_dict()["pct"] == "66"
+        assert cpu_util_metric.current == Decimal(500)
+        assert cpu_util_metric.to_serializable_dict()["pct"] == "50"
