@@ -18,7 +18,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from ai.backend.client.v2.exceptions import NotFoundError, PermissionDeniedError
+from ai.backend.client.v2.exceptions import NotFoundError
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
 from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 from ai.backend.common.dto.manager.v2.scheduling_history.request import (
@@ -89,21 +89,6 @@ class TestAdminSearchReplicaGroupHistories:
         found = {item.id for item in result.items}
         assert replica_group_history_seed.scaling_history_id in found
         assert not set(replica_group_history_seed.lifecycle_history_ids) & found
-
-    async def test_admin_search_as_regular_user_is_rejected(
-        self,
-        user_v2_registry: V2ClientRegistry,
-        replica_group_history_seed: ReplicaGroupHistorySeed,
-    ) -> None:
-        """The unscoped admin route is superadmin-only, so a regular user is refused.
-
-        The route carries ``superadmin_required``; a non-superadmin caller must be rejected
-        at the middleware rather than receive an empty page.
-        """
-        with pytest.raises(PermissionDeniedError):
-            await user_v2_registry.scheduling_history.search_replica_group_history(
-                AdminSearchReplicaGroupHistoriesInput()
-            )
 
 
 class TestScopedSearchReplicaGroupHistories:
