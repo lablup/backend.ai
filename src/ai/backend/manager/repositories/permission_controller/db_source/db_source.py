@@ -9,6 +9,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import contains_eager, selectinload
 
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.permission.types import (
     RBACElementType,
     RelationType,
@@ -51,13 +52,17 @@ from ai.backend.manager.data.permission.status import (
     RoleStatus,
 )
 from ai.backend.manager.data.permission.types import (
-    EntityType,
+    EntityType as LegacyEntityType,
+)
+from ai.backend.manager.data.permission.types import (
     OperationType,
     Permission,
     RBACElementRef,
     ScopeData,
     ScopeListResult,
-    ScopeType,
+)
+from ai.backend.manager.data.permission.types import (
+    ScopeType as LegacyScopeType,
 )
 from ai.backend.manager.data.permission.virtual_scope import (
     ScopePermissionCheckKey,
@@ -161,10 +166,7 @@ class _PermissionGroupKey:
 class _VirtualScopePermissionGroupKey:
     """Group key for batching virtual-scope-chain resolution inputs.
 
-    Keys sharing the same field values are resolved by a single SQL round-trip
-    differing only in the per-target ``entity_id`` IN-list. Both types are the
-    DB-facing :class:`EntityType` enum (converted from the open string types):
-    ``entity_type`` matches membership rows, ``subject_entity_type`` matches
+    ``entity_type`` matches membership rows; ``subject_entity_type`` matches
     permission rows.
     """
 
@@ -384,8 +386,8 @@ class PermissionDBSource:
             ase = AssociationScopesEntitiesRow
             project_subq = (
                 sa.select(ase.scope_id).where(
-                    ase.entity_type == EntityType.ROLE,
-                    ase.scope_type == ScopeType.PROJECT,
+                    ase.entity_type == LegacyEntityType.ROLE,
+                    ase.scope_type == LegacyScopeType.PROJECT,
                     sa.cast(ase.entity_id, sa.String) == str(data.role_id),
                 )
             ).subquery()
@@ -399,8 +401,8 @@ class PermissionDBSource:
                         & (UserRoleRow.user_id == data.user_id),
                     )
                     .where(
-                        ase.entity_type == EntityType.ROLE,
-                        ase.scope_type == ScopeType.PROJECT,
+                        ase.entity_type == LegacyEntityType.ROLE,
+                        ase.scope_type == LegacyScopeType.PROJECT,
                         ase.scope_id.in_(sa.select(project_subq.c.scope_id)),
                     )
                     .group_by(ase.scope_id)
@@ -571,7 +573,7 @@ class PermissionDBSource:
                     RoleRow.status == RoleStatus.ACTIVE,
                     UserRoleRow.user_id == user_id,
                     sa.or_(
-                        PermissionRow.scope_type == ScopeType.GLOBAL,
+                        PermissionRow.scope_type == LegacyScopeType.GLOBAL,
                         PermissionRow.scope_id == scope_id.scope_id,
                     ),
                     PermissionRow.operation == operation,
@@ -611,7 +613,7 @@ class PermissionDBSource:
                     UserRoleRow.user_id == user_id,
                     sa.or_(
                         sa.and_(
-                            PermissionRow.scope_type == ScopeType.GLOBAL,
+                            PermissionRow.scope_type == LegacyScopeType.GLOBAL,
                             PermissionRow.operation == operation,
                         ),
                         sa.and_(
@@ -792,7 +794,7 @@ class PermissionDBSource:
 
             items = [
                 ScopeData(
-                    id=ScopeId(scope_type=ScopeType.DOMAIN, scope_id=row.name),
+                    id=ScopeId(scope_type=LegacyScopeType.DOMAIN, scope_id=row.name),
                     name=row.name,
                 )
                 for row in result.rows
@@ -821,7 +823,7 @@ class PermissionDBSource:
 
             items = [
                 ScopeData(
-                    id=ScopeId(scope_type=ScopeType.PROJECT, scope_id=str(row.id)),
+                    id=ScopeId(scope_type=LegacyScopeType.PROJECT, scope_id=str(row.id)),
                     name=row.name,
                 )
                 for row in result.rows
@@ -850,7 +852,7 @@ class PermissionDBSource:
 
             items = [
                 ScopeData(
-                    id=ScopeId(scope_type=ScopeType.USER, scope_id=str(row.uuid)),
+                    id=ScopeId(scope_type=LegacyScopeType.USER, scope_id=str(row.uuid)),
                     name=row.username if row.username is not None else row.email,
                 )
                 for row in result.rows
@@ -920,7 +922,7 @@ class PermissionDBSource:
 
     def _build_direct_scopes_cte(
         self,
-        entity_type: EntityType,
+        entity_type: LegacyEntityType,
         entity_ids: Sequence[str],
     ) -> sa.CTE:
         """Build the ``direct_scopes`` CTE for one ``(entity_type, entity_ids)`` group.
@@ -1254,12 +1256,11 @@ class PermissionDBSource:
             _VirtualScopePermissionGroupKey, list[VirtualScopePermissionCheckKey]
         ] = defaultdict(list)
         for key in keys:
-            entity_type = EntityType(key.entity.entity_type)
             groups[
                 _VirtualScopePermissionGroupKey(
                     user_id=key.user_id,
-                    entity_type=entity_type,
-                    subject_entity_type=entity_type,
+                    entity_type=key.entity.entity_type,
+                    subject_entity_type=key.entity.entity_type,
                 )
             ].append(key)
 
@@ -1291,7 +1292,7 @@ class PermissionDBSource:
                 _VirtualScopePermissionGroupKey(
                     user_id=key.user_id,
                     entity_type=EntityType(key.scope.scope_type),
-                    subject_entity_type=EntityType(key.subject_entity_type),
+                    subject_entity_type=key.subject_entity_type,
                 )
             ].append(key)
 
@@ -1342,7 +1343,11 @@ class PermissionDBSource:
                         # scope_bindings.scope_id is a native UUID; permissions.scope_id
                         # stores its canonical string form. Cast to compare.
                         perm.c.scope_id == sa.cast(sb.c.scope_id, sa.String),
-                        perm.c.entity_type == group_key.subject_entity_type,
+                        # permissions.entity_type is an enum-backed column; bind the open
+                        # string type as a plain VARCHAR so unknown types match nothing
+                        # instead of failing enum coercion.
+                        perm.c.entity_type
+                        == sa.literal(group_key.subject_entity_type, sa.String()),
                     ),
                 )
                 .join(roles, roles.c.id == perm.c.role_id)
