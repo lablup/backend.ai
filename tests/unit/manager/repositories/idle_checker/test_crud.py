@@ -161,7 +161,7 @@ class TestIdleCheckerRepository:
                         spec=OptionalState.update(
                             IdleCheckerSpec(
                                 type=CheckerType.NETWORK_TIMEOUT,
-                                network=NetworkTimeoutSpec(),
+                                network=NetworkTimeoutSpec(max_network_inactivity_seconds=1),
                             )
                         )
                     ),
