@@ -2505,6 +2505,68 @@ class ScheduleDBSource:
                 raise AgentResourceCapacityExceeded(
                     f"Agent {agent_id}: capacity exceeded for slot '{r.slot_name}'"
                 )
+        await self._stamp_allocations_reserved(db_sess, kernel_id)
+
+    async def _reserve_kernel_resources_for_preemption(
+        self,
+        db_sess: SASession,
+        kernel_id: KernelId,
+        agent_id: AgentId,
+    ) -> None:
+        """Reserve a kernel's requested slots ahead of the victims' release.
+
+        Same shape as :meth:`_reserve_kernel_resources`, but the guard
+        excludes ``used``: the victims still hold their allocations, so
+        ``reserved + used`` may transiently exceed ``capacity``. Only
+        ``reserved + requested <= capacity`` is enforced — a reservation
+        the agent could never satisfy is rejected.
+        """
+        ar = AgentResourceRow.__table__
+        requested_rows = (
+            await db_sess.execute(
+                sa.select(ResourceAllocationRow.slot_name, ResourceAllocationRow.requested)
+                .where(
+                    ResourceAllocationRow.kernel_id == kernel_id,
+                    ResourceAllocationRow.free_at.is_(None),
+                    ResourceAllocationRow.used_at.is_(None),
+                )
+                .order_by(ResourceAllocationRow.slot_name)
+            )
+        ).all()
+        for r in requested_rows:
+            new_reserved = ar.c.reserved + r.requested
+            result = await db_sess.execute(
+                sa.update(ar)
+                .where(
+                    ar.c.agent_id == agent_id,
+                    ar.c.slot_name == r.slot_name,
+                    new_reserved <= ar.c.capacity,
+                )
+                .values(reserved=new_reserved)
+            )
+            if cast(CursorResult[Any], result).rowcount == 0:
+                raise AgentResourceCapacityExceeded(
+                    f"Agent {agent_id}: reservation exceeds capacity for slot '{r.slot_name}'"
+                )
+        await self._stamp_allocations_reserved(db_sess, kernel_id)
+
+    async def _stamp_allocations_reserved(
+        self,
+        db_sess: SASession,
+        kernel_id: KernelId,
+    ) -> None:
+        """Record the hold-established time on the kernel's active
+        allocation rows (idempotent via the ``reserved_at IS NULL`` guard)."""
+        await db_sess.execute(
+            sa.update(ResourceAllocationRow)
+            .where(
+                ResourceAllocationRow.kernel_id == kernel_id,
+                ResourceAllocationRow.free_at.is_(None),
+                ResourceAllocationRow.used_at.is_(None),
+                ResourceAllocationRow.reserved_at.is_(None),
+            )
+            .values(reserved_at=sa.func.now())
+        )
 
     async def _free_allocations_and_release(
         self,

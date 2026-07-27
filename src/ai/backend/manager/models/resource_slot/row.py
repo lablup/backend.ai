@@ -161,6 +161,11 @@ class ResourceAllocationRow(CreatedAtMixin, Base):  # type: ignore[misc]
     used: Mapped[Decimal | None] = mapped_column(
         "used", sa.Numeric(precision=24, scale=6), nullable=True
     )
+    reserved_at: Mapped[datetime | None] = mapped_column(
+        "reserved_at",
+        sa.DateTime(timezone=True),
+        nullable=True,
+    )
     used_at: Mapped[datetime | None] = mapped_column(
         "used_at",
         sa.DateTime(timezone=True),

@@ -33,6 +33,9 @@ class SessionStatus(CIStrEnum):
     # values are only meaningful inside the manager
     PENDING = "PENDING"
     DEPRIORITIZING = "DEPRIORITIZING"  # transient: lower priority and go back to PENDING
+    # holds a resource reservation (preemption plan) and waits for the
+    # victims' resources to free before becoming SCHEDULED
+    RESERVED = "RESERVED"
     # ---
     SCHEDULED = "SCHEDULED"
     PREPARING = "PREPARING"
@@ -132,9 +135,10 @@ class SessionStatus(CIStrEnum):
         """Return statuses eligible as preemption victim candidates (BEP-1055).
 
         Still occupying resources and able to transition to termination —
-        strips TERMINATING, whose resources free without preemption.
+        strips TERMINATING, whose resources free without preemption, and
+        RESERVED, whose hold belongs to another preemption plan.
         """
-        return cls.resource_occupied_statuses() & cls.terminatable_statuses()
+        return (cls.resource_occupied_statuses() & cls.terminatable_statuses()) - {cls.RESERVED}
 
     @classmethod
     @lru_cache(maxsize=1)
