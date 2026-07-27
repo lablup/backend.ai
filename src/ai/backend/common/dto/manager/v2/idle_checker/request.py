@@ -1,25 +1,19 @@
 from __future__ import annotations
 
 from typing import Self
-from uuid import UUID
 
 from pydantic import ConfigDict, Field, model_validator
 
-from ai.backend.common.api_handlers import BaseRequestModel
+from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.dto.manager.v2.idle_checker.types import (
     CheckerTypeFilter,
     IdleCheckerInputTypeDTO,
     IdleCheckerOrderField,
-    IdleCheckerScopeTypeDTO,
 )
+from ai.backend.common.identifier.idle_checker import IdleCheckerID
 from ai.backend.common.types import SessionTypes
-
-
-class IdleCheckerScope(BaseRequestModel):
-    scope_type: IdleCheckerScopeTypeDTO = Field(description="Idle checker binding scope type.")
-    scope_id: UUID = Field(description="UUID of the scope.")
 
 
 class SessionLifetimeSpecInputDTO(BaseRequestModel):
@@ -29,34 +23,38 @@ class SessionLifetimeSpecInputDTO(BaseRequestModel):
 class IdleCheckerSpecInputDTO(BaseRequestModel):
     model_config = ConfigDict(extra="forbid")
 
-    type: IdleCheckerInputTypeDTO
-    session_lifetime: SessionLifetimeSpecInputDTO
+    session_lifetime: SessionLifetimeSpecInputDTO | None = Field(default=None)
+
+    @model_validator(mode="after")
+    def _validate_exactly_one_spec(self) -> Self:
+        if self.session_lifetime is None:
+            raise ValueError("Exactly one idle checker specification must be provided")
+        return self
 
 
 class CreateIdleCheckerInput(BaseRequestModel):
     name: str = Field(min_length=1, max_length=128)
-    description: str = Field(description="Idle checker description.")
+    description: str | None = Field(default=None, description="Idle checker description.")
     checker_type: IdleCheckerInputTypeDTO
     target_session_types: list[SessionTypes] = Field(min_length=1)
     initial_grace_period_seconds: int = Field(default=0, ge=0)
     checker_spec: IdleCheckerSpecInputDTO
 
-    @model_validator(mode="after")
-    def _validate_spec_type(self) -> Self:
-        if self.checker_spec.type != self.checker_type:
-            raise ValueError("checker_type must match checker_spec.type")
-        return self
-
 
 class UpdateIdleCheckerInput(BaseRequestModel):
+    id: IdleCheckerID = Field(description="Idle checker ID to update.")
     name: str | None = Field(default=None, min_length=1, max_length=128)
-    description: str | None = Field(
-        default=None,
-        description="Updated description. Omit or pass null to leave it unchanged.",
+    description: str | Sentinel | None = Field(
+        default=SENTINEL,
+        description="Updated description. Omit to leave unchanged or pass null to clear.",
     )
     target_session_types: list[SessionTypes] | None = Field(default=None, min_length=1)
     initial_grace_period_seconds: int | None = Field(default=None, ge=0)
     checker_spec: IdleCheckerSpecInputDTO | None = Field(default=None)
+
+
+class PurgeIdleCheckerInput(BaseRequestModel):
+    id: IdleCheckerID = Field(description="Idle checker ID to purge.")
 
 
 class IdleCheckerFilter(BaseRequestModel):

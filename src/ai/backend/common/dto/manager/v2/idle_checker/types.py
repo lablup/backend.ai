@@ -15,12 +15,6 @@ class IdleCheckerInputTypeDTO(StrEnum):
     SESSION_LIFETIME = "session_lifetime"
 
 
-class IdleCheckerScopeTypeDTO(StrEnum):
-    DOMAIN = "domain"
-    PROJECT = "project"
-    RESOURCE_GROUP = "resource_group"
-
-
 class CheckerTypeFilter(BaseRequestModel):
     equals: IdleCheckerTypeDTO | None = Field(default=None)
     in_: list[IdleCheckerTypeDTO] | None = Field(default=None, alias="in")

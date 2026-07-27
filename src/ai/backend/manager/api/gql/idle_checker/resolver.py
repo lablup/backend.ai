@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from uuid import UUID
-
 from strawberry import Info
 
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
@@ -16,27 +14,27 @@ from ai.backend.manager.api.gql.idle_checker.types import (
     IdleCheckerConnectionGQL,
     IdleCheckerFilterGQL,
     IdleCheckerOrderByGQL,
-    IdleCheckerScopeGQL,
+    PurgeIdleCheckerInputGQL,
     PurgeIdleCheckerPayloadGQL,
     UpdateIdleCheckerInputGQL,
     UpdateIdleCheckerPayloadGQL,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.api.gql.utils import check_admin_only
 from ai.backend.manager.errors.api import NotImplementedAPI
 
 
-@gql_root_field(
+@gql_root_field(  # type: ignore[misc]
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
         description=(
-            "Searches idle checkers available in the requested scope with filtering, "
-            "ordering, and pagination."
+            "Searches global idle checker definitions with filtering, ordering, and "
+            "pagination (super admin only)."
         ),
     )
-)  # type: ignore[misc]
-async def scoped_idle_checkers(
+)
+async def admin_idle_checkers(
     info: Info[StrawberryGQLContext],
-    scope: IdleCheckerScopeGQL,
     filter: IdleCheckerFilterGQL | None = None,
     order_by: list[IdleCheckerOrderByGQL] | None = None,
     first: int | None = None,
@@ -46,54 +44,47 @@ async def scoped_idle_checkers(
     limit: int | None = None,
     offset: int | None = None,
 ) -> IdleCheckerConnectionGQL:
+    check_admin_only()
     raise NotImplementedAPI("Idle checker search is not implemented.")
 
 
 @gql_mutation(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
-        description=(
-            "Creates an idle checker and binds it to the requested management and "
-            "application scope."
-        ),
+        description="Creates a global idle checker definition (super admin only).",
     )
 )
-async def create_idle_checker(
+async def admin_create_idle_checker(
     info: Info[StrawberryGQLContext],
-    scope: IdleCheckerScopeGQL,
     input: CreateIdleCheckerInputGQL,
 ) -> CreateIdleCheckerPayloadGQL:
+    check_admin_only()
     raise NotImplementedAPI("Idle checker creation is not implemented.")
 
 
 @gql_mutation(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
-        description=(
-            "Updates selected fields of an idle checker when the caller has management "
-            "permission on that checker."
-        ),
+        description="Updates a global idle checker definition (super admin only).",
     )
 )
-async def update_idle_checker(
+async def admin_update_idle_checker(
     info: Info[StrawberryGQLContext],
-    id: UUID,
     input: UpdateIdleCheckerInputGQL,
 ) -> UpdateIdleCheckerPayloadGQL:
+    check_admin_only()
     raise NotImplementedAPI("Idle checker update is not implemented.")
 
 
 @gql_mutation(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
-        description=(
-            "Permanently removes an unbound idle checker when the caller has management "
-            "permission on that checker."
-        ),
+        description="Permanently removes an unbound idle checker (super admin only).",
     )
 )
-async def purge_idle_checker(
+async def admin_purge_idle_checker(
     info: Info[StrawberryGQLContext],
-    id: UUID,
+    input: PurgeIdleCheckerInputGQL,
 ) -> PurgeIdleCheckerPayloadGQL:
+    check_admin_only()
     raise NotImplementedAPI("Idle checker purge is not implemented.")
