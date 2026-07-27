@@ -1,12 +1,13 @@
 import asyncio
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Any, override
 
 import pytest
 from typeguard import TypeCheckError
 
+from ai.backend.common.configs.redis import RedisConfig
 from ai.backend.common.exception import (
     BackendAISchemaValidationFailed,
     InvalidResourceSlotQuantity,
@@ -15,6 +16,7 @@ from ai.backend.common.exception import (
 from ai.backend.common.identifier.resource_slot import ResourceSlotName
 from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import (
+    REDIS_PASSWORD_MASK,
     BinarySize,
     DefaultForUnspecified,
     HardwareMetadata,
@@ -27,6 +29,7 @@ from ai.backend.common.types import (
     _stringify_number,
     aobject,
     check_typed_dict,
+    safe_print_redis_config,
 )
 
 
@@ -632,3 +635,75 @@ class TestResourceSlotEntryToResourceSlot:
 
     def test_empty_entries(self) -> None:
         assert ResourceSlotEntry.inputs_to_resource_slot([]) == ResourceSlot()
+
+
+@dataclass(frozen=True)
+class _RedisMaskingCase:
+    label: str
+    raw_config: dict[str, Any]
+    leaked_secrets: list[str] = field(default_factory=list)
+    expected_mask_count: int = 0
+
+
+class TestSafePrintRedisConfig:
+    @pytest.mark.parametrize(
+        "case",
+        [
+            _RedisMaskingCase(
+                label="no-credentials",
+                raw_config={"addr": "127.0.0.1:6379"},
+            ),
+            _RedisMaskingCase(
+                label="password",
+                raw_config={"addr": "127.0.0.1:6379", "password": "s3cr3t"},
+                leaked_secrets=["s3cr3t"],
+                expected_mask_count=1,
+            ),
+            _RedisMaskingCase(
+                label="sentinel-password",
+                raw_config={
+                    "sentinel": ["127.0.0.1:26379"],
+                    "service_name": "mymaster",
+                    "password": "s3cr3t",
+                    "sentinel_password": "s3ntin3l",
+                },
+                leaked_secrets=["s3cr3t", "s3ntin3l"],
+                expected_mask_count=2,
+            ),
+            _RedisMaskingCase(
+                label="override-configs",
+                raw_config={
+                    "addr": "127.0.0.1:6379",
+                    "password": "s3cr3t",
+                    "override_configs": {
+                        "stream": {
+                            "addr": "127.0.0.1:6380",
+                            "password": "0verr1de",
+                            "sentinel_password": "0verr1de-s3ntin3l",
+                        },
+                    },
+                },
+                leaked_secrets=["s3cr3t", "0verr1de", "0verr1de-s3ntin3l"],
+                expected_mask_count=3,
+            ),
+        ],
+        ids=lambda case: case.label,
+    )
+    def test_passwords_are_masked(self, case: _RedisMaskingCase) -> None:
+        printed = safe_print_redis_config(RedisConfig.model_validate(case.raw_config))
+        for secret in case.leaked_secrets:
+            assert secret not in printed
+        assert printed.count(REDIS_PASSWORD_MASK) == case.expected_mask_count
+
+    def test_source_config_is_left_intact(self) -> None:
+        redis_config = RedisConfig.model_validate({
+            "addr": "127.0.0.1:6379",
+            "password": "s3cr3t",
+            "override_configs": {
+                "stream": {"addr": "127.0.0.1:6380", "password": "0verr1de"},
+            },
+        })
+        safe_print_redis_config(redis_config)
+        assert redis_config.password == "s3cr3t"
+        assert redis_config.override_configs is not None
+        assert redis_config.override_configs["stream"].password == "0verr1de"
