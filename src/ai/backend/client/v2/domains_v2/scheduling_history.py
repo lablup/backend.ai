@@ -102,7 +102,7 @@ class V2SchedulingHistoryClient(BaseDomainClient):
 
     # ========== Replica Group History ==========
 
-    async def search_replica_group_history(
+    async def admin_search_replica_group_history(
         self, request: AdminSearchReplicaGroupHistoriesInput
     ) -> SearchReplicaGroupHistoriesPayload:
         """Search replica-group scheduling histories with admin scope."""
