@@ -3,7 +3,6 @@ from .fixed_query_builder import (
     ContainerLiveStatQueryBuilder,
     ContainerMetricQueryBuilder,
     LabelValuesQuery,
-    SessionUtilizationQueryBuilder,
 )
 from .preset import LabelMatcher, LabelOperator, MetricPreset
 from .querier import ContainerMetricQuerier, MetricQuerier
@@ -20,6 +19,5 @@ __all__ = [
     "MetricQuerier",
     "MetricValue",
     "PrometheusClient",
-    "SessionUtilizationQueryBuilder",
     "ValueType",
 ]

@@ -1,4 +1,3 @@
-import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Final
@@ -7,7 +6,7 @@ from ai.backend.common.metrics.types import (
     CONTAINER_UTILIZATION_METRIC_LABEL_NAME,
     CONTAINER_UTILIZATION_METRIC_NAME,
 )
-from ai.backend.common.types import KernelAggregationMode, KernelId, SessionId
+from ai.backend.common.types import KernelId
 from ai.backend.manager.clients.prometheus.metric_types import (
     DIFF_METRICS,
     RATE_METRICS,
@@ -15,7 +14,7 @@ from ai.backend.manager.clients.prometheus.metric_types import (
     ContainerMetricOptionalLabel,
     MetricType,
 )
-from ai.backend.manager.clients.prometheus.preset import LabelMatcher, MetricPreset
+from ai.backend.manager.clients.prometheus.preset import LabelMatcher, MetricPreset, regex_union
 from ai.backend.manager.clients.prometheus.querier import ContainerMetricQuerier
 from ai.backend.manager.clients.prometheus.types import ValueType
 
@@ -34,17 +33,6 @@ _LIVE_STAT_MAX_TEMPLATE: Final[str] = f"max_over_time(({_GAUGE_TEMPLATE})[{{wind
 _LIVE_STAT_AVG_TEMPLATE: Final[str] = f"avg_over_time(({_GAUGE_TEMPLATE})[{{window}}:])"
 _LIVE_STAT_RATE_MAX_TEMPLATE: Final[str] = f"max_over_time(({_RATE_TEMPLATE})[{{window}}:])"
 _LIVE_STAT_RATE_AVG_TEMPLATE: Final[str] = f"avg_over_time(({_RATE_TEMPLATE})[{{window}}:])"
-_ANY_KERNEL_UTILIZATION_TEMPLATE: Final[str] = (
-    f"min by (session_id)({CONTAINER_UTILIZATION_METRIC_NAME}{{{{{{labels}}}}}})"
-)
-_ALL_KERNEL_UTILIZATION_TEMPLATE: Final[str] = (
-    f"max by (session_id)({CONTAINER_UTILIZATION_METRIC_NAME}{{{{{{labels}}}}}})"
-)
-_AVERAGE_KERNEL_UTILIZATION_TEMPLATE: Final[str] = (
-    f"avg by (session_id)({CONTAINER_UTILIZATION_METRIC_NAME}{{{{{{labels}}}}}})"
-)
-_SESSION_UTILIZATION_AVG_TEMPLATE: Final[str] = "avg_over_time(({template})[{{window}}:])"
-
 _INSTANT_GROUP_BY: Final[frozenset[str]] = frozenset({
     "kernel_id",
     "container_metric_name",
@@ -62,15 +50,11 @@ class LabelValuesQuery:
     metric_match: str
 
 
-def _regex_union(values: Sequence[str]) -> str:
-    return "|".join(re.escape(value).replace(r"\-", "-") for value in values)
-
-
 def _value_type_regex(value_types: Sequence[ValueType]) -> str:
-    return _regex_union([value_type.value for value_type in value_types])
+    return regex_union([value_type.value for value_type in value_types])
 
 
-_LIVE_STAT_RATE_METRIC_REGEX: Final[str] = _regex_union(sorted(RATE_METRICS | DIFF_METRICS))
+_LIVE_STAT_RATE_METRIC_REGEX: Final[str] = regex_union(sorted(RATE_METRICS | DIFF_METRICS))
 _INSTANT_VALUE_TYPE_REGEX: Final[str] = _value_type_regex([
     ValueType.CURRENT,
     ValueType.CAPACITY,
@@ -135,46 +119,6 @@ class ContainerMetricQueryBuilder:
                 return _DIFF_TEMPLATE
 
 
-class SessionUtilizationQueryBuilder:
-    """Build session-level queries from safe utilization policy inputs."""
-
-    def build(
-        self,
-        *,
-        metric_name: str,
-        kernel_aggregation: KernelAggregationMode,
-        time_window_seconds: int | None,
-        session_ids: Sequence[SessionId],
-    ) -> MetricPreset:
-        value_type = ValueType.CURRENT if metric_name == "mem" else ValueType.PCT
-        session_id_pattern = _regex_union([str(session_id) for session_id in session_ids])
-        labels = {
-            CONTAINER_UTILIZATION_METRIC_LABEL_NAME: LabelMatcher.exact(metric_name),
-            "value_type": LabelMatcher.exact(value_type.value),
-            "session_id": LabelMatcher.regex(session_id_pattern),
-        }
-        template = self._template(kernel_aggregation)
-        window = ""
-        if time_window_seconds is not None:
-            template = _SESSION_UTILIZATION_AVG_TEMPLATE.format(template=template)
-            window = f"{time_window_seconds}s"
-
-        return MetricPreset(
-            template=template,
-            labels=labels,
-            window=window,
-        )
-
-    def _template(self, kernel_aggregation: KernelAggregationMode) -> str:
-        match kernel_aggregation:
-            case KernelAggregationMode.ANY:
-                return _ANY_KERNEL_UTILIZATION_TEMPLATE
-            case KernelAggregationMode.ALL:
-                return _ALL_KERNEL_UTILIZATION_TEMPLATE
-            case KernelAggregationMode.AVERAGE:
-                return _AVERAGE_KERNEL_UTILIZATION_TEMPLATE
-
-
 class ContainerLiveStatQueryBuilder:
     """Builds the per-query PromQL batch backing the legacy `live_stat`
     payload (`fetch_container_live_stats`)."""
@@ -188,7 +132,7 @@ class ContainerLiveStatQueryBuilder:
         self,
         kernel_ids: Sequence[KernelId],
     ) -> ContainerLiveStatQueries:
-        kernel_id_regex = _regex_union([str(kid) for kid in kernel_ids])
+        kernel_id_regex = regex_union([str(kid) for kid in kernel_ids])
 
         instant_labels = {
             "kernel_id": LabelMatcher.regex(kernel_id_regex),

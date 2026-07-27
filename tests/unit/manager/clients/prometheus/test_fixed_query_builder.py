@@ -7,18 +7,16 @@ from uuid import UUID
 
 import pytest
 
-from ai.backend.common.types import KernelAggregationMode, KernelId, SessionId
+from ai.backend.common.types import KernelId
 from ai.backend.manager.clients.prometheus import (
     ContainerLiveStatQueryBuilder,
     ContainerMetricQueryBuilder,
-    SessionUtilizationQueryBuilder,
 )
-from ai.backend.manager.clients.prometheus.fixed_query_builder import _regex_union
 from ai.backend.manager.clients.prometheus.metric_types import (
     ContainerMetricOptionalLabel,
     MetricType,
 )
-from ai.backend.manager.clients.prometheus.preset import LabelMatcher, MetricPreset
+from ai.backend.manager.clients.prometheus.preset import LabelMatcher, MetricPreset, regex_union
 from ai.backend.manager.clients.prometheus.types import ValueType
 
 
@@ -153,55 +151,9 @@ class TestGetContainerLiveStatQueries:
         assert 'value_type="current"' in result.rate_avg.render()
 
 
-class TestSessionUtilizationQueryBuilder:
-    @pytest.fixture
-    def session_id(self) -> SessionId:
-        return SessionId(UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"))
-
-    @pytest.mark.parametrize(
-        ("kernel_aggregation", "query_aggregation"),
-        [
-            (KernelAggregationMode.ANY, "min by (session_id)"),
-            (KernelAggregationMode.ALL, "max by (session_id)"),
-            (KernelAggregationMode.AVERAGE, "avg by (session_id)"),
-        ],
-    )
-    def test_builds_current_session_level_query(
-        self,
-        session_id: SessionId,
-        kernel_aggregation: KernelAggregationMode,
-        query_aggregation: str,
-    ) -> None:
-        preset = SessionUtilizationQueryBuilder().build(
-            metric_name="cpu_util",
-            kernel_aggregation=kernel_aggregation,
-            time_window_seconds=None,
-            session_ids=[session_id],
-        )
-        rendered = preset.render()
-
-        assert query_aggregation in rendered
-        assert 'container_metric_name="cpu_util"' in rendered
-        assert 'value_type="pct"' in rendered
-        assert f'session_id=~"{session_id}"' in rendered
-
-    def test_builds_windowed_session_level_query(self, session_id: SessionId) -> None:
-        preset = SessionUtilizationQueryBuilder().build(
-            metric_name="cpu_util",
-            kernel_aggregation=KernelAggregationMode.AVERAGE,
-            time_window_seconds=300,
-            session_ids=[session_id],
-        )
-
-        assert (
-            "avg_over_time((avg by (session_id)(backendai_container_utilization" in preset.render()
-        )
-        assert ")[300s:])" in preset.render()
-
-
 class TestRegexUnion:
     def test_escapes_special_chars(self) -> None:
-        result = _regex_union(["a.b", "c+d"])
+        result = regex_union(["a.b", "c+d"])
         assert r"a\.b" in result
         assert r"c\+d" in result
         assert "|" in result

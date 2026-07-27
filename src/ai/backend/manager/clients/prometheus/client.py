@@ -15,13 +15,13 @@ from ai.backend.common.dto.clients.prometheus.response import (
 )
 from ai.backend.common.exception import (
     FailedToGetMetric,
+    InvalidMetricPresetTemplate,
     PrometheusConnectionError,
 )
-from ai.backend.common.types import KernelAggregationMode, KernelId, SessionId
+from ai.backend.common.types import KernelId, SessionId
 from ai.backend.manager.clients.prometheus.fixed_query_builder import (
     ContainerLiveStatQueryBuilder,
     ContainerMetricQueryBuilder,
-    SessionUtilizationQueryBuilder,
 )
 from ai.backend.manager.clients.prometheus.metric_types import (
     ContainerMetricOptionalLabel,
@@ -30,7 +30,7 @@ from ai.backend.manager.clients.prometheus.metric_types import (
     KernelLiveStatBatchResult,
     MetricResultValue,
 )
-from ai.backend.manager.clients.prometheus.preset import LabelMatcher, MetricPreset
+from ai.backend.manager.clients.prometheus.preset import LabelMatcher, MetricPreset, regex_union
 
 DEFAULT_TIMEOUT_SECONDS: float = 30.0
 
@@ -43,7 +43,6 @@ class PrometheusClient:
     _timeout: aiohttp.ClientTimeout
     _container_metric_query_builder: ContainerMetricQueryBuilder
     _container_live_stat_query_builder: ContainerLiveStatQueryBuilder
-    _session_utilization_query_builder: SessionUtilizationQueryBuilder
 
     def __init__(
         self,
@@ -59,7 +58,6 @@ class PrometheusClient:
         self._timeout = aiohttp.ClientTimeout(total=timeout)
         self._container_metric_query_builder = container_metric_query_builder
         self._container_live_stat_query_builder = container_live_stat_query_builder
-        self._session_utilization_query_builder = SessionUtilizationQueryBuilder()
 
     async def fetch_available_container_metric_names(self) -> list[str]:
         query = self._container_metric_query_builder.get_container_metric_metadata_query()
@@ -139,17 +137,22 @@ class PrometheusClient:
     async def fetch_session_utilization(
         self,
         *,
-        metric_name: str,
-        kernel_aggregation: KernelAggregationMode,
-        time_window_seconds: int | None,
+        query_template: str,
+        time_window: str,
         session_ids: Sequence[SessionId],
         evaluation_time: str,
     ) -> PrometheusResponse:
-        preset = self._session_utilization_query_builder.build(
-            metric_name=metric_name,
-            kernel_aggregation=kernel_aggregation,
-            time_window_seconds=time_window_seconds,
-            session_ids=session_ids,
+        if "{labels}" not in query_template:
+            raise InvalidMetricPresetTemplate(
+                "Session utilization query presets must contain a {labels} placeholder."
+            )
+        session_id_pattern = regex_union([
+            str(session_id) for session_id in dict.fromkeys(session_ids)
+        ])
+        preset = MetricPreset(
+            template=query_template,
+            labels={"session_id": LabelMatcher.regex(session_id_pattern)},
+            window=time_window,
         )
         return await self._query_instant(preset, time=evaluation_time)
 

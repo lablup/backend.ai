@@ -8,7 +8,6 @@ from ai.backend.manager.clients.prometheus.metric_types import (
     KernelLiveStatBatchResult,
     KernelLiveStatValues,
 )
-from ai.backend.manager.repositories.session.repository import SessionRepository
 from ai.backend.manager.services.metric.actions.live_stat import ContainerLiveStatAction
 from ai.backend.manager.services.metric.service import MetricService
 
@@ -21,19 +20,11 @@ class TestKernelLiveStatBatch:
         return Mock()
 
     @pytest.fixture()
-    def mock_session_repository(self) -> Mock:
-        return Mock(spec=SessionRepository)
-
-    @pytest.fixture()
     def metric_service(
         self,
         mock_metric_repository: Mock,
-        mock_session_repository: Mock,
     ) -> MetricService:
-        return MetricService(
-            metric_repository=mock_metric_repository,
-            session_repository=mock_session_repository,
-        )
+        return MetricService(metric_repository=mock_metric_repository)
 
     async def test_passes_raw_result_through(
         self,

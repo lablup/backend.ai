@@ -10,8 +10,12 @@ from ai.backend.common.dto.clients.prometheus import (
     PrometheusResponse,
     QueryTimeRange,
 )
-from ai.backend.common.exception import FailedToGetMetric, PrometheusConnectionError
-from ai.backend.common.types import KernelAggregationMode, SessionId
+from ai.backend.common.exception import (
+    FailedToGetMetric,
+    InvalidMetricPresetTemplate,
+    PrometheusConnectionError,
+)
+from ai.backend.common.types import SessionId
 from ai.backend.manager.clients.prometheus import (
     ContainerLiveStatQueryBuilder,
     ContainerMetricQueryBuilder,
@@ -242,31 +246,46 @@ class TestQueryInstant:
         field_values = {field[0]["name"]: field[2] for field in form_data._fields}
         assert field_values["time"] == "1704067200.123"
 
-    async def test_fetch_session_utilization_builds_query(
+    async def test_fetch_session_utilization_renders_stored_preset(
         self,
         prometheus_client: PrometheusClient,
         mock_session: Mock,
         success_response: AsyncMock,
     ) -> None:
-        session_id = SessionId(uuid4())
+        first_session_id = SessionId(uuid4())
+        second_session_id = SessionId(uuid4())
+        query_template = (
+            'min by (session_id) (backendai_container_utilization{{value_type="current",'
+            'container_metric_name="cpu_used",{labels}}})'
+        )
 
         await prometheus_client.fetch_session_utilization(
-            metric_name="cpu_util",
-            kernel_aggregation=KernelAggregationMode.AVERAGE,
-            time_window_seconds=300,
-            session_ids=[session_id],
+            query_template=query_template,
+            time_window="5m",
+            session_ids=[first_session_id, second_session_id, first_session_id],
             evaluation_time="1704067200.123",
         )
 
         mock_session.post.assert_called_once()
         form_data = mock_session.post.call_args.kwargs["data"]
         field_values = {field[0]["name"]: field[2] for field in form_data._fields}
-        assert "avg by (session_id)" in field_values["query"]
-        assert 'container_metric_name="cpu_util"' in field_values["query"]
-        assert 'value_type="pct"' in field_values["query"]
-        assert f'session_id=~"{session_id}"' in field_values["query"]
-        assert ")[300s:])" in field_values["query"]
+        assert "min by (session_id)" in field_values["query"]
+        assert 'container_metric_name="cpu_used"' in field_values["query"]
+        assert 'value_type="current"' in field_values["query"]
+        assert f'session_id=~"{first_session_id}|{second_session_id}"' in field_values["query"]
         assert field_values["time"] == "1704067200.123"
+
+    async def test_fetch_session_utilization_requires_labels_placeholder(
+        self,
+        prometheus_client: PrometheusClient,
+    ) -> None:
+        with pytest.raises(InvalidMetricPresetTemplate, match="labels"):
+            await prometheus_client.fetch_session_utilization(
+                query_template="sum(metric)",
+                time_window="5m",
+                session_ids=[SessionId(uuid4())],
+                evaluation_time="1704067200.123",
+            )
 
     @pytest.fixture
     def error_4xx_response(self, mock_session: Mock) -> AsyncMock:

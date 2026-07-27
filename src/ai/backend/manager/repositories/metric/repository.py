@@ -7,6 +7,7 @@ from ai.backend.common.dto.clients.prometheus.request import QueryTimeRange
 from ai.backend.common.exception import (
     BackendAIError,
     FailedToGetMetric,
+    InvalidMetricPresetTemplate,
     PrometheusConnectionError,
 )
 from ai.backend.common.metrics.metric import DomainType, LayerType
@@ -21,10 +22,15 @@ from ai.backend.manager.clients.prometheus.metric_types import (
     ContainerMetricResult,
     KernelLiveStatBatchResult,
 )
-from ai.backend.manager.data.metric.types import SessionUtilizationMetricResult
 from ai.backend.manager.errors.common import InternalServerError
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.metric.types import SessionUtilizationMetricQuery
+from ai.backend.manager.repositories.metric.types import (
+    SessionUtilizationMetricQuery,
+    SessionUtilizationMetricResult,
+)
+from ai.backend.manager.repositories.prometheus_query_preset.db_source import (
+    PrometheusQueryPresetDBSource,
+)
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -46,6 +52,7 @@ metric_repository_resilience = Resilience(
 class MetricRepository:
     _db: ExtendedAsyncSAEngine
     _prometheus_client: PrometheusClient
+    _prometheus_query_preset_db_source: PrometheusQueryPresetDBSource
 
     def __init__(
         self,
@@ -54,6 +61,7 @@ class MetricRepository:
     ) -> None:
         self._db = db
         self._prometheus_client = prometheus_client
+        self._prometheus_query_preset_db_source = PrometheusQueryPresetDBSource(db)
 
     async def query_container_metric_metadata(self) -> list[str]:
         return await self._prometheus_client.fetch_available_container_metric_names()
@@ -83,22 +91,26 @@ class MetricRepository:
         self,
         query: SessionUtilizationMetricQuery,
     ) -> SessionUtilizationMetricResult:
+        preset = await self._prometheus_query_preset_db_source.get_by_id(query.preset_id)
+        if "session_id" not in preset.filter_labels:
+            raise InvalidMetricPresetTemplate(
+                "Session utilization query presets must allow the session_id filter label."
+            )
         try:
             response = await self._prometheus_client.fetch_session_utilization(
-                metric_name=query.metric_name,
-                kernel_aggregation=query.kernel_aggregation,
-                time_window_seconds=query.time_window_seconds,
+                query_template=preset.query_template,
+                time_window=preset.time_window or "",
                 session_ids=query.session_ids,
                 evaluation_time=query.evaluation_time.isoformat(),
             )
         except (PrometheusConnectionError, FailedToGetMetric) as e:
             log.warning(
-                "Utilization query failed for metric {} and policy {}: {}",
-                query.metric_name,
-                query.kernel_aggregation,
+                "Utilization query failed for preset {}: {}",
+                query.preset_id,
                 e,
             )
             return SessionUtilizationMetricResult(by_session={})
+        requested_session_ids = set(query.session_ids)
         values: dict[SessionId, Decimal] = {}
         for result in response.data.result:
             if result.metric.session_id is None or not result.values:
@@ -108,7 +120,7 @@ class MetricRepository:
                 value = Decimal(result.values[-1][1])
             except (ValueError, InvalidOperation):
                 continue
-            if not value.is_finite():
+            if session_id not in requested_session_ids or not value.is_finite():
                 continue
             if session_id in values:
                 raise InternalServerError(
