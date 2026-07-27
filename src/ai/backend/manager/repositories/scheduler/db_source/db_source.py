@@ -2964,6 +2964,16 @@ class ScheduleDBSource:
 
         async with self._db.begin_session_read_committed() as db_sess:
             now = await self._get_db_now_in_session(db_sess)
+            # Release the kernels' holds (prereserved/reserved/used) on their
+            # agents before the placement is cleared.
+            held_kernel_rows = (
+                await db_sess.execute(
+                    sa.select(KernelRow.id).where(KernelRow.session_id.in_(session_ids))
+                )
+            ).all()
+            await self._free_allocations_and_release(
+                db_sess, [row.id for row in held_kernel_rows], now
+            )
             stmt = (
                 sa.update(KernelRow)
                 .where(KernelRow.session_id.in_(session_ids))
@@ -2992,7 +3002,15 @@ class ScheduleDBSource:
             await db_sess.execute(
                 sa.update(ResourceAllocationRow)
                 .where(ResourceAllocationRow.kernel_id.in_(kernel_ids))
-                .values(used=None, used_at=None, free_at=None)
+                .values(
+                    prereserved=0,
+                    reserved=0,
+                    prereserved_at=None,
+                    reserved_at=None,
+                    used=None,
+                    used_at=None,
+                    free_at=None,
+                )
             )
             return len(kernel_ids)
 

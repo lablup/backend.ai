@@ -12,6 +12,7 @@ from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import (
     SessionStatus,
     StatusTransitions,
+    TransitionStatus,
 )
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
@@ -64,10 +65,26 @@ class ReleaseReservedSessionsLifecycleHandler(SessionLifecycleHandler):
     @classmethod
     @override
     def status_transitions(cls) -> StatusTransitions:
-        """Kernel admission happens in the repository; the session advances
-        via the CHECK_RESERVED_PROGRESS promotion once no kernel stays
-        RESERVED."""
-        return StatusTransitions()
+        """Kernel admission happens in the repository and the session
+        advances via the CHECK_RESERVED_PROGRESS promotion, so success
+        declares nothing. Waiting sessions are reported as failures with no
+        retry transition (they stay RESERVED); when the operator opts into
+        a phase timeout or retry limit, the session abandons its
+        reservation and returns to the queue — the PENDING reset also
+        releases the prereserved holds.
+        """
+        return StatusTransitions(
+            success=None,
+            need_retry=None,
+            expired=TransitionStatus(
+                session=SessionStatus.PENDING,
+                kernel=KernelStatus.PENDING,
+            ),
+            give_up=TransitionStatus(
+                session=SessionStatus.PENDING,
+                kernel=KernelStatus.PENDING,
+            ),
+        )
 
     @property
     @override
