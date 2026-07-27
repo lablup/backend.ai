@@ -26,7 +26,6 @@ from ai.backend.manager.repositories.base.integrity import (
     parse_integrity_error,
 )
 from ai.backend.manager.repositories.base.rbac.utils import bulk_insert_on_conflict_do_nothing
-from ai.backend.manager.repositories.base.types import IntegrityErrorCheck
 from ai.backend.manager.repositories.base.upserter import UpserterSpec
 
 TRow = TypeVar("TRow", bound=Base)
@@ -49,8 +48,6 @@ class RBACEntityUpserter[TRow: Base]:
         index_elements: Columns of the unique constraint used as the ON CONFLICT target.
         index_where: Predicate of a partial unique index, when the conflict target is one
             (e.g. ``scope_id IS NULL``); ``None`` for a plain unique constraint.
-        integrity_error_checks: Checks mapping a raised IntegrityError to a domain error
-            (e.g. a FK gate). An unmatched error is re-raised as-is.
         additional_scope_refs: Additional scope references for multi-scope entities. Only
             meaningful alongside a ``scope_ref``.
         relation_type: The relation type for the scope-entity association. Defaults to AUTO.
@@ -61,7 +58,6 @@ class RBACEntityUpserter[TRow: Base]:
     scope_ref: RBACElementRef | None
     index_elements: list[str]
     index_where: Any | None = None
-    integrity_error_checks: Sequence[IntegrityErrorCheck] = field(default_factory=tuple)
     additional_scope_refs: Sequence[RBACElementRef] = field(default_factory=list)
     relation_type: RelationType = RelationType.AUTO
 
@@ -117,7 +113,7 @@ async def execute_rbac_entity_upserter[TRow: Base](
     except sa.exc.IntegrityError as e:
         # The ON CONFLICT target is handled as an update; any other violation (e.g. a FK gate)
         # still raises and is mapped to a domain error, or re-raised if unmatched.
-        match_integrity_error(parse_integrity_error(e), upserter.integrity_error_checks)
+        match_integrity_error(parse_integrity_error(e), spec.integrity_error_checks)
     row_data = result.fetchone()
     if row_data is None:
         raise UpsertEmptyResultError
