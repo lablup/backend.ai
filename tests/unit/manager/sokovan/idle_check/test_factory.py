@@ -10,6 +10,7 @@ class TestFactoryRegistration:
         _, task_specs = build_reconciler_coordinator(
             replica_group_repository=MagicMock(),
             idle_checker_repository=MagicMock(),
+            metric_repository=MagicMock(),
             scheduling_controller=MagicMock(),
             valkey_live=MagicMock(),
             valkey_schedule=MagicMock(),

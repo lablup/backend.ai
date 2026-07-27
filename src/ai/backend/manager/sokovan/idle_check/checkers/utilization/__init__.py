@@ -1,0 +1,1 @@
+"""Utilization idle checker."""

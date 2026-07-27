@@ -10,6 +10,10 @@ from .actions.container import (
     ContainerMetricMetadataActionResult,
 )
 from .actions.live_stat import ContainerLiveStatAction, ContainerLiveStatActionResult
+from .actions.session_utilization import (
+    SessionUtilizationBatchAction,
+    SessionUtilizationBatchActionResult,
+)
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -22,6 +26,12 @@ class MetricService:
         metric_repository: MetricRepository,
     ) -> None:
         self._metric_repository = metric_repository
+
+    async def query_session_utilization_batch(
+        self,
+        action: SessionUtilizationBatchAction,
+    ) -> SessionUtilizationBatchActionResult:
+        raise NotImplementedError
 
     async def query_container_metric_metadata(
         self,
