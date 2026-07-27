@@ -54,6 +54,7 @@ from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
 from ai.backend.manager.models.user import UserRole, users
+from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.testutils.fixtures import DomainFixtureData
 
 from .conftest import AuthUserFixtureData
@@ -140,6 +141,12 @@ async def signup_default_project(
                 resource_policy=resource_policy_fixture,
             )
         )
+        await conn.execute(
+            sa.insert(VirtualScopeRow.__table__).values(
+                scope_type=ScopeType.PROJECT,
+                scope_id=data.project_id,
+            )
+        )
     yield data
     async with db_engine.begin() as conn:
         await conn.execute(
@@ -150,6 +157,12 @@ async def signup_default_project(
         for email in data.cleanup_emails:
             await conn.execute(keypairs.delete().where(keypairs.c.user_id == email))
             await conn.execute(users.delete().where(users.c.email == email))
+        await conn.execute(
+            VirtualScopeRow.__table__.delete().where(
+                VirtualScopeRow.__table__.c.scope_type == ScopeType.PROJECT,
+                VirtualScopeRow.__table__.c.scope_id == data.project_id,
+            )
+        )
         await conn.execute(
             GroupRow.__table__.delete().where(GroupRow.__table__.c.id == data.project_id),
         )
@@ -282,6 +295,12 @@ async def cross_domain_fixture(
             )
         )
         await conn.execute(
+            sa.insert(VirtualScopeRow.__table__).values(
+                scope_type=ScopeType.PROJECT,
+                scope_id=group_id,
+            )
+        )
+        await conn.execute(
             sa.insert(users).values(
                 uuid=str(admin_data.user_uuid),
                 username=f"other-admin-{admin_unique}",
@@ -389,6 +408,12 @@ async def cross_domain_fixture(
         await conn.execute(
             users.delete().where(
                 users.c.uuid.in_([str(admin_data.user_uuid), str(user_data.user_uuid)])
+            )
+        )
+        await conn.execute(
+            VirtualScopeRow.__table__.delete().where(
+                VirtualScopeRow.__table__.c.scope_type == ScopeType.PROJECT,
+                VirtualScopeRow.__table__.c.scope_id == group_id,
             )
         )
         await conn.execute(GroupRow.__table__.delete().where(GroupRow.__table__.c.id == group_id))

@@ -132,6 +132,7 @@ from ai.backend.manager.models.session_template import session_templates
 from ai.backend.manager.models.user import users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import vfolders
+from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.manager.notification.notification_center import NotificationCenter
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.registry import AgentRegistry
@@ -738,8 +739,20 @@ async def group_fixture(
                 resource_policy=resource_policy_fixture,
             )
         )
+        await conn.execute(
+            sa.insert(VirtualScopeRow.__table__).values(
+                scope_type=ScopeType.PROJECT,
+                scope_id=group_id,
+            )
+        )
     yield group_id
     async with db_engine.begin() as conn:
+        await conn.execute(
+            VirtualScopeRow.__table__.delete().where(
+                VirtualScopeRow.__table__.c.scope_type == ScopeType.PROJECT,
+                VirtualScopeRow.__table__.c.scope_id == group_id,
+            )
+        )
         await conn.execute(GroupRow.__table__.delete().where(GroupRow.__table__.c.id == group_id))
 
 

@@ -25,6 +25,7 @@ from ai.backend.client.v2.exceptions import (
 )
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.container_registry import ContainerRegistryType
+from ai.backend.common.data.permission.types import ScopeType
 from ai.backend.common.dto.manager.deployment.types import OrderDirection
 from ai.backend.common.dto.manager.group.request import GroupFilter, SearchGroupsRequest
 from ai.backend.common.dto.manager.group.response import (
@@ -50,6 +51,7 @@ from ai.backend.manager.models.image import ImageRow, ImageType
 from ai.backend.manager.models.kernel import KernelRow, KernelStatus
 from ai.backend.manager.models.session import SessionRow, SessionStatus
 from ai.backend.manager.models.vfolder import VFolderRow
+from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.testutils.fixtures import DomainFixtureData
 
 
@@ -73,9 +75,21 @@ async def test_group_for_deletion(
                 resource_policy=resource_policy_fixture,
             )
         )
+        await conn.execute(
+            sa.insert(VirtualScopeRow.__table__).values(
+                scope_type=ScopeType.PROJECT,
+                scope_id=group_id,
+            )
+        )
     yield group_id
     # Cleanup: force delete if still exists
     async with db_engine.begin() as conn:
+        await conn.execute(
+            VirtualScopeRow.__table__.delete().where(
+                VirtualScopeRow.__table__.c.scope_type == ScopeType.PROJECT,
+                VirtualScopeRow.__table__.c.scope_id == group_id,
+            )
+        )
         await conn.execute(GroupRow.__table__.delete().where(GroupRow.__table__.c.id == group_id))
 
 
@@ -107,6 +121,12 @@ async def group_with_vfolder_mounted(
                 is_active=True,
                 domain_name=domain_fixture.domain_name,
                 resource_policy=resource_policy_fixture,
+            )
+        )
+        await conn.execute(
+            sa.insert(VirtualScopeRow.__table__).values(
+                scope_type=ScopeType.PROJECT,
+                scope_id=group_id,
             )
         )
         # Create vfolder
@@ -184,6 +204,12 @@ async def group_with_vfolder_mounted(
         await conn.execute(
             VFolderRow.__table__.delete().where(VFolderRow.__table__.c.id == vfolder_id)
         )
+        await conn.execute(
+            VirtualScopeRow.__table__.delete().where(
+                VirtualScopeRow.__table__.c.scope_type == ScopeType.PROJECT,
+                VirtualScopeRow.__table__.c.scope_id == group_id,
+            )
+        )
         await conn.execute(GroupRow.__table__.delete().where(GroupRow.__table__.c.id == group_id))
 
 
@@ -214,6 +240,12 @@ async def group_with_active_kernel(
                 is_active=True,
                 domain_name=domain_fixture.domain_name,
                 resource_policy=resource_policy_fixture,
+            )
+        )
+        await conn.execute(
+            sa.insert(VirtualScopeRow.__table__).values(
+                scope_type=ScopeType.PROJECT,
+                scope_id=group_id,
             )
         )
         # Create session (required FK for kernel)
@@ -275,6 +307,12 @@ async def group_with_active_kernel(
         await conn.execute(
             SessionRow.__table__.delete().where(SessionRow.__table__.c.id == session_id)
         )
+        await conn.execute(
+            VirtualScopeRow.__table__.delete().where(
+                VirtualScopeRow.__table__.c.scope_type == ScopeType.PROJECT,
+                VirtualScopeRow.__table__.c.scope_id == group_id,
+            )
+        )
         await conn.execute(GroupRow.__table__.delete().where(GroupRow.__table__.c.id == group_id))
 
 
@@ -304,6 +342,12 @@ async def group_with_active_endpoint(
                 is_active=True,
                 domain_name=domain_fixture.domain_name,
                 resource_policy=resource_policy_fixture,
+            )
+        )
+        await conn.execute(
+            sa.insert(VirtualScopeRow.__table__).values(
+                scope_type=ScopeType.PROJECT,
+                scope_id=group_id,
             )
         )
         # Create container registry (required by image)
@@ -364,6 +408,12 @@ async def group_with_active_endpoint(
                 ContainerRegistryRow.__table__.c.id == registry_id
             )
         )
+        await conn.execute(
+            VirtualScopeRow.__table__.delete().where(
+                VirtualScopeRow.__table__.c.scope_type == ScopeType.PROJECT,
+                VirtualScopeRow.__table__.c.scope_id == group_id,
+            )
+        )
         await conn.execute(GroupRow.__table__.delete().where(GroupRow.__table__.c.id == group_id))
 
 
@@ -390,6 +440,12 @@ async def multiple_test_groups(
                     resource_policy=resource_policy_fixture,
                 )
             )
+            await conn.execute(
+                sa.insert(VirtualScopeRow.__table__).values(
+                    scope_type=ScopeType.PROJECT,
+                    scope_id=group_id,
+                )
+            )
             group_ids.append(group_id)
 
     yield group_ids
@@ -397,6 +453,12 @@ async def multiple_test_groups(
     # Cleanup
     async with db_engine.begin() as conn:
         for group_id in group_ids:
+            await conn.execute(
+                VirtualScopeRow.__table__.delete().where(
+                    VirtualScopeRow.__table__.c.scope_type == ScopeType.PROJECT,
+                    VirtualScopeRow.__table__.c.scope_id == group_id,
+                )
+            )
             await conn.execute(
                 GroupRow.__table__.delete().where(GroupRow.__table__.c.id == group_id)
             )

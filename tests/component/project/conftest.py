@@ -63,6 +63,7 @@ from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.user import users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.group.repositories import GroupRepositories
 from ai.backend.manager.repositories.group.repository import GroupRepository
@@ -333,8 +334,20 @@ async def target_project_fixture(
                 resource_policy=resource_policy_fixture,
             )
         )
+        await conn.execute(
+            sa.insert(VirtualScopeRow.__table__).values(
+                scope_type=ScopeType.PROJECT,
+                scope_id=project_id,
+            )
+        )
     yield project_id
     async with db_engine.begin() as conn:
+        await conn.execute(
+            VirtualScopeRow.__table__.delete().where(
+                VirtualScopeRow.__table__.c.scope_type == ScopeType.PROJECT,
+                VirtualScopeRow.__table__.c.scope_id == project_id,
+            )
+        )
         await conn.execute(GroupRow.__table__.delete().where(GroupRow.__table__.c.id == project_id))
 
 
@@ -357,8 +370,20 @@ async def other_project_fixture(
                 resource_policy=resource_policy_fixture,
             )
         )
+        await conn.execute(
+            sa.insert(VirtualScopeRow.__table__).values(
+                scope_type=ScopeType.PROJECT,
+                scope_id=project_id,
+            )
+        )
     yield project_id
     async with db_engine.begin() as conn:
+        await conn.execute(
+            VirtualScopeRow.__table__.delete().where(
+                VirtualScopeRow.__table__.c.scope_type == ScopeType.PROJECT,
+                VirtualScopeRow.__table__.c.scope_id == project_id,
+            )
+        )
         await conn.execute(GroupRow.__table__.delete().where(GroupRow.__table__.c.id == project_id))
 
 

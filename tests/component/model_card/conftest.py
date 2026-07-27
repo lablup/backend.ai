@@ -50,6 +50,7 @@ from ai.backend.manager.models.rbac_models.permission.permission import Permissi
 from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import vfolders
+from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
 from ai.backend.manager.repositories.group.repositories import GroupRepositories
 from ai.backend.manager.repositories.group.repository import GroupRepository
 from ai.backend.manager.repositories.model_card.repository import ModelCardRepository
@@ -200,10 +201,22 @@ async def model_store_project_fixture(
                 type=ProjectType.MODEL_STORE,
             )
         )
+        await conn.execute(
+            sa.insert(VirtualScopeRow.__table__).values(
+                scope_type=ScopeType.PROJECT,
+                scope_id=project_id,
+            )
+        )
     yield project_id
     async with db_engine.begin() as conn:
         await conn.execute(
             ModelCardRow.__table__.delete().where(ModelCardRow.__table__.c.project == project_id)
+        )
+        await conn.execute(
+            VirtualScopeRow.__table__.delete().where(
+                VirtualScopeRow.__table__.c.scope_type == ScopeType.PROJECT,
+                VirtualScopeRow.__table__.c.scope_id == project_id,
+            )
         )
         await conn.execute(GroupRow.__table__.delete().where(GroupRow.__table__.c.id == project_id))
 
@@ -228,10 +241,22 @@ async def second_project_fixture(
                 type=ProjectType.MODEL_STORE,
             )
         )
+        await conn.execute(
+            sa.insert(VirtualScopeRow.__table__).values(
+                scope_type=ScopeType.PROJECT,
+                scope_id=project_id,
+            )
+        )
     yield project_id
     async with db_engine.begin() as conn:
         await conn.execute(
             ModelCardRow.__table__.delete().where(ModelCardRow.__table__.c.project == project_id)
+        )
+        await conn.execute(
+            VirtualScopeRow.__table__.delete().where(
+                VirtualScopeRow.__table__.c.scope_type == ScopeType.PROJECT,
+                VirtualScopeRow.__table__.c.scope_id == project_id,
+            )
         )
         await conn.execute(GroupRow.__table__.delete().where(GroupRow.__table__.c.id == project_id))
 
