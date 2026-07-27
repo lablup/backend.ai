@@ -441,21 +441,15 @@ class UserUsageBucketRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
 
 
 class UsageBucketEntryRow(Base):  # type: ignore[misc]
-    """Per-slot normalized entry for usage bucket aggregation (Phase 3).
+    """Per-slot normalized entry for a usage bucket.
 
-    ``resource_usage`` accumulates a kernel's ``occupied_slots`` integrated
-    over the time it held them.  It records an allocation, not a measurement: a
-    kernel holding a GPU idle for an hour counts the same as one saturating it.
-    That is what fair share wants -- holding a resource denies it to others -- but
-    it means "usage" would overstate what this column knows.
+    ``resource_usage`` holds resource-seconds (occupied slots integrated over the
+    time held), summed per slice.  Unconstrained NUMERIC on purpose: a domain-level
+    daily mem bucket reaches ~1e18 byte-seconds, past any fixed precision.
 
-    Declared as unconstrained NUMERIC on purpose: a domain-level daily mem bucket
-    runs to ~1e18 byte-seconds on a large cluster, past any fixed precision worth
-    writing down, and PostgreSQL's unconstrained numeric has no such ceiling.
-
-    One entry per (bucket_id, slot_name). ``bucket_type`` is a discriminator
-    indicating which parent table (domain/project/user_usage_buckets) owns
-    this entry.  No FK constraint because references span three tables.
+    One entry per (bucket_id, slot_name). ``bucket_type`` discriminates which parent
+    table (domain/project/user_usage_buckets) owns it; no FK because references
+    span three tables.
     """
 
     __tablename__ = "usage_bucket_entries"
