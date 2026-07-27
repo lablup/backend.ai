@@ -21,7 +21,7 @@ from ai.backend.manager.sokovan.idle_check.checkers.network_timeout import Netwo
 from ai.backend.manager.sokovan.idle_check.checkers.session_lifetime import (
     SessionLifetimeChecker,
 )
-from ai.backend.manager.sokovan.idle_check.checkers.utilization.checker import UtilizationChecker
+from ai.backend.manager.sokovan.idle_check.checkers.utilization import UtilizationChecker
 from ai.backend.manager.sokovan.idle_check.handlers.reconcile import IdleCheckReconcileHandler
 from ai.backend.manager.sokovan.idle_check.source import IdleCheckSource
 from ai.backend.manager.sokovan.idle_check.types import (

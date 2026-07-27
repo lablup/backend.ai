@@ -34,7 +34,7 @@ from ai.backend.manager.sokovan.idle_check.checkers.base import (
     CheckerAssignment,
     IdleCheckerContext,
 )
-from ai.backend.manager.sokovan.idle_check.checkers.utilization.checker import UtilizationChecker
+from ai.backend.manager.sokovan.idle_check.checkers.utilization import UtilizationChecker
 
 _NOW = datetime(2026, 7, 25, 12, tzinfo=UTC)
 _EXISTING_EXPIRE_AT = _NOW + timedelta(minutes=5)
