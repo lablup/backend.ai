@@ -690,20 +690,10 @@ class TestSafePrintRedisConfig:
         ids=lambda case: case.label,
     )
     def test_passwords_are_masked(self, case: _RedisMaskingCase) -> None:
-        printed = safe_print_redis_config(RedisConfig.model_validate(case.raw_config))
+        redis_config = RedisConfig.model_validate(case.raw_config)
+        printed = safe_print_redis_config(redis_config)
         for secret in case.leaked_secrets:
             assert secret not in printed
+            # The helper masks a copy; the caller's config keeps its credentials.
+            assert secret in str(redis_config)
         assert printed.count(REDIS_PASSWORD_MASK) == case.expected_mask_count
-
-    def test_source_config_is_left_intact(self) -> None:
-        redis_config = RedisConfig.model_validate({
-            "addr": "127.0.0.1:6379",
-            "password": "s3cr3t",
-            "override_configs": {
-                "stream": {"addr": "127.0.0.1:6380", "password": "0verr1de"},
-            },
-        })
-        safe_print_redis_config(redis_config)
-        assert redis_config.password == "s3cr3t"
-        assert redis_config.override_configs is not None
-        assert redis_config.override_configs["stream"].password == "0verr1de"
