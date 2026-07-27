@@ -133,6 +133,7 @@ from ai.backend.common.types import (
     ServiceDiscoveryType,
     SessionId,
     aobject,
+    safe_print_redis_config,
 )
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 from ai.backend.logging.otel import OpenTelemetrySpec
@@ -528,7 +529,6 @@ class AgentRPCServer(aobject):
         self._redis_config = config.redis_config_iv.check(
             await self.etcd.get_prefix("config/redis"),
         )
-        log.info("configured redis: {0}", self._redis_config)
 
         # Update local_config with redis settings
         # Convert HostPortPair to dict format for compatibility
@@ -539,6 +539,7 @@ class AgentRPCServer(aobject):
                 redis_config_dict["addr"] = f"{addr.host}:{addr.port}"
 
         redis_config = RedisConfig.model_validate(redis_config_dict)
+        log.info("configured redis: {0}", safe_print_redis_config(redis_config))
         self.local_config.overwrite(redis=redis_config)
 
         # Fill up vfolder configs from etcd and store as separate attributes
