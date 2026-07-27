@@ -28,7 +28,6 @@ class SessionIdleCheckPhaseBatchUpdaterSpec(BatchUpdaterSpec[SessionIdleCheckRow
 
 @dataclass
 class SessionIdleCheckJudgmentBatchUpdaterSpec(BatchUpdaterSpec[SessionIdleCheckRow]):
-    status: IdleCheckPhase
     judgments: Sequence[IdleJudgmentData]
 
     @property
@@ -39,7 +38,16 @@ class SessionIdleCheckJudgmentBatchUpdaterSpec(BatchUpdaterSpec[SessionIdleCheck
     @override
     def build_values(self) -> dict[str, Any]:
         return {
-            "last_status": self.status,
+            "last_status": sa.case(*[
+                (
+                    sa.and_(
+                        SessionIdleCheckRow.session_id == judgment.session_id,
+                        SessionIdleCheckRow.idle_checker_id == judgment.checker_id,
+                    ),
+                    judgment.status,
+                )
+                for judgment in self.judgments
+            ]),
             "expire_at": sa.case(*[
                 (
                     sa.and_(

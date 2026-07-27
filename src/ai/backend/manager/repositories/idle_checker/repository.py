@@ -76,13 +76,6 @@ class IdleCheckerRepository:
 
     async def batch_apply_session_idle_check_judgments(
         self,
-        *,
-        idle_expired: Sequence[IdleJudgmentData],
-        idle: Sequence[IdleJudgmentData],
-        active: Sequence[IdleJudgmentData],
+        judgments: Sequence[IdleJudgmentData],
     ) -> None:
-        await self._db_source.batch_apply_session_idle_check_judgments(
-            idle_expired=idle_expired,
-            idle=idle,
-            active=active,
-        )
+        await self._db_source.batch_apply_session_idle_check_judgments(judgments)

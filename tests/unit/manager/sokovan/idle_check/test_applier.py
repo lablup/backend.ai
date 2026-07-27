@@ -73,11 +73,7 @@ class TestIdleCheckApplier:
     ) -> None:
         await applier.apply(apply_input)
 
-        repository.batch_apply_session_idle_check_judgments.assert_awaited_once_with(
-            idle_expired=[judgments[2]],
-            idle=[judgments[1]],
-            active=[judgments[0]],
-        )
+        repository.batch_apply_session_idle_check_judgments.assert_awaited_once_with(judgments)
 
     async def test_skips_empty_result(
         self,

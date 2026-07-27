@@ -300,56 +300,16 @@ class IdleCheckerDBSource:
 
     async def batch_apply_session_idle_check_judgments(
         self,
-        *,
-        idle_expired: Sequence[IdleJudgmentData],
-        idle: Sequence[IdleJudgmentData],
-        active: Sequence[IdleJudgmentData],
+        judgments: Sequence[IdleJudgmentData],
     ) -> None:
-        idle_expired_pairs = [
-            (judgment.session_id, judgment.checker_id) for judgment in idle_expired
-        ]
-        idle_pairs = [(judgment.session_id, judgment.checker_id) for judgment in idle]
-        active_pairs = [(judgment.session_id, judgment.checker_id) for judgment in active]
+        pairs = [(judgment.session_id, judgment.checker_id) for judgment in judgments]
         async with self._ops.write_ops() as w:
-            if idle_expired_pairs:
+            if pairs:
                 await w.batch_update(
                     BatchUpdater(
-                        spec=SessionIdleCheckJudgmentBatchUpdaterSpec(
-                            IdleCheckPhase.IDLE_EXPIRED,
-                            idle_expired,
-                        ),
+                        spec=SessionIdleCheckJudgmentBatchUpdaterSpec(judgments),
                         conditions=[
-                            SessionIdleCheckConditions.by_pairs(idle_expired_pairs),
-                            SessionIdleCheckConditions.by_status_not_equals(
-                                IdleCheckPhase.IDLE_EXPIRED
-                            ),
-                        ],
-                    )
-                )
-            if idle_pairs:
-                await w.batch_update(
-                    BatchUpdater(
-                        spec=SessionIdleCheckJudgmentBatchUpdaterSpec(
-                            IdleCheckPhase.IDLE,
-                            idle,
-                        ),
-                        conditions=[
-                            SessionIdleCheckConditions.by_pairs(idle_pairs),
-                            SessionIdleCheckConditions.by_status_not_equals(
-                                IdleCheckPhase.IDLE_EXPIRED
-                            ),
-                        ],
-                    )
-                )
-            if active_pairs:
-                await w.batch_update(
-                    BatchUpdater(
-                        spec=SessionIdleCheckJudgmentBatchUpdaterSpec(
-                            IdleCheckPhase.ACTIVE,
-                            active,
-                        ),
-                        conditions=[
-                            SessionIdleCheckConditions.by_pairs(active_pairs),
+                            SessionIdleCheckConditions.by_pairs(pairs),
                             SessionIdleCheckConditions.by_status_not_equals(
                                 IdleCheckPhase.IDLE_EXPIRED
                             ),

@@ -483,14 +483,11 @@ class TestFetchJudgmentBatch:
             ),
         ]
 
-        await repository.batch_apply_session_idle_check_judgments(
-            idle_expired=idle_expired,
-            idle=idle,
-            active=active,
-        )
+        judgments = [*idle_expired, *idle, *active]
+        await repository.batch_apply_session_idle_check_judgments(judgments)
 
         async with database.begin_readonly_session() as db_sess:
-            for judgment in [*idle_expired, *idle, *active]:
+            for judgment in judgments:
                 row = await db_sess.get(
                     SessionIdleCheckRow,
                     (judgment.session_id, judgment.checker_id),
@@ -504,11 +501,7 @@ class TestFetchJudgmentBatch:
         self,
         repository: IdleCheckerRepository,
     ) -> None:
-        await repository.batch_apply_session_idle_check_judgments(
-            idle_expired=[],
-            idle=[],
-            active=[],
-        )
+        await repository.batch_apply_session_idle_check_judgments([])
 
     async def test_never_touches_idle_expired_row(
         self,
@@ -516,19 +509,15 @@ class TestFetchJudgmentBatch:
         repository: IdleCheckerRepository,
         judgment_rows: JudgmentRows,
     ) -> None:
-        await repository.batch_apply_session_idle_check_judgments(
-            idle_expired=[],
-            idle=[],
-            active=[
-                IdleJudgmentData(
-                    session_id=judgment_rows.idle_expired_session_id,
-                    checker_id=judgment_rows.checker_id,
-                    status=IdleCheckPhase.ACTIVE,
-                    expire_at=datetime(2026, 3, 1, tzinfo=UTC),
-                    message="activity detected",
-                )
-            ],
-        )
+        await repository.batch_apply_session_idle_check_judgments([
+            IdleJudgmentData(
+                session_id=judgment_rows.idle_expired_session_id,
+                checker_id=judgment_rows.checker_id,
+                status=IdleCheckPhase.ACTIVE,
+                expire_at=datetime(2026, 3, 1, tzinfo=UTC),
+                message="activity detected",
+            )
+        ])
 
         async with database.begin_readonly_session() as db_sess:
             row = await db_sess.get(
@@ -548,19 +537,15 @@ class TestFetchJudgmentBatch:
     ) -> None:
         missing_session_id = SessionId(uuid.uuid4())
 
-        await repository.batch_apply_session_idle_check_judgments(
-            idle_expired=[],
-            idle=[],
-            active=[
-                IdleJudgmentData(
-                    session_id=missing_session_id,
-                    checker_id=judgment_rows.checker_id,
-                    status=IdleCheckPhase.ACTIVE,
-                    expire_at=datetime(2026, 3, 1, tzinfo=UTC),
-                    message="activity detected",
-                )
-            ],
-        )
+        await repository.batch_apply_session_idle_check_judgments([
+            IdleJudgmentData(
+                session_id=missing_session_id,
+                checker_id=judgment_rows.checker_id,
+                status=IdleCheckPhase.ACTIVE,
+                expire_at=datetime(2026, 3, 1, tzinfo=UTC),
+                message="activity detected",
+            )
+        ])
 
         async with database.begin_readonly_session() as db_sess:
             row = await db_sess.get(
