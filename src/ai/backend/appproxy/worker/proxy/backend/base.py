@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Any, final
 
 from aiohttp.streams import AsyncStreamIterator
+from multidict import CIMultiDict
 from yarl import URL
 
 from ai.backend.appproxy.common.types import RouteInfo
@@ -20,7 +21,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 class HttpRequest:
     method: str
     path: str | URL
-    headers: dict[str, Any]
+    headers: CIMultiDict[str] | dict[str, Any]
     body: AsyncStreamIterator[bytes] | None
 
 
