@@ -42,6 +42,7 @@ from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.identifier.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.identifier.session import SessionID
+from ai.backend.common.identifier.session_group import SessionGroupID
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
@@ -199,6 +200,7 @@ class SessionScopeDraft(_DraftBaseModel):
     project_id: ProjectID | None = None
     resource_group_id: ResourceGroupID | None = None
     resource_group_name: ResourceGroupName | None = None
+    session_group_id: SessionGroupID | None = None
 
 
 class SessionClassificationDraft(_DraftBaseModel):

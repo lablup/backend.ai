@@ -36,6 +36,7 @@ from ai.backend.common.identifier.replica import ReplicaID
 from ai.backend.common.identifier.replica_group import ReplicaGroupID
 from ai.backend.common.identifier.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
+from ai.backend.common.identifier.session_group import SessionGroupID
 from ai.backend.common.identifier.user import UserID
 from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import (
@@ -2303,6 +2304,32 @@ class DeploymentDBSource:
                 status_map[ReplicaID(route_id)] = session_status
 
             return status_map
+
+    async def fetch_route_session_group_ids(
+        self,
+        route_ids: set[ReplicaID],
+    ) -> Mapping[ReplicaID, SessionGroupID]:
+        """Resolve the SessionGroup each route inherits from its replica group.
+
+        A replica group always owns exactly one SessionGroup, so the join
+        yields at most one row per route. Routes whose ``replica_group_id``
+        is NULL are absent from the mapping.
+        """
+        if not route_ids:
+            return {}
+
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            query = (
+                sa.select(RoutingRow.id, ReplicaGroupRow.session_group_id)
+                .select_from(RoutingRow)
+                .join(ReplicaGroupRow, RoutingRow.replica_group_id == ReplicaGroupRow.id)
+                .where(RoutingRow.id.in_(route_ids))
+            )
+            result = await db_sess.execute(query)
+            return {
+                ReplicaID(route_id): SessionGroupID(session_group_id)
+                for route_id, session_group_id in result.all()
+            }
 
     async def fetch_route_session_kernel_infos(
         self,

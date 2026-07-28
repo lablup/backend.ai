@@ -63,7 +63,6 @@ def _create_scaling_group(
         config={},
         agent_selection_strategy=AgentSelectionStrategy.DISPERSED,
         agent_selector_config={},
-        enforce_spreading_endpoint_replica=False,
         allow_fractional_resource_fragmentation=False,
         route_cleanup_target_statuses=[],
     )
