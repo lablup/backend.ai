@@ -27,6 +27,9 @@ from ai.backend.manager.repositories.app_config_fragment.purgers import (
 from ai.backend.manager.repositories.app_config_fragment.types import (
     ResolvedAppConfigScope,
 )
+from ai.backend.manager.repositories.app_config_fragment.upserters import (
+    AppConfigFragmentUpserterSpec,
+)
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     Updater,
@@ -66,6 +69,12 @@ class AppConfigFragmentRepository:
     @app_config_fragment_repository_resilience.apply()
     async def create(self, spec: AppConfigFragmentCreatorSpec) -> AppConfigFragmentData:
         return await self._db_source.create(spec)
+
+    @app_config_fragment_repository_resilience.apply()
+    async def bulk_upsert(
+        self, specs: Sequence[AppConfigFragmentUpserterSpec]
+    ) -> list[AppConfigFragmentData]:
+        return await self._db_source.bulk_upsert(specs)
 
     @app_config_fragment_repository_resilience.apply()
     async def get_by_id(self, fragment_id: AppConfigFragmentID) -> AppConfigFragmentData:
