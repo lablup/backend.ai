@@ -484,4 +484,9 @@ async def replica_group_history_seed(
         await conn.execute(
             sa.delete(ReplicaGroupRow).where(ReplicaGroupRow.deployment_id == deployment_id)
         )
+        await conn.execute(
+            sa.delete(SessionGroupRow).where(
+                SessionGroupRow.id.in_(list(session_group_ids.values()))
+            )
+        )
         await conn.execute(sa.delete(EndpointRow).where(EndpointRow.id == deployment_id))
