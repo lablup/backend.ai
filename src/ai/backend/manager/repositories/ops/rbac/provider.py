@@ -248,10 +248,8 @@ class RBACWriteOps(WriteOps):
     ) -> RBACEntityUpserterResult[TRow]:
         """Upsert one row (INSERT ON CONFLICT UPDATE) with its RBAC scope association.
 
-        On insert the new row is bound to its scope like :meth:`create_scoped`; on conflict
-        the row is updated in place and binding it again is a no-op. A GLOBAL upserter
-        (``scope_ref=None``) binds to no scope at all. The conflict target the upserter
-        carries must identify the scope — see :attr:`RBACEntityUpserter.index_elements`.
+        The upsert counterpart of :meth:`create_scoped`; see :class:`RBACEntityUpserter` for
+        the conflict target it requires.
         """
         return await execute_rbac_entity_upserter(self._sess, upserter)
 

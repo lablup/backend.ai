@@ -37,11 +37,9 @@ class UpserterSpec[TRow: Base](ABC):
 
     @property
     def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
-        """Integrity error checks to match when the statement raises.
+        """Constraint violations to map to domain errors, other than the conflict target.
 
-        Override to declare expected constraint violations and their domain errors — the
-        conflict target itself is an update, so these cover the other constraints (a FK gate,
-        say). Empty by default (unmatched errors raise RepositoryIntegrityError).
+        Empty by default; an unmatched error raises RepositoryIntegrityError.
         """
         return ()
 
