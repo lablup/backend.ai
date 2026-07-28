@@ -118,6 +118,7 @@ class EntityType(enum.StrEnum):
     ERROR_LOG = "error_log"
     EXPORT = "export"
     GROUP = "group"
+    IDLE_CHECKER = "idle_checker"
     KERNEL = "kernel"
     KEYPAIR = "keypair"
     LOGIN_CLIENT_TYPE = "login_client_type"

@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from datetime import datetime
 from enum import StrEnum
-from typing import Any, Self, override
+from typing import Any, Self, cast, override
 from uuid import UUID
 
 from strawberry import UNSET, Info
@@ -45,6 +45,7 @@ from ai.backend.common.dto.manager.v2.idle_checker.response import (
 from ai.backend.common.dto.manager.v2.idle_checker.types import (
     CheckerTypeFilter as CheckerTypeFilterDTO,
 )
+from ai.backend.common.identifier.idle_checker import IdleCheckerID
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import SessionTypes
 from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection, StringFilter
@@ -58,9 +59,9 @@ from ai.backend.manager.api.gql.decorators import (
     gql_pydantic_input,
     gql_pydantic_type,
 )
-from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
+from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
+from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
-from ai.backend.manager.errors.api import NotImplementedAPI
 
 
 @gql_enum(
@@ -102,7 +103,7 @@ class IdleCheckerInputTypeGQL(StrEnum):
     model=SessionLifetimeSpecInfo,
     name="SessionLifetimeIdleCheckerSpec",
 )
-class SessionLifetimeIdleCheckerSpecGQL:
+class SessionLifetimeIdleCheckerSpecGQL(PydanticOutputMixin[SessionLifetimeSpecInfo]):
     max_lifetime_seconds: int = gql_field(description="Maximum session lifetime in seconds.")
 
 
@@ -117,7 +118,7 @@ class SessionLifetimeIdleCheckerSpecGQL:
     model=IdleCheckerSpecInfo,
     name="IdleCheckerSpec",
 )
-class IdleCheckerSpecGQL:
+class IdleCheckerSpecGQL(PydanticOutputMixin[IdleCheckerSpecInfo]):
     type: IdleCheckerTypeGQL = gql_field(description="Checker implementation type.")
     session_lifetime: SessionLifetimeIdleCheckerSpecGQL = gql_field(
         description="Settings that define the maximum lifetime of a session.",
@@ -151,15 +152,18 @@ class IdleCheckerGQL(PydanticNodeMixin[IdleCheckerNode]):
 
     @classmethod
     @override
-    def resolve_nodes(
+    async def resolve_nodes(
         cls,
         *,
-        info: Info,
+        info: Info[StrawberryGQLContext, Any],
         node_ids: Iterable[str],
         required: bool = False,
-    ) -> list[Self]:
+    ) -> Iterable[Self]:
         check_admin_only()
-        raise NotImplementedAPI("Idle checker node resolution is not implemented.")
+        results = await info.context.data_loaders.idle_checker_loader.load_many([
+            IdleCheckerID(UUID(node_id)) for node_id in node_ids
+        ])
+        return cast(list[Self], results)
 
 
 IdleCheckerEdgeGQL = Edge[IdleCheckerGQL]
@@ -369,7 +373,7 @@ class PurgeIdleCheckerInputGQL(PydanticInputMixin[PurgeIdleCheckerInputDTO]):
     model=CreateIdleCheckerPayloadDTO,
     name="CreateIdleCheckerPayload",
 )
-class CreateIdleCheckerPayloadGQL:
+class CreateIdleCheckerPayloadGQL(PydanticOutputMixin[CreateIdleCheckerPayloadDTO]):
     idle_checker: IdleCheckerGQL = gql_field(description="Created idle checker.")
 
 
@@ -384,7 +388,7 @@ class CreateIdleCheckerPayloadGQL:
     model=UpdateIdleCheckerPayloadDTO,
     name="UpdateIdleCheckerPayload",
 )
-class UpdateIdleCheckerPayloadGQL:
+class UpdateIdleCheckerPayloadGQL(PydanticOutputMixin[UpdateIdleCheckerPayloadDTO]):
     idle_checker: IdleCheckerGQL = gql_field(description="Updated idle checker.")
 
 
@@ -399,5 +403,5 @@ class UpdateIdleCheckerPayloadGQL:
     model=PurgeIdleCheckerPayloadDTO,
     name="PurgeIdleCheckerPayload",
 )
-class PurgeIdleCheckerPayloadGQL:
+class PurgeIdleCheckerPayloadGQL(PydanticOutputMixin[PurgeIdleCheckerPayloadDTO]):
     id: UUID = gql_field(description="Purged idle checker ID.")

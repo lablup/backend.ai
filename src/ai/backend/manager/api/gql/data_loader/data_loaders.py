@@ -11,6 +11,7 @@ from ai.backend.common.identifier.app_config_definition import AppConfigDefiniti
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.domain import DomainID
+from ai.backend.common.identifier.idle_checker import IdleCheckerID
 from ai.backend.common.identifier.kernel_scheduling_history import KernelSchedulingHistoryID
 from ai.backend.common.types import AgentId, ImageID, KernelId, SessionId
 from ai.backend.manager.data.permission.id import ObjectId
@@ -64,6 +65,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.api.gql.huggingface_registry import (  # pants: no-infer-dep
         HuggingFaceRegistry,
     )
+    from ai.backend.manager.api.gql.idle_checker.types import IdleCheckerGQL  # pants: no-infer-dep
     from ai.backend.manager.api.gql.image.types import (  # pants: no-infer-dep
         ImageV2AliasGQL,
         ImageV2GQL,
@@ -188,6 +190,22 @@ class DataLoaders:
 
             dtos = await adapter.batch_load_by_ids(ids)
             return [ACF.from_pydantic(dto) if dto is not None else None for dto in dtos]
+
+        return DataLoader(load_fn=load_fn)
+
+    @cached_property
+    def idle_checker_loader(
+        self,
+    ) -> DataLoader[IdleCheckerID, IdleCheckerGQL | None]:
+        adapter = self._adapters.idle_checker
+
+        async def load_fn(ids: list[IdleCheckerID]) -> list[IdleCheckerGQL | None]:
+            from ai.backend.manager.api.gql.idle_checker.types import (  # pants: no-infer-dep
+                IdleCheckerGQL as IC,
+            )
+
+            dtos = await adapter.batch_load_by_ids(ids)
+            return [IC.from_pydantic(dto) if dto is not None else None for dto in dtos]
 
         return DataLoader(load_fn=load_fn)
 
