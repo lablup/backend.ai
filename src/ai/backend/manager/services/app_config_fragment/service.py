@@ -15,6 +15,10 @@ from ai.backend.manager.services.app_config_fragment.actions.bulk_update import 
     BulkUpdateAppConfigFragmentAction,
     BulkUpdateAppConfigFragmentActionResult,
 )
+from ai.backend.manager.services.app_config_fragment.actions.bulk_upsert import (
+    BulkUpsertAppConfigFragmentsAction,
+    BulkUpsertAppConfigFragmentsActionResult,
+)
 from ai.backend.manager.services.app_config_fragment.actions.create import (
     CreateAppConfigFragmentAction,
     CreateAppConfigFragmentActionResult,
@@ -34,10 +38,6 @@ from ai.backend.manager.services.app_config_fragment.actions.scoped_search impor
 from ai.backend.manager.services.app_config_fragment.actions.update import (
     UpdateAppConfigFragmentAction,
     UpdateAppConfigFragmentActionResult,
-)
-from ai.backend.manager.services.app_config_fragment.actions.upsert import (
-    UpsertAppConfigFragmentsAction,
-    UpsertAppConfigFragmentsActionResult,
 )
 
 __all__ = ("AppConfigFragmentService",)
@@ -68,11 +68,11 @@ class AppConfigFragmentService:
         data = await self._repository.get_by_id(action.fragment_id)
         return GetAppConfigFragmentActionResult(fragment=data)
 
-    async def upsert(
-        self, action: UpsertAppConfigFragmentsAction
-    ) -> UpsertAppConfigFragmentsActionResult:
+    async def bulk_upsert(
+        self, action: BulkUpsertAppConfigFragmentsAction
+    ) -> BulkUpsertAppConfigFragmentsActionResult:
         fragments = await self._repository.bulk_upsert(action.upserter_specs)
-        return UpsertAppConfigFragmentsActionResult(fragments=fragments, _scope=action.scope)
+        return BulkUpsertAppConfigFragmentsActionResult(fragments=fragments, _scope=action.scope)
 
     async def admin_search(
         self, action: AdminSearchAppConfigFragmentAction

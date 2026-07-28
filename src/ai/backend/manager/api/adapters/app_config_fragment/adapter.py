@@ -79,6 +79,9 @@ from ai.backend.manager.services.app_config_fragment.actions.bulk_purge import (
 from ai.backend.manager.services.app_config_fragment.actions.bulk_update import (
     BulkUpdateAppConfigFragmentAction,
 )
+from ai.backend.manager.services.app_config_fragment.actions.bulk_upsert import (
+    BulkUpsertAppConfigFragmentsAction,
+)
 from ai.backend.manager.services.app_config_fragment.actions.create import (
     CreateAppConfigFragmentAction,
 )
@@ -93,9 +96,6 @@ from ai.backend.manager.services.app_config_fragment.actions.scoped_search impor
 )
 from ai.backend.manager.services.app_config_fragment.actions.update import (
     UpdateAppConfigFragmentAction,
-)
-from ai.backend.manager.services.app_config_fragment.actions.upsert import (
-    UpsertAppConfigFragmentsAction,
 )
 from ai.backend.manager.types import OptionalState
 
@@ -168,8 +168,8 @@ class AppConfigFragmentAdapter(BaseAdapter):
             )
             for item in items
         ]
-        action_result = await self._processors.app_config_fragment.upsert.wait_for_complete(
-            UpsertAppConfigFragmentsAction(scope=scope, upserter_specs=specs)
+        action_result = await self._processors.app_config_fragment.bulk_upsert.wait_for_complete(
+            BulkUpsertAppConfigFragmentsAction(scope=scope, upserter_specs=specs)
         )
         return UpsertAppConfigFragmentsPayload(
             items=[self._fragment_to_node(fragment) for fragment in action_result.fragments],

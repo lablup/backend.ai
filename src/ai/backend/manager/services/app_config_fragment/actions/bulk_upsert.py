@@ -20,7 +20,7 @@ from ai.backend.manager.services.app_config_fragment.actions.base import (
 
 
 @dataclass
-class UpsertAppConfigFragmentsAction(AppConfigFragmentScopeAction):
+class BulkUpsertAppConfigFragmentsAction(AppConfigFragmentScopeAction):
     """Upsert many fragments at one scope (RBAC-authorized at that scope).
 
     Every item shares ``scope``, so the RBAC gate is the write permission at that single
@@ -54,7 +54,7 @@ class UpsertAppConfigFragmentsAction(AppConfigFragmentScopeAction):
 
 
 @dataclass
-class UpsertAppConfigFragmentsActionResult(AppConfigFragmentScopeActionResult):
+class BulkUpsertAppConfigFragmentsActionResult(AppConfigFragmentScopeActionResult):
     fragments: list[AppConfigFragmentData]
     #: The scope the upsert ran at, carried only to report the RBAC scope.
     _scope: AppConfigFragmentSearchScope
