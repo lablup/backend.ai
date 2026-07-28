@@ -19,7 +19,6 @@ from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeySta
 from ai.backend.common.data.entity.project import PROJECT_SCOPE_TYPE
 from ai.backend.common.data.entity.types import ScopeRef
 from ai.backend.common.data.permission.types import RBACElementType
-from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import AccessKey, VFolderID
@@ -122,11 +121,7 @@ from ai.backend.manager.repositories.keypair.types import (
     KeypairResourcePolicyKeypairSearchScope,
     UserKeypairSearchScope,
 )
-from ai.backend.manager.repositories.ops.rbac.provider import (
-    EntityMembersAddition,
-    RBACOpsProvider,
-    ScopeUserMember,
-)
+from ai.backend.manager.repositories.ops.rbac.provider import RBACOpsProvider
 from ai.backend.manager.repositories.permission_controller.creators import UserRoleCreatorSpec
 from ai.backend.manager.repositories.permission_controller.role_manager import RoleManager
 from ai.backend.manager.repositories.user.creators import UserCreateSpec, UserCreatorSpec
@@ -147,8 +142,6 @@ from ai.backend.manager.repositories.user.updaters import UserUpdaterSpec, UserU
 from ai.backend.manager.repositories.vfolder.deletion import initiate_vfolder_deletion
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
-
-_DOMAIN_SCOPE_TYPE = VirtualScopeType(RBACElementType.DOMAIN.value)
 
 
 class UserDBSource:
@@ -196,8 +189,8 @@ class UserDBSource:
 
         async with self._db.begin_session() as db_session:
             # Check if domain exists before creating user
-            domain_id = await self._get_domain_id(db_session, domain_name)
-            if domain_id is None:
+            domain_exists = await self._check_domain_exists(db_session, domain_name)
+            if not domain_exists:
                 raise UserCreationBadRequest(f"Domain '{domain_name}' does not exist.")
 
             # Check if user with the same email or username already exists
@@ -221,7 +214,7 @@ class UserDBSource:
             rbac_creator = RBACEntityCreator(
                 spec=creator.spec,
                 element_type=RBACElementType.USER,
-                scope_ref=RBACElementRef(RBACElementType.DOMAIN, str(domain_id)),
+                scope_ref=RBACElementRef(RBACElementType.DOMAIN, domain_name),
                 additional_scope_refs=project_scope_refs,
             )
             result = await execute_rbac_entity_creator(db_session, rbac_creator)
@@ -299,8 +292,7 @@ class UserDBSource:
         spec = cast(UserCreatorSpec, item.creator.spec)
 
         # Validate domain
-        domain_id = await self._get_domain_id(db_session, spec.domain_name)
-        if domain_id is None:
+        if not await self._check_domain_exists(db_session, spec.domain_name):
             raise UserCreationBadRequest(f"Domain '{spec.domain_name}' does not exist")
 
         # Validate no duplicate
@@ -321,7 +313,7 @@ class UserDBSource:
         rbac_creator = RBACEntityCreator(
             spec=item.creator.spec,
             element_type=RBACElementType.USER,
-            scope_ref=RBACElementRef(RBACElementType.DOMAIN, str(domain_id)),
+            scope_ref=RBACElementRef(RBACElementType.DOMAIN, spec.domain_name),
             additional_scope_refs=project_scope_refs,
         )
         result = await execute_rbac_entity_creator(db_session, rbac_creator)
@@ -869,13 +861,6 @@ class UserDBSource:
         query = sa.select(DomainRow.name).where(DomainRow.name == domain_name)
         result = await session.scalar(query)
         return result is not None
-
-    async def _get_domain_id(
-        self, session: SASession | AsyncConnection, domain_name: str
-    ) -> DomainID | None:
-        query = sa.select(DomainRow.id).where(DomainRow.name == domain_name)
-        domain_id: DomainID | None = await session.scalar(query)
-        return domain_id
 
     async def _check_resource_policy_exists(
         self, session: SASession | AsyncConnection, policy_name: str

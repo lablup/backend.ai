@@ -9,7 +9,7 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
-from ai.backend.client.v2.exceptions import ConflictError, NotFoundError, ServerError
+from ai.backend.client.v2.exceptions import ConflictError, NotFoundError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.domain import (
@@ -216,12 +216,12 @@ class TestDomainPurgeValidation:
                     scaling_groups.delete().where(scaling_groups.c.name == sgroup_name)
                 )
 
-    async def test_purge_nonexistent_domain_raises_server_error(
+    async def test_purge_nonexistent_domain_raises_not_found(
         self,
         admin_registry: BackendAIClientRegistry,
     ) -> None:
-        """F-PURGE-BIZ-4: Purging nonexistent domain → ServerError (HTTP 500)."""
-        with pytest.raises(ServerError):
+        """F-PURGE-BIZ-4: Purging nonexistent domain → NotFoundError (HTTP 404)."""
+        with pytest.raises(NotFoundError):
             await admin_registry.domain.purge(
                 PurgeDomainRequest(name="nonexistent-domain-xyz-99999")
             )

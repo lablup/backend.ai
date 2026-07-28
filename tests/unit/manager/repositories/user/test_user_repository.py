@@ -669,7 +669,7 @@ class TestUserRepository:
                     AssociationScopesEntitiesRow.entity_type == EntityType.USER,
                     AssociationScopesEntitiesRow.entity_id == str(result.user.uuid),
                     AssociationScopesEntitiesRow.scope_type == ScopeType.DOMAIN,
-                    AssociationScopesEntitiesRow.scope_id == str(sample_domain.domain_id),
+                    AssociationScopesEntitiesRow.scope_id == sample_domain.domain_name,
                 )
             )
             assert domain_assoc is not None

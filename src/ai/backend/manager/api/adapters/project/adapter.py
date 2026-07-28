@@ -42,6 +42,7 @@ from ai.backend.common.dto.manager.v2.group.types import (
     ProjectUserFilter,
 )
 from ai.backend.common.exception import UnreachableError
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.api.adapters.user.adapter import UserAdapter
@@ -67,6 +68,7 @@ from ai.backend.manager.repositories.group.types import (
     UserProjectSearchScope,
 )
 from ai.backend.manager.repositories.group.updaters import GroupUpdaterSpec
+from ai.backend.manager.services.domain.actions.get_domain import GetDomainAction
 from ai.backend.manager.services.group.actions.assign_users_to_project import (
     AssignUsersToProjectAction,
 )
@@ -98,6 +100,12 @@ _PROJECT_PAGINATION_SPEC = PaginationSpec(
 
 class ProjectAdapter(BaseAdapter):
     """Adapter for project (group) operations."""
+
+    async def _resolve_domain_id(self, domain_name: str) -> DomainID:
+        result = await self._processors.domain.get_domain.wait_for_complete(
+            GetDomainAction(domain_name=domain_name)
+        )
+        return result.data.id
 
     # ------------------------------------------------------------------ batch load (DataLoader)
 
@@ -169,8 +177,13 @@ class ProjectAdapter(BaseAdapter):
             integration_name=input.integration_name,
             resource_policy=input.resource_policy,
         )
+        domain_id = await self._resolve_domain_id(input.domain_name)
         result = await self._processors.group.create_group.wait_for_complete(
-            CreateGroupAction(creator=Creator(spec=spec), _domain_name=input.domain_name)
+            CreateGroupAction(
+                creator=Creator(spec=spec),
+                _domain_name=input.domain_name,
+                _domain_id=domain_id,
+            )
         )
         if result.data is None:
             raise UnreachableError("create_group must return data")
@@ -271,8 +284,9 @@ class ProjectAdapter(BaseAdapter):
             base_conditions=base_conditions,
         )
 
+        domain_id = await self._resolve_domain_id(scope.domain_name)
         action_result = await self._processors.group.search_projects_by_domain.wait_for_complete(
-            SearchProjectsByDomainAction(scope=scope, querier=querier)
+            SearchProjectsByDomainAction(scope=scope, querier=querier, _domain_id=domain_id)
         )
 
         return AdminSearchGroupsPayload(

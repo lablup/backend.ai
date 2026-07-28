@@ -16,6 +16,7 @@ import pytest
 
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.exception import InvalidAPIParameters
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.user import UserID
 from ai.backend.common.types import AccessKey, SecretKey
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
@@ -179,7 +180,7 @@ class TestCreateUser:
                 domain_name="default",
             )
         )
-        action = CreateUserAction(creator=creator)
+        action = CreateUserAction(creator=creator, _domain_id=DomainID(uuid.uuid4()))
 
         result = await service.create_user(action)
 
@@ -209,7 +210,9 @@ class TestCreateUser:
                 domain_name="default",
             )
         )
-        action = CreateUserAction(creator=creator, group_ids=group_ids)
+        action = CreateUserAction(
+            creator=creator, _domain_id=DomainID(uuid.uuid4()), group_ids=group_ids
+        )
 
         result = await service.create_user(action)
 
@@ -235,7 +238,7 @@ class TestCreateUser:
                 domain_name="default",
             )
         )
-        action = CreateUserAction(creator=creator)
+        action = CreateUserAction(creator=creator, _domain_id=DomainID(uuid.uuid4()))
 
         with pytest.raises(UserConflict):
             await service.create_user(action)

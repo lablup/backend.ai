@@ -9,7 +9,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncConnection
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
-from ai.backend.client.v2.exceptions import ConflictError, InvalidRequestError, NotFoundError
+from ai.backend.client.v2.exceptions import ConflictError, NotFoundError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.data.permission.types import RelationType
 from ai.backend.common.dto.manager.user import (
@@ -149,8 +149,8 @@ class TestUserCreateCrud:
         resource_policy_fixture: str,
         admin_registry: BackendAIClientRegistry,
     ) -> None:
-        """F-BIZ-2: Non-existent domain → InvalidRequestError (400)."""
-        with pytest.raises(InvalidRequestError):
+        """F-BIZ-2: Non-existent domain → NotFoundError (404)."""
+        with pytest.raises(NotFoundError):
             await admin_registry.user.create(
                 CreateUserRequest(
                     email="no-domain@test.local",

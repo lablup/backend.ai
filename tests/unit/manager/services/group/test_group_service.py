@@ -15,6 +15,7 @@ import pytest
 from sqlalchemy.exc import IntegrityError
 
 from ai.backend.common.exception import InvalidAPIParameters
+from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.group.types import GroupData
 from ai.backend.manager.errors.resource import ProjectNotFound
@@ -110,7 +111,9 @@ class TestCreateGroup:
         creator = Creator(
             spec=GroupCreatorSpec(name="new-project", domain_name="default", description="desc")
         )
-        action = CreateGroupAction(creator=creator, _domain_name="default")
+        action = CreateGroupAction(
+            creator=creator, _domain_name="default", _domain_id=DomainID(uuid.uuid4())
+        )
 
         result = await service.create_group(action)
 
@@ -136,7 +139,9 @@ class TestCreateGroup:
                 total_resource_slots=slots,
             )
         )
-        action = CreateGroupAction(creator=creator, _domain_name="default")
+        action = CreateGroupAction(
+            creator=creator, _domain_name="default", _domain_id=DomainID(uuid.uuid4())
+        )
 
         result = await service.create_group(action)
 
@@ -154,7 +159,9 @@ class TestCreateGroup:
         )
 
         creator = Creator(spec=GroupCreatorSpec(name="existing", domain_name="default"))
-        action = CreateGroupAction(creator=creator, _domain_name="default")
+        action = CreateGroupAction(
+            creator=creator, _domain_name="default", _domain_id=DomainID(uuid.uuid4())
+        )
 
         with pytest.raises(IntegrityError):
             await service.create_group(action)
@@ -475,7 +482,9 @@ class TestSearchProjectsByDomain:
 
         scope = DomainProjectSearchScope(domain_name="corp")
         querier = BatchQuerier(pagination=OffsetPagination(limit=10, offset=0))
-        action = SearchProjectsByDomainAction(scope=scope, querier=querier)
+        action = SearchProjectsByDomainAction(
+            scope=scope, querier=querier, _domain_id=DomainID(uuid.uuid4())
+        )
 
         result = await service.search_projects_by_domain(action)
 
@@ -501,7 +510,9 @@ class TestSearchProjectsByDomain:
 
         scope = DomainProjectSearchScope(domain_name="nonexistent")
         querier = BatchQuerier(pagination=OffsetPagination(limit=10, offset=0))
-        action = SearchProjectsByDomainAction(scope=scope, querier=querier)
+        action = SearchProjectsByDomainAction(
+            scope=scope, querier=querier, _domain_id=DomainID(uuid.uuid4())
+        )
 
         result = await service.search_projects_by_domain(action)
 
