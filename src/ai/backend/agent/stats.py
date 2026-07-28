@@ -316,6 +316,12 @@ class Metric:
     capacity: Decimal | None = None
     current_hook: Callable[[Metric], Decimal] | None = None
 
+    def __attrs_post_init__(self) -> None:
+        # Hook-derived metrics (e.g., rate-based cpu_util) must never expose the raw
+        # measurement as current; the first observation feeds a cumulative counter here.
+        if self.current_hook is not None:
+            self.current = self.current_hook(self)
+
     def update(self, value: Measurement) -> None:
         if value.capacity is not None:
             self.capacity = value.capacity
