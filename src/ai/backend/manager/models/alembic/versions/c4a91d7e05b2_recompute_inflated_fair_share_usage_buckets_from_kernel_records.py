@@ -12,7 +12,7 @@ now holding the product directly instead of a factor to multiply back out.
 stored directly.
 
 Revision ID: c4a91d7e05b2
-Revises: 8f3c1d5a2b47
+Revises: 71cb16a7a9c5
 Create Date: 2026-07-20 00:00:00.000000
 
 """
@@ -25,7 +25,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "c4a91d7e05b2"
-down_revision = "8f3c1d5a2b47"
+down_revision = "71cb16a7a9c5"
 # Part of: NEXT_RELEASE_VERSION
 branch_labels = None
 depends_on = None
