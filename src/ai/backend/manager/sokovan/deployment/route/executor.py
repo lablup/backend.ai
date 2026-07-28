@@ -26,6 +26,7 @@ from ai.backend.common.exception import BackendAIError
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.identifier.replica import ReplicaID
+from ai.backend.common.identifier.session_group import SessionGroupID
 from ai.backend.common.service_discovery import ServiceDiscovery
 from ai.backend.common.service_discovery.service_discovery import ModelServiceMetadata
 from ai.backend.common.types import SessionId
@@ -119,6 +120,10 @@ class RouteExecutor:
                 deployment_ids = {route.deployment_id for route in routes}
                 deployments = await self._deployment_repo.get_deployments_by_ids(deployment_ids)
                 deployment_map = {dep.id: dep for dep in deployments}
+            with RouteRecorderContext.shared_step("load_session_groups"):
+                session_group_map = await self._deployment_repo.fetch_route_session_group_ids({
+                    route.route_id for route in routes
+                })
 
         route_session_ids: dict[UUID, SessionId] = {}
         successes: list[RouteData] = []
@@ -127,7 +132,7 @@ class RouteExecutor:
         # Phase 2: Create sessions (per-route)
         for route in routes:
             try:
-                session_id = await self._provision_route(route, deployment_map)
+                session_id = await self._provision_route(route, deployment_map, session_group_map)
                 if session_id is not None:
                     route_session_ids[route.route_id] = session_id
                 successes.append(route)
@@ -1128,8 +1133,13 @@ class RouteExecutor:
         self,
         route: RouteData,
         deployment_map: Mapping[DeploymentID, DeploymentInfo],
+        session_group_map: Mapping[ReplicaID, SessionGroupID],
     ) -> SessionId | None:
         """Provision a single route by creating a session.
+
+        The session inherits the SessionGroup of the route's replica group
+        (BEP-1064) so the group's placement policy governs every replica
+        of that group.
 
         Returns:
             SessionId: newly created session ID
@@ -1162,6 +1172,7 @@ class RouteExecutor:
                     context=deployment_context,
                     route_id=route.route_id,
                     target_revision=target_revision,
+                    session_group_id=session_group_map.get(route.route_id),
                 )
                 return await self._scheduling_controller.enqueue_session_from_draft(draft)
 
