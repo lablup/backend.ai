@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any, TypeVar, cast
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.engine import CursorResult
 
-from ai.backend.manager.errors.repository import UpsertEmptyResultError
+from ai.backend.common.exception import UnreachableError
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.repositories.base.types import IntegrityErrorCheck
 
@@ -136,7 +136,7 @@ async def execute_upserter[TRow: Base](
     row_data = result.fetchone()
 
     if row_data is None:
-        raise UpsertEmptyResultError
+        raise UnreachableError("ON CONFLICT DO UPDATE returns the inserted or updated row")
 
     created_row: TRow = row_class(**dict(row_data._mapping))
     return UpserterResult(row=created_row)
