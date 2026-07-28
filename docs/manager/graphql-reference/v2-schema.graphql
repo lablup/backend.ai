@@ -7726,7 +7726,7 @@ type Mutation {
   adminUpdateIdleChecker(input: UpdateIdleCheckerInput!): UpdateIdleCheckerPayload!
 
   """
-  Added in 26.8.0. Permanently removes an unbound idle checker (super admin only).
+  Added in 26.8.0. Permanently removes a global idle checker (super admin only).
   """
   adminPurgeIdleChecker(input: PurgeIdleCheckerInput!): PurgeIdleCheckerPayload!
 

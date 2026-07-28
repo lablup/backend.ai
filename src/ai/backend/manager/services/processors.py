@@ -143,6 +143,8 @@ if TYPE_CHECKING:
     )
     from ai.backend.manager.services.group.processors import GroupProcessors
     from ai.backend.manager.services.group.service import GroupService
+    from ai.backend.manager.services.idle_checker.processors import IdleCheckerProcessors
+    from ai.backend.manager.services.idle_checker.service import IdleCheckerService
     from ai.backend.manager.services.image.processors import ImageProcessors
     from ai.backend.manager.services.image.service import ImageService
     from ai.backend.manager.services.keypair_resource_policy.processors import (
@@ -405,6 +407,7 @@ class Services:
     fair_share: FairShareService
     group: GroupService
     user: UserService
+    idle_checker: IdleCheckerService
     image: ImageService
     container_registry: ContainerRegistryService
     vfolder: VFolderService
@@ -475,6 +478,7 @@ class Processors(AbstractProcessorPackage):
     fair_share: FairShareProcessors
     group: GroupProcessors
     user: UserProcessors
+    idle_checker: IdleCheckerProcessors
     image: ImageProcessors
     vfolder: VFolderProcessors
     vfolder_admin: VFolderAdminProcessors
@@ -538,6 +542,7 @@ class Processors(AbstractProcessorPackage):
             *self.fair_share.supported_actions(),
             *self.group.supported_actions(),
             *self.user.supported_actions(),
+            *self.idle_checker.supported_actions(),
             *self.image.supported_actions(),
             *self.container_registry.supported_actions(),
             *self.vfolder.supported_actions(),
