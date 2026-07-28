@@ -17,7 +17,7 @@ existing route sessions join the same group so a running deployment's members
 are visible to the scheduler from the first tick.
 
 Revision ID: 8f3c1d5a2b47
-Revises: e7a41b29c8d3
+Revises: 890490020974
 Create Date: 2026-07-28
 
 """
@@ -29,7 +29,7 @@ from ai.backend.manager.models.base import GUID
 
 # revision identifiers, used by Alembic.
 revision = "8f3c1d5a2b47"
-down_revision = "e7a41b29c8d3"
+down_revision = "890490020974"
 # Part of: NEXT_RELEASE_VERSION
 branch_labels = None
 depends_on = None
