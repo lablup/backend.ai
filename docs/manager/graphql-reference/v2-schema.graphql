@@ -2705,6 +2705,27 @@ type CreateHuggingFaceRegistryPayload {
   huggingfaceRegistry: HuggingFaceRegistry!
 }
 
+"""
+Added in 26.8.0. Binds a global idle checker to a single scope. Requires permission on the given scope (subject to RBAC).
+"""
+input CreateIdleCheckerBindingInput {
+  """Scope the checker is bound to."""
+  scope: IdleCheckerScopeRef!
+
+  """Idle checker to bind."""
+  idleCheckerId: UUID!
+
+  """Whether the binding participates in idle checking."""
+  enabled: Boolean! = true
+}
+
+"""
+Added in 26.8.0. Returns the created idle checker binding. The node contains the server-assigned identifier and timestamps.
+"""
+type CreateIdleCheckerBindingPayload {
+  idleCheckerBinding: IdleCheckerBinding!
+}
+
 """Added in 26.8.0. Defines a reusable global idle checker specification."""
 input CreateIdleCheckerInput {
   """Idle checker name."""
@@ -5386,6 +5407,119 @@ type IdleChecker implements Node {
 }
 
 """
+Added in 26.8.0. Represents one association between a scope and a reusable idle checker. The scope and checker are the binding's immutable identity; the enabled flag controls whether the association participates.
+"""
+type IdleCheckerBinding implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """Kind of the bound scope."""
+  scopeType: IdleCheckerScopeType!
+
+  """Scope identifier, interpreted according to the scope type."""
+  scopeId: String!
+
+  """ID of the bound idle checker."""
+  idleCheckerId: UUID!
+
+  """Whether the binding participates in idle checking."""
+  enabled: Boolean!
+
+  """Creation timestamp."""
+  createdAt: DateTime!
+
+  """Last update timestamp."""
+  updatedAt: DateTime!
+
+  """The bound idle checker definition."""
+  idleChecker: IdleChecker!
+}
+
+"""
+Added in 26.8.0. Provides a paginated collection of idle checker bindings. The count reports all records matching the supplied filter.
+"""
+type IdleCheckerBindingConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [IdleCheckerBindingEdge!]!
+
+  """Total number of matching idle checker bindings."""
+  count: Int!
+}
+
+"""An edge in a connection."""
+type IdleCheckerBindingEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: IdleCheckerBinding!
+}
+
+"""
+Added in 26.8.0. Defines criteria for searching idle checker bindings. Nested logical fields can combine or negate multiple criteria.
+"""
+input IdleCheckerBindingFilter {
+  """Scope type filter."""
+  scopeType: IdleCheckerScopeTypeFilter = null
+
+  """Scope identifier filter."""
+  scopeId: StringFilter = null
+
+  """Bound idle checker ID filter."""
+  idleCheckerId: UUIDFilter = null
+
+  """Filter by the enabled flag."""
+  enabled: Boolean = null
+
+  """Creation timestamp filter."""
+  createdAt: DateTimeFilter = null
+
+  """Update timestamp filter."""
+  updatedAt: DateTimeFilter = null
+
+  """Match all nested filters."""
+  AND: [IdleCheckerBindingFilter!] = null
+
+  """Match any nested filter."""
+  OR: [IdleCheckerBindingFilter!] = null
+
+  """Negate nested filters."""
+  NOT: [IdleCheckerBindingFilter!] = null
+}
+
+"""
+Added in 26.8.0. Defines one ordering rule for an idle checker binding search. Multiple rules are applied in the order they are supplied.
+"""
+input IdleCheckerBindingOrderBy {
+  """Order field."""
+  field: IdleCheckerBindingOrderField!
+
+  """Order direction."""
+  direction: OrderDirection! = ASC
+}
+
+"""
+Added in 26.8.0. Lists fields that can determine idle checker binding result order. Each field is paired with an ascending or descending direction.
+"""
+enum IdleCheckerBindingOrderField {
+  SCOPE_TYPE
+  ENABLED
+  CREATED_AT
+  UPDATED_AT
+}
+
+"""
+Added in 26.8.0. Scope for the scoped idle checker binding query. All items are OR'd; the item list must not be empty.
+"""
+input IdleCheckerBindingScope {
+  """Scope-tagged items (OR across all items)."""
+  items: [IdleCheckerScopeRef!]!
+}
+
+"""
 Added in 26.8.0. Provides a paginated collection of global idle checker definitions. The count reports all records matching the supplied filter.
 """
 type IdleCheckerConnection {
@@ -5460,6 +5594,37 @@ enum IdleCheckerOrderField {
   CHECKER_TYPE
   CREATED_AT
   UPDATED_AT
+}
+
+"""
+Added in 26.8.0. References a single scope as a typed (scopeType, scopeId) pair. The identifier is interpreted according to the scope type.
+"""
+input IdleCheckerScopeRef {
+  """Kind of the scope."""
+  scopeType: IdleCheckerScopeType!
+
+  """Scope identifier, interpreted according to the scope type."""
+  scopeId: String!
+}
+
+"""
+Added in 26.8.0. Identifies the kind of scope an idle checker binding applies to. The value determines how the scope identifier is interpreted.
+"""
+enum IdleCheckerScopeType {
+  DOMAIN
+  PROJECT
+  RESOURCE_GROUP
+}
+
+"""
+Added in 26.8.0. Filters idle checker bindings by their scope type. Use either an exact value or a list of accepted values.
+"""
+input IdleCheckerScopeTypeFilter {
+  """Exact scope type."""
+  equals: IdleCheckerScopeType = null
+
+  """Allowed scope types."""
+  in: [IdleCheckerScopeType!] = null
 }
 
 """
@@ -7731,6 +7896,21 @@ type Mutation {
   adminPurgeIdleChecker(input: PurgeIdleCheckerInput!): PurgeIdleCheckerPayload!
 
   """
+  Added in 26.8.0. Binds a global idle checker to a scope (super admin only).
+  """
+  adminCreateIdleCheckerBinding(input: CreateIdleCheckerBindingInput!): CreateIdleCheckerBindingPayload!
+
+  """
+  Added in 26.8.0. Updates an idle checker binding's options. Requires permission on the binding's scope (subject to RBAC).
+  """
+  updateIdleCheckerBinding(input: UpdateIdleCheckerBindingInput!): UpdateIdleCheckerBindingPayload!
+
+  """
+  Added in 26.8.0. Permanently removes an idle checker binding. Requires permission on the binding's scope (subject to RBAC).
+  """
+  purgeIdleCheckerBinding(input: PurgeIdleCheckerBindingInput!): PurgeIdleCheckerBindingPayload!
+
+  """
   Added in 26.7.0. Register a new app config allow-list entry (super admin only).
   """
   adminCreateAppConfigAllowList(input: CreateAppConfigAllowListInput!): CreateAppConfigAllowListPayload
@@ -9942,6 +10122,19 @@ type PurgeDomainPayload {
   purged: Boolean!
 }
 
+"""Added in 26.8.0. Identifies the idle checker binding to purge."""
+input PurgeIdleCheckerBindingInput {
+  """Idle checker binding ID to purge."""
+  id: UUID!
+}
+
+"""
+Added in 26.8.0. Confirms that an idle checker binding was permanently removed. The returned identifier refers to the deleted binding.
+"""
+type PurgeIdleCheckerBindingPayload {
+  id: UUID!
+}
+
 """Added in 26.8.0. Identifies the idle checker to purge."""
 input PurgeIdleCheckerInput {
   """Idle checker ID to purge."""
@@ -10064,6 +10257,16 @@ type Query {
   Added in 26.8.0. Searches global idle checker definitions with filtering, ordering, and pagination (super admin only).
   """
   adminIdleCheckers(filter: IdleCheckerFilter = null, orderBy: [IdleCheckerOrderBy!] = null, first: Int = null, after: String = null, last: Int = null, before: String = null, limit: Int = null, offset: Int = null): IdleCheckerConnection!
+
+  """
+  Added in 26.8.0. Searches idle checker bindings across all scopes with filtering, ordering, and pagination (super admin only).
+  """
+  adminIdleCheckerBindings(filter: IdleCheckerBindingFilter = null, orderBy: [IdleCheckerBindingOrderBy!] = null, first: Int = null, after: String = null, last: Int = null, before: String = null, limit: Int = null, offset: Int = null): IdleCheckerBindingConnection!
+
+  """
+  Added in 26.8.0. Searches idle checker bindings within the given scopes. All scope items are OR'd, at least one item is required, and each item requires permission on that scope (subject to RBAC).
+  """
+  scopedIdleCheckerBindings(scope: IdleCheckerBindingScope!, filter: IdleCheckerBindingFilter = null, orderBy: [IdleCheckerBindingOrderBy!] = null, first: Int = null, after: String = null, last: Int = null, before: String = null, limit: Int = null, offset: Int = null): IdleCheckerBindingConnection!
 
   """
   Added in 25.14.0. Retrieve a specific artifact by its ID. Returns detailed information about the artifact including its metadata, registry information, and availability status.
@@ -14634,6 +14837,24 @@ input UpdateHuggingFaceRegistryInput {
 type UpdateHuggingFaceRegistryPayload {
   """Updated HuggingFace registry"""
   huggingfaceRegistry: HuggingFaceRegistry!
+}
+
+"""
+Added in 26.8.0. Updates an idle checker binding's enabled state. The bound scope and checker are immutable; rebind by purging and recreating.
+"""
+input UpdateIdleCheckerBindingInput {
+  """Idle checker binding ID to update."""
+  id: UUID!
+
+  """New enabled state."""
+  enabled: Boolean!
+}
+
+"""
+Added in 26.8.0. Returns the idle checker binding after an update is applied. The node reflects the complete persisted state, including unchanged fields.
+"""
+type UpdateIdleCheckerBindingPayload {
+  idleCheckerBinding: IdleCheckerBinding!
 }
 
 """
