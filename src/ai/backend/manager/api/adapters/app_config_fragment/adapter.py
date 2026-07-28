@@ -273,7 +273,7 @@ class AppConfigFragmentAdapter(BaseAdapter):
 
     # --- read fragments by config name (one scope, RBAC-authorized) ---
 
-    async def app_config_fragments_by_names(
+    async def scoped_app_config_fragments_by_names(
         self,
         scope_type: AppConfigScopeType,
         scope_id: AppConfigScopeID | None,

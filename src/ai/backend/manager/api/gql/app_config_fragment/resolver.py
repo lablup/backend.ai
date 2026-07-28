@@ -148,13 +148,13 @@ async def my_upsert_app_config_fragments(
         ),
     )
 )  # type: ignore[misc]
-async def app_config_fragments_by_names(
+async def scoped_app_config_fragments_by_names(
     info: Info[StrawberryGQLContext],
     scope_type: AppConfigScopeType,
     config_names: list[str],
     scope_id: UUID | None = None,
 ) -> list[AppConfigFragmentGQL]:
-    nodes = await info.context.adapters.app_config_fragment.app_config_fragments_by_names(
+    nodes = await info.context.adapters.app_config_fragment.scoped_app_config_fragments_by_names(
         scope_type,
         AppConfigScopeID(scope_id) if scope_id is not None else None,
         config_names,

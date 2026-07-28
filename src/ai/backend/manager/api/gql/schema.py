@@ -35,9 +35,9 @@ from .app_config_definition import (
 from .app_config_fragment import (
     admin_app_config_fragments,
     app_config_fragment,
-    app_config_fragments_by_names,
     my_app_config_fragments_by_names,
     my_upsert_app_config_fragments,
+    scoped_app_config_fragments_by_names,
     scoped_upsert_app_config_fragments,
 )
 from .artifact import (
@@ -540,7 +540,7 @@ class Query:
     admin_idle_checkers = admin_idle_checkers
     admin_idle_checker_bindings = admin_idle_checker_bindings
     scoped_idle_checker_bindings = scoped_idle_checker_bindings
-    app_config_fragments_by_names = app_config_fragments_by_names
+    scoped_app_config_fragments_by_names = scoped_app_config_fragments_by_names
     my_app_config_fragments_by_names = my_app_config_fragments_by_names
     artifact = artifact
     artifacts = artifacts
