@@ -2710,7 +2710,7 @@ Added in 26.8.0. Binds a global idle checker to a single scope. Requires permiss
 """
 input CreateIdleCheckerBindingInput {
   """Scope the checker is bound to."""
-  scope: IdleCheckerBindingScope!
+  scope: IdleCheckerScopeRef!
 
   """Idle checker to bind."""
   idleCheckerId: UUID!
@@ -5512,14 +5512,11 @@ enum IdleCheckerBindingOrderField {
 }
 
 """
-Added in 26.8.0. References a single scope as a typed (scopeType, scopeId) pair. The identifier is interpreted according to the scope type.
+Added in 26.8.0. Scope for the scoped idle checker binding query. All items are OR'd; the item list must not be empty.
 """
 input IdleCheckerBindingScope {
-  """Kind of the scope."""
-  scopeType: IdleCheckerScopeType!
-
-  """Scope identifier, interpreted according to the scope type."""
-  scopeId: String!
+  """Scope-tagged items (OR across all items)."""
+  items: [IdleCheckerScopeRef!]!
 }
 
 """
@@ -5597,6 +5594,17 @@ enum IdleCheckerOrderField {
   CHECKER_TYPE
   CREATED_AT
   UPDATED_AT
+}
+
+"""
+Added in 26.8.0. References a single scope as a typed (scopeType, scopeId) pair. The identifier is interpreted according to the scope type.
+"""
+input IdleCheckerScopeRef {
+  """Kind of the scope."""
+  scopeType: IdleCheckerScopeType!
+
+  """Scope identifier, interpreted according to the scope type."""
+  scopeId: String!
 }
 
 """
@@ -10253,7 +10261,7 @@ type Query {
   """
   Added in 26.8.0. Searches idle checker bindings within the given scopes. All scope items are OR'd, at least one item is required, and each item requires permission on that scope (subject to RBAC).
   """
-  scopedIdleCheckerBindings(scope: [IdleCheckerBindingScope!]!, filter: IdleCheckerBindingFilter = null, orderBy: [IdleCheckerBindingOrderBy!] = null, first: Int = null, after: String = null, last: Int = null, before: String = null, limit: Int = null, offset: Int = null): IdleCheckerBindingConnection!
+  scopedIdleCheckerBindings(scope: IdleCheckerBindingScope!, filter: IdleCheckerBindingFilter = null, orderBy: [IdleCheckerBindingOrderBy!] = null, first: Int = null, after: String = null, last: Int = null, before: String = null, limit: Int = null, offset: Int = null): IdleCheckerBindingConnection!
 
   """
   Added in 25.14.0. Retrieve a specific artifact by its ID. Returns detailed information about the artifact including its metadata, registry information, and availability status.

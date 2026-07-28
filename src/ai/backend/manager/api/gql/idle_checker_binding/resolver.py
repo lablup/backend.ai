@@ -61,7 +61,7 @@ async def admin_idle_checker_bindings(
 )
 async def scoped_idle_checker_bindings(
     info: Info[StrawberryGQLContext],
-    scope: list[IdleCheckerBindingScopeGQL],
+    scope: IdleCheckerBindingScopeGQL,
     filter: IdleCheckerBindingFilterGQL | None = None,
     order_by: list[IdleCheckerBindingOrderByGQL] | None = None,
     first: int | None = None,

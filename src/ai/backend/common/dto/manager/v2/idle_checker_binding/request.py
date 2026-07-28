@@ -19,7 +19,7 @@ from ai.backend.common.dto.manager.v2.idle_checker_binding.types import (
 from ai.backend.common.identifier.idle_checker import IdleCheckerBindingID, IdleCheckerID
 
 
-class IdleCheckerBindingScopeDTO(BaseRequestModel):
+class IdleCheckerScopeRefDTO(BaseRequestModel):
     """A typed (scope_type, scope_id) pair referencing one scope."""
 
     scope_type: IdleCheckerScopeTypeDTO = Field(description="Kind of the scope.")
@@ -29,8 +29,19 @@ class IdleCheckerBindingScopeDTO(BaseRequestModel):
     )
 
 
+class IdleCheckerBindingScopeDTO(BaseRequestModel):
+    """Scope for the scoped idle checker binding query.
+
+    All items are OR'd. Raises an error if the item list is empty.
+    """
+
+    items: list[IdleCheckerScopeRefDTO] = Field(
+        min_length=1, description="Scope-tagged items (OR across all items)."
+    )
+
+
 class CreateIdleCheckerBindingInput(BaseRequestModel):
-    scope: IdleCheckerBindingScopeDTO = Field(description="Scope the checker is bound to.")
+    scope: IdleCheckerScopeRefDTO = Field(description="Scope the checker is bound to.")
     idle_checker_id: IdleCheckerID = Field(description="Idle checker to bind.")
     enabled: bool = Field(
         default=True,
@@ -79,9 +90,7 @@ class SearchIdleCheckerBindingsInput(BaseRequestModel):
 
 
 class ScopedSearchIdleCheckerBindingsInput(BaseRequestModel):
-    scope: list[IdleCheckerBindingScopeDTO] = Field(
-        min_length=1, description="Scope items (OR across all items)."
-    )
+    scope: IdleCheckerBindingScopeDTO = Field(description="Scope (OR across all items).")
     filter: IdleCheckerBindingFilter | None = Field(default=None)
     order: list[IdleCheckerBindingOrder] | None = Field(default=None)
     first: int | None = Field(default=None, ge=1)

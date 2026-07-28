@@ -21,6 +21,7 @@ from ai.backend.common.dto.manager.v2.idle_checker_binding.request import (
 )
 from ai.backend.common.dto.manager.v2.idle_checker_binding.request import (
     IdleCheckerBindingScopeDTO,
+    IdleCheckerScopeRefDTO,
 )
 from ai.backend.common.dto.manager.v2.idle_checker_binding.request import (
     PurgeIdleCheckerBindingInput as PurgeIdleCheckerBindingInputDTO,
@@ -91,12 +92,28 @@ class IdleCheckerScopeTypeGQL(StrEnum):
             "The identifier is interpreted according to the scope type."
         ),
     ),
-    name="IdleCheckerBindingScope",
+    name="IdleCheckerScopeRef",
 )
-class IdleCheckerBindingScopeGQL(PydanticInputMixin[IdleCheckerBindingScopeDTO]):
+class IdleCheckerScopeRefGQL(PydanticInputMixin[IdleCheckerScopeRefDTO]):
     scope_type: IdleCheckerScopeTypeGQL = gql_field(description="Kind of the scope.")
     scope_id: str = gql_field(
         description="Scope identifier, interpreted according to the scope type."
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Scope for the scoped idle checker binding query. "
+            "All items are OR'd; the item list must not be empty."
+        ),
+    ),
+    name="IdleCheckerBindingScope",
+)
+class IdleCheckerBindingScopeGQL(PydanticInputMixin[IdleCheckerBindingScopeDTO]):
+    items: list[IdleCheckerScopeRefGQL] = gql_field(
+        description="Scope-tagged items (OR across all items)."
     )
 
 
@@ -267,7 +284,7 @@ class IdleCheckerBindingOrderByGQL(PydanticInputMixin[IdleCheckerBindingOrderDTO
     name="CreateIdleCheckerBindingInput",
 )
 class CreateIdleCheckerBindingInputGQL(PydanticInputMixin[CreateIdleCheckerBindingInputDTO]):
-    scope: IdleCheckerBindingScopeGQL = gql_field(description="Scope the checker is bound to.")
+    scope: IdleCheckerScopeRefGQL = gql_field(description="Scope the checker is bound to.")
     idle_checker_id: UUID = gql_field(description="Idle checker to bind.")
     enabled: bool = gql_field(
         description="Whether the binding participates in idle checking.",
