@@ -12,7 +12,6 @@ from pydantic import Field
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.dto.manager.pagination import PaginationInfo
 from ai.backend.common.identifier.deployment import DeploymentID
-from ai.backend.common.identifier.replica_group import ReplicaGroupID
 from ai.backend.common.identifier.replica_group_history import ReplicaGroupHistoryID
 
 from .types import SubStepResultInfo
@@ -125,10 +124,14 @@ class RouteHistoryNode(BaseResponseModel):
 
 
 class ReplicaGroupHistoryNode(BaseResponseModel):
-    """Node model representing a replica-group scheduling history record."""
+    """Node model representing a replica-group scheduling history record.
+
+    Carries no ``replica_group_id``: a replica group is an internal implementation
+    detail that is never addressable by clients, so the history is identified by
+    its own ID and attributed to the owning deployment.
+    """
 
     id: ReplicaGroupHistoryID = Field(description="History record ID")
-    replica_group_id: ReplicaGroupID = Field(description="Replica group this history belongs to")
     deployment_id: DeploymentID = Field(description="Deployment the replica group belongs to")
     category: str = Field(description="Handler category: 'lifecycle' or 'scaling'")
     phase: str = Field(description="Scheduling phase")

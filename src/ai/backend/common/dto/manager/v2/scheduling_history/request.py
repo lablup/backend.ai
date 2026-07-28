@@ -214,12 +214,13 @@ class SearchRouteHistoryInput(BaseRequestModel):
 
 
 class ReplicaGroupHistoryFilter(BaseRequestModel):
-    """Filter conditions for replica-group scheduling history search."""
+    """Filter conditions for replica-group scheduling history search.
+
+    Offers no ``replica_group_id`` axis: a replica group is an internal
+    implementation detail, so clients narrow by the owning deployment instead.
+    """
 
     id: UUIDFilter | None = Field(default=None, description="Filter by history record ID")
-    replica_group_id: UUIDFilter | None = Field(
-        default=None, description="Filter by replica group ID"
-    )
     deployment_id: UUIDFilter | None = Field(
         default=None, description="Filter by owning deployment ID"
     )

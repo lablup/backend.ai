@@ -21,6 +21,9 @@ from ai.backend.common.dto.manager.v2.scheduling_history.request import (
 from ai.backend.common.dto.manager.v2.scheduling_history.request import (
     ReplicaGroupHistoryOrder as ReplicaGroupHistoryOrderDTO,
 )
+from ai.backend.common.dto.manager.v2.scheduling_history.response import (
+    ReplicaGroupHistoryNode as ReplicaGroupHistoryNodeDTO,
+)
 from ai.backend.common.dto.manager.v2.scheduling_history.types import (
     OrderDirection as OrderDirectionDTO,
 )
@@ -113,13 +116,24 @@ class TestReplicaGroupHistoryScopeGQL:
             scope.to_pydantic()
 
 
+class TestReplicaGroupIsNotAddressable:
+    """A replica group is internal, so its ID reaches no client-facing surface."""
+
+    def test_gql_surfaces_carry_no_replica_group_id(self) -> None:
+        assert not hasattr(ReplicaGroupHistoryGQL, "replica_group_id")
+        assert not hasattr(ReplicaGroupHistoryFilterGQL, "replica_group_id")
+
+    def test_dto_surfaces_carry_no_replica_group_id(self) -> None:
+        assert "replica_group_id" not in ReplicaGroupHistoryNodeDTO.model_fields
+        assert "replica_group_id" not in ReplicaGroupHistoryFilterDTO.model_fields
+
+    def test_history_rows_are_not_refetchable_by_id(self) -> None:
+        # Reachable only through the owning deployment, so there is no node(id:) path.
+        assert "resolve_nodes" not in vars(ReplicaGroupHistoryGQL)
+
+
 class TestReplicaGroupHistoryFilterGQL:
     """Tests for ``ReplicaGroupHistoryFilterGQL.to_pydantic()``."""
-
-    def test_replica_group_id_is_not_part_of_the_schema(self) -> None:
-        # A replica group is internal, so neither the node nor the filter carries its ID.
-        assert not hasattr(ReplicaGroupHistoryFilterGQL, "replica_group_id")
-        assert not hasattr(ReplicaGroupHistoryGQL, "replica_group_id")
 
     def test_deployment_id_survives_conversion(self, deployment_id: uuid.UUID) -> None:
         f = ReplicaGroupHistoryFilterGQL(deployment_id=UUIDFilter(equals=deployment_id))

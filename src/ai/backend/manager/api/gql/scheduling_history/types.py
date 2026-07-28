@@ -61,7 +61,6 @@ from ai.backend.common.dto.manager.v2.scheduling_history.types import (
     SubStepResultInfo,
 )
 from ai.backend.common.identifier.kernel_scheduling_history import KernelSchedulingHistoryID
-from ai.backend.common.identifier.replica_group_history import ReplicaGroupHistoryID
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
@@ -405,8 +404,14 @@ class DeploymentHistory(PydanticNodeMixin[DeploymentHistoryNode]):
     name="ReplicaGroupHistory",
 )
 class ReplicaGroupHistoryGQL(PydanticNodeMixin[ReplicaGroupHistoryNode]):
-    # A replica group is an internal implementation detail — only its history is
-    # exposed, so ``replica_group_id`` is deliberately kept off the schema.
+    """Replica-group scheduling history record.
+
+    Deliberately implements no ``resolve_nodes``: a replica group is an internal
+    implementation detail reachable only through its owning deployment, so there
+    is no by-ID refetch path for its history. ``Connection`` requires the Node
+    interface, which is the only reason this stays a node type.
+    """
+
     id: NodeID[str]
     deployment_id: ID
     category: ReplicaGroupHistoryCategoryGQL
@@ -435,21 +440,6 @@ class ReplicaGroupHistoryGQL(PydanticNodeMixin[ReplicaGroupHistoryNode]):
         | None
     ):
         return await info.context.data_loaders.deployment_loader.load(UUID(str(self.deployment_id)))
-
-    @classmethod
-    @override
-    async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
-        cls,
-        *,
-        info: Info[StrawberryGQLContext],
-        node_ids: Iterable[str],
-        required: bool = False,
-    ) -> Iterable[Self | None]:
-        # DataLoader returns GQL type instances directly via from_pydantic adapter.
-        results = await info.context.data_loaders.replica_group_history_loader.load_many([
-            ReplicaGroupHistoryID(UUID(nid)) for nid in node_ids
-        ])
-        return cast(list[Self | None], results)
 
 
 @gql_node_type(BackendAIGQLMeta(added_version="26.3.0", description="Route history record."))
@@ -742,8 +732,6 @@ class DeploymentHistoryOrderBy(PydanticInputMixin[DeploymentHistoryOrderDTO]):
     name="ReplicaGroupHistoryFilter",
 )
 class ReplicaGroupHistoryFilterGQL(PydanticInputMixin[ReplicaGroupHistoryFilterDTO]):
-    # ``replica_group_id`` is deliberately absent: a replica group is an internal
-    # implementation detail, so clients neither receive nor filter by its ID.
     id: UUIDFilter | None = None
     deployment_id: UUIDFilter | None = None
     category: list[ReplicaGroupHistoryCategoryGQL] | None = None
