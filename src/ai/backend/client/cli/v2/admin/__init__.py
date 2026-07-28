@@ -54,6 +54,15 @@ def app_config_allow_list() -> None:
     """Admin app config allow-list commands."""
 
 
+@admin.group(
+    cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.admin.idle_checker:idle_checker",
+    name="idle-checker",
+)
+def idle_checker() -> None:
+    """Admin idle checker commands."""
+
+
 @admin.group(cls=LazyGroup, import_name="ai.backend.client.cli.v2.admin.deployment:deployment")
 def deployment() -> None:
     """Admin deployment commands."""

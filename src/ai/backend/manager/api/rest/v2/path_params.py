@@ -98,6 +98,10 @@ class AppConfigFragmentIdPathParam(BaseRequestModel):
     fragment_id: UUID = Field(description="App config fragment UUID")
 
 
+class IdleCheckerIdPathParam(BaseRequestModel):
+    idle_checker_id: UUID = Field(description="Idle checker UUID")
+
+
 class ReplicaIdPathParam(BaseRequestModel):
     replica_id: UUID = Field(description="Replica UUID")
 

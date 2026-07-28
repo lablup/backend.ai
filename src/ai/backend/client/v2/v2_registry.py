@@ -29,6 +29,7 @@ if TYPE_CHECKING:
     from .domains_v2.fair_share import V2FairShareClient
     from .domains_v2.gql import V2GQLClient
     from .domains_v2.huggingface_registry import V2HuggingFaceRegistryClient
+    from .domains_v2.idle_checker import V2IdleCheckerClient
     from .domains_v2.image import V2ImageClient
     from .domains_v2.keypair import V2KeypairClient
     from .domains_v2.login_client_type import V2LoginClientTypeClient
@@ -163,6 +164,12 @@ class V2ClientRegistry:
         from .domains_v2.huggingface_registry import V2HuggingFaceRegistryClient
 
         return V2HuggingFaceRegistryClient(self._client)
+
+    @cached_property
+    def idle_checker(self) -> V2IdleCheckerClient:
+        from .domains_v2.idle_checker import V2IdleCheckerClient
+
+        return V2IdleCheckerClient(self._client)
 
     @cached_property
     def image(self) -> V2ImageClient:

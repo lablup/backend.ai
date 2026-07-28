@@ -54,6 +54,8 @@ def build_v2_routes(
     from .fair_share.registry import register_v2_fair_share_routes
     from .huggingface_registry.handler import V2HuggingFaceRegistryHandler
     from .huggingface_registry.registry import register_v2_huggingface_registry_routes
+    from .idle_checker.handler import V2IdleCheckerHandler
+    from .idle_checker.registry import register_v2_idle_checker_routes
     from .image.handler import V2ImageHandler
     from .image.registry import register_v2_image_routes
     from .keypair.handler import V2KeypairHandler
@@ -142,6 +144,7 @@ def build_v2_routes(
     huggingface_registry_handler = V2HuggingFaceRegistryHandler(
         adapter=adapters.huggingface_registry
     )
+    idle_checker_handler = V2IdleCheckerHandler(adapter=adapters.idle_checker)
     image_handler = V2ImageHandler(adapter=adapters.image)
     keypair_handler = V2KeypairHandler(adapter=adapters.user)
     login_client_type_handler = V2LoginClientTypeHandler(adapter=adapters.login_client_type)
@@ -218,6 +221,7 @@ def build_v2_routes(
     v2_reg.add_subregistry(
         register_v2_huggingface_registry_routes(huggingface_registry_handler, route_deps)
     )
+    v2_reg.add_subregistry(register_v2_idle_checker_routes(idle_checker_handler, route_deps))
     v2_reg.add_subregistry(register_v2_image_routes(image_handler, route_deps))
     v2_reg.add_subregistry(register_v2_keypair_routes(keypair_handler, route_deps))
     v2_reg.add_subregistry(
