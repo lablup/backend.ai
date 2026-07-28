@@ -34,6 +34,7 @@ from ai.backend.common.identifier.resource_group import (
     ResourceGroupName,
 )
 from ai.backend.common.identifier.resource_slot import ResourceSlotName
+from ai.backend.common.identifier.session_group import SessionGroupID
 from ai.backend.common.identifier.user import UserID
 from ai.backend.common.resource.types import TotalResourceData
 from ai.backend.common.types import (
@@ -92,6 +93,7 @@ from ai.backend.manager.models.session import (
     SessionDependencyRow,
     SessionRow,
 )
+from ai.backend.manager.models.session_group.row import SessionGroupRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import (
     ExtendedAsyncSAEngine,
@@ -181,6 +183,7 @@ from ai.backend.manager.views.sokovan.workload import (
     KernelWorkload,
     ResourceRequest,
     SessionDependencyInfo,
+    SessionGroupPolicy,
     SessionPlacement,
     SessionWorkload,
     WorkloadMeta,
@@ -281,6 +284,9 @@ class ScheduleDBSource:
             preemption_candidates = await self._fetch_preemption_candidates(
                 db_sess, resource_group, pending_sessions, observed_at
             )
+            session_group_members = await self._fetch_session_group_members(
+                db_sess, resource_group.meta.id, pending_sessions
+            )
 
             return SchedulingFetch(
                 resource_group=resource_group.meta,
@@ -292,6 +298,7 @@ class ScheduleDBSource:
                 session_dependencies=SessionDependencySnapshot(by_session=session_dependencies),
                 observed_at=observed_at,
                 preemption_candidates=preemption_candidates,
+                session_group_members=session_group_members,
             )
 
     async def _fetch_resource_group_with_slot_inventory(
@@ -412,6 +419,7 @@ class ScheduleDBSource:
                     SessionRow.designated_agent_ids,
                     SessionRow.requested_starts_at,
                     SessionRow.options,
+                    SessionRow.session_group_id,
                 )
             )
             .where(
@@ -461,6 +469,11 @@ class ScheduleDBSource:
                     row.requested
                 )
 
+        group_policies = await self._fetch_session_group_policies(
+            db_sess,
+            {row.session_group_id for row in session_rows.values() if row.session_group_id},
+        )
+
         workloads: list[SessionWorkload] = []
         for session_id, row in session_rows.items():
             kernels = [
@@ -498,6 +511,9 @@ class ScheduleDBSource:
                         designated_agent_ids=[AgentId(a) for a in row.designated_agent_ids]
                         if row.designated_agent_ids is not None
                         else None,
+                        session_group=group_policies.get(row.session_group_id)
+                        if row.session_group_id is not None
+                        else None,
                     ),
                     priority=row.priority,
                     job_priority=row.job_priority,
@@ -508,6 +524,85 @@ class ScheduleDBSource:
             )
 
         return PendingSessions(sessions=workloads)
+
+    async def _fetch_session_group_policies(
+        self,
+        db_sess: SASession,
+        session_group_ids: set[SessionGroupID],
+    ) -> dict[SessionGroupID, SessionGroupPolicy]:
+        """Load the placement policy of the groups the pending sessions belong to.
+
+        A group already soft-deleted is left out: its members place
+        unconstrained, matching the NULL-group default.
+        """
+        if not session_group_ids:
+            return {}
+        rows = (
+            await db_sess.execute(
+                sa.select(
+                    SessionGroupRow.id,
+                    SessionGroupRow.placement_direction,
+                    SessionGroupRow.placement_enforcement,
+                ).where(
+                    SessionGroupRow.id.in_(session_group_ids),
+                    SessionGroupRow.deleted_at.is_(None),
+                )
+            )
+        ).all()
+        return {
+            row.id: SessionGroupPolicy(
+                group_id=row.id,
+                direction=row.placement_direction,
+                enforcement=row.placement_enforcement,
+            )
+            for row in rows
+        }
+
+    async def _fetch_session_group_members(
+        self,
+        db_sess: SASession,
+        resource_group_id: ResourceGroupID,
+        pending_sessions: PendingSessions,
+    ) -> dict[AgentId, dict[SessionGroupID, int]]:
+        """Count the live members each agent holds, per session group.
+
+        Occupancy comes from ``resource_allocations`` (the authority) joined
+        with ``sessions.session_group_id``; a kernel counts while it holds
+        agent resources, so sessions merely reserved (SCHEDULED/PREPARING)
+        count as well. Sessions are counted DISTINCT per agent, so a
+        multi-node session counts once on each agent hosting its kernels.
+        No query runs when this pass has no placement-engaged group.
+        """
+        group_ids = pending_sessions.placement_group_ids
+        if not group_ids:
+            return {}
+
+        ra = ResourceAllocationRow.__table__
+        k = KernelRow.__table__
+        s = SessionRow.__table__
+        stmt = (
+            sa.select(
+                s.c.session_group_id,
+                k.c.agent,
+                sa.func.count(sa.distinct(s.c.id)).label("member_count"),
+            )
+            .select_from(ra.join(k, ra.c.kernel_id == k.c.id).join(s, k.c.session_id == s.c.id))
+            .where(
+                s.c.session_group_id.in_(group_ids),
+                s.c.resource_group_id == resource_group_id,
+                k.c.status.in_(KernelStatus.resource_holding_statuses()),
+                k.c.agent.is_not(None),
+                ra.c.free_at.is_(None),
+            )
+            .group_by(s.c.session_group_id, k.c.agent)
+        )
+        rows = (await db_sess.execute(stmt)).all()
+        members_by_agent: dict[AgentId, dict[SessionGroupID, int]] = defaultdict(dict)
+        for row in rows:
+            members_by_agent[AgentId(row.agent)][SessionGroupID(row.session_group_id)] = (
+                row.member_count
+            )
+        return dict(members_by_agent)
 
     async def _fetch_agents(
         self, db_sess: SASession, resource_group_id: ResourceGroupID

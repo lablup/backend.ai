@@ -102,6 +102,7 @@ def _make_workload(
             ],
             agent_selection_policy=AgentSelectionPolicy.STRICT,
             designated_agent_ids=None,
+            session_group=None,
         ),
         priority=priority,
         job_priority=0,

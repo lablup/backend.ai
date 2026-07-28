@@ -21,6 +21,7 @@ from dateutil.tz import tzutc
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.identifier.session_group import SessionGroupID
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
@@ -60,6 +61,7 @@ from ai.backend.manager.models.resource_slot.row import ResourceSlotTypeRow
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.scheduling_history.row import SessionSchedulingHistoryRow
 from ai.backend.manager.models.session import SessionDependencyRow, SessionRow
+from ai.backend.manager.models.session_group.row import SessionGroupRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.views.sokovan.allocation import (
@@ -86,6 +88,7 @@ _SCHEDULER_ROWS: list[type] = [
     AgentRow,
     ContainerRegistryRow,
     ImageRow,
+    SessionGroupRow,
     SessionRow,
     KernelRow,
     ResourceSlotTypeRow,
@@ -402,6 +405,7 @@ async def create_pending_session_with_kernels(
     session_status: SessionStatus = SessionStatus.PENDING,
     kernel_status: KernelStatus = KernelStatus.PENDING,
     assign_agents: bool = False,
+    session_group_id: SessionGroupID | None = None,
 ) -> tuple[SessionId, list[KernelId]]:
     """Create a session with one kernel per agent assignment.
 
@@ -444,6 +448,7 @@ async def create_pending_session_with_kernels(
                 requested_slots=ResourceSlot({"cpu": total_cpu, "mem": total_mem}),
                 created_at=now,
                 starts_at=now if session_status == SessionStatus.RUNNING else None,
+                session_group_id=session_group_id,
                 images=["python:3.8"],
                 vfolder_mounts=[],
                 environ={},
