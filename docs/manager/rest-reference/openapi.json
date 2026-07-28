@@ -10433,6 +10433,459 @@
         "title": "DeleteHuggingFaceRegistryInput",
         "type": "object"
       },
+      "IdleCheckerInputTypeDTO": {
+        "enum": [
+          "session_lifetime"
+        ],
+        "title": "IdleCheckerInputTypeDTO",
+        "type": "string"
+      },
+      "IdleCheckerSpecInputDTO": {
+        "additionalProperties": false,
+        "properties": {
+          "session_lifetime": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SessionLifetimeSpecInputDTO"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          }
+        },
+        "title": "IdleCheckerSpecInputDTO",
+        "type": "object"
+      },
+      "SessionLifetimeSpecInputDTO": {
+        "properties": {
+          "max_lifetime_seconds": {
+            "minimum": 1,
+            "title": "Max Lifetime Seconds",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "max_lifetime_seconds"
+        ],
+        "title": "SessionLifetimeSpecInputDTO",
+        "type": "object"
+      },
+      "SessionTypes": {
+        "enum": [
+          "interactive",
+          "batch",
+          "inference",
+          "system"
+        ],
+        "title": "SessionTypes",
+        "type": "string"
+      },
+      "CreateIdleCheckerInput": {
+        "properties": {
+          "name": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Idle checker description.",
+            "title": "Description"
+          },
+          "checker_type": {
+            "$ref": "#/components/schemas/IdleCheckerInputTypeDTO"
+          },
+          "target_session_types": {
+            "items": {
+              "$ref": "#/components/schemas/SessionTypes"
+            },
+            "minItems": 1,
+            "title": "Target Session Types",
+            "type": "array"
+          },
+          "initial_grace_period_seconds": {
+            "default": 0,
+            "minimum": 0,
+            "title": "Initial Grace Period Seconds",
+            "type": "integer"
+          },
+          "checker_spec": {
+            "$ref": "#/components/schemas/IdleCheckerSpecInputDTO"
+          }
+        },
+        "required": [
+          "name",
+          "checker_type",
+          "target_session_types",
+          "checker_spec"
+        ],
+        "title": "CreateIdleCheckerInput",
+        "type": "object"
+      },
+      "CheckerTypeFilter": {
+        "properties": {
+          "equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/IdleCheckerTypeDTO"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/IdleCheckerTypeDTO"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "In"
+          }
+        },
+        "title": "CheckerTypeFilter",
+        "type": "object"
+      },
+      "IdleCheckerFilter": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "checker_type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CheckerTypeFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DateTimeFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DateTimeFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "AND": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/IdleCheckerFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "And"
+          },
+          "OR": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/IdleCheckerFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Or"
+          },
+          "NOT": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/IdleCheckerFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Not"
+          }
+        },
+        "title": "IdleCheckerFilter",
+        "type": "object"
+      },
+      "IdleCheckerOrder": {
+        "properties": {
+          "field": {
+            "$ref": "#/components/schemas/IdleCheckerOrderField"
+          },
+          "direction": {
+            "$ref": "#/components/schemas/OrderDirection",
+            "default": "ASC"
+          }
+        },
+        "required": [
+          "field"
+        ],
+        "title": "IdleCheckerOrder",
+        "type": "object"
+      },
+      "IdleCheckerOrderField": {
+        "enum": [
+          "name",
+          "checker_type",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "IdleCheckerOrderField",
+        "type": "string"
+      },
+      "IdleCheckerTypeDTO": {
+        "enum": [
+          "session_lifetime"
+        ],
+        "title": "IdleCheckerTypeDTO",
+        "type": "string"
+      },
+      "SearchIdleCheckersInput": {
+        "properties": {
+          "filter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/IdleCheckerFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "order": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/IdleCheckerOrder"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Order"
+          },
+          "first": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "First"
+          },
+          "after": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "After"
+          },
+          "last": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Last"
+          },
+          "before": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Before"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Limit"
+          },
+          "offset": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Offset"
+          }
+        },
+        "title": "SearchIdleCheckersInput",
+        "type": "object"
+      },
+      "UpdateIdleCheckerInput": {
+        "properties": {
+          "id": {
+            "description": "Idle checker ID to update.",
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Name"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "$ref": "#/components/schemas/Sentinel"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": 1,
+            "description": "Updated description. Omit to leave unchanged or pass null to clear.",
+            "title": "Description"
+          },
+          "target_session_types": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/SessionTypes"
+                },
+                "minItems": 1,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Target Session Types"
+          },
+          "initial_grace_period_seconds": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Initial Grace Period Seconds"
+          },
+          "checker_spec": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/IdleCheckerSpecInputDTO"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "UpdateIdleCheckerInput",
+        "type": "object"
+      },
       "ImageAliasNestedFilterInputDTO": {
         "description": "Nested filter for image aliases within an image.",
         "properties": {
@@ -36545,16 +36998,6 @@
         "title": "TokenRequestModel",
         "type": "object"
       },
-      "SessionTypes": {
-        "enum": [
-          "interactive",
-          "batch",
-          "inference",
-          "system"
-        ],
-        "title": "SessionTypes",
-        "type": "string"
-      },
       "CreateFromParamsRequest": {
         "description": "POST ``/`` and POST ``/_/create``",
         "properties": {
@@ -43839,6 +44282,129 @@
         },
         "parameters": [],
         "description": "Delete a HuggingFace registry.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/idle-checkers/": {
+      "post": {
+        "operationId": "v2/idle-checkers.admin_create",
+        "tags": [
+          "v2/idle-checkers"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateIdleCheckerInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/idle-checkers/search": {
+      "post": {
+        "operationId": "v2/idle-checkers.admin_search",
+        "tags": [
+          "v2/idle-checkers"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchIdleCheckersInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/idle-checkers/{idle_checker_id}": {
+      "patch": {
+        "operationId": "v2/idle-checkers.admin_update",
+        "tags": [
+          "v2/idle-checkers"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateIdleCheckerInput"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "idle_checker_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n"
+      },
+      "delete": {
+        "operationId": "v2/idle-checkers.admin_purge",
+        "tags": [
+          "v2/idle-checkers"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "idle_checker_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/v2/images/search": {
