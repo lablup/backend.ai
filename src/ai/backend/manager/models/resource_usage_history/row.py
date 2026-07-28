@@ -441,16 +441,15 @@ class UserUsageBucketRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
 
 
 class UsageBucketEntryRow(Base):  # type: ignore[misc]
-    """Per-slot normalized entry for usage bucket aggregation (Phase 3).
+    """Per-slot normalized entry for a usage bucket.
 
-    Stores amount and duration separately instead of pre-multiplied resource-seconds,
-    eliminating overflow risk for large memory values.
-    The product ``amount * duration_seconds`` is computed at SQL query time
-    where PostgreSQL auto-extends NUMERIC precision.
+    ``resource_usage`` holds resource-seconds (occupied slots integrated over the
+    time held), summed per slice.  Unconstrained NUMERIC on purpose: a domain-level
+    daily mem bucket reaches ~1e18 byte-seconds, past any fixed precision.
 
-    One entry per (bucket_id, slot_name). ``bucket_type`` is a discriminator
-    indicating which parent table (domain/project/user_usage_buckets) owns
-    this entry.  No FK constraint because references span three tables.
+    One entry per (bucket_id, slot_name). ``bucket_type`` discriminates which parent
+    table (domain/project/user_usage_buckets) owns it; no FK because references
+    span three tables.
     """
 
     __tablename__ = "usage_bucket_entries"
@@ -458,10 +457,7 @@ class UsageBucketEntryRow(Base):  # type: ignore[misc]
     bucket_id: Mapped[uuid.UUID] = mapped_column("bucket_id", GUID(), nullable=False)
     bucket_type: Mapped[str] = mapped_column("bucket_type", sa.String(length=16), nullable=False)
     slot_name: Mapped[str] = mapped_column("slot_name", sa.String(length=64), nullable=False)
-    amount: Mapped[Decimal] = mapped_column(
-        "amount", sa.Numeric(precision=24, scale=6), nullable=False
-    )
-    duration_seconds: Mapped[int] = mapped_column("duration_seconds", sa.Integer(), nullable=False)
+    resource_usage: Mapped[Decimal] = mapped_column("resource_usage", sa.Numeric(), nullable=False)
     capacity: Mapped[Decimal] = mapped_column(
         "capacity", sa.Numeric(precision=24, scale=6), nullable=False
     )
