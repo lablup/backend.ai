@@ -279,7 +279,7 @@ class AppConfigFragmentAdapter(BaseAdapter):
 
     async def scoped_app_config_fragments_by_names(
         self, input: ScopedAppConfigFragmentsByNamesInput
-    ) -> list[AppConfigFragmentNode]:
+    ) -> list[AppConfigFragmentNode | None]:
         """The fragments written at one scope for the given config names.
 
         RBAC-authorized at that scope, so a caller reads only a scope they may read. Meant for
@@ -294,7 +294,7 @@ class AppConfigFragmentAdapter(BaseAdapter):
 
     async def my_app_config_fragments_by_names(
         self, input: MyAppConfigFragmentsByNamesInput
-    ) -> list[AppConfigFragmentNode]:
+    ) -> list[AppConfigFragmentNode | None]:
         """The current user's own ``user``-scope fragments for the given ``config_names``.
 
         Calls ``current_user()`` internally — the caller does not pass a scope.
@@ -311,7 +311,7 @@ class AppConfigFragmentAdapter(BaseAdapter):
 
     async def _fragments_by_names(
         self, scope: AppConfigFragmentSearchScope, config_names: list[str]
-    ) -> list[AppConfigFragmentNode]:
+    ) -> list[AppConfigFragmentNode | None]:
         if not config_names:
             return []
         # A scope holds at most one fragment per config name, so the result is bounded by the
@@ -325,13 +325,14 @@ class AppConfigFragmentAdapter(BaseAdapter):
         action_result = await self._processors.app_config_fragment.scoped_search.wait_for_complete(
             ScopedSearchAppConfigFragmentAction(scope=scope, querier=querier)
         )
-        # Answer in the order the names were asked for; a name with no fragment at this scope
-        # is left out rather than held as a gap.
+        # Answer at the position each name was asked for, so a name with no fragment at this
+        # scope holds its place as a null.
         fragment_map = {fragment.config_name: fragment for fragment in action_result.data}
         return [
             self._fragment_to_node(fragment_map[config_name])
-            for config_name in config_names
             if config_name in fragment_map
+            else None
+            for config_name in config_names
         ]
 
     # --- admin fragment search ---

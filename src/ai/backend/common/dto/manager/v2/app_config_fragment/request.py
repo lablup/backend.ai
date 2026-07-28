@@ -66,8 +66,8 @@ class ScopedAppConfigFragmentsByNamesInput(BaseRequestModel):
     config_names: list[str] = Field(
         min_length=1,
         description=(
-            "Config names whose fragments to read. Answered in this order, a repeated name "
-            "repeated in the answer; a name with no fragment at the scope is left out."
+            "Config names whose fragments to read. Answered position by position, null "
+            "where the scope holds no fragment for that name."
         ),
     )
 
@@ -78,8 +78,8 @@ class MyAppConfigFragmentsByNamesInput(BaseRequestModel):
     config_names: list[str] = Field(
         min_length=1,
         description=(
-            "Config names whose fragments to read. Answered in this order, a repeated name "
-            "repeated in the answer; a name with no fragment at the scope is left out."
+            "Config names whose fragments to read. Answered position by position, null "
+            "where the scope holds no fragment for that name."
         ),
     )
 

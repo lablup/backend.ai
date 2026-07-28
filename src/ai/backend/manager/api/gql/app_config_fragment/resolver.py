@@ -145,8 +145,8 @@ async def my_upsert_app_config_fragments(
         added_version=NEXT_RELEASE_VERSION,
         description=(
             "Read the fragments written at one scope for the given config names — the current "
-            "values, to inspect before editing them. Answered in the order the names were "
-            "given, leaving out a name with no fragment there. RBAC-authorized at that scope."
+            "values, to inspect before editing them. Answered position by position, null "
+            "where the scope holds no fragment for that name. RBAC-authorized at that scope."
         ),
     )
 )  # type: ignore[misc]
@@ -154,27 +154,31 @@ async def scoped_app_config_fragments_by_names(
     info: Info[StrawberryGQLContext],
     scope: AppConfigScopeRefGQL,
     config_names: list[str],
-) -> list[AppConfigFragmentGQL]:
+) -> list[AppConfigFragmentGQL | None]:
     nodes = await info.context.adapters.app_config_fragment.scoped_app_config_fragments_by_names(
         ScopedAppConfigFragmentsByNamesInput(scope=scope.to_pydantic(), config_names=config_names)
     )
-    return [AppConfigFragmentGQL.from_pydantic(node) for node in nodes]
+    return [
+        AppConfigFragmentGQL.from_pydantic(node) if node is not None else None for node in nodes
+    ]
 
 
 @gql_root_field(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
         description=(
-            "Read the current user's own user-scope fragments for the given config names, in "
-            "the order the names were given, leaving out a name with no fragment there."
+            "Read the current user's own user-scope fragments for the given config names, "
+            "position by position, null where the scope holds no fragment for that name."
         ),
     )
 )  # type: ignore[misc]
 async def my_app_config_fragments_by_names(
     info: Info[StrawberryGQLContext],
     config_names: list[str],
-) -> list[AppConfigFragmentGQL]:
+) -> list[AppConfigFragmentGQL | None]:
     nodes = await info.context.adapters.app_config_fragment.my_app_config_fragments_by_names(
         MyAppConfigFragmentsByNamesInput(config_names=config_names)
     )
-    return [AppConfigFragmentGQL.from_pydantic(node) for node in nodes]
+    return [
+        AppConfigFragmentGQL.from_pydantic(node) if node is not None else None for node in nodes
+    ]
