@@ -1,11 +1,7 @@
 import logging
-from collections import defaultdict
 
-from ai.backend.common.identifier.prometheus_query_preset import PrometheusQueryPresetID
-from ai.backend.common.types import SessionId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.repositories.metric.repository import MetricRepository
-from ai.backend.manager.repositories.metric.types import SessionUtilizationMetricQuery
 
 from .actions.container import (
     ContainerMetricAction,
@@ -14,11 +10,6 @@ from .actions.container import (
     ContainerMetricMetadataActionResult,
 )
 from .actions.live_stat import ContainerLiveStatAction, ContainerLiveStatActionResult
-from .actions.session_utilization import (
-    QuerySessionUtilizationAction,
-    QuerySessionUtilizationActionResult,
-    SessionUtilizationObservation,
-)
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -31,38 +22,6 @@ class MetricService:
         metric_repository: MetricRepository,
     ) -> None:
         self._metric_repository = metric_repository
-
-    async def query_session_utilization(
-        self,
-        action: QuerySessionUtilizationAction,
-    ) -> QuerySessionUtilizationActionResult:
-        session_ids_by_preset: defaultdict[PrometheusQueryPresetID, dict[SessionId, None]] = (
-            defaultdict(dict)
-        )
-        for query in action.queries:
-            for session_id in query.session_ids:
-                session_ids_by_preset[query.preset_id][session_id] = None
-
-        observations_by_preset: dict[
-            PrometheusQueryPresetID,
-            dict[SessionId, SessionUtilizationObservation],
-        ] = {}
-        for preset_id, session_ids in session_ids_by_preset.items():
-            result = await self._metric_repository.query_session_utilization_metrics(
-                SessionUtilizationMetricQuery(
-                    preset_id=preset_id,
-                    session_ids=list(session_ids),
-                    evaluation_time=action.evaluation_time,
-                )
-            )
-            observations_by_preset[preset_id] = {
-                session_id: SessionUtilizationObservation(
-                    preset_id=preset_id,
-                    value=value,
-                )
-                for session_id, value in result.by_session.items()
-            }
-        return QuerySessionUtilizationActionResult(observations_by_preset=observations_by_preset)
 
     async def query_container_metric_metadata(
         self,

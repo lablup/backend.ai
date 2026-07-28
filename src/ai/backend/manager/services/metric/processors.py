@@ -14,10 +14,6 @@ from ai.backend.manager.services.metric.actions.live_stat import (
     ContainerLiveStatAction,
     ContainerLiveStatActionResult,
 )
-from ai.backend.manager.services.metric.actions.session_utilization import (
-    QuerySessionUtilizationAction,
-    QuerySessionUtilizationActionResult,
-)
 from ai.backend.manager.services.metric.service import MetricService
 
 
@@ -28,10 +24,6 @@ class MetricProcessors(AbstractProcessorPackage):
     ]
     query_container_live_stat: ActionProcessor[
         ContainerLiveStatAction, ContainerLiveStatActionResult
-    ]
-    query_session_utilization: ActionProcessor[
-        QuerySessionUtilizationAction,
-        QuerySessionUtilizationActionResult,
     ]
 
     def __init__(
@@ -47,9 +39,6 @@ class MetricProcessors(AbstractProcessorPackage):
         self.query_container_live_stat = ActionProcessor(
             service.query_container_live_stats, action_monitors
         )
-        self.query_session_utilization = ActionProcessor(
-            service.query_session_utilization, action_monitors
-        )
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -57,5 +46,4 @@ class MetricProcessors(AbstractProcessorPackage):
             ContainerMetricAction.spec(),
             ContainerMetricMetadataAction.spec(),
             ContainerLiveStatAction.spec(),
-            QuerySessionUtilizationAction.spec(),
         ]

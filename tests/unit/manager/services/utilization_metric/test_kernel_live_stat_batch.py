@@ -20,11 +20,10 @@ class TestKernelLiveStatBatch:
         return Mock()
 
     @pytest.fixture()
-    def metric_service(
-        self,
-        mock_metric_repository: Mock,
-    ) -> MetricService:
-        return MetricService(metric_repository=mock_metric_repository)
+    def metric_service(self, mock_metric_repository: Mock) -> MetricService:
+        return MetricService(
+            metric_repository=mock_metric_repository,
+        )
 
     async def test_passes_raw_result_through(
         self,
