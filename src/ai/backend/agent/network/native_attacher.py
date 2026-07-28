@@ -29,6 +29,7 @@ from ai.backend.agent.errors.network import (
     StaticAddressUnavailable,
     SubnetAddressPoolExhausted,
 )
+from ai.backend.agent.network.journal_io import atomic_exclusive_write
 from ai.backend.logging import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -112,7 +113,8 @@ class HostLocalIpam:
             return {}
         owners: dict[str, str] = {}
         for f in sorted(d.iterdir(), key=lambda p: p.name):
-            if f.is_file():
+            # Skip dot-prefixed temp files a crashed atomic write may have left (see journal_io).
+            if f.is_file() and not f.name.startswith("."):
                 owners.setdefault(f.read_text().strip(), f.name)
         return owners
 
@@ -126,8 +128,10 @@ class HostLocalIpam:
     def _write_claim(self, d: Path, ip: str, owner: str) -> None:
         d.mkdir(parents=True, exist_ok=True)
         try:
-            with (d / ip).open("x") as f:
-                f.write(owner)
+            # Atomic + exclusive: a crash mid-write must never leave an empty claim (which replay
+            # would read as an address owned by "" -- a leak), and an existing file still signals a
+            # second writer.
+            atomic_exclusive_write(d / ip, owner)
         except FileExistsError as e:
             raise NetworkStateStoreConflict(
                 f"address {ip} exists on disk but is free in memory (store: {d}) — "

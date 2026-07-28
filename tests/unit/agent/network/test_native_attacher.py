@@ -176,6 +176,19 @@ class TestHostLocalIpamJournal:
         newcomer = await restarted.allocate("172.30.1.0/24", "cidB", "eth0", reserve=["172.30.1.1"])
         assert newcomer != held  # the survivor's address is not handed out again
 
+    async def test_replay_ignores_a_leftover_atomic_write_temp(self, tmp_path: Path) -> None:
+        # A crash between an atomic write's link and its temp-unlink can leave a dot-prefixed temp
+        # (journal_io). Replay must not read it as a claim owned by its contents, which would both
+        # invent a phantom owner and mark a bogus "address" used.
+        await HostLocalIpam(tmp_path).allocate(
+            "172.30.1.0/24", "cid", "eth0", reserve=["172.30.1.1"]
+        )
+        subnet_dir = tmp_path / "172.30.1.0_24"
+        (subnet_dir / ".tmp-172.30.1.9.999").write_text("stale/eth0")  # leftover temp
+
+        owners = await HostLocalIpam(tmp_path).owners("172.30.1.0/24")  # fresh replay from disk
+        assert owners == {"cid/eth0": "172.30.1.2"}  # the temp is not read as a claim
+
     async def test_release_survives_a_restart(self, tmp_path: Path) -> None:
         held = await HostLocalIpam(tmp_path).allocate(
             "172.30.1.0/24", "cidA", "eth0", reserve=["172.30.1.1"]

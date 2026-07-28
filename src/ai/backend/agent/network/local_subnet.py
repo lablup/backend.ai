@@ -51,6 +51,7 @@ from ai.backend.agent.errors.network import (
     LocalSubnetPoolExhausted,
     NetworkStateStoreConflict,
 )
+from ai.backend.agent.network.journal_io import atomic_exclusive_write, atomic_write
 
 _DEFAULT_LOCAL_SUBNET_STATE_DIR = Path("/var/lib/backend.ai/net-local-subnet")
 
@@ -190,7 +191,9 @@ class LocalSubnetAllocator:
 
     def _write_layout(self) -> None:
         self._dir.mkdir(parents=True, exist_ok=True)
-        (self._dir / _LAYOUT_FILE).write_text(self._layout.serialize())
+        # Atomic overwrite: a crash mid-write must never leave an empty/truncated marker, which
+        # _read_layout would reject as an "unreadable layout" and fail block allocation node-wide.
+        atomic_write(self._dir / _LAYOUT_FILE, self._layout.serialize())
 
     def _replay(self) -> dict[str, int]:
         """Rebuild session -> index from the journal. A session recorded twice (only possible in a
@@ -240,8 +243,10 @@ class LocalSubnetAllocator:
         self._dir.mkdir(parents=True, exist_ok=True)
         self._write_layout()  # the first claim is what marks a fresh store
         try:
-            with (self._dir / str(index)).open("x") as f:
-                f.write(session_id)
+            # Atomic + exclusive: a crash mid-write must never leave an empty claim (replay would
+            # read a block owned by "" -- a leaked /26), and an existing file still signals a second
+            # writer.
+            atomic_exclusive_write(self._dir / str(index), session_id)
         except FileExistsError as e:
             raise NetworkStateStoreConflict(
                 f"local-subnet index {index} exists on disk but is free in memory "
