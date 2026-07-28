@@ -17,7 +17,9 @@ from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
     BulkPurgeAppConfigFragmentInput,
     BulkUpdateAppConfigFragmentInput,
     CreateAppConfigFragmentInput,
+    MyAppConfigFragmentsByNamesInput,
     MyUpsertAppConfigFragmentsInput,
+    ScopedAppConfigFragmentsByNamesInput,
     ScopedSearchAppConfigFragmentInput,
     ScopedUpsertAppConfigFragmentsInput,
     UpdateAppConfigFragmentInput,
@@ -274,22 +276,20 @@ class AppConfigFragmentAdapter(BaseAdapter):
     # --- read fragments by config name (one scope, RBAC-authorized) ---
 
     async def scoped_app_config_fragments_by_names(
-        self,
-        scope_type: AppConfigScopeType,
-        scope_id: AppConfigScopeID | None,
-        config_names: list[str],
+        self, input: ScopedAppConfigFragmentsByNamesInput
     ) -> list[AppConfigFragmentNode]:
-        """The fragments written at one scope for the given ``config_names``.
+        """The fragments written at one scope for the given config names.
 
         RBAC-authorized at that scope, so a caller reads only a scope they may read. Meant for
         fetching the current fragment values before editing them.
         """
         return await self._fragments_by_names(
-            AppConfigFragmentSearchScope(scope_type=scope_type, scope_id=scope_id), config_names
+            AppConfigFragmentSearchScope(scope_type=input.scope_type, scope_id=input.scope_id),
+            input.config_names,
         )
 
     async def my_app_config_fragments_by_names(
-        self, config_names: list[str]
+        self, input: MyAppConfigFragmentsByNamesInput
     ) -> list[AppConfigFragmentNode]:
         """The current user's own ``user``-scope fragments for the given ``config_names``.
 
@@ -302,7 +302,7 @@ class AppConfigFragmentAdapter(BaseAdapter):
             AppConfigFragmentSearchScope(
                 scope_type=AppConfigScopeType.USER, scope_id=AppConfigScopeID(me.user_id)
             ),
-            config_names,
+            input.config_names,
         )
 
     async def _fragments_by_names(
