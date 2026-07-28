@@ -16280,7 +16280,6 @@ type ReplicaGroupHistory implements Node
 {
   """The Globally Unique ID of this object"""
   id: ID!
-  replicaGroupId: ID!
   deploymentId: ID!
   category: ReplicaGroupHistoryCategory!
   phase: String!
@@ -16336,7 +16335,6 @@ input ReplicaGroupHistoryFilter
   @join__type(graph: STRAWBERRY)
 {
   id: UUIDFilter = null
-  replicaGroupId: UUIDFilter = null
   deploymentId: UUIDFilter = null
   category: [ReplicaGroupHistoryCategory!] = null
   phase: StringFilter = null

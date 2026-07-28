@@ -932,6 +932,14 @@ class SchedulingHistoryAdapter(BaseAdapter):
             )
             if condition is not None:
                 conditions.append(condition)
+        if filter.deployment_id is not None:
+            condition = self.convert_uuid_filter(
+                filter.deployment_id,
+                equals_factory=ReplicaGroupHistoryConditions.by_deployment_id_filter,
+                in_factory=ReplicaGroupHistoryConditions.by_deployment_id_in,
+            )
+            if condition is not None:
+                conditions.append(condition)
         if filter.category:
             conditions.append(
                 ReplicaGroupHistoryConditions.by_categories([

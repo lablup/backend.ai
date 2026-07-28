@@ -11248,7 +11248,6 @@ input ReplicaFilter {
 type ReplicaGroupHistory implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
-  replicaGroupId: ID!
   deploymentId: ID!
   category: ReplicaGroupHistoryCategory!
   phase: String!
@@ -11296,7 +11295,6 @@ type ReplicaGroupHistoryEdge {
 """Added in 26.8.0. Filter for replica-group scheduling history"""
 input ReplicaGroupHistoryFilter {
   id: UUIDFilter = null
-  replicaGroupId: UUIDFilter = null
   deploymentId: UUIDFilter = null
   category: [ReplicaGroupHistoryCategory!] = null
   phase: StringFilter = null

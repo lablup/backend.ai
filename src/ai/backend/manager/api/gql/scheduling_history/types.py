@@ -405,8 +405,9 @@ class DeploymentHistory(PydanticNodeMixin[DeploymentHistoryNode]):
     name="ReplicaGroupHistory",
 )
 class ReplicaGroupHistoryGQL(PydanticNodeMixin[ReplicaGroupHistoryNode]):
+    # A replica group is an internal implementation detail — only its history is
+    # exposed, so ``replica_group_id`` is deliberately kept off the schema.
     id: NodeID[str]
-    replica_group_id: ID
     deployment_id: ID
     category: ReplicaGroupHistoryCategoryGQL
     phase: str
@@ -741,8 +742,9 @@ class DeploymentHistoryOrderBy(PydanticInputMixin[DeploymentHistoryOrderDTO]):
     name="ReplicaGroupHistoryFilter",
 )
 class ReplicaGroupHistoryFilterGQL(PydanticInputMixin[ReplicaGroupHistoryFilterDTO]):
+    # ``replica_group_id`` is deliberately absent: a replica group is an internal
+    # implementation detail, so clients neither receive nor filter by its ID.
     id: UUIDFilter | None = None
-    replica_group_id: UUIDFilter | None = None
     deployment_id: UUIDFilter | None = None
     category: list[ReplicaGroupHistoryCategoryGQL] | None = None
     phase: StringFilter | None = None

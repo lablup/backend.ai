@@ -30,11 +30,12 @@ from ai.backend.common.dto.manager.v2.scheduling_history.types import (
     ReplicaGroupHistoryScopeDTO,
 )
 from ai.backend.manager.api.gql.base import OrderDirection as OrderDirectionGQL
-from ai.backend.manager.api.gql.base import StringFilter
+from ai.backend.manager.api.gql.base import StringFilter, UUIDFilter
 from ai.backend.manager.api.gql.rbac.types.scope import UUIDScopeGQL
 from ai.backend.manager.api.gql.scheduling_history.types import (
     ReplicaGroupHistoryCategoryGQL,
     ReplicaGroupHistoryFilterGQL,
+    ReplicaGroupHistoryGQL,
     ReplicaGroupHistoryOrderByGQL,
     ReplicaGroupHistoryOrderFieldGQL,
     ReplicaGroupHistoryScopeGQL,
@@ -114,6 +115,18 @@ class TestReplicaGroupHistoryScopeGQL:
 
 class TestReplicaGroupHistoryFilterGQL:
     """Tests for ``ReplicaGroupHistoryFilterGQL.to_pydantic()``."""
+
+    def test_replica_group_id_is_not_part_of_the_schema(self) -> None:
+        # A replica group is internal, so neither the node nor the filter carries its ID.
+        assert not hasattr(ReplicaGroupHistoryFilterGQL, "replica_group_id")
+        assert not hasattr(ReplicaGroupHistoryGQL, "replica_group_id")
+
+    def test_deployment_id_survives_conversion(self, deployment_id: uuid.UUID) -> None:
+        f = ReplicaGroupHistoryFilterGQL(deployment_id=UUIDFilter(equals=deployment_id))
+        dto = f.to_pydantic()
+        assert isinstance(dto, ReplicaGroupHistoryFilterDTO)
+        assert dto.deployment_id is not None
+        assert dto.deployment_id.equals == deployment_id
 
     @pytest.mark.parametrize(
         "category",
