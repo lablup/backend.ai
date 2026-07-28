@@ -4065,6 +4065,38 @@ type CreateHuggingFaceRegistryPayload
   huggingfaceRegistry: HuggingFaceRegistry!
 }
 
+"""Added in 26.8.0. Defines a reusable global idle checker specification."""
+input CreateIdleCheckerInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Idle checker name."""
+  name: String!
+
+  """Idle checker description."""
+  description: String = null
+
+  """Checker implementation type."""
+  checkerType: IdleCheckerInputType!
+
+  """Target session types."""
+  targetSessionTypes: [SessionTypes!]!
+
+  """Initial grace period in seconds."""
+  initialGracePeriodSeconds: Int! = 0
+
+  """Typed checker specification."""
+  checkerSpec: IdleCheckerSpecInput!
+}
+
+"""
+Added in 26.8.0. Returns the created global idle checker definition. The node contains the server-assigned identifier and timestamps.
+"""
+type CreateIdleCheckerPayload
+  @join__type(graph: STRAWBERRY)
+{
+  idleChecker: IdleChecker!
+}
+
 type CreateKeyPair
   @join__type(graph: GRAPHENE)
 {
@@ -7885,6 +7917,172 @@ type HuggingFaceRegistryEdge
 
   """The item at the end of the edge"""
   node: HuggingFaceRegistry!
+}
+
+"""
+Added in 26.8.0. Represents a reusable idle checker definition independent of its bindings. It includes target session types, a grace period, and typed checker settings.
+"""
+type IdleChecker implements Node
+  @join__implements(graph: STRAWBERRY, interface: "Node")
+  @join__type(graph: STRAWBERRY)
+{
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """Idle checker name."""
+  name: String!
+
+  """Optional description."""
+  description: String
+
+  """Checker implementation type."""
+  checkerType: IdleCheckerType!
+
+  """Session types evaluated by this checker."""
+  targetSessionTypes: [SessionTypes!]!
+
+  """Initial grace period in seconds."""
+  initialGracePeriodSeconds: Int!
+
+  """Typed idle checker specification."""
+  spec: IdleCheckerSpec!
+
+  """Creation timestamp."""
+  createdAt: DateTime!
+
+  """Last update timestamp."""
+  updatedAt: DateTime!
+}
+
+"""
+Added in 26.8.0. Provides a paginated collection of global idle checker definitions. The count reports all records matching the supplied filter.
+"""
+type IdleCheckerConnection
+  @join__type(graph: STRAWBERRY)
+{
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [IdleCheckerEdge!]!
+
+  """Total number of matching idle checkers."""
+  count: Int!
+}
+
+"""An edge in a connection."""
+type IdleCheckerEdge
+  @join__type(graph: STRAWBERRY)
+{
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: IdleChecker!
+}
+
+"""
+Added in 26.8.0. Defines criteria for searching registered idle checkers. Nested logical fields can combine or negate multiple criteria.
+"""
+input IdleCheckerFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """Name filter."""
+  name: StringFilter = null
+
+  """Checker type filter."""
+  checkerType: IdleCheckerTypeFilter = null
+
+  """Creation timestamp filter."""
+  createdAt: DateTimeFilter = null
+
+  """Update timestamp filter."""
+  updatedAt: DateTimeFilter = null
+
+  """Match all nested filters."""
+  AND: [IdleCheckerFilter!] = null
+
+  """Match any nested filter."""
+  OR: [IdleCheckerFilter!] = null
+
+  """Negate nested filters."""
+  NOT: [IdleCheckerFilter!] = null
+}
+
+"""
+Added in 26.8.0. Lists checker implementations accepted by create and update operations. Only implementations fully supported by this API version are exposed.
+"""
+enum IdleCheckerInputType
+  @join__type(graph: STRAWBERRY)
+{
+  SESSION_LIFETIME @join__enumValue(graph: STRAWBERRY)
+}
+
+"""
+Added in 26.8.0. Defines one ordering rule for an idle checker search. Multiple rules are applied in the order they are supplied.
+"""
+input IdleCheckerOrderBy
+  @join__type(graph: STRAWBERRY)
+{
+  """Order field."""
+  field: IdleCheckerOrderField!
+
+  """Order direction."""
+  direction: OrderDirection! = ASC
+}
+
+"""
+Added in 26.8.0. Lists fields that can determine idle checker result order. Each field is paired with an ascending or descending direction.
+"""
+enum IdleCheckerOrderField
+  @join__type(graph: STRAWBERRY)
+{
+  NAME @join__enumValue(graph: STRAWBERRY)
+  CHECKER_TYPE @join__enumValue(graph: STRAWBERRY)
+  CREATED_AT @join__enumValue(graph: STRAWBERRY)
+  UPDATED_AT @join__enumValue(graph: STRAWBERRY)
+}
+
+"""
+Added in 26.8.0. Contains the settings used by an idle checker implementation. This API version exposes session-lifetime settings only.
+"""
+type IdleCheckerSpec
+  @join__type(graph: STRAWBERRY)
+{
+  type: IdleCheckerType!
+  sessionLifetime: SessionLifetimeIdleCheckerSpec!
+}
+
+"""
+Added in 26.8.0. Supplies the implementation-specific settings for an idle checker. Exactly one checker-specific field must be provided.
+"""
+input IdleCheckerSpecInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Session-lifetime checker settings."""
+  sessionLifetime: SessionLifetimeIdleCheckerSpecInput
+}
+
+"""
+Added in 26.8.0. Identifies the implementation used to evaluate an idle condition. The value determines how the checker specification is interpreted.
+"""
+enum IdleCheckerType
+  @join__type(graph: STRAWBERRY)
+{
+  SESSION_LIFETIME @join__enumValue(graph: STRAWBERRY)
+}
+
+"""
+Added in 26.8.0. Filters idle checkers by their implementation type. Use either an exact value or a list of accepted values.
+"""
+input IdleCheckerTypeFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """Exact checker type."""
+  equals: IdleCheckerType = null
+
+  """Allowed checker types."""
+  in: [IdleCheckerType!] = null
 }
 
 type Image
@@ -11727,6 +11925,21 @@ type Mutation
   adminUpdateAgentResourceGroup(input: UpdateAgentResourceGroupInput!): UpdateAgentResourceGroupPayload @join__field(graph: STRAWBERRY)
 
   """
+  Added in 26.8.0. Creates a global idle checker definition (super admin only).
+  """
+  adminCreateIdleChecker(input: CreateIdleCheckerInput!): CreateIdleCheckerPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.8.0. Updates a global idle checker definition (super admin only).
+  """
+  adminUpdateIdleChecker(input: UpdateIdleCheckerInput!): UpdateIdleCheckerPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.8.0. Permanently removes an unbound idle checker (super admin only).
+  """
+  adminPurgeIdleChecker(input: PurgeIdleCheckerInput!): PurgeIdleCheckerPayload! @join__field(graph: STRAWBERRY)
+
+  """
   Added in 26.7.0. Register a new app config allow-list entry (super admin only).
   """
   adminCreateAppConfigAllowList(input: CreateAppConfigAllowListInput!): CreateAppConfigAllowListPayload @join__field(graph: STRAWBERRY)
@@ -14281,6 +14494,23 @@ type PurgeGroup
   msg: String
 }
 
+"""Added in 26.8.0. Identifies the idle checker to purge."""
+input PurgeIdleCheckerInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Idle checker ID to purge."""
+  id: UUID!
+}
+
+"""
+Added in 26.8.0. Confirms that an idle checker was permanently removed. The returned identifier refers to the deleted checker.
+"""
+type PurgeIdleCheckerPayload
+  @join__type(graph: STRAWBERRY)
+{
+  id: UUID!
+}
+
 """Added in 25.4.0."""
 type PurgeImageById
   @join__type(graph: GRAPHENE)
@@ -14848,6 +15078,11 @@ type Query
   Added in 26.8.0. Search app config fragments across every scope with filtering, ordering, and pagination (super admin only).
   """
   adminAppConfigFragments(filter: AppConfigFragmentFilter = null, orderBy: [AppConfigFragmentOrderBy!] = null, first: Int = null, after: String = null, last: Int = null, before: String = null, limit: Int = null, offset: Int = null): AppConfigFragmentConnection @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.8.0. Searches global idle checker definitions with filtering, ordering, and pagination (super admin only).
+  """
+  adminIdleCheckers(filter: IdleCheckerFilter = null, orderBy: [IdleCheckerOrderBy!] = null, first: Int = null, after: String = null, last: Int = null, before: String = null, limit: Int = null, offset: Int = null): IdleCheckerConnection! @join__field(graph: STRAWBERRY)
 
   """
   Added in 25.14.0. Retrieve a specific artifact by its ID. Returns detailed information about the artifact including its metadata, registry information, and availability status.
@@ -18918,6 +19153,25 @@ enum SessionFailurePolicy
   TOLERANT @join__enumValue(graph: STRAWBERRY)
 }
 
+"""
+Added in 26.8.0. Configures the maximum lifetime of a running session. The checker expires a session after the configured duration is reached.
+"""
+type SessionLifetimeIdleCheckerSpec
+  @join__type(graph: STRAWBERRY)
+{
+  maxLifetimeSeconds: Int!
+}
+
+"""
+Added in 26.8.0. Supplies settings for a session-lifetime checker. The lifetime is measured in seconds from the session's effective start.
+"""
+input SessionLifetimeIdleCheckerSpecInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Maximum session lifetime in seconds."""
+  maxLifetimeSeconds: Int!
+}
+
 """Added in 26.4.2. A virtual folder mount specification."""
 input SessionMountItemInput
   @join__type(graph: STRAWBERRY)
@@ -20237,6 +20491,42 @@ type UpdateHuggingFaceRegistryPayload
 {
   """Updated HuggingFace registry"""
   huggingfaceRegistry: HuggingFaceRegistry!
+}
+
+"""
+Added in 26.8.0. Applies a partial update to an existing idle checker. Only fields supplied by the caller are replaced.
+"""
+input UpdateIdleCheckerInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Idle checker ID to update."""
+  id: UUID!
+
+  """New name."""
+  name: String
+
+  """
+  New description; omit it to keep the current value or pass null to clear.
+  """
+  description: String
+
+  """New target session types."""
+  targetSessionTypes: [SessionTypes!]
+
+  """New initial grace period."""
+  initialGracePeriodSeconds: Int
+
+  """New checker specification."""
+  checkerSpec: IdleCheckerSpecInput
+}
+
+"""
+Added in 26.8.0. Returns the idle checker after an update is applied. The node reflects the complete persisted state, including unchanged fields.
+"""
+type UpdateIdleCheckerPayload
+  @join__type(graph: STRAWBERRY)
+{
+  idleChecker: IdleChecker!
 }
 
 """
