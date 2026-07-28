@@ -158,14 +158,14 @@ def _aggregate_kernel_records(
 
     kernel_usage_records is the largest table and cannot be indexed for the
     per-day rebuild (the day is a functional expression on ``period_start``), so it
-    is scanned a single time here.  The three bucket levels roll up from ``_rebuilt``
+    is scanned a single time here.  The three bucket levels roll up from ``_daily_kernel_usage``
     (roughly entities * days * slots rows) instead of re-scanning the raw records.
-    ``_rebuilt`` holds the finest grain that carries every level's key columns.
+    ``_daily_kernel_usage`` holds the finest grain that carries every level's key columns.
     """
     conn.execute(
         sa.text(
             """
-            CREATE TEMP TABLE _rebuilt ON COMMIT DROP AS
+            CREATE TEMP TABLE _daily_kernel_usage ON COMMIT DROP AS
             SELECT user_uuid, project_id, domain_name, resource_group_id,
                    (period_start AT TIME ZONE 'UTC')::date AS period_date,
                    kv.key AS slot_name,
@@ -177,7 +177,7 @@ def _aggregate_kernel_records(
         ),
         {"rebuild_from": rebuild_from, "rebuild_to": rebuild_to},
     )
-    conn.execute(sa.text("ANALYZE _rebuilt"))
+    conn.execute(sa.text("ANALYZE _daily_kernel_usage"))
 
 
 def _sync_jsonb_mirror(
@@ -233,21 +233,21 @@ def _sync_jsonb_mirror(
 
 
 def _rebuild_user_buckets(conn: sa.engine.Connection, rebuild_from: date, rebuild_to: date) -> None:
-    """Roll _rebuilt up to user buckets (sum over domain), then sync the JSONB mirror."""
+    """Roll _daily_kernel_usage up to user buckets (sum over domain), then sync the JSONB mirror."""
     conn.execute(
         sa.text(
             """
             INSERT INTO usage_bucket_entries
                 (bucket_id, bucket_type, slot_name, resource_usage, capacity)
-            SELECT user_usage_buckets.id, 'user', _rebuilt.slot_name,
-                   SUM(_rebuilt.resource_usage), 0
+            SELECT user_usage_buckets.id, 'user', _daily_kernel_usage.slot_name,
+                   SUM(_daily_kernel_usage.resource_usage), 0
             FROM user_usage_buckets
-            JOIN _rebuilt
-              ON _rebuilt.user_uuid = user_usage_buckets.user_uuid
-             AND _rebuilt.project_id = user_usage_buckets.project_id
-             AND _rebuilt.resource_group_id = user_usage_buckets.resource_group_id
-             AND _rebuilt.period_date = user_usage_buckets.period_start
-            GROUP BY user_usage_buckets.id, _rebuilt.slot_name
+            JOIN _daily_kernel_usage
+              ON _daily_kernel_usage.user_uuid = user_usage_buckets.user_uuid
+             AND _daily_kernel_usage.project_id = user_usage_buckets.project_id
+             AND _daily_kernel_usage.resource_group_id = user_usage_buckets.resource_group_id
+             AND _daily_kernel_usage.period_date = user_usage_buckets.period_start
+            GROUP BY user_usage_buckets.id, _daily_kernel_usage.slot_name
             """
         )
     )
@@ -257,20 +257,20 @@ def _rebuild_user_buckets(conn: sa.engine.Connection, rebuild_from: date, rebuil
 def _rebuild_project_buckets(
     conn: sa.engine.Connection, rebuild_from: date, rebuild_to: date
 ) -> None:
-    """Roll _rebuilt up to project buckets (sum over user), then sync the JSONB mirror."""
+    """Roll _daily_kernel_usage up to project buckets (sum over user), then sync the JSONB mirror."""
     conn.execute(
         sa.text(
             """
             INSERT INTO usage_bucket_entries
                 (bucket_id, bucket_type, slot_name, resource_usage, capacity)
-            SELECT project_usage_buckets.id, 'project', _rebuilt.slot_name,
-                   SUM(_rebuilt.resource_usage), 0
+            SELECT project_usage_buckets.id, 'project', _daily_kernel_usage.slot_name,
+                   SUM(_daily_kernel_usage.resource_usage), 0
             FROM project_usage_buckets
-            JOIN _rebuilt
-              ON _rebuilt.project_id = project_usage_buckets.project_id
-             AND _rebuilt.resource_group_id = project_usage_buckets.resource_group_id
-             AND _rebuilt.period_date = project_usage_buckets.period_start
-            GROUP BY project_usage_buckets.id, _rebuilt.slot_name
+            JOIN _daily_kernel_usage
+              ON _daily_kernel_usage.project_id = project_usage_buckets.project_id
+             AND _daily_kernel_usage.resource_group_id = project_usage_buckets.resource_group_id
+             AND _daily_kernel_usage.period_date = project_usage_buckets.period_start
+            GROUP BY project_usage_buckets.id, _daily_kernel_usage.slot_name
             """
         )
     )
@@ -280,20 +280,20 @@ def _rebuild_project_buckets(
 def _rebuild_domain_buckets(
     conn: sa.engine.Connection, rebuild_from: date, rebuild_to: date
 ) -> None:
-    """Roll _rebuilt up to domain buckets (sum over user and project), then sync JSONB."""
+    """Roll _daily_kernel_usage up to domain buckets (sum over user and project), then sync JSONB."""
     conn.execute(
         sa.text(
             """
             INSERT INTO usage_bucket_entries
                 (bucket_id, bucket_type, slot_name, resource_usage, capacity)
-            SELECT domain_usage_buckets.id, 'domain', _rebuilt.slot_name,
-                   SUM(_rebuilt.resource_usage), 0
+            SELECT domain_usage_buckets.id, 'domain', _daily_kernel_usage.slot_name,
+                   SUM(_daily_kernel_usage.resource_usage), 0
             FROM domain_usage_buckets
-            JOIN _rebuilt
-              ON _rebuilt.domain_name = domain_usage_buckets.domain_name
-             AND _rebuilt.resource_group_id = domain_usage_buckets.resource_group_id
-             AND _rebuilt.period_date = domain_usage_buckets.period_start
-            GROUP BY domain_usage_buckets.id, _rebuilt.slot_name
+            JOIN _daily_kernel_usage
+              ON _daily_kernel_usage.domain_name = domain_usage_buckets.domain_name
+             AND _daily_kernel_usage.resource_group_id = domain_usage_buckets.resource_group_id
+             AND _daily_kernel_usage.period_date = domain_usage_buckets.period_start
+            GROUP BY domain_usage_buckets.id, _daily_kernel_usage.slot_name
             """
         )
     )
