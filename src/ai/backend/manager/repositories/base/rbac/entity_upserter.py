@@ -20,13 +20,13 @@ class ConflictTarget:
 
     Attributes:
         columns: Columns of the index to infer.
-        partial_index_predicate: The index's predicate when it is partial (e.g.
-            ``scope_id IS NULL``); it has to match the index definition for the inference to
-            succeed. ``None`` for a plain unique constraint.
+        index_predicate: The WHERE of a partial index (e.g. ``scope_id IS NULL``), which has
+            to match the index definition for the inference to succeed. ``None`` for a plain
+            unique constraint. This is not a filter on the update — it only picks the index.
     """
 
     columns: list[str]
-    partial_index_predicate: sa.ColumnElement[bool] | None = None
+    index_predicate: sa.ColumnElement[bool] | None = None
 
 
 @dataclass

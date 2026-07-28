@@ -269,7 +269,7 @@ class RBACWriteOps(WriteOps):
             .values(spec.build_insert_values())
             .on_conflict_do_update(
                 index_elements=upserter.conflict_target.columns,
-                index_where=upserter.conflict_target.partial_index_predicate,
+                index_where=upserter.conflict_target.index_predicate,
                 set_=spec.build_update_values(),
             )
             .returning(*table.columns)

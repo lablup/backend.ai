@@ -371,7 +371,7 @@ class TestUpsertScoped:
                 scope_ref=None,
                 conflict_target=ConflictTarget(
                     columns=["name", "scope_type"],
-                    partial_index_predicate=UpsertScopedTestRow.scope_id.is_(None),
+                    index_predicate=UpsertScopedTestRow.scope_id.is_(None),
                 ),
                 additional_scope_refs=[],
                 expected_bindings=[],
@@ -442,7 +442,7 @@ class TestUpsertScoped:
                 scope_ref=None,
                 conflict_target=ConflictTarget(
                     columns=["name", "scope_type"],
-                    partial_index_predicate=UpsertScopedTestRow.scope_id.is_(None),
+                    index_predicate=UpsertScopedTestRow.scope_id.is_(None),
                 ),
                 additional_scope_refs=[],
                 expected_bindings=[],
