@@ -11,7 +11,6 @@ from ai.backend.manager.repositories.base import (
     BatchQuerier,
     Creator,
     Purger,
-    Querier,
     Updater,
 )
 from ai.backend.manager.repositories.idle_checker.db_source.db_source import IdleCheckerDBSource
@@ -40,8 +39,7 @@ class IdleCheckerRepository:
         return await self._db_source.create(creator)
 
     async def update(self, updater: Updater[IdleCheckerRow]) -> IdleCheckerData:
-        querier = Querier(row_class=IdleCheckerRow, pk_value=updater.pk_value)
-        return await self._db_source.update(querier, updater)
+        return await self._db_source.update(updater)
 
     async def purge(self, purger: Purger[IdleCheckerRow]) -> IdleCheckerData:
         return await self._db_source.purge(purger)

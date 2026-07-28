@@ -83,15 +83,13 @@ class IdleCheckerDBSource:
             checker = (await w.create(creator)).row
             return checker.to_data()
 
-    async def update(
-        self,
-        querier: Querier[IdleCheckerRow],
-        updater: Updater[IdleCheckerRow],
-    ) -> IdleCheckerData:
+    async def update(self, updater: Updater[IdleCheckerRow]) -> IdleCheckerData:
         async with self._ops.write_ops() as w:
-            checker_result = await w.query(querier)
+            checker_result = await w.query(
+                Querier(row_class=IdleCheckerRow, pk_value=updater.pk_value)
+            )
             if checker_result is None:
-                raise IdleCheckerNotFound(str(querier.pk_value))
+                raise IdleCheckerNotFound(str(updater.pk_value))
             spec = cast(IdleCheckerUpdaterSpec, updater.spec).spec.optional_value()
             if spec is not None and spec.type != checker_result.row.checker_type:
                 raise IdleCheckerTypeChangeNotAllowed(
@@ -99,7 +97,7 @@ class IdleCheckerDBSource:
                 )
             result = await w.update(updater)
             if result is None:
-                raise IdleCheckerNotFound(str(querier.pk_value))
+                raise IdleCheckerNotFound(str(updater.pk_value))
             return result.row.to_data()
 
     async def purge(self, purger: Purger[IdleCheckerRow]) -> IdleCheckerData:
