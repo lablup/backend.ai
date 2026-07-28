@@ -7,7 +7,6 @@ from typing import cast
 
 import sqlalchemy as sa
 
-from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
@@ -116,23 +115,24 @@ class AppConfigFragmentDBSource:
             results: list[AppConfigFragmentData] = []
             for spec in specs:
                 element_type = spec.scope_type.to_rbac_element_type()
-                if spec.scope_type is AppConfigScopeType.PUBLIC:
+                if element_type is None:
+                    # A public fragment is GLOBAL: it binds to no scope, and its NULL scope_id
+                    # sits outside the plain unique constraint, so the conflict target is the
+                    # partial index guarding it.
+                    scope_ref = None
                     conflict_target = ConflictTarget(
                         columns=["config_name", "scope_type"],
                         index_predicate=AppConfigFragmentRow.scope_id.is_(None),
                     )
                 else:
+                    scope_ref = RBACElementRef(element_type, str(spec.scope_id))
                     conflict_target = ConflictTarget(
                         columns=["config_name", "scope_type", "scope_id"]
                     )
                 upserter = RBACEntityUpserter(
                     spec=spec,
                     element_type=RBACElementType.APP_CONFIG_FRAGMENT,
-                    scope_ref=(
-                        RBACElementRef(element_type, str(spec.scope_id))
-                        if element_type is not None
-                        else None
-                    ),
+                    scope_ref=scope_ref,
                     conflict_target=conflict_target,
                 )
                 results.append((await w.upsert_scoped(upserter)).row.to_data())
