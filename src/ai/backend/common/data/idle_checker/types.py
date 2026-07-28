@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import enum
+from decimal import Decimal
 from typing import Self
 
 from pydantic import Field, model_validator
 
+from ai.backend.common.identifier.prometheus_query_preset import PrometheusQueryPresetID
 from ai.backend.common.types import BackendAISchema
 
 
@@ -22,6 +24,19 @@ class IdleCheckPhase(enum.StrEnum):
     ACTIVE = "active"
     IDLE = "idle"
     IDLE_EXPIRED = "idle_expired"
+
+
+class UtilizationThresholdEntry(BackendAISchema):
+    """One preset-backed session utilization threshold."""
+
+    preset_id: PrometheusQueryPresetID = Field(
+        description="Prometheus query preset used to evaluate utilization."
+    )
+    threshold: Decimal = Field(
+        ge=0,
+        le=100,
+        description="Underutilization threshold as a percentage.",
+    )
 
 
 class SessionLifetimeSpec(BackendAISchema):
@@ -49,10 +64,17 @@ class NetworkTimeoutSpec(BackendAISchema):
 
 
 class UtilizationSpec(BackendAISchema):
-    """Config for ``CheckerType.UTILIZATION``.
+    """Config for ``CheckerType.UTILIZATION``."""
 
-    Concrete fields land with the checker-logic stories.
-    """
+    max_underutilized_duration_seconds: int = Field(
+        ge=1,
+        description=(
+            "Maximum duration that the configured utilization conditions may remain satisfied."
+        ),
+    )
+    threshold: UtilizationThresholdEntry = Field(
+        description="Preset-backed utilization threshold evaluated for the session.",
+    )
 
 
 class IdleCheckerSpec(BackendAISchema):
