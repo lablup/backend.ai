@@ -2,7 +2,7 @@ import json
 import logging
 import secrets
 from collections.abc import Mapping, Sequence
-from typing import Any, cast, override
+from typing import Any, cast
 
 import aiohttp_cors
 import sqlalchemy as sa
