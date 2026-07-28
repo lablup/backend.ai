@@ -2715,8 +2715,8 @@ input CreateIdleCheckerBindingInput {
   """Idle checker to bind."""
   idleCheckerId: UUID!
 
-  """Binding options; omit to use the defaults."""
-  options: IdleCheckerBindingOptionsInput = null
+  """Whether the binding participates in idle checking."""
+  enabled: Boolean! = true
 }
 
 """
@@ -5407,7 +5407,7 @@ type IdleChecker implements Node {
 }
 
 """
-Added in 26.8.0. Represents one association between a scope and a reusable idle checker. The scope and checker are the binding's immutable identity; binding-level options control how the association participates.
+Added in 26.8.0. Represents one association between a scope and a reusable idle checker. The scope and checker are the binding's immutable identity; the enabled flag controls whether the association participates.
 """
 type IdleCheckerBinding implements Node {
   """The Globally Unique ID of this object"""
@@ -5416,14 +5416,14 @@ type IdleCheckerBinding implements Node {
   """Kind of the bound scope."""
   scopeType: IdleCheckerScopeType!
 
-  """Scope identifier: the domain, project, or resource group ID."""
-  scopeId: UUID!
+  """Scope identifier, interpreted according to the scope type."""
+  scopeId: String!
 
   """ID of the bound idle checker."""
   idleCheckerId: UUID!
 
-  """Binding-level options."""
-  options: IdleCheckerBindingOptions!
+  """Whether the binding participates in idle checking."""
+  enabled: Boolean!
 
   """Creation timestamp."""
   createdAt: DateTime!
@@ -5466,7 +5466,7 @@ input IdleCheckerBindingFilter {
   scopeType: IdleCheckerScopeTypeFilter = null
 
   """Scope identifier filter."""
-  scopeId: UUIDFilter = null
+  scopeId: StringFilter = null
 
   """Bound idle checker ID filter."""
   idleCheckerId: UUIDFilter = null
@@ -5491,23 +5491,6 @@ input IdleCheckerBindingFilter {
 }
 
 """
-Added in 26.8.0. Contains the binding-level options of an idle checker binding.
-"""
-type IdleCheckerBindingOptions {
-  enabled: Boolean!
-}
-
-"""
-Added in 26.8.0. Supplies binding-level options. Omitted fields use their defaults on create or keep the current value on update.
-"""
-input IdleCheckerBindingOptionsInput {
-  """
-  Whether the binding participates in idle checking. Omit to use the default (true) on create or to keep the current value on update.
-  """
-  enabled: Boolean = null
-}
-
-"""
 Added in 26.8.0. Defines one ordering rule for an idle checker binding search. Multiple rules are applied in the order they are supplied.
 """
 input IdleCheckerBindingOrderBy {
@@ -5529,17 +5512,14 @@ enum IdleCheckerBindingOrderField {
 }
 
 """
-Added in 26.8.0. Identifies a single scope an idle checker binding applies to. Exactly one scope field must be provided.
+Added in 26.8.0. References a single scope as a typed (scopeType, scopeId) pair. The identifier is interpreted according to the scope type.
 """
-input IdleCheckerBindingScope @oneOf {
-  """Domain ID."""
-  domain: UUID
+input IdleCheckerBindingScope {
+  """Kind of the scope."""
+  scopeType: IdleCheckerScopeType!
 
-  """Project ID."""
-  project: UUID
-
-  """Resource group ID."""
-  resourceGroup: UUID
+  """Scope identifier, interpreted according to the scope type."""
+  scopeId: String!
 }
 
 """
@@ -7903,9 +7883,9 @@ type Mutation {
   adminPurgeIdleChecker(input: PurgeIdleCheckerInput!): PurgeIdleCheckerPayload!
 
   """
-  Added in 26.8.0. Binds a global idle checker to a scope. Requires permission on the scope given in the input (subject to RBAC).
+  Added in 26.8.0. Binds a global idle checker to a scope (super admin only).
   """
-  createIdleCheckerBinding(input: CreateIdleCheckerBindingInput!): CreateIdleCheckerBindingPayload!
+  adminCreateIdleCheckerBinding(input: CreateIdleCheckerBindingInput!): CreateIdleCheckerBindingPayload!
 
   """
   Added in 26.8.0. Updates an idle checker binding's options. Requires permission on the binding's scope (subject to RBAC).
@@ -10271,9 +10251,9 @@ type Query {
   adminIdleCheckerBindings(filter: IdleCheckerBindingFilter = null, orderBy: [IdleCheckerBindingOrderBy!] = null, first: Int = null, after: String = null, last: Int = null, before: String = null, limit: Int = null, offset: Int = null): IdleCheckerBindingConnection!
 
   """
-  Added in 26.8.0. Searches idle checker bindings within a single scope. Requires permission on the given scope (subject to RBAC).
+  Added in 26.8.0. Searches idle checker bindings within the given scopes. All scope items are OR'd, at least one item is required, and each item requires permission on that scope (subject to RBAC).
   """
-  scopedIdleCheckerBindings(scope: IdleCheckerBindingScope!, filter: IdleCheckerBindingFilter = null, orderBy: [IdleCheckerBindingOrderBy!] = null, first: Int = null, after: String = null, last: Int = null, before: String = null, limit: Int = null, offset: Int = null): IdleCheckerBindingConnection!
+  scopedIdleCheckerBindings(scope: [IdleCheckerBindingScope!]!, filter: IdleCheckerBindingFilter = null, orderBy: [IdleCheckerBindingOrderBy!] = null, first: Int = null, after: String = null, last: Int = null, before: String = null, limit: Int = null, offset: Int = null): IdleCheckerBindingConnection!
 
   """
   Added in 25.14.0. Retrieve a specific artifact by its ID. Returns detailed information about the artifact including its metadata, registry information, and availability status.
@@ -14740,14 +14720,14 @@ type UpdateHuggingFaceRegistryPayload {
 }
 
 """
-Added in 26.8.0. Replaces an idle checker binding's options. The bound scope and checker are immutable; rebind by purging and recreating.
+Added in 26.8.0. Updates an idle checker binding's enabled state. The bound scope and checker are immutable; rebind by purging and recreating.
 """
 input UpdateIdleCheckerBindingInput {
   """Idle checker binding ID to update."""
   id: UUID!
 
-  """New binding options."""
-  options: IdleCheckerBindingOptionsInput!
+  """New enabled state."""
+  enabled: Boolean!
 }
 
 """

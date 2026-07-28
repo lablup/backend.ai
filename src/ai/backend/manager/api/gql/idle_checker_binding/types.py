@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Annotated, Any, Self, override
 from uuid import UUID
 
 import strawberry
-from strawberry import UNSET, Info
+from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.dto.manager.v2.idle_checker_binding.request import (
@@ -17,11 +17,10 @@ from ai.backend.common.dto.manager.v2.idle_checker_binding.request import (
     IdleCheckerBindingFilter as IdleCheckerBindingFilterDTO,
 )
 from ai.backend.common.dto.manager.v2.idle_checker_binding.request import (
-    IdleCheckerBindingOptionsInputDTO,
-    IdleCheckerBindingScopeDTO,
+    IdleCheckerBindingOrder as IdleCheckerBindingOrderDTO,
 )
 from ai.backend.common.dto.manager.v2.idle_checker_binding.request import (
-    IdleCheckerBindingOrder as IdleCheckerBindingOrderDTO,
+    IdleCheckerBindingScopeDTO,
 )
 from ai.backend.common.dto.manager.v2.idle_checker_binding.request import (
     PurgeIdleCheckerBindingInput as PurgeIdleCheckerBindingInputDTO,
@@ -34,7 +33,6 @@ from ai.backend.common.dto.manager.v2.idle_checker_binding.response import (
 )
 from ai.backend.common.dto.manager.v2.idle_checker_binding.response import (
     IdleCheckerBindingNode,
-    IdleCheckerBindingOptionsInfo,
 )
 from ai.backend.common.dto.manager.v2.idle_checker_binding.response import (
     PurgeIdleCheckerBindingPayload as PurgeIdleCheckerBindingPayloadDTO,
@@ -49,6 +47,7 @@ from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
     OrderDirection,
+    StringFilter,
     UUIDFilter,
 )
 from ai.backend.manager.api.gql.decorators import (
@@ -88,50 +87,16 @@ class IdleCheckerScopeTypeGQL(StrEnum):
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
         description=(
-            "Identifies a single scope an idle checker binding applies to. "
-            "Exactly one scope field must be provided."
+            "References a single scope as a typed (scopeType, scopeId) pair. "
+            "The identifier is interpreted according to the scope type."
         ),
     ),
     name="IdleCheckerBindingScope",
-    one_of=True,
 )
 class IdleCheckerBindingScopeGQL(PydanticInputMixin[IdleCheckerBindingScopeDTO]):
-    domain: UUID | None = gql_field(description="Domain ID.", default=UNSET)
-    project: UUID | None = gql_field(description="Project ID.", default=UNSET)
-    resource_group: UUID | None = gql_field(description="Resource group ID.", default=UNSET)
-
-
-@gql_pydantic_input(
-    BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
-        description=(
-            "Supplies binding-level options. "
-            "Omitted fields use their defaults on create or keep the current value on update."
-        ),
-    ),
-    name="IdleCheckerBindingOptionsInput",
-)
-class IdleCheckerBindingOptionsInputGQL(PydanticInputMixin[IdleCheckerBindingOptionsInputDTO]):
-    enabled: bool | None = gql_field(
-        description=(
-            "Whether the binding participates in idle checking. "
-            "Omit to use the default (true) on create or to keep the current value on update."
-        ),
-        default=None,
-    )
-
-
-@gql_pydantic_type(
-    BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
-        description="Contains the binding-level options of an idle checker binding.",
-    ),
-    model=IdleCheckerBindingOptionsInfo,
-    name="IdleCheckerBindingOptions",
-)
-class IdleCheckerBindingOptionsGQL:
-    enabled: bool = gql_field(
-        description="Whether the binding participates in idle checking.",
+    scope_type: IdleCheckerScopeTypeGQL = gql_field(description="Kind of the scope.")
+    scope_id: str = gql_field(
+        description="Scope identifier, interpreted according to the scope type."
     )
 
 
@@ -141,7 +106,7 @@ class IdleCheckerBindingOptionsGQL:
         description=(
             "Represents one association between a scope and a reusable idle checker. "
             "The scope and checker are the binding's immutable identity; "
-            "binding-level options control how the association participates."
+            "the enabled flag controls whether the association participates."
         ),
     ),
     name="IdleCheckerBinding",
@@ -151,11 +116,11 @@ class IdleCheckerBindingGQL(PydanticNodeMixin[IdleCheckerBindingNode]):
         description="Relay global node identifier backed by the binding's UUID."
     )
     scope_type: IdleCheckerScopeTypeGQL = gql_field(description="Kind of the bound scope.")
-    scope_id: UUID = gql_field(
-        description="Scope identifier: the domain, project, or resource group ID."
+    scope_id: str = gql_field(
+        description="Scope identifier, interpreted according to the scope type."
     )
     idle_checker_id: UUID = gql_field(description="ID of the bound idle checker.")
-    options: IdleCheckerBindingOptionsGQL = gql_field(description="Binding-level options.")
+    enabled: bool = gql_field(description="Whether the binding participates in idle checking.")
     created_at: datetime = gql_field(description="Creation timestamp.")
     updated_at: datetime = gql_field(description="Last update timestamp.")
 
@@ -238,7 +203,7 @@ class IdleCheckerBindingFilterGQL(PydanticInputMixin[IdleCheckerBindingFilterDTO
         description="Scope type filter.",
         default=None,
     )
-    scope_id: UUIDFilter | None = gql_field(description="Scope identifier filter.", default=None)
+    scope_id: StringFilter | None = gql_field(description="Scope identifier filter.", default=None)
     idle_checker_id: UUIDFilter | None = gql_field(
         description="Bound idle checker ID filter.",
         default=None,
@@ -304,9 +269,9 @@ class IdleCheckerBindingOrderByGQL(PydanticInputMixin[IdleCheckerBindingOrderDTO
 class CreateIdleCheckerBindingInputGQL(PydanticInputMixin[CreateIdleCheckerBindingInputDTO]):
     scope: IdleCheckerBindingScopeGQL = gql_field(description="Scope the checker is bound to.")
     idle_checker_id: UUID = gql_field(description="Idle checker to bind.")
-    options: IdleCheckerBindingOptionsInputGQL | None = gql_field(
-        description="Binding options; omit to use the defaults.",
-        default=None,
+    enabled: bool = gql_field(
+        description="Whether the binding participates in idle checking.",
+        default=True,
     )
 
 
@@ -314,7 +279,7 @@ class CreateIdleCheckerBindingInputGQL(PydanticInputMixin[CreateIdleCheckerBindi
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
         description=(
-            "Replaces an idle checker binding's options. "
+            "Updates an idle checker binding's enabled state. "
             "The bound scope and checker are immutable; rebind by purging and recreating."
         ),
     ),
@@ -322,7 +287,7 @@ class CreateIdleCheckerBindingInputGQL(PydanticInputMixin[CreateIdleCheckerBindi
 )
 class UpdateIdleCheckerBindingInputGQL(PydanticInputMixin[UpdateIdleCheckerBindingInputDTO]):
     id: UUID = gql_field(description="Idle checker binding ID to update.")
-    options: IdleCheckerBindingOptionsInputGQL = gql_field(description="New binding options.")
+    enabled: bool = gql_field(description="New enabled state.")
 
 
 @gql_pydantic_input(

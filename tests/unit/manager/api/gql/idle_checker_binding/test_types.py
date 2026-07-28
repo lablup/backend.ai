@@ -1,28 +1,20 @@
 from __future__ import annotations
 
-import uuid
-
+from ai.backend.common.dto.manager.v2.idle_checker_binding.types import IdleCheckerScopeTypeDTO
 from ai.backend.manager.api.gql.idle_checker_binding.types import (
-    IdleCheckerBindingOptionsInputGQL,
     IdleCheckerBindingScopeGQL,
+    IdleCheckerScopeTypeGQL,
 )
 
 
 class TestIdleCheckerBindingInputs:
-    def test_one_of_scope_converts_to_dto(self) -> None:
-        domain_id = uuid.uuid4()
-
-        input_ = IdleCheckerBindingScopeGQL(domain=domain_id)
-
-        dto = input_.to_pydantic()
-
-        assert dto.domain == domain_id
-        assert dto.project is None
-        assert dto.resource_group is None
-
-    def test_options_input_converts_to_dto(self) -> None:
-        input_ = IdleCheckerBindingOptionsInputGQL(enabled=False)
+    def test_scope_pair_converts_to_dto(self) -> None:
+        input_ = IdleCheckerBindingScopeGQL(
+            scope_type=IdleCheckerScopeTypeGQL.PROJECT,
+            scope_id="7b56b1f4-2936-4d29-9db9-621cc5b1cf8f",
+        )
 
         dto = input_.to_pydantic()
 
-        assert dto.enabled is False
+        assert dto.scope_type == IdleCheckerScopeTypeDTO.PROJECT
+        assert dto.scope_id == "7b56b1f4-2936-4d29-9db9-621cc5b1cf8f"

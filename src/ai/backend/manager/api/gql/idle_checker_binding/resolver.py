@@ -53,14 +53,15 @@ async def admin_idle_checker_bindings(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
         description=(
-            "Searches idle checker bindings within a single scope. "
-            "Requires permission on the given scope (subject to RBAC)."
+            "Searches idle checker bindings within the given scopes. "
+            "All scope items are OR'd, at least one item is required, and each item "
+            "requires permission on that scope (subject to RBAC)."
         ),
     )
 )
 async def scoped_idle_checker_bindings(
     info: Info[StrawberryGQLContext],
-    scope: IdleCheckerBindingScopeGQL,
+    scope: list[IdleCheckerBindingScopeGQL],
     filter: IdleCheckerBindingFilterGQL | None = None,
     order_by: list[IdleCheckerBindingOrderByGQL] | None = None,
     first: int | None = None,
@@ -76,16 +77,14 @@ async def scoped_idle_checker_bindings(
 @gql_mutation(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
-        description=(
-            "Binds a global idle checker to a scope. "
-            "Requires permission on the scope given in the input (subject to RBAC)."
-        ),
+        description="Binds a global idle checker to a scope (super admin only).",
     )
 )
-async def create_idle_checker_binding(
+async def admin_create_idle_checker_binding(
     info: Info[StrawberryGQLContext],
     input: CreateIdleCheckerBindingInputGQL,
 ) -> CreateIdleCheckerBindingPayloadGQL:
+    check_admin_only()
     raise NotImplementedAPI("Idle checker binding creation is not implemented.")
 
 

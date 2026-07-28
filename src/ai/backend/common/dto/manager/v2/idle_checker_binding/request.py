@@ -2,64 +2,45 @@ from __future__ import annotations
 
 from typing import Self
 
-from pydantic import ConfigDict, Field, model_validator
+from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import (
     DateTimeFilter,
+    StringFilter,
     UUIDFilter,
 )
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.dto.manager.v2.idle_checker_binding.types import (
     IdleCheckerBindingOrderField,
+    IdleCheckerScopeTypeDTO,
     ScopeTypeFilter,
 )
-from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.idle_checker import IdleCheckerBindingID, IdleCheckerID
-from ai.backend.common.identifier.project import ProjectID
-from ai.backend.common.identifier.resource_group import ResourceGroupID
 
 
 class IdleCheckerBindingScopeDTO(BaseRequestModel):
-    model_config = ConfigDict(extra="forbid")
+    """A typed (scope_type, scope_id) pair referencing one scope."""
 
-    domain: DomainID | None = Field(default=None, description="Domain ID.")
-    project: ProjectID | None = Field(default=None, description="Project ID.")
-    resource_group: ResourceGroupID | None = Field(default=None, description="Resource group ID.")
-
-    @model_validator(mode="after")
-    def _validate_exactly_one_scope(self) -> Self:
-        provided = 0
-        for value in (self.domain, self.project, self.resource_group):
-            if value is None:
-                continue
-            provided += 1
-        if provided != 1:
-            raise ValueError("Exactly one scope must be provided")
-        return self
-
-
-class IdleCheckerBindingOptionsInputDTO(BaseRequestModel):
-    enabled: bool | None = Field(
-        default=None,
-        description=(
-            "Whether the binding participates in idle checking. "
-            "Omit to use the default (true) on create or to keep the current value on update."
-        ),
+    scope_type: IdleCheckerScopeTypeDTO = Field(description="Kind of the scope.")
+    scope_id: str = Field(
+        min_length=1,
+        description="Scope identifier, interpreted according to the scope type.",
     )
 
 
 class CreateIdleCheckerBindingInput(BaseRequestModel):
     scope: IdleCheckerBindingScopeDTO = Field(description="Scope the checker is bound to.")
     idle_checker_id: IdleCheckerID = Field(description="Idle checker to bind.")
-    options: IdleCheckerBindingOptionsInputDTO | None = Field(
-        default=None, description="Binding options; omit to use the defaults."
+    enabled: bool = Field(
+        default=True,
+        description="Whether the binding participates in idle checking.",
     )
 
 
 class UpdateIdleCheckerBindingInput(BaseRequestModel):
     id: IdleCheckerBindingID = Field(description="Idle checker binding ID to update.")
-    options: IdleCheckerBindingOptionsInputDTO = Field(description="New binding options.")
+    enabled: bool = Field(description="New enabled state.")
 
 
 class PurgeIdleCheckerBindingInput(BaseRequestModel):
@@ -68,7 +49,7 @@ class PurgeIdleCheckerBindingInput(BaseRequestModel):
 
 class IdleCheckerBindingFilter(BaseRequestModel):
     scope_type: ScopeTypeFilter | None = Field(default=None)
-    scope_id: UUIDFilter | None = Field(default=None)
+    scope_id: StringFilter | None = Field(default=None)
     idle_checker_id: UUIDFilter | None = Field(default=None)
     enabled: bool | None = Field(default=None)
     created_at: DateTimeFilter | None = Field(default=None)
@@ -98,7 +79,9 @@ class SearchIdleCheckerBindingsInput(BaseRequestModel):
 
 
 class ScopedSearchIdleCheckerBindingsInput(BaseRequestModel):
-    scope: IdleCheckerBindingScopeDTO = Field(description="Scope to search bindings in.")
+    scope: list[IdleCheckerBindingScopeDTO] = Field(
+        min_length=1, description="Scope items (OR across all items)."
+    )
     filter: IdleCheckerBindingFilter | None = Field(default=None)
     order: list[IdleCheckerBindingOrder] | None = Field(default=None)
     first: int | None = Field(default=None, ge=1)

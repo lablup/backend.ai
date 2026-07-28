@@ -7,19 +7,14 @@ from pydantic import Field
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.dto.manager.v2.idle_checker_binding.types import IdleCheckerScopeTypeDTO
 from ai.backend.common.identifier.idle_checker import IdleCheckerBindingID, IdleCheckerID
-from ai.backend.common.identifier.scope import ScopeID
-
-
-class IdleCheckerBindingOptionsInfo(BaseResponseModel):
-    enabled: bool
 
 
 class IdleCheckerBindingNode(BaseResponseModel):
     id: IdleCheckerBindingID
     scope_type: IdleCheckerScopeTypeDTO
-    scope_id: ScopeID
+    scope_id: str
     idle_checker_id: IdleCheckerID
-    options: IdleCheckerBindingOptionsInfo
+    enabled: bool
     created_at: datetime
     updated_at: datetime
 

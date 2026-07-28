@@ -163,8 +163,8 @@ from .idle_checker import (
     admin_update_idle_checker,
 )
 from .idle_checker_binding import (
+    admin_create_idle_checker_binding,
     admin_idle_checker_bindings,
-    create_idle_checker_binding,
     purge_idle_checker_binding,
     scoped_idle_checker_bindings,
     update_idle_checker_binding,
@@ -751,7 +751,7 @@ class Mutation:
     admin_create_idle_checker = admin_create_idle_checker
     admin_update_idle_checker = admin_update_idle_checker
     admin_purge_idle_checker = admin_purge_idle_checker
-    create_idle_checker_binding = create_idle_checker_binding
+    admin_create_idle_checker_binding = admin_create_idle_checker_binding
     update_idle_checker_binding = update_idle_checker_binding
     purge_idle_checker_binding = purge_idle_checker_binding
     admin_create_app_config_allow_list = admin_create_app_config_allow_list
