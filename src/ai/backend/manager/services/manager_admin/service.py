@@ -33,8 +33,8 @@ __all__ = ("ManagerAdminService",)
 # disabling an announcement only flips the flag and keeps the stored message
 # (re-enabling does not require retyping). Older deployments stored a bare
 # message string directly at ``manager/announcement``; ``get_announcement``
-# falls back to that legacy key (treating its presence as enabled) when the
-# split keys are absent, and the first write migrates to the split layout.
+# reads each subpath on its own and falls back to that legacy key for whichever
+# one is absent, and the first write migrates to the split layout.
 _ANNOUNCEMENT_KEY = "manager/announcement"
 _ANNOUNCEMENT_MESSAGE_KEY = "manager/announcement/message"
 _ANNOUNCEMENT_ENABLED_KEY = "manager/announcement/enabled"
@@ -92,16 +92,20 @@ class ManagerAdminService:
         return UpdateManagerStatusActionResult()
 
     async def get_announcement(self, action: GetAnnouncementAction) -> GetAnnouncementActionResult:
-        """Get the current announcement from etcd."""
-        enabled_flag = await self._etcd.get(_ANNOUNCEMENT_ENABLED_KEY)
-        if enabled_flag is None:
-            # The split keys have not been written yet: fall back to the legacy
-            # single key, whose bare presence denotes an enabled announcement.
-            legacy = await self._etcd.get(_ANNOUNCEMENT_KEY)
-            if legacy is None:
-                return GetAnnouncementActionResult(enabled=False, message="")
-            return GetAnnouncementActionResult(enabled=True, message=legacy)
+        """Get the current announcement from etcd.
+
+        Each subpath key is read on its own; whichever one is absent falls back
+        to the legacy single key, whose bare presence denotes an enabled
+        announcement. Absent everywhere means "no announcement".
+        """
         message = await self._etcd.get(_ANNOUNCEMENT_MESSAGE_KEY)
+        enabled_flag = await self._etcd.get(_ANNOUNCEMENT_ENABLED_KEY)
+        if message is None or enabled_flag is None:
+            legacy_message = await self._etcd.get(_ANNOUNCEMENT_KEY)
+            if message is None:
+                message = legacy_message
+            if enabled_flag is None:
+                enabled_flag = "true" if legacy_message is not None else "false"
         return GetAnnouncementActionResult(enabled=enabled_flag == "true", message=message or "")
 
     async def update_announcement(
@@ -123,14 +127,16 @@ class ManagerAdminService:
             message = current.message
         else:
             message = action.message
-        # Write the message and the enabled flag under their subpaths in a single
-        # transaction, then drop the legacy single key so stale data (superseded
-        # by the split keys) does not linger.
-        await self._etcd.put_prefix(
-            _ANNOUNCEMENT_KEY,
-            {"message": message, "enabled": "true" if action.enabled else "false"},
-        )
-        await self._etcd.delete(_ANNOUNCEMENT_KEY)
+        # Replace the whole announcement subtree in a single transaction: the two
+        # subpath keys are written and every other key under the prefix is
+        # removed, so the legacy single key (superseded by the split keys) is
+        # dropped as part of the same write rather than in a separate step.
+        await self._etcd.atomic_replace_prefixes({
+            _ANNOUNCEMENT_KEY: {
+                "message": message,
+                "enabled": "true" if action.enabled else "false",
+            },
+        })
         return UpdateAnnouncementActionResult()
 
     async def perform_scheduler_ops(
