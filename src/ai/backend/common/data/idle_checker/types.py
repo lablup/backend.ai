@@ -67,7 +67,7 @@ class UtilizationSpec(BackendAISchema):
     """Config for ``CheckerType.UTILIZATION``."""
 
     max_underutilized_duration_seconds: int = Field(
-        gt=0,
+        ge=1,
         description=(
             "Maximum duration that the configured utilization conditions may remain satisfied."
         ),
