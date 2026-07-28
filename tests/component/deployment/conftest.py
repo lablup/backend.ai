@@ -44,6 +44,7 @@ from ai.backend.manager.models.deployment_policy.row import DeploymentPolicyRow
 from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
 from ai.backend.manager.models.endpoint.row import EndpointRow
 from ai.backend.manager.models.image.row import ImageRow
+from ai.backend.manager.models.session_group.row import SessionGroupRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import vfolders
 from ai.backend.manager.plugin.network import NetworkPluginContext
@@ -373,5 +374,13 @@ async def deployment_seed_data(
         await conn.execute(
             EndpointRow.__table__.delete().where(
                 EndpointRow.__table__.c.domain == domain_fixture.domain_name
+            )
+        )
+        # Session groups are created by the deployment flow and reference the
+        # domain with a RESTRICT FK; deleting endpoints above cascades their
+        # replica groups, so the session groups are unreferenced by now.
+        await conn.execute(
+            SessionGroupRow.__table__.delete().where(
+                SessionGroupRow.__table__.c.domain_id == domain_fixture.domain_id
             )
         )
