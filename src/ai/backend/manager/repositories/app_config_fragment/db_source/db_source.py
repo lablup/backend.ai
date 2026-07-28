@@ -108,32 +108,26 @@ class AppConfigFragmentDBSource:
         """Upsert each fragment at its scope in one transaction (all-or-nothing).
 
         Each item inserts-or-updates; a newly inserted row binds to its scope, an updated one
-        keeps its binding. A ``public`` fragment is GLOBAL (no binding) and conflicts on the
-        partial unique index guarded by ``scope_id IS NULL``.
+        keeps its binding. A ``public`` fragment is GLOBAL, so it binds to no scope.
         """
         async with self._rbac_ops_provider.write_ops() as w:
             results: list[AppConfigFragmentData] = []
             for spec in specs:
+                # A public fragment is GLOBAL — no scope element, so it binds to nothing. Its
+                # NULL scope_id still keys it like any other row (NULLS NOT DISTINCT), so one
+                # conflict target serves every scope.
                 element_type = spec.scope_type.to_rbac_element_type()
-                if element_type is None:
-                    # A public fragment is GLOBAL: it binds to no scope, and its NULL scope_id
-                    # sits outside the plain unique constraint, so the conflict target is the
-                    # partial index guarding it.
-                    scope_ref = None
-                    conflict_target = ConflictTarget(
-                        columns=["config_name", "scope_type"],
-                        index_predicate=AppConfigFragmentRow.scope_id.is_(None),
-                    )
-                else:
-                    scope_ref = RBACElementRef(element_type, str(spec.scope_id))
-                    conflict_target = ConflictTarget(
-                        columns=["config_name", "scope_type", "scope_id"]
-                    )
                 upserter = RBACEntityUpserter(
                     spec=spec,
                     element_type=RBACElementType.APP_CONFIG_FRAGMENT,
-                    scope_ref=scope_ref,
-                    conflict_target=conflict_target,
+                    scope_ref=(
+                        RBACElementRef(element_type, str(spec.scope_id))
+                        if element_type is not None
+                        else None
+                    ),
+                    conflict_target=ConflictTarget(
+                        columns=["config_name", "scope_type", "scope_id"]
+                    ),
                 )
                 results.append((await w.upsert_scoped(upserter)).row.to_data())
             return results
