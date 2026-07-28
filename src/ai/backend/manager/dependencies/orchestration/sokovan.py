@@ -25,6 +25,7 @@ from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
 from ai.backend.manager.repositories.fair_share import FairShareRepository
 from ai.backend.manager.repositories.idle_checker.repository import IdleCheckerRepository
+from ai.backend.manager.repositories.metric.repository import MetricRepository
 from ai.backend.manager.repositories.prometheus_query_preset.repository import (
     PrometheusQueryPresetRepository,
 )
@@ -34,7 +35,6 @@ from ai.backend.manager.repositories.resource_usage_history import (
 )
 from ai.backend.manager.repositories.runtime_variant.repository import RuntimeVariantRepository
 from ai.backend.manager.repositories.scheduler import SchedulerRepository
-from ai.backend.manager.services.metric.service import MetricService
 from ai.backend.manager.sokovan.deployment.coordinator import DeploymentCoordinator
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
 from ai.backend.manager.sokovan.deployment.route.coordinator import RouteCoordinator
@@ -67,7 +67,7 @@ class SokovanOrchestratorInput:
     deployment_repository: DeploymentRepository
     replica_group_repository: ReplicaGroupRepository
     idle_checker_repository: IdleCheckerRepository
-    metric_service: MetricService
+    metric_repository: MetricRepository
     fair_share_repository: FairShareRepository
     resource_usage_repository: ResourceUsageHistoryRepository
     config_provider: ManagerConfigProvider
@@ -202,7 +202,7 @@ class SokovanOrchestratorDependency(
         reconciler_coordinator, reconciler_task_specs = build_reconciler_coordinator(
             replica_group_repository=setup_input.replica_group_repository,
             idle_checker_repository=setup_input.idle_checker_repository,
-            metric_service=setup_input.metric_service,
+            metric_repository=setup_input.metric_repository,
             scheduling_controller=setup_input.scheduling_controller,
             valkey_live=setup_input.valkey_live,
             valkey_schedule=setup_input.valkey_schedule,

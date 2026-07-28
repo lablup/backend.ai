@@ -6,13 +6,11 @@ from datetime import timedelta
 from typing import override
 
 from ai.backend.common.data.idle_checker.types import IdleCheckPhase, UtilizationSpec
+from ai.backend.common.identifier.prometheus_query_preset import PrometheusQueryPresetID
+from ai.backend.common.types import SessionId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.repositories.idle_checker.types import IdleJudgmentData
-from ai.backend.manager.services.metric.actions.session_utilization import (
-    SessionUtilizationAction,
-    SessionUtilizationQuery,
-)
-from ai.backend.manager.services.metric.service import MetricService
+from ai.backend.manager.repositories.metric.repository import MetricRepository
 from ai.backend.manager.sokovan.idle_check.checkers.base import (
     CheckerAssignment,
     IdleChecker,
@@ -25,10 +23,10 @@ log = BraceStyleAdapter(logging.getLogger(__name__))
 class UtilizationChecker(IdleChecker):
     """Judge session utilization from agent-emitted Prometheus metrics."""
 
-    _metric_service: MetricService
+    _metric_repository: MetricRepository
 
-    def __init__(self, metric_service: MetricService) -> None:
-        self._metric_service = metric_service
+    def __init__(self, metric_repository: MetricRepository) -> None:
+        self._metric_repository = metric_repository
 
     @override
     async def judge(
@@ -39,7 +37,7 @@ class UtilizationChecker(IdleChecker):
     ) -> Sequence[IdleJudgmentData]:
         # Unknown sessions are ignored because their utilization status cannot be determined.
         valid_assignments: list[tuple[CheckerAssignment, UtilizationSpec]] = []
-        queries: list[SessionUtilizationQuery] = []
+        session_ids_by_preset: dict[PrometheusQueryPresetID, list[SessionId]] = {}
         for assignment in assignments:
             spec = assignment.definition.spec.utilization
             if spec is None:
@@ -50,30 +48,25 @@ class UtilizationChecker(IdleChecker):
                 )
                 continue
             valid_assignments.append((assignment, spec))
-            queries.append(
-                SessionUtilizationQuery(
-                    preset_id=spec.threshold.preset_id,
-                    session_ids=[session.session_id for session in assignment.sessions],
-                )
-            )
-        if not queries:
+            session_ids = session_ids_by_preset.setdefault(spec.threshold.preset_id, [])
+            for session in assignment.sessions:
+                session_ids.append(session.session_id)
+        if not session_ids_by_preset:
             return []
 
-        result = await self._metric_service.query_session_utilization(
-            SessionUtilizationAction(
-                queries=queries,
-                evaluation_time=context.current_time,
-            )
+        values_by_preset = await self._metric_repository.query_session_utilization_metrics(
+            session_ids_by_preset,
+            evaluation_time=context.current_time,
         )
         judgments: list[IdleJudgmentData] = []
         for assignment, spec in valid_assignments:
             threshold = spec.threshold
-            observations = result.observations_by_preset.get(threshold.preset_id, {})
+            values = values_by_preset.get(threshold.preset_id, {})
             for session in assignment.sessions:
-                observation = observations.get(session.session_id)
-                if observation is None:
+                value = values.get(session.session_id)
+                if value is None:
                     continue
-                is_idle = observation.value < threshold.threshold
+                is_idle = value < threshold.threshold
                 refreshed_expire_at = context.current_time + timedelta(
                     seconds=spec.max_underutilized_duration_seconds
                 )
@@ -98,8 +91,8 @@ class UtilizationChecker(IdleChecker):
                             "Utilization check: "
                             f"max_underutilized_duration_seconds="
                             f"{spec.max_underutilized_duration_seconds}, "
-                            f"metric=[preset_id={observation.preset_id}, "
-                            f"value={observation.value:f}/{threshold.threshold:f}]"
+                            f"metric=[preset_id={threshold.preset_id}, "
+                            f"value={value:f}/{threshold.threshold:f}]"
                         ),
                     )
                 )

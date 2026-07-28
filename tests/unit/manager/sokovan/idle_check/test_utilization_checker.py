@@ -23,13 +23,7 @@ from ai.backend.common.identifier.prometheus_query_preset import PrometheusQuery
 from ai.backend.common.types import SessionId, SessionTypes
 from ai.backend.manager.data.idle_checker.types import IdleCheckSession
 from ai.backend.manager.repositories.idle_checker.types import IdleCheckerDefinitionData
-from ai.backend.manager.services.metric.actions.session_utilization import (
-    SessionUtilizationAction,
-    SessionUtilizationActionResult,
-    SessionUtilizationObservation,
-    SessionUtilizationQuery,
-)
-from ai.backend.manager.services.metric.service import MetricService
+from ai.backend.manager.repositories.metric.repository import MetricRepository
 from ai.backend.manager.sokovan.idle_check.checkers.base import (
     CheckerAssignment,
     IdleCheckerContext,
@@ -78,14 +72,14 @@ class TestUtilizationSpec:
 
 class TestUtilizationChecker:
     @pytest.fixture()
-    def metric_service(self) -> MagicMock:
-        service = MagicMock(spec=MetricService)
-        service.query_session_utilization = AsyncMock()
-        return service
+    def metric_repository(self) -> MagicMock:
+        repository = MagicMock(spec=MetricRepository)
+        repository.query_session_utilization_metrics = AsyncMock()
+        return repository
 
     @pytest.fixture()
-    def checker(self, metric_service: MagicMock) -> UtilizationChecker:
-        return UtilizationChecker(metric_service)
+    def checker(self, metric_repository: MagicMock) -> UtilizationChecker:
+        return UtilizationChecker(metric_repository)
 
     @pytest.fixture()
     def assignment_factory(self) -> AssignmentFactory:
@@ -117,32 +111,20 @@ class TestUtilizationChecker:
 
         return create_assignment
 
-    async def test_batches_all_assignments_into_one_metric_service_call(
+    async def test_batches_all_assignments_into_one_repository_call(
         self,
         checker: UtilizationChecker,
-        metric_service: MagicMock,
+        metric_repository: MagicMock,
         assignment_factory: AssignmentFactory,
     ) -> None:
         first_preset_id = PrometheusQueryPresetID(uuid4())
         second_preset_id = PrometheusQueryPresetID(uuid4())
         first_session = _session()
         second_session = _session()
-        metric_service.query_session_utilization.return_value = SessionUtilizationActionResult(
-            observations_by_preset={
-                first_preset_id: {
-                    first_session.session_id: SessionUtilizationObservation(
-                        preset_id=first_preset_id,
-                        value=Decimal("5"),
-                    )
-                },
-                second_preset_id: {
-                    second_session.session_id: SessionUtilizationObservation(
-                        preset_id=second_preset_id,
-                        value=Decimal("15"),
-                    )
-                },
-            }
-        )
+        metric_repository.query_session_utilization_metrics.return_value = {
+            first_preset_id: {first_session.session_id: Decimal("5")},
+            second_preset_id: {second_session.session_id: Decimal("15")},
+        }
 
         judgments = await checker.judge(
             [
@@ -164,40 +146,68 @@ class TestUtilizationChecker:
             IdleCheckPhase.IDLE,
             IdleCheckPhase.IDLE,
         ]
-        metric_service.query_session_utilization.assert_awaited_once_with(
-            SessionUtilizationAction(
-                queries=[
-                    SessionUtilizationQuery(
-                        preset_id=first_preset_id,
-                        session_ids=[first_session.session_id],
-                    ),
-                    SessionUtilizationQuery(
-                        preset_id=second_preset_id,
-                        session_ids=[second_session.session_id],
-                    ),
-                ],
-                evaluation_time=_NOW,
-            )
+        metric_repository.query_session_utilization_metrics.assert_awaited_once_with(
+            {
+                first_preset_id: [first_session.session_id],
+                second_preset_id: [second_session.session_id],
+            },
+            evaluation_time=_NOW,
+        )
+
+    async def test_merges_sessions_sharing_a_preset_into_one_query(
+        self,
+        checker: UtilizationChecker,
+        metric_repository: MagicMock,
+        assignment_factory: AssignmentFactory,
+    ) -> None:
+        preset_id = PrometheusQueryPresetID(uuid4())
+        first_session = _session()
+        second_session = _session()
+        metric_repository.query_session_utilization_metrics.return_value = {
+            preset_id: {
+                first_session.session_id: Decimal("5"),
+                second_session.session_id: Decimal("15"),
+            },
+        }
+
+        judgments = await checker.judge(
+            [
+                assignment_factory(
+                    preset_id=preset_id,
+                    threshold=Decimal("10"),
+                    sessions=[first_session],
+                ),
+                assignment_factory(
+                    preset_id=preset_id,
+                    threshold=Decimal("10"),
+                    sessions=[second_session],
+                ),
+            ],
+            context=IdleCheckerContext(current_time=_NOW),
+        )
+
+        assert [judgment.status for judgment in judgments] == [
+            IdleCheckPhase.IDLE,
+            IdleCheckPhase.ACTIVE,
+        ]
+        metric_repository.query_session_utilization_metrics.assert_awaited_once_with(
+            {
+                preset_id: [first_session.session_id, second_session.session_id],
+            },
+            evaluation_time=_NOW,
         )
 
     async def test_underutilized_result_uses_existing_deadline(
         self,
         checker: UtilizationChecker,
-        metric_service: MagicMock,
+        metric_repository: MagicMock,
         assignment_factory: AssignmentFactory,
     ) -> None:
         preset_id = PrometheusQueryPresetID(uuid4())
         session = _session()
-        metric_service.query_session_utilization.return_value = SessionUtilizationActionResult(
-            observations_by_preset={
-                preset_id: {
-                    session.session_id: SessionUtilizationObservation(
-                        preset_id=preset_id,
-                        value=Decimal("9.9"),
-                    )
-                }
-            }
-        )
+        metric_repository.query_session_utilization_metrics.return_value = {
+            preset_id: {session.session_id: Decimal("9.9")},
+        }
 
         judgments = await checker.judge(
             [
@@ -218,21 +228,14 @@ class TestUtilizationChecker:
     async def test_first_underutilized_result_initializes_deadline(
         self,
         checker: UtilizationChecker,
-        metric_service: MagicMock,
+        metric_repository: MagicMock,
         assignment_factory: AssignmentFactory,
     ) -> None:
         preset_id = PrometheusQueryPresetID(uuid4())
         session = _session(expire_at=None)
-        metric_service.query_session_utilization.return_value = SessionUtilizationActionResult(
-            observations_by_preset={
-                preset_id: {
-                    session.session_id: SessionUtilizationObservation(
-                        preset_id=preset_id,
-                        value=Decimal("9.9"),
-                    )
-                }
-            }
-        )
+        metric_repository.query_session_utilization_metrics.return_value = {
+            preset_id: {session.session_id: Decimal("9.9")},
+        }
 
         judgments = await checker.judge(
             [
@@ -259,23 +262,16 @@ class TestUtilizationChecker:
     async def test_existing_idle_result_preserves_deadline(
         self,
         checker: UtilizationChecker,
-        metric_service: MagicMock,
+        metric_repository: MagicMock,
         assignment_factory: AssignmentFactory,
         expire_at: datetime,
         expected_status: IdleCheckPhase,
     ) -> None:
         preset_id = PrometheusQueryPresetID(uuid4())
         session = _session(expire_at=expire_at)
-        metric_service.query_session_utilization.return_value = SessionUtilizationActionResult(
-            observations_by_preset={
-                preset_id: {
-                    session.session_id: SessionUtilizationObservation(
-                        preset_id=preset_id,
-                        value=Decimal("5"),
-                    )
-                }
-            }
-        )
+        metric_repository.query_session_utilization_metrics.return_value = {
+            preset_id: {session.session_id: Decimal("5")},
+        }
 
         judgments = await checker.judge(
             [
@@ -296,22 +292,15 @@ class TestUtilizationChecker:
     async def test_threshold_or_above_returns_active_and_refreshes_deadline(
         self,
         checker: UtilizationChecker,
-        metric_service: MagicMock,
+        metric_repository: MagicMock,
         assignment_factory: AssignmentFactory,
         value: Decimal,
     ) -> None:
         preset_id = PrometheusQueryPresetID(uuid4())
         session = _session()
-        metric_service.query_session_utilization.return_value = SessionUtilizationActionResult(
-            observations_by_preset={
-                preset_id: {
-                    session.session_id: SessionUtilizationObservation(
-                        preset_id=preset_id,
-                        value=value,
-                    )
-                }
-            }
-        )
+        metric_repository.query_session_utilization_metrics.return_value = {
+            preset_id: {session.session_id: value},
+        }
 
         judgments = await checker.judge(
             [
@@ -331,13 +320,11 @@ class TestUtilizationChecker:
     async def test_missing_observation_is_ignored(
         self,
         checker: UtilizationChecker,
-        metric_service: MagicMock,
+        metric_repository: MagicMock,
         assignment_factory: AssignmentFactory,
     ) -> None:
         preset_id = PrometheusQueryPresetID(uuid4())
-        metric_service.query_session_utilization.return_value = SessionUtilizationActionResult(
-            observations_by_preset={}
-        )
+        metric_repository.query_session_utilization_metrics.return_value = {}
 
         judgments = await checker.judge(
             [
@@ -355,7 +342,7 @@ class TestUtilizationChecker:
     async def test_mismatched_spec_is_ignored(
         self,
         checker: UtilizationChecker,
-        metric_service: MagicMock,
+        metric_repository: MagicMock,
     ) -> None:
         assignment = CheckerAssignment(
             definition=IdleCheckerDefinitionData(
@@ -376,4 +363,4 @@ class TestUtilizationChecker:
         )
 
         assert judgments == []
-        metric_service.query_session_utilization.assert_not_awaited()
+        metric_repository.query_session_utilization_metrics.assert_not_awaited()
