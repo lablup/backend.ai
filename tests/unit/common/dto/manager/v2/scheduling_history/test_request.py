@@ -254,21 +254,21 @@ class TestReplicaGroupHistoryFilter:
 
     def test_default_creation_all_none(self) -> None:
         f = ReplicaGroupHistoryFilter()
-        assert f.replica_group_id is None
         assert f.deployment_id is None
         assert f.AND is None
         assert f.OR is None
         assert f.NOT is None
 
-    def test_with_both_ids(self) -> None:
-        group_id = uuid.uuid4()
+    def test_with_deployment_id(self) -> None:
         dep_id = uuid.uuid4()
-        f = ReplicaGroupHistoryFilter(
-            replica_group_id=UUIDFilter(equals=group_id),
-            deployment_id=UUIDFilter(equals=dep_id),
-        )
-        assert f.replica_group_id is not None
+        f = ReplicaGroupHistoryFilter(deployment_id=UUIDFilter(equals=dep_id))
         assert f.deployment_id is not None
+        assert f.deployment_id.equals == dep_id
+
+    def test_offers_no_replica_group_id_axis(self) -> None:
+        # A replica group is an internal implementation detail — clients narrow
+        # by the owning deployment instead.
+        assert "replica_group_id" not in ReplicaGroupHistoryFilter.model_fields
 
     def test_nested_conjunctions_parse_as_the_same_filter(self) -> None:
         f = ReplicaGroupHistoryFilter.model_validate({
