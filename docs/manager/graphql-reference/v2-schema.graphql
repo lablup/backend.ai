@@ -7939,7 +7939,7 @@ type Mutation {
   """
   Added in 26.8.0. Upsert many app config fragments at one scope (insert, or replace config on conflict), all-or-nothing. RBAC-authorized at that scope.
   """
-  upsertAppConfigFragments(input: UpsertAppConfigFragmentsInput!): [AppConfigFragment!]!
+  scopedUpsertAppConfigFragments(input: ScopedUpsertAppConfigFragmentsInput!): [AppConfigFragment!]!
 
   """
   Added in 26.8.0. Upsert many app config fragments at the current user's own user scope, all-or-nothing.
@@ -13630,6 +13630,20 @@ type ScopeResourceUsageV2 {
   assignable: [ResourceLimitEntry!]!
 }
 
+"""
+Added in 26.8.0. Upsert many fragments at one scope; the scope is named once for all items.
+"""
+input ScopedUpsertAppConfigFragmentsInput {
+  """Scope the fragments are written at (public | domain | user)."""
+  scopeType: AppConfigScopeType!
+
+  """Scope identifier: the domain id or user id; null for public scope."""
+  scopeId: UUID = null
+
+  """The (config_name, config) pairs to upsert."""
+  items: [AppConfigFragmentUpsertItem!]!
+}
+
 """Added in 26.3.0. A registered service instance in the catalog."""
 type ServiceCatalog implements Node {
   """The Globally Unique ID of this object"""
@@ -15514,20 +15528,6 @@ input UpdateVFSStorageInput {
 type UpdateVFSStoragePayload {
   """Updated VFS storage"""
   vfsStorage: VFSStorage!
-}
-
-"""
-Added in 26.8.0. Upsert many fragments at one scope; the scope is named once for all items.
-"""
-input UpsertAppConfigFragmentsInput {
-  """Scope the fragments are written at (public | domain | user)."""
-  scopeType: AppConfigScopeType!
-
-  """Scope identifier: the domain id or user id; null for public scope."""
-  scopeId: UUID = null
-
-  """The (config_name, config) pairs to upsert."""
-  items: [AppConfigFragmentUpsertItem!]!
 }
 
 """

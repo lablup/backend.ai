@@ -49,7 +49,10 @@ from ai.backend.manager.repositories.base import (
 )
 from ai.backend.manager.repositories.base.rbac.entity_creator import RBACEntityCreator
 from ai.backend.manager.repositories.base.rbac.entity_purger import RBACEntityPurger
-from ai.backend.manager.repositories.base.rbac.entity_upserter import RBACEntityUpserter
+from ai.backend.manager.repositories.base.rbac.entity_upserter import (
+    ConflictTarget,
+    RBACEntityUpserter,
+)
 from ai.backend.manager.repositories.ops.rbac.provider import RBACOpsProvider
 
 __all__ = ("AppConfigFragmentDBSource",)
@@ -114,11 +117,14 @@ class AppConfigFragmentDBSource:
             for spec in specs:
                 element_type = spec.scope_type.to_rbac_element_type()
                 if spec.scope_type is AppConfigScopeType.PUBLIC:
-                    index_elements = ["config_name", "scope_type"]
-                    index_where = AppConfigFragmentRow.scope_id.is_(None)
+                    conflict_target = ConflictTarget(
+                        columns=["config_name", "scope_type"],
+                        index_predicate=AppConfigFragmentRow.scope_id.is_(None),
+                    )
                 else:
-                    index_elements = ["config_name", "scope_type", "scope_id"]
-                    index_where = None
+                    conflict_target = ConflictTarget(
+                        columns=["config_name", "scope_type", "scope_id"]
+                    )
                 upserter = RBACEntityUpserter(
                     spec=spec,
                     element_type=RBACElementType.APP_CONFIG_FRAGMENT,
@@ -127,8 +133,7 @@ class AppConfigFragmentDBSource:
                         if element_type is not None
                         else None
                     ),
-                    index_elements=index_elements,
-                    index_where=index_where,
+                    conflict_target=conflict_target,
                 )
                 results.append((await w.upsert_scoped(upserter)).row.to_data())
             return results

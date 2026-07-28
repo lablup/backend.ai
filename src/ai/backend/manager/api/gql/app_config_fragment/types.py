@@ -26,7 +26,7 @@ from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
     MyUpsertAppConfigFragmentsInput as MyUpsertAppConfigFragmentsInputDTO,
 )
 from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
-    UpsertAppConfigFragmentsInput as UpsertAppConfigFragmentsInputDTO,
+    ScopedUpsertAppConfigFragmentsInput as ScopedUpsertAppConfigFragmentsInputDTO,
 )
 from ai.backend.common.dto.manager.v2.app_config_fragment.response import (
     AppConfigFragmentNode,
@@ -59,7 +59,7 @@ __all__ = (
     "AppConfigFragmentUpsertItemGQL",
     "AppConfigScopeTypeFilterGQL",
     "MyUpsertAppConfigFragmentsInputGQL",
-    "UpsertAppConfigFragmentsInputGQL",
+    "ScopedUpsertAppConfigFragmentsInputGQL",
 )
 
 
@@ -80,9 +80,11 @@ class AppConfigFragmentUpsertItemGQL(PydanticInputMixin[AppConfigFragmentUpsertI
         added_version=NEXT_RELEASE_VERSION,
         description="Upsert many fragments at one scope; the scope is named once for all items.",
     ),
-    name="UpsertAppConfigFragmentsInput",
+    name="ScopedUpsertAppConfigFragmentsInput",
 )
-class UpsertAppConfigFragmentsInputGQL(PydanticInputMixin[UpsertAppConfigFragmentsInputDTO]):
+class ScopedUpsertAppConfigFragmentsInputGQL(
+    PydanticInputMixin[ScopedUpsertAppConfigFragmentsInputDTO]
+):
     scope_type: AppConfigScopeType = gql_field(
         description="Scope the fragments are written at (public | domain | user)."
     )

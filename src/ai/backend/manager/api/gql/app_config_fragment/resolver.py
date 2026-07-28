@@ -33,7 +33,7 @@ from .types import (
     AppConfigFragmentGQL,
     AppConfigFragmentOrderByGQL,
     MyUpsertAppConfigFragmentsInputGQL,
-    UpsertAppConfigFragmentsInputGQL,
+    ScopedUpsertAppConfigFragmentsInputGQL,
 )
 
 
@@ -109,11 +109,11 @@ async def admin_app_config_fragments(
         ),
     )
 )
-async def upsert_app_config_fragments(
+async def scoped_upsert_app_config_fragments(
     info: Info[StrawberryGQLContext],
-    input: UpsertAppConfigFragmentsInputGQL,
+    input: ScopedUpsertAppConfigFragmentsInputGQL,
 ) -> list[AppConfigFragmentGQL]:
-    payload = await info.context.adapters.app_config_fragment.upsert_app_config_fragments(
+    payload = await info.context.adapters.app_config_fragment.scoped_upsert_app_config_fragments(
         input.to_pydantic()
     )
     return [AppConfigFragmentGQL.from_pydantic(node) for node in payload.items]

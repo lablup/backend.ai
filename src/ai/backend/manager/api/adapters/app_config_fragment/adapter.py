@@ -19,8 +19,8 @@ from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
     CreateAppConfigFragmentInput,
     MyUpsertAppConfigFragmentsInput,
     ScopedSearchAppConfigFragmentInput,
+    ScopedUpsertAppConfigFragmentsInput,
     UpdateAppConfigFragmentInput,
-    UpsertAppConfigFragmentsInput,
 )
 from ai.backend.common.dto.manager.v2.app_config_fragment.response import (
     AppConfigFragmentBulkErrorInfo,
@@ -130,8 +130,8 @@ class AppConfigFragmentAdapter(BaseAdapter):
             app_config_fragment=self._fragment_to_node(action_result.fragment),
         )
 
-    async def upsert_app_config_fragments(
-        self, input: UpsertAppConfigFragmentsInput
+    async def scoped_upsert_app_config_fragments(
+        self, input: ScopedUpsertAppConfigFragmentsInput
     ) -> UpsertAppConfigFragmentsPayload:
         """Upsert many fragments at the scope named in ``input`` (RBAC-authorized there)."""
         return await self._upsert(

@@ -31,7 +31,7 @@ __all__ = (
     "MyUpsertAppConfigFragmentsInput",
     "ScopedSearchAppConfigFragmentInput",
     "UpdateAppConfigFragmentInput",
-    "UpsertAppConfigFragmentsInput",
+    "ScopedUpsertAppConfigFragmentsInput",
 )
 
 
@@ -42,7 +42,7 @@ class AppConfigFragmentUpsertItem(BaseRequestModel):
     config: dict[str, Any] = Field(description="The fragment's JSON config document.")
 
 
-class UpsertAppConfigFragmentsInput(BaseRequestModel):
+class ScopedUpsertAppConfigFragmentsInput(BaseRequestModel):
     """Upsert many fragments at one scope; the scope is named once for all items."""
 
     scope_type: AppConfigScopeType = Field(
