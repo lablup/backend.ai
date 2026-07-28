@@ -74,17 +74,19 @@ class UtilizationChecker(IdleChecker):
                 if observation is None:
                     continue
                 is_idle = observation.value < threshold.threshold
+                refreshed_expire_at = context.current_time + timedelta(
+                    seconds=spec.max_underutilized_duration_seconds
+                )
                 if is_idle:
-                    expire_at = session.expire_at
-                    status = (
-                        IdleCheckPhase.IDLE_EXPIRED
-                        if expire_at <= context.current_time
-                        else IdleCheckPhase.IDLE
+                    expire_at = (
+                        session.expire_at if session.expire_at is not None else refreshed_expire_at
                     )
+                    if expire_at <= context.current_time:
+                        status = IdleCheckPhase.IDLE_EXPIRED
+                    else:
+                        status = IdleCheckPhase.IDLE
                 else:
-                    expire_at = context.current_time + timedelta(
-                        seconds=spec.max_underutilized_duration_seconds
-                    )
+                    expire_at = refreshed_expire_at
                     status = IdleCheckPhase.ACTIVE
                 judgments.append(
                     IdleJudgmentData(

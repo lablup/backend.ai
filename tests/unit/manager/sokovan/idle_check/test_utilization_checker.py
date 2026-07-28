@@ -53,7 +53,7 @@ class AssignmentFactory(Protocol):
 
 def _session(
     *,
-    expire_at: datetime = _EXISTING_EXPIRE_AT,
+    expire_at: datetime | None = _EXISTING_EXPIRE_AT,
 ) -> IdleCheckSession:
     return IdleCheckSession(
         session_id=SessionId(uuid4()),
@@ -221,6 +221,40 @@ class TestUtilizationChecker:
         assert judgments[0].status is IdleCheckPhase.IDLE
         assert judgments[0].expire_at == _EXISTING_EXPIRE_AT
         assert f"metric=[preset_id={preset_id}, value=9.9/10]" in judgments[0].message
+
+    async def test_first_underutilized_result_initializes_deadline(
+        self,
+        checker: UtilizationChecker,
+        metric_service: MagicMock,
+        assignment_factory: AssignmentFactory,
+    ) -> None:
+        preset_id = uuid4()
+        session = _session(expire_at=None)
+        metric_service.query_session_utilization.return_value = SessionUtilizationActionResult(
+            observations_by_preset={
+                preset_id: {
+                    session.session_id: SessionUtilizationObservation(
+                        preset_id=preset_id,
+                        value=Decimal("9.9"),
+                    )
+                }
+            }
+        )
+
+        judgments = await checker.judge(
+            [
+                assignment_factory(
+                    preset_id=preset_id,
+                    threshold=Decimal("10"),
+                    sessions=[session],
+                )
+            ],
+            context=IdleCheckerContext(current_time=_NOW),
+        )
+
+        assert len(judgments) == 1
+        assert judgments[0].status is IdleCheckPhase.IDLE
+        assert judgments[0].expire_at == _NOW + timedelta(seconds=_DURATION_SECONDS)
 
     @pytest.mark.parametrize(
         ("expire_at", "expected_status"),
