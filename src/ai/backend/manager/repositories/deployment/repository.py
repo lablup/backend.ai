@@ -24,6 +24,7 @@ from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.replica import ReplicaID
 from ai.backend.common.identifier.resource_group import ResourceGroupName
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
+from ai.backend.common.identifier.session_group import SessionGroupID
 from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
@@ -1140,6 +1141,17 @@ class DeploymentRepository:
     ) -> Mapping[ReplicaID, SessionStatus | None]:
         """Fetch session IDs for multiple routes."""
         return await self._db_source.fetch_session_statuses_by_route_ids(route_ids)
+
+    @deployment_repository_resilience.apply()
+    async def fetch_route_session_group_ids(
+        self,
+        route_ids: set[ReplicaID],
+    ) -> Mapping[ReplicaID, SessionGroupID]:
+        """Resolve the SessionGroup each route inherits from its replica group.
+
+        Routes with no replica group assigned are absent from the mapping.
+        """
+        return await self._db_source.fetch_route_session_group_ids(route_ids)
 
     @deployment_repository_resilience.apply()
     async def fetch_route_session_kernel_infos(

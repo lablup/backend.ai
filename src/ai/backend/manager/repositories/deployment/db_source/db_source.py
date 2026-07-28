@@ -31,10 +31,13 @@ from ai.backend.common.identifier.deployment_preset import DeploymentPresetID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.image import ImageID
+from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.identifier.replica import ReplicaID
 from ai.backend.common.identifier.replica_group import ReplicaGroupID
 from ai.backend.common.identifier.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.identifier.runtime_variant import RuntimeVariantID
+from ai.backend.common.identifier.session_group import SessionGroupID
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.identifier.vfolder import VFolderUUID
 from ai.backend.common.types import (
     AccessKey,
@@ -195,6 +198,7 @@ from ai.backend.manager.repositories.deployment.types import (
 from ai.backend.manager.repositories.scheduling_history.creators import (
     DeploymentHistoryCreatorSpec,
 )
+from ai.backend.manager.repositories.session_group.creators import SessionGroupCreatorSpec
 from ai.backend.manager.utils import query_userinfo_from_session
 
 
@@ -338,12 +342,23 @@ class DeploymentDBSource:
             await execute_rbac_entity_creator(db_sess, policy_creator)
             await db_sess.flush()
 
+            # Every replica group owns a session group (1:1) carrying the
+            # placement policy of its replicas.
+            primary_session_group = SessionGroupCreatorSpec.for_replica_group(
+                domain_name=endpoint.domain,
+                project_id=ProjectID(endpoint.project),
+                owner_user_id=UserID(endpoint.session_owner),
+            ).build_row()
+            db_sess.add(primary_session_group)
+            await db_sess.flush()
+
             # Every deployment owns a primary replica group that holds its
             # revision pointers and per-revision desired replica counts. The
             # revision pointers start empty; the first rollout populates them
             # via ``activate_revision`` / the deployment swap.
             primary_replica_group = ReplicaGroupRow(
                 deployment_id=endpoint.id,
+                session_group_id=primary_session_group.id,
                 desired_current_replica_count=endpoint.replicas,
                 rollout=policy_creator_spec.strategy_spec.to_rollout_spec(),
             )
@@ -2289,6 +2304,32 @@ class DeploymentDBSource:
                 status_map[ReplicaID(route_id)] = session_status
 
             return status_map
+
+    async def fetch_route_session_group_ids(
+        self,
+        route_ids: set[ReplicaID],
+    ) -> Mapping[ReplicaID, SessionGroupID]:
+        """Resolve the SessionGroup each route inherits from its replica group.
+
+        A replica group always owns exactly one SessionGroup, so the join
+        yields at most one row per route. Routes whose ``replica_group_id``
+        is NULL are absent from the mapping.
+        """
+        if not route_ids:
+            return {}
+
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            query = (
+                sa.select(RoutingRow.id, ReplicaGroupRow.session_group_id)
+                .select_from(RoutingRow)
+                .join(ReplicaGroupRow, RoutingRow.replica_group_id == ReplicaGroupRow.id)
+                .where(RoutingRow.id.in_(route_ids))
+            )
+            result = await db_sess.execute(query)
+            return {
+                ReplicaID(route_id): SessionGroupID(session_group_id)
+                for route_id, session_group_id in result.all()
+            }
 
     async def fetch_route_session_kernel_infos(
         self,
