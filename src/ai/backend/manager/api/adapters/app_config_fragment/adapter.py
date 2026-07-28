@@ -321,7 +321,14 @@ class AppConfigFragmentAdapter(BaseAdapter):
         action_result = await self._processors.app_config_fragment.scoped_search.wait_for_complete(
             ScopedSearchAppConfigFragmentAction(scope=scope, querier=querier)
         )
-        return [self._fragment_to_node(item) for item in action_result.data]
+        # Answer in the order the names were asked for; a name with no fragment at this scope
+        # is left out rather than held as a gap.
+        fragment_map = {fragment.config_name: fragment for fragment in action_result.data}
+        return [
+            self._fragment_to_node(fragment_map[config_name])
+            for config_name in config_names
+            if config_name in fragment_map
+        ]
 
     # --- admin fragment search ---
 

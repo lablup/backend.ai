@@ -144,7 +144,8 @@ async def my_upsert_app_config_fragments(
         added_version=NEXT_RELEASE_VERSION,
         description=(
             "Read the fragments written at one scope for the given config names — the current "
-            "values, to inspect before editing them. RBAC-authorized at that scope."
+            "values, to inspect before editing them. Answered in the order the names were "
+            "given, leaving out a name with no fragment there. RBAC-authorized at that scope."
         ),
     )
 )  # type: ignore[misc]
@@ -166,7 +167,8 @@ async def scoped_app_config_fragments_by_names(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
         description=(
-            "Read the current user's own user-scope fragments for the given config names."
+            "Read the current user's own user-scope fragments for the given config names, in "
+            "the order the names were given, leaving out a name with no fragment there."
         ),
     )
 )  # type: ignore[misc]
