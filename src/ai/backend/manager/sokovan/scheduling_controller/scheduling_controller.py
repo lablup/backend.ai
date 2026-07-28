@@ -384,6 +384,10 @@ class SchedulingController:
                 # The fitting check has no preemption context
                 job_priority=0,
                 victim_candidates=None,
+                # Group constraints are not applied to the fitting check: it
+                # answers "does this fit", and loading the group observations
+                # on this path is a separate decision (BEP-1064 open question).
+                session_group=None,
             )
             # Trackers are throwaway here: the fitting check only needs the
             # immutable observations, never the committed batch state. The

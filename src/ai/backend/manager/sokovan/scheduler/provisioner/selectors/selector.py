@@ -16,6 +16,7 @@ from decimal import Decimal
 
 from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.identifier.resource_slot import ResourceSlotName
+from ai.backend.common.identifier.session_group import SessionGroupID
 from ai.backend.common.types import (
     AgentId,
     AgentSelectionStrategy,
@@ -31,6 +32,7 @@ from ai.backend.manager.views.sokovan.agent import AgentInfo, AgentLimit
 from ai.backend.manager.views.sokovan.snapshot import PreemptionCandidate, UserVictimCandidates
 from ai.backend.manager.views.sokovan.workload import (
     ResourceRequest,
+    SessionGroupPolicy,
     SessionPlacement,
     SessionWorkload,
 )
@@ -98,6 +100,8 @@ class AgentSelectionCriteria:
     # The owner's preemption victim candidates (None disables the
     # preemption path, e.g. the fitting check)
     victim_candidates: UserVictimCandidates | None
+    # Placement policy of the session's group (None means unconstrained)
+    session_group: SessionGroupPolicy | None
 
     @classmethod
     def from_workload(
@@ -115,7 +119,14 @@ class AgentSelectionCriteria:
             designated_agent_ids=workload.placement.designated_agent_ids,
             job_priority=workload.job_priority,
             victim_candidates=victim_candidates,
+            session_group=workload.placement.session_group,
         )
+
+    def session_group_id(self) -> SessionGroupID | None:
+        """The group the placement counts toward (None when unconstrained)."""
+        if self.session_group is None:
+            return None
+        return self.session_group.group_id
 
 
 @dataclass
@@ -430,7 +441,11 @@ class AgentSelector:
             candidates, resource_req
         )
         # Track the in-flight allocation for the selected agent
-        selected_tracker.apply_diff(resource_req.requested_slots, resource_req.container_count)
+        selected_tracker.apply_diff(
+            resource_req.requested_slots,
+            resource_req.container_count,
+            criteria.session_group_id(),
+        )
         return AgentSelection(
             resource_requirements=resource_req,
             selected_agent=selected_tracker.original_agent,
@@ -502,7 +517,11 @@ class AgentSelector:
         # once, freeing everywhere); the requirement consumes from the
         # chosen agent.
         self._apply_victim_reclaims(trackers, chosen)
-        selected_tracker.apply_diff(resource_req.requested_slots, resource_req.container_count)
+        selected_tracker.apply_diff(
+            resource_req.requested_slots,
+            resource_req.container_count,
+            criteria.session_group_id(),
+        )
         return AgentSelection(
             resource_requirements=resource_req,
             selected_agent=selected_tracker.original_agent,
@@ -596,7 +615,9 @@ class AgentSelector:
                 candidates = exclusion.filter(candidates, criteria, resource_req)
                 if not candidates:
                     # Raised inside the step so the record names the filter.
-                    raise NoCompatibleAgentError(exclusion.name())
+                    raise NoCompatibleAgentError(
+                        exclusion.name(), exclusion.failure_message(criteria, resource_req)
+                    )
         return candidates
 
     def _run_stateful_filters(

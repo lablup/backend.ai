@@ -31,6 +31,16 @@ class AbstractExclusionTrackerFilter(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    def failure_message(
+        self,
+        criteria: AgentSelectionCriteria,
+        resource_req: ResourceRequirements,
+    ) -> str:
+        """Why this filter left no candidates, in the terms of what it
+        enforced — it becomes the session's scheduling-failure reason."""
+        raise NotImplementedError
+
+    @abstractmethod
     def filter(
         self,
         trackers: Sequence[AgentStateTracker],

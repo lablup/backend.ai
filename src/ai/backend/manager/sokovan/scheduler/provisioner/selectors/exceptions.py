@@ -90,10 +90,12 @@ class NoCompatibleAgentError(AgentSelectionError):
     error_title = "No compatible agents for the request."
 
     filter_name: str
+    failure_reason: str
 
-    def __init__(self, filter_name: str) -> None:
+    def __init__(self, filter_name: str, failure_reason: str) -> None:
         self.filter_name = filter_name
-        super().__init__(f"no agents passed the '{filter_name}' filter")
+        self.failure_reason = failure_reason
+        super().__init__(f"no agents passed the '{filter_name}' filter: {failure_reason}")
 
     @override
     def error_code(self) -> ErrorCode:

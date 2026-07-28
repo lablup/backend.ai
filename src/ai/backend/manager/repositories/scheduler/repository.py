@@ -147,6 +147,7 @@ class SchedulerRepository:
                 resources=ResourceGroupResource(
                     agents=fetch.agents,
                     failed_sessions_by_agent=failed_sessions_by_agent,
+                    group_members_by_agent=fetch.session_group_members,
                 ),
                 session_dependencies=fetch.session_dependencies,
                 policy=fetch.policy,

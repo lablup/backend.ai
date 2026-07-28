@@ -164,9 +164,9 @@ Which pipeline stage the enforcement level attaches to *is* the semantics. `desi
 | Direction | Rank | Effect |
 |-----------|------|--------|
 | `spread` | The agent's member count | Narrows to the agents holding the fewest members; if any hold none, only that tier survives |
-| `pack` | 0 when the agent holds at least one member, 1 otherwise | Narrows to agents that already hold members and **leaves the choice among them to the RG strategy** |
+| `pack` | The agent's member count, negated | Narrows to the agents holding the most members; the group converges onto as few agents as possible |
 
-`pack` is not defined as "the agent with the most members" because an order ranks one tracker at a time and cannot see a global maximum. Narrowing to "where the group already is" and letting the RG strategy pick also fits the orthogonality of the two axes.
+The two directions are the same rank in opposite signs. The pipeline takes the minimum rank **across every candidate**, so a negated count selects the global maximum — `pack` can express "the fullest agent" and does. The RG strategy still picks within whatever tier is left, which matters when several agents tie.
 
 **Filter conditions (strict):**
 
@@ -262,7 +262,7 @@ The RG axis keeps its existing `dispersed`/`concentrated`. Distinct vocabulary f
 | Orthogonality | A separate axis from the RG `agent_selection_strategy`; the RG strategy operates on the candidate set the SessionGroup leaves |
 | Precedence | `designated_agents` > **SessionGroup** > RG strategy. The more local target always applies first |
 | Implementation point | `preferred` is a tracker **order**, `strict` is an **exclusion filter**, following the existing `designated_agents` precedent — no arbitration logic |
-| Ranks | spread = member count; pack = 0 when members present, 1 otherwise. `pack` skips the constraint for the first member (**anchor rule**) |
+| Ranks | The same rank in opposite signs: spread = member count, pack = negated member count (the pipeline's minimum over all candidates makes that the global maximum). `pack` skips the constraint for the first member (**anchor rule**) |
 | Unsatisfiable strict | **No preemption, recorded as an error.** The exclusion stage is where conditions unsalvageable by any state change (preemption included) belong. The session stays PENDING and retries |
 | Observation | `resource_allocations` joined with `sessions.session_group_id`; every agent-bound live session counts; a multi-node session counts once per agent; only this pass's groups are loaded |
 | In-batch accumulation | Per-group increments on `AgentStateTracker` under the existing commit/rollback contract |

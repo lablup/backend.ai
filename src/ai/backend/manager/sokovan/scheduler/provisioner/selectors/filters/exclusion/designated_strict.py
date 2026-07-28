@@ -31,6 +31,15 @@ class DesignatedStrictTrackerFilter(AbstractExclusionTrackerFilter):
         return "Designated agents present (or no strict designation)"
 
     @override
+    def failure_message(
+        self,
+        criteria: AgentSelectionCriteria,
+        resource_req: ResourceRequirements,
+    ) -> str:
+        designated = ", ".join(str(agent_id) for agent_id in criteria.designated_agent_ids or [])
+        return f"none of the strictly designated agents [{designated}] is available"
+
+    @override
     def filter(
         self,
         trackers: Sequence[AgentStateTracker],

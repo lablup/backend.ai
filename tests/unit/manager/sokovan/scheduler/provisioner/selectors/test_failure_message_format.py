@@ -96,6 +96,7 @@ def _criteria(requirements: list[ResourceRequirements]) -> AgentSelectionCriteri
         designated_agent_ids=None,
         job_priority=0,
         victim_candidates=None,
+        session_group=None,
     )
 
 
@@ -111,6 +112,7 @@ def _designated_criteria(
         designated_agent_ids=designated_agent_ids,
         job_priority=0,
         victim_candidates=None,
+        session_group=None,
     )
 
 
@@ -253,7 +255,10 @@ class TestGoldenDesignatedAgentAbsent:
             )
 
         assert exc_info.value.filter_name == "designated-strict"
-        assert exc_info.value.extra_msg == "no agents passed the 'designated-strict' filter"
+        assert exc_info.value.extra_msg == (
+            "no agents passed the 'designated-strict' filter: none of the strictly "
+            "designated agents [designated-a, designated-b] is available"
+        )
 
 
 class TestGoldenBatchErrorDirectConstruction:

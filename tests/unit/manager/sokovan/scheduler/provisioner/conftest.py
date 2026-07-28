@@ -51,6 +51,7 @@ from ai.backend.manager.views.sokovan.snapshot import (
 from ai.backend.manager.views.sokovan.workload import (
     KernelWorkload,
     ResourceRequest,
+    SessionGroupPolicy,
     SessionPlacement,
     SessionWorkload,
     WorkloadMeta,
@@ -70,6 +71,7 @@ def _make_workload(
     kernel_slots: list[Mapping[str, str]] | None = None,
     priority: int = 0,
     cluster_mode: ClusterMode = ClusterMode.SINGLE_NODE,
+    session_group: SessionGroupPolicy | None = None,
 ) -> SessionWorkload:
     if kernel_slots is None:
         kernel_slots = [{"cpu": "1", "mem": "1024"}]
@@ -101,6 +103,7 @@ def _make_workload(
             ],
             agent_selection_policy=AgentSelectionPolicy.STRICT,
             designated_agent_ids=None,
+            session_group=session_group,
         ),
         priority=priority,
         job_priority=0,

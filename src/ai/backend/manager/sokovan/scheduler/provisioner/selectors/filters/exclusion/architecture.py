@@ -29,6 +29,14 @@ class ArchitectureTrackerFilter(AbstractExclusionTrackerFilter):
         return "Agents with a matching architecture found"
 
     @override
+    def failure_message(
+        self,
+        criteria: AgentSelectionCriteria,
+        resource_req: ResourceRequirements,
+    ) -> str:
+        return f"no agent serves the required architecture '{resource_req.required_architecture}'"
+
+    @override
     def filter(
         self,
         trackers: Sequence[AgentStateTracker],

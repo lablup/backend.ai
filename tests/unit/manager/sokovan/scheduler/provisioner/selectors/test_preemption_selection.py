@@ -104,6 +104,7 @@ def _criteria(
         designated_agent_ids=None,
         job_priority=job_priority,
         victim_candidates=victim_candidates,
+        session_group=None,
     )
 
 

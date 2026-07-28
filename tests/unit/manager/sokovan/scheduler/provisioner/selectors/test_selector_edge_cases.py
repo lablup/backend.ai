@@ -64,6 +64,7 @@ def _criteria(requirements: list[ResourceRequirements]) -> AgentSelectionCriteri
         designated_agent_ids=None,
         job_priority=0,
         victim_candidates=None,
+        session_group=None,
     )
 
 
