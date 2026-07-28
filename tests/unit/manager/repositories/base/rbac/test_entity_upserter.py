@@ -440,6 +440,8 @@ class TestRBACEntityUpserter:
 
             rows = (await db_sess.scalars(sa.select(RBACEntityUpserterTestRow))).all()
             assert len(rows) == 1
+            assert rows[0].id == _EXISTING_ROW_ID
+            assert rows[0].value == "after"
 
             assocs = (await db_sess.scalars(sa.select(AssociationScopesEntitiesRow))).all()
             assert len(assocs) == len(case.expected_bindings)
