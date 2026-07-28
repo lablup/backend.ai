@@ -25,40 +25,46 @@ down_revision = "c4a91d7e05b2"
 branch_labels = None
 depends_on = None
 
-_TABLE = "app_config_fragments"
-_UNIQUE = "uq_app_config_fragments_config_name_scope_type_scope_id"
-_PUBLIC_INDEX = "uq_app_config_fragments_public_config_name"
-
 
 def upgrade() -> None:
     # The partial index already kept public rows unique, so nothing can collide under the
     # widened constraint.
-    op.execute(sa.text(f"DROP INDEX IF EXISTS {_PUBLIC_INDEX}"))
-    op.execute(sa.text(f"ALTER TABLE {_TABLE} DROP CONSTRAINT IF EXISTS {_UNIQUE}"))
+    op.execute(sa.text("DROP INDEX IF EXISTS uq_app_config_fragments_public_config_name"))
     op.execute(
-        sa.text(f"""
-            ALTER TABLE {_TABLE}
-            ADD CONSTRAINT {_UNIQUE}
+        sa.text("""
+            ALTER TABLE app_config_fragments
+            DROP CONSTRAINT IF EXISTS uq_app_config_fragments_config_name_scope_type_scope_id
+        """)
+    )
+    op.execute(
+        sa.text("""
+            ALTER TABLE app_config_fragments
+            ADD CONSTRAINT uq_app_config_fragments_config_name_scope_type_scope_id
             UNIQUE NULLS NOT DISTINCT (config_name, scope_type, scope_id)
         """)
     )
 
 
 def downgrade() -> None:
-    op.execute(sa.text(f"ALTER TABLE {_TABLE} DROP CONSTRAINT IF EXISTS {_UNIQUE}"))
     op.execute(
-        sa.text(f"""
-            ALTER TABLE {_TABLE}
-            ADD CONSTRAINT {_UNIQUE}
+        sa.text("""
+            ALTER TABLE app_config_fragments
+            DROP CONSTRAINT IF EXISTS uq_app_config_fragments_config_name_scope_type_scope_id
+        """)
+    )
+    op.execute(
+        sa.text("""
+            ALTER TABLE app_config_fragments
+            ADD CONSTRAINT uq_app_config_fragments_config_name_scope_type_scope_id
             UNIQUE (config_name, scope_type, scope_id)
         """)
     )
     # Public rows fall outside the plain constraint again, so restore their own index. A
     # duplicate public row cannot exist here: NULLS NOT DISTINCT rejected it.
     op.execute(
-        sa.text(f"""
-            CREATE UNIQUE INDEX IF NOT EXISTS {_PUBLIC_INDEX}
-            ON {_TABLE} (config_name, scope_type)
+        sa.text("""
+            CREATE UNIQUE INDEX IF NOT EXISTS uq_app_config_fragments_public_config_name
+            ON app_config_fragments (config_name, scope_type)
             WHERE scope_id IS NULL
         """)
     )
