@@ -40,6 +40,7 @@ from ai.backend.common.dto.manager.v2.scheduling_history.types import SubStepRes
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.kernel_scheduling_history import KernelSchedulingHistoryID
 from ai.backend.common.identifier.replica import ReplicaID
+from ai.backend.common.identifier.replica_group_history import ReplicaGroupHistoryID
 from ai.backend.common.types import KernelId, SessionId
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
@@ -244,6 +245,25 @@ class SchedulingHistoryAdapter(BaseAdapter):
             )
         )
         history_map = {h.id: self._deployment_data_to_dto(h) for h in action_result.histories}
+        return [history_map.get(history_id) for history_id in ids]
+
+    async def batch_load_replica_group_histories_by_ids(
+        self, ids: Sequence[ReplicaGroupHistoryID]
+    ) -> list[ReplicaGroupHistoryNode | None]:
+        """Batch load replica-group scheduling histories by their IDs for DataLoader use.
+
+        Returns ReplicaGroupHistoryNode DTOs in the same order as the input ids list.
+        """
+        if not ids:
+            return []
+        querier = BatchQuerier(
+            pagination=OffsetPagination(limit=len(ids)),
+            conditions=[ReplicaGroupHistoryConditions.by_ids(ids)],
+        )
+        action_result = await self._processors.scheduling_history.global_search_replica_group_history.wait_for_complete(
+            GlobalSearchReplicaGroupHistoryAction(querier=querier)
+        )
+        history_map = {h.id: self._replica_group_data_to_dto(h) for h in action_result.items}
         return [history_map.get(history_id) for history_id in ids]
 
     async def batch_load_route_histories_by_ids(

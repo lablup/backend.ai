@@ -10428,6 +10428,11 @@ type ModelDeployment implements Node
   """The replicas of this entity."""
   replicas(filter: ReplicaFilter = null, orderBy: [ReplicaOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelReplicaConnection
 
+  """
+  Added in 26.8.0. The scheduling history of this deployment's replica groups. This is the per-replica-group scaling status that the deprecated ``scaling_state`` field points to.
+  """
+  replicaGroupHistories(filter: ReplicaGroupHistoryFilter = null, orderBy: [ReplicaGroupHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ReplicaGroupHistoryConnection
+
   """The auto scaling rules of this entity."""
   autoScalingRules(filter: AutoScalingRuleFilter = null, orderBy: [AutoScalingRuleOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): AutoScalingRuleConnection
 
@@ -15219,6 +15224,11 @@ type Query
   """Added in 26.4.2. List deployment history (admin only)"""
   adminDeploymentHistories(filter: DeploymentHistoryFilter = null, orderBy: [DeploymentHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DeploymentHistoryConnection @join__field(graph: STRAWBERRY)
 
+  """
+  Added in 26.8.0. List replica-group scheduling history (superadmin only)
+  """
+  adminReplicaGroupSchedulingHistories(filter: ReplicaGroupHistoryFilter = null, orderBy: [ReplicaGroupHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ReplicaGroupHistoryConnection @join__field(graph: STRAWBERRY)
+
   """Added in 26.4.2. List route history (admin only)"""
   adminRouteHistories(filter: RouteHistoryFilter = null, orderBy: [RouteHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RouteHistoryConnection @join__field(graph: STRAWBERRY)
 
@@ -15502,6 +15512,11 @@ type Query
 
   """Added in 26.2.0. Get scheduling history for a specific route."""
   routeScopedSchedulingHistories(scope: RouteScope!, filter: RouteHistoryFilter = null, orderBy: [RouteHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RouteHistoryConnection @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.8.0. Get scheduling history for the replica groups of a specific deployment.
+  """
+  scopedReplicaGroupSchedulingHistories(scope: ReplicaGroupHistoryScope!, filter: ReplicaGroupHistoryFilter = null, orderBy: [ReplicaGroupHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ReplicaGroupHistoryConnection @join__field(graph: STRAWBERRY)
 
   """Added in 26.2.0. List resource groups"""
   resourceGroups(filter: ResourceGroupFilter = null, orderBy: [ResourceGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ResourceGroupConnection @join__field(graph: STRAWBERRY) @deprecated(reason: "Use admin_resource_groups instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
@@ -16256,6 +16271,122 @@ input ReplicaFilter
   AND: [ReplicaFilter!] = null
   OR: [ReplicaFilter!] = null
   NOT: [ReplicaFilter!] = null
+}
+
+"""Added in 26.8.0. Replica-group scheduling history record."""
+type ReplicaGroupHistory implements Node
+  @join__implements(graph: STRAWBERRY, interface: "Node")
+  @join__type(graph: STRAWBERRY)
+{
+  """The Globally Unique ID of this object"""
+  id: ID!
+  replicaGroupId: ID!
+  deploymentId: ID!
+  category: ReplicaGroupHistoryCategory!
+  phase: String!
+  fromStatus: String
+  toStatus: String
+  result: SchedulingResult!
+  errorCode: String
+  message: String
+  subSteps: [SubStepResultGQL!]!
+  attempts: Int!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+
+  """The deployment the replica group belongs to."""
+  deployment: ModelDeployment
+}
+
+"""
+Added in 26.8.0. Handler category that produced a replica-group history row
+"""
+enum ReplicaGroupHistoryCategory
+  @join__type(graph: STRAWBERRY)
+{
+  LIFECYCLE @join__enumValue(graph: STRAWBERRY)
+  SCALING @join__enumValue(graph: STRAWBERRY)
+}
+
+"""Added in 26.8.0. Replica-group scheduling history connection."""
+type ReplicaGroupHistoryConnection
+  @join__type(graph: STRAWBERRY)
+{
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [ReplicaGroupHistoryEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type ReplicaGroupHistoryEdge
+  @join__type(graph: STRAWBERRY)
+{
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: ReplicaGroupHistory!
+}
+
+"""Added in 26.8.0. Filter for replica-group scheduling history"""
+input ReplicaGroupHistoryFilter
+  @join__type(graph: STRAWBERRY)
+{
+  id: UUIDFilter = null
+  replicaGroupId: UUIDFilter = null
+  deploymentId: UUIDFilter = null
+  category: [ReplicaGroupHistoryCategory!] = null
+  phase: StringFilter = null
+  fromStatus: [String!] = null
+  toStatus: [String!] = null
+  result: SchedulingResultFilter = null
+  errorCode: StringFilter = null
+  message: StringFilter = null
+  createdAt: DateTimeFilter = null
+  updatedAt: DateTimeFilter = null
+  AND: [ReplicaGroupHistoryFilter!] = null
+  OR: [ReplicaGroupHistoryFilter!] = null
+  NOT: [ReplicaGroupHistoryFilter!] = null
+}
+
+"""
+Added in 26.8.0. Order by specification for replica-group scheduling history
+"""
+input ReplicaGroupHistoryOrderBy
+  @join__type(graph: STRAWBERRY)
+{
+  field: ReplicaGroupHistoryOrderField!
+  direction: OrderDirection! = DESC
+}
+
+"""
+Added in 26.8.0. Fields available for ordering replica-group scheduling history
+"""
+enum ReplicaGroupHistoryOrderField
+  @join__type(graph: STRAWBERRY)
+{
+  CREATED_AT @join__enumValue(graph: STRAWBERRY)
+  UPDATED_AT @join__enumValue(graph: STRAWBERRY)
+  PHASE @join__enumValue(graph: STRAWBERRY)
+  FROM_STATUS @join__enumValue(graph: STRAWBERRY)
+  TO_STATUS @join__enumValue(graph: STRAWBERRY)
+  RESULT @join__enumValue(graph: STRAWBERRY)
+  ATTEMPTS @join__enumValue(graph: STRAWBERRY)
+}
+
+"""
+Added in 26.8.0. Scope for replica-group scheduling history query. All items are OR'd; raises an error if every field is empty.
+"""
+input ReplicaGroupHistoryScope
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  Deployment IDs to get the history of every owned replica group for. The scoped search is single-target for now, so exactly one item is accepted across all fields.
+  """
+  deployment: [UUIDScope!] = null
 }
 
 """

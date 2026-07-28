@@ -3,10 +3,12 @@ from __future__ import annotations
 from .resolver import (
     DeploymentHistoryConnection,
     KernelSchedulingHistoryConnectionGQL,
+    ReplicaGroupHistoryConnectionGQL,
     RouteHistoryConnection,
     SessionSchedulingHistoryConnection,
     admin_deployment_histories,
     admin_kernel_scheduling_histories,
+    admin_replica_group_scheduling_histories,
     admin_route_histories,
     admin_session_scheduling_histories,
     deployment_histories,
@@ -14,6 +16,7 @@ from .resolver import (
     route_histories,
     route_scoped_scheduling_histories,
     scoped_kernel_scheduling_histories,
+    scoped_replica_group_scheduling_histories,
     session_scheduling_histories,
     session_scoped_scheduling_histories,
 )
@@ -26,6 +29,11 @@ from .types import (
     KernelSchedulingHistoryGQL,
     KernelSchedulingHistoryOrderByGQL,
     KernelScopeGQL,
+    ReplicaGroupHistoryCategoryGQL,
+    ReplicaGroupHistoryFilterGQL,
+    ReplicaGroupHistoryGQL,
+    ReplicaGroupHistoryOrderByGQL,
+    ReplicaGroupHistoryScopeGQL,
     RouteHistory,
     RouteHistoryFilter,
     RouteHistoryOrderBy,
@@ -41,11 +49,13 @@ from .types import (
 __all__ = (
     # Enums
     "SchedulingResultGQL",
+    "ReplicaGroupHistoryCategoryGQL",
     # Types
     "SubStepResultGQL",
     "SessionSchedulingHistory",
     "KernelSchedulingHistoryGQL",
     "DeploymentHistory",
+    "ReplicaGroupHistoryGQL",
     "RouteHistory",
     # Filters
     "SessionSchedulingHistoryFilter",
@@ -54,28 +64,34 @@ __all__ = (
     "KernelSchedulingHistoryOrderByGQL",
     "DeploymentHistoryFilter",
     "DeploymentHistoryOrderBy",
+    "ReplicaGroupHistoryFilterGQL",
+    "ReplicaGroupHistoryOrderByGQL",
     "RouteHistoryFilter",
     "RouteHistoryOrderBy",
     # Scope types (added in 26.2.0)
     "SessionScope",
     "KernelScopeGQL",
     "DeploymentScope",
+    "ReplicaGroupHistoryScopeGQL",
     "RouteScope",
     # Connections
     "SessionSchedulingHistoryConnection",
     "KernelSchedulingHistoryConnectionGQL",
     "DeploymentHistoryConnection",
+    "ReplicaGroupHistoryConnectionGQL",
     "RouteHistoryConnection",
     # Queries - Admin
     "admin_session_scheduling_histories",
     "admin_kernel_scheduling_histories",
     "admin_deployment_histories",
+    "admin_replica_group_scheduling_histories",
     "admin_route_histories",
     # Queries - Scoped (added in 26.2.0)
     "session_scoped_scheduling_histories",
     "scoped_kernel_scheduling_histories",
     "deployment_scoped_scheduling_histories",
     "route_scoped_scheduling_histories",
+    "scoped_replica_group_scheduling_histories",
     # Queries - Legacy (deprecated)
     "session_scheduling_histories",
     "deployment_histories",

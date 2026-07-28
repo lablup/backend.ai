@@ -12,6 +12,7 @@ from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.kernel_scheduling_history import KernelSchedulingHistoryID
+from ai.backend.common.identifier.replica_group_history import ReplicaGroupHistoryID
 from ai.backend.common.types import AgentId, ImageID, KernelId, SessionId
 from ai.backend.manager.data.permission.id import ObjectId
 
@@ -109,6 +110,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.api.gql.scheduling_history.types import (  # pants: no-infer-dep
         DeploymentHistory,
         KernelSchedulingHistoryGQL,
+        ReplicaGroupHistoryGQL,
         RouteHistory,
         SessionSchedulingHistory,
     )
@@ -790,6 +792,24 @@ class DataLoaders:
 
             dtos = await adapter.batch_load_deployment_histories_by_ids(ids)
             return [DH.from_pydantic(dto) if dto is not None else None for dto in dtos]
+
+        return DataLoader(load_fn=load_fn)
+
+    @cached_property
+    def replica_group_history_loader(
+        self,
+    ) -> DataLoader[ReplicaGroupHistoryID, ReplicaGroupHistoryGQL | None]:
+        adapter = self._adapters.scheduling_history
+
+        async def load_fn(
+            ids: list[ReplicaGroupHistoryID],
+        ) -> list[ReplicaGroupHistoryGQL | None]:
+            from ai.backend.manager.api.gql.scheduling_history.types import (  # pants: no-infer-dep
+                ReplicaGroupHistoryGQL as RGH,
+            )
+
+            dtos = await adapter.batch_load_replica_group_histories_by_ids(ids)
+            return [RGH.from_pydantic(dto) if dto is not None else None for dto in dtos]
 
         return DataLoader(load_fn=load_fn)
 
