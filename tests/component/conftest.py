@@ -150,6 +150,7 @@ from ai.backend.manager.repositories.user_resource_policy.repository import (
 )
 from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.auth.service import AuthService
+from ai.backend.testutils.action_validators import mock_virtual_scope_rbac_validators
 from ai.backend.testutils.bootstrap import (  # noqa: F401
     etcd_container,
     postgres_container,
@@ -1327,6 +1328,7 @@ def auth_processors(
         service=service,
         action_monitors=[],
         validators=ActionValidators(
+            virtual_scope_rbac=mock_virtual_scope_rbac_validators(),
             rbac=RBACValidators(
                 scope=MagicMock(spec=ScopeActionRBACValidator),
                 single_entity=MagicMock(spec=SingleEntityActionRBACValidator),
