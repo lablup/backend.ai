@@ -1,11 +1,11 @@
-"""Integration tests for the RBAC entity upserter with a real database."""
+"""Integration tests for RBACWriteOps.upsert_scoped with a real database."""
 
 from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncGenerator, Sequence
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, override
+from typing import Any, override
 from uuid import UUID
 
 import aiohttp.web
@@ -30,21 +30,47 @@ from ai.backend.manager.errors.repository import (
     ForeignKeyViolationError,
     UnsupportedCompositePrimaryKeyError,
 )
+from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.base import GUID, Base
+from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.keypair import KeyPairRow
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
-from ai.backend.manager.repositories.base import IntegrityErrorCheck
-from ai.backend.manager.repositories.base.rbac.entity_upserter import (
-    RBACEntityUpserter,
-    execute_rbac_entity_upserter,
+from ai.backend.manager.models.rbac_models.permission.object_permission import ObjectPermissionRow
+from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
+from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
+from ai.backend.manager.models.resource_policy import (
+    KeyPairResourcePolicyRow,
+    UserResourcePolicyRow,
 )
+from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow
+from ai.backend.manager.models.user import UserRow
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.base import IntegrityErrorCheck
+from ai.backend.manager.repositories.base.rbac.entity_upserter import RBACEntityUpserter
 from ai.backend.manager.repositories.base.upserter import UpserterSpec
+from ai.backend.manager.repositories.ops.rbac.provider import RBACOpsProvider
 from ai.backend.testutils.db import with_tables
 
-if TYPE_CHECKING:
-    from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-
+# ORM cluster registration: an ORM insert triggers configure_mappers() over the whole
+# registry, and importing the RBAC ops provider registers RoleRow/UserRoleRow whose string
+# relationships resolve against these rows. _ORM_CLUSTER keeps them live.
+_ORM_CLUSTER = (
+    AgentRow,
+    AssociationScopesEntitiesRow,
+    DomainRow,
+    KeyPairRow,
+    KeyPairResourcePolicyRow,
+    ObjectPermissionRow,
+    PermissionRow,
+    RoleRow,
+    ScalingGroupForDomainRow,
+    UserResourcePolicyRow,
+    UserRoleRow,
+    UserRow,
+)
 
 _ENTITY_NAME = "fragment"
 _EXISTING_ROW_ID = UUID("11111111-1111-1111-1111-111111111111")
@@ -57,15 +83,15 @@ _PROJECT_SCOPE_ID = "project-scope-1"
 # =============================================================================
 
 
-class RBACEntityUpserterTestRow(Base):  # type: ignore[misc]
-    """ORM model for upserter testing: one row per (name, scope_type, scope_id)."""
+class UpsertScopedTestRow(Base):  # type: ignore[misc]
+    """ORM model for upsert_scoped testing: one row per (name, scope_type, scope_id)."""
 
-    __tablename__ = "test_rbac_upserter"
+    __tablename__ = "test_upsert_scoped"
     __table_args__ = (
-        sa.UniqueConstraint("name", "scope_type", "scope_id", name="uq_test_rbac_upserter_scoped"),
+        sa.UniqueConstraint("name", "scope_type", "scope_id", name="uq_test_upsert_scoped"),
         # NULLs are distinct to a unique constraint, so public rows need their own index.
         sa.Index(
-            "uq_test_rbac_upserter_public",
+            "uq_test_upsert_scoped_public",
             "name",
             "scope_type",
             unique=True,
@@ -83,12 +109,12 @@ class RBACEntityUpserterTestRow(Base):  # type: ignore[misc]
     value: Mapped[str] = mapped_column(sa.String(50), nullable=False)
 
 
-class RBACUpserterFKTestRow(Base):  # type: ignore[misc]
+class UpsertScopedFKTestRow(Base):  # type: ignore[misc]
     """ORM model whose self-referencing FK acts as a gate for integrity error testing."""
 
-    __tablename__ = "test_rbac_upserter_fk"
+    __tablename__ = "test_upsert_scoped_fk"
     __table_args__ = (
-        sa.UniqueConstraint("name", name="uq_test_rbac_upserter_fk_name"),
+        sa.UniqueConstraint("name", name="uq_test_upsert_scoped_fk_name"),
         {"extend_existing": True},
     )
 
@@ -97,14 +123,14 @@ class RBACUpserterFKTestRow(Base):  # type: ignore[misc]
     )
     name: Mapped[str] = mapped_column(sa.String(50), nullable=False)
     parent_id: Mapped[UUID | None] = mapped_column(
-        GUID, sa.ForeignKey("test_rbac_upserter_fk.id"), nullable=True
+        GUID, sa.ForeignKey("test_upsert_scoped_fk.id"), nullable=True
     )
 
 
-class CompositePKTestRow(Base):  # type: ignore[misc]
+class UpsertScopedCompositePKTestRow(Base):  # type: ignore[misc]
     """ORM model with a composite primary key for testing rejection."""
 
-    __tablename__ = "test_rbac_upserter_composite_pk"
+    __tablename__ = "test_upsert_scoped_composite_pk"
     __table_args__ = {"extend_existing": True}
 
     tenant_id: Mapped[int] = mapped_column(sa.Integer, primary_key=True)
@@ -117,7 +143,7 @@ class CompositePKTestRow(Base):  # type: ignore[misc]
 # =============================================================================
 
 
-class ScopedUpserterSpec(UpserterSpec[RBACEntityUpserterTestRow]):
+class ScopedUpserterSpec(UpserterSpec[UpsertScopedTestRow]):
     """Upserts one scoped row, updating only its value on conflict."""
 
     def __init__(self, scope_type: str, scope_id: str | None, value: str) -> None:
@@ -127,8 +153,8 @@ class ScopedUpserterSpec(UpserterSpec[RBACEntityUpserterTestRow]):
 
     @property
     @override
-    def row_class(self) -> type[RBACEntityUpserterTestRow]:
-        return RBACEntityUpserterTestRow
+    def row_class(self) -> type[UpsertScopedTestRow]:
+        return UpsertScopedTestRow
 
     @override
     def build_insert_values(self) -> dict[str, Any]:
@@ -144,10 +170,10 @@ class ScopedUpserterSpec(UpserterSpec[RBACEntityUpserterTestRow]):
         return {"value": self._value}
 
 
-class _TestRBACUpsertParentMissingError(BackendAIError, aiohttp.web.HTTPBadRequest):
+class _TestUpsertParentMissingError(BackendAIError, aiohttp.web.HTTPBadRequest):
     """Test domain error simulating a rejected FK gate."""
 
-    error_type = "https://api.backend.ai/probs/test-rbac-upsert-parent-missing"
+    error_type = "https://api.backend.ai/probs/test-upsert-scoped-parent-missing"
     error_title = "Parent does not exist."
 
     @override
@@ -159,7 +185,7 @@ class _TestRBACUpsertParentMissingError(BackendAIError, aiohttp.web.HTTPBadReque
         )
 
 
-class FKGateUpserterSpec(UpserterSpec[RBACUpserterFKTestRow]):
+class FKGateUpserterSpec(UpserterSpec[UpsertScopedFKTestRow]):
     """Upserts a row behind a FK gate, mapping the violation to a domain error."""
 
     def __init__(self, parent_id: UUID) -> None:
@@ -167,8 +193,8 @@ class FKGateUpserterSpec(UpserterSpec[RBACUpserterFKTestRow]):
 
     @property
     @override
-    def row_class(self) -> type[RBACUpserterFKTestRow]:
-        return RBACUpserterFKTestRow
+    def row_class(self) -> type[UpsertScopedFKTestRow]:
+        return UpsertScopedFKTestRow
 
     @property
     @override
@@ -176,7 +202,7 @@ class FKGateUpserterSpec(UpserterSpec[RBACUpserterFKTestRow]):
         return (
             IntegrityErrorCheck(
                 violation_type=ForeignKeyViolationError,
-                error=_TestRBACUpsertParentMissingError(extra_msg="parent does not exist"),
+                error=_TestUpsertParentMissingError(extra_msg="parent does not exist"),
             ),
         )
 
@@ -189,13 +215,13 @@ class FKGateUpserterSpec(UpserterSpec[RBACUpserterFKTestRow]):
         return {"parent_id": self._parent_id}
 
 
-class CompositePKUpserterSpec(UpserterSpec[CompositePKTestRow]):
+class CompositePKUpserterSpec(UpserterSpec[UpsertScopedCompositePKTestRow]):
     """Upserter spec for composite PK testing."""
 
     @property
     @override
-    def row_class(self) -> type[CompositePKTestRow]:
-        return CompositePKTestRow
+    def row_class(self) -> type[UpsertScopedCompositePKTestRow]:
+        return UpsertScopedCompositePKTestRow
 
     @override
     def build_insert_values(self) -> dict[str, Any]:
@@ -235,11 +261,16 @@ class _UpsertCase:
 
 
 @pytest.fixture
+def provider(database_connection: ExtendedAsyncSAEngine) -> RBACOpsProvider:
+    return RBACOpsProvider(database_connection)
+
+
+@pytest.fixture
 async def create_tables(
     database_connection: ExtendedAsyncSAEngine,
 ) -> AsyncGenerator[None, None]:
     async with with_tables(
-        database_connection, [RBACEntityUpserterTestRow, AssociationScopesEntitiesRow]
+        database_connection, [UpsertScopedTestRow, AssociationScopesEntitiesRow]
     ):
         yield
 
@@ -249,7 +280,7 @@ async def create_fk_tables(
     database_connection: ExtendedAsyncSAEngine,
 ) -> AsyncGenerator[None, None]:
     async with with_tables(
-        database_connection, [RBACUpserterFKTestRow, AssociationScopesEntitiesRow]
+        database_connection, [UpsertScopedFKTestRow, AssociationScopesEntitiesRow]
     ):
         yield
 
@@ -259,10 +290,14 @@ async def create_composite_pk_table(
     database_connection: ExtendedAsyncSAEngine,
 ) -> AsyncGenerator[None, None]:
     async with database_connection.begin() as conn:
-        await conn.run_sync(lambda c: CompositePKTestRow.__table__.create(c, checkfirst=True))
+        await conn.run_sync(
+            lambda c: UpsertScopedCompositePKTestRow.__table__.create(c, checkfirst=True)
+        )
     yield
     async with database_connection.begin() as conn:
-        await conn.run_sync(lambda c: CompositePKTestRow.__table__.drop(c, checkfirst=True))
+        await conn.run_sync(
+            lambda c: UpsertScopedCompositePKTestRow.__table__.drop(c, checkfirst=True)
+        )
 
 
 @pytest.fixture
@@ -271,11 +306,11 @@ async def seeded_case(
     create_tables: None,
     request: pytest.FixtureRequest,
 ) -> _UpsertCase:
-    """Insert the conflicting row and its bindings directly, bypassing the upserter."""
+    """Insert the conflicting row and its bindings directly, bypassing the write op."""
     case: _UpsertCase = request.param
     async with database_connection.begin_session() as db_sess:
         await db_sess.execute(
-            sa.insert(RBACEntityUpserterTestRow).values(
+            sa.insert(UpsertScopedTestRow).values(
                 id=_EXISTING_ROW_ID,
                 name=_ENTITY_NAME,
                 scope_type=case.scope_type,
@@ -300,8 +335,8 @@ async def seeded_case(
 # =============================================================================
 
 
-class TestRBACEntityUpserter:
-    """Insert and conflict paths of execute_rbac_entity_upserter."""
+class TestUpsertScoped:
+    """Insert and conflict paths of RBACWriteOps.upsert_scoped."""
 
     @pytest.mark.parametrize(
         "case",
@@ -335,7 +370,7 @@ class TestRBACEntityUpserter:
                 scope_id=None,
                 scope_ref=None,
                 index_elements=["name", "scope_type"],
-                index_where=RBACEntityUpserterTestRow.scope_id.is_(None),
+                index_where=UpsertScopedTestRow.scope_id.is_(None),
                 additional_scope_refs=[],
                 expected_bindings=[],
             ),
@@ -345,13 +380,13 @@ class TestRBACEntityUpserter:
     async def test_insert_binds_new_row(
         self,
         database_connection: ExtendedAsyncSAEngine,
+        provider: RBACOpsProvider,
         create_tables: None,
         case: _UpsertCase,
     ) -> None:
         """An inserted row is bound to every scope the upserter carries."""
-        async with database_connection.begin_session() as db_sess:
-            result = await execute_rbac_entity_upserter(
-                db_sess,
+        async with provider.write_ops() as w:
+            result = await w.upsert_scoped(
                 RBACEntityUpserter(
                     spec=ScopedUpserterSpec(case.scope_type, case.scope_id, "after"),
                     element_type=RBACElementType.VFOLDER,
@@ -359,20 +394,21 @@ class TestRBACEntityUpserter:
                     index_elements=case.index_elements,
                     index_where=case.index_where,
                     additional_scope_refs=case.additional_scope_refs,
-                ),
+                )
             )
 
-            assert result.row.value == "after"
-            assert result.row.scope_id == case.scope_id
+        assert result.row.value == "after"
+        assert result.row.scope_id == case.scope_id
 
-            rows = (await db_sess.scalars(sa.select(RBACEntityUpserterTestRow))).all()
-            assert len(rows) == 1
+        async with database_connection.begin_session_read_committed() as sess:
+            rows = (await sess.scalars(sa.select(UpsertScopedTestRow))).all()
+            assocs = (await sess.scalars(sa.select(AssociationScopesEntitiesRow))).all()
 
-            assocs = (await db_sess.scalars(sa.select(AssociationScopesEntitiesRow))).all()
-            assert {_ScopeBinding(a.scope_type, a.scope_id) for a in assocs} == set(
-                case.expected_bindings
-            )
-            assert {a.entity_id for a in assocs} <= {str(result.row.id)}
+        assert len(rows) == 1
+        assert {_ScopeBinding(a.scope_type, a.scope_id) for a in assocs} == set(
+            case.expected_bindings
+        )
+        assert {a.entity_id for a in assocs} <= {str(result.row.id)}
 
     @pytest.mark.parametrize(
         "seeded_case",
@@ -406,7 +442,7 @@ class TestRBACEntityUpserter:
                 scope_id=None,
                 scope_ref=None,
                 index_elements=["name", "scope_type"],
-                index_where=RBACEntityUpserterTestRow.scope_id.is_(None),
+                index_where=UpsertScopedTestRow.scope_id.is_(None),
                 additional_scope_refs=[],
                 expected_bindings=[],
             ),
@@ -417,14 +453,14 @@ class TestRBACEntityUpserter:
     async def test_conflict_updates_row_without_duplicating_bindings(
         self,
         database_connection: ExtendedAsyncSAEngine,
+        provider: RBACOpsProvider,
         seeded_case: _UpsertCase,
     ) -> None:
         """A conflicting upsert updates the row in place and leaves its bindings as they were."""
         case = seeded_case
 
-        async with database_connection.begin_session() as db_sess:
-            result = await execute_rbac_entity_upserter(
-                db_sess,
+        async with provider.write_ops() as w:
+            result = await w.upsert_scoped(
                 RBACEntityUpserter(
                     spec=ScopedUpserterSpec(case.scope_type, case.scope_id, "after"),
                     element_type=RBACElementType.VFOLDER,
@@ -432,51 +468,54 @@ class TestRBACEntityUpserter:
                     index_elements=case.index_elements,
                     index_where=case.index_where,
                     additional_scope_refs=case.additional_scope_refs,
-                ),
+                )
             )
 
-            assert result.row.id == _EXISTING_ROW_ID
-            assert result.row.value == "after"
+        assert result.row.id == _EXISTING_ROW_ID
+        assert result.row.value == "after"
 
-            rows = (await db_sess.scalars(sa.select(RBACEntityUpserterTestRow))).all()
-            assert len(rows) == 1
-            assert rows[0].id == _EXISTING_ROW_ID
-            assert rows[0].value == "after"
+        async with database_connection.begin_session_read_committed() as sess:
+            rows = (await sess.scalars(sa.select(UpsertScopedTestRow))).all()
+            assocs = (await sess.scalars(sa.select(AssociationScopesEntitiesRow))).all()
 
-            assocs = (await db_sess.scalars(sa.select(AssociationScopesEntitiesRow))).all()
-            assert len(assocs) == len(case.expected_bindings)
-            assert {_ScopeBinding(a.scope_type, a.scope_id) for a in assocs} == set(
-                case.expected_bindings
-            )
+        assert len(rows) == 1
+        assert rows[0].id == _EXISTING_ROW_ID
+        assert rows[0].value == "after"
+        assert len(assocs) == len(case.expected_bindings)
+        assert {_ScopeBinding(a.scope_type, a.scope_id) for a in assocs} == set(
+            case.expected_bindings
+        )
 
     async def test_integrity_error_off_the_conflict_target_raises_domain_error(
         self,
-        database_connection: ExtendedAsyncSAEngine,
+        provider: RBACOpsProvider,
         create_fk_tables: None,
     ) -> None:
         """A FK violation is mapped by the spec's checks instead of being swallowed."""
-        async with database_connection.begin_session(commit_on_end=False) as db_sess:
-            upserter = RBACEntityUpserter(
-                spec=FKGateUpserterSpec(parent_id=uuid.uuid4()),
-                element_type=RBACElementType.VFOLDER,
-                scope_ref=RBACElementRef(RBACElementType.USER, _USER_SCOPE_ID),
-                index_elements=["name"],
-            )
-            with pytest.raises(_TestRBACUpsertParentMissingError, match="parent does not exist"):
-                await execute_rbac_entity_upserter(db_sess, upserter)
+        with pytest.raises(_TestUpsertParentMissingError, match="parent does not exist"):
+            async with provider.write_ops() as w:
+                await w.upsert_scoped(
+                    RBACEntityUpserter(
+                        spec=FKGateUpserterSpec(parent_id=uuid.uuid4()),
+                        element_type=RBACElementType.VFOLDER,
+                        scope_ref=RBACElementRef(RBACElementType.USER, _USER_SCOPE_ID),
+                        index_elements=["name"],
+                    )
+                )
 
     async def test_composite_pk_is_rejected(
         self,
-        database_connection: ExtendedAsyncSAEngine,
+        provider: RBACOpsProvider,
         create_composite_pk_table: None,
     ) -> None:
         """A composite primary key has no single entity id to bind, so it is rejected."""
-        async with database_connection.begin_session() as db_sess:
-            upserter = RBACEntityUpserter(
-                spec=CompositePKUpserterSpec(),
-                element_type=RBACElementType.VFOLDER,
-                scope_ref=RBACElementRef(RBACElementType.USER, _USER_SCOPE_ID),
-                index_elements=["tenant_id", "item_id"],
-            )
-            with pytest.raises(UnsupportedCompositePrimaryKeyError):
-                await execute_rbac_entity_upserter(db_sess, upserter)
+        with pytest.raises(UnsupportedCompositePrimaryKeyError):
+            async with provider.write_ops() as w:
+                await w.upsert_scoped(
+                    RBACEntityUpserter(
+                        spec=CompositePKUpserterSpec(),
+                        element_type=RBACElementType.VFOLDER,
+                        scope_ref=RBACElementRef(RBACElementType.USER, _USER_SCOPE_ID),
+                        index_elements=["tenant_id", "item_id"],
+                    )
+                )
