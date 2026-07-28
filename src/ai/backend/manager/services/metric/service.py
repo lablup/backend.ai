@@ -1,7 +1,7 @@
 import logging
 from collections import defaultdict
-from uuid import UUID
 
+from ai.backend.common.identifier.prometheus_query_preset import PrometheusQueryPresetID
 from ai.backend.common.types import SessionId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.repositories.metric.repository import MetricRepository
@@ -15,8 +15,8 @@ from .actions.container import (
 )
 from .actions.live_stat import ContainerLiveStatAction, ContainerLiveStatActionResult
 from .actions.session_utilization import (
-    SessionUtilizationAction,
-    SessionUtilizationActionResult,
+    QuerySessionUtilizationAction,
+    QuerySessionUtilizationActionResult,
     SessionUtilizationObservation,
 )
 
@@ -34,15 +34,17 @@ class MetricService:
 
     async def query_session_utilization(
         self,
-        action: SessionUtilizationAction,
-    ) -> SessionUtilizationActionResult:
-        session_ids_by_preset: defaultdict[UUID, dict[SessionId, None]] = defaultdict(dict)
+        action: QuerySessionUtilizationAction,
+    ) -> QuerySessionUtilizationActionResult:
+        session_ids_by_preset: defaultdict[PrometheusQueryPresetID, dict[SessionId, None]] = (
+            defaultdict(dict)
+        )
         for query in action.queries:
             for session_id in query.session_ids:
                 session_ids_by_preset[query.preset_id][session_id] = None
 
         observations_by_preset: dict[
-            UUID,
+            PrometheusQueryPresetID,
             dict[SessionId, SessionUtilizationObservation],
         ] = {}
         for preset_id, session_ids in session_ids_by_preset.items():
@@ -60,7 +62,7 @@ class MetricService:
                 )
                 for session_id, value in result.by_session.items()
             }
-        return SessionUtilizationActionResult(observations_by_preset=observations_by_preset)
+        return QuerySessionUtilizationActionResult(observations_by_preset=observations_by_preset)
 
     async def query_container_metric_metadata(
         self,

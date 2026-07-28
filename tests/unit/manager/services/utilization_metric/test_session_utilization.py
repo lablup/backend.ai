@@ -7,6 +7,7 @@ from uuid import uuid4
 
 import pytest
 
+from ai.backend.common.identifier.prometheus_query_preset import PrometheusQueryPresetID
 from ai.backend.common.types import SessionId
 from ai.backend.manager.repositories.metric.repository import MetricRepository
 from ai.backend.manager.repositories.metric.types import (
@@ -14,7 +15,7 @@ from ai.backend.manager.repositories.metric.types import (
     SessionUtilizationMetricResult,
 )
 from ai.backend.manager.services.metric.actions.session_utilization import (
-    SessionUtilizationAction,
+    QuerySessionUtilizationAction,
     SessionUtilizationObservation,
     SessionUtilizationQuery,
 )
@@ -39,7 +40,7 @@ class TestQuerySessionUtilization:
         service: MetricService,
         metric_repository: MagicMock,
     ) -> None:
-        preset_id = uuid4()
+        preset_id = PrometheusQueryPresetID(uuid4())
         first_session_id = SessionId(uuid4())
         second_session_id = SessionId(uuid4())
         metric_repository.query_session_utilization_metrics.return_value = (
@@ -52,7 +53,7 @@ class TestQuerySessionUtilization:
         )
 
         result = await service.query_session_utilization(
-            SessionUtilizationAction(
+            QuerySessionUtilizationAction(
                 queries=[
                     SessionUtilizationQuery(
                         preset_id=preset_id,
@@ -92,8 +93,8 @@ class TestQuerySessionUtilization:
         service: MetricService,
         metric_repository: MagicMock,
     ) -> None:
-        first_preset_id = uuid4()
-        second_preset_id = uuid4()
+        first_preset_id = PrometheusQueryPresetID(uuid4())
+        second_preset_id = PrometheusQueryPresetID(uuid4())
         first_session_id = SessionId(uuid4())
         second_session_id = SessionId(uuid4())
         metric_repository.query_session_utilization_metrics.side_effect = [
@@ -106,7 +107,7 @@ class TestQuerySessionUtilization:
         ]
 
         result = await service.query_session_utilization(
-            SessionUtilizationAction(
+            QuerySessionUtilizationAction(
                 queries=[
                     SessionUtilizationQuery(
                         preset_id=first_preset_id,
@@ -141,13 +142,13 @@ class TestQuerySessionUtilization:
         service: MetricService,
         metric_repository: MagicMock,
     ) -> None:
-        preset_id = uuid4()
+        preset_id = PrometheusQueryPresetID(uuid4())
         metric_repository.query_session_utilization_metrics.return_value = (
             SessionUtilizationMetricResult(by_session={})
         )
 
         result = await service.query_session_utilization(
-            SessionUtilizationAction(
+            QuerySessionUtilizationAction(
                 queries=[
                     SessionUtilizationQuery(
                         preset_id=preset_id,
@@ -166,7 +167,7 @@ class TestQuerySessionUtilization:
         metric_repository: MagicMock,
     ) -> None:
         result = await service.query_session_utilization(
-            SessionUtilizationAction(queries=[], evaluation_time=_NOW)
+            QuerySessionUtilizationAction(queries=[], evaluation_time=_NOW)
         )
 
         assert result.observations_by_preset == {}

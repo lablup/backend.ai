@@ -3,10 +3,10 @@ from __future__ import annotations
 import enum
 from decimal import Decimal
 from typing import Self
-from uuid import UUID
 
 from pydantic import Field, model_validator
 
+from ai.backend.common.identifier.prometheus_query_preset import PrometheusQueryPresetID
 from ai.backend.common.types import BackendAISchema
 
 
@@ -29,7 +29,9 @@ class IdleCheckPhase(enum.StrEnum):
 class UtilizationThresholdEntry(BackendAISchema):
     """One preset-backed session utilization threshold."""
 
-    preset_id: UUID = Field(description="Prometheus query preset used to evaluate utilization.")
+    preset_id: PrometheusQueryPresetID = Field(
+        description="Prometheus query preset used to evaluate utilization."
+    )
     threshold: Decimal = Field(
         ge=0,
         le=100,

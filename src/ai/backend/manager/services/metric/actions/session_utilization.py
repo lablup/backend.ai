@@ -5,9 +5,9 @@ from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
 from typing import override
-from uuid import UUID
 
 from ai.backend.common.data.permission.types import EntityType
+from ai.backend.common.identifier.prometheus_query_preset import PrometheusQueryPresetID
 from ai.backend.common.types import SessionId
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.services.metric.actions.base import (
@@ -18,18 +18,18 @@ from ai.backend.manager.services.metric.actions.base import (
 
 @dataclass(frozen=True)
 class SessionUtilizationQuery:
-    preset_id: UUID
+    preset_id: PrometheusQueryPresetID
     session_ids: Sequence[SessionId]
 
 
 @dataclass(frozen=True)
 class SessionUtilizationObservation:
-    preset_id: UUID
+    preset_id: PrometheusQueryPresetID
     value: Decimal
 
 
 @dataclass(frozen=True)
-class SessionUtilizationAction(QueryMetricAction):
+class QuerySessionUtilizationAction(QueryMetricAction):
     queries: Sequence[SessionUtilizationQuery]
     evaluation_time: datetime
 
@@ -49,9 +49,9 @@ class SessionUtilizationAction(QueryMetricAction):
 
 
 @dataclass(frozen=True)
-class SessionUtilizationActionResult(QueryMetricActionResult):
+class QuerySessionUtilizationActionResult(QueryMetricActionResult):
     observations_by_preset: Mapping[
-        UUID,
+        PrometheusQueryPresetID,
         Mapping[SessionId, SessionUtilizationObservation],
     ]
 

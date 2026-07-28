@@ -23,6 +23,7 @@ from ai.backend.manager.clients.prometheus.metric_types import (
     KernelLiveStatBatchResult,
 )
 from ai.backend.manager.errors.common import InternalServerError
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.metric.types import (
     SessionUtilizationMetricQuery,
     SessionUtilizationMetricResult,
@@ -54,11 +55,11 @@ class MetricRepository:
 
     def __init__(
         self,
+        db: ExtendedAsyncSAEngine,
         prometheus_client: PrometheusClient,
-        prometheus_query_preset_db_source: PrometheusQueryPresetDBSource,
     ) -> None:
         self._prometheus_client = prometheus_client
-        self._prometheus_query_preset_db_source = prometheus_query_preset_db_source
+        self._prometheus_query_preset_db_source = PrometheusQueryPresetDBSource(db)
 
     async def query_container_metric_metadata(self) -> list[str]:
         return await self._prometheus_client.fetch_available_container_metric_names()

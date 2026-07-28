@@ -15,8 +15,8 @@ from ai.backend.manager.services.metric.actions.live_stat import (
     ContainerLiveStatActionResult,
 )
 from ai.backend.manager.services.metric.actions.session_utilization import (
-    SessionUtilizationAction,
-    SessionUtilizationActionResult,
+    QuerySessionUtilizationAction,
+    QuerySessionUtilizationActionResult,
 )
 from ai.backend.manager.services.metric.service import MetricService
 
@@ -30,8 +30,8 @@ class MetricProcessors(AbstractProcessorPackage):
         ContainerLiveStatAction, ContainerLiveStatActionResult
     ]
     query_session_utilization: ActionProcessor[
-        SessionUtilizationAction,
-        SessionUtilizationActionResult,
+        QuerySessionUtilizationAction,
+        QuerySessionUtilizationActionResult,
     ]
 
     def __init__(
@@ -57,5 +57,5 @@ class MetricProcessors(AbstractProcessorPackage):
             ContainerMetricAction.spec(),
             ContainerMetricMetadataAction.spec(),
             ContainerLiveStatAction.spec(),
-            SessionUtilizationAction.spec(),
+            QuerySessionUtilizationAction.spec(),
         ]

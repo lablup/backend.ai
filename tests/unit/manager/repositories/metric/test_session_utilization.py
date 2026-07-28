@@ -2,13 +2,14 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from decimal import Decimal
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import pytest
 
 from ai.backend.common.dto.clients.prometheus.response import PrometheusResponse
 from ai.backend.common.exception import InvalidMetricPresetTemplate, PrometheusConnectionError
+from ai.backend.common.identifier.prometheus_query_preset import PrometheusQueryPresetID
 from ai.backend.common.types import SessionId
 from ai.backend.manager.clients.prometheus.client import PrometheusClient
 from ai.backend.manager.data.prometheus_query_preset.types import PrometheusQueryPresetData
@@ -81,10 +82,14 @@ class TestQuerySessionUtilizationMetrics:
         prometheus_client: MagicMock,
         preset_db_source: MagicMock,
     ) -> MetricRepository:
-        return MetricRepository(
-            prometheus_client=prometheus_client,
-            prometheus_query_preset_db_source=preset_db_source,
-        )
+        with patch(
+            "ai.backend.manager.repositories.metric.repository.PrometheusQueryPresetDBSource",
+            return_value=preset_db_source,
+        ):
+            return MetricRepository(
+                db=MagicMock(),
+                prometheus_client=prometheus_client,
+            )
 
     def _query(
         self,
@@ -92,7 +97,7 @@ class TestQuerySessionUtilizationMetrics:
         session_id: SessionId,
     ) -> SessionUtilizationMetricQuery:
         return SessionUtilizationMetricQuery(
-            preset_id=preset.id,
+            preset_id=PrometheusQueryPresetID(preset.id),
             session_ids=(session_id,),
             evaluation_time=_EVALUATION_TIME,
         )
@@ -112,7 +117,7 @@ class TestQuerySessionUtilizationMetrics:
         result = await repository.query_session_utilization_metrics(self._query(preset, session_id))
 
         assert result == SessionUtilizationMetricResult(by_session={session_id: Decimal("9.9")})
-        preset_db_source.get_by_id.assert_awaited_once_with(preset.id)
+        preset_db_source.get_by_id.assert_awaited_once_with(PrometheusQueryPresetID(preset.id))
         prometheus_client.fetch_session_utilization.assert_awaited_once_with(
             query_template=preset.query_template,
             time_window="5m",
