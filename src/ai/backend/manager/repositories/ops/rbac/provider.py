@@ -21,7 +21,7 @@ from ai.backend.common.data.permission.types import (
     RelationType,
     ScopeType,
 )
-from ai.backend.common.exception import RBACTypeConversionError
+from ai.backend.common.exception import RBACTypeConversionError, UnreachableError
 from ai.backend.common.identifier.role_preset import RolePresetID
 from ai.backend.common.identifier.user import UserID
 from ai.backend.common.identifier.virtual_scope import VirtualScopeID
@@ -37,6 +37,7 @@ from ai.backend.manager.data.permission.types import (
     ScopeType as LegacyScopeType,
 )
 from ai.backend.manager.errors.permission import VirtualScopeNotFound
+from ai.backend.manager.errors.repository import UnsupportedCompositePrimaryKeyError
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
@@ -52,7 +53,10 @@ from ai.backend.manager.repositories.base import (
     BulkCreator,
 )
 from ai.backend.manager.repositories.base.creator import BulkCreatorError
-from ai.backend.manager.repositories.base.integrity import parse_integrity_error
+from ai.backend.manager.repositories.base.integrity import (
+    match_integrity_error,
+    parse_integrity_error,
+)
 from ai.backend.manager.repositories.base.purger import (
     BulkPurgerError,
     BulkPurgerResultWithFailures,
@@ -73,6 +77,11 @@ from ai.backend.manager.repositories.base.rbac.entity_purger import (
     execute_rbac_entity_batch_purger,
     execute_rbac_entity_purger,
 )
+from ai.backend.manager.repositories.base.rbac.entity_upserter import (
+    RBACEntityUpserter,
+    RBACEntityUpserterResult,
+)
+from ai.backend.manager.repositories.base.rbac.utils import bulk_insert_on_conflict_do_nothing
 from ai.backend.manager.repositories.ops.base.provider import DBOpsProvider, WriteOps
 from ai.backend.manager.repositories.permission_controller.creators import (
     PermissionCreatorSpec,
@@ -236,6 +245,63 @@ class RBACWriteOps(WriteOps):
     ) -> RBACEntityCreatorResult[TRow]:
         """Insert one row with its RBAC scope association (the creator carries its scope)."""
         return await execute_rbac_entity_creator(self._sess, creator)
+
+    async def upsert_scoped[TRow: Base](
+        self,
+        upserter: RBACEntityUpserter[TRow],
+    ) -> RBACEntityUpserterResult[TRow]:
+        """Upsert one row (INSERT ON CONFLICT UPDATE) with its RBAC scope association.
+
+        The upsert counterpart of :meth:`create_scoped`; see :class:`RBACEntityUpserter` for
+        the conflict target it requires.
+        """
+        spec = upserter.spec
+        row_class = spec.row_class
+        table = row_class.__table__
+        pk_columns = sa.inspect(row_class).primary_key
+        if len(pk_columns) != 1:
+            raise UnsupportedCompositePrimaryKeyError(
+                f"Entity upserter only supports single-column primary keys (table: {table.name})",
+            )
+
+        stmt = (
+            pg_insert(table)
+            .values(spec.build_insert_values())
+            .on_conflict_do_update(
+                index_elements=upserter.conflict_target.columns,
+                index_where=upserter.conflict_target.index_predicate,
+                set_=spec.build_update_values(),
+            )
+            .returning(*table.columns)
+        )
+        try:
+            result = await self._sess.execute(stmt)
+        except sa.exc.IntegrityError as e:
+            # The conflict target is an update, so this is another constraint (a FK gate, say).
+            match_integrity_error(parse_integrity_error(e), spec.integrity_error_checks)
+        else:
+            row_data = result.fetchone()
+
+        if row_data is None:
+            raise UnreachableError("ON CONFLICT DO UPDATE returns the inserted or updated row")
+        row: TRow = row_class(**dict(row_data._mapping))
+
+        entity_type = upserter.element_type.to_entity_type()
+        pk_value = row_data._mapping[pk_columns[0].name]
+        await bulk_insert_on_conflict_do_nothing(
+            self._sess,
+            [
+                AssociationScopesEntitiesRow(
+                    scope_type=scope_ref.element_type.to_scope_type(),
+                    scope_id=scope_ref.element_id,
+                    entity_type=entity_type,
+                    entity_id=str(pk_value),
+                    relation_type=upserter.relation_type,
+                )
+                for scope_ref in upserter.all_scope_refs()
+            ],
+        )
+        return RBACEntityUpserterResult(row=row)
 
     async def bulk_create_scoped[TRow: Base](
         self,
