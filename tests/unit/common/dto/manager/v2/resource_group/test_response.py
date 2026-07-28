@@ -23,7 +23,6 @@ from ai.backend.common.dto.manager.v2.resource_group.response import (
 )
 from ai.backend.common.dto.manager.v2.resource_group.types import (
     PreemptionModeDTO,
-    PreemptionOrderDTO,
     SchedulerTypeDTO,
 )
 from ai.backend.common.dto.manager.v2.session.types import ClusterModeEnum
@@ -36,6 +35,7 @@ from ai.backend.common.dto.manager.v2.session_options.types import (
     AgentSelectionPolicyEnum,
     FailurePolicyEnum,
 )
+from ai.backend.common.types import PreemptionOrder
 
 
 def _make_resource_group_node(name: str = "test-group") -> ResourceGroupNode:
@@ -72,7 +72,7 @@ def _make_resource_group_detail_node(name: str = "test-group") -> ResourceGroupD
             preemption=PreemptionConfigInfo(
                 enabled=False,
                 preemptible_priority=5,
-                order=PreemptionOrderDTO.OLDEST,
+                order=PreemptionOrder.OLDEST,
                 mode=PreemptionModeDTO.TERMINATE,
                 preemption_min_runtime=0.0,
             ),

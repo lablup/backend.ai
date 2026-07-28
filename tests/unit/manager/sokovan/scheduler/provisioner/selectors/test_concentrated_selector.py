@@ -161,6 +161,7 @@ class TestConcentratedAgentSelector:
                 }
             ),
             containers=1,
+            session_group_id=None,
         )
 
         remaining_low = low.remaining_slots()

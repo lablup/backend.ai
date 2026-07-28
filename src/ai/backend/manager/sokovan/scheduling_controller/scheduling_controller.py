@@ -17,7 +17,7 @@ from ai.backend.common.identifier.image import ImageID
 from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.identifier.resource_slot import ResourceSlotName
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
-from ai.backend.common.types import ResourceSlot, ResourceSlotEntry, SessionId
+from ai.backend.common.types import PreemptionOrder, ResourceSlot, ResourceSlotEntry, SessionId
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -43,9 +43,6 @@ from ai.backend.manager.metrics.scheduler import (
 )
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.scheduler import SchedulerRepository
-from ai.backend.manager.sokovan.scheduler.provisioner.selectors.exceptions import (
-    BatchAgentSelectionFailedError,
-)
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import (
     AgentSelectionCriteria,
     AgentSelector,
@@ -86,6 +83,7 @@ from .validators import (
     MountNameValidationRule,
     PendingSessionCountLimitRule,
     PendingSessionResourceLimitRule,
+    PriorityLimitRule,
     RequestedSlotTypeRule,
     RequiredResourceSlotRule,
     ResourceLimitRule,
@@ -169,6 +167,7 @@ class SchedulingController:
         self._spec_validator = SessionSpecValidator([
             PendingSessionCountLimitRule(),
             PendingSessionResourceLimitRule(),
+            PriorityLimitRule(),
             ContainerLimitRule(),
             ImageSlotTypeRule(),
             RequestedSlotTypeRule(),
@@ -382,36 +381,48 @@ class SchedulingController:
                 requirements=plan.requirements(),
                 agent_selection_policy=scheduling_target.agent_selection_policy,
                 designated_agent_ids=list(scheduling_target.designated_agents) or None,
+                # The fitting check has no preemption context
+                job_priority=0,
+                victim_candidates=None,
+                # Group constraints are not applied to the fitting check: it
+                # answers "does this fit", and loading the group observations
+                # on this path is a separate decision (BEP-1064 open question).
+                session_group=None,
             )
             # Trackers are throwaway here: the fitting check only needs the
             # immutable observations, never the committed batch state. The
             # same builder as the real scheduling pass is used; only the
             # retry-failure hints are absent.
             trackers = build_agent_trackers(data.resources)
-            # A resource group with no candidate agents (NoAgentsInResourceGroupError)
-            # is likewise a whole-request error, so it propagates too.
-            try:
-                await self._agent_selector.select_agents_for_batch_requirements(
-                    trackers, criteria, data.limit
-                )
-            except BatchAgentSelectionFailedError as e:
-                for err in e.errors:
-                    hint = err.build_remediation_hint()
-                    reason = UnschedulableReasonHint(
-                        required_reduction=(
-                            tuple(
-                                ResourceSlotEntry(
-                                    resource_type=ResourceSlotName(str(k)),
-                                    quantity=format(v, "f"),
-                                )
-                                for k, v in hint.required_reduction.items()
+            # The fitting check consumes resolvable placement failures as
+            # computed results; absolute failures (no candidate agents at all,
+            # an exclusion filter leaving none) propagate as whole-request
+            # errors.
+            # The victim-less criteria never enter the preemption path, so
+            # the order is only a pool key placeholder here.
+            computation = await self._agent_selector.compute_placements(
+                data.agent_selection_strategy,
+                trackers,
+                criteria,
+                data.limit,
+                PreemptionOrder.OLDEST,
+            )
+            for failure in computation.failures:
+                reason = UnschedulableReasonHint(
+                    required_reduction=(
+                        tuple(
+                            ResourceSlotEntry(
+                                resource_type=ResourceSlotName(str(k)),
+                                quantity=format(v, "f"),
                             )
-                            if hint.required_reduction is not None
-                            else None
-                        ),
-                    )
-                    for index in plan.groups[err.requirement_index].indices:
-                        failure_hints[index] = reason
+                            for k, v in failure.missing_slots.items()
+                        )
+                        if failure.missing_slots
+                        else None
+                    ),
+                )
+                for index in plan.groups[failure.requirement_index].indices:
+                    failure_hints[index] = reason
 
         kernel_result = [
             ComputeScheduleKernelResult(
@@ -558,6 +569,49 @@ class SchedulingController:
             await self.mark_scheduling_needed(schedule_types)
 
         return result
+
+    async def mark_sessions_status(
+        self,
+        session_ids: list[SessionId],
+        to_status: SessionStatus,
+        reason: str,
+    ) -> list[SessionId]:
+        """
+        Move sessions to ``to_status`` and broadcast the transition.
+
+        Terminal sessions are skipped. Used by the preemption path (BEP-1055):
+        RUNNING -> PREEMPTED when a victim is confirmed, and PREEMPTED -> PENDING
+        when a reschedule victim is re-enqueued.
+
+        Args:
+            session_ids: Sessions to transition
+            to_status: Target session status
+            reason: Status reason recorded on the transitioned sessions
+
+        Returns:
+            IDs of the sessions actually transitioned.
+        """
+        marked_sessions = await self._repository.mark_sessions_status(
+            session_ids, to_status, reason
+        )
+        if not marked_sessions:
+            return marked_sessions
+
+        log.info("Marked {} sessions as {}", len(marked_sessions), to_status)
+        await self._event_producer.broadcast_events_batch([
+            SchedulingBroadcastEvent(
+                session_id=session_id,
+                creation_id="",
+                status_transition=str(to_status),
+                reason=reason,
+            )
+            for session_id in marked_sessions
+        ])
+        self._operation_metrics.observe_success(
+            operation="mark_sessions_status",
+            count=len(marked_sessions),
+        )
+        return marked_sessions
 
     async def validate_session_spec(self, spec: SessionValidationSpec) -> None:
         # TODO: Refactor to use ValidationRule

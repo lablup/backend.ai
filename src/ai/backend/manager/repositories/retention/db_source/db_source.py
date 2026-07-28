@@ -58,6 +58,7 @@ from ai.backend.manager.models.scheduling_history.row import (
     SessionSchedulingHistoryRow,
 )
 from ai.backend.manager.models.session.row import SessionRow
+from ai.backend.manager.models.session_group.row import SessionGroupRow
 from ai.backend.manager.models.vfolder.row import VFolderInvitationRow
 from ai.backend.manager.repositories.base import (
     BatchPurger,
@@ -100,7 +101,9 @@ class RetentionDBSource:
         ``usage_buckets``) list their specs child-before-parent so the drain
         removes FK-less or plain-FK children first. FK-CASCADE children are left
         to the DB unless they also need their own boundary sweep (terminal
-        routings / replica_groups outliving a still-running endpoint).
+        routings / replica_groups outliving a still-running endpoint). A parent
+        that only becomes deletable once its referencing rows are gone
+        (session_groups) is listed last instead.
         """
         # A session is held back while any kernel still references it or a
         # RESTRICT-guarded routing points at it, then purged once the blocker
@@ -115,6 +118,14 @@ class RetentionDBSource:
             sa.select(sa.literal(1))
             .where(RoutingRow.session == SessionRow.id)
             .correlate(SessionRow)
+            .exists()
+        )
+        # A placement group outlives its owner replica group, so it is collected
+        # once nothing references it any more.
+        group_has_replica_group = (
+            sa.select(sa.literal(1))
+            .where(ReplicaGroupRow.session_group_id == SessionGroupRow.id)
+            .correlate(SessionGroupRow)
             .exists()
         )
         return {
@@ -236,6 +247,22 @@ class RetentionDBSource:
                     conditions=(EndpointRow.lifecycle_stage == EndpointLifecycle.DESTROYED,),
                 ),
                 RetentionPurgerSpec(EndpointTokenRow, EndpointTokenRow.expires_at, threshold),
+                # session_groups is the parent side of
+                # replica_groups.session_group_id (NO ACTION, non-deferrable): a
+                # group is deletable only once nothing references it, hence the
+                # unreferenced guard instead of matching the terminal replica
+                # groups, which would abort the statement. Ordering it last is
+                # what collects the groups freed by the ReplicaGroupRow and
+                # EndpointRow specs (the latter through the endpoint's cascade to
+                # replica_groups) in the same tick rather than the next one.
+                # Nothing else clears them: the application never hard-deletes a
+                # replica group, and the FK points the wrong way for a DB cascade.
+                RetentionPurgerSpec(
+                    SessionGroupRow,
+                    SessionGroupRow.created_at,
+                    threshold,
+                    conditions=(~group_has_replica_group,),
+                ),
             ),
             # Each bucket kind is purged on its own period_end, with its FK-less
             # usage_bucket_entries (keyed by bucket_id + bucket_type) drained first.

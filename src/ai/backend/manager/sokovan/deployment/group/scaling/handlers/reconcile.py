@@ -39,7 +39,15 @@ class GroupScalingReconcileHandler(
                         deficit = (
                             view.desired_current_replica_count - view.current_live_replica_count
                         )
-                        if deficit > 0:
+                        if deficit > 0 and view.target_revision_id is None:
+                            # Steady-state self-heal only. During a rollout the current
+                            # revision is never refilled: a replica that died (agent
+                            # failure or user termination — indistinguishable) stays
+                            # gone and its capacity moves to the target revision as the
+                            # rolling step advances. Refilling would re-grab freed
+                            # resources and starve the target side (capacity livelock);
+                            # a target revision that cannot come up is covered by the
+                            # rollout timeout + rollback path instead.
                             create_instructions.append(
                                 GroupRouteCreateInstruction(
                                     replica_group_id=view.group_id,
@@ -75,20 +83,24 @@ class GroupScalingReconcileHandler(
                                     count=-deficit,
                                 )
                             )
+                    # The current revision converges on count alone — serving is never
+                    # required of it. Replicas that cannot be scheduled stay PENDING (live
+                    # but not serving); requiring serving here would livelock the rollout
+                    # when old-revision replicas can never become serving. The no-downtime
+                    # invariant (new replicas serve before the old side drains) is enforced
+                    # by target_matched below, which does require serving.
                     if view.target_revision_id is None:
-                        # Steady-state scaling: converge on count alone. Replicas that cannot
-                        # be scheduled stay PENDING; serving health is judged separately and
-                        # must not block the loop, so a rising/falling goal is always absorbed.
+                        # Steady state: exact count (a deficit is being refilled).
                         current_matched = (
                             view.current_live_replica_count == view.desired_current_replica_count
                         )
                     else:
-                        # Rollout in flight: require serving so the rolling step waits for the
-                        # new replicas before draining the old (no-downtime invariant).
+                        # Rollout in flight: one-sided. The current side is drain-only
+                        # (dead replicas are not refilled), so a shortfall is a final
+                        # state and must not hold the group out of STABLE — only a
+                        # surplus still waiting to drain does.
                         current_matched = (
-                            view.current_live_replica_count == view.desired_current_replica_count
-                            and view.current_serving_replica_count
-                            == view.desired_current_replica_count
+                            view.current_live_replica_count <= view.desired_current_replica_count
                         )
                     target_matched = (
                         view.target_live_replica_count == view.desired_target_replica_count

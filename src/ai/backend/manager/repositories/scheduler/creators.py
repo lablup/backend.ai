@@ -198,6 +198,7 @@ class SessionRowFromSpec(CreatorSpec[SessionRow]):
             domain_name=str(spec.scope.domain_name),
             resource_group_id=spec.scope.resource_group_id,
             scaling_group_name=str(spec.scope.resource_group_name),
+            session_group_id=spec.scope.session_group_id,
             session_type=spec.resource_spec.classification.session_type,
             cluster_mode=cluster_mode_value,
             cluster_size=spec.resource_spec.options.cluster_size,

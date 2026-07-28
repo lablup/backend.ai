@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
@@ -29,6 +29,8 @@ from ai.backend.common.resource.types import TotalResourceData
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
+    KernelId,
+    PreemptionMode,
     SessionId,
     VFolderMount,
     VFolderMountOptions,
@@ -54,9 +56,7 @@ from ai.backend.manager.views.sokovan.agent import AgentLimit, ResourceGroupReso
 from ai.backend.manager.views.sokovan.allocation import SessionAllocation
 from ai.backend.manager.views.sokovan.lifecycle import (
     KernelCreationInfo,
-    SessionRunningData,
     SessionsForPullWithImages,
-    SessionsForStartWithImages,
     SessionWithKernels,
 )
 from ai.backend.manager.views.sokovan.scheduling import ComputeScheduleData, SchedulingData
@@ -67,7 +67,6 @@ from ai.backend.manager.views.sokovan.search import (
 from ai.backend.manager.views.sokovan.session import (
     MarkTerminatingResult,
     SweptSessionInfo,
-    TerminatingKernelWithAgentData,
     TerminatingSessionData,
 )
 from ai.backend.manager.views.sokovan.session_creation import SessionSpecContext, UserEnqueueInfo
@@ -148,9 +147,11 @@ class SchedulerRepository:
                 resources=ResourceGroupResource(
                     agents=fetch.agents,
                     failed_sessions_by_agent=failed_sessions_by_agent,
+                    group_members_by_agent=fetch.session_group_members,
                 ),
                 session_dependencies=fetch.session_dependencies,
                 policy=fetch.policy,
+                preemption_candidates=fetch.preemption_candidates,
             ),
             global_scope=GlobalScopeSnapshot(
                 occupancy=fetch.occupancy,
@@ -214,6 +215,7 @@ class SchedulerRepository:
             ),
             resources=ResourceGroupResource(agents=fetch.agents),
             limit=AgentLimit(max_container_count=await self._get_max_container_count()),
+            agent_selection_strategy=fetch.agent_selection_strategy,
         )
 
     @scheduler_repository_resilience.apply()
@@ -258,6 +260,39 @@ class SchedulerRepository:
         )
 
     @scheduler_repository_resilience.apply()
+    async def mark_sessions_status(
+        self,
+        session_ids: list[SessionId],
+        to_status: SessionStatus,
+        reason: str,
+    ) -> list[SessionId]:
+        """
+        Move sessions to ``to_status``, skipping the sessions whose current
+        status cannot enter it. A move to PENDING re-enqueues the sessions'
+        kernels in the same transaction.
+
+        Returns the IDs of the sessions actually transitioned.
+        """
+        return await self._db_source.mark_sessions_status(session_ids, to_status, reason)
+
+    @scheduler_repository_resilience.apply()
+    async def get_resource_group_preemption_mode(
+        self, resource_group_id: ResourceGroupID
+    ) -> PreemptionMode:
+        """Return the preemption mode configured on a resource group."""
+        return await self._db_source.get_resource_group_preemption_mode(resource_group_id)
+
+    @scheduler_repository_resilience.apply()
+    async def reserve_sessions(self, allocations: list[SessionAllocation]) -> list[SessionId]:
+        """Prereserve the sessions backed by a preemption plan."""
+        return await self._db_source.reserve_sessions(allocations)
+
+    @scheduler_repository_resilience.apply()
+    async def admit_prereserved_kernels(self, session_ids: Sequence[SessionId]) -> list[KernelId]:
+        """Admit prereserved kernels that fit now, first reserved first."""
+        return await self._db_source.admit_prereserved_kernels(session_ids)
+
+    @scheduler_repository_resilience.apply()
     async def get_all_resource_groups(self) -> list[ResourceGroupID]:
         """Get ids of all defined resource groups."""
         return await self._db_source.get_all_resource_groups()
@@ -277,18 +312,6 @@ class SchedulerRepository:
         :return: List of TerminatingSessionData objects with kernel details
         """
         return await self._db_source.get_terminating_sessions_by_ids(session_ids)
-
-    @scheduler_repository_resilience.apply()
-    async def get_terminating_kernels_with_lost_agents_by_ids(
-        self,
-        session_ids: list[SessionId],
-    ) -> list[TerminatingKernelWithAgentData]:
-        """
-        Get kernels in TERMINATING sessions that have lost or missing agents
-        from given session IDs.
-        Used by SweepLostAgentKernelsLifecycleHandler for resource group based processing.
-        """
-        return await self._db_source.get_terminating_kernels_with_lost_agents_by_ids(session_ids)
 
     async def _get_max_container_count(self) -> int | None:
         """
@@ -464,13 +487,6 @@ class SchedulerRepository:
         await self._db_source.check_available_image(image_id, domain, user_uuid)
 
     @scheduler_repository_resilience.apply()
-    async def update_sessions_to_running(self, sessions_data: list[SessionRunningData]) -> None:
-        """
-        Update sessions from CREATING to RUNNING state with occupying_slots.
-        """
-        await self._db_source.update_sessions_to_running(sessions_data)
-
-    @scheduler_repository_resilience.apply()
     async def update_kernels_to_pulling_for_image(
         self,
         agent_id: AgentId,
@@ -598,7 +614,7 @@ class SchedulerRepository:
     async def reset_kernels_to_pending_for_sessions(
         self, session_ids: list[SessionId], reason: str
     ) -> int:
-        """Reset kernels to PENDING for the given sessions when max retries exceeded."""
+        """Reset kernels to PENDING for the given sessions going back to the queue."""
         return await self._db_source.reset_kernels_to_pending_for_sessions(session_ids, reason)
 
     @scheduler_repository_resilience.apply()
@@ -647,39 +663,6 @@ class SchedulerRepository:
         return await self._db_source.get_sessions_for_pull_by_ids(session_ids)
 
     @scheduler_repository_resilience.apply()
-    async def get_sessions_for_start(
-        self,
-        session_statuses: list[SessionStatus],
-        kernel_statuses: list[KernelStatus],
-    ) -> SessionsForStartWithImages:
-        """
-        Get sessions for starting with specified statuses.
-        Returns SessionsForStartWithImages dataclass.
-
-        :param statuses: Session statuses to filter by (typically PREPARED, CREATING)
-        :param kernel_statuses: Kernel statuses to filter by (typically PREPARED)
-        :return: SessionsForStartWithImages object
-        """
-        return await self._db_source.get_sessions_for_start(session_statuses, kernel_statuses)
-
-    @scheduler_repository_resilience.apply()
-    async def get_sessions_for_start_by_ids(
-        self,
-        session_ids: list[SessionId],
-    ) -> SessionsForStartWithImages:
-        """
-        Get sessions for starting by session IDs.
-
-        This method is used by handlers that need additional session data
-        (SessionDataForStart and ImageConfigData) beyond what the coordinator
-        provides (HandlerSessionData).
-
-        :param session_ids: List of session IDs to fetch
-        :return: SessionsForStartWithImages object with sessions and image configs
-        """
-        return await self._db_source.get_sessions_for_start_by_ids(session_ids)
-
-    @scheduler_repository_resilience.apply()
     async def mark_session_cancelled(
         self, session_id: SessionId, error_info: ErrorStatusInfo, reason: str = "FAILED_TO_START"
     ) -> None:
@@ -687,13 +670,6 @@ class SchedulerRepository:
         Mark a session as cancelled with error information.
         """
         await self._db_source.mark_session_cancelled(session_id, error_info, reason)
-
-    @scheduler_repository_resilience.apply()
-    async def get_container_info_for_kernels(self, session_id: SessionId) -> dict[UUID, str | None]:
-        """
-        Get container IDs for kernels in a session.
-        """
-        return await self._db_source.get_container_info_for_kernels(session_id)
 
     @scheduler_repository_resilience.apply()
     async def update_session_error_info(
@@ -987,24 +963,6 @@ class SchedulerRepository:
             min_priority: Minimum priority floor (priority will not go below this)
         """
         await self._db_source.lower_session_priority(session_ids, amount, min_priority)
-
-    async def update_kernels_last_observed_at(
-        self,
-        kernel_observation_times: Mapping[UUID, datetime],
-    ) -> int:
-        """Update the last_observed_at timestamp for multiple kernels.
-
-        Used by fair share observer to record when kernels were last observed
-        for resource usage tracking. Each kernel can have a different observation
-        time (e.g., terminated kernels use terminated_at, running kernels use now).
-
-        Args:
-            kernel_observation_times: Mapping of kernel ID to observation timestamp
-
-        Returns:
-            Number of kernels updated
-        """
-        return await self._db_source.update_kernels_last_observed_at(kernel_observation_times)
 
     async def get_db_now(self) -> datetime:
         """Get the current timestamp from the database.

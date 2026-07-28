@@ -9,6 +9,7 @@ from functools import cached_property
 
 from ai.backend.common.identifier.architecture import ArchName
 from ai.backend.common.identifier.resource_slot import ResourceSlotName
+from ai.backend.common.identifier.session_group import SessionGroupID
 from ai.backend.common.types import AgentId, SessionId
 
 
@@ -84,6 +85,12 @@ class ResourceGroupResource:
     # Sessions that previously failed per agent (retry deprioritization
     # hints from Valkey; empty for the fitting check)
     failed_sessions_by_agent: Mapping[AgentId, frozenset[SessionId]] = field(default_factory=dict)
+    # Live members each agent already holds, per session group (loaded only
+    # for the groups of this pass's pending sessions; empty for the fitting
+    # check)
+    group_members_by_agent: Mapping[AgentId, Mapping[SessionGroupID, int]] = field(
+        default_factory=dict
+    )
 
     @cached_property
     def slots(self) -> Mapping[ResourceSlotName, SlotResource]:

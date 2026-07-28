@@ -10,6 +10,7 @@ from ai.backend.common.clients.http_client.client_pool import (
     ClientPool,
     tcp_client_session_factory,
 )
+from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.dependencies import NonMonitorableDependencyProvider
@@ -73,6 +74,7 @@ class SokovanOrchestratorInput:
     network_plugin_ctx: NetworkPluginContext
     event_producer: EventProducer
     valkey_schedule: ValkeyScheduleClient
+    valkey_live: ValkeyLiveClient
     valkey_stat: ValkeyStatClient
     agent_selector: AgentSelector
     # Controller dependencies
@@ -199,6 +201,7 @@ class SokovanOrchestratorDependency(
             replica_group_repository=setup_input.replica_group_repository,
             idle_checker_repository=setup_input.idle_checker_repository,
             scheduling_controller=setup_input.scheduling_controller,
+            valkey_live=setup_input.valkey_live,
             valkey_schedule=setup_input.valkey_schedule,
             lock_factory=setup_input.distributed_lock_factory,
             config_provider=setup_input.config_provider,

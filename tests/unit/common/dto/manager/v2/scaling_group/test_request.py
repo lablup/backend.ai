@@ -12,10 +12,10 @@ from ai.backend.common.dto.manager.v2.scaling_group.request import (
 )
 from ai.backend.common.dto.manager.v2.scaling_group.types import (
     PreemptionMode,
-    PreemptionOrder,
     SchedulerType,
 )
 from ai.backend.common.exception import BackendAISchemaValidationFailed
+from ai.backend.common.types import PreemptionOrder
 
 
 class TestPreemptionConfigInput:

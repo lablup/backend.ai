@@ -18,12 +18,14 @@ from ai.backend.manager.sokovan.scheduler.results import (
     SessionExecutionResult,
     SessionTransitionInfo,
 )
+from ai.backend.manager.sokovan.scheduler.types import ScheduleType
 from ai.backend.manager.views.sokovan.lifecycle import SessionWithKernels
 
 if TYPE_CHECKING:
     from ai.backend.manager.sokovan.scheduler.provisioner.provisioner import (
         SessionProvisioner,
     )
+    from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
@@ -42,9 +44,11 @@ class ScheduleSessionsLifecycleHandler(SessionLifecycleHandler):
         self,
         provisioner: SessionProvisioner,
         repository: SchedulerRepository,
+        scheduling_controller: SchedulingController,
     ) -> None:
         self._provisioner = provisioner
         self._repository = repository
+        self._scheduling_controller = scheduling_controller
 
     @classmethod
     @override
@@ -138,6 +142,29 @@ class ScheduleSessionsLifecycleHandler(SessionLifecycleHandler):
             failure.session_id: failure for failure in schedule_result.scheduling_failures
         }
 
+        # Reservation-backed placements: the sessions hold their resources
+        # (kernels already RESERVED) and wait for their victims; the victims
+        # enter the preemption flow (PREEMPTED branches by the group's mode).
+        reserved_ids = set(schedule_result.reserved_session_ids)
+        if reserved_ids:
+            await self._scheduling_controller.mark_sessions_status(
+                list(reserved_ids),
+                SessionStatus.RESERVED,
+                reason="preemption-reservation",
+            )
+            victim_ids = sorted({
+                victim_id
+                for entry in schedule_result.preemption_plan
+                for victim_id in entry.victim_session_ids
+            })
+            if victim_ids:
+                await self._scheduling_controller.mark_sessions_status(
+                    victim_ids,
+                    SessionStatus.PREEMPTED,
+                    reason="preempted-by-reservation",
+                )
+                await self._scheduling_controller.mark_scheduling_needed([ScheduleType.PREEMPTED])
+
         # Allocated sessions transition to SCHEDULED; failed attempts are reported
         # as failures so the coordinator can classify them (need_retry/expired/
         # give_up); the rest were not attempted this cycle (priority/resource
@@ -147,6 +174,9 @@ class ScheduleSessionsLifecycleHandler(SessionLifecycleHandler):
             session_id = session.session_info.identity.id
             if session_id in scheduled_ids:
                 result.successes.append(self._to_transition_info(session, "triggered-by-scheduler"))
+            elif session_id in reserved_ids:
+                # Marked RESERVED above; not a coordinator transition target.
+                result.skipped.append(self._to_transition_info(session, "preemption-reservation"))
             elif session_id in failure_map:
                 reason = failure_map[session_id].msg or "scheduling-failed"
                 result.failures.append(self._to_transition_info(session, reason))

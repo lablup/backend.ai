@@ -6,7 +6,7 @@ import logging
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any, cast
 from uuid import UUID
@@ -34,6 +34,7 @@ from ai.backend.common.identifier.resource_group import (
     ResourceGroupName,
 )
 from ai.backend.common.identifier.resource_slot import ResourceSlotName
+from ai.backend.common.identifier.session_group import SessionGroupID
 from ai.backend.common.identifier.user import UserID
 from ai.backend.common.resource.types import TotalResourceData
 from ai.backend.common.types import (
@@ -41,6 +42,7 @@ from ai.backend.common.types import (
     AgentId,
     ClusterMode,
     KernelId,
+    PreemptionMode,
     ResourceSlot,
     SessionId,
     SessionTypes,
@@ -91,6 +93,7 @@ from ai.backend.manager.models.session import (
     SessionDependencyRow,
     SessionRow,
 )
+from ai.backend.manager.models.session_group.row import SessionGroupRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import (
     ExtendedAsyncSAEngine,
@@ -125,6 +128,7 @@ from ai.backend.manager.repositories.scheduler.types.session_creation import (
     SessionSpecFetch,
     UserEnqueueFetch,
 )
+from ai.backend.manager.repositories.scheduler.updaters import SessionStatusBatchUpdaterSpec
 from ai.backend.manager.repositories.scheduling_history import (
     SessionSchedulingHistoryCreatorSpec,
 )
@@ -143,13 +147,10 @@ from ai.backend.manager.views.sokovan.lifecycle import (
     KernelCreationInfo,
     SessionDataForPull,
     SessionDataForStart,
-    SessionRunningData,
     SessionsForPullWithImages,
-    SessionsForStartWithImages,
     SessionWithKernels,
 )
 from ai.backend.manager.views.sokovan.resource_group import ResourceGroupMeta
-from ai.backend.manager.views.sokovan.results import ScheduledSessionData
 from ai.backend.manager.views.sokovan.search import (
     SessionWithKernelsAndUserSearchResult,
     SessionWithKernelsSearchResult,
@@ -158,7 +159,6 @@ from ai.backend.manager.views.sokovan.session import (
     MarkTerminatingResult,
     SweptSessionInfo,
     TerminatingKernelData,
-    TerminatingKernelWithAgentData,
     TerminatingSessionData,
 )
 from ai.backend.manager.views.sokovan.session_creation import (
@@ -166,6 +166,8 @@ from ai.backend.manager.views.sokovan.session_creation import (
     ResourceGroupEnqueueInfo,
 )
 from ai.backend.manager.views.sokovan.snapshot import (
+    PreemptionCandidate,
+    PreemptionCandidateSnapshot,
     ResourceAllocation,
     ResourceGroupSchedulingPolicy,
     ResourceLimit,
@@ -175,11 +177,13 @@ from ai.backend.manager.views.sokovan.snapshot import (
     SlotAllocation,
     UserResourceAllocation,
     UserResourceLimit,
+    UserVictimCandidates,
 )
 from ai.backend.manager.views.sokovan.workload import (
     KernelWorkload,
     ResourceRequest,
     SessionDependencyInfo,
+    SessionGroupPolicy,
     SessionPlacement,
     SessionWorkload,
     WorkloadMeta,
@@ -220,6 +224,16 @@ class _ScalingGroupWithSlotInventory:
 
     rg_row: ScalingGroupRow
     served_slot_names: frozenset[ResourceSlotName]
+
+
+@dataclass
+class _PreemptionCandidateAccumulator:
+    """Per-session build state: the session-level row shared by the
+    session's result rows plus the per-(agent, slot) amounts folded
+    across them."""
+
+    row: sa.Row[Any]
+    slots_by_agent: dict[AgentId, dict[ResourceSlotName, Decimal]]
 
 
 class ScheduleDBSource:
@@ -267,6 +281,12 @@ class ScheduleDBSource:
             session_ids = [s.meta.session_id for s in pending_sessions.sessions]
             session_dependencies = await self._fetch_session_dependencies(db_sess, session_ids)
             observed_at = await self._get_db_now_in_session(db_sess)
+            preemption_candidates = await self._fetch_preemption_candidates(
+                db_sess, resource_group, pending_sessions, observed_at
+            )
+            session_group_members = await self._fetch_session_group_members(
+                db_sess, resource_group.meta.id, pending_sessions
+            )
 
             return SchedulingFetch(
                 resource_group=resource_group.meta,
@@ -277,6 +297,8 @@ class ScheduleDBSource:
                 resource_policy=resource_policy,
                 session_dependencies=SessionDependencySnapshot(by_session=session_dependencies),
                 observed_at=observed_at,
+                preemption_candidates=preemption_candidates,
+                session_group_members=session_group_members,
             )
 
     async def _fetch_resource_group_with_slot_inventory(
@@ -363,7 +385,9 @@ class ScheduleDBSource:
             policy=ResourceGroupSchedulingPolicy(
                 scheduler=rg_row.scheduler,
                 agent_selection_strategy=rg_row.scheduler_opts.agent_selection_strategy,
+                preemption_order=rg_row.scheduler_opts.preemption.order,
             ),
+            preemption=rg_row.scheduler_opts.preemption,
         )
 
     async def _fetch_pending_sessions(
@@ -395,6 +419,7 @@ class ScheduleDBSource:
                     SessionRow.designated_agent_ids,
                     SessionRow.requested_starts_at,
                     SessionRow.options,
+                    SessionRow.session_group_id,
                 )
             )
             .where(
@@ -444,6 +469,11 @@ class ScheduleDBSource:
                     row.requested
                 )
 
+        group_policies = await self._fetch_session_group_policies(
+            db_sess,
+            {row.session_group_id for row in session_rows.values() if row.session_group_id},
+        )
+
         workloads: list[SessionWorkload] = []
         for session_id, row in session_rows.items():
             kernels = [
@@ -481,6 +511,9 @@ class ScheduleDBSource:
                         designated_agent_ids=[AgentId(a) for a in row.designated_agent_ids]
                         if row.designated_agent_ids is not None
                         else None,
+                        session_group=group_policies.get(row.session_group_id)
+                        if row.session_group_id is not None
+                        else None,
                     ),
                     priority=row.priority,
                     job_priority=row.job_priority,
@@ -491,6 +524,85 @@ class ScheduleDBSource:
             )
 
         return PendingSessions(sessions=workloads)
+
+    async def _fetch_session_group_policies(
+        self,
+        db_sess: SASession,
+        session_group_ids: set[SessionGroupID],
+    ) -> dict[SessionGroupID, SessionGroupPolicy]:
+        """Load the placement policy of the groups the pending sessions belong to.
+
+        A group already soft-deleted is left out: its members place
+        unconstrained, matching the NULL-group default.
+        """
+        if not session_group_ids:
+            return {}
+        rows = (
+            await db_sess.execute(
+                sa.select(
+                    SessionGroupRow.id,
+                    SessionGroupRow.placement_direction,
+                    SessionGroupRow.placement_enforcement,
+                ).where(
+                    SessionGroupRow.id.in_(session_group_ids),
+                    SessionGroupRow.deleted_at.is_(None),
+                )
+            )
+        ).all()
+        return {
+            row.id: SessionGroupPolicy(
+                group_id=row.id,
+                direction=row.placement_direction,
+                enforcement=row.placement_enforcement,
+            )
+            for row in rows
+        }
+
+    async def _fetch_session_group_members(
+        self,
+        db_sess: SASession,
+        resource_group_id: ResourceGroupID,
+        pending_sessions: PendingSessions,
+    ) -> dict[AgentId, dict[SessionGroupID, int]]:
+        """Count the live members each agent holds, per session group.
+
+        Occupancy comes from ``resource_allocations`` (the authority) joined
+        with ``sessions.session_group_id``; a kernel counts while it holds
+        agent resources, so sessions merely reserved (SCHEDULED/PREPARING)
+        count as well. Sessions are counted DISTINCT per agent, so a
+        multi-node session counts once on each agent hosting its kernels.
+        No query runs when this pass has no placement-engaged group.
+        """
+        group_ids = pending_sessions.placement_group_ids
+        if not group_ids:
+            return {}
+
+        ra = ResourceAllocationRow.__table__
+        k = KernelRow.__table__
+        s = SessionRow.__table__
+        stmt = (
+            sa.select(
+                s.c.session_group_id,
+                k.c.agent,
+                sa.func.count(sa.distinct(s.c.id)).label("member_count"),
+            )
+            .select_from(ra.join(k, ra.c.kernel_id == k.c.id).join(s, k.c.session_id == s.c.id))
+            .where(
+                s.c.session_group_id.in_(group_ids),
+                s.c.resource_group_id == resource_group_id,
+                k.c.status.in_(KernelStatus.resource_holding_statuses()),
+                k.c.agent.is_not(None),
+                ra.c.free_at.is_(None),
+            )
+            .group_by(s.c.session_group_id, k.c.agent)
+        )
+        rows = (await db_sess.execute(stmt)).all()
+        members_by_agent: dict[AgentId, dict[SessionGroupID, int]] = defaultdict(dict)
+        for row in rows:
+            members_by_agent[AgentId(row.agent)][SessionGroupID(row.session_group_id)] = (
+                row.member_count
+            )
+        return dict(members_by_agent)
 
     async def _fetch_agents(
         self, db_sess: SASession, resource_group_id: ResourceGroupID
@@ -517,7 +629,8 @@ class ScheduleDBSource:
             slots = {
                 ResourceSlotName(ar.slot_name): SlotResource(
                     capacity=ar.capacity,
-                    reserved=ar.reserved,
+                    # Advance reservations occupy capacity for scheduling
+                    reserved=ar.reserved + ar.prereserved,
                     used=ar.used,
                 )
                 for ar in agent_row.agent_resource_rows
@@ -853,6 +966,122 @@ class ScheduleDBSource:
 
         return dict(dependencies_by_session)
 
+    async def _fetch_preemption_candidates(
+        self,
+        db_sess: SASession,
+        resource_group: ResourceGroupFetch,
+        pending_sessions: PendingSessions,
+        observed_at: datetime,
+    ) -> PreemptionCandidateSnapshot:
+        """Load this resource group's preemption victim candidates per owner.
+
+        A candidate is one whole session (the preemption unit): a
+        preemptible, non-private session that holds unfreed agent
+        allocations (SCHEDULED onward, terminatable — same hold definition
+        as the occupancy scan), owned by a pending owner, with
+        ``job_priority`` strictly below that owner's max pending
+        ``job_priority`` — a superset of every per-pending comparison, so
+        no valid victim is dropped. With a minimum runtime configured,
+        sessions below it are dropped too (NULL ``starts_at`` counts as
+        zero runtime). Candidates are unordered — reclaim ordering is
+        per-pending, so it stays in the selection layer. No query runs
+        when preemption is disabled on the group.
+        """
+        if not resource_group.preemption.enabled:
+            return PreemptionCandidateSnapshot.empty()
+        max_pending_priority: dict[UserID, int] = {}
+        for workload in pending_sessions.sessions:
+            # Private (SFTP/system) sessions never initiate preemption,
+            # just as they are never victims
+            if workload.is_private:
+                continue
+            owner = workload.meta.owner.user_uuid
+            current = max_pending_priority.get(owner)
+            if current is None or workload.job_priority > current:
+                max_pending_priority[owner] = workload.job_priority
+        if not max_pending_priority:
+            return PreemptionCandidateSnapshot.empty()
+
+        ra = ResourceAllocationRow.__table__
+        k = KernelRow.__table__
+        s = SessionRow.__table__
+        # Victim prefilter: owned by a pending owner AND strictly below
+        # that owner's own max pending job_priority
+        candidate_filter = sa.or_(
+            *(
+                sa.and_(s.c.user_uuid == user_uuid, s.c.job_priority < threshold)
+                for user_uuid, threshold in max_pending_priority.items()
+            )
+        )
+        # Per allocation row the agent holds ``used`` once reported, else
+        # the ``requested`` reservation — the amount freed on preemption.
+        allocated_sum = sa.func.sum(sa.func.coalesce(ra.c.used, ra.c.requested)).label("allocated")
+        stmt = (
+            sa.select(
+                s.c.id,
+                s.c.user_uuid,
+                s.c.job_priority,
+                s.c.starts_at,
+                k.c.agent,
+                ra.c.slot_name,
+                allocated_sum,
+            )
+            .select_from(ra.join(k, ra.c.kernel_id == k.c.id).join(s, k.c.session_id == s.c.id))
+            .where(
+                s.c.resource_group_id == resource_group.meta.id,
+                s.c.status.in_(SessionStatus.preemption_victim_statuses()),
+                s.c.is_preemptible == sa.true(),
+                # Private (SFTP/system) sessions are never preemption victims
+                s.c.session_type.not_in(SessionTypes.private_types()),
+                candidate_filter,
+                k.c.status.in_(KernelStatus.resource_holding_statuses()),
+                k.c.agent.is_not(None),
+                ra.c.free_at.is_(None),
+            )
+            .group_by(
+                s.c.id,
+                s.c.user_uuid,
+                s.c.job_priority,
+                s.c.starts_at,
+                k.c.agent,
+                ra.c.slot_name,
+            )
+        )
+        min_runtime = resource_group.preemption.preemption_min_runtime
+        if min_runtime > timedelta(0):
+            stmt = stmt.where(s.c.starts_at <= observed_at - min_runtime)
+        rows = (await db_sess.execute(stmt)).all()
+
+        # One accumulator per session: the session-level values from any of
+        # its rows plus the per-(agent, slot) amounts folded across rows
+        candidates: dict[SessionId, _PreemptionCandidateAccumulator] = {}
+        for row in rows:
+            session_id = SessionId(row.id)
+            accumulator = candidates.get(session_id)
+            if accumulator is None:
+                accumulator = _PreemptionCandidateAccumulator(row=row, slots_by_agent={})
+                candidates[session_id] = accumulator
+            accumulator.slots_by_agent.setdefault(AgentId(row.agent), {})[
+                ResourceSlotName(row.slot_name)
+            ] = row.allocated
+
+        by_user: dict[UserID, list[PreemptionCandidate]] = defaultdict(list)
+        for session_id, accumulator in candidates.items():
+            by_user[UserID(accumulator.row.user_uuid)].append(
+                PreemptionCandidate(
+                    session_id=session_id,
+                    job_priority=accumulator.row.job_priority,
+                    started_at=accumulator.row.starts_at,
+                    allocated_slots_by_agent=accumulator.slots_by_agent,
+                )
+            )
+        return PreemptionCandidateSnapshot(
+            by_user={
+                user_uuid: UserVictimCandidates(candidates=user_candidates)
+                for user_uuid, user_candidates in by_user.items()
+            }
+        )
+
     async def mark_sessions_terminating(
         self,
         session_ids: list[SessionId],
@@ -902,6 +1131,210 @@ class ScheduleDBSource:
                 force_terminated_sessions=force_terminated_sessions,
                 skipped_sessions=skipped_sessions,
             )
+
+    async def mark_sessions_status(
+        self,
+        session_ids: list[SessionId],
+        to_status: SessionStatus,
+        reason: str,
+    ) -> list[SessionId]:
+        """
+        Move sessions to ``to_status`` and record the transition in the
+        scheduling history, as every status transition does.
+
+        Only the session status moves; what the new status means happens later,
+        in the handler that owns it. Sessions already in a terminal status are
+        skipped.
+
+        :param session_ids: Sessions to transition
+        :param to_status: Target session status
+        :param reason: Status reason recorded on the transitioned sessions
+        :return: IDs of the sessions actually transitioned
+        """
+        if not session_ids:
+            return []
+
+        async with self._db.begin_session_read_committed() as db_sess:
+            now = await self._get_db_now_in_session(db_sess)
+            markable = sa.and_(
+                SessionRow.id.in_(session_ids),
+                SessionRow.status.not_in(SessionStatus.terminal_statuses()),
+            )
+            status_result = await db_sess.execute(
+                sa.select(SessionRow.id, SessionRow.status).where(markable)
+            )
+            source_statuses: dict[SessionId, SessionStatus] = {
+                cast(SessionId, row.id): SessionStatus(row.status) for row in status_result
+            }
+            values = SessionStatusBatchUpdaterSpec(
+                to_status=to_status,
+                status_changed_at=now,
+                reason=reason,
+            ).build_values()
+            mark_result = await db_sess.execute(
+                sa.update(SessionRow).values(**values).where(markable).returning(SessionRow.id)
+            )
+            marked_sessions = [cast(SessionId, row.id) for row in mark_result]
+            if not marked_sessions:
+                return []
+
+            phase = f"mark_{to_status.name.lower()}"
+            history_specs = [
+                SessionSchedulingHistoryCreatorSpec(
+                    session_id=session_id,
+                    phase=phase,
+                    result=SchedulingResult.SUCCESS,
+                    message=f"{phase} success",
+                    from_status=source_statuses.get(session_id),
+                    to_status=to_status,
+                )
+                for session_id in marked_sessions
+            ]
+            await self._record_scheduling_history(db_sess, BulkCreator(specs=history_specs))
+
+            return marked_sessions
+
+    async def get_resource_group_preemption_mode(
+        self, resource_group_id: ResourceGroupID
+    ) -> PreemptionMode:
+        """Return the preemption mode configured on a resource group.
+
+        Raises:
+            ScalingGroupNotFound: when the resource group does not exist.
+        """
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
+            resource_group = await self._fetch_resource_group(db_sess, resource_group_id)
+        return resource_group.preemption.mode
+
+    async def admit_prereserved_kernels(
+        self,
+        session_ids: Sequence[SessionId],
+    ) -> list[KernelId]:
+        """Admit prereserved kernels whose agents can now host them.
+
+        Per agent, kernels are tried in ``prereserved_at`` order (first
+        reserved, first admitted). Admission moves the kernel's row buckets
+        from ``prereserved`` into ``reserved`` and mirrors the same amounts
+        on the agent under the normal invariant (``used + reserved + amount
+        <= capacity``), then advances the kernel to SCHEDULED. A kernel
+        that does not fit stops its agent for this cycle so a later
+        reservation never overtakes an earlier one.
+        """
+        if not session_ids:
+            return []
+        k = KernelRow.__table__
+        ra = ResourceAllocationRow.__table__
+        admitted: list[KernelId] = []
+        async with self._db.begin_session_read_committed() as db_sess:
+            waiting_rows = (
+                await db_sess.execute(
+                    sa.select(
+                        k.c.id.label("kernel_id"),
+                        k.c.agent,
+                    )
+                    .select_from(k.join(ra, ra.c.kernel_id == k.c.id))
+                    .where(
+                        k.c.session_id.in_(session_ids),
+                        k.c.status == KernelStatus.RESERVED,
+                        k.c.agent.is_not(None),
+                        ra.c.free_at.is_(None),
+                        ra.c.reserved_at.is_(None),
+                    )
+                    .group_by(k.c.id, k.c.agent)
+                    # First reserved, first admitted: the walk below relies
+                    # on this per-agent ordering.
+                    .order_by(k.c.agent, sa.func.min(ra.c.prereserved_at), k.c.id)
+                )
+            ).all()
+
+            by_agent: dict[AgentId, list[KernelId]] = {}
+            for row in waiting_rows:
+                by_agent.setdefault(AgentId(row.agent), []).append(KernelId(row.kernel_id))
+
+            now = await self._get_db_now_in_session(db_sess)
+            for agent_id, kernel_ids in by_agent.items():
+                for kernel_id in kernel_ids:
+                    if not await self._admit_kernel_hold(db_sess, agent_id, kernel_id, now):
+                        # First reserved, first admitted: later reservations
+                        # on this agent wait for the next cycle.
+                        break
+                    await db_sess.execute(
+                        sa.update(KernelRow)
+                        .where(
+                            KernelRow.id == kernel_id,
+                            KernelRow.status == KernelStatus.RESERVED,
+                        )
+                        .values(
+                            status=KernelStatus.SCHEDULED,
+                            status_info="prereservation-admitted",
+                            status_changed=now,
+                            status_history=sql_json_merge(
+                                KernelRow.__table__.c.status_history,
+                                (),
+                                {KernelStatus.SCHEDULED.name: now.isoformat()},
+                            ),
+                        )
+                    )
+                    admitted.append(kernel_id)
+        return admitted
+
+    async def _admit_kernel_hold(
+        self,
+        db_sess: SASession,
+        agent_id: AgentId,
+        kernel_id: KernelId,
+        now: datetime,
+    ) -> bool:
+        """Move one kernel's holds from ``prereserved`` into ``reserved``.
+
+        The rows move first (``reserved = prereserved, prereserved = 0``
+        with the ``reserved_at`` stamp) and their returned amounts drive
+        the agent mirror under the admission guard; False rolls the whole
+        move back when any slot does not fit yet.
+        """
+        ar = AgentResourceRow.__table__
+        savepoint = await db_sess.begin_nested()
+        moved_rows = (
+            await db_sess.execute(
+                sa.update(ResourceAllocationRow)
+                .where(
+                    ResourceAllocationRow.kernel_id == kernel_id,
+                    ResourceAllocationRow.free_at.is_(None),
+                    ResourceAllocationRow.reserved_at.is_(None),
+                )
+                .values(
+                    reserved=ResourceAllocationRow.prereserved,
+                    prereserved=0,
+                    reserved_at=now,
+                )
+                .returning(ResourceAllocationRow.slot_name, ResourceAllocationRow.reserved)
+            )
+        ).all()
+        if not moved_rows:
+            await savepoint.rollback()
+            return False
+        amounts = sa.values(
+            sa.column("slot_name", sa.String),
+            sa.column("amount", sa.Numeric),
+            name="admit_amounts",
+        ).data([(row.slot_name, row.reserved) for row in moved_rows])
+        result = await db_sess.execute(
+            sa.update(ar)
+            .where(
+                ar.c.agent_id == agent_id,
+                ar.c.slot_name == amounts.c.slot_name,
+                ar.c.used + ar.c.reserved + amounts.c.amount <= ar.c.capacity,
+            )
+            .values(
+                reserved=ar.c.reserved + amounts.c.amount,
+                prereserved=ar.c.prereserved - amounts.c.amount,
+            )
+        )
+        if cast(CursorResult[Any], result).rowcount != len(moved_rows):
+            await savepoint.rollback()
+            return False
+        await savepoint.commit()
+        return True
 
     async def _free_kernel_allocations(
         self,
@@ -1305,56 +1738,6 @@ class ScheduleDBSource:
 
         return timed_out_sessions
 
-    async def get_terminating_kernels_with_lost_agents_by_ids(
-        self,
-        session_ids: list[SessionId],
-    ) -> list[TerminatingKernelWithAgentData]:
-        """
-        Fetch kernels in TERMINATING state that have lost or missing agents
-        from given session IDs.
-
-        :param session_ids: Pre-filtered session IDs from Coordinator
-        :return: List of kernels with lost agents
-        """
-        if not session_ids:
-            return []
-
-        async with self._db.begin_readonly_session_read_committed() as db_sess:
-            query = (
-                sa.select(
-                    KernelRow.id,
-                    KernelRow.session_id,
-                    KernelRow.status,
-                    KernelRow.agent,
-                    AgentRow.status.label("agent_status"),
-                )
-                .select_from(KernelRow)
-                .outerjoin(AgentRow, KernelRow.agent == AgentRow.id)
-                .where(
-                    KernelRow.session_id.in_(session_ids),
-                    KernelRow.status == KernelStatus.TERMINATING,
-                    sa.or_(
-                        KernelRow.agent.is_(None),  # No agent assigned
-                        AgentRow.status.in_(
-                            AgentStatus.unavailable_statuses()
-                        ),  # Agent unavailable
-                    ),
-                )
-            )
-            result = await db_sess.execute(query)
-            rows = result.fetchall()
-
-            return [
-                TerminatingKernelWithAgentData(
-                    kernel_id=KernelId(row.id),
-                    session_id=row.session_id,
-                    status=row.status,
-                    agent_id=row.agent,
-                    agent_status=str(row.agent_status) if row.agent_status else None,
-                )
-                for row in rows
-            ]
-
     async def enqueue_session_from_spec(
         self,
         spec: SessionSpec,
@@ -1559,6 +1942,7 @@ class ScheduleDBSource:
                 resource_group=resource_group,
                 global_info=global_info,
                 agents=agents,
+                agent_selection_strategy=rg_row.scheduler_opts.agent_selection_strategy,
             )
 
     async def _fetch_session_spec_fetch(
@@ -1686,6 +2070,7 @@ class ScheduleDBSource:
                         KeyPairResourcePolicyRow.max_containers_per_session,
                         KeyPairResourcePolicyRow.max_pending_session_count,
                         KeyPairResourcePolicyRow.max_pending_session_resource_slots,
+                        KeyPairResourcePolicyRow.max_priority,
                         KeyPairResourcePolicyRow.allowed_vfolder_hosts,
                     )
                     .select_from(UserRow)
@@ -1707,6 +2092,7 @@ class ScheduleDBSource:
                         else None
                     ),
                     allowed_vfolder_hosts=policy_row.allowed_vfolder_hosts,
+                    max_priority=policy_row.max_priority,
                 )
 
         dotfile_bundle = DotfileBundle()
@@ -1980,6 +2366,75 @@ class ScheduleDBSource:
 
         return scheduled_session_ids
 
+    async def reserve_sessions(self, allocations: list[SessionAllocation]) -> list[SessionId]:
+        """Prereserve the sessions backed by a preemption plan.
+
+        Mirrors :meth:`allocate_sessions` for reservations: each kernel is
+        assigned its agent, advanced PENDING -> RESERVED, and its slots are
+        prereserved (``prereserved`` hold, ``used`` excluded from the
+        guard). Session status is NOT changed here — the caller marks the
+        returned sessions RESERVED. A failed capacity gate rolls the whole
+        batch back and the sessions stay PENDING for the next tick.
+        """
+        reserved_session_ids: list[SessionId] = []
+        try:
+            async with self._db.begin_session_read_committed() as db_sess:
+                now = await self._get_db_now_in_session(db_sess)
+                for allocation in allocations:
+                    await self._reserve_single_session(db_sess, allocation, now)
+                    reserved_session_ids.append(allocation.session_id)
+        except AgentResourceCapacityExceeded as e:
+            log.warning("Reservation batch rolled back on capacity gate: {}", e)
+            return []
+
+        return reserved_session_ids
+
+    async def _reserve_single_session(
+        self,
+        db_sess: SASession,
+        allocation: SessionAllocation,
+        now: datetime,
+    ) -> None:
+        """Prereserve and assign each kernel of a session to its chosen agent.
+
+        The PENDING -> RESERVED update doubles as the idempotency gate,
+        exactly like :meth:`_allocate_single_session`.
+        """
+        for kernel_alloc in allocation.kernel_allocations:
+            promoted = await db_sess.execute(
+                sa.update(KernelRow)
+                .where(
+                    sa.and_(
+                        KernelRow.id == kernel_alloc.kernel_id,
+                        KernelRow.status == KernelStatus.PENDING,
+                    )
+                )
+                .values(
+                    status=KernelStatus.RESERVED,
+                    status_info="reserved",
+                    status_data={},
+                    status_changed=now,
+                    status_history=sql_json_merge(
+                        KernelRow.__table__.c.status_history,
+                        (),
+                        {KernelStatus.RESERVED.name: now.isoformat()},
+                    ),
+                    agent=kernel_alloc.agent_id,
+                    agent_addr=kernel_alloc.agent_addr,
+                )
+            )
+            if cast(CursorResult[Any], promoted).rowcount == 0:
+                continue
+            await self._prereserve_kernel_resources(
+                db_sess, KernelId(kernel_alloc.kernel_id), kernel_alloc.agent_id
+            )
+
+        await db_sess.execute(
+            sa.update(SessionRow)
+            .where(SessionRow.id == allocation.session_id)
+            .values(agent_ids=allocation.unique_agent_ids())
+        )
+
     async def _allocate_single_session(
         self,
         db_sess: SASession,
@@ -2219,6 +2674,8 @@ class ScheduleDBSource:
         ar = AgentResourceRow.__table__
         slots = sorted(resource_slot_to_quantities(occupied_slots), key=lambda s: s.slot_name)
         for s in slots:
+            # ``reserved`` is not SET here, so RETURNING yields the amount the
+            # row still held; it is zeroed right after the move.
             alloc_result = await db_sess.execute(
                 sa.update(ResourceAllocationRow)
                 .where(
@@ -2228,16 +2685,24 @@ class ScheduleDBSource:
                     ResourceAllocationRow.used_at.is_(None),
                 )
                 .values(used=s.quantity, used_at=sa.func.now())
-                .returning(ResourceAllocationRow.requested)
+                .returning(ResourceAllocationRow.reserved)
             )
             alloc_row = alloc_result.first()
             if alloc_row is None:
                 continue
             await db_sess.execute(
+                sa.update(ResourceAllocationRow)
+                .where(
+                    ResourceAllocationRow.kernel_id == kernel_id,
+                    ResourceAllocationRow.slot_name == s.slot_name,
+                )
+                .values(reserved=0)
+            )
+            await db_sess.execute(
                 sa.update(ar)
                 .where(ar.c.agent_id == agent_id, ar.c.slot_name == s.slot_name)
                 .values(
-                    reserved=sa.func.greatest(ar.c.reserved - alloc_row.requested, 0),
+                    reserved=sa.func.greatest(ar.c.reserved - alloc_row.reserved, 0),
                     used=ar.c.used + s.quantity,
                 )
             )
@@ -2283,7 +2748,7 @@ class ScheduleDBSource:
                 .where(
                     ar.c.agent_id == agent_id,
                     ar.c.slot_name == r.slot_name,
-                    new_reserved + ar.c.used <= ar.c.capacity,
+                    new_reserved + ar.c.prereserved + ar.c.used <= ar.c.capacity,
                 )
                 .values(reserved=new_reserved)
             )
@@ -2291,6 +2756,85 @@ class ScheduleDBSource:
                 raise AgentResourceCapacityExceeded(
                     f"Agent {agent_id}: capacity exceeded for slot '{r.slot_name}'"
                 )
+        await self._stamp_allocations_reserved(db_sess, kernel_id)
+
+    async def _prereserve_kernel_resources(
+        self,
+        db_sess: SASession,
+        kernel_id: KernelId,
+        agent_id: AgentId,
+    ) -> None:
+        """Prereserve a kernel's requested slots ahead of the victims' release.
+
+        Targets the kernel's allocation rows that never held anything yet
+        (``prereserved_at``, ``used_at`` and ``free_at`` all unset): stamps
+        ``prereserved_at`` and adds their amounts into the agent's
+        ``prereserved`` in one pass. The guard excludes ``used``: the
+        victims still hold their allocations, so the future holds may
+        transiently overlap them. ``reserved + prereserved + requested <=
+        capacity`` is enforced — a prereservation the agent could never
+        satisfy is rejected, rolling back the stamp with the rest of the
+        transaction.
+        """
+        ar = AgentResourceRow.__table__
+        stamped_rows = (
+            await db_sess.execute(
+                sa.update(ResourceAllocationRow)
+                .where(
+                    ResourceAllocationRow.kernel_id == kernel_id,
+                    ResourceAllocationRow.prereserved_at.is_(None),
+                    ResourceAllocationRow.used_at.is_(None),
+                    ResourceAllocationRow.free_at.is_(None),
+                )
+                .values(
+                    prereserved_at=sa.func.now(),
+                    prereserved=ResourceAllocationRow.requested,
+                )
+                .returning(ResourceAllocationRow.slot_name, ResourceAllocationRow.prereserved)
+            )
+        ).all()
+        if not stamped_rows:
+            return
+        amounts = sa.values(
+            sa.column("slot_name", sa.String),
+            sa.column("requested", sa.Numeric),
+            name="prereserve_amounts",
+        ).data([(row.slot_name, row.prereserved) for row in stamped_rows])
+        result = await db_sess.execute(
+            sa.update(ar)
+            .where(
+                ar.c.agent_id == agent_id,
+                ar.c.slot_name == amounts.c.slot_name,
+                ar.c.reserved + ar.c.prereserved + amounts.c.requested <= ar.c.capacity,
+            )
+            .values(prereserved=ar.c.prereserved + amounts.c.requested)
+        )
+        if cast(CursorResult[Any], result).rowcount != len(stamped_rows):
+            raise AgentResourceCapacityExceeded(
+                f"Agent {agent_id}: prereservation exceeds capacity"
+            )
+
+    async def _stamp_allocations_reserved(
+        self,
+        db_sess: SASession,
+        kernel_id: KernelId,
+    ) -> None:
+        """Record the admitted hold on the kernel's active allocation rows:
+        the amount into the row's ``reserved`` bucket and the time into
+        ``reserved_at`` (idempotent via the ``reserved_at IS NULL`` guard)."""
+        await db_sess.execute(
+            sa.update(ResourceAllocationRow)
+            .where(
+                ResourceAllocationRow.kernel_id == kernel_id,
+                ResourceAllocationRow.free_at.is_(None),
+                ResourceAllocationRow.used_at.is_(None),
+                ResourceAllocationRow.reserved_at.is_(None),
+            )
+            .values(
+                reserved_at=sa.func.now(),
+                reserved=ResourceAllocationRow.requested,
+            )
+        )
 
     async def _free_allocations_and_release(
         self,
@@ -2301,11 +2845,12 @@ class ScheduleDBSource:
         """Free the given kernels' active allocations and release their hold on
         ``agent_resources``.
 
-        Rows that were only reserved (``used_at IS NULL``) decrement the agent's
-        ``reserved`` by ``requested``; rows that were running (``used_at`` set)
-        decrement ``used`` by the recorded amount. ``greatest(…, 0)`` guards
-        against drift-induced negatives. Idempotent via the ``free_at IS NULL``
-        guard. Returns the number of allocation rows freed.
+        The row's bucket values are the ledger: each agent counter is
+        decremented by the row's own ``prereserved`` / ``reserved`` /
+        ``used`` amounts unconditionally — no interpretation happens here.
+        ``greatest(…, 0)`` guards against drift-induced negatives. Idempotent
+        via the ``free_at IS NULL`` guard. Returns the number of allocation
+        rows freed.
         """
         if not kernel_ids:
             return 0
@@ -2328,9 +2873,9 @@ class ScheduleDBSource:
                 .returning(
                     ResourceAllocationRow.kernel_id,
                     ResourceAllocationRow.slot_name,
-                    ResourceAllocationRow.requested,
+                    ResourceAllocationRow.prereserved,
+                    ResourceAllocationRow.reserved,
                     ResourceAllocationRow.used,
-                    ResourceAllocationRow.used_at,
                 )
             )
         ).all()
@@ -2338,24 +2883,26 @@ class ScheduleDBSource:
             return 0
 
         reserved_delta: dict[tuple[str, str], Decimal] = defaultdict(Decimal)
+        prereserved_delta: dict[tuple[str, str], Decimal] = defaultdict(Decimal)
         used_delta: dict[tuple[str, str], Decimal] = defaultdict(Decimal)
         for r in freed:
             agent_id = agent_by_kernel.get(r.kernel_id)
             if not agent_id:
                 continue
             key = (agent_id, r.slot_name)
-            if r.used_at is None:
-                reserved_delta[key] += r.requested
-            elif r.used is not None:
+            prereserved_delta[key] += r.prereserved
+            reserved_delta[key] += r.reserved
+            if r.used is not None:
                 used_delta[key] += r.used
 
-        for key in sorted(set(reserved_delta) | set(used_delta)):
+        for key in sorted(set(reserved_delta) | set(prereserved_delta) | set(used_delta)):
             agent_id, slot_name = key
             await db_sess.execute(
                 sa.update(ar)
                 .where(ar.c.agent_id == agent_id, ar.c.slot_name == slot_name)
                 .values(
                     reserved=sa.func.greatest(ar.c.reserved - reserved_delta[key], 0),
+                    prereserved=sa.func.greatest(ar.c.prereserved - prereserved_delta[key], 0),
                     used=sa.func.greatest(ar.c.used - used_delta[key], 0),
                 )
             )
@@ -2450,6 +2997,10 @@ class ScheduleDBSource:
         Also frees normalized resource allocations and releases the kernel's
         reserved/used hold on agent_resources.
 
+        The status guard keeps a late or duplicate termination event from
+        overwriting a kernel that already reached a terminal status, which would
+        replace its recorded reason and timestamps.
+
         :param kernel_id: Kernel ID to update
         :param reason: Termination reason
         :param exit_code: Process exit code
@@ -2460,7 +3011,10 @@ class ScheduleDBSource:
             stmt = (
                 sa.update(KernelRow)
                 .where(
-                    KernelRow.id == kernel_id,
+                    sa.and_(
+                        KernelRow.id == kernel_id,
+                        KernelRow.status.in_(KernelStatus.force_terminatable_statuses()),
+                    ),
                 )
                 .values(
                     status=KernelStatus.TERMINATED,
@@ -2481,13 +3035,13 @@ class ScheduleDBSource:
                 .returning(KernelRow.id)
             )
             result = await db_sess.execute(stmt)
-            row = result.first()
-            if row is None:
-                return False
+            updated = result.first() is not None
 
-            # Free allocations and release the kernel's reserved/used hold.
+            # Free allocations and release the kernel's reserved/used hold. This
+            # runs even when the status guard blocked the update so that a kernel
+            # already in a terminal status never keeps its hold; it is idempotent.
             await self._free_allocations_and_release(db_sess, [kernel_id], now)
-        return True
+        return updated
 
     async def reset_kernels_to_pending_for_sessions(
         self, session_ids: list[SessionId], reason: str
@@ -2495,8 +3049,11 @@ class ScheduleDBSource:
         """
         Reset kernels to PENDING status for the given sessions.
 
-        This is used when sessions exceed max retries and need to be rescheduled.
-        Clears agent assignments and resets retry count in status_data.
+        Used when a session goes back to the queue — after exceeding max retries,
+        or after a reschedule teardown. Clears the placement (agent, container),
+        resets the retry count, and restores the ``resource_allocations`` rows to
+        their enqueue-time shape so the next scheduling pass reads the original
+        request again; kernels that already terminated are covered too.
 
         :param session_ids: List of session IDs whose kernels should be reset
         :param reason: The reason for the reset
@@ -2509,20 +3066,27 @@ class ScheduleDBSource:
 
         async with self._db.begin_session_read_committed() as db_sess:
             now = await self._get_db_now_in_session(db_sess)
+            # Release the kernels' holds (prereserved/reserved/used) on their
+            # agents before the placement is cleared.
+            held_kernel_rows = (
+                await db_sess.execute(
+                    sa.select(KernelRow.id).where(KernelRow.session_id.in_(session_ids))
+                )
+            ).all()
+            await self._free_allocations_and_release(
+                db_sess, [row.id for row in held_kernel_rows], now
+            )
             stmt = (
                 sa.update(KernelRow)
-                .where(
-                    sa.and_(
-                        KernelRow.session_id.in_(session_ids),
-                        KernelRow.status.in_(KernelStatus.retriable_statuses()),
-                    )
-                )
+                .where(KernelRow.session_id.in_(session_ids))
                 .values(
                     agent=None,
                     agent_addr=None,
+                    container_id=None,
                     status=KernelStatus.PENDING,
                     status_info=reason,
                     status_changed=now,
+                    terminated_at=None,
                     status_data=sql_json_merge(
                         KernelRow.__table__.c.status_data,
                         ("scheduler",),
@@ -2534,9 +3098,23 @@ class ScheduleDBSource:
                         {KernelStatus.PENDING.name: now.isoformat()},
                     ),
                 )
+                .returning(KernelRow.id)
             )
-            result = await db_sess.execute(stmt)
-            return cast(CursorResult[Any], result).rowcount
+            kernel_ids = [row.id for row in await db_sess.execute(stmt)]
+            await db_sess.execute(
+                sa.update(ResourceAllocationRow)
+                .where(ResourceAllocationRow.kernel_id.in_(kernel_ids))
+                .values(
+                    prereserved=0,
+                    reserved=0,
+                    prereserved_at=None,
+                    reserved_at=None,
+                    used=None,
+                    used_at=None,
+                    free_at=None,
+                )
+            )
+            return len(kernel_ids)
 
     async def get_agent_ids_for_sessions(
         self, session_ids: list[SessionId]
@@ -2615,6 +3193,9 @@ class ScheduleDBSource:
         """
         Update multiple kernels to TERMINATED status.
 
+        Kernels that already reached a terminal status are left untouched so
+        their recorded reason and timestamps survive a late termination event.
+
         :param kernel_ids: List of kernel ID strings to update
         :param reason: Termination reason
         :return: Number of kernels updated
@@ -2629,7 +3210,12 @@ class ScheduleDBSource:
 
             stmt = (
                 sa.update(KernelRow)
-                .where(KernelRow.id.in_(kernel_uuids))
+                .where(
+                    sa.and_(
+                        KernelRow.id.in_(kernel_uuids),
+                        KernelRow.status.in_(KernelStatus.force_terminatable_statuses()),
+                    )
+                )
                 .values(
                     status=KernelStatus.TERMINATED,
                     status_info=reason,
@@ -2889,14 +3475,6 @@ class ScheduleDBSource:
                 if allowed_registries is None or image_row.registry not in allowed_registries:
                     raise ImageNotFound
 
-    async def update_sessions_to_running(self, sessions_data: list[SessionRunningData]) -> None:
-        """No-op after Phase 3 (BA-4308).
-
-        Previously wrote sessions.occupying_slots JSONB.  The column is now
-        deprecated — resource allocations are tracked via the normalized
-        resource_allocations / agent_resources tables.
-        """
-
     async def _resolve_image_configs(
         self, db_sess: SASession, unique_images: set[ImageIdentifier]
     ) -> dict[UUID, ImageConfigData]:
@@ -2950,116 +3528,6 @@ class ScheduleDBSource:
 
         return image_configs
 
-    async def _get_sessions_by_statuses(
-        self,
-        db_sess: SASession,
-        statuses: list[SessionStatus],
-    ) -> list[ScheduledSessionData]:
-        """
-        Get sessions with specified statuses.
-        Returns dataclass objects instead of SessionRow.
-        """
-        # Get sessions with specified statuses and their kernels
-        stmt = (
-            sa.select(SessionRow)
-            .where(SessionRow.status.in_(statuses))
-            .options(
-                selectinload(SessionRow.kernels).options(
-                    load_only(
-                        KernelRow.id,
-                        KernelRow.agent,
-                        KernelRow.agent_addr,
-                        KernelRow.scaling_group,
-                        KernelRow.image,
-                        KernelRow.image_id,
-                        KernelRow.architecture,
-                        KernelRow.status,
-                        KernelRow.status_changed,
-                    )
-                )
-            )
-        )
-        result = await db_sess.execute(stmt)
-        sessions = result.scalars().all()
-
-        scheduled_sessions: list[ScheduledSessionData] = []
-        for session in sessions:
-            # Create kernel data list with status_changed timestamp
-            kernels_data = []
-            for kernel in session.kernels:
-                kernel_data = KernelBindingData(
-                    kernel_id=kernel.id,
-                    agent_id=AgentId(kernel.agent) if kernel.agent else None,
-                    agent_addr=kernel.agent_addr,
-                    scaling_group=kernel.scaling_group or "",
-                    image=kernel.image or "",
-                    image_id=kernel.image_id,
-                    architecture=ArchName(kernel.architecture or ""),
-                    status=kernel.status,
-                    status_changed=kernel.status_changed.timestamp()
-                    if kernel.status_changed
-                    else None,
-                )
-                kernels_data.append(kernel_data)
-
-            scheduled_session = ScheduledSessionData(
-                session_id=session.id,
-                creation_id=session.creation_id or "",
-                access_key=AccessKey(session.access_key) if session.access_key else AccessKey(""),
-                reason="triggered-by-scheduler",
-            )
-            scheduled_sessions.append(scheduled_session)
-
-        return scheduled_sessions
-
-    async def _get_scheduled_sessions(self, db_sess: SASession) -> list[ScheduledSessionData]:
-        """
-        Get sessions in SCHEDULED status for precondition checking.
-        Returns dataclass objects instead of SessionRow.
-        """
-        # Get sessions with SCHEDULED status and their kernels
-        stmt = (
-            sa.select(SessionRow)
-            .where(SessionRow.status == SessionStatus.SCHEDULED)
-            .options(
-                selectinload(SessionRow.kernels).options(
-                    load_only(
-                        KernelRow.id,
-                        KernelRow.agent,
-                        KernelRow.agent_addr,
-                        KernelRow.scaling_group,
-                        KernelRow.image,
-                        KernelRow.image_id,
-                        KernelRow.architecture,
-                    )
-                ),
-                load_only(
-                    SessionRow.id,
-                    SessionRow.creation_id,
-                    SessionRow.access_key,
-                    SessionRow.session_type,
-                    SessionRow.name,
-                ),
-            )
-        )
-        result = await db_sess.execute(stmt)
-        sessions = result.scalars().all()
-
-        scheduled_sessions: list[ScheduledSessionData] = []
-        for session in sessions:
-            scheduled_sessions.append(
-                ScheduledSessionData(
-                    session_id=session.id,
-                    creation_id=session.creation_id or "",
-                    access_key=AccessKey(session.access_key)
-                    if session.access_key
-                    else AccessKey(""),
-                    reason="triggered-by-scheduler",
-                )
-            )
-
-        return scheduled_sessions
-
     async def get_sessions_for_pull(
         self,
         session_statuses: list[SessionStatus],
@@ -3092,39 +3560,6 @@ class ScheduleDBSource:
 
             return SessionsForPullWithImages(
                 sessions=sessions_for_pull, image_configs=image_configs
-            )
-
-    async def get_sessions_for_start(
-        self,
-        session_statuses: list[SessionStatus],
-        kernel_statuses: list[KernelStatus],
-    ) -> SessionsForStartWithImages:
-        """
-        Get sessions for starting with specified statuses.
-        Returns SessionsForStartWithImages dataclass.
-
-        :param statuses: Session statuses to filter by (typically PREPARED, CREATING)
-        :return: SessionsForStartWithImages object
-        """
-        async with self._db.begin_readonly_session_read_committed() as db_sess:
-            # Get sessions with all fields needed for starting
-            sessions_for_start = await self._get_sessions_for_start(
-                db_sess, session_statuses, kernel_statuses
-            )
-
-            # Collect unique images to resolve
-            unique_images: set[ImageIdentifier] = set()
-            for session in sessions_for_start:
-                for kernel in session.kernels:
-                    unique_images.add(
-                        ImageIdentifier(canonical=kernel.image, architecture=kernel.architecture)
-                    )
-
-            # Resolve all images and build ImageConfigData
-            image_configs = await self._resolve_image_configs(db_sess, unique_images)
-
-            return SessionsForStartWithImages(
-                sessions=sessions_for_start, image_configs=image_configs
             )
 
     async def _get_sessions_for_pull(
@@ -3227,187 +3662,6 @@ class ScheduleDBSource:
 
         return list(sessions_map.values())
 
-    async def _get_sessions_for_start(
-        self,
-        db_sess: SASession,
-        session_statuses: list[SessionStatus],
-        kernel_statuses: list[KernelStatus],
-    ) -> list[SessionDataForStart]:
-        """
-        Get sessions with all fields needed for starting.
-        """
-        # Get sessions with specified statuses and their kernels with specified statuses
-        # Using JOIN to filter kernels by status
-        stmt = (
-            sa.select(
-                SessionRow.id,
-                SessionRow.creation_id,
-                SessionRow.access_key,
-                SessionRow.session_type,
-                SessionRow.name,
-                SessionRow.environ,
-                SessionRow.cluster_mode,
-                SessionRow.user_uuid,
-                SessionRow.network_type,
-                SessionRow.network_id,
-                KernelRow.id.label("kernel_id"),
-                KernelRow.agent,
-                KernelRow.agent_addr,
-                KernelRow.scaling_group,
-                KernelRow.image,
-                KernelRow.image_id,
-                KernelRow.architecture,
-                KernelRow.cluster_role,
-                KernelRow.cluster_idx,
-                KernelRow.local_rank,
-                KernelRow.cluster_hostname,
-                KernelRow.uid,
-                KernelRow.main_gid,
-                KernelRow.gids,
-                KernelRow.requested_slots,
-                KernelRow.resource_opts,
-                KernelRow.bootstrap_script,
-                KernelRow.startup_command,
-                KernelRow.preopen_ports,
-                KernelRow.internal_data,
-                KernelRow.vfolder_mounts,
-                KernelRow.status.label("kernel_status"),
-                KernelRow.status_changed,
-            )
-            .select_from(SessionRow)
-            .outerjoin(KernelRow, SessionRow.id == KernelRow.session_id)
-            .where(
-                sa.and_(
-                    SessionRow.status.in_(session_statuses),
-                    KernelRow.status.in_(kernel_statuses),
-                )
-            )
-            .order_by(SessionRow.created_at, SessionRow.id)
-        )
-        result = await db_sess.execute(stmt)
-        rows = result.fetchall()
-
-        # Group rows by session
-        session_data: dict[SessionId, dict[str, Any]] = defaultdict(lambda: {"kernels": []})
-        user_uuids = set()
-
-        for row in rows:
-            session_id = row.id
-            if "info" not in session_data[session_id]:
-                session_data[session_id]["info"] = {
-                    "id": row.id,
-                    "creation_id": row.creation_id,
-                    "access_key": row.access_key,
-                    "session_type": row.session_type,
-                    "name": row.name,
-                    "environ": row.environ,
-                    "cluster_mode": row.cluster_mode,
-                    "user_uuid": row.user_uuid,
-                    "network_type": row.network_type,
-                    "network_id": row.network_id,
-                }
-                if row.user_uuid:
-                    user_uuids.add(row.user_uuid)
-
-            if row.kernel_id:  # Only add kernel if it exists
-                session_data[session_id]["kernels"].append({
-                    "kernel_id": row.kernel_id,
-                    "agent": row.agent,
-                    "agent_addr": row.agent_addr,
-                    "scaling_group": row.scaling_group,
-                    "image": row.image,
-                    "image_id": row.image_id,
-                    "architecture": row.architecture,
-                    "kernel_status": row.kernel_status,
-                    "status_changed": row.status_changed,
-                    "cluster_role": row.cluster_role,
-                    "cluster_idx": row.cluster_idx,
-                    "local_rank": row.local_rank,
-                    "cluster_hostname": row.cluster_hostname,
-                    "uid": row.uid,
-                    "main_gid": row.main_gid,
-                    "gids": row.gids,
-                    "requested_slots": row.requested_slots,
-                    "resource_opts": row.resource_opts,
-                    "bootstrap_script": row.bootstrap_script,
-                    "startup_command": row.startup_command,
-                    "preopen_ports": row.preopen_ports,
-                    "internal_data": row.internal_data,
-                    "vfolder_mounts": row.vfolder_mounts,
-                })
-
-        # Load user info for sessions
-        user_map = {}
-        if user_uuids:
-            user_query = sa.select(
-                UserRow.uuid,
-                UserRow.email,
-                UserRow.username,
-            ).where(UserRow.uuid.in_(user_uuids))
-            user_result = await db_sess.execute(user_query)
-            user_map = {row.uuid: row for row in user_result.fetchall()}
-
-        # Convert to dataclass
-        sessions_for_start: list[SessionDataForStart] = []
-        for session_id, data in session_data.items():
-            session_info = data["info"]
-
-            # Get user info
-            user_info = user_map.get(session_info["user_uuid"])
-            if not user_info:
-                log.warning("User info not found for session {}", session_id)
-                continue
-
-            # Convert kernels
-            kernel_bindings = [
-                KernelBindingData(
-                    kernel_id=k["kernel_id"],
-                    agent_id=k["agent"],
-                    agent_addr=k["agent_addr"],
-                    scaling_group=k["scaling_group"],
-                    image=k["image"],
-                    image_id=k["image_id"],
-                    architecture=k["architecture"],
-                    status=k["kernel_status"],
-                    status_changed=k["status_changed"].timestamp() if k["status_changed"] else None,
-                    cluster_role=k["cluster_role"],
-                    cluster_idx=k["cluster_idx"],
-                    local_rank=k["local_rank"],
-                    cluster_hostname=k["cluster_hostname"],
-                    uid=k["uid"],
-                    main_gid=k["main_gid"],
-                    gids=k["gids"] or [],
-                    requested_slots=k["requested_slots"] or ResourceSlot(),
-                    resource_opts=k["resource_opts"] or {},
-                    bootstrap_script=k["bootstrap_script"],
-                    startup_command=k["startup_command"],
-                    preopen_ports=k["preopen_ports"] or [],
-                    internal_data=k["internal_data"],
-                    vfolder_mounts=k["vfolder_mounts"] or [],
-                )
-                for k in data["kernels"]
-            ]
-
-            sessions_for_start.append(
-                SessionDataForStart(
-                    session_id=session_info["id"],
-                    creation_id=session_info["creation_id"],
-                    access_key=session_info["access_key"],
-                    session_type=session_info["session_type"],
-                    name=session_info["name"],
-                    cluster_mode=session_info["cluster_mode"],
-                    kernels=kernel_bindings,
-                    environ=session_info.get("environ", {}),
-                    user_uuid=session_info["user_uuid"],
-                    user_email=user_info.email,
-                    user_name=user_info.username,
-                    network_type=session_info["network_type"],
-                    network_id=session_info["network_id"],
-                )
-            )
-
-        return sessions_for_start
-
     async def mark_session_cancelled(
         self, session_id: SessionId, error_info: ErrorStatusInfo, reason: str = "FAILED_TO_START"
     ) -> None:
@@ -3495,18 +3749,6 @@ class ScheduleDBSource:
                 )
             )
             await db_sess.execute(kernel_stmt)
-
-    async def get_container_info_for_kernels(self, session_id: SessionId) -> dict[UUID, str | None]:
-        """
-        Get container IDs for kernels in a session.
-        Used for cleanup when session fails to start.
-        """
-        async with self._db.begin_readonly_session_read_committed() as db_sess:
-            stmt = sa.select(KernelRow.id, KernelRow.container_id).where(
-                KernelRow.session_id == session_id
-            )
-            result = await db_sess.execute(stmt)
-            return {row.id: row.container_id for row in result}
 
     async def get_keypair_concurrencies_from_db(
         self, access_key: AccessKey
@@ -3993,218 +4235,6 @@ class ScheduleDBSource:
 
         return list(sessions_map.values())
 
-    async def get_sessions_for_start_by_ids(
-        self,
-        session_ids: list[SessionId],
-    ) -> SessionsForStartWithImages:
-        """
-        Get sessions for starting by session IDs.
-
-        This method is used by handlers that need additional session data
-        beyond what the coordinator provides (HandlerSessionData).
-
-        :param session_ids: List of session IDs to fetch
-        :return: SessionsForStartWithImages object with sessions and image configs
-        """
-        if not session_ids:
-            return SessionsForStartWithImages(sessions=[], image_configs={})
-
-        async with self._db.begin_readonly_session_read_committed() as db_sess:
-            # Get sessions with all fields needed for starting
-            sessions_for_start = await self._fetch_sessions_for_start_by_ids(db_sess, session_ids)
-
-            # Collect unique images to resolve
-            unique_images: set[ImageIdentifier] = set()
-            for session in sessions_for_start:
-                for kernel in session.kernels:
-                    unique_images.add(
-                        ImageIdentifier(canonical=kernel.image, architecture=kernel.architecture)
-                    )
-
-            # Resolve all images and build ImageConfigData
-            image_configs = await self._resolve_image_configs(db_sess, unique_images)
-
-            return SessionsForStartWithImages(
-                sessions=sessions_for_start, image_configs=image_configs
-            )
-
-    async def _fetch_sessions_for_start_by_ids(
-        self,
-        db_sess: SASession,
-        session_ids: list[SessionId],
-    ) -> list[SessionDataForStart]:
-        """
-        Get sessions with all fields needed for starting by session IDs.
-        """
-        stmt = (
-            sa.select(
-                SessionRow.id,
-                SessionRow.creation_id,
-                SessionRow.access_key,
-                SessionRow.session_type,
-                SessionRow.name,
-                SessionRow.environ,
-                SessionRow.cluster_mode,
-                SessionRow.user_uuid,
-                SessionRow.network_type,
-                SessionRow.network_id,
-                KernelRow.id.label("kernel_id"),
-                KernelRow.agent,
-                KernelRow.agent_addr,
-                KernelRow.scaling_group,
-                KernelRow.image,
-                KernelRow.image_id,
-                KernelRow.architecture,
-                KernelRow.cluster_role,
-                KernelRow.cluster_idx,
-                KernelRow.local_rank,
-                KernelRow.cluster_hostname,
-                KernelRow.uid,
-                KernelRow.main_gid,
-                KernelRow.gids,
-                KernelRow.requested_slots,
-                KernelRow.resource_opts,
-                KernelRow.bootstrap_script,
-                KernelRow.startup_command,
-                KernelRow.preopen_ports,
-                KernelRow.internal_data,
-                KernelRow.vfolder_mounts,
-                KernelRow.status.label("kernel_status"),
-                KernelRow.status_changed,
-            )
-            .select_from(SessionRow)
-            .outerjoin(KernelRow, SessionRow.id == KernelRow.session_id)
-            .where(SessionRow.id.in_(session_ids))
-            .order_by(SessionRow.created_at, SessionRow.id, KernelRow.cluster_idx)
-        )
-        result = await db_sess.execute(stmt)
-        rows = result.fetchall()
-
-        # Group rows by session
-        session_data: dict[SessionId, dict[str, Any]] = defaultdict(lambda: {"kernels": []})
-        user_uuids = set()
-
-        for row in rows:
-            session_id = row.id
-            if "info" not in session_data[session_id]:
-                session_data[session_id]["info"] = {
-                    "id": row.id,
-                    "creation_id": row.creation_id,
-                    "access_key": row.access_key,
-                    "session_type": row.session_type,
-                    "name": row.name,
-                    "environ": row.environ,
-                    "cluster_mode": row.cluster_mode,
-                    "user_uuid": row.user_uuid,
-                    "network_type": row.network_type,
-                    "network_id": row.network_id,
-                }
-                if row.user_uuid:
-                    user_uuids.add(row.user_uuid)
-
-            if row.kernel_id:  # Only add kernel if it exists
-                session_data[session_id]["kernels"].append({
-                    "kernel_id": row.kernel_id,
-                    "agent": row.agent,
-                    "agent_addr": row.agent_addr,
-                    "scaling_group": row.scaling_group,
-                    "image": row.image,
-                    "image_id": row.image_id,
-                    "architecture": row.architecture,
-                    "kernel_status": row.kernel_status,
-                    "status_changed": row.status_changed,
-                    "cluster_role": row.cluster_role,
-                    "cluster_idx": row.cluster_idx,
-                    "local_rank": row.local_rank,
-                    "cluster_hostname": row.cluster_hostname,
-                    "uid": row.uid,
-                    "main_gid": row.main_gid,
-                    "gids": row.gids,
-                    "requested_slots": row.requested_slots,
-                    "resource_opts": row.resource_opts,
-                    "bootstrap_script": row.bootstrap_script,
-                    "startup_command": row.startup_command,
-                    "preopen_ports": row.preopen_ports,
-                    "internal_data": row.internal_data,
-                    "vfolder_mounts": row.vfolder_mounts,
-                })
-
-        # Load user info for sessions
-        user_map = {}
-        if user_uuids:
-            user_query = sa.select(
-                UserRow.uuid,
-                UserRow.email,
-                UserRow.username,
-            ).where(UserRow.uuid.in_(user_uuids))
-            user_result = await db_sess.execute(user_query)
-            user_map = {row.uuid: row for row in user_result.fetchall()}
-
-        # Convert to dataclass
-        sessions_for_start: list[SessionDataForStart] = []
-        for session_id, data in session_data.items():
-            session_info = data["info"]
-
-            # Get user info
-            user_info = user_map.get(session_info["user_uuid"])
-            if not user_info:
-                log.warning("User info not found for session {}", session_id)
-                continue
-
-            # Convert kernels
-            kernel_bindings = [
-                KernelBindingData(
-                    kernel_id=k["kernel_id"],
-                    agent_id=k["agent"],
-                    agent_addr=k["agent_addr"],
-                    scaling_group=k["scaling_group"],
-                    image=k["image"],
-                    image_id=k["image_id"],
-                    architecture=k["architecture"],
-                    status=k["kernel_status"],
-                    status_changed=k["status_changed"].timestamp() if k["status_changed"] else None,
-                    cluster_role=k["cluster_role"],
-                    cluster_idx=k["cluster_idx"],
-                    local_rank=k["local_rank"],
-                    cluster_hostname=k["cluster_hostname"],
-                    uid=k["uid"],
-                    main_gid=k["main_gid"],
-                    gids=k["gids"] or [],
-                    requested_slots=k["requested_slots"] or ResourceSlot(),
-                    resource_opts=k["resource_opts"] or {},
-                    bootstrap_script=k["bootstrap_script"],
-                    startup_command=k["startup_command"],
-                    preopen_ports=k["preopen_ports"] or [],
-                    internal_data=k["internal_data"],
-                    vfolder_mounts=k["vfolder_mounts"] or [],
-                )
-                for k in data["kernels"]
-            ]
-
-            sessions_for_start.append(
-                SessionDataForStart(
-                    session_id=session_info["id"],
-                    creation_id=session_info["creation_id"],
-                    access_key=session_info["access_key"],
-                    session_type=session_info["session_type"],
-                    name=session_info["name"],
-                    cluster_mode=session_info["cluster_mode"],
-                    kernels=kernel_bindings,
-                    environ=session_info.get("environ", {}),
-                    user_uuid=session_info["user_uuid"],
-                    user_email=user_info.email,
-                    user_name=user_info.username,
-                    network_type=session_info["network_type"],
-                    network_id=session_info["network_id"],
-                )
-            )
-
-        return sessions_for_start
-
-    # ========================================================================
-    # Search methods (BatchQuerier pattern)
-    # ========================================================================
-
     async def search_sessions_with_kernels(
         self,
         querier: BatchQuerier,
@@ -4629,41 +4659,6 @@ class ScheduleDBSource:
                 .values(priority=new_priority)
             )
             await db_sess.execute(update_stmt)
-
-    async def update_kernels_last_observed_at(
-        self,
-        kernel_observation_times: Mapping[UUID, datetime],
-    ) -> int:
-        """
-        Update the last_observed_at timestamp for multiple kernels.
-
-        Used by fair share observer to record when kernels were last observed
-        for resource usage tracking. Each kernel can have a different observation
-        time (e.g., terminated kernels use terminated_at, running kernels use now).
-
-        :param kernel_observation_times: Mapping of kernel ID to observation timestamp
-        :return: Number of kernels updated
-        """
-        if not kernel_observation_times:
-            return 0
-
-        async with self._db.begin_session_read_committed() as db_sess:
-            total_updated = 0
-            # Group by observation time for efficient batch updates
-            time_to_kernels: dict[datetime, list[UUID]] = {}
-            for kernel_id, observed_at in kernel_observation_times.items():
-                time_to_kernels.setdefault(observed_at, []).append(kernel_id)
-
-            for observed_at, kernel_ids in time_to_kernels.items():
-                update_stmt = (
-                    sa.update(KernelRow)
-                    .where(KernelRow.id.in_(kernel_ids))
-                    .values(last_observed_at=observed_at)
-                )
-                result = await db_sess.execute(update_stmt)
-                total_updated += cast(CursorResult[Any], result).rowcount
-
-            return total_updated
 
     async def get_db_now(self) -> datetime:
         """Get the current timestamp from the database.

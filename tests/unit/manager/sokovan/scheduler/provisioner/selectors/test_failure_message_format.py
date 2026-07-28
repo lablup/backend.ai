@@ -17,24 +17,25 @@ import pytest
 from ai.backend.common.identifier.architecture import ArchName
 from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.identifier.resource_slot import ResourceSlotName
-from ai.backend.common.types import AgentId, SessionId
+from ai.backend.common.types import AgentId, AgentSelectionStrategy, PreemptionOrder, SessionId
 from ai.backend.manager.data.session.options import AgentSelectionPolicy
-from ai.backend.manager.sokovan.scheduler.provisioner.selectors.concentrated import (
-    ConcentratedAgentSelector,
-)
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.exceptions import (
     BatchAgentSelectionFailedError,
-    ContainerLimitExceededError,
-    InsufficientResourcesError,
     NoAgentsInResourceGroupError,
-    NoAvailableAgentError,
+    NoCompatibleAgentError,
+)
+from ai.backend.manager.sokovan.scheduler.provisioner.selectors.pool import (
+    create_agent_selector,
 )
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import (
     AgentSelectionCriteria,
     AgentSelector,
 )
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.tracker import AgentStateTracker
-from ai.backend.manager.sokovan.scheduler.provisioner.selectors.types import ResourceRequirements
+from ai.backend.manager.sokovan.scheduler.provisioner.selectors.types import (
+    PlacementFailure,
+    ResourceRequirements,
+)
 from ai.backend.manager.sokovan.scheduler.provisioner.validators.exceptions import (
     ConcurrencyLimitExceeded,
     DependenciesNotSatisfied,
@@ -93,6 +94,9 @@ def _criteria(requirements: list[ResourceRequirements]) -> AgentSelectionCriteri
         requirements=requirements,
         agent_selection_policy=AgentSelectionPolicy.STRICT,
         designated_agent_ids=None,
+        job_priority=0,
+        victim_candidates=None,
+        session_group=None,
     )
 
 
@@ -106,6 +110,9 @@ def _designated_criteria(
         requirements=requirements,
         agent_selection_policy=AgentSelectionPolicy.STRICT,
         designated_agent_ids=designated_agent_ids,
+        job_priority=0,
+        victim_candidates=None,
+        session_group=None,
     )
 
 
@@ -113,86 +120,35 @@ def _trackers(agents: list[AgentInfo]) -> list[AgentStateTracker]:
     return [AgentStateTracker(original_agent=agent) for agent in agents]
 
 
-def _concentrated() -> AgentSelector:
-    return AgentSelector(ConcentratedAgentSelector(agent_selection_resource_priority=["cpu"]))
+def _selector() -> AgentSelector:
+    return create_agent_selector(["cpu"])
 
 
-class TestInsufficientResourcesErrorFormat:
-    """InsufficientResourcesError must use a header + indented bullet list."""
+class TestBatchAgentSelectionFailedErrorFormat:
+    """The batch error must list per-requirement failures line-by-line."""
 
-    def test_multi_resource_shortfall_uses_newlines(self) -> None:
-        error = InsufficientResourcesError(
-            agent_id=AgentId("agent-a"),
-            requested_slots=_slots({"cpu": "4", "mem": "8192"}),
-            available_slots=_slots({"cpu": "1", "mem": "2048"}),
-            insufficient_resources={
-                ResourceSlotName("cpu"): ("4", "1"),
-                ResourceSlotName("mem"): ("8192", "2048"),
-            },
-        )
-        message = error.extra_msg or ""
-        lines = message.splitlines()
-        assert lines[0] == "Agent agent-a has insufficient resources:"
-        assert "  - cpu: requested=4, available=1" in lines
-        assert "  - mem: requested=8192, available=2048" in lines
-        # No legacy "; " join must remain.
-        assert "; " not in message
-
-
-class TestNoAvailableAgentErrorAggregationFormat:
-    """The NoAvailableAgentError aggregator must list per-agent reasons line-by-line."""
-
-    @pytest.fixture
-    def heterogeneous_failing_agents(self) -> list[AgentInfo]:
-        return [
-            _agent("agent-a", {"cpu": "1", "mem": "2048"}),
-            _agent("agent-b", {"cpu": "8", "mem": "16384"}, container_count=10),
-        ]
-
-    async def test_multi_agent_failure_message_layout(
-        self,
-        heterogeneous_failing_agents: list[AgentInfo],
-    ) -> None:
-        criteria = _criteria([_req({"cpu": "4", "mem": "8192"})])
-
-        with pytest.raises(BatchAgentSelectionFailedError) as exc_info:
-            await _concentrated().select_agents_for_batch_requirements(
-                _trackers(heterogeneous_failing_agents),
-                criteria,
-                AgentLimit(max_container_count=10),
-            )
-        assert len(exc_info.value.errors) == 1
-        error = exc_info.value.errors[0]
-        assert isinstance(error, NoAvailableAgentError)
-
-        # Inspect the raw payload we constructed (not the aiohttp title wrapper),
-        # since SchedulingFailure.msg is derived from str(e) but the format
-        # contract lives in extra_msg.
-        message = error.extra_msg or ""
-        lines = message.splitlines()
-        assert lines[0].startswith("no available agents for the request (")
-        assert "arch=x86_64" in lines[0]
-        assert any(line.startswith("- ") for line in lines[1:])
-        assert "; " not in message
-
-
-class TestNoAvailableAgentHeaderFormat:
-    """The header's requested-slots summary must be human-readable."""
-
-    def test_header_humanizes_byte_slots(self) -> None:
-        error = NoAvailableAgentError(
-            resource_requirement=_req(
-                {"cpu": "1000", "mem": "1073741824"},
-                arch="aarch64",
+    def test_multi_failure_message_layout(self) -> None:
+        error = BatchAgentSelectionFailedError([
+            PlacementFailure(
+                requirement_index=0,
+                resource_requirement=_req({"cpu": "4"}),
+                filter_name="resource",
+                missing_slots=_slots({"cpu": "2"}),
+                missing_containers=0,
             ),
-            requirement_index=0,
-            agent_errors={},
-        )
-
-        header = (error.extra_msg or "").splitlines()[0]
-        assert "cpu=1000" in header
-        assert "mem=1 GiB" in header
-        assert "1073741824" not in header
+            PlacementFailure(
+                requirement_index=1,
+                resource_requirement=_req({"cpu": "1"}),
+                filter_name="container-limit",
+                missing_slots={},
+                missing_containers=2,
+            ),
+        ])
+        message = error.extra_msg or ""
+        lines = message.splitlines()
+        assert lines[0] == "2 requirement(s) could not be placed:"
+        assert sum(line.startswith("- requirement #") for line in lines) == 2
+        assert "; " not in message
 
 
 class TestMultipleValidationErrorsFormat:
@@ -215,12 +171,15 @@ class TestSchedulingFailureMsgRoundTripsAsJson:
     """status_data JSON round-trip must preserve newline-formatted messages."""
 
     def test_newlines_survive_json_serialization(self) -> None:
-        error = InsufficientResourcesError(
-            agent_id=AgentId("agent-a"),
-            requested_slots=_slots({"cpu": "4"}),
-            available_slots=_slots({"cpu": "1"}),
-            insufficient_resources={ResourceSlotName("cpu"): ("4", "1")},
-        )
+        error = BatchAgentSelectionFailedError([
+            PlacementFailure(
+                requirement_index=0,
+                resource_requirement=_req({"cpu": "4"}),
+                filter_name="resource",
+                missing_slots=_slots({"cpu": "3"}),
+                missing_containers=0,
+            ),
+        ])
         original = error.extra_msg or ""
         encoded = json.dumps({"msg": original})
         decoded = json.loads(encoded)
@@ -233,199 +192,115 @@ class TestSchedulingFailureMsgRoundTripsAsJson:
 # ============================================================================
 
 
-class TestGoldenInsufficientResourcesError:
-    def test_single_resource_shortfall_full_message(self) -> None:
-        error = InsufficientResourcesError(
-            agent_id=AgentId("agent-a"),
-            requested_slots=_slots({"cpu": "4"}),
-            available_slots=_slots({"cpu": "1"}),
-            insufficient_resources={ResourceSlotName("cpu"): ("4", "1")},
-        )
-        expected = "Agent agent-a has insufficient resources:\n  - cpu: requested=4, available=1"
-        assert error.extra_msg == expected
-
-    def test_multi_resource_shortfall_full_message(self) -> None:
-        error = InsufficientResourcesError(
-            agent_id=AgentId("agent-a"),
-            requested_slots=_slots({"cpu": "4", "mem": "8192"}),
-            available_slots=_slots({"cpu": "1", "mem": "2048"}),
-            insufficient_resources={
-                ResourceSlotName("cpu"): ("4", "1"),
-                ResourceSlotName("mem"): ("8 GiB", "2 GiB"),
-            },
-        )
-        expected = (
-            "Agent agent-a has insufficient resources:\n"
-            "  - cpu: requested=4, available=1\n"
-            "  - mem: requested=8 GiB, available=2 GiB"
-        )
-        assert error.extra_msg == expected
-
-
-class TestGoldenContainerLimitExceededError:
-    def test_full_message(self) -> None:
-        err = ContainerLimitExceededError(
-            agent_id=AgentId("agent-b"),
-            current_count=10,
-            max_count=10,
-        )
-        assert err.extra_msg == "Agent agent-b container limit exceeded: current=10, max=10"
-
-
-class TestGoldenMultipleValidationErrors:
-    def test_full_extra_msg_equals_expected(self) -> None:
-        errors = [
-            ConcurrencyLimitExceeded(max_sessions=5, session_type="concurrent"),
-            DependenciesNotSatisfied(pending_dependency_names=["dep-x not finished"]),
-        ]
-        aggregated = MultipleValidationErrors(errors)
-        expected = (
-            "Multiple validation errors occurred:\n"
-            "- ConcurrencyLimitExceeded: You cannot run more than 5 concurrent sessions\n"
-            "- DependenciesNotSatisfied: Waiting dependency sessions to finish"
-            " as success. (dep-x not finished)"
-        )
-        assert aggregated.extra_msg == expected
-
-
-class TestGoldenNoAvailableAgentError:
+class TestGoldenResourceShortfall:
     """End-to-end golden test that exercises the selector path."""
 
     @pytest.fixture
-    def agents_with_two_failure_modes(self) -> list[AgentInfo]:
+    def agents_too_small(self) -> list[AgentInfo]:
         return [
             _agent("agent-a", {"cpu": "1"}),
-            _agent("agent-b", {"cpu": "8"}, container_count=10),
+            _agent("agent-b", {"cpu": "2"}),
         ]
 
     async def test_all_agents_failing_full_extra_msg(
         self,
-        agents_with_two_failure_modes: list[AgentInfo],
+        agents_too_small: list[AgentInfo],
     ) -> None:
         criteria = _criteria([_req({"cpu": "4"})])
 
         with pytest.raises(BatchAgentSelectionFailedError) as exc_info:
-            await _concentrated().select_agents_for_batch_requirements(
-                _trackers(agents_with_two_failure_modes),
+            await _selector().select_agents_for_batch_requirements(
+                AgentSelectionStrategy.CONCENTRATED,
+                _trackers(agents_too_small),
                 criteria,
                 AgentLimit(max_container_count=10),
+                PreemptionOrder.OLDEST,
             )
-        assert len(exc_info.value.errors) == 1
-        error = exc_info.value.errors[0]
-        assert isinstance(error, NoAvailableAgentError)
 
+        # The shortfall is measured against the best-fitting agent (agent-b).
         expected = (
-            "no available agents for the request"
-            " (containers=1, arch=x86_64, slots=cpu=4):\n"
-            "- Agent agent-a has insufficient resources:\n"
-            "    - cpu: requested=4, available=1\n"
-            "- Agent agent-b container limit exceeded: current=10, max=10"
+            "1 requirement(s) could not be placed:\n"
+            "- requirement #0 (containers=1, arch=x86_64, slots=cpu=4):"
+            " no agents passed the 'resource' filter\n"
+            "  - cpu: missing=2"
         )
-        assert error.extra_msg == expected
+        assert exc_info.value.extra_msg == expected
 
 
-class TestGoldenNoDesignatedAgentCompatible:
-    """End-to-end golden test for the designated-agent failure path."""
+class TestGoldenDesignatedAgentAbsent:
+    """End-to-end golden test for the strict-designation failure path."""
 
     @pytest.fixture
-    def designated_agents_plus_fallback(self) -> list[AgentInfo]:
-        # The designated-only-incompatible branch requires at least one
-        # non-designated compatible agent so the early "no available agents"
-        # branch does not short-circuit before reaching it.
-        return [
-            _agent("designated-a", {"cpu": "1"}),
-            _agent("designated-b", {"cpu": "8"}, container_count=10),
-            _agent("non-designated-ok", {"cpu": "16"}),
-        ]
+    def pool_without_designated_agents(self) -> list[AgentInfo]:
+        return [_agent("non-designated-ok", {"cpu": "16"})]
 
-    async def test_full_extra_msg_when_designated_incompatible(
+    async def test_full_extra_msg_when_designated_absent(
         self,
-        designated_agents_plus_fallback: list[AgentInfo],
+        pool_without_designated_agents: list[AgentInfo],
     ) -> None:
+        """The strict-designation filter emptying the pool is an absolute
+        failure, so it propagates directly instead of a batch aggregate."""
         criteria = _designated_criteria(
             [_req({"cpu": "4"})],
             designated_agent_ids=[AgentId("designated-a"), AgentId("designated-b")],
         )
 
-        with pytest.raises(BatchAgentSelectionFailedError) as exc_info:
-            await _concentrated().select_agents_for_batch_requirements(
-                _trackers(designated_agents_plus_fallback),
+        with pytest.raises(NoCompatibleAgentError) as exc_info:
+            await _selector().select_agents_for_batch_requirements(
+                AgentSelectionStrategy.CONCENTRATED,
+                _trackers(pool_without_designated_agents),
                 criteria,
                 AgentLimit(max_container_count=10),
+                PreemptionOrder.OLDEST,
             )
-        assert len(exc_info.value.errors) == 1
-        error = exc_info.value.errors[0]
-        assert isinstance(error, NoAvailableAgentError)
 
+        assert exc_info.value.filter_name == "designated-strict"
+        assert exc_info.value.extra_msg == (
+            "no agents passed the 'designated-strict' filter: none of the strictly "
+            "designated agents [designated-a, designated-b] is available"
+        )
+
+
+class TestGoldenBatchErrorDirectConstruction:
+    """Drive BatchAgentSelectionFailedError's constructor with structured inputs."""
+
+    def test_humanizes_mem_in_header_and_shortfall(self) -> None:
+        error = BatchAgentSelectionFailedError([
+            PlacementFailure(
+                requirement_index=1,
+                resource_requirement=_req({"cpu": "1000", "mem": "2147483648"}, arch="aarch64"),
+                filter_name="resource",
+                missing_slots=_slots({"mem": "1073741824"}),
+                missing_containers=0,
+            ),
+        ])
         expected = (
-            "no designated agent is compatible for the request"
-            " (containers=1, arch=x86_64, slots=cpu=4):\n"
-            "- designated agent 'designated-a': Agent designated-a"
-            " has insufficient resources:\n"
-            "    - cpu: requested=4, available=1\n"
-            "- designated agent 'designated-b': Agent designated-b"
-            " container limit exceeded: current=10, max=10"
+            "1 requirement(s) could not be placed:\n"
+            "- requirement #1 (containers=1, arch=aarch64, slots=cpu=1000 mem=2 GiB):"
+            " no agents passed the 'resource' filter\n"
+            "  - mem: missing=1 GiB"
         )
         assert error.extra_msg == expected
 
-
-class TestGoldenNoAvailableAgentDirectConstruction:
-    """Drive NoAvailableAgentError's constructor directly with structured inputs."""
-
-    def test_compat_failures_with_mixed_inner_errors(self) -> None:
-        err = NoAvailableAgentError(
-            resource_requirement=_req({"cpu": "4"}),
-            requirement_index=0,
-            agent_errors={
-                AgentId("agent-a"): InsufficientResourcesError(
-                    agent_id=AgentId("agent-a"),
-                    requested_slots=_slots({"cpu": "4"}),
-                    available_slots=_slots({"cpu": "1"}),
-                    insufficient_resources={ResourceSlotName("cpu"): ("4", "1")},
-                ),
-                AgentId("agent-b"): ContainerLimitExceededError(
-                    agent_id=AgentId("agent-b"),
-                    current_count=10,
-                    max_count=10,
-                ),
-            },
-        )
+    def test_container_limit_failure_reports_containers_to_free(self) -> None:
+        # The container limit empties the pool without any slot being short;
+        # the message reports how many containers must be freed instead.
+        error = BatchAgentSelectionFailedError([
+            PlacementFailure(
+                requirement_index=0,
+                resource_requirement=_req({"cpu": "1"}),
+                filter_name="container-limit",
+                missing_slots={},
+                missing_containers=1,
+            ),
+        ])
         expected = (
-            "no available agents for the request"
-            " (containers=1, arch=x86_64, slots=cpu=4):\n"
-            "- Agent agent-a has insufficient resources:\n"
-            "    - cpu: requested=4, available=1\n"
-            "- Agent agent-b container limit exceeded: current=10, max=10"
+            "1 requirement(s) could not be placed:\n"
+            "- requirement #0 (containers=1, arch=x86_64, slots=cpu=1):"
+            " no agents passed the 'container-limit' filter\n"
+            "  - containers: missing=1"
         )
-        assert err.extra_msg == expected
-
-    def test_designated_failures_reports_missing_designations(self) -> None:
-        # Only 'designated-a' has a recorded failure; 'designated-b' was not
-        # even considered (e.g. filtered out by arch). The constructor must
-        # synthesize the 'not found in compatible agents' message for it.
-        err = NoAvailableAgentError(
-            resource_requirement=_req({"cpu": "2"}),
-            requirement_index=0,
-            agent_errors={
-                AgentId("designated-a"): ContainerLimitExceededError(
-                    agent_id=AgentId("designated-a"),
-                    current_count=5,
-                    max_count=5,
-                ),
-            },
-            designated_agent_ids=[
-                AgentId("designated-a"),
-                AgentId("designated-b"),
-            ],
-        )
-        expected = (
-            "no designated agent is compatible for the request"
-            " (containers=1, arch=x86_64, slots=cpu=2):\n"
-            "- designated agent 'designated-a': Agent designated-a"
-            " container limit exceeded: current=5, max=5\n"
-            "- designated agent 'designated-b': not found in compatible agents"
-        )
-        assert err.extra_msg == expected
+        assert error.extra_msg == expected
 
 
 class TestGoldenNoAgentsInResourceGroupError:

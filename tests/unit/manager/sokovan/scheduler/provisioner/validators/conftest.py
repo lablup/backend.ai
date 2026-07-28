@@ -25,6 +25,7 @@ from ai.backend.common.types import (
     AgentSelectionStrategy,
     ClusterMode,
     KernelId,
+    PreemptionOrder,
     SessionId,
     SessionTypes,
 )
@@ -110,6 +111,7 @@ def _make_workload(
             ],
             agent_selection_policy=AgentSelectionPolicy.STRICT,
             designated_agent_ids=None,
+            session_group=None,
         ),
         priority=0,
         job_priority=0,
@@ -137,6 +139,7 @@ def _make_snapshot(
             policy=ResourceGroupSchedulingPolicy(
                 scheduler="fifo",
                 agent_selection_strategy=AgentSelectionStrategy.CONCENTRATED,
+                preemption_order=PreemptionOrder.OLDEST,
             ),
         ),
         global_scope=GlobalScopeSnapshot(

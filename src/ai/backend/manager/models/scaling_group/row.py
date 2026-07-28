@@ -32,11 +32,10 @@ from sqlalchemy.sql.expression import false, true
 
 from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.schema.resource_group import PreemptionConfig
 from ai.backend.common.types import (
     AgentSelectionStrategy,
     BackendAISchema,
-    PreemptionMode,
-    PreemptionOrder,
     SessionTypes,
 )
 from ai.backend.manager.data.deployment.types import DeploymentOptions
@@ -85,37 +84,6 @@ __all__: Sequence[str] = (
 )
 
 
-class PreemptionConfig(BackendAISchema):
-    model_config = ConfigDict(frozen=True)
-
-    enabled: bool = False
-    """Whether preemption is enabled for this resource group (opt-in)"""
-
-    preemptible_priority: int = 5
-    """Sessions with priority <= this value are preemptible"""
-
-    order: PreemptionOrder = PreemptionOrder.OLDEST
-    """Tie-breaking order for same-priority sessions"""
-
-    mode: PreemptionMode = PreemptionMode.TERMINATE
-    """How to preempt sessions"""
-
-    preemption_min_runtime: timedelta = timedelta(seconds=0)
-    """Minimum session runtime before it becomes preemptible (0 = disabled)"""
-
-    @field_serializer("order", mode="plain")
-    def serialize_order(self, value: PreemptionOrder) -> str:
-        return value.value
-
-    @field_serializer("mode", mode="plain")
-    def serialize_mode(self, value: PreemptionMode) -> str:
-        return value.value
-
-    @field_serializer("preemption_min_runtime", mode="plain")
-    def serialize_preemption_min_runtime(self, value: timedelta) -> float:
-        return value.total_seconds()
-
-
 class ScalingGroupOpts(BackendAISchema):
     model_config = ConfigDict(frozen=True)
 
@@ -134,8 +102,15 @@ class ScalingGroupOpts(BackendAISchema):
     agent_selection_strategy: AgentSelectionStrategy = AgentSelectionStrategy.DISPERSED
     agent_selector_config: dict[str, Any] = Field(default_factory=dict)
 
-    # Only used in the ConcentratedAgentSelector
     enforce_spreading_endpoint_replica: bool = False
+    """Deprecated: replaced by the replica group's SessionGroup placement policy (BEP-1064).
+
+    Nothing reads this field — the spreading chain it was meant to drive was
+    already dead code (BA-6135). Existing values were migrated onto each
+    replica group's SessionGroup (``true`` → ``spread`` + ``preferred``,
+    otherwise ``none``). Kept only so persisted ``scheduler_opts`` documents
+    keep round-tripping; the column and API drop in the next major.
+    """
 
     allow_fractional_resource_fragmentation: bool = True
     """If set to false, agent will refuse to start kernel when they are forced to fragment fractional resource request"""
@@ -427,7 +402,6 @@ class ScalingGroupRow(Base):  # type: ignore[misc]
                     config=self.scheduler_opts.config,
                     agent_selection_strategy=self.scheduler_opts.agent_selection_strategy,
                     agent_selector_config=self.scheduler_opts.agent_selector_config,
-                    enforce_spreading_endpoint_replica=self.scheduler_opts.enforce_spreading_endpoint_replica,
                     allow_fractional_resource_fragmentation=self.scheduler_opts.allow_fractional_resource_fragmentation,
                     route_cleanup_target_statuses=self.scheduler_opts.route_cleanup_target_statuses,
                     preemption=DataPreemptionConfig(

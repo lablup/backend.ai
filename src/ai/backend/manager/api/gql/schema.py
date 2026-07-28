@@ -156,6 +156,19 @@ from .huggingface_registry import (
     huggingface_registry,
     update_huggingface_registry,
 )
+from .idle_checker import (
+    admin_create_idle_checker,
+    admin_idle_checkers,
+    admin_purge_idle_checker,
+    admin_update_idle_checker,
+)
+from .idle_checker_binding import (
+    admin_create_idle_checker_binding,
+    admin_idle_checker_bindings,
+    purge_idle_checker_binding,
+    scoped_idle_checker_bindings,
+    update_idle_checker_binding,
+)
 from .image import (
     admin_image_aliases,
     admin_images_v2,
@@ -431,6 +444,7 @@ from .scheduling_handler import scheduling_handlers
 from .scheduling_history import (
     admin_deployment_histories,
     admin_kernel_scheduling_histories,
+    admin_replica_group_histories,
     admin_route_histories,
     admin_session_scheduling_histories,
     deployment_histories,
@@ -438,6 +452,7 @@ from .scheduling_history import (
     route_histories,
     route_scoped_scheduling_histories,
     scoped_kernel_scheduling_histories,
+    scoped_replica_group_histories,
     session_scheduling_histories,
     session_scoped_scheduling_histories,
 )
@@ -518,6 +533,9 @@ class Query:
     admin_app_config_allow_lists = admin_app_config_allow_lists
     app_config_fragment = app_config_fragment
     admin_app_config_fragments = admin_app_config_fragments
+    admin_idle_checkers = admin_idle_checkers
+    admin_idle_checker_bindings = admin_idle_checker_bindings
+    scoped_idle_checker_bindings = scoped_idle_checker_bindings
     artifact = artifact
     artifacts = artifacts
     artifact_revision = artifact_revision
@@ -554,6 +572,7 @@ class Query:
     admin_kernel_scheduling_histories = admin_kernel_scheduling_histories
     admin_deployments = admin_deployments
     admin_deployment_histories = admin_deployment_histories
+    admin_replica_group_histories = admin_replica_group_histories
     admin_route_histories = admin_route_histories
     admin_notification_channel = admin_notification_channel
     admin_notification_channels = admin_notification_channels
@@ -639,6 +658,7 @@ class Query:
     scoped_kernel_scheduling_histories = scoped_kernel_scheduling_histories
     deployment_scoped_scheduling_histories = deployment_scoped_scheduling_histories
     route_scoped_scheduling_histories = route_scoped_scheduling_histories
+    scoped_replica_group_histories = scoped_replica_group_histories
     # Legacy APIs (deprecated)
     resource_groups = resource_groups
     domain_fair_share = domain_fair_share
@@ -732,6 +752,12 @@ class Query:
 @strawberry.type
 class Mutation:
     admin_update_agent_resource_group = admin_update_agent_resource_group
+    admin_create_idle_checker = admin_create_idle_checker
+    admin_update_idle_checker = admin_update_idle_checker
+    admin_purge_idle_checker = admin_purge_idle_checker
+    admin_create_idle_checker_binding = admin_create_idle_checker_binding
+    update_idle_checker_binding = update_idle_checker_binding
+    purge_idle_checker_binding = purge_idle_checker_binding
     admin_create_app_config_allow_list = admin_create_app_config_allow_list
     admin_purge_app_config_allow_list = admin_purge_app_config_allow_list
     admin_update_app_config_allow_list = admin_update_app_config_allow_list

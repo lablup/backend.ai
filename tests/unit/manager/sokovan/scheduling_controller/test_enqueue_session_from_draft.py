@@ -197,6 +197,7 @@ def _user_policy() -> UserEnqueuePolicy:
         max_pending_session_count=None,
         max_pending_session_resource_slots=None,
         allowed_vfolder_hosts=VFolderHostPermissionMap(),
+        max_priority=None,
     )
 
 

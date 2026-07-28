@@ -103,6 +103,30 @@ class TestSessionLastAccessMarker:
 
         assert await test_valkey_live.get_live_data(marker_key) is None
 
+    async def test_get_batch_returns_timestamps_by_session(
+        self,
+        test_valkey_live: ValkeyLiveClient,
+        session_id: SessionId,
+    ) -> None:
+        missing_session_id = SessionId(uuid4())
+        await test_valkey_live.update_session_last_access(session_id)
+
+        result = await test_valkey_live.get_session_last_access_batch([
+            session_id,
+            missing_session_id,
+        ])
+
+        timestamp = result[session_id]
+        assert timestamp is not None
+        assert timestamp > 0
+        assert result[missing_session_id] is None
+
+    async def test_get_batch_returns_empty_mapping(
+        self,
+        test_valkey_live: ValkeyLiveClient,
+    ) -> None:
+        assert await test_valkey_live.get_session_last_access_batch([]) == {}
+
 
 class TestActiveAppConnections:
     @pytest.fixture()
@@ -152,6 +176,48 @@ class TestActiveAppConnections:
 
         assert removed_count == 1
         assert await test_valkey_live.count_active_connections(session_id) == 0
+
+
+class TestCountActiveConnectionsBatch:
+    @pytest.fixture()
+    async def session_ids_with_active_connections(
+        self,
+        test_valkey_live: ValkeyLiveClient,
+    ) -> list[SessionId]:
+        session_ids = [SessionId(uuid4()) for _ in range(3)]
+        await test_valkey_live.update_connection_tracker(
+            session_ids[0], KernelId(uuid4()), "ssh", "stream-1"
+        )
+        await test_valkey_live.update_connection_tracker(
+            session_ids[0], KernelId(uuid4()), "ssh", "stream-2"
+        )
+        await test_valkey_live.update_connection_tracker(
+            session_ids[1], KernelId(uuid4()), "jupyter", "stream-1"
+        )
+        return session_ids
+
+    async def test_returns_connection_counts_by_session(
+        self,
+        test_valkey_live: ValkeyLiveClient,
+        session_ids_with_active_connections: list[SessionId],
+    ) -> None:
+        result = await test_valkey_live.count_active_connections_batch(
+            session_ids_with_active_connections
+        )
+
+        assert result == {
+            session_ids_with_active_connections[0]: 2,
+            session_ids_with_active_connections[1]: 1,
+            session_ids_with_active_connections[2]: 0,
+        }
+
+    async def test_returns_empty_mapping_for_empty_input(
+        self,
+        test_valkey_live: ValkeyLiveClient,
+    ) -> None:
+        result = await test_valkey_live.count_active_connections_batch([])
+
+        assert result == {}
 
 
 async def test_valkey_live_client_lifecycle(test_valkey_live: ValkeyLiveClient) -> None:

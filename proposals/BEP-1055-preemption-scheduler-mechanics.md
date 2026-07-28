@@ -1,10 +1,10 @@
 ---
 Author: HyeokJin Kim (hyeokjin@lablup.com)
-Status: Draft
+Status: Implemented
 Created: 2026-07-03
 Created-Version:
 Target-Version:
-Implemented-Version:
+Implemented-Version: 26.8.0
 ---
 
 # Preemption Scheduler Mechanics
@@ -118,7 +118,7 @@ On allocation failure the provisioner calls the planner. The planner **only read
 | `now - started_at >= preemption_min_runtime` | Anti-thrashing. **Default 0 (disabled)** |
 
 **Victim selection** (per-agent):
-- On an agent where the pending session could fit, sort candidates by **`job_priority` ascending, then `order` (oldest/newest)** and accumulate. `preemption_order` is retained (only the `preemptible_priority` threshold is removed).
+- On an agent where the pending session could fit, pick victims by **`job_priority` ascending, then the configured `order` strategy** — `oldest`/`newest` break ties by start time; `fewest-sessions`/`smallest-resources` choose deficit-aware against the pending session's shortfall. `preemption_order` is retained (only the `preemptible_priority` threshold is removed).
 - Preempt **only when fully satisfied**: `free(A) + sum(victim slots) >= requested` (no partial preemption, avoiding wasted kills and livelock).
 - **v1 trigger = single-node pending only.** Multi-node victims are allowed but **evicted atomically across all kernels** (no partial gang preemption). Multi-node (cross-agent) triggers are out of scope.
 - Keep a selected-victim set within a tick so one session is not double-counted for two pending sessions.
@@ -152,7 +152,7 @@ There is no separate `RESCHEDULING` state. `PREEMPTED` covers the kernel-cleanup
 | State model | Single new state `PREEMPTED` → terminate: TERMINATED / reschedule: PENDING (REQUEUE, id/priority/`job_priority` preserved). No separate RESCHEDULING |
 | Preemption axis | Preempt by the new **`job_priority`** (scope-local), not the global scheduler `priority`; victims chosen by relative comparison within the same owner |
 | Priority scope | v1 = user scope only (`victim.user_uuid == pending.user_uuid`); project scope is future (needs a "project session") |
-| Config change | Drop RG `preemptible_priority` (absolute threshold unneeded); keep `preemption_order` (oldest/newest tie-break) |
+| Config change | Drop RG `preemptible_priority` (absolute threshold unneeded); keep `preemption_order`, extended to `oldest\|newest\|fewest-sessions\|smallest-resources` (BA-6748) — the latter two select victims deficit-aware against the pending session |
 | Priority cap | Keypair resource policy `max_priority` caps the global `priority` a user may declare; `job_priority` needs no cap (self-scoped) |
 | Scope | v1 single-node trigger + atomic multi-node victim eviction, no partial preemption |
 | Anti-thrashing | Preempt only on full satisfaction, never preempt equal `job_priority`, `preemption_min_runtime` (default 0). Slurm's `PreemptExemptTime` is likewise no-exemption when unset (-1 equals 0) |

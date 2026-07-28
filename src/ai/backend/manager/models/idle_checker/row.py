@@ -9,6 +9,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from ai.backend.common.data.idle_checker.types import CheckerType, IdleCheckerSpec, IdleCheckPhase
 from ai.backend.common.identifier.idle_checker import IdleCheckerID
 from ai.backend.common.types import SessionId, SessionTypes
+from ai.backend.manager.data.idle_checker.types import IdleCheckerData
 from ai.backend.manager.models.base import GUID, Base, PydanticColumn, StrEnumType
 from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin, UpdatedAtMixin
 
@@ -28,7 +29,10 @@ class IdleCheckerRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
     name: Mapped[str] = mapped_column("name", sa.String(length=128), nullable=False)
     description: Mapped[str | None] = mapped_column("description", sa.Text, nullable=True)
     checker_type: Mapped[CheckerType] = mapped_column(
-        "checker_type", StrEnumType(CheckerType), nullable=False
+        "checker_type",
+        StrEnumType(CheckerType),
+        sa.Computed("spec ->> 'type'", persisted=True),
+        nullable=False,
     )
     target_session_types: Mapped[list[SessionTypes]] = mapped_column(
         "target_session_types",
@@ -44,6 +48,19 @@ class IdleCheckerRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
     spec: Mapped[IdleCheckerSpec] = mapped_column(
         "spec", PydanticColumn(IdleCheckerSpec), nullable=False
     )
+
+    def to_data(self) -> IdleCheckerData:
+        return IdleCheckerData(
+            id=self.id,
+            name=self.name,
+            description=self.description,
+            checker_type=self.checker_type,
+            target_session_types=self.target_session_types,
+            initial_grace_period_seconds=self.initial_grace_period_seconds,
+            spec=self.spec,
+            created_at=self.created_at,
+            updated_at=self.updated_at,
+        )
 
 
 class IdleCheckerBindingRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
@@ -108,8 +125,8 @@ class SessionIdleCheckRow(UpdatedAtMixin, Base):  # type: ignore[misc]
     idle_checker_id: Mapped[IdleCheckerID] = mapped_column(
         "idle_checker_id", GUID(IdleCheckerID), nullable=False
     )
-    expire_at: Mapped[datetime] = mapped_column(
-        "expire_at", sa.DateTime(timezone=True), nullable=False
+    expire_at: Mapped[datetime | None] = mapped_column(
+        "expire_at", sa.DateTime(timezone=True), nullable=True
     )
     last_status: Mapped[IdleCheckPhase] = mapped_column(
         "last_status", StrEnumType(IdleCheckPhase), nullable=False

@@ -33,6 +33,9 @@ class SessionStatus(CIStrEnum):
     # values are only meaningful inside the manager
     PENDING = "PENDING"
     DEPRIORITIZING = "DEPRIORITIZING"  # transient: lower priority and go back to PENDING
+    # holds a resource reservation (preemption plan) and waits for the
+    # victims' resources to free before becoming SCHEDULED
+    RESERVED = "RESERVED"
     # ---
     SCHEDULED = "SCHEDULED"
     PREPARING = "PREPARING"
@@ -45,9 +48,12 @@ class SessionStatus(CIStrEnum):
     RUNNING = "RUNNING"
     RESTARTING = "RESTARTING"
     RUNNING_DEGRADED = "RUNNING_DEGRADED"
-    # transient: confirmed preemption victim; after kernel cleanup it
-    # branches by PreemptionMode to TERMINATED (terminate) or PENDING (reschedule)
+    # transient: confirmed preemption victim; branches by PreemptionMode to
+    # TERMINATING (terminate) or RESCHEDULING (reschedule)
     PREEMPTED = "PREEMPTED"
+    # transient: kernels are being torn down to put the session back in the
+    # queue; becomes PENDING once they are all gone
+    RESCHEDULING = "RESCHEDULING"
     # ---
     TERMINATING = "TERMINATING"
     TERMINATED = "TERMINATED"
@@ -74,8 +80,10 @@ class SessionStatus(CIStrEnum):
                 cls.PENDING,
                 cls.DEPRIORITIZING,
                 cls.PREEMPTED,
+                cls.RESCHEDULING,
                 cls.TERMINATED,
                 cls.CANCELLED,
+                cls.ERROR,
             )
         )
 
@@ -120,6 +128,17 @@ class SessionStatus(CIStrEnum):
         marked PREEMPTED, so those source statuses are rejected.
         """
         return frozenset((cls.RUNNING,))
+
+    @classmethod
+    @lru_cache(maxsize=1)
+    def preemption_victim_statuses(cls) -> frozenset[SessionStatus]:
+        """Return statuses eligible as preemption victim candidates (BEP-1055).
+
+        Still occupying resources and able to transition to termination —
+        strips TERMINATING, whose resources free without preemption, and
+        RESERVED, whose hold belongs to another preemption plan.
+        """
+        return (cls.resource_occupied_statuses() & cls.terminatable_statuses()) - {cls.RESERVED}
 
     @classmethod
     @lru_cache(maxsize=1)

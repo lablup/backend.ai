@@ -22,6 +22,7 @@ from ai.backend.common.types import (
     AgentSelectionStrategy,
     ClusterMode,
     KernelId,
+    PreemptionOrder,
     SessionId,
     SessionTypes,
 )
@@ -48,6 +49,7 @@ from ai.backend.manager.views.sokovan.snapshot import (
 from ai.backend.manager.views.sokovan.workload import (
     KernelWorkload,
     ResourceRequest,
+    SessionGroupPolicy,
     SessionPlacement,
     SessionWorkload,
     WorkloadMeta,
@@ -95,6 +97,7 @@ def create_session_workload(
     session_type: SessionTypes = SessionTypes.INTERACTIVE,
     requested_starts_at: datetime | None = None,
     is_preemptible: bool = False,
+    session_group: SessionGroupPolicy | None = None,
 ) -> SessionWorkload:
     """Create a SessionWorkload for testing.
 
@@ -119,6 +122,7 @@ def create_session_workload(
             kernels=kernels,
             agent_selection_policy=agent_selection_policy,
             designated_agent_ids=designated_agent_ids,
+            session_group=session_group,
         ),
         priority=priority,
         job_priority=job_priority,
@@ -147,6 +151,7 @@ def create_system_snapshot(
             policy=ResourceGroupSchedulingPolicy(
                 scheduler=scheduler,
                 agent_selection_strategy=agent_selection_strategy,
+                preemption_order=PreemptionOrder.OLDEST,
             ),
         ),
         global_scope=GlobalScopeSnapshot(

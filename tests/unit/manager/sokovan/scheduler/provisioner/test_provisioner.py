@@ -14,10 +14,7 @@ from ai.backend.manager.sokovan.scheduler.provisioner.provisioner import (
     SessionProvisioner,
     SessionProvisionerArgs,
 )
-from ai.backend.manager.sokovan.scheduler.provisioner.selectors.concentrated import (
-    ConcentratedAgentSelector,
-)
-from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import AgentSelector
+from ai.backend.manager.sokovan.scheduler.provisioner.selectors.pool import create_agent_selector
 from ai.backend.manager.sokovan.scheduler.provisioner.sequencers.fifo import FIFOSequencer
 from ai.backend.manager.sokovan.scheduler.provisioner.validators.dependencies import (
     DependenciesValidator,
@@ -48,9 +45,7 @@ def _make_provisioner(
         SessionProvisionerArgs(
             validator=SchedulingValidator([DependenciesValidator()]),
             default_sequencer=FIFOSequencer(),
-            default_agent_selector=AgentSelector(
-                ConcentratedAgentSelector(agent_selection_resource_priority=["cpu", "mem"])
-            ),
+            agent_selector=create_agent_selector(["cpu", "mem"]),
             repository=repository,
             fair_share_repository=MagicMock(),
             config_provider=config_provider,

@@ -1,14 +1,23 @@
 from __future__ import annotations
 
 from collections.abc import Collection, Sequence
-from datetime import datetime
 
 from ai.backend.common.data.idle_checker.types import IdleCheckPhase
+from ai.backend.manager.data.common.types import SearchResult
+from ai.backend.manager.data.idle_checker.types import IdleCheckerData
 from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.models.idle_checker.row import IdleCheckerRow
+from ai.backend.manager.repositories.base import (
+    BatchQuerier,
+    Creator,
+    Purger,
+    Updater,
+)
 from ai.backend.manager.repositories.idle_checker.db_source.db_source import IdleCheckerDBSource
 from ai.backend.manager.repositories.idle_checker.types import (
     ExpiredIdleCheckBatchData,
     IdleCheckBatchData,
+    IdleJudgmentData,
     InitialGracePeriodBatchData,
     SessionIdleCheckAssignmentData,
     SessionIdleCheckPair,
@@ -19,12 +28,24 @@ __all__ = ("IdleCheckerRepository",)
 
 
 class IdleCheckerRepository:
-    """Reads for idle-check reconciler Sources."""
+    """Idle checker persistence and reconciler data access."""
 
     _db_source: IdleCheckerDBSource
 
     def __init__(self, ops_provider: DBOpsProvider) -> None:
         self._db_source = IdleCheckerDBSource(ops_provider)
+
+    async def create(self, creator: Creator[IdleCheckerRow]) -> IdleCheckerData:
+        return await self._db_source.create(creator)
+
+    async def update(self, updater: Updater[IdleCheckerRow]) -> IdleCheckerData:
+        return await self._db_source.update(updater)
+
+    async def purge(self, purger: Purger[IdleCheckerRow]) -> IdleCheckerData:
+        return await self._db_source.purge(purger)
+
+    async def admin_search(self, querier: BatchQuerier) -> SearchResult[IdleCheckerData]:
+        return await self._db_source.admin_search(querier)
 
     async def fetch_judgment_batch(
         self, session_statuses: Collection[SessionStatus]
@@ -52,12 +73,10 @@ class IdleCheckerRepository:
         self,
         pairs_to_create: Sequence[SessionIdleCheckPair],
         pairs_to_delete: Sequence[SessionIdleCheckPair],
-        now: datetime,
     ) -> None:
         await self._db_source.sync_session_idle_check_assignments(
             pairs_to_create,
             pairs_to_delete,
-            now,
         )
 
     async def batch_update_session_idle_check_phase(
@@ -72,3 +91,9 @@ class IdleCheckerRepository:
             from_phase=from_phase,
             to_phase=to_phase,
         )
+
+    async def batch_apply_session_idle_check_judgments(
+        self,
+        judgments: Sequence[IdleJudgmentData],
+    ) -> None:
+        await self._db_source.batch_apply_session_idle_check_judgments(judgments)

@@ -4,7 +4,7 @@ import uuid
 from collections.abc import Collection, Mapping
 from typing import cast
 
-from ai.backend.common.data.permission.types import OperationType, RBACElementType
+from ai.backend.common.data.permission.types import OperationType, Permission, RBACElementType
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
@@ -49,6 +49,10 @@ from ai.backend.manager.data.permission.types import (
     EntityType,
     ScopeListResult,
     ScopeType,
+)
+from ai.backend.manager.data.permission.virtual_scope import (
+    EntityPermissionCheckKey,
+    ScopePermissionCheckKey,
 )
 from ai.backend.manager.data.role_invitation.types import RoleInvitationData
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
@@ -437,6 +441,50 @@ class PermissionControllerRepository:
         arbitrary collection of per-target keys in a single query.
         """
         return await self._db_source.check_bulk_permission_with_scope_chain(data)
+
+    @permission_controller_repository_resilience.apply()
+    async def check_single_entity_permission_via_virtual_scope(
+        self,
+        key: EntityPermissionCheckKey,
+        permission: Permission,
+    ) -> bool:
+        """Permission check on a single entity through the virtual-scope chain.
+
+        Resolves the effective permission via
+        ``entity -> entity_memberships -> scope_bindings -> scope`` with per-hop
+        cap clipping and tests it bitwise against ``permission``.
+        """
+        return await self._db_source.check_single_entity_permission_via_virtual_scope(
+            key, permission
+        )
+
+    @permission_controller_repository_resilience.apply()
+    async def check_bulk_permission_via_virtual_scope(
+        self,
+        keys: Collection[EntityPermissionCheckKey],
+        permission: Permission,
+    ) -> Mapping[EntityPermissionCheckKey, bool]:
+        """Batch permission check on multiple entities through the virtual-scope chain.
+
+        Same semantics as check_single_entity_permission_via_virtual_scope but
+        for an arbitrary collection of per-entity keys, batched per
+        ``(user_id, entity_type)`` group.
+        """
+        return await self._db_source.check_bulk_permission_via_virtual_scope(keys, permission)
+
+    @permission_controller_repository_resilience.apply()
+    async def check_scope_permission_via_virtual_scope(
+        self,
+        keys: Collection[ScopePermissionCheckKey],
+        permission: Permission,
+    ) -> Mapping[ScopePermissionCheckKey, bool]:
+        """Permission check on target scopes through the virtual-scope chain.
+
+        Each scope is walked as an entity while permission rows are matched on
+        the key's ``entity_type``, batched per
+        ``(user_id, scope_type, entity_type)`` group.
+        """
+        return await self._db_source.check_scope_permission_via_virtual_scope(keys, permission)
 
     @permission_controller_repository_resilience.apply()
     async def resolve_effective_permissions(

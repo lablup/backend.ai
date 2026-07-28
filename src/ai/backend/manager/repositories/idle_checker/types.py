@@ -1,4 +1,4 @@
-"""Repository result types for the idle-check reconciler batch."""
+"""Repository result types for idle checkers."""
 
 from __future__ import annotations
 
@@ -41,6 +41,17 @@ class IdleCheckBatchData:
 class SessionIdleCheckPair:
     session_id: SessionId
     checker_id: IdleCheckerID
+
+
+@dataclass(frozen=True)
+class IdleJudgmentData:
+    """One session's judgment from one checker, persisted onto its session_idle_checks row."""
+
+    session_id: SessionId
+    checker_id: IdleCheckerID
+    status: IdleCheckPhase
+    expire_at: datetime
+    message: str
 
 
 @dataclass(frozen=True)

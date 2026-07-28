@@ -22,12 +22,12 @@ from ai.backend.manager.repositories.idle_checker.types import (
     IdleCheckAssignmentData,
     IdleCheckBatchData,
     IdleCheckerDefinitionData,
+    IdleJudgmentData,
 )
 from ai.backend.manager.sokovan.idle_check.checkers.base import (
     CheckerAssignment,
     IdleChecker,
     IdleCheckerContext,
-    IdleJudgment,
 )
 from ai.backend.manager.sokovan.idle_check.handlers.reconcile import IdleCheckReconcileHandler
 from ai.backend.manager.sokovan.idle_check.types import IdleCheckReconcileInfo
@@ -41,7 +41,7 @@ _SPECS: Final[dict[CheckerType, IdleCheckerSpec]] = {
     ),
     CheckerType.NETWORK_TIMEOUT: IdleCheckerSpec(
         type=CheckerType.NETWORK_TIMEOUT,
-        network=NetworkTimeoutSpec(),
+        network=NetworkTimeoutSpec(max_network_inactivity_seconds=3600),
     ),
 }
 
@@ -66,7 +66,7 @@ class FakeChecker(IdleChecker):
         assignments: Sequence[CheckerAssignment],
         *,
         context: IdleCheckerContext,
-    ) -> Sequence[IdleJudgment]:
+    ) -> Sequence[IdleJudgmentData]:
         self.judge_contexts.append(context)
         self.judge_calls.append([
             (
@@ -78,7 +78,7 @@ class FakeChecker(IdleChecker):
         if self.should_fail:
             raise InternalServerError("Fake checker failed")
         return [
-            IdleJudgment(
+            IdleJudgmentData(
                 checker_id=assignment.definition.checker_id,
                 session_id=session.session_id,
                 expire_at=_NOW,
@@ -112,6 +112,7 @@ def _assignment(
             session_id=session_id,
             created_at=datetime(2026, 1, 1, tzinfo=UTC),
             starts_at=None,
+            expire_at=_NOW,
         ),
         checker=checker,
     )
@@ -221,21 +222,21 @@ class TestIdleCheckReconcileHandler:
         result = await handler.execute(reconcile_info)
 
         assert result.judgments == [
-            IdleJudgment(
+            IdleJudgmentData(
                 checker_id=lifetime_definition.checker_id,
                 session_id=first_session_id,
                 expire_at=_NOW,
                 status=IdleCheckPhase.IDLE,
                 message="max lifetime exceeded",
             ),
-            IdleJudgment(
+            IdleJudgmentData(
                 checker_id=lifetime_definition.checker_id,
                 session_id=second_session_id,
                 expire_at=_NOW,
                 status=IdleCheckPhase.IDLE,
                 message="max lifetime exceeded",
             ),
-            IdleJudgment(
+            IdleJudgmentData(
                 checker_id=network_definition.checker_id,
                 session_id=first_session_id,
                 expire_at=_NOW,

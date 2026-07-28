@@ -1,27 +1,30 @@
-"""Tests for the agent selector pool keyed by AgentSelectionStrategy."""
+"""Tests for the shared AgentSelector's internal strategy pool."""
 
 from __future__ import annotations
 
 from ai.backend.common.types import AgentSelectionStrategy
-from ai.backend.manager.sokovan.scheduler.provisioner.provisioner import SessionProvisioner
+from ai.backend.manager.sokovan.scheduler.provisioner.selectors.pool import create_agent_selector
 
 
-class TestAgentSelectorPool:
+class TestAgentSelectorStrategyPool:
     def test_pool_maps_every_strategy(self) -> None:
-        pool = SessionProvisioner._make_agent_selector_pool(["cpu", "mem"])
+        selector = create_agent_selector(["cpu", "mem"])
 
         assert (
-            pool[AgentSelectionStrategy.CONCENTRATED].strategy_name() == "ConcentratedAgentSelector"
+            selector.strategy_name(AgentSelectionStrategy.CONCENTRATED)
+            == "ConcentratedAgentSelector"
         )
-        assert pool[AgentSelectionStrategy.DISPERSED].strategy_name() == "DispersedAgentSelector"
-        assert pool[AgentSelectionStrategy.ROUNDROBIN].strategy_name() == "RoundRobinAgentSelector"
-        assert pool[AgentSelectionStrategy.LEGACY].strategy_name() == "LegacyAgentSelector"
+        assert selector.strategy_name(AgentSelectionStrategy.DISPERSED) == "DispersedAgentSelector"
+        assert (
+            selector.strategy_name(AgentSelectionStrategy.ROUNDROBIN) == "RoundRobinAgentSelector"
+        )
+        assert selector.strategy_name(AgentSelectionStrategy.LEGACY) == "LegacyAgentSelector"
 
     def test_pool_success_messages_are_strategy_specific(self) -> None:
-        pool = SessionProvisioner._make_agent_selector_pool(["cpu", "mem"])
+        selector = create_agent_selector(["cpu", "mem"])
 
         messages = {
-            strategy: pool[strategy].strategy_success_message()
+            strategy: selector.strategy_success_message(strategy)
             for strategy in AgentSelectionStrategy
         }
         assert len(set(messages.values())) == len(messages)

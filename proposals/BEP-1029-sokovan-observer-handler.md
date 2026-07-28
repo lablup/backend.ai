@@ -1,10 +1,10 @@
 ---
 Author: HyeokJin Kim (hyeokjin@lablup.com)
-Status: Draft
+Status: Implemented
 Created: 2025-01-15
 Created-Version: 26.1.0
 Target-Version: 26.1.0
-Implemented-Version:
+Implemented-Version: 26.1.0
 ---
 
 # Sokovan ObserverHandler Pattern

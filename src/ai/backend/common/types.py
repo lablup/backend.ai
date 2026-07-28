@@ -22,6 +22,7 @@ from typing import (
     TYPE_CHECKING,
     Annotated,
     Any,
+    Final,
     Literal,
     NewType,
     NotRequired,
@@ -75,6 +76,7 @@ from .models.minilang.mount import MountPointParser
 __all__ = (
     "MODEL_SERVICE_RUNTIME_PROFILES",
     "PID",
+    "REDIS_PASSWORD_MASK",
     "AbstractPermission",
     "AbuseReport",
     "AbuseReportValue",
@@ -176,7 +178,7 @@ __all__ = (
 
 
 if TYPE_CHECKING:
-    from ai.backend.common.configs.redis import RedisConfig
+    from ai.backend.common.configs.redis import RedisConfig, SingleRedisConfig
     from ai.backend.common.data.vfolder.types import VFolderMountData
     from ai.backend.common.dto.manager.v2.common import BinarySizeInfo
 
@@ -2193,12 +2195,20 @@ class RedisProfileTarget:
         )
 
 
+REDIS_PASSWORD_MASK: Final = "********"
+
+
 def safe_print_redis_config(config: RedisConfig) -> str:
     safe_config = copy.deepcopy(config)
-    if config.password is not None:
-        safe_config.password = "********"
-    if config.sentinel_password is not None:
-        safe_config.sentinel_password = "********"
+    # The overrides carry their own credentials, so they must be masked as well.
+    masking_targets: list[SingleRedisConfig] = [safe_config]
+    if safe_config.override_configs is not None:
+        masking_targets.extend(safe_config.override_configs.values())
+    for target in masking_targets:
+        if target.password is not None:
+            target.password = REDIS_PASSWORD_MASK
+        if target.sentinel_password is not None:
+            target.sentinel_password = REDIS_PASSWORD_MASK
     return str(safe_config)
 
 
@@ -2250,8 +2260,18 @@ class PreemptionMode(enum.StrEnum):
 
 
 class PreemptionOrder(enum.StrEnum):
+    """Victim selection order for preemption.
+
+    OLDEST/NEWEST break same-priority ties by start time; FEWEST_SESSIONS
+    evicts the fewest sessions; SMALLEST_RESOURCES reclaims the least
+    resources. The deficit-aware orders are computed against the pending
+    session being placed.
+    """
+
     OLDEST = "oldest"
     NEWEST = "newest"
+    FEWEST_SESSIONS = "fewest-sessions"
+    SMALLEST_RESOURCES = "smallest-resources"
 
 
 class SchedulerStatus(TypedDict):

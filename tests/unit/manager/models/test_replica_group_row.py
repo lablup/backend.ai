@@ -3,6 +3,7 @@ import uuid
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.identifier.replica_group import ReplicaGroupID
+from ai.backend.common.identifier.session_group import SessionGroupID
 from ai.backend.manager.data.deployment.types import (
     ReplicaGroupLifecycle,
     ReplicaGroupScalingStatus,
@@ -39,6 +40,7 @@ def test_replica_group_status_columns_default_to_stable() -> None:
 
 def _make_row() -> ReplicaGroupRow:
     return ReplicaGroupRow(
+        session_group_id=SessionGroupID(uuid.uuid4()),
         id=ReplicaGroupID(uuid.uuid4()),
         deployment_id=DeploymentID(uuid.uuid4()),
         current_revision_id=DeploymentRevisionID(uuid.uuid4()),

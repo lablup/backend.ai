@@ -17,8 +17,10 @@ from ai.backend.common.data.idle_checker.types import (
 from ai.backend.common.data.permission.types import ScopeType
 from ai.backend.common.identifier.idle_checker import IdleCheckerID
 from ai.backend.common.types import SessionId, SessionTypes
-from ai.backend.manager.data.idle_checker.types import IdleCheckSession
+from ai.backend.manager.data.common.types import SearchResult
+from ai.backend.manager.data.idle_checker.types import IdleCheckerData, IdleCheckSession
 from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.errors.idle_checker import IdleCheckerNotFound
 from ai.backend.manager.models.idle_checker.conditions import SessionIdleCheckConditions
 from ai.backend.manager.models.idle_checker.row import (
     IdleCheckerBindingRow,
@@ -32,9 +34,14 @@ from ai.backend.manager.repositories.base import (
     BatchQuerier,
     BatchUpdater,
     BulkCreator,
+    Creator,
     NoPagination,
+    Purger,
+    Updater,
 )
-from ai.backend.manager.repositories.idle_checker.creators import SessionIdleCheckCreatorSpec
+from ai.backend.manager.repositories.idle_checker.creators import (
+    SessionIdleCheckCreatorSpec,
+)
 from ai.backend.manager.repositories.idle_checker.purgers import (
     SessionIdleCheckBatchPurgerSpec,
 )
@@ -44,12 +51,14 @@ from ai.backend.manager.repositories.idle_checker.types import (
     IdleCheckAssignmentData,
     IdleCheckBatchData,
     IdleCheckerDefinitionData,
+    IdleJudgmentData,
     InitialGracePeriodBatchData,
     InitialGracePeriodCheckData,
     SessionIdleCheckAssignmentData,
     SessionIdleCheckPair,
 )
 from ai.backend.manager.repositories.idle_checker.updaters import (
+    SessionIdleCheckJudgmentBatchUpdaterSpec,
     SessionIdleCheckPhaseBatchUpdaterSpec,
 )
 from ai.backend.manager.repositories.ops import DBOpsProvider
@@ -64,6 +73,35 @@ class IdleCheckerDBSource:
     def __init__(self, ops_provider: DBOpsProvider) -> None:
         self._ops = ops_provider
 
+    async def create(self, creator: Creator[IdleCheckerRow]) -> IdleCheckerData:
+        async with self._ops.write_ops() as w:
+            checker = (await w.create(creator)).row
+            return checker.to_data()
+
+    async def update(self, updater: Updater[IdleCheckerRow]) -> IdleCheckerData:
+        async with self._ops.write_ops() as w:
+            result = await w.update(updater)
+            if result is None:
+                raise IdleCheckerNotFound(str(updater.pk_value))
+            return result.row.to_data()
+
+    async def purge(self, purger: Purger[IdleCheckerRow]) -> IdleCheckerData:
+        async with self._ops.write_ops() as w:
+            result = await w.purge(purger)
+            if result is None:
+                raise IdleCheckerNotFound(str(purger.spec.pk_value()))
+            return result.row.to_data()
+
+    async def admin_search(self, querier: BatchQuerier) -> SearchResult[IdleCheckerData]:
+        async with self._ops.read_ops() as r:
+            result = await r.batch_query_in_global(sa.select(IdleCheckerRow), querier)
+        return SearchResult(
+            items=[row.IdleCheckerRow.to_data() for row in result.rows],
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
+
     async def fetch_judgment_batch(
         self,
         session_statuses: Collection[SessionStatus],
@@ -73,6 +111,7 @@ class IdleCheckerDBSource:
                 SessionRow.id.label("session_id"),
                 SessionRow.created_at.label("session_created_at"),
                 SessionRow.starts_at.label("session_starts_at"),
+                SessionIdleCheckRow.expire_at.label("session_expire_at"),
                 IdleCheckerRow.id.label("checker_id"),
                 IdleCheckerRow.checker_type,
                 IdleCheckerRow.target_session_types,
@@ -100,6 +139,7 @@ class IdleCheckerDBSource:
                         session_id=SessionId(row.session_id),
                         created_at=row.session_created_at,
                         starts_at=row.session_starts_at,
+                        expire_at=row.session_expire_at,
                     ),
                     checker=IdleCheckerDefinitionData(
                         checker_id=cast(IdleCheckerID, row.checker_id),
@@ -121,7 +161,10 @@ class IdleCheckerDBSource:
         check_query = (
             sa.select(SessionIdleCheckRow)
             .join(SessionRow, SessionIdleCheckRow.session_id == SessionRow.id)
-            .where(SessionIdleCheckRow.last_status == IdleCheckPhase.IDLE_EXPIRED)
+            .where(
+                SessionIdleCheckRow.last_status == IdleCheckPhase.IDLE_EXPIRED,
+                SessionIdleCheckRow.expire_at.is_not(None),
+            )
         )
         async with self._ops.read_ops() as r:
             now = await r.current_time()
@@ -139,7 +182,7 @@ class IdleCheckerDBSource:
                 ExpiredIdleCheckData(
                     session_id=check_row.session_id,
                     checker_id=check_row.idle_checker_id,
-                    expire_at=check_row.expire_at,
+                    expire_at=cast(datetime, check_row.expire_at),
                     last_status=check_row.last_status,
                     last_message=check_row.last_message,
                 )
@@ -258,13 +301,12 @@ class IdleCheckerDBSource:
         self,
         pairs_to_create: Sequence[SessionIdleCheckPair],
         pairs_to_delete: Sequence[SessionIdleCheckPair],
-        now: datetime,
     ) -> None:
         async with self._ops.write_ops() as w:
             if pairs_to_create:
                 await w.bulk_create(
                     BulkCreator(
-                        specs=[SessionIdleCheckCreatorSpec(pair, now) for pair in pairs_to_create]
+                        specs=[SessionIdleCheckCreatorSpec(pair) for pair in pairs_to_create]
                     )
                 )
             if pairs_to_delete:
@@ -292,6 +334,25 @@ class IdleCheckerDBSource:
                         conditions=[
                             SessionIdleCheckConditions.by_pairs(pair_values),
                             SessionIdleCheckConditions.by_status_equals(from_phase),
+                        ],
+                    )
+                )
+
+    async def batch_apply_session_idle_check_judgments(
+        self,
+        judgments: Sequence[IdleJudgmentData],
+    ) -> None:
+        pairs = [(judgment.session_id, judgment.checker_id) for judgment in judgments]
+        async with self._ops.write_ops() as w:
+            if pairs:
+                await w.batch_update(
+                    BatchUpdater(
+                        spec=SessionIdleCheckJudgmentBatchUpdaterSpec(judgments),
+                        conditions=[
+                            SessionIdleCheckConditions.by_pairs(pairs),
+                            SessionIdleCheckConditions.by_status_not_equals(
+                                IdleCheckPhase.IDLE_EXPIRED
+                            ),
                         ],
                     )
                 )

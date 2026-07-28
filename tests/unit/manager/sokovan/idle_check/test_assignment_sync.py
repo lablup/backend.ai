@@ -74,7 +74,6 @@ class TestIdleCheckAssignmentSyncHandler:
 
         assert set(result.pairs_to_create) == {pair_to_create}
         assert set(result.pairs_to_delete) == {pair_to_delete}
-        assert result.current_time == current_time
         assert result.processed_count() == 2
 
 
@@ -91,13 +90,11 @@ class TestIdleCheckAssignmentSyncApplier:
         self,
         applier: IdleCheckAssignmentSyncApplier,
         repository: AsyncMock,
-        current_time: datetime,
         pair_to_create: SessionIdleCheckPair,
         pair_to_delete: SessionIdleCheckPair,
     ) -> None:
         apply_input = MagicMock()
         apply_input.result = IdleCheckAssignmentSyncResult(
-            current_time=current_time,
             pairs_to_create=[pair_to_create],
             pairs_to_delete=[pair_to_delete],
         )
@@ -107,17 +104,15 @@ class TestIdleCheckAssignmentSyncApplier:
         repository.sync_session_idle_check_assignments.assert_awaited_once_with(
             [pair_to_create],
             [pair_to_delete],
-            current_time,
         )
 
     async def test_skips_empty_assignment_changes(
         self,
         applier: IdleCheckAssignmentSyncApplier,
         repository: AsyncMock,
-        current_time: datetime,
     ) -> None:
         apply_input = MagicMock()
-        apply_input.result = IdleCheckAssignmentSyncResult(current_time=current_time)
+        apply_input.result = IdleCheckAssignmentSyncResult()
 
         await applier.apply(apply_input)
 

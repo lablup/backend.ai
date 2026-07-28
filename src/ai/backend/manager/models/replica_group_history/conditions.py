@@ -46,6 +46,44 @@ class ReplicaGroupHistoryConditions:
 
         return inner
 
+    # UUID filter conditions for replica_group_id
+    @staticmethod
+    def by_replica_group_id_filter(spec: UUIDEqualMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.negated:
+                return ReplicaGroupHistoryRow.replica_group_id != spec.value
+            return ReplicaGroupHistoryRow.replica_group_id == spec.value
+
+        return inner
+
+    @staticmethod
+    def by_replica_group_id_in(spec: UUIDInMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.negated:
+                return ReplicaGroupHistoryRow.replica_group_id.notin_(spec.values)
+            return ReplicaGroupHistoryRow.replica_group_id.in_(spec.values)
+
+        return inner
+
+    # UUID filter conditions for deployment_id
+    @staticmethod
+    def by_deployment_id_filter(spec: UUIDEqualMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.negated:
+                return ReplicaGroupHistoryRow.deployment_id != spec.value
+            return ReplicaGroupHistoryRow.deployment_id == spec.value
+
+        return inner
+
+    @staticmethod
+    def by_deployment_id_in(spec: UUIDInMatchSpec) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            if spec.negated:
+                return ReplicaGroupHistoryRow.deployment_id.notin_(spec.values)
+            return ReplicaGroupHistoryRow.deployment_id.in_(spec.values)
+
+        return inner
+
     @staticmethod
     def by_category(category: ReplicaGroupHandlerCategory) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:

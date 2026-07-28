@@ -29,6 +29,9 @@ from ai.backend.manager.sokovan.scheduler.fair_share import (
 from ai.backend.manager.sokovan.scheduler.handlers import (
     CheckPreconditionLifecycleHandler,
     DeprioritizeSessionsLifecycleHandler,
+    PreemptSessionsLifecycleHandler,
+    ReleaseReservedSessionsLifecycleHandler,
+    RescheduleSessionsLifecycleHandler,
     ScheduleSessionsLifecycleHandler,
     SessionLifecycleHandler,
     StartSessionsLifecycleHandler,
@@ -117,7 +120,7 @@ def create_default_scheduler_components(
         SessionProvisionerArgs(
             validator=validator,
             default_sequencer=sequencer,
-            default_agent_selector=agent_selector,
+            agent_selector=agent_selector,
             repository=repository,
             fair_share_repository=fair_share_repository,
             config_provider=config_provider,
@@ -221,6 +224,7 @@ def _create_lifecycle_handlers(
         ScheduleType.SCHEDULE: ScheduleSessionsLifecycleHandler(
             args.provisioner,
             args.repository,
+            args.scheduling_controller,
         ),
         ScheduleType.DEPRIORITIZE: DeprioritizeSessionsLifecycleHandler(
             args.repository,
@@ -236,6 +240,18 @@ def _create_lifecycle_handlers(
         ScheduleType.TERMINATE: TerminateSessionsLifecycleHandler(
             args.terminator,
             args.repository,
+        ),
+        ScheduleType.RELEASE_RESERVED: ReleaseReservedSessionsLifecycleHandler(
+            args.repository,
+        ),
+        ScheduleType.PREEMPTED: PreemptSessionsLifecycleHandler(
+            args.repository,
+            args.scheduling_controller,
+        ),
+        ScheduleType.RESCHEDULING: RescheduleSessionsLifecycleHandler(
+            args.terminator,
+            args.repository,
+            args.scheduling_controller,
         ),
         ScheduleType.SWEEP: SweepSessionsLifecycleHandler(
             args.repository,
@@ -255,6 +271,16 @@ def _create_promotion_specs() -> Mapping[ScheduleType, PromotionSpec]:
         # Promote to PREPARED when no kernel is in pre-prepared states.
         # Includes SCHEDULED to handle cases where kernels advance to PREPARED
         # while the session status update to PREPARING hasn't happened yet.
+        # Promote to SCHEDULED when no kernel still holds an unadmitted
+        # reservation (kernel admission is the RELEASE_RESERVED cycle's job)
+        ScheduleType.CHECK_RESERVED_PROGRESS: PromotionSpec(
+            name="promote-to-scheduled",
+            target_statuses=[SessionStatus.RESERVED],
+            target_kernel_statuses=[KernelStatus.RESERVED],
+            kernel_match_type=KernelMatchType.NOT_ANY,
+            success_status=SessionStatus.SCHEDULED,
+            reason="triggered-by-scheduler",
+        ),
         ScheduleType.CHECK_PULLING_PROGRESS: PromotionSpec(
             name="promote-to-prepared",
             target_statuses=[

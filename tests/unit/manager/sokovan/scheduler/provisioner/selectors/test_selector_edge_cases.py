@@ -11,7 +11,7 @@ import pytest
 from ai.backend.common.identifier.architecture import ArchName
 from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.identifier.resource_slot import ResourceSlotName
-from ai.backend.common.types import AgentId, SessionId
+from ai.backend.common.types import AgentId, AgentSelectionStrategy, PreemptionOrder, SessionId
 from ai.backend.manager.data.session.options import AgentSelectionPolicy
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.concentrated import (
     ConcentratedAgentSelector,
@@ -21,16 +21,17 @@ from ai.backend.manager.sokovan.scheduler.provisioner.selectors.dispersed import
 )
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.exceptions import (
     BatchAgentSelectionFailedError,
-    NoAvailableAgentError,
     NoCompatibleAgentError,
 )
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.legacy import LegacyAgentSelector
+from ai.backend.manager.sokovan.scheduler.provisioner.selectors.pool import (
+    create_agent_selector,
+)
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.roundrobin import (
     RoundRobinAgentSelector,
 )
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import (
     AgentSelectionCriteria,
-    AgentSelector,
 )
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.tracker import AgentStateTracker
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.types import ResourceRequirements
@@ -61,6 +62,9 @@ def _criteria(requirements: list[ResourceRequirements]) -> AgentSelectionCriteri
         requirements=requirements,
         agent_selection_policy=AgentSelectionPolicy.STRICT,
         designated_agent_ids=None,
+        job_priority=0,
+        victim_candidates=None,
+        session_group=None,
     )
 
 
@@ -90,33 +94,36 @@ class TestSelectorEdgeCases:
     ) -> None:
         """Requesting a slot no agent has is treated as zero availability."""
         criteria = _criteria([_req({"cpu": "1", "npu": "1"})])
-        selector = AgentSelector(
-            ConcentratedAgentSelector(agent_selection_resource_priority=["cpu", "mem"])
-        )
+        selector = create_agent_selector(["cpu", "mem"])
 
         with pytest.raises(BatchAgentSelectionFailedError) as exc_info:
             await selector.select_agents_for_batch_requirements(
-                _trackers(agents_with_varied_occupancy), criteria, NO_LIMIT
+                AgentSelectionStrategy.CONCENTRATED,
+                _trackers(agents_with_varied_occupancy),
+                criteria,
+                NO_LIMIT,
+                PreemptionOrder.OLDEST,
             )
-        assert isinstance(exc_info.value.errors[0], NoAvailableAgentError)
+        assert exc_info.value.failures[0].filter_name == "resource"
 
-    async def test_unknown_architecture_fails_with_arch_error(
+    async def test_unknown_architecture_propagates_as_absolute_failure(
         self,
         agents_with_varied_occupancy: list[AgentInfo],
     ) -> None:
-        """An architecture no agent provides raises NoCompatibleAgentError."""
+        """An architecture no agent provides empties the architecture filter;
+        the absolute failure propagates instead of becoming a batch result."""
         criteria = _criteria([_req({"cpu": "1"}, arch="riscv64")])
-        selector = AgentSelector(
-            ConcentratedAgentSelector(agent_selection_resource_priority=["cpu", "mem"])
-        )
+        selector = create_agent_selector(["cpu", "mem"])
 
-        with pytest.raises(BatchAgentSelectionFailedError) as exc_info:
+        with pytest.raises(NoCompatibleAgentError) as exc_info:
             await selector.select_agents_for_batch_requirements(
-                _trackers(agents_with_varied_occupancy), criteria, NO_LIMIT
+                AgentSelectionStrategy.CONCENTRATED,
+                _trackers(agents_with_varied_occupancy),
+                criteria,
+                NO_LIMIT,
+                PreemptionOrder.OLDEST,
             )
-        error = exc_info.value.errors[0]
-        assert isinstance(error, NoCompatibleAgentError)
-        assert error.build_remediation_hint().available_archs == ["x86_64"]
+        assert exc_info.value.filter_name == "architecture"
 
     def test_extremely_large_resource_values(
         self,
@@ -154,13 +161,15 @@ class TestSelectorEdgeCases:
     ) -> None:
         """When no agent has remaining capacity the batch fails."""
         criteria = _criteria([_req({"cpu": "1", "mem": "1024"})])
-        selector = AgentSelector(
-            ConcentratedAgentSelector(agent_selection_resource_priority=["cpu", "mem"])
-        )
+        selector = create_agent_selector(["cpu", "mem"])
 
         with pytest.raises(BatchAgentSelectionFailedError):
             await selector.select_agents_for_batch_requirements(
-                _trackers(agents_all_fully_occupied), criteria, NO_LIMIT
+                AgentSelectionStrategy.CONCENTRATED,
+                _trackers(agents_all_fully_occupied),
+                criteria,
+                NO_LIMIT,
+                PreemptionOrder.OLDEST,
             )
 
     def test_priority_with_nonexistent_resources(

@@ -21,7 +21,6 @@ class IdleCheckAssignmentSyncHandler(
         return IdleCheckAssignmentSyncResult(
             pairs_to_create=list(desired - current),
             pairs_to_delete=list(current - desired),
-            current_time=reconcile_info.current_time,
         )
 
     @override

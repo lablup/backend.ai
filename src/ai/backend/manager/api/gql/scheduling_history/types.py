@@ -25,6 +25,12 @@ from ai.backend.common.dto.manager.v2.scheduling_history.request import (
     KernelHistoryOrder as KernelHistoryOrderDTO,
 )
 from ai.backend.common.dto.manager.v2.scheduling_history.request import (
+    ReplicaGroupHistoryFilter as ReplicaGroupHistoryFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.scheduling_history.request import (
+    ReplicaGroupHistoryOrder as ReplicaGroupHistoryOrderDTO,
+)
+from ai.backend.common.dto.manager.v2.scheduling_history.request import (
     RouteHistoryFilter as RouteHistoryFilterDTO,
 )
 from ai.backend.common.dto.manager.v2.scheduling_history.request import (
@@ -42,12 +48,14 @@ from ai.backend.common.dto.manager.v2.scheduling_history.request import (
 from ai.backend.common.dto.manager.v2.scheduling_history.response import (
     DeploymentHistoryNode,
     KernelHistoryNode,
+    ReplicaGroupHistoryNode,
     RouteHistoryNode,
     SessionHistoryNode,
 )
 from ai.backend.common.dto.manager.v2.scheduling_history.types import (
     DeploymentHistoryScopeDTO,
     KernelHistoryScopeDTO,
+    ReplicaGroupHistoryScopeDTO,
     RouteHistoryScopeDTO,
     SessionHistoryScopeDTO,
     SubStepResultInfo,
@@ -90,12 +98,15 @@ __all__ = (
     "SessionSchedulingHistoryOrderField",
     "KernelSchedulingHistoryOrderFieldGQL",
     "DeploymentHistoryOrderField",
+    "ReplicaGroupHistoryCategoryGQL",
+    "ReplicaGroupHistoryOrderFieldGQL",
     "RouteHistoryOrderField",
     # Types
     "SubStepResultGQL",
     "SessionSchedulingHistory",
     "KernelSchedulingHistoryGQL",
     "DeploymentHistory",
+    "ReplicaGroupHistoryGQL",
     "RouteHistory",
     # Filters
     "SessionSchedulingHistoryFilter",
@@ -104,12 +115,15 @@ __all__ = (
     "KernelSchedulingHistoryOrderByGQL",
     "DeploymentHistoryFilter",
     "DeploymentHistoryOrderBy",
+    "ReplicaGroupHistoryFilterGQL",
+    "ReplicaGroupHistoryOrderByGQL",
     "RouteHistoryFilter",
     "RouteHistoryOrderBy",
     # Scope types (added in 26.2.0)
     "SessionScope",
     "KernelScopeGQL",
     "DeploymentScope",
+    "ReplicaGroupHistoryScopeGQL",
     "RouteScope",
 )
 
@@ -178,6 +192,35 @@ class DeploymentHistoryOrderField(StrEnum):
 class RouteHistoryOrderField(StrEnum):
     CREATED_AT = "created_at"
     UPDATED_AT = "updated_at"
+
+
+@gql_enum(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Handler category that produced a replica-group history row",
+    ),
+    name="ReplicaGroupHistoryCategory",
+)
+class ReplicaGroupHistoryCategoryGQL(StrEnum):
+    LIFECYCLE = "lifecycle"
+    SCALING = "scaling"
+
+
+@gql_enum(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Fields available for ordering replica-group scheduling history",
+    ),
+    name="ReplicaGroupHistoryOrderField",
+)
+class ReplicaGroupHistoryOrderFieldGQL(StrEnum):
+    CREATED_AT = "created_at"
+    UPDATED_AT = "updated_at"
+    PHASE = "phase"
+    FROM_STATUS = "from_status"
+    TO_STATUS = "to_status"
+    RESULT = "result"
+    ATTEMPTS = "attempts"
 
 
 # Types
@@ -353,6 +396,45 @@ class DeploymentHistory(PydanticNodeMixin[DeploymentHistoryNode]):
         return cast(list[Self | None], results)
 
 
+@gql_node_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Replica-group scheduling history record.",
+    ),
+    name="ReplicaGroupHistory",
+)
+class ReplicaGroupHistoryGQL(PydanticNodeMixin[ReplicaGroupHistoryNode]):
+    # No resolve_nodes: these rows are reached through the owning deployment.
+    id: NodeID[str]
+    deployment_id: ID
+    category: ReplicaGroupHistoryCategoryGQL
+    phase: str
+    from_status: str | None
+    to_status: str | None
+    result: SchedulingResultGQL
+    error_code: str | None
+    message: str | None
+    sub_steps: list[SubStepResultGQL]
+    attempts: int
+    created_at: datetime
+    updated_at: datetime
+
+    @gql_field(
+        description="The deployment the replica group belongs to.",
+    )  # type: ignore[misc]
+    async def deployment(
+        self,
+        info: Info[StrawberryGQLContext],
+    ) -> (
+        Annotated[
+            ModelDeployment,
+            strawberry.lazy("ai.backend.manager.api.gql.deployment.types.deployment"),
+        ]
+        | None
+    ):
+        return await info.context.data_loaders.deployment_loader.load(UUID(str(self.deployment_id)))
+
+
 @gql_node_type(BackendAIGQLMeta(added_version="26.3.0", description="Route history record."))
 class RouteHistory(PydanticNodeMixin[RouteHistoryNode]):
     id: NodeID[str]
@@ -492,6 +574,29 @@ class RouteScope(PydanticInputMixin[RouteHistoryScopeDTO]):
     route_id: UUID = gql_field(description="Route ID to get history for")
 
 
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description=(
+            "Scope for replica-group scheduling history query. "
+            "All items are OR'd; raises an error if every field is empty."
+        ),
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="ReplicaGroupHistoryScope",
+)
+class ReplicaGroupHistoryScopeGQL(PydanticInputMixin[ReplicaGroupHistoryScopeDTO]):
+    """Scope for replica-group scheduling history queries."""
+
+    deployment: list[UUIDScopeGQL] | None = gql_field(
+        description=(
+            "Deployment IDs to get the history of every owned replica group for. "
+            "The scoped search is single-target for now, so exactly one item is accepted "
+            "across all fields."
+        ),
+        default=None,
+    )
+
+
 # Filters and orders (pydantic-backed inputs)
 
 
@@ -605,6 +710,42 @@ class DeploymentHistoryFilter(PydanticInputMixin[DeploymentHistoryFilterDTO]):
 )
 class DeploymentHistoryOrderBy(PydanticInputMixin[DeploymentHistoryOrderDTO]):
     field: DeploymentHistoryOrderField
+    direction: OrderDirection = OrderDirection.DESC
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter for replica-group scheduling history",
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="ReplicaGroupHistoryFilter",
+)
+class ReplicaGroupHistoryFilterGQL(PydanticInputMixin[ReplicaGroupHistoryFilterDTO]):
+    id: UUIDFilter | None = None
+    deployment_id: UUIDFilter | None = None
+    category: list[ReplicaGroupHistoryCategoryGQL] | None = None
+    phase: StringFilter | None = None
+    from_status: list[str] | None = None
+    to_status: list[str] | None = None
+    result: SchedulingResultFilterGQL | None = None
+    error_code: StringFilter | None = None
+    message: StringFilter | None = None
+    created_at: DateTimeFilter | None = None
+    updated_at: DateTimeFilter | None = None
+    AND: list[Self] | None = None
+    OR: list[Self] | None = None
+    NOT: list[Self] | None = None
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Order by specification for replica-group scheduling history",
+        added_version=NEXT_RELEASE_VERSION,
+    ),
+    name="ReplicaGroupHistoryOrderBy",
+)
+class ReplicaGroupHistoryOrderByGQL(PydanticInputMixin[ReplicaGroupHistoryOrderDTO]):
+    field: ReplicaGroupHistoryOrderFieldGQL
     direction: OrderDirection = OrderDirection.DESC
 
 

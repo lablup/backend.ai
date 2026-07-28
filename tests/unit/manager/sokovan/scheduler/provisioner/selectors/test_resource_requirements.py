@@ -131,6 +131,7 @@ class TestPlacementPlanFromPlacement:
             kernels=kernels,
             agent_selection_policy=AgentSelectionPolicy.STRICT,
             designated_agent_ids=None,
+            session_group=None,
         )
 
         plan = PlacementPlan.from_placement(placement)

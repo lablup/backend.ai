@@ -44,6 +44,7 @@ from ai.backend.manager.models.deployment_policy.row import DeploymentPolicyRow
 from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
 from ai.backend.manager.models.endpoint.row import EndpointRow
 from ai.backend.manager.models.image.row import ImageRow
+from ai.backend.manager.models.session_group.row import SessionGroupRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import vfolders
 from ai.backend.manager.plugin.network import NetworkPluginContext
@@ -59,10 +60,9 @@ from ai.backend.manager.sokovan.deployment.deployment_controller import (
     DeploymentControllerArgs,
 )
 from ai.backend.manager.sokovan.deployment.revision_draft import RevisionDraftReader
-from ai.backend.manager.sokovan.scheduler.provisioner.selectors.concentrated import (
-    ConcentratedAgentSelector,
+from ai.backend.manager.sokovan.scheduler.provisioner.selectors.pool import (
+    create_agent_selector,
 )
-from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import AgentSelector
 from ai.backend.manager.sokovan.scheduling_controller import (
     SchedulingController,
     SchedulingControllerArgs,
@@ -128,10 +128,8 @@ def deployment_processors(
             valkey_schedule=valkey_clients.schedule,
             network_plugin_ctx=network_plugin_ctx,
             hook_plugin_ctx=hook_plugin_ctx,
-            agent_selector=AgentSelector(
-                ConcentratedAgentSelector(
-                    config_provider.config.manager.agent_selection_resource_priority
-                )
+            agent_selector=create_agent_selector(
+                config_provider.config.manager.agent_selection_resource_priority
             ),
         )
     )
@@ -376,5 +374,13 @@ async def deployment_seed_data(
         await conn.execute(
             EndpointRow.__table__.delete().where(
                 EndpointRow.__table__.c.domain == domain_fixture.domain_name
+            )
+        )
+        # Replica group creation makes a SessionGroup with it; the rows
+        # outlive the endpoint delete and hold RESTRICT FKs on the domain
+        # and project fixtures torn down after this one.
+        await conn.execute(
+            SessionGroupRow.__table__.delete().where(
+                SessionGroupRow.__table__.c.domain_id == domain_fixture.domain_id
             )
         )

@@ -17,13 +17,10 @@ import pytest
 from ai.backend.common.identifier.architecture import ArchName
 from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.common.identifier.resource_slot import ResourceSlotName
-from ai.backend.common.types import AgentId, SessionId
+from ai.backend.common.types import AgentId, AgentSelectionStrategy, PreemptionOrder, SessionId
 from ai.backend.manager.data.session.options import AgentSelectionPolicy
-from ai.backend.manager.sokovan.scheduler.provisioner.selectors.concentrated import (
-    ConcentratedAgentSelector,
-)
-from ai.backend.manager.sokovan.scheduler.provisioner.selectors.dispersed import (
-    DispersedAgentSelector,
+from ai.backend.manager.sokovan.scheduler.provisioner.selectors.pool import (
+    create_agent_selector,
 )
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import (
     AgentSelectionCriteria,
@@ -101,17 +98,15 @@ def _criteria(
         ],
         agent_selection_policy=AgentSelectionPolicy.STRICT,
         designated_agent_ids=designated_agent_ids,
+        job_priority=0,
+        victim_candidates=None,
+        session_group=None,
     )
 
 
 @pytest.fixture
-def concentrated_selector() -> AgentSelector:
-    return AgentSelector(ConcentratedAgentSelector(["cpu", "mem"]))
-
-
-@pytest.fixture
-def dispersed_selector() -> AgentSelector:
-    return AgentSelector(DispersedAgentSelector(["cpu", "mem"]))
+def selector() -> AgentSelector:
+    return create_agent_selector(["cpu", "mem"])
 
 
 class TestFailedAgentFiltering:
@@ -119,13 +114,17 @@ class TestFailedAgentFiltering:
 
     async def test_failed_agent_is_avoided(
         self,
-        concentrated_selector: AgentSelector,
+        selector: AgentSelector,
     ) -> None:
         """An agent where this session previously failed is excluded."""
         trackers = _trackers({"agent-a": frozenset({SESSION_ID})})
 
-        selections = await concentrated_selector.select_agents_for_batch_requirements(
-            trackers, _criteria(), NO_LIMIT
+        selections = await selector.select_agents_for_batch_requirements(
+            AgentSelectionStrategy.CONCENTRATED,
+            trackers,
+            _criteria(),
+            NO_LIMIT,
+            PreemptionOrder.OLDEST,
         )
 
         assert len(selections) == 1
@@ -133,7 +132,7 @@ class TestFailedAgentFiltering:
 
     async def test_other_sessions_failures_do_not_filter(
         self,
-        concentrated_selector: AgentSelector,
+        selector: AgentSelector,
     ) -> None:
         """Failures recorded for other sessions leave selection unchanged."""
         other_session = SessionId(uuid.uuid4())
@@ -142,15 +141,19 @@ class TestFailedAgentFiltering:
             "agent-b": frozenset({other_session}),
         })
 
-        selections = await concentrated_selector.select_agents_for_batch_requirements(
-            trackers, _criteria(), NO_LIMIT
+        selections = await selector.select_agents_for_batch_requirements(
+            AgentSelectionStrategy.CONCENTRATED,
+            trackers,
+            _criteria(),
+            NO_LIMIT,
+            PreemptionOrder.OLDEST,
         )
 
         assert len(selections) == 1
 
     async def test_all_agents_failed_fallback(
         self,
-        concentrated_selector: AgentSelector,
+        selector: AgentSelector,
     ) -> None:
         """When every compatible agent has failed, the filter is skipped."""
         trackers = _trackers({
@@ -158,8 +161,12 @@ class TestFailedAgentFiltering:
             "agent-b": frozenset({SESSION_ID}),
         })
 
-        selections = await concentrated_selector.select_agents_for_batch_requirements(
-            trackers, _criteria(), NO_LIMIT
+        selections = await selector.select_agents_for_batch_requirements(
+            AgentSelectionStrategy.CONCENTRATED,
+            trackers,
+            _criteria(),
+            NO_LIMIT,
+            PreemptionOrder.OLDEST,
         )
 
         assert len(selections) == 1
@@ -167,26 +174,34 @@ class TestFailedAgentFiltering:
 
     async def test_no_failed_agents_no_change(
         self,
-        concentrated_selector: AgentSelector,
+        selector: AgentSelector,
     ) -> None:
         """No prior failures: normal selection proceeds."""
         trackers = _trackers()
 
-        selections = await concentrated_selector.select_agents_for_batch_requirements(
-            trackers, _criteria(), NO_LIMIT
+        selections = await selector.select_agents_for_batch_requirements(
+            AgentSelectionStrategy.CONCENTRATED,
+            trackers,
+            _criteria(),
+            NO_LIMIT,
+            PreemptionOrder.OLDEST,
         )
 
         assert len(selections) == 1
 
     async def test_designated_agent_overrides_failed_filter(
         self,
-        concentrated_selector: AgentSelector,
+        selector: AgentSelector,
     ) -> None:
         """The designated-agent check runs before the failed-agent filter."""
         trackers = _trackers({"agent-a": frozenset({SESSION_ID})})
 
-        selections = await concentrated_selector.select_agents_for_batch_requirements(
-            trackers, _criteria(designated_agent_ids=[AGENT_A]), NO_LIMIT
+        selections = await selector.select_agents_for_batch_requirements(
+            AgentSelectionStrategy.CONCENTRATED,
+            trackers,
+            _criteria(designated_agent_ids=[AGENT_A]),
+            NO_LIMIT,
+            PreemptionOrder.OLDEST,
         )
 
         assert len(selections) == 1
@@ -194,13 +209,17 @@ class TestFailedAgentFiltering:
 
     async def test_failed_filter_works_with_dispersed_strategy(
         self,
-        dispersed_selector: AgentSelector,
+        selector: AgentSelector,
     ) -> None:
         """Filtering happens upstream of the strategy, not inside it."""
         trackers = _trackers({"agent-a": frozenset({SESSION_ID})})
 
-        selections = await dispersed_selector.select_agents_for_batch_requirements(
-            trackers, _criteria(), NO_LIMIT
+        selections = await selector.select_agents_for_batch_requirements(
+            AgentSelectionStrategy.DISPERSED,
+            trackers,
+            _criteria(),
+            NO_LIMIT,
+            PreemptionOrder.OLDEST,
         )
 
         assert len(selections) == 1
@@ -208,13 +227,17 @@ class TestFailedAgentFiltering:
 
     async def test_failed_agent_not_in_pool_is_ignored(
         self,
-        concentrated_selector: AgentSelector,
+        selector: AgentSelector,
     ) -> None:
         """A failure record for an agent no longer in the pool is harmless."""
         trackers = _trackers({"agent-nonexistent": frozenset({SESSION_ID})})
 
-        selections = await concentrated_selector.select_agents_for_batch_requirements(
-            trackers, _criteria(), NO_LIMIT
+        selections = await selector.select_agents_for_batch_requirements(
+            AgentSelectionStrategy.CONCENTRATED,
+            trackers,
+            _criteria(),
+            NO_LIMIT,
+            PreemptionOrder.OLDEST,
         )
 
         assert len(selections) == 1

@@ -10,10 +10,9 @@ from ai.backend.common.dependencies import DependencyComposer, DependencyStack
 from ai.backend.logging.types import LogLevel
 from ai.backend.manager.plugin.error_monitor import ErrorEventDispatcher
 from ai.backend.manager.plugin.monitor import ManagerErrorPluginContext, ManagerStatsPluginContext
-from ai.backend.manager.sokovan.scheduler.provisioner.selectors.concentrated import (
-    ConcentratedAgentSelector,
+from ai.backend.manager.sokovan.scheduler.provisioner.selectors.pool import (
+    create_agent_selector,
 )
-from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import AgentSelector
 
 from .agents import AgentsComposer, AgentsInput, AgentsResources
 from .bootstrap import BootstrapComposer, BootstrapInput, BootstrapResources
@@ -240,7 +239,7 @@ class ManagerDependencyComposer(DependencyComposer[DependencyInput, DependencyRe
         resource_priority = (
             bootstrap.config_provider.config.manager.agent_selection_resource_priority
         )
-        agent_selector = AgentSelector(ConcentratedAgentSelector(resource_priority))
+        agent_selector = create_agent_selector(resource_priority)
 
         # Stage 8: Agents (controllers, client pools, agent registry)
         agents = await stack.enter_composer(
@@ -274,6 +273,7 @@ class ManagerDependencyComposer(DependencyComposer[DependencyInput, DependencyRe
                 distributed_lock_factory=domain.distributed_lock_factory,
                 valkey_profile_target=config.redis.to_valkey_profile_target(),
                 valkey_schedule=infrastructure.valkey.schedule,
+                valkey_live=infrastructure.valkey.live,
                 valkey_stat=infrastructure.valkey.stat,
                 pidx=setup_input.pidx,
                 scheduler_repository=domain.repositories.scheduler.repository,
