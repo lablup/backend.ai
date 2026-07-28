@@ -27,6 +27,7 @@ This BEP redefines the release procedure as **three actions** — the rc release
 - Defining version grades (Edge/LTS) and support periods — that belongs to the support policy document. Here we deal only with the **list of maintained versions**.
 - Automatic conflict resolution for backports, `Fixes:` trailers, and deterministic backport scope inference in CI — see 3.(b) for the advisory split.
 - Moving **code** backward from a version branch to `main`. Branch-only code commits measured zero, so we state the principle only and build no workflow.
+- Taking the WebUI bundle out of the release artifact. It has to ship inside the artifact for now, so 3.(d) only decouples **when** the bundle is pinned, not where it lives.
 - Alembic backport policy and changes to the version numbering scheme. Milestones stay for release planning; they are dropped only from the backport decision.
 
 ## 2. Current State & Scope, by Area
@@ -83,6 +84,17 @@ For each area, separate **✅ what already exists** from **➕ what to add**. Me
 | ➕ | Skip towncrier when there are no fragments to consume. For a prerelease, strip the rc suffix before searching for the block |
 | ➕ | The file must read as a complete release note from the rc onward; the final release consolidates it; a patch release records **only the fixes backported into it** |
 
+### 2.6 WebUI bundle and the GraphQL schema
+
+| | Item |
+|---|---|
+| ✅ | The built WebUI bundle is committed into this repo (`src/ai/backend/web/static/`, 4718 files) and ships in the wheel via `resources(sources=["static/**/*"])` |
+| ✅ | `release.sh <version> [webui_version]` pins the bundle **inside the release commit** — every recent commit touching `static/` is a `release:` commit |
+| ✅ | WebUI builds against `docs/manager/graphql-reference/`, and every tag (rc included) already publishes `supergraph.graphql` as a GitHub Release asset |
+| ✅ | The schema does not move on a version branch in practice — 55 commits on `26.4` since its fork point, **0 touching `docs/manager/graphql-reference/`** |
+| ➕ | Make that a **rule**: from the rc1 tag onward the version branch does not change the GraphQL schema, enforced in CI |
+| ➕ | Pin the bundle in an **independent PR**, not in the release commit — drop `webui_version` from `release.sh` |
+
 ## 3. Implementation Design
 
 **Core flow**: feature completion → rc1 release on `main` (freeze + NEXT bump + towncrier) → tag and cut the version branch at that same commit → backport fixes during the rc period → release `.0` from the branch → copy the version changelog into `main`.
@@ -138,7 +150,25 @@ Why copying suffices: the version file is owned solely by that branch, and `main
 
 This PR does not touch `changes/`. **Each tree drains its own fragment pool with its own release** — the `main` pool is drained by the cut (rc1), the branch pool by that branch's releases. Fragments the branch consumed remain in the `main` pool and are consumed again into `<next>`'s notes at the next cut; the same fix appearing in two versions' notes is expected.
 
-### (d) Release procedure
+### (d) WebUI bundle and the schema freeze contract
+
+The bundle must ship inside the release artifact, so the two repos cannot be decoupled by packaging. They are decoupled in time instead: WebUI needs the schema **early** (at the cut) and this repo needs the bundle **late** (at the final release), and the rc period is exactly that gap.
+
+| Party | Commitment |
+|---|---|
+| backend.ai | Publish `supergraph.graphql` as a release asset at the rc1 tag, and **do not change the GraphQL schema on that version branch afterwards** |
+| WebUI | Build against that asset and release its bundle |
+| backend.ai | Take the resulting bundle in an **independent PR**, not in the release commit |
+
+**The freeze is a rule, not an observation.** A version branch only takes `fix:` backports, which is why the schema has not moved in practice, but nothing prevents a fix from touching a GraphQL field. CI fails any change under `docs/manager/graphql-reference/` on a version-branch PR, with the existing `graphql-inspector` job as the breaking-change backstop. Only then can WebUI treat the rc1 asset as that version's final schema.
+
+**Pinning the bundle is separate from releasing.** `release.sh` drops its `webui_version` argument; the bundle arrives as `chore: update webui to <x>` whenever WebUI ships, and a release commit simply carries whatever bundle the branch holds. If WebUI misses the rc window, `.0` still goes out on schedule with the current bundle and the update rides the next patch release — so a patch release may exist solely to advance the bundle, which is the one carve-out to "a patch release records only backported fixes" (3.(c)).
+
+**Each tree owns its own bundle**, exactly like the fragment pool: `main` carries the bundle for the version under development, a version branch carries its own, and each is updated by its own PR. 4718 files are never cherry-picked between them.
+
+Pinning an rc bundle during the rc period is already the established practice (past pins include `25.18.0-rc.1`, `25.13.0-rc.2`, `25.12.0-rc.1`), which lets an rc2 verify the UI before the final release.
+
+### (e) Release procedure
 
 Who does what, once this is in place.
 
@@ -151,6 +181,7 @@ Who does what, once this is in place.
 | Cut 5 | **Automated** | Tag push → `ci.yml make-final-release` → wheels/scies, GitHub Release (prerelease), PyPI |
 | rc period | **Automated** | fix PRs merged to `main` → `backport.yml` opens cherry-pick PRs on `<version>`; success auto-merges, conflict lands as a draft PR + `pending:backport` |
 | rc period | Human | Resolve conflicted draft PRs. For more verification, `release.sh <version>.0rc2` on the branch |
+| rc period | WebUI | Build against the rc1 `supergraph.graphql` asset and ship a bundle; it lands here as its own `chore: update webui to <x>` PR |
 | Final 1 | Human | `release.sh <version>.0` on the branch → PR → merge |
 | Final 2 | **Automated** | Tag `<version>.0` → GitHub Release + PyPI |
 | Final 3 | **Automated** | `changelog-sync.yml` opens a `main` PR copying `CHANGELOG-<version>.md` |
@@ -160,12 +191,13 @@ Humans run two scripts, merge two PRs, and resolve backport conflicts. Tagging, 
 
 rc releases are published to PyPI like any other tag; `make-final-release` already uploads on every tag, so this needs no change beyond confirming the `deploy-to-pypi` environment gate.
 
-### (e) Work scope
+### (f) Work scope
 
 | Work | Content |
 |---|---|
 | **Version management in CI** | New `cut-release-branch.sh` (the whole cut PR procedure, absorbing freeze/bump out of `release.sh`), a workflow that tags and branches from `merge_commit_sha` on release-PR merge, align `VERSION` on `main` |
 | **Label-based backport + advisory skill** | Introduce `maintained-versions.yml`, replace target decision in `backport.yml` (keep the matrix JSON shape → downstream jobs unchanged), pre-filter, remove `-X theirs`, draft PR on conflict, fix trailers, `backport:<version>` and `no-backport` labels, a Claude skill that suggests target scope on a PR and that lists, classifies, and cleans up `pending:backport` PRs |
+| **WebUI decoupling** | Drop `webui_version` from `release.sh` so the bundle is pinned by its own PR, add a CI check that rejects `docs/manager/graphql-reference/` changes on version-branch PRs, and optionally warn when `static/version.json` lags the release version |
 | **Changelog split and script cleanup** | Per-version-branch files via a temporary towncrier config (written at the repo root so its relative `directory`/`template` paths resolve), towncrier skip guard, hardcoding and prerelease handling in `extract-release-changelog.py`, new `changelog-sync.yml`, 2 CI bugs (the edge-release regex `[0-9]{2}\.[0-9]{2}` never matches a `YY.S` branch, `X.Y.0rc1` in `check-backport-commits.py`), update `daily-workflows.rst` |
 
 ## 4. Decision Summary
@@ -186,12 +218,16 @@ rc releases are published to PyPI like any other tag; `make-final-release` alrea
 | Fragment ownership | Each tree drains its own pool with its own release. No backward movement |
 | Reflection into `main` | **One version file copied** per final tag. Not a cherry-pick |
 | rc on PyPI | Published like any other tag. No workflow change needed |
+| Schema freeze | From the rc1 tag onward the version branch **does not change the GraphQL schema**, enforced in CI. The rc1 release asset is that version's final schema, and WebUI builds against it |
+| WebUI bundle pin | Pinned by its own PR, never inside a release commit. A release carries whatever bundle the branch holds, so WebUI never blocks `.0`; a patch release may exist solely to advance the bundle |
+| Bundle ownership | Each tree owns its own bundle, like the fragment pool. Never cherry-picked between trees |
 
 ## 5. Open Questions
 
 - **Whether rc releases keep their own release heading block** until the final release consolidates them, or write into the final block from the start. Today's `CHANGELOG.md` shows the former as the existing practice (0 rc headings survive, 9 rc tags exist).
 - **Permissions for the `/backport` comment trigger** — write access versus maintainers only.
 - **Which versions stay in `maintained-versions.yml`, and for how long** — follows from the support policy decision.
+- **Whether the WebUI bundle can eventually leave the release artifact** (a separate bundle wheel or an install-time download, both compatible with the webserver's existing `static_path`). Out of scope while the artifact must contain it, but it is the only change that removes the coupling rather than scheduling around it.
 
 ## 6. References
 
