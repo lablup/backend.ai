@@ -126,9 +126,7 @@ class RouteHistoryNode(BaseResponseModel):
 class ReplicaGroupHistoryNode(BaseResponseModel):
     """Node model representing a replica-group scheduling history record.
 
-    Carries no ``replica_group_id``: a replica group is an internal implementation
-    detail that is never addressable by clients, so the history is identified by
-    its own ID and attributed to the owning deployment.
+    Has no ``replica_group_id``: a replica group is not addressable by clients.
     """
 
     id: ReplicaGroupHistoryID = Field(description="History record ID")

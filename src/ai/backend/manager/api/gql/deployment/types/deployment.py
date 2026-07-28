@@ -176,9 +176,8 @@ if TYPE_CHECKING:
     from ai.backend.manager.api.gql.project_v2.types.node import ProjectV2GQL
     from ai.backend.manager.api.gql.resource_group.types import ResourceGroupGQL
 
-    # Resolved at schema build time via strawberry.lazy() below: importing the
-    # scheduling_history package here would close the
-    # scheduling_history -> rbac -> deployment import cycle.
+    # Kept lazy below: a runtime import closes the scheduling_history -> rbac
+    # -> deployment cycle.
     from ai.backend.manager.api.gql.scheduling_history.resolver import (
         ReplicaGroupHistoryConnectionGQL,
     )

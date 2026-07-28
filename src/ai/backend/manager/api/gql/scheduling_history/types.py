@@ -404,14 +404,7 @@ class DeploymentHistory(PydanticNodeMixin[DeploymentHistoryNode]):
     name="ReplicaGroupHistory",
 )
 class ReplicaGroupHistoryGQL(PydanticNodeMixin[ReplicaGroupHistoryNode]):
-    """Replica-group scheduling history record.
-
-    Deliberately implements no ``resolve_nodes``: a replica group is an internal
-    implementation detail reachable only through its owning deployment, so there
-    is no by-ID refetch path for its history. ``Connection`` requires the Node
-    interface, which is the only reason this stays a node type.
-    """
-
+    # No resolve_nodes: these rows are reached through the owning deployment.
     id: NodeID[str]
     deployment_id: ID
     category: ReplicaGroupHistoryCategoryGQL
@@ -592,11 +585,7 @@ class RouteScope(PydanticInputMixin[RouteHistoryScopeDTO]):
     name="ReplicaGroupHistoryScope",
 )
 class ReplicaGroupHistoryScopeGQL(PydanticInputMixin[ReplicaGroupHistoryScopeDTO]):
-    """Scope for replica-group scheduling history queries.
-
-    A replica group is not an RBAC scope of its own, so the history is scoped by the
-    owning deployment.
-    """
+    """Scope for replica-group scheduling history queries."""
 
     deployment: list[UUIDScopeGQL] | None = gql_field(
         description=(

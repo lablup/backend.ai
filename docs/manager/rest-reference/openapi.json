@@ -26266,7 +26266,7 @@
         "type": "string"
       },
       "ReplicaGroupHistoryFilter": {
-        "description": "Filter conditions for replica-group scheduling history search.\n\nOffers no ``replica_group_id`` axis: a replica group is an internal\nimplementation detail, so clients narrow by the owning deployment instead.",
+        "description": "Filter conditions for replica-group scheduling history search.",
         "properties": {
           "id": {
             "anyOf": [
