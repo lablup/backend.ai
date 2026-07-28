@@ -53,11 +53,6 @@ class _EmptyScopeCase:
     deployment: list[UUIDScopeGQL] | None
 
 
-@pytest.fixture
-def deployment_id() -> uuid.UUID:
-    return uuid.UUID("11111111-1111-1111-1111-111111111111")
-
-
 @dataclass(frozen=True)
 class _EnumPairCase:
     """A GQL enum and the DTO enum it must stay value-identical to."""
@@ -95,7 +90,8 @@ class TestEnumParity:
 class TestReplicaGroupHistoryScopeGQL:
     """Tests for ``ReplicaGroupHistoryScopeGQL.to_pydantic()``."""
 
-    def test_deployment_scope_survives_conversion(self, deployment_id: uuid.UUID) -> None:
+    def test_deployment_scope_survives_conversion(self) -> None:
+        deployment_id = uuid.uuid4()
         scope = ReplicaGroupHistoryScopeGQL(deployment=[UUIDScopeGQL(value=deployment_id)])
         dto = scope.to_pydantic()
         assert isinstance(dto, ReplicaGroupHistoryScopeDTO)
@@ -135,7 +131,8 @@ class TestReplicaGroupIsNotAddressable:
 class TestReplicaGroupHistoryFilterGQL:
     """Tests for ``ReplicaGroupHistoryFilterGQL.to_pydantic()``."""
 
-    def test_deployment_id_survives_conversion(self, deployment_id: uuid.UUID) -> None:
+    def test_deployment_id_survives_conversion(self) -> None:
+        deployment_id = uuid.uuid4()
         f = ReplicaGroupHistoryFilterGQL(deployment_id=UUIDFilter(equals=deployment_id))
         dto = f.to_pydantic()
         assert isinstance(dto, ReplicaGroupHistoryFilterDTO)
