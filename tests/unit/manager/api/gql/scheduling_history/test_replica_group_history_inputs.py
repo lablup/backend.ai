@@ -22,11 +22,14 @@ from ai.backend.common.dto.manager.v2.scheduling_history.request import (
     ReplicaGroupHistoryOrder as ReplicaGroupHistoryOrderDTO,
 )
 from ai.backend.common.dto.manager.v2.scheduling_history.types import (
-    OrderDirection,
+    OrderDirection as OrderDirectionDTO,
+)
+from ai.backend.common.dto.manager.v2.scheduling_history.types import (
     ReplicaGroupHistoryCategoryType,
     ReplicaGroupHistoryOrderField,
     ReplicaGroupHistoryScopeDTO,
 )
+from ai.backend.manager.api.gql.base import OrderDirection as OrderDirectionGQL
 from ai.backend.manager.api.gql.base import StringFilter
 from ai.backend.manager.api.gql.rbac.types.scope import UUIDScopeGQL
 from ai.backend.manager.api.gql.scheduling_history.types import (
@@ -171,14 +174,14 @@ class TestReplicaGroupHistoryOrderByGQL:
     )
     @pytest.mark.parametrize(
         "direction",
-        list(OrderDirection),
+        list(OrderDirectionGQL),
         ids=lambda direction: direction.value,
     )
     def test_order_survives_conversion(
-        self, field: ReplicaGroupHistoryOrderFieldGQL, direction: OrderDirection
+        self, field: ReplicaGroupHistoryOrderFieldGQL, direction: OrderDirectionGQL
     ) -> None:
         order = ReplicaGroupHistoryOrderByGQL(field=field, direction=direction)
         dto = order.to_pydantic()
         assert isinstance(dto, ReplicaGroupHistoryOrderDTO)
         assert dto.field == ReplicaGroupHistoryOrderField(field.value)
-        assert dto.direction == direction
+        assert dto.direction == OrderDirectionDTO(direction.value)
