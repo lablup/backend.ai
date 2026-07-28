@@ -44,8 +44,8 @@ class IdleCheckerRepository:
     async def purge(self, purger: Purger[IdleCheckerRow]) -> IdleCheckerData:
         return await self._db_source.purge(purger)
 
-    async def search(self, querier: BatchQuerier) -> SearchResult[IdleCheckerData]:
-        return await self._db_source.search(querier)
+    async def admin_search(self, querier: BatchQuerier) -> SearchResult[IdleCheckerData]:
+        return await self._db_source.admin_search(querier)
 
     async def fetch_judgment_batch(
         self, session_statuses: Collection[SessionStatus]

@@ -107,7 +107,7 @@ class IdleCheckerDBSource:
                 raise IdleCheckerNotFound(str(purger.spec.pk_value()))
             return result.row.to_data()
 
-    async def search(self, querier: BatchQuerier) -> SearchResult[IdleCheckerData]:
+    async def admin_search(self, querier: BatchQuerier) -> SearchResult[IdleCheckerData]:
         async with self._ops.read_ops() as r:
             result = await r.batch_query_in_global(sa.select(IdleCheckerRow), querier)
         return SearchResult(
