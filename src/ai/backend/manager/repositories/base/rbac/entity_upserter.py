@@ -11,11 +11,9 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.data.permission.types import RBACElementType, RelationType
+from ai.backend.common.exception import UnreachableError
 from ai.backend.manager.data.permission.types import RBACElementRef
-from ai.backend.manager.errors.repository import (
-    UnsupportedCompositePrimaryKeyError,
-    UpsertEmptyResultError,
-)
+from ai.backend.manager.errors.repository import UnsupportedCompositePrimaryKeyError
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
@@ -102,7 +100,7 @@ async def execute_rbac_entity_upserter[TRow: Base](
         row_data = result.fetchone()
 
     if row_data is None:
-        raise UpsertEmptyResultError
+        raise UnreachableError("ON CONFLICT DO UPDATE returns the inserted or updated row")
     row: TRow = row_class(**dict(row_data._mapping))
 
     entity_type = upserter.element_type.to_entity_type()
