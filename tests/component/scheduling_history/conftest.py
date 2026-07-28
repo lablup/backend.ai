@@ -22,6 +22,7 @@ from ai.backend.common.identifier.replica_group import ReplicaGroupID
 from ai.backend.common.identifier.replica_group_history import ReplicaGroupHistoryID
 from ai.backend.common.identifier.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.identifier.session import SessionID
+from ai.backend.common.identifier.session_group import SessionGroupID
 from ai.backend.common.schema.deployment import IntOrPercent, ReplicaGroupRolloutSpec
 from ai.backend.common.types import KernelId, ResourceSlot
 from ai.backend.manager.actions.validators import ActionValidators
@@ -44,12 +45,17 @@ from ai.backend.manager.api.rest.v2.scheduling_history.registry import (
 from ai.backend.manager.data.deployment.types import ReplicaGroupHandlerCategory
 from ai.backend.manager.data.kernel.types import KernelSchedulingPhase
 from ai.backend.manager.data.session.types import SchedulingResult
+from ai.backend.manager.data.session_group.types import (
+    SessionGroupPlacementDirection,
+    SessionGroupPlacementEnforcement,
+)
 from ai.backend.manager.models.endpoint.row import EndpointRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
 from ai.backend.manager.models.replica_group_history.row import ReplicaGroupHistoryRow
 from ai.backend.manager.models.scheduling_history.row import KernelSchedulingHistoryRow
 from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.session_group.row import SessionGroupRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.scheduling_history.repository import (
     SchedulingHistoryRepository,
@@ -378,8 +384,29 @@ async def replica_group_history_seed(
             )
         )
         await db_sess.flush()
+        # Each replica group owns its placement group (1:1).
+        session_group_ids = {
+            gid: SessionGroupID(uuid.uuid4()) for gid in (replica_group_id, other_replica_group_id)
+        }
         db_sess.add_all([
-            ReplicaGroupRow(id=gid, deployment_id=deployment_id, rollout=rollout)
+            SessionGroupRow(
+                id=session_group_id,
+                domain_id=domain_fixture.domain_id,
+                project_id=group_fixture,
+                owner_user_id=admin_user_fixture.user_uuid,
+                placement_direction=SessionGroupPlacementDirection.SPREAD,
+                placement_enforcement=SessionGroupPlacementEnforcement.PREFERRED,
+            )
+            for session_group_id in session_group_ids.values()
+        ])
+        await db_sess.flush()
+        db_sess.add_all([
+            ReplicaGroupRow(
+                id=gid,
+                deployment_id=deployment_id,
+                session_group_id=session_group_ids[gid],
+                rollout=rollout,
+            )
             for gid in (replica_group_id, other_replica_group_id)
         ])
         await db_sess.flush()
@@ -456,5 +483,10 @@ async def replica_group_history_seed(
         )
         await conn.execute(
             sa.delete(ReplicaGroupRow).where(ReplicaGroupRow.deployment_id == deployment_id)
+        )
+        await conn.execute(
+            sa.delete(SessionGroupRow).where(
+                SessionGroupRow.id.in_(list(session_group_ids.values()))
+            )
         )
         await conn.execute(sa.delete(EndpointRow).where(EndpointRow.id == deployment_id))

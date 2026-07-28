@@ -35,6 +35,7 @@ from ai.backend.common.events.types import EventDomain
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.domain import DomainID
 from ai.backend.common.identifier.resource_group import ResourceGroupID
+from ai.backend.common.identifier.session_group import SessionGroupID
 from ai.backend.common.schema.deployment import IntOrPercent, ReplicaGroupRolloutSpec
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.actions.types import OperationStatus
@@ -1178,6 +1179,7 @@ class TestDeploymentsTerminalChildCleanup:
         async with db.begin_session() as sess:
             sess.add(
                 ReplicaGroupRow(
+                    session_group_id=SessionGroupID(uuid.uuid4()),
                     id=uuid.uuid4(),
                     deployment_id=endpoint_id,
                     lifecycle=lifecycle,

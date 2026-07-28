@@ -8,9 +8,14 @@ from uuid import UUID
 import sqlalchemy as sa
 
 from ai.backend.common.data.permission.types import RBACElementType
+from ai.backend.manager.errors.user import UserPurgeFailure
 from ai.backend.manager.models.error_logs import ErrorLogRow
 from ai.backend.manager.models.group import AssocGroupUserRow
 from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
+from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.session.row import AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES
+from ai.backend.manager.models.session_group.row import SessionGroupRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.vfolder import VFolderPermissionRow
 from ai.backend.manager.repositories.base.purger import BatchPurger, BatchPurgerSpec
@@ -79,6 +84,50 @@ class UserGroupAssociationBatchPurgerSpec(BatchPurgerSpec[AssocGroupUserRow]):
 
 
 @dataclass
+class UserSessionGroupBatchPurgerSpec(BatchPurgerSpec[SessionGroupRow]):
+    """PurgerSpec for deleting the placement groups a user owns.
+
+    A group is only a placement policy, but its members are not: dropping it
+    while a member session still holds an agent would hide that session from the
+    scheduler's per-agent member counts before its containers are gone. The
+    purge therefore refuses while any member is still occupying resources, the
+    same way it refuses while the user's vfolders are mounted to active kernels.
+    """
+
+    user_uuid: UUID
+
+    @override
+    def build_subquery(self) -> sa.sql.Select[tuple[SessionGroupRow]]:
+        return sa.select(SessionGroupRow).where(SessionGroupRow.owner_user_id == self.user_uuid)
+
+    @override
+    def conflict_checks(self) -> Sequence[ConflictCheck]:
+        return (
+            ConflictCheck(
+                condition=lambda: sa.and_(
+                    ReplicaGroupRow.session_group_id == SessionGroupRow.id,
+                    SessionGroupRow.owner_user_id == self.user_uuid,
+                ),
+                error=UserPurgeFailure(
+                    "Some of the user's placement groups still belong to a replica group. "
+                    "Delegate or remove their deployments first.",
+                ),
+            ),
+            ConflictCheck(
+                condition=lambda: sa.and_(
+                    SessionRow.session_group_id == SessionGroupRow.id,
+                    SessionGroupRow.owner_user_id == self.user_uuid,
+                    SessionRow.status.in_(AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES),
+                ),
+                error=UserPurgeFailure(
+                    "Some sessions of the user's placement groups are still occupying agents. "
+                    "Wait for those sessions to terminate first.",
+                ),
+            ),
+        )
+
+
+@dataclass
 class UserBatchPurgerSpec(RBACEntityBatchPurgerSpec[UserRow]):
     """PurgerSpec for deleting a user with RBAC scope/permission cleanup."""
 
@@ -130,4 +179,11 @@ def create_user_purger(user_uuid: UUID) -> BatchPurger[UserRow]:
     return BatchPurger(
         spec=UserBatchPurgerSpec(user_uuid=user_uuid),
         batch_size=1,  # We expect only one row to be deleted
+    )
+
+
+def create_user_session_group_purger(user_uuid: UUID) -> BatchPurger[SessionGroupRow]:
+    """Create a BatchPurger for deleting the placement groups a user owns."""
+    return BatchPurger(
+        spec=UserSessionGroupBatchPurgerSpec(user_uuid=user_uuid),
     )
