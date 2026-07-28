@@ -13655,11 +13655,8 @@ type ScopeResourceUsageV2 {
 Added in 26.8.0. Upsert many fragments at one scope; the scope is named once for all items.
 """
 input ScopedUpsertAppConfigFragmentsInput {
-  """Scope the fragments are written at (public | domain | user)."""
-  scopeType: AppConfigScopeType!
-
-  """Scope identifier: the domain id or user id; null for public scope."""
-  scopeId: UUID = null
+  """Scope the fragments are written at."""
+  scope: AppConfigScopeRef!
 
   """The (config_name, config) pairs to upsert."""
   items: [AppConfigFragmentUpsertItem!]!

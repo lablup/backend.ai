@@ -106,13 +106,7 @@ class AppConfigScopeRefGQL(PydanticInputMixin[AppConfigScopeRefDTO]):
 class ScopedUpsertAppConfigFragmentsInputGQL(
     PydanticInputMixin[ScopedUpsertAppConfigFragmentsInputDTO]
 ):
-    scope_type: AppConfigScopeType = gql_field(
-        description="Scope the fragments are written at (public | domain | user)."
-    )
-    scope_id: UUID | None = gql_field(
-        description="Scope identifier: the domain id or user id; null for public scope.",
-        default=None,
-    )
+    scope: AppConfigScopeRefGQL = gql_field(description="Scope the fragments are written at.")
     items: list[AppConfigFragmentUpsertItemGQL] = gql_field(
         description="The (config_name, config) pairs to upsert."
     )

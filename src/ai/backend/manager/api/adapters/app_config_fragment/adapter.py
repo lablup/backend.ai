@@ -137,7 +137,9 @@ class AppConfigFragmentAdapter(BaseAdapter):
     ) -> UpsertAppConfigFragmentsPayload:
         """Upsert many fragments at the scope named in ``input`` (RBAC-authorized there)."""
         return await self._upsert(
-            AppConfigFragmentSearchScope(scope_type=input.scope_type, scope_id=input.scope_id),
+            AppConfigFragmentSearchScope(
+                scope_type=input.scope.scope_type, scope_id=input.scope.scope_id
+            ),
             input.items,
         )
 
