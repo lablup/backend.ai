@@ -11,7 +11,9 @@ remaining-kernel / live-routing NOT EXISTS guards. The terminal-state filter is
 validated on the FK-free ``roles`` table via ``RetentionPurgerSpec`` directly;
 ``login`` and the invitation tables share that exact spec, so they are not
 duplicated here. deployments' specs are likewise exercised directly (its
-deployment_revisions FK chain makes a full sweep disproportionate).
+deployment_revisions FK chain makes a full sweep disproportionate); its
+session_groups tail is drained straight from the catalog, so the position of
+that spec within the category is covered too.
 
 sweep() derives its threshold from DB ``now``, so fixtures use timestamps
 relative to the real current time; every category is seeded with a 30-day policy
@@ -21,7 +23,7 @@ so its threshold lands at ~now-30d.
 from __future__ import annotations
 
 import uuid
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
@@ -45,11 +47,16 @@ from ai.backend.manager.data.error_log.types import ErrorLogSeverity
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.retention.types import RetentionCategory, RetentionPurgeResult
+from ai.backend.manager.data.session_group.types import (
+    SessionGroupPlacementDirection,
+    SessionGroupPlacementEnforcement,
+)
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.audit_log.row import AuditLogRow
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.deployment_policy.row import DeploymentPolicyRow
+from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointLifecycle, EndpointRow, EndpointTokenRow
 from ai.backend.manager.models.error_logs import ErrorLogRow
@@ -89,6 +96,7 @@ from ai.backend.manager.models.session import (
     SessionStatus,
     SessionTypes,
 )
+from ai.backend.manager.models.session_group.row import SessionGroupRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder.row import VFolderRow
@@ -154,6 +162,78 @@ def _policy_row(
         enabled=enabled,
         last_swept_at=last_swept_at,
     )
+
+
+async def _seed_scope(engine: ExtendedAsyncSAEngine) -> _Scope:
+    """Insert the parent rows a session / endpoint / placement group hangs off of."""
+    scope = _Scope()
+    async with engine.begin_session() as sess:
+        sess.add(
+            ProjectResourcePolicyRow(
+                name=scope.policy_name,
+                max_vfolder_count=0,
+                max_quota_scope_size=-1,
+                max_network_count=0,
+            )
+        )
+        sess.add(
+            UserResourcePolicyRow(
+                name=scope.user_policy_name,
+                max_vfolder_count=0,
+                max_quota_scope_size=-1,
+                max_session_count_per_model_session=10,
+                max_customized_image_count=10,
+            )
+        )
+        sess.add(
+            DomainRow(id=scope.domain_id, name=scope.domain_name, description=None, is_active=True)
+        )
+        sess.add(
+            ScalingGroupRow(
+                name=scope.sgroup_name,
+                id=scope.sgroup_id,
+                driver="static",
+                driver_opts={},
+                scheduler="fifo",
+                scheduler_opts=ScalingGroupOpts(),
+            )
+        )
+        sess.add(
+            UserRow(
+                uuid=scope.user_uuid,
+                username="retention-user",
+                email="retention@example.com",
+                password=PasswordInfo(
+                    password="pw",
+                    algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
+                    rounds=100_000,
+                    salt_size=32,
+                ),
+                need_password_change=False,
+                full_name="Retention User",
+                description="",
+                status=UserStatus.ACTIVE,
+                status_info="",
+                domain_name=scope.domain_name,
+                role=UserRole.USER,
+                resource_policy=scope.user_policy_name,
+            )
+        )
+        sess.add(
+            GroupRow(
+                id=scope.group_id,
+                name="retention-group",
+                description=None,
+                is_active=True,
+                domain_name=scope.domain_name,
+                total_resource_slots=ResourceSlot(),
+                allowed_vfolder_hosts={},
+                dotfiles=b"\x90",
+                resource_policy=scope.policy_name,
+                type=ProjectType.GENERAL,
+            )
+        )
+    return scope
 
 
 def _make_db_source(
@@ -1252,6 +1332,253 @@ class TestDeploymentsTerminalChildCleanup:
         assert result.deleted_count == 2  # drained + failed, both old
         assert await _count(db, ReplicaGroupRow) == 2  # stable + recently-drained
         assert await _count(db, EndpointRow) == 1  # the live endpoint is untouched
+
+
+class TestDeploymentsSessionGroupCleanup:
+    """deployments closes with the placement groups its replica_group / endpoint
+    specs orphaned. session_groups is the parent side of the NO ACTION
+    replica_groups.session_group_id FK, so a group only becomes collectable once
+    nothing references it -- which is what makes the spec's position in the
+    category matter. The real catalog specs are drained here (in catalog order,
+    one transaction) so a reordering breaks these tests."""
+
+    # deployment_revisions / endpoint_tokens are out of this fixture's table set;
+    # every other deployments spec runs as the catalog declares it.
+    _UNLOADED = (DeploymentRevisionRow, EndpointTokenRow)
+
+    @pytest.fixture
+    async def db(
+        self, database_connection: ExtendedAsyncSAEngine
+    ) -> AsyncIterator[ExtendedAsyncSAEngine]:
+        async with with_tables(
+            database_connection,
+            [
+                DomainRow,
+                ProjectResourcePolicyRow,
+                UserResourcePolicyRow,
+                KeyPairResourcePolicyRow,
+                ScalingGroupRow,
+                UserRow,
+                KeyPairRow,
+                GroupRow,
+                SessionGroupRow,
+                SessionRow,
+                EndpointRow,
+                ReplicaGroupRow,
+                RoutingRow,
+            ],
+        ):
+            yield database_connection
+
+    @pytest.fixture
+    async def scope(self, db: ExtendedAsyncSAEngine) -> _Scope:
+        return await _seed_scope(db)
+
+    async def _add_endpoint(
+        self,
+        db: ExtendedAsyncSAEngine,
+        scope: _Scope,
+        *,
+        lifecycle: EndpointLifecycle = EndpointLifecycle.READY,
+        destroyed_at: datetime | None = None,
+    ) -> DeploymentID:
+        endpoint_id = DeploymentID(uuid.uuid4())
+        async with db.begin_session() as sess:
+            sess.add(
+                EndpointRow(
+                    id=endpoint_id,
+                    name=f"endpoint-{endpoint_id}",
+                    created_user=scope.user_uuid,
+                    session_owner=scope.user_uuid,
+                    domain=scope.domain_name,
+                    project=scope.group_id,
+                    resource_group=scope.sgroup_name,
+                    lifecycle_stage=lifecycle,
+                    destroyed_at=destroyed_at,
+                    replicas=0,
+                )
+            )
+        return endpoint_id
+
+    async def _add_group(
+        self, db: ExtendedAsyncSAEngine, scope: _Scope, *, created_at: datetime
+    ) -> SessionGroupID:
+        group_id = SessionGroupID(uuid.uuid4())
+        async with db.begin_session() as sess:
+            sess.add(
+                SessionGroupRow(
+                    id=group_id,
+                    domain_id=scope.domain_id,
+                    project_id=scope.group_id,
+                    owner_user_id=scope.user_uuid,
+                    placement_direction=SessionGroupPlacementDirection.SPREAD,
+                    placement_enforcement=SessionGroupPlacementEnforcement.PREFERRED,
+                    created_at=created_at,
+                )
+            )
+        return group_id
+
+    async def _add_replica_group(
+        self,
+        db: ExtendedAsyncSAEngine,
+        endpoint_id: DeploymentID,
+        group_id: SessionGroupID,
+        *,
+        lifecycle: ReplicaGroupLifecycle,
+        updated_at: datetime,
+    ) -> None:
+        async with db.begin_session() as sess:
+            sess.add(
+                ReplicaGroupRow(
+                    id=uuid.uuid4(),
+                    deployment_id=endpoint_id,
+                    session_group_id=group_id,
+                    lifecycle=lifecycle,
+                    rollout=ReplicaGroupRolloutSpec(
+                        max_surge=IntOrPercent(count=1),
+                        max_unavailable=IntOrPercent(count=0),
+                    ),
+                    updated_at=updated_at,
+                )
+            )
+
+    async def _add_member_session(
+        self, db: ExtendedAsyncSAEngine, scope: _Scope, group_id: SessionGroupID
+    ) -> uuid.UUID:
+        session_id = uuid.uuid4()
+        async with db.begin_session() as sess:
+            sess.add(
+                SessionRow(
+                    id=session_id,
+                    name=f"session-{session_id}",
+                    session_type=SessionTypes.INFERENCE,
+                    cluster_mode="single-node",
+                    cluster_size=1,
+                    domain_name=scope.domain_name,
+                    domain_id=scope.domain_id,
+                    group_id=scope.group_id,
+                    scaling_group_name=scope.sgroup_name,
+                    resource_group_id=scope.sgroup_id,
+                    user_uuid=scope.user_uuid,
+                    occupying_slots=ResourceSlot({}),
+                    requested_slots=ResourceSlot({}),
+                    status=SessionStatus.RUNNING,
+                    status_info="",
+                    target_sgroup_names=[],
+                    vfolder_mounts=[],
+                    environ={},
+                    session_group_id=group_id,
+                )
+            )
+        return session_id
+
+    def _deployment_specs(self) -> list[RetentionPurgerSpec[Base]]:
+        specs = RetentionDBSource._catalog(_THRESHOLD)[RetentionCategory.DEPLOYMENTS]
+        return [spec for spec in specs if spec.row_class not in self._UNLOADED]
+
+    async def _drain(
+        self, db: ExtendedAsyncSAEngine, specs: Sequence[RetentionPurgerSpec[Base]]
+    ) -> int:
+        """Drain ``specs`` in order within one transaction, as the sweep does."""
+        deleted = 0
+        async with DBOpsProvider(db).write_ops() as w:
+            for spec in specs:
+                result = await w.batch_purge(BatchPurger(spec=spec, batch_size=100))
+                deleted += result.deleted_count
+        return deleted
+
+    async def test_group_of_terminal_replica_group_purged(
+        self, db: ExtendedAsyncSAEngine, scope: _Scope
+    ) -> None:
+        endpoint_id = await self._add_endpoint(db, scope)
+        group_id = await self._add_group(db, scope, created_at=_OLD)
+        await self._add_replica_group(
+            db, endpoint_id, group_id, lifecycle=ReplicaGroupLifecycle.DRAINED, updated_at=_OLD
+        )
+
+        await self._drain(db, self._deployment_specs())
+
+        assert await _count(db, ReplicaGroupRow) == 0
+        assert await _count(db, SessionGroupRow) == 0  # no orphan left behind
+
+    async def test_group_of_live_replica_group_preserved(
+        self, db: ExtendedAsyncSAEngine, scope: _Scope
+    ) -> None:
+        endpoint_id = await self._add_endpoint(db, scope)
+        group_id = await self._add_group(db, scope, created_at=_OLD)
+        await self._add_replica_group(
+            db, endpoint_id, group_id, lifecycle=ReplicaGroupLifecycle.STABLE, updated_at=_OLD
+        )
+
+        await self._drain(db, self._deployment_specs())
+
+        assert await _count(db, ReplicaGroupRow) == 1
+        assert await _count(db, SessionGroupRow) == 1  # still referenced -> kept
+
+    async def test_group_purged_through_destroyed_endpoint_cascade(
+        self, db: ExtendedAsyncSAEngine, scope: _Scope
+    ) -> None:
+        # The endpoint spec cascades replica_groups away; the group spec runs
+        # after it, so the freed group goes in the same drain.
+        endpoint_id = await self._add_endpoint(
+            db, scope, lifecycle=EndpointLifecycle.DESTROYED, destroyed_at=_OLD
+        )
+        group_id = await self._add_group(db, scope, created_at=_OLD)
+        await self._add_replica_group(
+            db, endpoint_id, group_id, lifecycle=ReplicaGroupLifecycle.STABLE, updated_at=_NEW
+        )
+
+        await self._drain(db, self._deployment_specs())
+
+        assert await _count(db, EndpointRow) == 0
+        assert await _count(db, ReplicaGroupRow) == 0  # DB cascade
+        assert await _count(db, SessionGroupRow) == 0
+
+    async def test_recently_created_unreferenced_group_preserved(
+        self, db: ExtendedAsyncSAEngine, scope: _Scope
+    ) -> None:
+        # Guards the create-group-then-create-replica-group window: a group whose
+        # owner row is not committed yet is inside the boundary and survives.
+        await self._add_group(db, scope, created_at=_NEW)
+
+        await self._drain(db, self._deployment_specs())
+
+        assert await _count(db, SessionGroupRow) == 1
+
+    async def test_member_session_survives_the_purged_group(
+        self, db: ExtendedAsyncSAEngine, scope: _Scope
+    ) -> None:
+        # sessions.session_group_id is ON DELETE SET NULL, so a member outliving
+        # its group keeps its row (the unbinding itself is covered by the model
+        # test); the sweep must not hold the group back for it either.
+        endpoint_id = await self._add_endpoint(db, scope)
+        group_id = await self._add_group(db, scope, created_at=_OLD)
+        await self._add_replica_group(
+            db, endpoint_id, group_id, lifecycle=ReplicaGroupLifecycle.DRAINED, updated_at=_OLD
+        )
+        await self._add_member_session(db, scope, group_id)
+
+        await self._drain(db, self._deployment_specs())
+
+        assert await _count(db, SessionGroupRow) == 0
+        assert await _count(db, SessionRow) == 1
+
+    async def test_group_drained_before_its_replica_group_waits_a_tick(
+        self, db: ExtendedAsyncSAEngine, scope: _Scope
+    ) -> None:
+        # What the order buys: the unreferenced guard makes any order FK-safe,
+        # but a group visited before its replica group is simply not collectable
+        # yet and slips to the next sweep.
+        endpoint_id = await self._add_endpoint(db, scope)
+        group_id = await self._add_group(db, scope, created_at=_OLD)
+        await self._add_replica_group(
+            db, endpoint_id, group_id, lifecycle=ReplicaGroupLifecycle.DRAINED, updated_at=_OLD
+        )
+
+        await self._drain(db, list(reversed(self._deployment_specs())))
+
+        assert await _count(db, ReplicaGroupRow) == 0
+        assert await _count(db, SessionGroupRow) == 1  # missed this tick
 
 
 class TestUsageBucketsRetention:
