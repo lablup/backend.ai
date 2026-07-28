@@ -13,6 +13,22 @@ from ai.backend.manager.models.base import Base
 from ai.backend.manager.repositories.base.upserter import UpserterSpec
 
 
+@dataclass(frozen=True)
+class ConflictTarget:
+    """The unique index ON CONFLICT arbitrates on — a violation of it updates, any other
+    constraint still raises.
+
+    Attributes:
+        columns: Columns of the index to infer.
+        partial_index_predicate: The index's predicate when it is partial (e.g.
+            ``scope_id IS NULL``); it has to match the index definition for the inference to
+            succeed. ``None`` for a plain unique constraint.
+    """
+
+    columns: list[str]
+    partial_index_predicate: sa.ColumnElement[bool] | None = None
+
+
 @dataclass
 class RBACEntityUpserter[TRow: Base]:
     """Upserter for a single entity (INSERT ON CONFLICT UPDATE) with its scope associations.
@@ -21,18 +37,16 @@ class RBACEntityUpserter[TRow: Base]:
     scope(s), an updated one is bound again as a no-op. ``scope_ref=None`` marks a GLOBAL
     entity that binds to no scope.
 
-    ``index_elements`` is the ON CONFLICT target (``index_where`` for a partial index) and must
-    include the scope columns alongside a ``scope_ref`` — the conflict path updates whichever
-    row it matches and binds it to ``scope_ref``, so a scope-blind target would let a caller
-    overwrite another scope's row. ``relation_type`` applies only to a binding this upsert
-    inserts; an already-bound entity keeps its recorded one.
+    ``conflict_target`` must include the scope columns alongside a ``scope_ref`` — the conflict
+    path updates whichever row it matches and binds it to ``scope_ref``, so a scope-blind
+    target would let a caller overwrite another scope's row. ``relation_type`` applies only to
+    a binding this upsert inserts; an already-bound entity keeps its recorded one.
     """
 
     spec: UpserterSpec[TRow]
     element_type: RBACElementType
     scope_ref: RBACElementRef | None
-    index_elements: list[str]
-    index_where: sa.ColumnElement[bool] | None = None
+    conflict_target: ConflictTarget
     additional_scope_refs: Sequence[RBACElementRef] = field(default_factory=list)
     relation_type: RelationType = RelationType.AUTO
 

@@ -49,7 +49,10 @@ from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import IntegrityErrorCheck
-from ai.backend.manager.repositories.base.rbac.entity_upserter import RBACEntityUpserter
+from ai.backend.manager.repositories.base.rbac.entity_upserter import (
+    ConflictTarget,
+    RBACEntityUpserter,
+)
 from ai.backend.manager.repositories.base.upserter import UpserterSpec
 from ai.backend.manager.repositories.ops.rbac.provider import RBACOpsProvider
 from ai.backend.testutils.db import with_tables
@@ -249,8 +252,7 @@ class _UpsertCase:
     scope_type: str
     scope_id: str | None
     scope_ref: RBACElementRef | None
-    index_elements: list[str]
-    index_where: sa.ColumnElement[bool] | None
+    conflict_target: ConflictTarget
     additional_scope_refs: list[RBACElementRef]
     expected_bindings: list[_ScopeBinding]
 
@@ -346,8 +348,7 @@ class TestUpsertScoped:
                 scope_type="user",
                 scope_id=_USER_SCOPE_ID,
                 scope_ref=RBACElementRef(RBACElementType.USER, _USER_SCOPE_ID),
-                index_elements=["name", "scope_type", "scope_id"],
-                index_where=None,
+                conflict_target=ConflictTarget(columns=["name", "scope_type", "scope_id"]),
                 additional_scope_refs=[],
                 expected_bindings=[_ScopeBinding(ScopeType.USER, _USER_SCOPE_ID)],
             ),
@@ -356,8 +357,7 @@ class TestUpsertScoped:
                 scope_type="project",
                 scope_id=_PROJECT_SCOPE_ID,
                 scope_ref=RBACElementRef(RBACElementType.PROJECT, _PROJECT_SCOPE_ID),
-                index_elements=["name", "scope_type", "scope_id"],
-                index_where=None,
+                conflict_target=ConflictTarget(columns=["name", "scope_type", "scope_id"]),
                 additional_scope_refs=[RBACElementRef(RBACElementType.USER, _USER_SCOPE_ID)],
                 expected_bindings=[
                     _ScopeBinding(ScopeType.PROJECT, _PROJECT_SCOPE_ID),
@@ -369,8 +369,10 @@ class TestUpsertScoped:
                 scope_type="public",
                 scope_id=None,
                 scope_ref=None,
-                index_elements=["name", "scope_type"],
-                index_where=UpsertScopedTestRow.scope_id.is_(None),
+                conflict_target=ConflictTarget(
+                    columns=["name", "scope_type"],
+                    partial_index_predicate=UpsertScopedTestRow.scope_id.is_(None),
+                ),
                 additional_scope_refs=[],
                 expected_bindings=[],
             ),
@@ -391,8 +393,7 @@ class TestUpsertScoped:
                     spec=ScopedUpserterSpec(case.scope_type, case.scope_id, "after"),
                     element_type=RBACElementType.VFOLDER,
                     scope_ref=case.scope_ref,
-                    index_elements=case.index_elements,
-                    index_where=case.index_where,
+                    conflict_target=case.conflict_target,
                     additional_scope_refs=case.additional_scope_refs,
                 )
             )
@@ -418,8 +419,7 @@ class TestUpsertScoped:
                 scope_type="user",
                 scope_id=_USER_SCOPE_ID,
                 scope_ref=RBACElementRef(RBACElementType.USER, _USER_SCOPE_ID),
-                index_elements=["name", "scope_type", "scope_id"],
-                index_where=None,
+                conflict_target=ConflictTarget(columns=["name", "scope_type", "scope_id"]),
                 additional_scope_refs=[],
                 expected_bindings=[_ScopeBinding(ScopeType.USER, _USER_SCOPE_ID)],
             ),
@@ -428,8 +428,7 @@ class TestUpsertScoped:
                 scope_type="project",
                 scope_id=_PROJECT_SCOPE_ID,
                 scope_ref=RBACElementRef(RBACElementType.PROJECT, _PROJECT_SCOPE_ID),
-                index_elements=["name", "scope_type", "scope_id"],
-                index_where=None,
+                conflict_target=ConflictTarget(columns=["name", "scope_type", "scope_id"]),
                 additional_scope_refs=[RBACElementRef(RBACElementType.USER, _USER_SCOPE_ID)],
                 expected_bindings=[
                     _ScopeBinding(ScopeType.PROJECT, _PROJECT_SCOPE_ID),
@@ -441,8 +440,10 @@ class TestUpsertScoped:
                 scope_type="public",
                 scope_id=None,
                 scope_ref=None,
-                index_elements=["name", "scope_type"],
-                index_where=UpsertScopedTestRow.scope_id.is_(None),
+                conflict_target=ConflictTarget(
+                    columns=["name", "scope_type"],
+                    partial_index_predicate=UpsertScopedTestRow.scope_id.is_(None),
+                ),
                 additional_scope_refs=[],
                 expected_bindings=[],
             ),
@@ -465,8 +466,7 @@ class TestUpsertScoped:
                     spec=ScopedUpserterSpec(case.scope_type, case.scope_id, "after"),
                     element_type=RBACElementType.VFOLDER,
                     scope_ref=case.scope_ref,
-                    index_elements=case.index_elements,
-                    index_where=case.index_where,
+                    conflict_target=case.conflict_target,
                     additional_scope_refs=case.additional_scope_refs,
                 )
             )
@@ -499,7 +499,7 @@ class TestUpsertScoped:
                         spec=FKGateUpserterSpec(parent_id=uuid.uuid4()),
                         element_type=RBACElementType.VFOLDER,
                         scope_ref=RBACElementRef(RBACElementType.USER, _USER_SCOPE_ID),
-                        index_elements=["name"],
+                        conflict_target=ConflictTarget(columns=["name"]),
                     )
                 )
 
@@ -516,6 +516,6 @@ class TestUpsertScoped:
                         spec=CompositePKUpserterSpec(),
                         element_type=RBACElementType.VFOLDER,
                         scope_ref=RBACElementRef(RBACElementType.USER, _USER_SCOPE_ID),
-                        index_elements=["tenant_id", "item_id"],
+                        conflict_target=ConflictTarget(columns=["tenant_id", "item_id"]),
                     )
                 )

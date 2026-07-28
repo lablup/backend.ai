@@ -268,8 +268,8 @@ class RBACWriteOps(WriteOps):
             pg_insert(table)
             .values(spec.build_insert_values())
             .on_conflict_do_update(
-                index_elements=upserter.index_elements,
-                index_where=upserter.index_where,
+                index_elements=upserter.conflict_target.columns,
+                index_where=upserter.conflict_target.partial_index_predicate,
                 set_=spec.build_update_values(),
             )
             .returning(*table.columns)
