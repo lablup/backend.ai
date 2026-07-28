@@ -8,7 +8,7 @@ from uuid import uuid4
 import pytest
 
 from ai.backend.common.dto.clients.prometheus.response import PrometheusResponse
-from ai.backend.common.exception import PrometheusConnectionError
+from ai.backend.common.exception import InvalidMetricPresetTemplate, PrometheusConnectionError
 from ai.backend.common.types import SessionId
 from ai.backend.manager.clients.prometheus.client import PrometheusClient
 from ai.backend.manager.data.prometheus_query_preset.types import PrometheusQueryPresetData
@@ -120,16 +120,22 @@ class TestQuerySessionUtilizationMetrics:
             evaluation_time=_EVALUATION_TIME.isoformat(),
         )
 
+    @pytest.mark.parametrize(
+        "error",
+        [
+            PrometheusConnectionError("unavailable"),
+            InvalidMetricPresetTemplate("failed to render template"),
+        ],
+    )
     async def test_failed_query_returns_unknown(
         self,
         repository: MetricRepository,
         prometheus_client: MagicMock,
         preset: PrometheusQueryPresetData,
+        error: Exception,
     ) -> None:
         session_id = SessionId(uuid4())
-        prometheus_client.fetch_session_utilization.side_effect = PrometheusConnectionError(
-            "unavailable"
-        )
+        prometheus_client.fetch_session_utilization.side_effect = error
 
         result = await repository.query_session_utilization_metrics(self._query(preset, session_id))
 

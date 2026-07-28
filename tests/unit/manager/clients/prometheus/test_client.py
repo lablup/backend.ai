@@ -12,7 +12,6 @@ from ai.backend.common.dto.clients.prometheus import (
 )
 from ai.backend.common.exception import (
     FailedToGetMetric,
-    InvalidMetricPresetTemplate,
     PrometheusConnectionError,
 )
 from ai.backend.common.types import SessionId
@@ -274,18 +273,6 @@ class TestQueryInstant:
         assert 'value_type="current"' in field_values["query"]
         assert f'session_id=~"{first_session_id}|{second_session_id}"' in field_values["query"]
         assert field_values["time"] == "1704067200.123"
-
-    async def test_fetch_session_utilization_requires_labels_placeholder(
-        self,
-        prometheus_client: PrometheusClient,
-    ) -> None:
-        with pytest.raises(InvalidMetricPresetTemplate, match="labels"):
-            await prometheus_client.fetch_session_utilization(
-                query_template="sum(metric)",
-                time_window="5m",
-                session_ids=[SessionId(uuid4())],
-                evaluation_time="1704067200.123",
-            )
 
     @pytest.fixture
     def error_4xx_response(self, mock_session: Mock) -> AsyncMock:

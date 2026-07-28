@@ -15,7 +15,6 @@ from ai.backend.common.dto.clients.prometheus.response import (
 )
 from ai.backend.common.exception import (
     FailedToGetMetric,
-    InvalidMetricPresetTemplate,
     PrometheusConnectionError,
 )
 from ai.backend.common.types import KernelId, SessionId
@@ -142,10 +141,6 @@ class PrometheusClient:
         session_ids: Sequence[SessionId],
         evaluation_time: str,
     ) -> PrometheusResponse:
-        if "{labels}" not in query_template:
-            raise InvalidMetricPresetTemplate(
-                "Session utilization query presets must contain a {labels} placeholder."
-            )
         session_id_pattern = regex_union([
             str(session_id) for session_id in dict.fromkeys(session_ids)
         ])
