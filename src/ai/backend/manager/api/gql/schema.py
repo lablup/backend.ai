@@ -437,6 +437,7 @@ from .scheduling_handler import scheduling_handlers
 from .scheduling_history import (
     admin_deployment_histories,
     admin_kernel_scheduling_histories,
+    admin_replica_group_histories,
     admin_route_histories,
     admin_session_scheduling_histories,
     deployment_histories,
@@ -444,6 +445,7 @@ from .scheduling_history import (
     route_histories,
     route_scoped_scheduling_histories,
     scoped_kernel_scheduling_histories,
+    scoped_replica_group_histories,
     session_scheduling_histories,
     session_scoped_scheduling_histories,
 )
@@ -561,6 +563,7 @@ class Query:
     admin_kernel_scheduling_histories = admin_kernel_scheduling_histories
     admin_deployments = admin_deployments
     admin_deployment_histories = admin_deployment_histories
+    admin_replica_group_histories = admin_replica_group_histories
     admin_route_histories = admin_route_histories
     admin_notification_channel = admin_notification_channel
     admin_notification_channels = admin_notification_channels
@@ -646,6 +649,7 @@ class Query:
     scoped_kernel_scheduling_histories = scoped_kernel_scheduling_histories
     deployment_scoped_scheduling_histories = deployment_scoped_scheduling_histories
     route_scoped_scheduling_histories = route_scoped_scheduling_histories
+    scoped_replica_group_histories = scoped_replica_group_histories
     # Legacy APIs (deprecated)
     resource_groups = resource_groups
     domain_fair_share = domain_fair_share

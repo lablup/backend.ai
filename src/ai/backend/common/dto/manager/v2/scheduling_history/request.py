@@ -217,9 +217,6 @@ class ReplicaGroupHistoryFilter(BaseRequestModel):
     """Filter conditions for replica-group scheduling history search."""
 
     id: UUIDFilter | None = Field(default=None, description="Filter by history record ID")
-    replica_group_id: UUIDFilter | None = Field(
-        default=None, description="Filter by replica group ID"
-    )
     deployment_id: UUIDFilter | None = Field(
         default=None, description="Filter by owning deployment ID"
     )
