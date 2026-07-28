@@ -5,7 +5,7 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Protocol
 from unittest.mock import AsyncMock, MagicMock
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 import pytest
 from pydantic import ValidationError
@@ -19,6 +19,7 @@ from ai.backend.common.data.idle_checker.types import (
     UtilizationThresholdEntry,
 )
 from ai.backend.common.identifier.idle_checker import IdleCheckerID
+from ai.backend.common.identifier.prometheus_query_preset import PrometheusQueryPresetID
 from ai.backend.common.types import SessionId, SessionTypes
 from ai.backend.manager.data.idle_checker.types import IdleCheckSession
 from ai.backend.manager.repositories.idle_checker.types import IdleCheckerDefinitionData
@@ -44,7 +45,7 @@ class AssignmentFactory(Protocol):
     def __call__(
         self,
         *,
-        preset_id: UUID,
+        preset_id: PrometheusQueryPresetID,
         threshold: Decimal,
         sessions: Sequence[IdleCheckSession],
         duration_seconds: int = _DURATION_SECONDS,
@@ -69,17 +70,9 @@ class TestUtilizationSpec:
             UtilizationSpec(
                 max_underutilized_duration_seconds=0,
                 threshold=UtilizationThresholdEntry(
-                    preset_id=uuid4(),
+                    preset_id=PrometheusQueryPresetID(uuid4()),
                     threshold=Decimal("10"),
                 ),
-            )
-
-    @pytest.mark.parametrize("threshold", [Decimal("-0.1"), Decimal("100.1")])
-    def test_rejects_threshold_outside_percentage_range(self, threshold: Decimal) -> None:
-        with pytest.raises(ValidationError):
-            UtilizationThresholdEntry(
-                preset_id=uuid4(),
-                threshold=threshold,
             )
 
 
@@ -98,7 +91,7 @@ class TestUtilizationChecker:
     def assignment_factory(self) -> AssignmentFactory:
         def create_assignment(
             *,
-            preset_id: UUID,
+            preset_id: PrometheusQueryPresetID,
             threshold: Decimal,
             sessions: Sequence[IdleCheckSession],
             duration_seconds: int = _DURATION_SECONDS,
@@ -130,8 +123,8 @@ class TestUtilizationChecker:
         metric_service: MagicMock,
         assignment_factory: AssignmentFactory,
     ) -> None:
-        first_preset_id = uuid4()
-        second_preset_id = uuid4()
+        first_preset_id = PrometheusQueryPresetID(uuid4())
+        second_preset_id = PrometheusQueryPresetID(uuid4())
         first_session = _session()
         second_session = _session()
         metric_service.query_session_utilization.return_value = SessionUtilizationActionResult(
@@ -193,7 +186,7 @@ class TestUtilizationChecker:
         metric_service: MagicMock,
         assignment_factory: AssignmentFactory,
     ) -> None:
-        preset_id = uuid4()
+        preset_id = PrometheusQueryPresetID(uuid4())
         session = _session()
         metric_service.query_session_utilization.return_value = SessionUtilizationActionResult(
             observations_by_preset={
@@ -228,7 +221,7 @@ class TestUtilizationChecker:
         metric_service: MagicMock,
         assignment_factory: AssignmentFactory,
     ) -> None:
-        preset_id = uuid4()
+        preset_id = PrometheusQueryPresetID(uuid4())
         session = _session(expire_at=None)
         metric_service.query_session_utilization.return_value = SessionUtilizationActionResult(
             observations_by_preset={
@@ -271,7 +264,7 @@ class TestUtilizationChecker:
         expire_at: datetime,
         expected_status: IdleCheckPhase,
     ) -> None:
-        preset_id = uuid4()
+        preset_id = PrometheusQueryPresetID(uuid4())
         session = _session(expire_at=expire_at)
         metric_service.query_session_utilization.return_value = SessionUtilizationActionResult(
             observations_by_preset={
@@ -307,7 +300,7 @@ class TestUtilizationChecker:
         assignment_factory: AssignmentFactory,
         value: Decimal,
     ) -> None:
-        preset_id = uuid4()
+        preset_id = PrometheusQueryPresetID(uuid4())
         session = _session()
         metric_service.query_session_utilization.return_value = SessionUtilizationActionResult(
             observations_by_preset={
@@ -341,7 +334,7 @@ class TestUtilizationChecker:
         metric_service: MagicMock,
         assignment_factory: AssignmentFactory,
     ) -> None:
-        preset_id = uuid4()
+        preset_id = PrometheusQueryPresetID(uuid4())
         metric_service.query_session_utilization.return_value = SessionUtilizationActionResult(
             observations_by_preset={}
         )

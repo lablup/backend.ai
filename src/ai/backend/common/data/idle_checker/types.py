@@ -33,9 +33,7 @@ class UtilizationThresholdEntry(BackendAISchema):
         description="Prometheus query preset used to evaluate utilization."
     )
     threshold: Decimal = Field(
-        ge=0,
-        le=100,
-        description="Underutilization threshold as a percentage.",
+        description="Underutilization threshold compared against the preset's query result.",
     )
 
 
