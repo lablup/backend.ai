@@ -17,7 +17,7 @@ from ai.backend.common.types import SessionTypes
 
 
 class SessionLifetimeSpecInputDTO(BaseRequestModel):
-    max_lifetime_seconds: int = Field(ge=0)
+    max_lifetime_seconds: int = Field(ge=1)
 
 
 class IdleCheckerSpecInputDTO(BaseRequestModel):

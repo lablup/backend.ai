@@ -51,9 +51,9 @@ class TestIdleCheckerSpecInput:
         with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             IdleCheckerSpecInputDTO()
 
-    def test_rejects_negative_max_lifetime(self) -> None:
+    def test_rejects_zero_max_lifetime(self) -> None:
         with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
-            SessionLifetimeSpecInputDTO(max_lifetime_seconds=-1)
+            SessionLifetimeSpecInputDTO(max_lifetime_seconds=0)
 
 
 class TestUpdateIdleCheckerInput:
