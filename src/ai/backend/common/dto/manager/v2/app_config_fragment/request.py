@@ -25,6 +25,7 @@ __all__ = (
     "AppConfigFragmentScope",
     "AppConfigFragmentUpdateItem",
     "AppConfigFragmentUpsertItem",
+    "AppConfigScopeRef",
     "BulkPurgeAppConfigFragmentInput",
     "BulkUpdateAppConfigFragmentInput",
     "CreateAppConfigFragmentInput",
@@ -37,8 +38,8 @@ __all__ = (
 )
 
 
-class ScopedAppConfigFragmentsByNamesInput(BaseRequestModel):
-    """Read the fragments written at one scope for the given config names."""
+class AppConfigScopeRef(BaseRequestModel):
+    """One app config scope: its kind, and its owner id for the kinds that have one."""
 
     scope_type: AppConfigScopeType = Field(
         description="Scope the fragments are written at (public | domain | user)."
@@ -46,13 +47,6 @@ class ScopedAppConfigFragmentsByNamesInput(BaseRequestModel):
     scope_id: AppConfigScopeID | None = Field(
         default=None,
         description="Scope identifier: the domain id or the user id; null for public scope.",
-    )
-    config_names: list[str] = Field(
-        min_length=1,
-        description=(
-            "Config names whose fragments to read. Answered in this order, a repeated name "
-            "repeated in the answer; a name with no fragment at the scope is left out."
-        ),
     )
 
     @model_validator(mode="after")
@@ -63,6 +57,19 @@ class ScopedAppConfigFragmentsByNamesInput(BaseRequestModel):
         elif self.scope_id is None:
             raise ValueError("scope_id is required for domain and user scopes.")
         return self
+
+
+class ScopedAppConfigFragmentsByNamesInput(BaseRequestModel):
+    """Read the fragments written at one scope for the given config names."""
+
+    scope: AppConfigScopeRef = Field(description="Scope whose fragments to read.")
+    config_names: list[str] = Field(
+        min_length=1,
+        description=(
+            "Config names whose fragments to read. Answered in this order, a repeated name "
+            "repeated in the answer; a name with no fragment at the scope is left out."
+        ),
+    )
 
 
 class MyAppConfigFragmentsByNamesInput(BaseRequestModel):

@@ -12,13 +12,11 @@ from uuid import UUID
 from strawberry import Info
 from strawberry.relay import PageInfo
 
-from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
     AdminSearchAppConfigFragmentInput,
     MyAppConfigFragmentsByNamesInput,
     ScopedAppConfigFragmentsByNamesInput,
 )
-from ai.backend.common.identifier.app_config import AppConfigScopeID
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
@@ -36,6 +34,7 @@ from .types import (
     AppConfigFragmentFilterGQL,
     AppConfigFragmentGQL,
     AppConfigFragmentOrderByGQL,
+    AppConfigScopeRefGQL,
     MyUpsertAppConfigFragmentsInputGQL,
     ScopedUpsertAppConfigFragmentsInputGQL,
 )
@@ -153,16 +152,11 @@ async def my_upsert_app_config_fragments(
 )  # type: ignore[misc]
 async def scoped_app_config_fragments_by_names(
     info: Info[StrawberryGQLContext],
-    scope_type: AppConfigScopeType,
+    scope: AppConfigScopeRefGQL,
     config_names: list[str],
-    scope_id: UUID | None = None,
 ) -> list[AppConfigFragmentGQL]:
     nodes = await info.context.adapters.app_config_fragment.scoped_app_config_fragments_by_names(
-        ScopedAppConfigFragmentsByNamesInput(
-            scope_type=scope_type,
-            scope_id=AppConfigScopeID(scope_id) if scope_id is not None else None,
-            config_names=config_names,
-        )
+        ScopedAppConfigFragmentsByNamesInput(scope=scope.to_pydantic(), config_names=config_names)
     )
     return [AppConfigFragmentGQL.from_pydantic(node) for node in nodes]
 

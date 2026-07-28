@@ -284,7 +284,9 @@ class AppConfigFragmentAdapter(BaseAdapter):
         fetching the current fragment values before editing them.
         """
         return await self._fragments_by_names(
-            AppConfigFragmentSearchScope(scope_type=input.scope_type, scope_id=input.scope_id),
+            AppConfigFragmentSearchScope(
+                scope_type=input.scope.scope_type, scope_id=input.scope.scope_id
+            ),
             input.config_names,
         )
 

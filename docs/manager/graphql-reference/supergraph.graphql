@@ -1221,6 +1221,19 @@ input AppConfigFragmentUpsertItem
   config: JSON!
 }
 
+"""
+Added in 26.8.0. One app config scope: its kind, and its owner id for the kinds that have one.
+"""
+input AppConfigScopeRef
+  @join__type(graph: STRAWBERRY)
+{
+  """Scope the fragments are written at (public | domain | user)."""
+  scopeType: AppConfigScopeType!
+
+  """Scope identifier: the domain id or user id; null for public scope."""
+  scopeId: UUID = null
+}
+
 enum AppConfigScopeType
   @join__type(graph: STRAWBERRY)
 {
@@ -15357,7 +15370,7 @@ type Query
   """
   Added in 26.8.0. Read the fragments written at one scope for the given config names — the current values, to inspect before editing them. Answered in the order the names were given, leaving out a name with no fragment there. RBAC-authorized at that scope.
   """
-  scopedAppConfigFragmentsByNames(scopeType: AppConfigScopeType!, configNames: [String!]!, scopeId: UUID = null): [AppConfigFragment!]! @join__field(graph: STRAWBERRY)
+  scopedAppConfigFragmentsByNames(scope: AppConfigScopeRef!, configNames: [String!]!): [AppConfigFragment!]! @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.8.0. Read the current user's own user-scope fragments for the given config names, in the order the names were given, leaving out a name with no fragment there.
