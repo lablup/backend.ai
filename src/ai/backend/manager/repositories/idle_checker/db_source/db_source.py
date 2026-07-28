@@ -20,10 +20,7 @@ from ai.backend.common.types import SessionId, SessionTypes
 from ai.backend.manager.data.common.types import SearchResult
 from ai.backend.manager.data.idle_checker.types import IdleCheckerData, IdleCheckSession
 from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.errors.idle_checker import (
-    IdleCheckerNotFound,
-    IdleCheckerTypeChangeNotAllowed,
-)
+from ai.backend.manager.errors.idle_checker import IdleCheckerNotFound
 from ai.backend.manager.models.idle_checker.conditions import SessionIdleCheckConditions
 from ai.backend.manager.models.idle_checker.row import (
     IdleCheckerBindingRow,
@@ -40,7 +37,6 @@ from ai.backend.manager.repositories.base import (
     Creator,
     NoPagination,
     Purger,
-    Querier,
     Updater,
 )
 from ai.backend.manager.repositories.idle_checker.creators import (
@@ -62,7 +58,6 @@ from ai.backend.manager.repositories.idle_checker.types import (
     SessionIdleCheckPair,
 )
 from ai.backend.manager.repositories.idle_checker.updaters import (
-    IdleCheckerUpdaterSpec,
     SessionIdleCheckJudgmentBatchUpdaterSpec,
     SessionIdleCheckPhaseBatchUpdaterSpec,
 )
@@ -85,16 +80,6 @@ class IdleCheckerDBSource:
 
     async def update(self, updater: Updater[IdleCheckerRow]) -> IdleCheckerData:
         async with self._ops.write_ops() as w:
-            checker_result = await w.query(
-                Querier(row_class=IdleCheckerRow, pk_value=updater.pk_value)
-            )
-            if checker_result is None:
-                raise IdleCheckerNotFound(str(updater.pk_value))
-            spec = cast(IdleCheckerUpdaterSpec, updater.spec).spec.optional_value()
-            if spec is not None and spec.type != checker_result.row.checker_type:
-                raise IdleCheckerTypeChangeNotAllowed(
-                    f"{checker_result.row.checker_type.value} cannot be changed to {spec.type.value}"
-                )
             result = await w.update(updater)
             if result is None:
                 raise IdleCheckerNotFound(str(updater.pk_value))

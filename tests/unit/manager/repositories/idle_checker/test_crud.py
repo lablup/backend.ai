@@ -15,11 +15,9 @@ from ai.backend.common.data.idle_checker.types import (
 from ai.backend.common.identifier.idle_checker import IdleCheckerID
 from ai.backend.common.types import SessionTypes
 from ai.backend.manager.data.idle_checker.types import IdleCheckerData
-from ai.backend.manager.errors.idle_checker import (
-    IdleCheckerNotFound,
-    IdleCheckerTypeChangeNotAllowed,
-)
+from ai.backend.manager.errors.idle_checker import IdleCheckerNotFound
 from ai.backend.manager.models.idle_checker.conditions import IdleCheckerConditions
+from ai.backend.manager.models.idle_checker.orders import IdleCheckerOrders
 from ai.backend.manager.models.idle_checker.row import IdleCheckerRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import (
@@ -56,7 +54,6 @@ class TestIdleCheckerRepository:
         return IdleCheckerCreatorSpec(
             name="session lifetime",
             description=None,
-            checker_type=CheckerType.SESSION_LIFETIME,
             target_session_types=[SessionTypes.INTERACTIVE],
             initial_grace_period_seconds=30,
             spec=IdleCheckerSpec(
@@ -73,6 +70,25 @@ class TestIdleCheckerRepository:
     ) -> IdleCheckerData:
         return await repository.create(Creator(spec=creator_spec))
 
+    @pytest.fixture
+    async def network_checker(
+        self,
+        repository: IdleCheckerRepository,
+        creator_spec: IdleCheckerCreatorSpec,
+    ) -> IdleCheckerData:
+        return await repository.create(
+            Creator(
+                spec=replace(
+                    creator_spec,
+                    name="network timeout",
+                    spec=IdleCheckerSpec(
+                        type=CheckerType.NETWORK_TIMEOUT,
+                        network=NetworkTimeoutSpec(max_network_inactivity_seconds=60),
+                    ),
+                )
+            )
+        )
+
     async def test_create_returns_checker(
         self,
         repository: IdleCheckerRepository,
@@ -81,7 +97,7 @@ class TestIdleCheckerRepository:
         checker = await repository.create(Creator(spec=creator_spec))
 
         assert checker.name == creator_spec.name
-        assert checker.checker_type == creator_spec.checker_type
+        assert checker.checker_type == creator_spec.spec.type
 
     async def test_search_returns_all_global_checkers(
         self,
@@ -128,6 +144,39 @@ class TestIdleCheckerRepository:
 
         assert result.items == []
 
+    async def test_search_by_checker_type(
+        self,
+        repository: IdleCheckerRepository,
+        created_checker: IdleCheckerData,
+        network_checker: IdleCheckerData,
+    ) -> None:
+        result = await repository.admin_search(
+            BatchQuerier(
+                conditions=[
+                    IdleCheckerConditions.by_checker_type_equals(CheckerType.NETWORK_TIMEOUT)
+                ],
+                pagination=NoPagination(),
+            )
+        )
+
+        assert result.items == [network_checker]
+        assert created_checker not in result.items
+
+    async def test_search_orders_by_checker_type(
+        self,
+        repository: IdleCheckerRepository,
+        created_checker: IdleCheckerData,
+        network_checker: IdleCheckerData,
+    ) -> None:
+        result = await repository.admin_search(
+            BatchQuerier(
+                orders=[IdleCheckerOrders.checker_type(ascending=True)],
+                pagination=NoPagination(),
+            )
+        )
+
+        assert result.items == [network_checker, created_checker]
+
     async def test_update_changes_mutable_fields(
         self,
         repository: IdleCheckerRepository,
@@ -149,25 +198,25 @@ class TestIdleCheckerRepository:
         assert updated.name == "renamed lifetime"
         assert result.items == [updated]
 
-    async def test_rejects_checker_type_change(
+    async def test_update_spec_updates_checker_type(
         self,
         repository: IdleCheckerRepository,
         created_checker: IdleCheckerData,
     ) -> None:
-        with pytest.raises(IdleCheckerTypeChangeNotAllowed):
-            await repository.update(
-                Updater(
-                    spec=IdleCheckerUpdaterSpec(
-                        spec=OptionalState.update(
-                            IdleCheckerSpec(
-                                type=CheckerType.NETWORK_TIMEOUT,
-                                network=NetworkTimeoutSpec(max_network_inactivity_seconds=1),
-                            )
-                        )
-                    ),
-                    pk_value=created_checker.id,
-                )
+        network_spec = IdleCheckerSpec(
+            type=CheckerType.NETWORK_TIMEOUT,
+            network=NetworkTimeoutSpec(max_network_inactivity_seconds=1),
+        )
+
+        updated = await repository.update(
+            Updater(
+                spec=IdleCheckerUpdaterSpec(spec=OptionalState.update(network_spec)),
+                pk_value=created_checker.id,
             )
+        )
+
+        assert updated.spec == network_spec
+        assert updated.checker_type == CheckerType.NETWORK_TIMEOUT
 
     async def test_update_missing_checker_raises(
         self,

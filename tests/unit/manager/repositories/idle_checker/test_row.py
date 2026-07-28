@@ -152,7 +152,6 @@ class TestSessionIdleCheckRow:
                     id=checker_id,
                     name=f"checker-{checker_id}",
                     description=None,
-                    checker_type=CheckerType.SESSION_LIFETIME,
                     target_session_types=[SessionTypes.INTERACTIVE],
                     spec=IdleCheckerSpec(
                         type=CheckerType.SESSION_LIFETIME,
@@ -205,7 +204,6 @@ class TestSessionIdleCheckRow:
                         id=IdleCheckerID(uuid.uuid4()),
                         name="negative-grace-period-checker",
                         description=None,
-                        checker_type=CheckerType.SESSION_LIFETIME,
                         target_session_types=[SessionTypes.INTERACTIVE],
                         initial_grace_period_seconds=-1,
                         spec=IdleCheckerSpec(

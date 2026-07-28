@@ -29,7 +29,10 @@ class IdleCheckerRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc]
     name: Mapped[str] = mapped_column("name", sa.String(length=128), nullable=False)
     description: Mapped[str | None] = mapped_column("description", sa.Text, nullable=True)
     checker_type: Mapped[CheckerType] = mapped_column(
-        "checker_type", StrEnumType(CheckerType), nullable=False
+        "checker_type",
+        StrEnumType(CheckerType),
+        sa.Computed("spec ->> 'type'", persisted=True),
+        nullable=False,
     )
     target_session_types: Mapped[list[SessionTypes]] = mapped_column(
         "target_session_types",
