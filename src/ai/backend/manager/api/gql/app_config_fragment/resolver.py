@@ -20,6 +20,7 @@ from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    gql_mutation,
     gql_root_field,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
@@ -31,6 +32,8 @@ from .types import (
     AppConfigFragmentFilterGQL,
     AppConfigFragmentGQL,
     AppConfigFragmentOrderByGQL,
+    MyUpsertAppConfigFragmentsInputGQL,
+    ScopedUpsertAppConfigFragmentsInputGQL,
 )
 
 
@@ -95,3 +98,40 @@ async def admin_app_config_fragments(
         ),
         count=payload.total_count,
     )
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Upsert many app config fragments at one scope (insert, or replace config on "
+            "conflict), all-or-nothing. RBAC-authorized at that scope."
+        ),
+    )
+)
+async def scoped_upsert_app_config_fragments(
+    info: Info[StrawberryGQLContext],
+    input: ScopedUpsertAppConfigFragmentsInputGQL,
+) -> list[AppConfigFragmentGQL]:
+    payload = await info.context.adapters.app_config_fragment.scoped_upsert_app_config_fragments(
+        input.to_pydantic()
+    )
+    return [AppConfigFragmentGQL.from_pydantic(node) for node in payload.items]
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Upsert many app config fragments at the current user's own user scope, all-or-nothing."
+        ),
+    )
+)
+async def my_upsert_app_config_fragments(
+    info: Info[StrawberryGQLContext],
+    input: MyUpsertAppConfigFragmentsInputGQL,
+) -> list[AppConfigFragmentGQL]:
+    payload = await info.context.adapters.app_config_fragment.my_upsert_app_config_fragments(
+        input.to_pydantic()
+    )
+    return [AppConfigFragmentGQL.from_pydantic(node) for node in payload.items]
