@@ -289,6 +289,7 @@ class TestUsageBucketEntries:
 
         # Query aggregated usage — SUM(resource_usage) across buckets
         aggregated = await db_source.get_aggregated_usage_by_domain(
+            resource_group="default",
             lookback_start=date(2024, 1, 14),
             lookback_end=date(2024, 1, 17),
         )
