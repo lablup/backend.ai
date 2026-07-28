@@ -27,19 +27,13 @@ class AppConfigFragmentRow(LifecycleTimestampsMixin, Base):  # type: ignore[misc
 
     __tablename__ = "app_config_fragments"
     __table_args__ = (
+        # NULLS NOT DISTINCT so a public row, whose scope_id is NULL, is keyed like any other.
         sa.UniqueConstraint(
             "config_name",
             "scope_type",
             "scope_id",
             name="uq_app_config_fragments_config_name_scope_type_scope_id",
-        ),
-        # NULLs are distinct to a unique constraint, so public rows need their own index.
-        sa.Index(
-            "uq_app_config_fragments_public_config_name",
-            "config_name",
-            "scope_type",
-            unique=True,
-            postgresql_where=sa.text("scope_id IS NULL"),
+            postgresql_nulls_not_distinct=True,
         ),
         sa.CheckConstraint(
             "(scope_type = 'public') = (scope_id IS NULL)",

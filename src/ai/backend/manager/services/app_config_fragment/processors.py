@@ -21,6 +21,10 @@ from ai.backend.manager.services.app_config_fragment.actions.bulk_update import 
     BulkUpdateAppConfigFragmentAction,
     BulkUpdateAppConfigFragmentActionResult,
 )
+from ai.backend.manager.services.app_config_fragment.actions.bulk_upsert import (
+    BulkUpsertAppConfigFragmentsAction,
+    BulkUpsertAppConfigFragmentsActionResult,
+)
 from ai.backend.manager.services.app_config_fragment.actions.create import (
     CreateAppConfigFragmentAction,
     CreateAppConfigFragmentActionResult,
@@ -48,6 +52,9 @@ from ai.backend.manager.services.app_config_fragment.service import (
 
 class AppConfigFragmentProcessors(AbstractProcessorPackage):
     create: ScopeActionProcessor[CreateAppConfigFragmentAction, CreateAppConfigFragmentActionResult]
+    bulk_upsert: ScopeActionProcessor[
+        BulkUpsertAppConfigFragmentsAction, BulkUpsertAppConfigFragmentsActionResult
+    ]
     get: SingleEntityActionProcessor[GetAppConfigFragmentAction, GetAppConfigFragmentActionResult]
     admin_search: GlobalActionProcessor[
         AdminSearchAppConfigFragmentAction, AdminSearchAppConfigFragmentActionResult
@@ -81,6 +88,9 @@ class AppConfigFragmentProcessors(AbstractProcessorPackage):
         self.create = ScopeActionProcessor(
             service.create, action_monitors, validators=[validators.rbac.scope]
         )
+        self.bulk_upsert = ScopeActionProcessor(
+            service.bulk_upsert, action_monitors, validators=[validators.rbac.scope]
+        )
         self.get = SingleEntityActionProcessor(
             service.get, action_monitors, validators=[validators.rbac.single_entity]
         )
@@ -105,6 +115,7 @@ class AppConfigFragmentProcessors(AbstractProcessorPackage):
     def supported_actions(self) -> list[ActionSpec]:
         return [
             CreateAppConfigFragmentAction.spec(),
+            BulkUpsertAppConfigFragmentsAction.spec(),
             GetAppConfigFragmentAction.spec(),
             AdminSearchAppConfigFragmentAction.spec(),
             ScopedSearchAppConfigFragmentAction.spec(),
