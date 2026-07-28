@@ -129,6 +129,7 @@ from ai.backend.manager.repositories.user.purgers import (
     create_user_error_log_purger,
     create_user_group_association_purger,
     create_user_keypair_purger,
+    create_user_session_group_purger,
     create_user_vfolder_permission_purger,
 )
 from ai.backend.manager.repositories.user.types import (
@@ -700,6 +701,9 @@ class UserDBSource:
             await execute_batch_purger(session, create_user_keypair_purger(user_uuid))
             await execute_batch_purger(session, create_user_vfolder_permission_purger(user_uuid))
             await execute_batch_purger(session, create_user_group_association_purger(user_uuid))
+            # Placement groups the user still owns: their deployments were either
+            # delegated (the groups moved with them) or deleted by now.
+            await execute_batch_purger(session, create_user_session_group_purger(user_uuid))
 
             # Finally delete the user itself with RBAC scope/permission cleanup
             # to avoid dangling association_scopes_entities and permission rows.
@@ -716,6 +720,9 @@ class UserDBSource:
             await execute_batch_purger(session, create_user_keypair_purger(user_uuid))
             await execute_batch_purger(session, create_user_vfolder_permission_purger(user_uuid))
             await execute_batch_purger(session, create_user_group_association_purger(user_uuid))
+            # Placement groups the user still owns: their deployments were either
+            # delegated (the groups moved with them) or deleted by now.
+            await execute_batch_purger(session, create_user_session_group_purger(user_uuid))
 
             # Finally delete the user itself with RBAC scope/permission cleanup
             # to avoid dangling association_scopes_entities and permission rows.

@@ -7,6 +7,7 @@ from typing import override
 
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
+from ai.backend.common.identifier.session_group import SessionGroupID
 from ai.backend.common.schema.deployment import ReplicaGroupRolloutSpec
 from ai.backend.manager.data.deployment.types import (
     ReplicaGroupLifecycle,
@@ -19,6 +20,7 @@ from ai.backend.manager.repositories.base.creator import CreatorSpec
 @dataclass
 class ReplicaGroupCreatorSpec(CreatorSpec[ReplicaGroupRow]):
     deployment_id: DeploymentID
+    session_group_id: SessionGroupID
     target_revision_id: DeploymentRevisionID
     desired_target_replica_count: int
     rollout: ReplicaGroupRolloutSpec
@@ -27,6 +29,7 @@ class ReplicaGroupCreatorSpec(CreatorSpec[ReplicaGroupRow]):
     def build_row(self) -> ReplicaGroupRow:
         return ReplicaGroupRow(
             deployment_id=self.deployment_id,
+            session_group_id=self.session_group_id,
             target_revision_id=self.target_revision_id,
             lifecycle=ReplicaGroupLifecycle.ROLLING,
             scaling_status=ReplicaGroupScalingStatus.SCALING,

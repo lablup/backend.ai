@@ -8,12 +8,18 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 import sqlalchemy as sa
+from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.identifier.deployment import DeploymentID
 from ai.backend.common.identifier.deployment_revision import DeploymentRevisionID
 from ai.backend.common.identifier.replica_group import ReplicaGroupID
 from ai.backend.common.identifier.session_group import SessionGroupID
+from ai.backend.common.schema.deployment import (
+    IntOrPercent,
+    ReplicaGroupRolloutSpec,
+    TargetGroupSpec,
+)
 from ai.backend.common.types import BinarySize, ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.deployment.types import (
@@ -24,6 +30,10 @@ from ai.backend.manager.data.deployment.types import (
     RouteStatus,
     RouteSubStatus,
     RouteTrafficStatus,
+)
+from ai.backend.manager.data.session_group.types import (
+    SessionGroupPlacementDirection,
+    SessionGroupPlacementEnforcement,
 )
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.endpoint import EndpointRow
@@ -43,6 +53,7 @@ from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.session_group.row import SessionGroupRow
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.pagination import OffsetPagination
@@ -54,6 +65,7 @@ from ai.backend.manager.repositories.deployment.updaters import (
 )
 from ai.backend.manager.repositories.replica_group import ReplicaGroupRepository
 from ai.backend.manager.repositories.replica_group.types import (
+    GroupRolloutSetup,
     GroupRouteDrainInstruction,
     ReplicaGroupScalingReconcileApply,
 )
@@ -112,6 +124,26 @@ def _provisioning_route(
     )
 
 
+async def _create_session_group(db_sess: SASession, deployment_id: DeploymentID) -> SessionGroupID:
+    """Create the placement group a replica group owns, as ``create_endpoint`` does."""
+    endpoint = (
+        await db_sess.execute(sa.select(EndpointRow).where(EndpointRow.id == deployment_id))
+    ).scalar_one()
+    domain_id = (
+        await db_sess.execute(sa.select(DomainRow.id).where(DomainRow.name == endpoint.domain))
+    ).scalar_one()
+    row = SessionGroupRow(
+        domain_id=domain_id,
+        project_id=endpoint.project,
+        owner_user_id=endpoint.session_owner,
+        placement_direction=SessionGroupPlacementDirection.SPREAD,
+        placement_enforcement=SessionGroupPlacementEnforcement.PREFERRED,
+    )
+    db_sess.add(row)
+    await db_sess.flush()
+    return row.id
+
+
 def _password_info(password: str) -> PasswordInfo:
     return PasswordInfo(
         password=password,
@@ -142,6 +174,7 @@ class TestReplicaGroupRepository:
                 KeyPairRow,
                 GroupRow,
                 EndpointRow,
+                SessionGroupRow,
                 ReplicaGroupRow,
                 ReplicaGroupHistoryRow,
                 SessionRow,
@@ -256,7 +289,7 @@ class TestReplicaGroupRepository:
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
                 ReplicaGroupRow(
-                    session_group_id=SessionGroupID(uuid.uuid4()),
+                    session_group_id=await _create_session_group(db_sess, test_endpoint_id),
                     id=first,
                     deployment_id=test_endpoint_id,
                     desired_current_replica_count=1,
@@ -267,7 +300,7 @@ class TestReplicaGroupRepository:
             )
             db_sess.add(
                 ReplicaGroupRow(
-                    session_group_id=SessionGroupID(uuid.uuid4()),
+                    session_group_id=await _create_session_group(db_sess, test_endpoint_id),
                     id=second,
                     deployment_id=test_endpoint_id,
                     desired_current_replica_count=2,
@@ -285,6 +318,43 @@ class TestReplicaGroupRepository:
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> ReplicaGroupRepository:
         return ReplicaGroupRepository(db=db_with_cleanup)
+
+    async def test_setup_target_groups_gives_a_fresh_group_its_placement_group(
+        self,
+        replica_group_repository: ReplicaGroupRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_endpoint_id: DeploymentID,
+    ) -> None:
+        setup = GroupRolloutSetup(
+            deployment_id=test_endpoint_id,
+            target_revision_id=DeploymentRevisionID(uuid.uuid4()),
+            spec=TargetGroupSpec(
+                use_primary_group=False,
+                rollout=ReplicaGroupRolloutSpec(
+                    max_surge=IntOrPercent(count=1),
+                    max_unavailable=IntOrPercent(count=0),
+                ),
+            ),
+            desired_target_replica_count=2,
+        )
+
+        updated = await replica_group_repository.setup_target_groups([setup])
+
+        assert updated == {test_endpoint_id}
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            session_group = (
+                await db_sess.execute(
+                    sa.select(SessionGroupRow)
+                    .join(
+                        ReplicaGroupRow,
+                        ReplicaGroupRow.session_group_id == SessionGroupRow.id,
+                    )
+                    .where(ReplicaGroupRow.deployment_id == test_endpoint_id)
+                )
+            ).scalar_one()
+
+        assert session_group.placement_direction is SessionGroupPlacementDirection.SPREAD
+        assert session_group.placement_enforcement is SessionGroupPlacementEnforcement.PREFERRED
 
     async def test_search_deploy_scheduling_views_filters_by_lifecycle(
         self,
@@ -383,7 +453,7 @@ class TestReplicaGroupRepository:
             ).scalar_one()
             db_sess.add(
                 ReplicaGroupRow(
-                    session_group_id=SessionGroupID(uuid.uuid4()),
+                    session_group_id=await _create_session_group(db_sess, test_endpoint_id),
                     id=group_id,
                     deployment_id=test_endpoint_id,
                     current_revision_id=current_revision_id,
@@ -485,7 +555,7 @@ class TestReplicaGroupRepository:
             ).scalar_one()
             db_sess.add(
                 ReplicaGroupRow(
-                    session_group_id=SessionGroupID(uuid.uuid4()),
+                    session_group_id=await _create_session_group(db_sess, test_endpoint_id),
                     id=group_id,
                     deployment_id=test_endpoint_id,
                     current_revision_id=revision_id,
@@ -588,7 +658,7 @@ class TestReplicaGroupRepository:
             ).scalar_one()
             db_sess.add(
                 ReplicaGroupRow(
-                    session_group_id=SessionGroupID(uuid.uuid4()),
+                    session_group_id=await _create_session_group(db_sess, test_endpoint_id),
                     id=group_id,
                     deployment_id=test_endpoint_id,
                     current_revision_id=revision_id,
@@ -662,7 +732,7 @@ class TestReplicaGroupRepository:
             ).scalar_one()
             db_sess.add(
                 ReplicaGroupRow(
-                    session_group_id=SessionGroupID(uuid.uuid4()),
+                    session_group_id=await _create_session_group(db_sess, test_endpoint_id),
                     id=group_id,
                     deployment_id=test_endpoint_id,
                     current_revision_id=revision_id,
