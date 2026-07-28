@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
+from enum import StrEnum
 
 import pytest
 from pydantic import ValidationError
@@ -29,8 +30,10 @@ from ai.backend.common.dto.manager.v2.scheduling_history.types import (
 from ai.backend.manager.api.gql.base import StringFilter
 from ai.backend.manager.api.gql.rbac.types.scope import UUIDScopeGQL
 from ai.backend.manager.api.gql.scheduling_history.types import (
+    ReplicaGroupHistoryCategoryGQL,
     ReplicaGroupHistoryFilterGQL,
     ReplicaGroupHistoryOrderByGQL,
+    ReplicaGroupHistoryOrderFieldGQL,
     ReplicaGroupHistoryScopeGQL,
 )
 
@@ -46,6 +49,40 @@ class _EmptyScopeCase:
 @pytest.fixture
 def deployment_id() -> uuid.UUID:
     return uuid.UUID("11111111-1111-1111-1111-111111111111")
+
+
+@dataclass(frozen=True)
+class _EnumPairCase:
+    """A GQL enum and the DTO enum it must stay value-identical to."""
+
+    label: str
+    gql_enum: type[StrEnum]
+    dto_enum: type[StrEnum]
+
+
+class TestEnumParity:
+    """The GQL enums restate the DTO enum values, so guard them against drift."""
+
+    @pytest.mark.parametrize(
+        "case",
+        [
+            _EnumPairCase(
+                label="category",
+                gql_enum=ReplicaGroupHistoryCategoryGQL,
+                dto_enum=ReplicaGroupHistoryCategoryType,
+            ),
+            _EnumPairCase(
+                label="order_field",
+                gql_enum=ReplicaGroupHistoryOrderFieldGQL,
+                dto_enum=ReplicaGroupHistoryOrderField,
+            ),
+        ],
+        ids=lambda case: case.label,
+    )
+    def test_gql_enum_matches_dto_enum(self, case: _EnumPairCase) -> None:
+        assert {member.name: member.value for member in case.gql_enum} == {
+            member.name: member.value for member in case.dto_enum
+        }
 
 
 class TestReplicaGroupHistoryScopeGQL:
@@ -77,14 +114,14 @@ class TestReplicaGroupHistoryFilterGQL:
 
     @pytest.mark.parametrize(
         "category",
-        list(ReplicaGroupHistoryCategoryType),
+        list(ReplicaGroupHistoryCategoryGQL),
         ids=lambda category: category.value,
     )
-    def test_category_survives_conversion(self, category: ReplicaGroupHistoryCategoryType) -> None:
+    def test_category_survives_conversion(self, category: ReplicaGroupHistoryCategoryGQL) -> None:
         f = ReplicaGroupHistoryFilterGQL(category=[category])
         dto = f.to_pydantic()
         assert isinstance(dto, ReplicaGroupHistoryFilterDTO)
-        assert dto.category == [category]
+        assert dto.category == [ReplicaGroupHistoryCategoryType(category.value)]
 
     def test_and_produces_sub_filter_dto(self) -> None:
         f = ReplicaGroupHistoryFilterGQL(
@@ -129,7 +166,7 @@ class TestReplicaGroupHistoryOrderByGQL:
 
     @pytest.mark.parametrize(
         "field",
-        list(ReplicaGroupHistoryOrderField),
+        list(ReplicaGroupHistoryOrderFieldGQL),
         ids=lambda field: field.value,
     )
     @pytest.mark.parametrize(
@@ -138,10 +175,10 @@ class TestReplicaGroupHistoryOrderByGQL:
         ids=lambda direction: direction.value,
     )
     def test_order_survives_conversion(
-        self, field: ReplicaGroupHistoryOrderField, direction: OrderDirection
+        self, field: ReplicaGroupHistoryOrderFieldGQL, direction: OrderDirection
     ) -> None:
         order = ReplicaGroupHistoryOrderByGQL(field=field, direction=direction)
         dto = order.to_pydantic()
         assert isinstance(dto, ReplicaGroupHistoryOrderDTO)
-        assert dto.field == field
+        assert dto.field == ReplicaGroupHistoryOrderField(field.value)
         assert dto.direction == direction

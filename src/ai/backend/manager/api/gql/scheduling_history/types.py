@@ -55,8 +55,6 @@ from ai.backend.common.dto.manager.v2.scheduling_history.response import (
 from ai.backend.common.dto.manager.v2.scheduling_history.types import (
     DeploymentHistoryScopeDTO,
     KernelHistoryScopeDTO,
-    ReplicaGroupHistoryCategoryType,
-    ReplicaGroupHistoryOrderField,
     ReplicaGroupHistoryScopeDTO,
     RouteHistoryScopeDTO,
     SessionHistoryScopeDTO,
@@ -197,24 +195,33 @@ class RouteHistoryOrderField(StrEnum):
     UPDATED_AT = "updated_at"
 
 
-# The DTO enums are exposed directly so their values cannot drift from the wire contract.
-ReplicaGroupHistoryCategoryGQL: type[ReplicaGroupHistoryCategoryType] = gql_enum(
+@gql_enum(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
         description="Handler category that produced a replica-group history row",
     ),
-    ReplicaGroupHistoryCategoryType,
     name="ReplicaGroupHistoryCategory",
 )
+class ReplicaGroupHistoryCategoryGQL(StrEnum):
+    LIFECYCLE = "lifecycle"
+    SCALING = "scaling"
 
-ReplicaGroupHistoryOrderFieldGQL: type[ReplicaGroupHistoryOrderField] = gql_enum(
+
+@gql_enum(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
         description="Fields available for ordering replica-group scheduling history",
     ),
-    ReplicaGroupHistoryOrderField,
     name="ReplicaGroupHistoryOrderField",
 )
+class ReplicaGroupHistoryOrderFieldGQL(StrEnum):
+    CREATED_AT = "created_at"
+    UPDATED_AT = "updated_at"
+    PHASE = "phase"
+    FROM_STATUS = "from_status"
+    TO_STATUS = "to_status"
+    RESULT = "result"
+    ATTEMPTS = "attempts"
 
 
 # Types
