@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import socket
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
@@ -29,13 +28,16 @@ if TYPE_CHECKING:
 
 __all__ = ("ManagerAdminService",)
 
-# etcd key backing the system announcement. The value is a JSON object
-# ``{"enabled": bool, "message": str}`` so that disabling an announcement only
-# flips the flag and keeps the stored message (re-enabling does not require
-# retyping), without introducing a second key. Values written before this key
-# held JSON (a bare message string) are treated as enabled for backward
-# compatibility.
+# etcd keys backing the system announcement. The message and the enabled flag
+# are stored under separate subpaths of ``manager/announcement`` so that
+# disabling an announcement only flips the flag and keeps the stored message
+# (re-enabling does not require retyping). Older deployments stored a bare
+# message string directly at ``manager/announcement``; ``get_announcement``
+# falls back to that legacy key (treating its presence as enabled) when the
+# split keys are absent, and the first write migrates to the split layout.
 _ANNOUNCEMENT_KEY = "manager/announcement"
+_ANNOUNCEMENT_MESSAGE_KEY = "manager/announcement/message"
+_ANNOUNCEMENT_ENABLED_KEY = "manager/announcement/enabled"
 
 
 @dataclass
@@ -91,20 +93,16 @@ class ManagerAdminService:
 
     async def get_announcement(self, action: GetAnnouncementAction) -> GetAnnouncementActionResult:
         """Get the current announcement from etcd."""
-        raw = await self._etcd.get(_ANNOUNCEMENT_KEY)
-        if raw is None:
-            return GetAnnouncementActionResult(enabled=False, message="")
-        try:
-            data = json.loads(raw)
-        except (ValueError, TypeError):
-            data = None
-        if isinstance(data, dict) and "enabled" in data and "message" in data:
-            return GetAnnouncementActionResult(
-                enabled=bool(data["enabled"]), message=str(data["message"])
-            )
-        # Legacy value: the key used to hold a bare message string. Treat its
-        # presence as an enabled announcement for backward compatibility.
-        return GetAnnouncementActionResult(enabled=True, message=raw)
+        enabled_flag = await self._etcd.get(_ANNOUNCEMENT_ENABLED_KEY)
+        if enabled_flag is None:
+            # The split keys have not been written yet: fall back to the legacy
+            # single key, whose bare presence denotes an enabled announcement.
+            legacy = await self._etcd.get(_ANNOUNCEMENT_KEY)
+            if legacy is None:
+                return GetAnnouncementActionResult(enabled=False, message="")
+            return GetAnnouncementActionResult(enabled=True, message=legacy)
+        message = await self._etcd.get(_ANNOUNCEMENT_MESSAGE_KEY)
+        return GetAnnouncementActionResult(enabled=enabled_flag == "true", message=message or "")
 
     async def update_announcement(
         self, action: UpdateAnnouncementAction
@@ -119,15 +117,20 @@ class ManagerAdminService:
         if action.enabled and not action.message:
             raise InvalidAPIParameters(extra_msg="Empty message not allowed to enable announcement")
         # A request without a message (e.g. a plain disable) preserves the
-        # existing text, so read the current message before rewriting the key.
+        # existing text, so read the current message before rewriting the keys.
         if action.message is None:
             current = await self.get_announcement(GetAnnouncementAction())
             message = current.message
         else:
             message = action.message
-        await self._etcd.put(
-            _ANNOUNCEMENT_KEY, json.dumps({"enabled": action.enabled, "message": message})
+        # Write the message and the enabled flag under their subpaths in a single
+        # transaction, then drop the legacy single key so stale data (superseded
+        # by the split keys) does not linger.
+        await self._etcd.put_prefix(
+            _ANNOUNCEMENT_KEY,
+            {"message": message, "enabled": "true" if action.enabled else "false"},
         )
+        await self._etcd.delete(_ANNOUNCEMENT_KEY)
         return UpdateAnnouncementActionResult()
 
     async def perform_scheduler_ops(
