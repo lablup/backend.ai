@@ -252,33 +252,32 @@ class IdleCheckerHost:
         await self._valkey_stat.close()
         await self._valkey_live.close()
 
-    async def update_app_streaming_status(
-        self,
-        session_id: SessionId,
-        status: AppStreamingStatus,
-    ) -> None:
-        for checker in self._checkers:
-            await checker.update_app_streaming_status(session_id, status)
-
-    async def dispatch_session_status_event(
-        self,
-        session_id: SessionId,
-        status: SessionStatus,
-    ) -> None:
-        for checker in self._event_dispatch_checkers:
-            await checker.watch_session_status(session_id, status)
-
-    async def dispatch_session_execution_status_event(
-        self,
-        session_id: SessionId,
-        status: SessionExecutionStatus,
-    ) -> None:
-        for checker in self._event_dispatch_checkers:
-            await checker.watch_session_execution(session_id, status)
+    async def _fetch_idle_policy(
+        self, conn: SAConnection, access_key: AccessKey
+    ) -> Row[Any] | None:
+        query = (
+            sa.select(
+                keypair_resource_policies.c.max_session_lifetime,
+                keypair_resource_policies.c.idle_timeout,
+            )
+            .select_from(
+                sa.join(
+                    keypairs,
+                    keypair_resource_policies,
+                    keypair_resource_policies.c.name == keypairs.c.resource_policy,
+                ),
+            )
+            .where(keypairs.c.access_key == access_key)
+        )
+        result = await conn.execute(query)
+        return result.first()
 
     async def do_idle_check(self) -> None:
         log.debug("do_idle_check(): triggered")
-        policy_cache: dict[AccessKey, Row[Any]] = {}
+        # A missing policy is cached as None so that an orphaned access key is
+        # queried and warned about only once per cycle.
+        policy_cache: dict[AccessKey | None, Row[Any] | None] = {}
+        errors: list[BaseException] = []
         async with self._db.begin_readonly() as conn:
             j = sa.join(kernels, users, kernels.c.user_uuid == users.c.uuid)
             query = (
@@ -293,6 +292,7 @@ class IdleCheckerHost:
                     kernels.c.requested_slots,
                     kernels.c.cluster_size,
                     users.c.created_at.label("user_created_at"),
+                    users.c.main_access_key,
                 )
                 .select_from(j)
                 .where(
@@ -305,29 +305,26 @@ class IdleCheckerHost:
             rows = result.fetchall()
             for kernel in rows:
                 grace_period_end = await self._grace_period_checker.get_grace_period_end(kernel)
-                policy = policy_cache.get(kernel.access_key, None)
-                if policy is None:
-                    query = (
-                        sa.select(
-                            keypair_resource_policies.c.max_session_lifetime,
-                            keypair_resource_policies.c.idle_timeout,
-                        )
-                        .select_from(
-                            sa.join(
-                                keypairs,
-                                keypair_resource_policies,
-                                keypair_resource_policies.c.name == keypairs.c.resource_policy,
-                            ),
-                        )
-                        .where(keypairs.c.access_key == kernel.access_key)
+                # The idle policy is resolved through the user's main access key,
+                # which is a real foreign key, instead of the kernel's own access
+                # key, which may be left orphaned by a keypair deletion.
+                main_access_key = cast(AccessKey | None, kernel.main_access_key)
+                if main_access_key not in policy_cache:
+                    policy = (
+                        await self._fetch_idle_policy(conn, main_access_key)
+                        if main_access_key is not None
+                        else None
                     )
-                    result = await conn.execute(query)
-                    policy = result.first()
                     if policy is None:
-                        raise IdlePolicyNotFound(
-                            f"Resource policy not found for access_key={kernel.access_key}"
+                        log.warning(
+                            "idle policy not found for main_access_key={}; "
+                            "skipping its kernels in this cycle",
+                            main_access_key,
                         )
-                    policy_cache[kernel.access_key] = policy
+                    policy_cache[main_access_key] = policy
+                policy = policy_cache[main_access_key]
+                if policy is None:
+                    continue
 
                 check_tasks = [
                     checker.check_idleness(kernel, conn, policy, grace_period_end=grace_period_end)
@@ -335,7 +332,6 @@ class IdleCheckerHost:
                 ]
                 check_results = await aiotools.gather_safe(check_tasks)
                 terminated = False
-                errors: list[BaseException] = []
                 for checker, check_result in zip(self._checkers, check_results, strict=True):
                     if isinstance(check_result, BaseExceptionGroup):
                         errors.extend(check_result.exceptions)
@@ -353,8 +349,8 @@ class IdleCheckerHost:
                         if not terminated:
                             terminated = True
                             await checker.callback_idle_session(kernel.session_id)
-                if errors:
-                    raise IdleCheckerError("idle checker(s) raise errors", errors)
+        if errors:
+            raise IdleCheckerError("idle checker(s) raise errors", errors)
 
     async def get_idle_check_report(
         self,

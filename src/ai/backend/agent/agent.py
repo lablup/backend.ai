@@ -1830,6 +1830,16 @@ class AbstractAgent[
                     for kernel_id, container in dead_containers:
                         if kernel_id in self.restarting_kernels:
                             continue
+                        # A kernel we still track but that already left RUNNING is
+                        # being torn down by its own destroy flow, which reports the
+                        # real termination reason. Kernels missing from the registry
+                        # (e.g. after an agent restart) must still be picked up here.
+                        tracked_kernel = self.kernel_registry.get(kernel_id)
+                        if (
+                            tracked_kernel is not None
+                            and tracked_kernel.state != KernelLifecycleStatus.RUNNING
+                        ):
+                            continue
                         log.info(
                             "detected dead container during lifeycle sync (k:{}, c:{})",
                             kernel_id,
