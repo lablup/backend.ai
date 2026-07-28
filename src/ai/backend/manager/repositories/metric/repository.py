@@ -7,7 +7,6 @@ from ai.backend.common.dto.clients.prometheus.request import QueryTimeRange
 from ai.backend.common.exception import (
     BackendAIError,
     FailedToGetMetric,
-    InvalidMetricPresetTemplate,
     PrometheusConnectionError,
 )
 from ai.backend.common.metrics.metric import DomainType, LayerType
@@ -89,10 +88,6 @@ class MetricRepository:
         query: SessionUtilizationMetricQuery,
     ) -> SessionUtilizationMetricResult:
         preset = await self._prometheus_query_preset_db_source.get_by_id(query.preset_id)
-        if "session_id" not in preset.filter_labels:
-            raise InvalidMetricPresetTemplate(
-                "Session utilization query presets must allow the session_id filter label."
-            )
         try:
             response = await self._prometheus_client.fetch_session_utilization(
                 query_template=preset.query_template,

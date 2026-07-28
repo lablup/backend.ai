@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import replace
 from datetime import UTC, datetime
 from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock
@@ -9,7 +8,7 @@ from uuid import uuid4
 import pytest
 
 from ai.backend.common.dto.clients.prometheus.response import PrometheusResponse
-from ai.backend.common.exception import InvalidMetricPresetTemplate, PrometheusConnectionError
+from ai.backend.common.exception import PrometheusConnectionError
 from ai.backend.common.types import SessionId
 from ai.backend.manager.clients.prometheus.client import PrometheusClient
 from ai.backend.manager.data.prometheus_query_preset.types import PrometheusQueryPresetData
@@ -135,21 +134,6 @@ class TestQuerySessionUtilizationMetrics:
         result = await repository.query_session_utilization_metrics(self._query(preset, session_id))
 
         assert result == SessionUtilizationMetricResult(by_session={})
-
-    async def test_rejects_preset_without_session_id_filter(
-        self,
-        repository: MetricRepository,
-        prometheus_client: MagicMock,
-        preset_db_source: MagicMock,
-        preset: PrometheusQueryPresetData,
-    ) -> None:
-        session_id = SessionId(uuid4())
-        preset_db_source.get_by_id.return_value = replace(preset, filter_labels=[])
-
-        with pytest.raises(InvalidMetricPresetTemplate, match="session_id"):
-            await repository.query_session_utilization_metrics(self._query(preset, session_id))
-
-        prometheus_client.fetch_session_utilization.assert_not_awaited()
 
     async def test_skips_malformed_and_non_finite_values(
         self,
