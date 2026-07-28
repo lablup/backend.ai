@@ -23,6 +23,9 @@ from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
     AppConfigFragmentUpsertItem as AppConfigFragmentUpsertItemDTO,
 )
 from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
+    AppConfigScopeRef as AppConfigScopeRefDTO,
+)
+from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
     MyUpsertAppConfigFragmentsInput as MyUpsertAppConfigFragmentsInputDTO,
 )
 from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
@@ -57,6 +60,7 @@ __all__ = (
     "AppConfigFragmentOrderByGQL",
     "AppConfigFragmentOrderFieldGQL",
     "AppConfigFragmentUpsertItemGQL",
+    "AppConfigScopeRefGQL",
     "AppConfigScopeTypeFilterGQL",
     "MyUpsertAppConfigFragmentsInputGQL",
     "ScopedUpsertAppConfigFragmentsInputGQL",
@@ -78,13 +82,11 @@ class AppConfigFragmentUpsertItemGQL(PydanticInputMixin[AppConfigFragmentUpsertI
 @gql_pydantic_input(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
-        description="Upsert many fragments at one scope; the scope is named once for all items.",
+        description="One app config scope: its kind, and its owner id for the kinds that have one.",
     ),
-    name="ScopedUpsertAppConfigFragmentsInput",
+    name="AppConfigScopeRef",
 )
-class ScopedUpsertAppConfigFragmentsInputGQL(
-    PydanticInputMixin[ScopedUpsertAppConfigFragmentsInputDTO]
-):
+class AppConfigScopeRefGQL(PydanticInputMixin[AppConfigScopeRefDTO]):
     scope_type: AppConfigScopeType = gql_field(
         description="Scope the fragments are written at (public | domain | user)."
     )
@@ -92,6 +94,19 @@ class ScopedUpsertAppConfigFragmentsInputGQL(
         description="Scope identifier: the domain id or user id; null for public scope.",
         default=None,
     )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Upsert many fragments at one scope; the scope is named once for all items.",
+    ),
+    name="ScopedUpsertAppConfigFragmentsInput",
+)
+class ScopedUpsertAppConfigFragmentsInputGQL(
+    PydanticInputMixin[ScopedUpsertAppConfigFragmentsInputDTO]
+):
+    scope: AppConfigScopeRefGQL = gql_field(description="Scope the fragments are written at.")
     items: list[AppConfigFragmentUpsertItemGQL] = gql_field(
         description="The (config_name, config) pairs to upsert."
     )
