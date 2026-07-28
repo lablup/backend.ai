@@ -69,6 +69,13 @@ class TestSessionGroupSchema:
         }
         assert all(not columns[name].nullable for name in targets)
 
+    def test_owner_cannot_be_removed_before_their_groups(self) -> None:
+        # The purge settles a user's groups explicitly (transfer on delegation,
+        # delete otherwise); the database must not silently drop them instead.
+        (owner_fk,) = list(SessionGroupRow.__table__.columns["owner_user_id"].foreign_keys)
+
+        assert owner_fk.ondelete == "RESTRICT"
+
     def test_group_has_no_name_column(self) -> None:
         assert "name" not in SessionGroupRow.__table__.columns
 

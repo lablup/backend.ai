@@ -107,7 +107,10 @@ def upgrade() -> None:
                 ["project_id"], ["groups.id"], name="fk_session_groups_project_id_groups"
             ),
             sa.ForeignKeyConstraint(
-                ["owner_user_id"], ["users.uuid"], name="fk_session_groups_owner_user_id_users"
+                ["owner_user_id"],
+                ["users.uuid"],
+                name="fk_session_groups_owner_user_id_users",
+                ondelete="RESTRICT",
             ),
             sa.PrimaryKeyConstraint("id", name="pk_session_groups"),
         )

@@ -50,10 +50,14 @@ class SessionGroupRow(CreatedAtMixin, Base):  # type: ignore[misc]
     )
     # Admission is decided by the owner alone: every member session belongs to
     # this user. ``domain_id`` / ``project_id`` scope visibility and cleanup.
+    # RESTRICT rather than CASCADE: a user's groups are transferred (endpoint
+    # delegation) or removed by the purge itself, like every other record they
+    # own. Leaving the removal to the database would drop a group while its
+    # delegated member sessions keep running.
     owner_user_id: Mapped[UserID] = mapped_column(
         "owner_user_id",
         GUID(UserID),
-        sa.ForeignKey("users.uuid"),
+        sa.ForeignKey("users.uuid", ondelete="RESTRICT"),
         nullable=False,
     )
     placement_direction: Mapped[SessionGroupPlacementDirection] = mapped_column(
