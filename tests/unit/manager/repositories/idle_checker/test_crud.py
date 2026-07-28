@@ -93,7 +93,7 @@ class TestIdleCheckerRepository:
             Creator(spec=replace(creator_spec, name="second session lifetime"))
         )
 
-        result = await repository.search(BatchQuerier(pagination=NoPagination()))
+        result = await repository.admin_search(BatchQuerier(pagination=NoPagination()))
 
         assert {checker.id for checker in result.items} == {
             created_checker.id,
@@ -106,7 +106,7 @@ class TestIdleCheckerRepository:
         repository: IdleCheckerRepository,
         created_checker: IdleCheckerData,
     ) -> None:
-        result = await repository.search(
+        result = await repository.admin_search(
             BatchQuerier(
                 conditions=[IdleCheckerConditions.by_ids([created_checker.id])],
                 pagination=NoPagination(),
@@ -119,7 +119,7 @@ class TestIdleCheckerRepository:
         self,
         repository: IdleCheckerRepository,
     ) -> None:
-        result = await repository.search(
+        result = await repository.admin_search(
             BatchQuerier(
                 conditions=[IdleCheckerConditions.by_ids([IdleCheckerID(uuid.uuid4())])],
                 pagination=NoPagination(),
@@ -139,7 +139,7 @@ class TestIdleCheckerRepository:
                 pk_value=created_checker.id,
             )
         )
-        result = await repository.search(
+        result = await repository.admin_search(
             BatchQuerier(
                 conditions=[IdleCheckerConditions.by_ids([created_checker.id])],
                 pagination=NoPagination(),
