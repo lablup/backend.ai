@@ -13,11 +13,11 @@ from ai.backend.common.identifier.idle_checker import IdleCheckerID
 from ai.backend.common.types import SessionId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.idle_checker.types import IdleCheckSession
+from ai.backend.manager.repositories.idle_checker.types import IdleJudgmentData
 from ai.backend.manager.sokovan.idle_check.checkers.base import (
     CheckerAssignment,
     IdleChecker,
     IdleCheckerContext,
-    IdleJudgment,
 )
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
@@ -45,7 +45,7 @@ class NetworkTimeoutChecker(IdleChecker):
         assignments: Sequence[CheckerAssignment],
         *,
         context: IdleCheckerContext,
-    ) -> Sequence[IdleJudgment]:
+    ) -> Sequence[IdleJudgmentData]:
         # Fetch session states in one batch to avoid repeated I/O per assignment.
         sessions: list[IdleCheckSession] = []
         for assignment in assignments:
@@ -53,7 +53,7 @@ class NetworkTimeoutChecker(IdleChecker):
         states = await self._prepare_states(sessions)
 
         # Judge each assignment in one pass, using the pre-fetched states.
-        judgments: list[IdleJudgment] = []
+        judgments: list[IdleJudgmentData] = []
         for assignment in assignments:
             network_spec = assignment.definition.spec.network
             if network_spec is None:
@@ -88,9 +88,9 @@ class NetworkTimeoutChecker(IdleChecker):
         state: _NetworkIdleState,
         max_inactivity_seconds: int,
         current_time: datetime,
-    ) -> IdleJudgment:
+    ) -> IdleJudgmentData:
         if state.last_access == _ONGOING_ACTIVITY_SENTINEL or state.active_connections > 0:
-            return IdleJudgment(
+            return IdleJudgmentData(
                 checker_id=checker_id,
                 session_id=session_id,
                 expire_at=current_time + timedelta(seconds=max_inactivity_seconds),
@@ -115,7 +115,7 @@ class NetworkTimeoutChecker(IdleChecker):
         else:
             status = IdleCheckPhase.IDLE
             message = "No active network connection"
-        return IdleJudgment(
+        return IdleJudgmentData(
             checker_id=checker_id,
             session_id=session_id,
             expire_at=expire_at,
