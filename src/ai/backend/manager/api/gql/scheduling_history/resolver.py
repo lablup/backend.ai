@@ -458,7 +458,7 @@ async def route_histories(
         description="List replica-group scheduling history (superadmin only)",
     )
 )  # type: ignore[misc]
-async def admin_replica_group_scheduling_histories(
+async def admin_replica_group_histories(
     info: Info[StrawberryGQLContext],
     filter: ReplicaGroupHistoryFilterGQL | None = None,
     order_by: list[ReplicaGroupHistoryOrderByGQL] | None = None,
@@ -694,7 +694,7 @@ async def scoped_kernel_scheduling_histories(
         description="Get scheduling history for the replica groups of a specific deployment.",
     )
 )  # type: ignore[misc]
-async def scoped_replica_group_scheduling_histories(
+async def scoped_replica_group_histories(
     info: Info[StrawberryGQLContext],
     scope: ReplicaGroupHistoryScopeGQL,
     filter: ReplicaGroupHistoryFilterGQL | None = None,

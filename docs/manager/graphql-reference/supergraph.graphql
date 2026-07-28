@@ -15227,7 +15227,7 @@ type Query
   """
   Added in 26.8.0. List replica-group scheduling history (superadmin only)
   """
-  adminReplicaGroupSchedulingHistories(filter: ReplicaGroupHistoryFilter = null, orderBy: [ReplicaGroupHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ReplicaGroupHistoryConnection @join__field(graph: STRAWBERRY)
+  adminReplicaGroupHistories(filter: ReplicaGroupHistoryFilter = null, orderBy: [ReplicaGroupHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ReplicaGroupHistoryConnection @join__field(graph: STRAWBERRY)
 
   """Added in 26.4.2. List route history (admin only)"""
   adminRouteHistories(filter: RouteHistoryFilter = null, orderBy: [RouteHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): RouteHistoryConnection @join__field(graph: STRAWBERRY)
@@ -15516,7 +15516,7 @@ type Query
   """
   Added in 26.8.0. Get scheduling history for the replica groups of a specific deployment.
   """
-  scopedReplicaGroupSchedulingHistories(scope: ReplicaGroupHistoryScope!, filter: ReplicaGroupHistoryFilter = null, orderBy: [ReplicaGroupHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ReplicaGroupHistoryConnection @join__field(graph: STRAWBERRY)
+  scopedReplicaGroupHistories(scope: ReplicaGroupHistoryScope!, filter: ReplicaGroupHistoryFilter = null, orderBy: [ReplicaGroupHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ReplicaGroupHistoryConnection @join__field(graph: STRAWBERRY)
 
   """Added in 26.2.0. List resource groups"""
   resourceGroups(filter: ResourceGroupFilter = null, orderBy: [ResourceGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ResourceGroupConnection @join__field(graph: STRAWBERRY) @deprecated(reason: "Use admin_resource_groups instead. This API will be removed after v26.3.0. See BEP-1041 for migration guide.")
