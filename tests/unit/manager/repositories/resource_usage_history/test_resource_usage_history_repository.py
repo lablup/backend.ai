@@ -632,8 +632,7 @@ class TestResourceUsageHistoryRepository:
                         bucket_id=result.id,
                         bucket_type="user",
                         slot_name="cpu",
-                        amount=Decimal("3600"),
-                        duration_seconds=300,
+                        resource_usage=Decimal("3600"),
                         capacity=Decimal("0"),
                     )
                 )
@@ -703,8 +702,7 @@ class TestResourceUsageHistoryRepository:
                         bucket_id=result.id,
                         bucket_type="project",
                         slot_name="cpu",
-                        amount=Decimal("7200"),
-                        duration_seconds=300,
+                        resource_usage=Decimal("7200"),
                         capacity=Decimal("0"),
                     )
                 )
@@ -753,8 +751,7 @@ class TestResourceUsageHistoryRepository:
                         bucket_id=result.id,
                         bucket_type="domain",
                         slot_name="cpu",
-                        amount=Decimal("86400"),
-                        duration_seconds=300,
+                        resource_usage=Decimal("86400"),
                         capacity=Decimal("0"),
                     )
                 )

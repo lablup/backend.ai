@@ -100,36 +100,18 @@ class KernelUsagePreparationResult:
 
 
 @dataclass
-class BucketDelta:
-    """Separated resource amount and duration for a usage bucket.
-
-    Stores raw resource amounts and duration separately instead of
-    pre-multiplied resource-seconds.  The product ``amount * duration_seconds``
-    is computed at SQL query time where PostgreSQL auto-extends NUMERIC precision,
-    eliminating overflow risk for large memory values.
-
-    Attributes:
-        slots: Raw resource amounts (e.g., {"cpu": 2, "mem": 4096000000})
-        duration_seconds: Total usage duration in seconds
-    """
-
-    slots: ResourceSlot = field(default_factory=ResourceSlot)
-    duration_seconds: int = 0
-
-
-@dataclass
 class UsageBucketAggregationResult:
-    """Result of aggregating kernel usage into daily buckets.
+    """Resource-seconds to add to each bucket, from one observation tick.
 
-    Attributes:
-        user_usage_deltas: Aggregated usage deltas by user for bucket updates
-        project_usage_deltas: Aggregated usage deltas by project for bucket updates
-        domain_usage_deltas: Aggregated usage deltas by domain for bucket updates
+    Each value is ``sum(amount_k * duration_k)`` over the slices folded into that
+    bucket.  It must be accumulated as a sum of per-slice products: summing the
+    amounts and the durations separately and multiplying afterwards gives a cross
+    product inflated by the number of slices.
     """
 
-    user_usage_deltas: dict[UserUsageBucketKey, BucketDelta] = field(default_factory=dict)
-    project_usage_deltas: dict[ProjectUsageBucketKey, BucketDelta] = field(default_factory=dict)
-    domain_usage_deltas: dict[DomainUsageBucketKey, BucketDelta] = field(default_factory=dict)
+    user_usage_deltas: dict[UserUsageBucketKey, ResourceSlot] = field(default_factory=dict)
+    project_usage_deltas: dict[ProjectUsageBucketKey, ResourceSlot] = field(default_factory=dict)
+    domain_usage_deltas: dict[DomainUsageBucketKey, ResourceSlot] = field(default_factory=dict)
 
 
 class FairShareAggregator:
@@ -200,9 +182,9 @@ class FairShareAggregator:
         Returns:
             UsageBucketAggregationResult with deltas for each bucket
         """
-        user_deltas: dict[UserUsageBucketKey, BucketDelta] = defaultdict(BucketDelta)
-        project_deltas: dict[ProjectUsageBucketKey, BucketDelta] = defaultdict(BucketDelta)
-        domain_deltas: dict[DomainUsageBucketKey, BucketDelta] = defaultdict(BucketDelta)
+        user_deltas: dict[UserUsageBucketKey, ResourceSlot] = defaultdict(ResourceSlot)
+        project_deltas: dict[ProjectUsageBucketKey, ResourceSlot] = defaultdict(ResourceSlot)
+        domain_deltas: dict[DomainUsageBucketKey, ResourceSlot] = defaultdict(ResourceSlot)
 
         for spec in specs:
             # Split spec across day boundaries and aggregate
@@ -285,16 +267,15 @@ class FairShareAggregator:
         period_date: date,
         raw_slots: ResourceSlot,
         segment_seconds: int,
-        user_deltas: dict[UserUsageBucketKey, BucketDelta],
-        project_deltas: dict[ProjectUsageBucketKey, BucketDelta],
-        domain_deltas: dict[DomainUsageBucketKey, BucketDelta],
+        user_deltas: dict[UserUsageBucketKey, ResourceSlot],
+        project_deltas: dict[ProjectUsageBucketKey, ResourceSlot],
+        domain_deltas: dict[DomainUsageBucketKey, ResourceSlot],
     ) -> None:
         """Add resource usage to bucket deltas for a day.
 
-        Accumulates raw resource amounts and duration separately.
-        Slots are accumulated additively (sum of ``raw_slots`` across all
-        slices within the same bucket key) while ``duration_seconds`` tracks
-        total observation time.
+        The segment is converted to resource-seconds before accumulation.
+        Accumulating the amounts and the durations separately and multiplying
+        afterwards would give a cross product inflated by the slice count.
 
         Args:
             spec: Original spec (for entity identifiers)
@@ -305,6 +286,8 @@ class FairShareAggregator:
             project_deltas: Project deltas to update (mutated)
             domain_deltas: Domain deltas to update (mutated)
         """
+        segment_usage = self._calculate_resource_seconds(raw_slots, segment_seconds)
+
         # User bucket key
         user_key = UserUsageBucketKey(
             user_uuid=spec.user_uuid,
@@ -313,11 +296,7 @@ class FairShareAggregator:
             resource_group=spec.resource_group,
             period_date=period_date,
         )
-        ud = user_deltas[user_key]
-        user_deltas[user_key] = BucketDelta(
-            slots=ud.slots + raw_slots,
-            duration_seconds=ud.duration_seconds + segment_seconds,
-        )
+        user_deltas[user_key] = user_deltas[user_key] + segment_usage
 
         # Project bucket key
         project_key = ProjectUsageBucketKey(
@@ -326,11 +305,7 @@ class FairShareAggregator:
             resource_group=spec.resource_group,
             period_date=period_date,
         )
-        pd = project_deltas[project_key]
-        project_deltas[project_key] = BucketDelta(
-            slots=pd.slots + raw_slots,
-            duration_seconds=pd.duration_seconds + segment_seconds,
-        )
+        project_deltas[project_key] = project_deltas[project_key] + segment_usage
 
         # Domain bucket key
         domain_key = DomainUsageBucketKey(
@@ -338,11 +313,7 @@ class FairShareAggregator:
             resource_group=spec.resource_group,
             period_date=period_date,
         )
-        dd = domain_deltas[domain_key]
-        domain_deltas[domain_key] = BucketDelta(
-            slots=dd.slots + raw_slots,
-            duration_seconds=dd.duration_seconds + segment_seconds,
-        )
+        domain_deltas[domain_key] = domain_deltas[domain_key] + segment_usage
 
     def _prepare_kernel_usage_specs(
         self,

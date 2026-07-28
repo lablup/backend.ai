@@ -5,7 +5,6 @@ and calculating fair share scheduling ranks.
 """
 
 from .aggregator import (
-    BucketDelta,
     DomainUsageBucketKey,
     FairShareAggregator,
     KernelUsagePreparationResult,
@@ -24,7 +23,6 @@ from .calculator import (
 
 __all__ = [
     # Aggregator
-    "BucketDelta",
     "DomainUsageBucketKey",
     "FairShareAggregator",
     "KernelUsagePreparationResult",
