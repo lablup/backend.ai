@@ -4,6 +4,7 @@ from collections.abc import Sequence
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.identifier.entity import EntityID
+from ai.backend.manager.actions.types import ActionOperationType, ActionSpec
 
 
 class BaseBulkAction(ABC):
@@ -13,6 +14,12 @@ class BaseBulkAction(ABC):
     @abstractmethod
     def entity_type(cls) -> EntityType:
         """Return the type of entity that this action applies to."""
+        raise NotImplementedError
+
+    @classmethod
+    @abstractmethod
+    def operation_type(cls) -> ActionOperationType:
+        """Return the operation that this action performs on the entities."""
         raise NotImplementedError
 
     @abstractmethod
@@ -25,3 +32,11 @@ class BaseBulkAction(ABC):
     def required_permission(cls) -> Permission:
         """Return the permission required to perform this action."""
         raise NotImplementedError
+
+    @classmethod
+    def spec(cls) -> ActionSpec:
+        """Return the "entity:operation" spec keying reporter subscriptions and audit records."""
+        return ActionSpec(
+            entity_type=cls.entity_type(),
+            operation_type=cls.operation_type(),
+        )
