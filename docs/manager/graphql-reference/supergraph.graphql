@@ -15355,12 +15355,12 @@ type Query
   scopedIdleCheckerBindings(scope: IdleCheckerBindingScope!, filter: IdleCheckerBindingFilter = null, orderBy: [IdleCheckerBindingOrderBy!] = null, first: Int = null, after: String = null, last: Int = null, before: String = null, limit: Int = null, offset: Int = null): IdleCheckerBindingConnection! @join__field(graph: STRAWBERRY)
 
   """
-  Added in 26.8.0. Read the fragments written at one scope for the given config names — the current values, to inspect before editing them. RBAC-authorized at that scope.
+  Added in 26.8.0. Read the fragments written at one scope for the given config names — the current values, to inspect before editing them. Answered in the order the names were given, leaving out a name with no fragment there. RBAC-authorized at that scope.
   """
   scopedAppConfigFragmentsByNames(scopeType: AppConfigScopeType!, configNames: [String!]!, scopeId: UUID = null): [AppConfigFragment!]! @join__field(graph: STRAWBERRY)
 
   """
-  Added in 26.8.0. Read the current user's own user-scope fragments for the given config names.
+  Added in 26.8.0. Read the current user's own user-scope fragments for the given config names, in the order the names were given, leaving out a name with no fragment there.
   """
   myAppConfigFragmentsByNames(configNames: [String!]!): [AppConfigFragment!]! @join__field(graph: STRAWBERRY)
 
