@@ -40,6 +40,7 @@ from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.session.processors import SessionProcessors
 from ai.backend.manager.services.session.service import SessionService, SessionServiceArgs
 from ai.backend.manager.services.vfolder.processors.vfolder import VFolderProcessors
+from ai.backend.testutils.action_validators import mock_virtual_scope_rbac_validators
 from ai.backend.testutils.fixtures import DomainFixtureData
 
 
@@ -109,7 +110,8 @@ async def session_processors(
         service=service,
         action_monitors=[],
         validators=ActionValidators(
-            rbac=RBACValidators(scope=AsyncMock(), single_entity=AsyncMock(), bulk=AsyncMock())
+            virtual_scope_rbac=mock_virtual_scope_rbac_validators(),
+            rbac=RBACValidators(scope=AsyncMock(), single_entity=AsyncMock(), bulk=AsyncMock()),
         ),
     )
 
@@ -121,7 +123,8 @@ def agent_processors_mock() -> AgentProcessors:
         service=AsyncMock(),
         action_monitors=[],
         validators=ActionValidators(
-            rbac=RBACValidators(scope=AsyncMock(), single_entity=AsyncMock(), bulk=AsyncMock())
+            virtual_scope_rbac=mock_virtual_scope_rbac_validators(),
+            rbac=RBACValidators(scope=AsyncMock(), single_entity=AsyncMock(), bulk=AsyncMock()),
         ),
     )
 
@@ -133,7 +136,8 @@ def vfolder_processors_mock() -> VFolderProcessors:
         service=AsyncMock(),
         action_monitors=[],
         validators=ActionValidators(
-            rbac=RBACValidators(scope=AsyncMock(), single_entity=AsyncMock(), bulk=AsyncMock())
+            virtual_scope_rbac=mock_virtual_scope_rbac_validators(),
+            rbac=RBACValidators(scope=AsyncMock(), single_entity=AsyncMock(), bulk=AsyncMock()),
         ),
     )
 

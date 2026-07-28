@@ -83,6 +83,7 @@ from ai.backend.manager.sokovan.scheduling_controller import (
     SchedulingController,
     SchedulingControllerArgs,
 )
+from ai.backend.testutils.action_validators import mock_virtual_scope_rbac_validators
 from ai.backend.testutils.fixtures import DomainFixtureData
 
 if TYPE_CHECKING:
@@ -161,11 +162,12 @@ async def session_processors(
         service=service,
         action_monitors=[],
         validators=ActionValidators(
+            virtual_scope_rbac=mock_virtual_scope_rbac_validators(),
             rbac=RBACValidators(
                 scope=AsyncMock(),
                 single_entity=real_single_entity_validator,
                 bulk=real_bulk_validator,
-            )
+            ),
         ),
     )
 
@@ -710,10 +712,11 @@ async def compute_session_processors(
         service=service,
         action_monitors=[],
         validators=ActionValidators(
+            virtual_scope_rbac=mock_virtual_scope_rbac_validators(),
             rbac=RBACValidators(
                 scope=AsyncMock(),
                 single_entity=real_single_entity_validator,
                 bulk=real_bulk_validator,
-            )
+            ),
         ),
     )

@@ -86,6 +86,7 @@ from ai.backend.manager.services.deployment.service import (
     _convert_deployment_info_to_legacy_data,
 )
 from ai.backend.manager.sokovan.deployment import DeploymentController
+from ai.backend.testutils.action_validators import mock_virtual_scope_rbac_validators
 
 
 class DeploymentServiceBaseFixtures:
@@ -127,6 +128,7 @@ class DeploymentServiceBaseFixtures:
             deployment_service,
             [],
             ActionValidators(
+                virtual_scope_rbac=mock_virtual_scope_rbac_validators(),
                 rbac=RBACValidators(
                     scope=MagicMock(spec=ScopeActionRBACValidator),
                     single_entity=MagicMock(spec=SingleEntityActionRBACValidator),

@@ -68,6 +68,7 @@ from ai.backend.manager.services.permission_contoller.processors import (
 )
 from ai.backend.manager.services.permission_contoller.service import PermissionControllerService
 from ai.backend.manager.services.processors import Processors
+from ai.backend.testutils.action_validators import mock_virtual_scope_rbac_validators
 from ai.backend.testutils.fixtures import DomainFixtureData
 
 if TYPE_CHECKING:
@@ -80,6 +81,7 @@ def _build_validators(
 ) -> ActionValidators:
     permission_repo = PermissionControllerRepository(database_engine)
     return ActionValidators(
+        virtual_scope_rbac=mock_virtual_scope_rbac_validators(),
         rbac=RBACValidators(
             scope=ScopeActionRBACValidator(permission_repo, config_provider),
             single_entity=SingleEntityActionRBACValidator(permission_repo, config_provider),

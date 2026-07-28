@@ -25,11 +25,24 @@ from ai.backend.common.message_queue.abc.queue import AbstractMessageQueue
 from ai.backend.common.plugin.event import EventDispatcherPluginContext
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
+from ai.backend.manager.actions.bulk.validator.rbac import (
+    VirtualScopeBulkActionRBACValidator,
+)
 from ai.backend.manager.actions.monitors.audit_log import AuditLogMonitor
 from ai.backend.manager.actions.monitors.prometheus import PrometheusMonitor
 from ai.backend.manager.actions.monitors.reporter import ReporterMonitor
+from ai.backend.manager.actions.scope.validator.rbac import (
+    VirtualScopeScopeActionRBACValidator,
+)
+from ai.backend.manager.actions.single_entity.validator.rbac import (
+    VirtualScopeSingleEntityActionRBACValidator,
+)
 from ai.backend.manager.actions.validators import ActionValidators
-from ai.backend.manager.actions.validators.rbac import LegacyRBACValidators, RBACValidators
+from ai.backend.manager.actions.validators.rbac import (
+    LegacyRBACValidators,
+    RBACValidators,
+    VirtualScopeRBACValidators,
+)
 from ai.backend.manager.actions.validators.rbac.bulk import BulkActionRBACValidator
 from ai.backend.manager.actions.validators.rbac.legacy import (
     LegacyScopeActionRBACValidator,
@@ -270,6 +283,17 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
             scope=LegacyScopeActionRBACValidator(permission_controller_repository),
             single_entity=LegacySingleEntityActionRBACValidator(permission_controller_repository),
         )
+        virtual_scope_rbac_validators = VirtualScopeRBACValidators(
+            scope=VirtualScopeScopeActionRBACValidator(
+                permission_controller_repository, config_provider
+            ),
+            single_entity=VirtualScopeSingleEntityActionRBACValidator(
+                permission_controller_repository, config_provider
+            ),
+            bulk=VirtualScopeBulkActionRBACValidator(
+                permission_controller_repository, config_provider
+            ),
+        )
 
         processors = await stack.enter_dependency(
             ProcessorsDependency(),
@@ -281,6 +305,7 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
                 validators=ActionValidators(
                     rbac=rbac_validators,
                     legacy_rbac=legacy_rbac_validators,
+                    virtual_scope_rbac=virtual_scope_rbac_validators,
                 ),
             ),
         )
