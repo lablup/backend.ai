@@ -125,7 +125,10 @@ class IdleCheckerDBSource:
         check_query = (
             sa.select(SessionIdleCheckRow)
             .join(SessionRow, SessionIdleCheckRow.session_id == SessionRow.id)
-            .where(SessionIdleCheckRow.last_status == IdleCheckPhase.IDLE_EXPIRED)
+            .where(
+                SessionIdleCheckRow.last_status == IdleCheckPhase.IDLE_EXPIRED,
+                SessionIdleCheckRow.expire_at.is_not(None),
+            )
         )
         async with self._ops.read_ops() as r:
             now = await r.current_time()
@@ -143,7 +146,7 @@ class IdleCheckerDBSource:
                 ExpiredIdleCheckData(
                     session_id=check_row.session_id,
                     checker_id=check_row.idle_checker_id,
-                    expire_at=check_row.expire_at,
+                    expire_at=cast(datetime, check_row.expire_at),
                     last_status=check_row.last_status,
                     last_message=check_row.last_message,
                 )
@@ -262,13 +265,12 @@ class IdleCheckerDBSource:
         self,
         pairs_to_create: Sequence[SessionIdleCheckPair],
         pairs_to_delete: Sequence[SessionIdleCheckPair],
-        now: datetime,
     ) -> None:
         async with self._ops.write_ops() as w:
             if pairs_to_create:
                 await w.bulk_create(
                     BulkCreator(
-                        specs=[SessionIdleCheckCreatorSpec(pair, now) for pair in pairs_to_create]
+                        specs=[SessionIdleCheckCreatorSpec(pair) for pair in pairs_to_create]
                     )
                 )
             if pairs_to_delete:

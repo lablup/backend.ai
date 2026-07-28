@@ -33,7 +33,6 @@ class IdleCheckAssignmentSyncReconcileInfo(BaseReconcilerInfo):
 
 @dataclass
 class IdleCheckAssignmentSyncResult(BaseReconcilerResult):
-    current_time: datetime
     pairs_to_create: list[SessionIdleCheckPair] = field(default_factory=list)
     pairs_to_delete: list[SessionIdleCheckPair] = field(default_factory=list)
 

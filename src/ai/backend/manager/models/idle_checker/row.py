@@ -108,8 +108,8 @@ class SessionIdleCheckRow(UpdatedAtMixin, Base):  # type: ignore[misc]
     idle_checker_id: Mapped[IdleCheckerID] = mapped_column(
         "idle_checker_id", GUID(IdleCheckerID), nullable=False
     )
-    expire_at: Mapped[datetime] = mapped_column(
-        "expire_at", sa.DateTime(timezone=True), nullable=False
+    expire_at: Mapped[datetime | None] = mapped_column(
+        "expire_at", sa.DateTime(timezone=True), nullable=True
     )
     last_status: Mapped[IdleCheckPhase] = mapped_column(
         "last_status", StrEnumType(IdleCheckPhase), nullable=False

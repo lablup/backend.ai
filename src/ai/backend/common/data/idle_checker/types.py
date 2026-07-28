@@ -28,11 +28,10 @@ class SessionLifetimeSpec(BackendAISchema):
     """Config for ``CheckerType.SESSION_LIFETIME``."""
 
     max_lifetime_seconds: int = Field(
-        ge=0,
+        ge=1,
         description=(
             "Maximum time in seconds that a session may remain running. "
-            "Zero disables this checker definition. This is the sole lifetime limit "
-            "used by the reconciler idle checker."
+            "This is the sole lifetime limit used by the reconciler idle checker."
         ),
     )
 
@@ -41,10 +40,10 @@ class NetworkTimeoutSpec(BackendAISchema):
     """Config for ``CheckerType.NETWORK_TIMEOUT``."""
 
     max_network_inactivity_seconds: int = Field(
-        ge=0,
+        ge=1,
         description=(
             "Maximum time in seconds that an interactive session may have neither recent "
-            "network access nor an active connection. Zero disables this checker definition."
+            "network access nor an active connection."
         ),
     )
 

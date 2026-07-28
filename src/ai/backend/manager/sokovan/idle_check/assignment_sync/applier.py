@@ -45,5 +45,4 @@ class IdleCheckAssignmentSyncApplier(
         await self._repository.sync_session_idle_check_assignments(
             result.pairs_to_create,
             result.pairs_to_delete,
-            result.current_time,
         )
