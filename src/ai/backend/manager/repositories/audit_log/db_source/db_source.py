@@ -15,8 +15,10 @@ from ai.backend.manager.models.audit_log import AuditLogRow
 from ai.backend.manager.models.scopes import SearchScope
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
+    BulkCreator,
     Creator,
     execute_batch_querier,
+    execute_bulk_creator,
     execute_creator,
 )
 
@@ -51,6 +53,13 @@ class AuditLogDBSource:
         async with self._db.begin_session() as db_sess:
             result = await execute_creator(db_sess, creator)
             return result.row.to_dataclass()
+
+    @audit_log_db_source_resilience.apply()
+    async def bulk_create(self, bulk_creator: BulkCreator[AuditLogRow]) -> list[AuditLogData]:
+        """Insert multiple audit-log rows in a single bulk operation."""
+        async with self._db.begin_session() as db_sess:
+            result = await execute_bulk_creator(db_sess, bulk_creator)
+            return [row.to_dataclass() for row in result.rows]
 
     @audit_log_db_source_resilience.apply()
     async def search(

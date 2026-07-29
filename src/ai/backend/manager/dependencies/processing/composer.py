@@ -25,6 +25,9 @@ from ai.backend.common.message_queue.abc.queue import AbstractMessageQueue
 from ai.backend.common.plugin.event import EventDispatcherPluginContext
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
+from ai.backend.manager.actions.bulk.monitor.audit_log import BulkActionAuditLogMonitor
+from ai.backend.manager.actions.bulk.monitor.prometheus import BulkActionPrometheusMonitor
+from ai.backend.manager.actions.bulk.monitor.reporter import BulkActionReporterMonitor
 from ai.backend.manager.actions.bulk.validator.rbac import (
     VirtualScopeBulkActionRBACValidator,
 )
@@ -257,6 +260,11 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
                 SingleEntityActionReporterMonitor(reporter_hub),
                 SingleEntityActionPrometheusMonitor(),
                 SingleEntityActionAuditLogMonitor(audit_log_repository),
+            ],
+            bulk=[
+                BulkActionReporterMonitor(reporter_hub),
+                BulkActionPrometheusMonitor(),
+                BulkActionAuditLogMonitor(audit_log_repository),
             ],
             scope=[
                 ScopeActionReporterMonitor(reporter_hub),
