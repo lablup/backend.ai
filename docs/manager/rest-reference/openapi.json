@@ -1271,6 +1271,144 @@
         "title": "ScopedSearchAppConfigFragmentInput",
         "type": "object"
       },
+      "AppConfigScopeRef": {
+        "description": "One app config scope: its kind, and its owner id for the kinds that have one.",
+        "properties": {
+          "scope_type": {
+            "$ref": "#/components/schemas/AppConfigScopeType",
+            "description": "Scope the fragments are written at (public | domain | user)."
+          },
+          "scope_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Scope identifier: the domain id or the user id; null for public scope.",
+            "title": "Scope Id"
+          }
+        },
+        "required": [
+          "scope_type"
+        ],
+        "title": "AppConfigScopeRef",
+        "type": "object"
+      },
+      "ScopedAppConfigFragmentsByNamesInput": {
+        "description": "Read the fragments written at one scope for the given config names.",
+        "properties": {
+          "scope": {
+            "$ref": "#/components/schemas/AppConfigScopeRef",
+            "description": "Scope whose fragments to read."
+          },
+          "config_names": {
+            "description": "Config names whose fragments to read. Answered position by position, null where the scope holds no fragment for that name.",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Config Names",
+            "type": "array"
+          }
+        },
+        "required": [
+          "scope",
+          "config_names"
+        ],
+        "title": "ScopedAppConfigFragmentsByNamesInput",
+        "type": "object"
+      },
+      "AppConfigFragmentUpsertItem": {
+        "description": "One (config_name, config) pair to upsert at the request's scope.",
+        "properties": {
+          "config_name": {
+            "description": "Registered config name.",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Config Name",
+            "type": "string"
+          },
+          "config": {
+            "additionalProperties": true,
+            "description": "The fragment's JSON config document.",
+            "title": "Config",
+            "type": "object"
+          }
+        },
+        "required": [
+          "config_name",
+          "config"
+        ],
+        "title": "AppConfigFragmentUpsertItem",
+        "type": "object"
+      },
+      "ScopedUpsertAppConfigFragmentsInput": {
+        "description": "Upsert many fragments at one scope; the scope is named once for all items.",
+        "properties": {
+          "scope": {
+            "$ref": "#/components/schemas/AppConfigScopeRef",
+            "description": "Scope the fragments are written at."
+          },
+          "items": {
+            "description": "The (config_name, config) pairs to upsert.",
+            "items": {
+              "$ref": "#/components/schemas/AppConfigFragmentUpsertItem"
+            },
+            "minItems": 1,
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "scope",
+          "items"
+        ],
+        "title": "ScopedUpsertAppConfigFragmentsInput",
+        "type": "object"
+      },
+      "MyAppConfigFragmentsByNamesInput": {
+        "description": "Read the current user's own user-scope fragments for the given config names.",
+        "properties": {
+          "config_names": {
+            "description": "Config names whose fragments to read. Answered position by position, null where the scope holds no fragment for that name.",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Config Names",
+            "type": "array"
+          }
+        },
+        "required": [
+          "config_names"
+        ],
+        "title": "MyAppConfigFragmentsByNamesInput",
+        "type": "object"
+      },
+      "MyUpsertAppConfigFragmentsInput": {
+        "description": "Upsert many fragments at the current user's own user scope.\n\nThe scope is the acting user, resolved server-side, so it carries no scope fields.",
+        "properties": {
+          "items": {
+            "description": "The (config_name, config) pairs to upsert.",
+            "items": {
+              "$ref": "#/components/schemas/AppConfigFragmentUpsertItem"
+            },
+            "minItems": 1,
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "MyUpsertAppConfigFragmentsInput",
+        "type": "object"
+      },
       "UpdateAppConfigFragmentInput": {
         "description": "Input for updating one app config fragment's config document.\n\nThe target fragment is identified by the request path, not by this body.",
         "properties": {
@@ -41431,6 +41569,122 @@
         },
         "parameters": [],
         "description": "Search the fragments written at one scope (auth required, RBAC-authorized).\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/app-config-fragments/scoped/by-names": {
+      "post": {
+        "operationId": "v2/app-config-fragments.scoped_fragments_by_names",
+        "tags": [
+          "v2/app-config-fragments"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScopedAppConfigFragmentsByNamesInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Read one scope's fragments for the given config names (auth, RBAC-authorized).\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/app-config-fragments/scoped/bulk-upsert": {
+      "post": {
+        "operationId": "v2/app-config-fragments.scoped_bulk_upsert",
+        "tags": [
+          "v2/app-config-fragments"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScopedUpsertAppConfigFragmentsInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Upsert many fragments at one scope, all-or-nothing (auth, RBAC-authorized).\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/app-config-fragments/my/by-names": {
+      "post": {
+        "operationId": "v2/app-config-fragments.my_fragments_by_names",
+        "tags": [
+          "v2/app-config-fragments"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MyAppConfigFragmentsByNamesInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Read the caller's own user-scope fragments for the given config names (auth).\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/app-config-fragments/my/bulk-upsert": {
+      "post": {
+        "operationId": "v2/app-config-fragments.my_bulk_upsert",
+        "tags": [
+          "v2/app-config-fragments"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MyUpsertAppConfigFragmentsInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Upsert many fragments at the caller's own user scope, all-or-nothing (auth).\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/app-config-fragments/{fragment_id}": {
