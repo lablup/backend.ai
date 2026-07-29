@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any, override
@@ -149,10 +148,13 @@ class ScalingGroupSchedulerConfigUpdaterSpec(UpdaterSpec[ScalingGroupRow]):
                 "mode": preemption.mode.value,
                 "preemption_min_runtime": preemption.preemption_min_runtime.total_seconds(),
             }
+            # Bind the mapping itself: a pre-serialized str would be JSON-encoded a
+            # second time by the JSONB bind processor and land as a JSON string,
+            # which then fails ScalingGroupOpts validation on read-back.
             to_update["scheduler_opts"] = func.jsonb_set(
                 sa.literal_column("scheduler_opts"),
                 pg_array(["preemption"]),
-                cast(json.dumps(preemption_dict), JSONB),
+                cast(preemption_dict, JSONB),
             )
         return to_update
 
