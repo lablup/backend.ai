@@ -49,6 +49,7 @@ from ai.backend.manager.actions.single_entity.base import BaseSingleEntityAction
 from ai.backend.manager.actions.single_entity.validator.rbac import (
     VirtualScopeSingleEntityActionRBACValidator,
 )
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.agent import AgentRow
@@ -115,6 +116,11 @@ class _ProjectCreateScopeAction(BaseScopeAction):
 
     @classmethod
     @override
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.CREATE
+
+    @classmethod
+    @override
     def required_permission(cls) -> Permission:
         return Permission.CREATE
 
@@ -129,6 +135,11 @@ class _VfolderUpdateAction(BaseSingleEntityAction):
     @override
     def entity_type(cls) -> EntityType:
         return EntityType("vfolder")
+
+    @classmethod
+    @override
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPDATE
 
     @override
     def entity_id(self) -> EntityID:
@@ -150,6 +161,11 @@ class _BulkVfolderUpdateAction(BaseBulkAction):
     @override
     def entity_type(cls) -> EntityType:
         return EntityType("vfolder")
+
+    @classmethod
+    @override
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPDATE
 
     @override
     def entity_ids(self) -> Sequence[EntityID]:
