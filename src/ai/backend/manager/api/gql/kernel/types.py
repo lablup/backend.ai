@@ -81,6 +81,7 @@ class KernelV2StatusGQL(StrEnum):
     """GraphQL enum for kernel status."""
 
     PENDING = "PENDING"
+    RESERVED = "RESERVED"
     SCHEDULED = "SCHEDULED"
     PREPARING = "PREPARING"
     PREPARED = "PREPARED"
