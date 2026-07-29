@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import uuid
 from functools import lru_cache
 
 from ai.backend.common.data.permission.types import ScopeType
@@ -32,7 +31,6 @@ from ai.backend.manager.actions.action.types import SearchableActionTarget
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.idle_checker.types import IdleCheckerAssignmentData
-from ai.backend.manager.errors.idle_checker import InvalidIdleCheckerAssignmentScopeId
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.idle_checker.conditions import IdleCheckerAssignmentConditions
 from ai.backend.manager.models.idle_checker.orders import IdleCheckerAssignmentOrders
@@ -78,19 +76,12 @@ def _get_idle_checker_assignment_pagination_spec() -> PaginationSpec:
 class IdleCheckerAssignmentAdapter(BaseAdapter):
     """Adapter for idle checker assignment domain operations."""
 
-    @staticmethod
-    def _parse_scope_id(scope_id: str) -> uuid.UUID:
-        try:
-            return uuid.UUID(scope_id)
-        except ValueError as e:
-            raise InvalidIdleCheckerAssignmentScopeId(scope_id) from e
-
     async def admin_create(
         self, input: CreateIdleCheckerAssignmentInput
     ) -> CreateIdleCheckerAssignmentPayload:
         spec = IdleCheckerAssignmentCreatorSpec(
             scope_type=ScopeType(input.scope.scope_type.value),
-            scope_id=self._parse_scope_id(input.scope.scope_id),
+            scope_id=input.scope.scope_id,
             idle_checker_id=input.idle_checker_id,
             enabled=input.enabled,
         )
@@ -177,7 +168,7 @@ class IdleCheckerAssignmentAdapter(BaseAdapter):
             targets.append(
                 IdleCheckerAssignmentScopeTarget(
                     scope_type=ScopeType(ref.scope_type.value),
-                    scope_id=self._parse_scope_id(ref.scope_id),
+                    scope_id=ref.scope_id,
                 )
             )
         action_result = (
@@ -278,7 +269,7 @@ class IdleCheckerAssignmentAdapter(BaseAdapter):
         return IdleCheckerAssignmentNode(
             id=IdleCheckerAssignmentID(data.id),
             scope_type=IdleCheckerScopeTypeDTO(data.scope_type.value),
-            scope_id=str(data.scope_id),
+            scope_id=data.scope_id,
             idle_checker_id=data.idle_checker_id,
             enabled=data.enabled,
             created_at=data.created_at,

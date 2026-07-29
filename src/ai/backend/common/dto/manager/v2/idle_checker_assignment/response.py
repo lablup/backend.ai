@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from uuid import UUID
 
 from pydantic import Field
 
@@ -12,7 +13,7 @@ from ai.backend.common.identifier.idle_checker import IdleCheckerAssignmentID, I
 class IdleCheckerAssignmentNode(BaseResponseModel):
     id: IdleCheckerAssignmentID
     scope_type: IdleCheckerScopeTypeDTO
-    scope_id: str
+    scope_id: UUID
     idle_checker_id: IdleCheckerID
     enabled: bool
     created_at: datetime

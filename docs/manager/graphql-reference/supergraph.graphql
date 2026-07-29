@@ -8019,7 +8019,7 @@ type IdleCheckerAssignment implements Node
   scopeType: IdleCheckerScopeType!
 
   """Scope identifier, interpreted according to the scope type."""
-  scopeId: String!
+  scopeId: UUID!
 
   """ID of the bound idle checker."""
   idleCheckerId: UUID!
@@ -8232,7 +8232,7 @@ input IdleCheckerScopeRef
   scopeType: IdleCheckerScopeType!
 
   """Scope identifier, interpreted according to the scope type."""
-  scopeId: String!
+  scopeId: UUID!
 }
 
 """

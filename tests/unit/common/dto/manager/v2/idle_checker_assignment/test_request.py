@@ -14,11 +14,13 @@ from ai.backend.common.dto.manager.v2.idle_checker_assignment.types import IdleC
 from ai.backend.common.exception import BackendAISchemaValidationFailed
 from ai.backend.common.identifier.idle_checker import IdleCheckerID
 
+_DOMAIN_SCOPE_ID = uuid.UUID("7b56b1f4-2936-4d29-9db9-621cc5b1cf8f")
+
 
 def _domain_scope_ref() -> IdleCheckerScopeRefDTO:
     return IdleCheckerScopeRefDTO(
         scope_type=IdleCheckerScopeTypeDTO.DOMAIN,
-        scope_id="default",
+        scope_id=_DOMAIN_SCOPE_ID,
     )
 
 
@@ -27,14 +29,14 @@ class TestIdleCheckerScopeRef:
         ref = _domain_scope_ref()
 
         assert ref.scope_type is IdleCheckerScopeTypeDTO.DOMAIN
-        assert ref.scope_id == "default"
+        assert ref.scope_id == _DOMAIN_SCOPE_ID
 
-    def test_rejects_empty_scope_id(self) -> None:
+    def test_rejects_non_uuid_scope_id(self) -> None:
         with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
-            IdleCheckerScopeRefDTO(
-                scope_type=IdleCheckerScopeTypeDTO.DOMAIN,
-                scope_id="",
-            )
+            IdleCheckerScopeRefDTO.model_validate({
+                "scope_type": IdleCheckerScopeTypeDTO.DOMAIN,
+                "scope_id": "default",
+            })
 
 
 class TestIdleCheckerAssignmentScope:

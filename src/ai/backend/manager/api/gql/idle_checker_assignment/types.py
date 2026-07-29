@@ -95,7 +95,7 @@ class IdleCheckerScopeTypeGQL(StrEnum):
 )
 class IdleCheckerScopeRefGQL(PydanticInputMixin[IdleCheckerScopeRefDTO]):
     scope_type: IdleCheckerScopeTypeGQL = gql_field(description="Kind of the scope.")
-    scope_id: str = gql_field(
+    scope_id: UUID = gql_field(
         description="Scope identifier, interpreted according to the scope type."
     )
 
@@ -132,7 +132,7 @@ class IdleCheckerAssignmentGQL(PydanticNodeMixin[IdleCheckerAssignmentNode]):
         description="Relay global node identifier backed by the assignment's UUID."
     )
     scope_type: IdleCheckerScopeTypeGQL = gql_field(description="Kind of the bound scope.")
-    scope_id: str = gql_field(
+    scope_id: UUID = gql_field(
         description="Scope identifier, interpreted according to the scope type."
     )
     idle_checker_id: UUID = gql_field(description="ID of the bound idle checker.")

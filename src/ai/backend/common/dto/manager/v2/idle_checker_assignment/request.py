@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Self
+from uuid import UUID
 
 from pydantic import Field
 
@@ -22,8 +23,7 @@ class IdleCheckerScopeRefDTO(BaseRequestModel):
     """A typed (scope_type, scope_id) pair referencing one scope."""
 
     scope_type: IdleCheckerScopeTypeDTO = Field(description="Kind of the scope.")
-    scope_id: str = Field(
-        min_length=1,
+    scope_id: UUID = Field(
         description="Scope identifier, interpreted according to the scope type.",
     )
 

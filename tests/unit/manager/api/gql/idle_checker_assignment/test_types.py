@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import uuid
+
 from ai.backend.common.dto.manager.v2.idle_checker_assignment.types import IdleCheckerScopeTypeDTO
 from ai.backend.manager.api.gql.idle_checker_assignment.types import (
     IdleCheckerAssignmentScopeGQL,
@@ -14,7 +16,7 @@ class TestIdleCheckerAssignmentInputs:
             items=[
                 IdleCheckerScopeRefGQL(
                     scope_type=IdleCheckerScopeTypeGQL.PROJECT,
-                    scope_id="7b56b1f4-2936-4d29-9db9-621cc5b1cf8f",
+                    scope_id=uuid.UUID("7b56b1f4-2936-4d29-9db9-621cc5b1cf8f"),
                 ),
             ],
         )
@@ -23,4 +25,4 @@ class TestIdleCheckerAssignmentInputs:
 
         assert len(dto.items) == 1
         assert dto.items[0].scope_type == IdleCheckerScopeTypeDTO.PROJECT
-        assert dto.items[0].scope_id == "7b56b1f4-2936-4d29-9db9-621cc5b1cf8f"
+        assert dto.items[0].scope_id == uuid.UUID("7b56b1f4-2936-4d29-9db9-621cc5b1cf8f")

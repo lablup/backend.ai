@@ -10741,7 +10741,7 @@
           },
           "scope_id": {
             "description": "Scope identifier, interpreted according to the scope type.",
-            "minLength": 1,
+            "format": "uuid",
             "title": "Scope Id",
             "type": "string"
           }
