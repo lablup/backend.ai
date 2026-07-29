@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-from ai.backend.manager.actions.monitors.monitor import ActionMonitor
+from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.validators import ActionValidators
 from ai.backend.manager.dependencies.processing.processors import (
     ProcessorsDependency,
@@ -23,7 +23,7 @@ class TestProcessorsDependency:
         mock_create_processors.return_value = mock_processors
 
         mock_service_args = MagicMock()
-        mock_monitors: list[ActionMonitor] = [MagicMock(), MagicMock()]
+        mock_monitors = ActionMonitors(legacy=[MagicMock(), MagicMock()])
 
         dependency = ProcessorsDependency()
         processors_input = ProcessorsProviderInput(
