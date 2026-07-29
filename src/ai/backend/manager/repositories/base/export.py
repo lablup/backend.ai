@@ -12,12 +12,11 @@ from enum import StrEnum
 from typing import TYPE_CHECKING, Any
 
 import sqlalchemy as sa
+from sqlalchemy.orm.attributes import InstrumentedAttribute
 
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 
 if TYPE_CHECKING:
-    from sqlalchemy.orm.attributes import InstrumentedAttribute
-
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 
@@ -42,6 +41,10 @@ class ExportFieldType(StrEnum):
 
 # Formatter type definition - converts any value to string for CSV
 type ExportFormatter = Callable[[Any], str]
+
+# Selectable expression behind a field: either an ORM column attribute or a
+# correlated scalar subquery aggregating a 1:N relation into a single value.
+type ExportColumn = InstrumentedAttribute[Any] | sa.ColumnElement[Any]
 
 
 @dataclass(frozen=True)
@@ -72,16 +75,21 @@ class ExportFieldDef:
         name: Name displayed in CSV header
         description: Field description (displayed in client UI)
         field_type: Field type for client display
-        column: ORM column reference for SELECT query building
+        column: Selectable expression for SELECT query building — an ORM column
+            attribute, or a correlated scalar subquery for a 1:N relation
         formatter: Custom formatter (None uses default conversion)
         joins: Set of JoinDef required to access this field (None = no joins needed)
+
+    Only N:1 relations may be declared through ``joins``. A 1:N relation joined
+    into the main query multiplies the exported rows, so such a field must carry
+    a correlated aggregate in ``column`` instead and leave ``joins`` unset.
     """
 
     key: str
     name: str
     description: str
     field_type: ExportFieldType
-    column: InstrumentedAttribute[Any]
+    column: ExportColumn
     formatter: ExportFormatter | None = None
     joins: tuple[JoinDef, ...] | frozenset[JoinDef] | None = None
 
