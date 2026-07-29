@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
-from collections.abc import Iterable, Sequence
+from collections.abc import Collection, Iterable, Sequence
 from dataclasses import dataclass, field
 
 from ai.backend.common.types import SlotName
@@ -36,7 +36,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 class DeploymentRevisionValidationContext:
     """Read-only global state the validator chain consumes."""
 
-    required_slot_names: Iterable[SlotName] = field(default_factory=frozenset)
+    required_slot_names: Collection[SlotName] = field(default_factory=frozenset)
 
 
 class DeploymentRevisionValidatorRule(ABC):

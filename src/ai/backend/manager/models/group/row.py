@@ -486,7 +486,7 @@ async def resolve_groups(
     db_conn: SAConnection,
     domain_name: str,
     values: Iterable[uuid.UUID],
-) -> Iterable[uuid.UUID]: ...
+) -> Sequence[uuid.UUID]: ...
 
 
 @overload
@@ -494,14 +494,14 @@ async def resolve_groups(
     db_conn: SAConnection,
     domain_name: str,
     values: Iterable[str],
-) -> Iterable[uuid.UUID]: ...
+) -> Sequence[uuid.UUID]: ...
 
 
 async def resolve_groups(
     db_conn: SAConnection,
     domain_name: str,
     values: Iterable[uuid.UUID] | Iterable[str],
-) -> Iterable[uuid.UUID]:
+) -> Sequence[uuid.UUID]:
     listed_val = [*values]
     match listed_val:
         case [uuid.UUID(), *_]:

@@ -19,6 +19,7 @@ from collections.abc import (
     AsyncGenerator,
     Awaitable,
     Callable,
+    Collection,
     Coroutine,
     Generator,
     Iterable,
@@ -300,7 +301,7 @@ P = ParamSpec("P")
 KernelIdContainerPair = tuple[KernelId, Container]
 
 
-def update_additional_gids(environ: MutableMapping[str, str], gids: Iterable[int]) -> None:
+def update_additional_gids(environ: MutableMapping[str, str], gids: Collection[int]) -> None:
     if not gids:
         return
     if orig_additional_gids := environ.get("ADDITIONAL_GIDS"):
