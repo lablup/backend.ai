@@ -7,6 +7,7 @@ from collections.abc import Collection
 import sqlalchemy as sa
 
 from ai.backend.common.data.filter_specs import StringMatchSpec
+from ai.backend.common.identifier.resource_group import ResourceGroupID
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.condition_utils import make_string_in_factory
 from ai.backend.manager.models.scaling_group import (
@@ -19,6 +20,13 @@ __all__ = ("ScalingGroupConditions",)
 
 class ScalingGroupConditions:
     """Query conditions for scaling groups."""
+
+    @staticmethod
+    def by_ids(ids: Collection[ResourceGroupID]) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return ScalingGroupRow.id.in_(ids)
+
+        return inner
 
     @staticmethod
     def by_name_contains(spec: StringMatchSpec) -> QueryCondition:

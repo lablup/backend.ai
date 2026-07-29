@@ -119,6 +119,7 @@ class EntityType(enum.StrEnum):
     EXPORT = "export"
     GROUP = "group"
     IDLE_CHECKER = "idle_checker"
+    IDLE_CHECKER_ASSIGNMENT = "idle_checker_assignment"
     KERNEL = "kernel"
     KEYPAIR = "keypair"
     LOGIN_CLIENT_TYPE = "login_client_type"
@@ -369,6 +370,7 @@ class ScopeType(enum.StrEnum):
     APP_CONFIG_FRAGMENT = "app_config_fragment"
     KEYPAIR = "keypair"
     KEYPAIR_RESOURCE_POLICY = "keypair_resource_policy"
+    IDLE_CHECKER_ASSIGNMENT = "idle_checker_assignment"
 
     def to_element(self) -> RBACElementType:
         from ai.backend.common.exception import RBACTypeConversionError
@@ -405,6 +407,7 @@ class RBACElementType(enum.StrEnum):
     KEYPAIR = "keypair"
     NOTIFICATION_CHANNEL = "notification_channel"
     NETWORK = "network"
+    IDLE_CHECKER_ASSIGNMENT = "idle_checker_assignment"
     RESOURCE_GROUP = "resource_group"
     CONTAINER_REGISTRY = "container_registry"
     STORAGE_HOST = "storage_host"
