@@ -10,7 +10,10 @@ from ai.backend.common.api_handlers import SENTINEL
 from ai.backend.common.data.idle_checker.types import (
     CheckerType,
     IdleCheckerSpec,
+    NetworkTimeoutSpec,
     SessionLifetimeSpec,
+    UtilizationSpec,
+    UtilizationThresholdEntry,
 )
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.dto.manager.v2.idle_checker.request import (
@@ -20,20 +23,22 @@ from ai.backend.common.dto.manager.v2.idle_checker.request import (
     IdleCheckerSpecInputDTO,
     PurgeIdleCheckerInput,
     SearchIdleCheckersInput,
-    SessionLifetimeSpecInputDTO,
     UpdateIdleCheckerInput,
+    UtilizationSpecInputDTO,
 )
 from ai.backend.common.dto.manager.v2.idle_checker.response import (
     CreateIdleCheckerPayload,
     IdleCheckerNode,
     IdleCheckerSpecInfo,
+    NetworkTimeoutSpecInfo,
     PurgeIdleCheckerPayload,
     SearchIdleCheckerPayload,
     SessionLifetimeSpecInfo,
     UpdateIdleCheckerPayload,
+    UtilizationSpecInfo,
+    UtilizationThresholdInfo,
 )
 from ai.backend.common.dto.manager.v2.idle_checker.types import (
-    IdleCheckerInputTypeDTO,
     IdleCheckerOrderField,
     IdleCheckerTypeDTO,
 )
@@ -90,7 +95,7 @@ class IdleCheckerAdapter(BaseAdapter):
                 description=input.description,
                 target_session_types=input.target_session_types,
                 initial_grace_period_seconds=input.initial_grace_period_seconds,
-                spec=self._build_spec(input.checker_type, input.checker_spec),
+                spec=self._build_spec(input.checker_spec),
             )
         )
         action_result = await self._processors.idle_checker.create.wait_for_complete(
@@ -183,7 +188,6 @@ class IdleCheckerAdapter(BaseAdapter):
 
     @staticmethod
     def _data_to_node(data: IdleCheckerData) -> IdleCheckerNode:
-        session_lifetime = cast(SessionLifetimeSpec, data.spec.session_lifetime)
         return IdleCheckerNode(
             id=data.id,
             name=data.name,
@@ -191,29 +195,73 @@ class IdleCheckerAdapter(BaseAdapter):
             checker_type=IdleCheckerTypeDTO(data.checker_type.value),
             target_session_types=data.target_session_types,
             initial_grace_period_seconds=data.initial_grace_period_seconds,
-            spec=IdleCheckerSpecInfo(
-                type=IdleCheckerTypeDTO(data.spec.type.value),
-                session_lifetime=SessionLifetimeSpecInfo(
-                    max_lifetime_seconds=session_lifetime.max_lifetime_seconds
-                ),
-            ),
+            spec=IdleCheckerAdapter._spec_to_info(data.spec),
             created_at=data.created_at,
             updated_at=data.updated_at,
         )
 
     @staticmethod
-    def _build_spec(
-        checker_type: IdleCheckerInputTypeDTO,
-        checker_spec: IdleCheckerSpecInputDTO,
-    ) -> IdleCheckerSpec:
-        session_lifetime = cast(
-            SessionLifetimeSpecInputDTO,
-            checker_spec.session_lifetime,
-        )
+    def _spec_to_info(spec: IdleCheckerSpec) -> IdleCheckerSpecInfo:
+        checker_type = IdleCheckerTypeDTO(spec.type.value)
+        match spec.type:
+            case CheckerType.SESSION_LIFETIME:
+                session_lifetime = cast(SessionLifetimeSpec, spec.session_lifetime)
+                return IdleCheckerSpecInfo(
+                    type=checker_type,
+                    session_lifetime=SessionLifetimeSpecInfo(
+                        max_lifetime_seconds=session_lifetime.max_lifetime_seconds
+                    ),
+                )
+            case CheckerType.NETWORK_TIMEOUT:
+                network = cast(NetworkTimeoutSpec, spec.network)
+                return IdleCheckerSpecInfo(
+                    type=checker_type,
+                    network=NetworkTimeoutSpecInfo(
+                        max_network_inactivity_seconds=network.max_network_inactivity_seconds
+                    ),
+                )
+            case CheckerType.UTILIZATION:
+                utilization = cast(UtilizationSpec, spec.utilization)
+                return IdleCheckerSpecInfo(
+                    type=checker_type,
+                    utilization=UtilizationSpecInfo(
+                        max_underutilized_duration_seconds=(
+                            utilization.max_underutilized_duration_seconds
+                        ),
+                        threshold=UtilizationThresholdInfo(
+                            preset_id=utilization.threshold.preset_id,
+                            threshold=utilization.threshold.threshold,
+                        ),
+                    ),
+                )
+
+    @staticmethod
+    def _build_spec(checker_spec: IdleCheckerSpecInputDTO) -> IdleCheckerSpec:
+        if checker_spec.session_lifetime is not None:
+            session_lifetime = checker_spec.session_lifetime
+            return IdleCheckerSpec(
+                type=CheckerType.SESSION_LIFETIME,
+                session_lifetime=SessionLifetimeSpec(
+                    max_lifetime_seconds=session_lifetime.max_lifetime_seconds
+                ),
+            )
+        if checker_spec.network is not None:
+            network = checker_spec.network
+            return IdleCheckerSpec(
+                type=CheckerType.NETWORK_TIMEOUT,
+                network=NetworkTimeoutSpec(
+                    max_network_inactivity_seconds=network.max_network_inactivity_seconds
+                ),
+            )
+        utilization = cast(UtilizationSpecInputDTO, checker_spec.utilization)
         return IdleCheckerSpec(
-            type=CheckerType(checker_type.value),
-            session_lifetime=SessionLifetimeSpec(
-                max_lifetime_seconds=session_lifetime.max_lifetime_seconds
+            type=CheckerType.UTILIZATION,
+            utilization=UtilizationSpec(
+                max_underutilized_duration_seconds=(utilization.max_underutilized_duration_seconds),
+                threshold=UtilizationThresholdEntry(
+                    preset_id=utilization.threshold.preset_id,
+                    threshold=utilization.threshold.threshold,
+                ),
             ),
         )
 
@@ -224,12 +272,7 @@ class IdleCheckerAdapter(BaseAdapter):
     ) -> OptionalState[IdleCheckerSpec]:
         if checker_spec is None:
             return OptionalState.nop()
-        return OptionalState.update(
-            cls._build_spec(
-                IdleCheckerInputTypeDTO.SESSION_LIFETIME,
-                checker_spec,
-            )
-        )
+        return OptionalState.update(cls._build_spec(checker_spec))
 
     def _convert_filter(self, filter_: IdleCheckerFilter) -> list[QueryCondition]:
         conditions: list[QueryCondition] = []

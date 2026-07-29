@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from datetime import datetime
+from decimal import Decimal
 from enum import StrEnum
 from typing import Any, Self, cast, override
 from uuid import UUID
@@ -20,7 +21,10 @@ from ai.backend.common.dto.manager.v2.idle_checker.request import (
 )
 from ai.backend.common.dto.manager.v2.idle_checker.request import (
     IdleCheckerSpecInputDTO,
+    NetworkTimeoutSpecInputDTO,
     SessionLifetimeSpecInputDTO,
+    UtilizationSpecInputDTO,
+    UtilizationThresholdInputDTO,
 )
 from ai.backend.common.dto.manager.v2.idle_checker.request import (
     PurgeIdleCheckerInput as PurgeIdleCheckerInputDTO,
@@ -34,7 +38,10 @@ from ai.backend.common.dto.manager.v2.idle_checker.response import (
 from ai.backend.common.dto.manager.v2.idle_checker.response import (
     IdleCheckerNode,
     IdleCheckerSpecInfo,
+    NetworkTimeoutSpecInfo,
     SessionLifetimeSpecInfo,
+    UtilizationSpecInfo,
+    UtilizationThresholdInfo,
 )
 from ai.backend.common.dto.manager.v2.idle_checker.response import (
     PurgeIdleCheckerPayload as PurgeIdleCheckerPayloadDTO,
@@ -76,6 +83,8 @@ from ai.backend.manager.api.gql.utils import check_admin_only
 )
 class IdleCheckerTypeGQL(StrEnum):
     SESSION_LIFETIME = "session_lifetime"
+    NETWORK_TIMEOUT = "network_timeout"
+    UTILIZATION = "utilization"
 
 
 @gql_enum(
@@ -90,6 +99,8 @@ class IdleCheckerTypeGQL(StrEnum):
 )
 class IdleCheckerInputTypeGQL(StrEnum):
     SESSION_LIFETIME = "session_lifetime"
+    NETWORK_TIMEOUT = "network_timeout"
+    UTILIZATION = "utilization"
 
 
 @gql_pydantic_type(
@@ -110,18 +121,68 @@ class SessionLifetimeIdleCheckerSpecGQL(PydanticOutputMixin[SessionLifetimeSpecI
 @gql_pydantic_type(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
-        description=(
-            "Contains the settings used by an idle checker implementation. "
-            "This API version exposes session-lifetime settings only."
-        ),
+        description="Configures the maximum period without active network traffic.",
+    ),
+    model=NetworkTimeoutSpecInfo,
+    name="NetworkTimeoutIdleCheckerSpec",
+)
+class NetworkTimeoutIdleCheckerSpecGQL(PydanticOutputMixin[NetworkTimeoutSpecInfo]):
+    max_network_inactivity_seconds: int = gql_field(
+        description="Maximum network inactivity period in seconds."
+    )
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Defines a preset-backed utilization threshold.",
+    ),
+    model=UtilizationThresholdInfo,
+    name="UtilizationIdleCheckerThreshold",
+)
+class UtilizationIdleCheckerThresholdGQL(PydanticOutputMixin[UtilizationThresholdInfo]):
+    preset_id: UUID = gql_field(description="Prometheus query preset ID.")
+    threshold: Decimal = gql_field(description="Underutilization threshold.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Configures how long a session may remain underutilized.",
+    ),
+    model=UtilizationSpecInfo,
+    name="UtilizationIdleCheckerSpec",
+)
+class UtilizationIdleCheckerSpecGQL(PydanticOutputMixin[UtilizationSpecInfo]):
+    max_underutilized_duration_seconds: int = gql_field(
+        description="Maximum underutilized duration in seconds."
+    )
+    threshold: UtilizationIdleCheckerThresholdGQL = gql_field(
+        description="Preset-backed utilization threshold."
+    )
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Contains the settings used by an idle checker implementation.",
     ),
     model=IdleCheckerSpecInfo,
     name="IdleCheckerSpec",
 )
 class IdleCheckerSpecGQL(PydanticOutputMixin[IdleCheckerSpecInfo]):
     type: IdleCheckerTypeGQL = gql_field(description="Checker implementation type.")
-    session_lifetime: SessionLifetimeIdleCheckerSpecGQL = gql_field(
+    session_lifetime: SessionLifetimeIdleCheckerSpecGQL | None = gql_field(
         description="Settings that define the maximum lifetime of a session.",
+        default=None,
+    )
+    network: NetworkTimeoutIdleCheckerSpecGQL | None = gql_field(
+        description="Settings that define the maximum network inactivity period.",
+        default=None,
+    )
+    utilization: UtilizationIdleCheckerSpecGQL | None = gql_field(
+        description="Settings that define the maximum underutilized duration.",
+        default=None,
     )
 
 
@@ -204,6 +265,47 @@ class SessionLifetimeIdleCheckerSpecInputGQL(PydanticInputMixin[SessionLifetimeS
 @gql_pydantic_input(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
+        description="Supplies settings for a network-timeout checker.",
+    ),
+    name="NetworkTimeoutIdleCheckerSpecInput",
+)
+class NetworkTimeoutIdleCheckerSpecInputGQL(PydanticInputMixin[NetworkTimeoutSpecInputDTO]):
+    max_network_inactivity_seconds: int = gql_field(
+        description="Maximum network inactivity period in seconds."
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Supplies a preset-backed utilization threshold.",
+    ),
+    name="UtilizationIdleCheckerThresholdInput",
+)
+class UtilizationIdleCheckerThresholdInputGQL(PydanticInputMixin[UtilizationThresholdInputDTO]):
+    preset_id: UUID = gql_field(description="Prometheus query preset ID.")
+    threshold: Decimal = gql_field(description="Underutilization threshold.")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Supplies settings for a utilization checker.",
+    ),
+    name="UtilizationIdleCheckerSpecInput",
+)
+class UtilizationIdleCheckerSpecInputGQL(PydanticInputMixin[UtilizationSpecInputDTO]):
+    max_underutilized_duration_seconds: int = gql_field(
+        description="Maximum underutilized duration in seconds."
+    )
+    threshold: UtilizationIdleCheckerThresholdInputGQL = gql_field(
+        description="Preset-backed utilization threshold."
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
         description=(
             "Supplies the implementation-specific settings for an idle checker. "
             "Exactly one checker-specific field must be provided."
@@ -215,6 +317,14 @@ class SessionLifetimeIdleCheckerSpecInputGQL(PydanticInputMixin[SessionLifetimeS
 class IdleCheckerSpecInputGQL(PydanticInputMixin[IdleCheckerSpecInputDTO]):
     session_lifetime: SessionLifetimeIdleCheckerSpecInputGQL | None = gql_field(
         description="Session-lifetime checker settings.",
+        default=UNSET,
+    )
+    network: NetworkTimeoutIdleCheckerSpecInputGQL | None = gql_field(
+        description="Network-timeout checker settings.",
+        default=UNSET,
+    )
+    utilization: UtilizationIdleCheckerSpecInputGQL | None = gql_field(
+        description="Utilization checker settings.",
         default=UNSET,
     )
 

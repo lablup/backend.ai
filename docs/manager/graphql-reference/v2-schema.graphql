@@ -5595,6 +5595,8 @@ Added in 26.8.0. Lists checker implementations accepted by create and update ope
 """
 enum IdleCheckerInputType {
   SESSION_LIFETIME
+  NETWORK_TIMEOUT
+  UTILIZATION
 }
 
 """
@@ -5650,11 +5652,13 @@ input IdleCheckerScopeTypeFilter {
 }
 
 """
-Added in 26.8.0. Contains the settings used by an idle checker implementation. This API version exposes session-lifetime settings only.
+Added in 26.8.0. Contains the settings used by an idle checker implementation.
 """
 type IdleCheckerSpec {
   type: IdleCheckerType!
-  sessionLifetime: SessionLifetimeIdleCheckerSpec!
+  sessionLifetime: SessionLifetimeIdleCheckerSpec
+  network: NetworkTimeoutIdleCheckerSpec
+  utilization: UtilizationIdleCheckerSpec
 }
 
 """
@@ -5663,6 +5667,12 @@ Added in 26.8.0. Supplies the implementation-specific settings for an idle check
 input IdleCheckerSpecInput @oneOf {
   """Session-lifetime checker settings."""
   sessionLifetime: SessionLifetimeIdleCheckerSpecInput
+
+  """Network-timeout checker settings."""
+  network: NetworkTimeoutIdleCheckerSpecInput
+
+  """Utilization checker settings."""
+  utilization: UtilizationIdleCheckerSpecInput
 }
 
 """
@@ -5670,6 +5680,8 @@ Added in 26.8.0. Identifies the implementation used to evaluate an idle conditio
 """
 enum IdleCheckerType {
   SESSION_LIFETIME
+  NETWORK_TIMEOUT
+  UTILIZATION
 }
 
 """
@@ -8751,6 +8763,19 @@ input MyUpsertAppConfigFragmentsInput {
 extend type NetworkNode implements Node @key(fields: "id") {
   """The Globally Unique ID of this object"""
   id: ID!
+}
+
+"""
+Added in 26.8.0. Configures the maximum period without active network traffic.
+"""
+type NetworkTimeoutIdleCheckerSpec {
+  maxNetworkInactivitySeconds: Int!
+}
+
+"""Added in 26.8.0. Supplies settings for a network-timeout checker."""
+input NetworkTimeoutIdleCheckerSpecInput {
+  """Maximum network inactivity period in seconds."""
+  maxNetworkInactivitySeconds: Int!
 }
 
 """An object with a Globally Unique ID"""
@@ -16376,6 +16401,38 @@ input UserWeightInputItem {
   Priority weight multiplier. Higher weight = higher priority allocation ratio. Set to null to use resource group's default_weight.
   """
   weight: Decimal = null
+}
+
+"""
+Added in 26.8.0. Configures how long a session may remain underutilized.
+"""
+type UtilizationIdleCheckerSpec {
+  maxUnderutilizedDurationSeconds: Int!
+  threshold: UtilizationIdleCheckerThreshold!
+}
+
+"""Added in 26.8.0. Supplies settings for a utilization checker."""
+input UtilizationIdleCheckerSpecInput {
+  """Maximum underutilized duration in seconds."""
+  maxUnderutilizedDurationSeconds: Int!
+
+  """Preset-backed utilization threshold."""
+  threshold: UtilizationIdleCheckerThresholdInput!
+}
+
+"""Added in 26.8.0. Defines a preset-backed utilization threshold."""
+type UtilizationIdleCheckerThreshold {
+  presetId: UUID!
+  threshold: Decimal!
+}
+
+"""Added in 26.8.0. Supplies a preset-backed utilization threshold."""
+input UtilizationIdleCheckerThresholdInput {
+  """Prometheus query preset ID."""
+  presetId: UUID!
+
+  """Underutilization threshold."""
+  threshold: Decimal!
 }
 
 """Added in 25.16.0. VFS Storage configuration."""

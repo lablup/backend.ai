@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
@@ -13,10 +14,13 @@ from ai.backend.common.data.idle_checker.types import (
 )
 from ai.backend.common.dto.manager.v2.idle_checker.request import (
     IdleCheckerSpecInputDTO,
+    NetworkTimeoutSpecInputDTO,
     SessionLifetimeSpecInputDTO,
+    UtilizationSpecInputDTO,
+    UtilizationThresholdInputDTO,
 )
-from ai.backend.common.dto.manager.v2.idle_checker.types import IdleCheckerInputTypeDTO
 from ai.backend.common.identifier.idle_checker import IdleCheckerID
+from ai.backend.common.identifier.prometheus_query_preset import PrometheusQueryPresetID
 from ai.backend.common.types import SessionTypes
 from ai.backend.manager.api.adapters.idle_checker.adapter import IdleCheckerAdapter
 from ai.backend.manager.data.idle_checker.types import IdleCheckerData
@@ -82,14 +86,50 @@ class TestIdleCheckerAdapter:
         adapter: IdleCheckerAdapter,
         session_lifetime_spec_input: IdleCheckerSpecInputDTO,
     ) -> None:
-        spec = adapter._build_spec(
-            IdleCheckerInputTypeDTO.SESSION_LIFETIME,
-            session_lifetime_spec_input,
-        )
+        spec = adapter._build_spec(session_lifetime_spec_input)
 
         assert spec.type == CheckerType.SESSION_LIFETIME
         assert spec.session_lifetime is not None
         assert spec.session_lifetime.max_lifetime_seconds == 3600
+
+    def test_converts_network_spec(
+        self,
+        adapter: IdleCheckerAdapter,
+    ) -> None:
+        spec = adapter._build_spec(
+            IdleCheckerSpecInputDTO(
+                network=NetworkTimeoutSpecInputDTO(max_network_inactivity_seconds=600)
+            )
+        )
+        info = adapter._spec_to_info(spec)
+
+        assert spec.type == CheckerType.NETWORK_TIMEOUT
+        assert info.network is not None
+        assert info.network.max_network_inactivity_seconds == 600
+
+    def test_converts_utilization_spec(
+        self,
+        adapter: IdleCheckerAdapter,
+    ) -> None:
+        preset_id = PrometheusQueryPresetID(uuid4())
+        spec = adapter._build_spec(
+            IdleCheckerSpecInputDTO(
+                utilization=UtilizationSpecInputDTO(
+                    max_underutilized_duration_seconds=900,
+                    threshold=UtilizationThresholdInputDTO(
+                        preset_id=preset_id,
+                        threshold=Decimal("0.25"),
+                    ),
+                )
+            )
+        )
+        info = adapter._spec_to_info(spec)
+
+        assert spec.type == CheckerType.UTILIZATION
+        assert info.utilization is not None
+        assert info.utilization.max_underutilized_duration_seconds == 900
+        assert info.utilization.threshold.preset_id == preset_id
+        assert info.utilization.threshold.threshold == Decimal("0.25")
 
     async def test_batch_load_preserves_input_order_and_missing_entries(
         self,

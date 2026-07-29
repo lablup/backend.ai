@@ -10281,7 +10281,9 @@
       },
       "IdleCheckerInputTypeDTO": {
         "enum": [
-          "session_lifetime"
+          "session_lifetime",
+          "network_timeout",
+          "utilization"
         ],
         "title": "IdleCheckerInputTypeDTO",
         "type": "string"
@@ -10299,9 +10301,45 @@
               }
             ],
             "default": null
+          },
+          "network": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NetworkTimeoutSpecInputDTO"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "utilization": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UtilizationSpecInputDTO"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
           }
         },
         "title": "IdleCheckerSpecInputDTO",
+        "type": "object"
+      },
+      "NetworkTimeoutSpecInputDTO": {
+        "properties": {
+          "max_network_inactivity_seconds": {
+            "minimum": 1,
+            "title": "Max Network Inactivity Seconds",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "max_network_inactivity_seconds"
+        ],
+        "title": "NetworkTimeoutSpecInputDTO",
         "type": "object"
       },
       "SessionLifetimeSpecInputDTO": {
@@ -10327,6 +10365,50 @@
         ],
         "title": "SessionTypes",
         "type": "string"
+      },
+      "UtilizationSpecInputDTO": {
+        "properties": {
+          "max_underutilized_duration_seconds": {
+            "minimum": 1,
+            "title": "Max Underutilized Duration Seconds",
+            "type": "integer"
+          },
+          "threshold": {
+            "$ref": "#/components/schemas/UtilizationThresholdInputDTO"
+          }
+        },
+        "required": [
+          "max_underutilized_duration_seconds",
+          "threshold"
+        ],
+        "title": "UtilizationSpecInputDTO",
+        "type": "object"
+      },
+      "UtilizationThresholdInputDTO": {
+        "properties": {
+          "preset_id": {
+            "format": "uuid",
+            "title": "Preset Id",
+            "type": "string"
+          },
+          "threshold": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Threshold"
+          }
+        },
+        "required": [
+          "preset_id",
+          "threshold"
+        ],
+        "title": "UtilizationThresholdInputDTO",
+        "type": "object"
       },
       "CreateIdleCheckerInput": {
         "properties": {
@@ -10534,7 +10616,9 @@
       },
       "IdleCheckerTypeDTO": {
         "enum": [
-          "session_lifetime"
+          "session_lifetime",
+          "network_timeout",
+          "utilization"
         ],
         "title": "IdleCheckerTypeDTO",
         "type": "string"
