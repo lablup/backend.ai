@@ -8,7 +8,7 @@ from ai.backend.common.api_handlers import BaseRequestModel
 
 __all__ = (
     "MyGetAppConfigsInput",
-    "GetPublicAppConfigsInput",
+    "PublicGetAppConfigsInput",
 )
 
 
@@ -20,7 +20,7 @@ class MyGetAppConfigsInput(BaseRequestModel):
     )
 
 
-class GetPublicAppConfigsInput(BaseRequestModel):
+class PublicGetAppConfigsInput(BaseRequestModel):
     """Input for the anonymous, pre-login read, where only public fragments contribute."""
 
     config_names: list[str] = Field(

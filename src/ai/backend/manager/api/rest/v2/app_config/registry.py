@@ -27,6 +27,6 @@ def register_v2_app_config_routes(
 
     registry.add("POST", "/my/get", handler.my_get, middlewares=[auth_required])
     # Anonymous (pre-login) public read: no auth middleware.
-    registry.add("POST", "/public/get", handler.get_public)
+    registry.add("POST", "/public/get", handler.public_get)
 
     return registry

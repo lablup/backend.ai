@@ -5,8 +5,8 @@ from __future__ import annotations
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.app_config.types import AppConfigScopeType as AppConfigScopeTypeDTO
 from ai.backend.common.dto.manager.v2.app_config.request import (
-    GetPublicAppConfigsInput,
     MyGetAppConfigsInput,
+    PublicGetAppConfigsInput,
 )
 from ai.backend.common.dto.manager.v2.app_config.response import (
     AppConfigNode,
@@ -46,7 +46,7 @@ class AppConfigAdapter(BaseAdapter):
             ]
         )
 
-    async def get_public_app_configs(self, input: GetPublicAppConfigsInput) -> GetAppConfigsPayload:
+    async def public_get_app_configs(self, input: PublicGetAppConfigsInput) -> GetAppConfigsPayload:
         # Naming no principal is what makes this the anonymous read: only public contributes.
         action_result = await self._processors.app_config.get_app_configs.wait_for_complete(
             GetAppConfigsAction(config_names=input.config_names)

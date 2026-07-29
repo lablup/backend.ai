@@ -8,8 +8,8 @@ from typing import TYPE_CHECKING, Final
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam
 from ai.backend.common.dto.manager.v2.app_config.request import (
-    GetPublicAppConfigsInput,
     MyGetAppConfigsInput,
+    PublicGetAppConfigsInput,
 )
 from ai.backend.logging import BraceStyleAdapter
 
@@ -35,10 +35,10 @@ class V2AppConfigHandler:
         result = await self._adapter.my_get_app_configs(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
-    async def get_public(
+    async def public_get(
         self,
-        body: BodyParam[GetPublicAppConfigsInput],
+        body: BodyParam[PublicGetAppConfigsInput],
     ) -> APIResponse:
         """Get merged AppConfigs from public fragments only (anonymous)."""
-        result = await self._adapter.get_public_app_configs(body.parsed)
+        result = await self._adapter.public_get_app_configs(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)

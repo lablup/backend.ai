@@ -609,7 +609,7 @@
         "title": "MyGetAppConfigsInput",
         "type": "object"
       },
-      "GetPublicAppConfigsInput": {
+      "PublicGetAppConfigsInput": {
         "description": "Input for the anonymous, pre-login read, where only public fragments contribute.",
         "properties": {
           "config_names": {
@@ -625,7 +625,7 @@
         "required": [
           "config_names"
         ],
-        "title": "GetPublicAppConfigsInput",
+        "title": "PublicGetAppConfigsInput",
         "type": "object"
       },
       "BulkPurgeAppConfigFragmentInput": {
@@ -41855,7 +41855,7 @@
     },
     "/v2/app-config/public/get": {
       "post": {
-        "operationId": "v2/app-config.get_public",
+        "operationId": "v2/app-config.public_get",
         "tags": [
           "v2/app-config"
         ],
@@ -41868,7 +41868,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/GetPublicAppConfigsInput"
+                "$ref": "#/components/schemas/PublicGetAppConfigsInput"
               }
             }
           }

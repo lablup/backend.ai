@@ -10,8 +10,8 @@ import pytest
 
 from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.common.dto.manager.v2.app_config.request import (
-    GetPublicAppConfigsInput,
     MyGetAppConfigsInput,
+    PublicGetAppConfigsInput,
 )
 from ai.backend.common.exception import BackendAISchemaValidationFailed
 from ai.backend.common.identifier.app_config import AppConfigScopeID
@@ -115,11 +115,11 @@ class TestGetAppConfigsInputs:
 
     @pytest.mark.parametrize(
         "input_model",
-        [MyGetAppConfigsInput, GetPublicAppConfigsInput],
+        [MyGetAppConfigsInput, PublicGetAppConfigsInput],
         ids=lambda model: model.__name__,
     )
     def test_parses_config_names(
-        self, input_model: type[MyGetAppConfigsInput] | type[GetPublicAppConfigsInput]
+        self, input_model: type[MyGetAppConfigsInput] | type[PublicGetAppConfigsInput]
     ) -> None:
         parsed = input_model.model_validate({"config_names": ["theme", "layout"]})
 
@@ -127,11 +127,11 @@ class TestGetAppConfigsInputs:
 
     @pytest.mark.parametrize(
         "input_model",
-        [MyGetAppConfigsInput, GetPublicAppConfigsInput],
+        [MyGetAppConfigsInput, PublicGetAppConfigsInput],
         ids=lambda model: model.__name__,
     )
     def test_rejects_empty_config_names(
-        self, input_model: type[MyGetAppConfigsInput] | type[GetPublicAppConfigsInput]
+        self, input_model: type[MyGetAppConfigsInput] | type[PublicGetAppConfigsInput]
     ) -> None:
         with pytest.raises(BackendAISchemaValidationFailed):
             input_model.model_validate({"config_names": []})
