@@ -19,10 +19,10 @@
 - `get` by ID (any authenticated user) → `{entity}/commands.py`
 - scoped search → take the scope as a required argument in `{entity}/commands.py`
 
-**scoped search CLI pattern** (under consideration — may change to follow the SDK `scoped_search` direction):
-- Currently: the command name reflects the scope — `./bai session project-search {project_id}`.
+**scoped search CLI pattern:**
+- Command name `search-scoped`, mapped to SDK `scoped_search()` and REST `POST /v2/{entity}/scoped/search`.
 - The scope ID is a required positional argument, not an option flag.
-- Mapped to REST `POST /v2/{entity}/{scope_type}/{scope_id}/search`.
+- **Legacy:** a command named after the scope — `./bai session project-search {project_id}` — do not add new ones.
 
 **Place self-service operations (server `my_` prefix) in `my/{entity}.py`.**
 

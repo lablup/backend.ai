@@ -19,8 +19,8 @@
 ## Naming & scope
 
 - superadmin only: `admin_` prefix + call `_check_superadmin(request)` on the first line.
-- scoped: currently a `{scope}_` prefix (e.g. `domain_search_users`). **Forward direction (under consideration):** unify to `scoped_` and
-  receive the scope as a request field (see scoped search REST URL below).
+- scoped: `scoped_` prefix, receiving the scope as a request field (see scoped search REST URL below).
+  **Legacy:** a `{scope}_` prefix (e.g. `domain_search_users`) — do not add new ones.
 - self-service: `my_` prefix (e.g. `my_keypairs`). The Adapter resolves the user internally.
   - REST URL: `/v2/{entity}/my/{operation}` — the entity comes first, `my` is the scope qualifier.
 
@@ -28,12 +28,14 @@
 - `admin_search_*`: superadmin only, no scope — system-wide query.
 - scoped search: non-admin, scope argument required — query within that scope.
 - There is no "unscoped system-wide query" for non-admins.
+- The audience (`admin` / `scoped` / `my`) is always a REST path segment before the operation
+  name — see `api/rest/v2/AGENTS.md` for the full URL grammar.
 
-**scoped search REST URL** (under consideration):
-- Current: `/v2/{entity}/{scope_type}/{scope_id}/search` — express the scope as a nested resource path (not `search-by-{scope}`).
-  Example: `/v2/sessions/projects/{project_id}/search`.
-- **Forward direction:** Use a fixed path of the form `/v2/{entity}/scoped/search` and receive the scope as a request body field
-  (not a path param). Consistent with SDK `scoped_search` and GQL `scopedFoosV2`.
+**scoped search REST URL:**
+- Fixed path `/v2/{entity}/scoped/search`, with the scope as a request body field (not a path param).
+  Consistent with SDK `scoped_search` and GQL `scopedFoosV2`.
+- **Legacy:** the scope as a nested resource path, `/v2/{entity}/{scope_type}/{scope_id}/search`
+  (e.g. `/v2/sessions/projects/{project_id}/search`) — do not add new ones.
 
 **create / update / get / delete / purge — criteria for splitting out `admin_`:**
 - admin-only entities (Domain, ContainerRegistry, etc.): a single `admin_` endpoint.
