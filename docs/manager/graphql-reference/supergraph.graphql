@@ -19959,6 +19959,11 @@ type SessionV2MetadataInfo
   priority: Int!
 
   """
+  Scope-local preemption priority among the owner's own sessions (higher preempts lower; decoupled from `priority`).
+  """
+  jobPriority: Int!
+
+  """
   Whether this session is eligible for preemption by higher-priority sessions.
   """
   isPreemptible: Boolean!

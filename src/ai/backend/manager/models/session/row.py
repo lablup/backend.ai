@@ -763,6 +763,7 @@ class SessionRow(Base):  # type: ignore[misc]
             name=self.name,
             session_type=self.session_type,
             priority=self.priority,
+            job_priority=self.job_priority,
             is_preemptible=self.is_preemptible,
             cluster_mode=ClusterMode(self.cluster_mode),
             cluster_size=self.cluster_size,

@@ -186,6 +186,7 @@ class SessionData:
     id: UUID
     session_type: SessionTypes
     priority: int
+    job_priority: int
     is_preemptible: bool
     cluster_mode: ClusterMode
     cluster_size: int

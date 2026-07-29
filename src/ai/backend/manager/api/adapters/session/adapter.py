@@ -1106,6 +1106,7 @@ class SessionAdapter(BaseAdapter):
                 cluster_mode=data.cluster_mode.name,
                 cluster_size=data.cluster_size,
                 priority=data.priority,
+                job_priority=data.job_priority,
                 is_preemptible=data.is_preemptible,
                 tag=data.tag,
             ),

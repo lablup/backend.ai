@@ -214,6 +214,15 @@ class SessionV2MetadataInfoGQL:
     )
     cluster_size: int = gql_field(description="Number of nodes in the cluster.")
     priority: int = gql_field(description="Scheduling priority of the session.")
+    job_priority: int = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Scope-local preemption priority among the owner's own sessions "
+                "(higher preempts lower; decoupled from `priority`)."
+            ),
+        )
+    )
     is_preemptible: bool = gql_field(
         description="Whether this session is eligible for preemption by higher-priority sessions."
     )

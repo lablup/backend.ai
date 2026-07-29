@@ -32,6 +32,7 @@ def _make_metadata(
     cluster_mode: str = "single-node",
     cluster_size: int = 1,
     priority: int = 0,
+    job_priority: int = 0,
     is_preemptible: bool = False,
 ) -> SessionMetadataInfo:
     return SessionMetadataInfo(
@@ -39,6 +40,7 @@ def _make_metadata(
         cluster_mode=cluster_mode,
         cluster_size=cluster_size,
         priority=priority,
+        job_priority=job_priority,
         is_preemptible=is_preemptible,
     )
 
@@ -48,6 +50,7 @@ def _make_metadata_gql_dto(
     cluster_mode: str = "single-node",
     cluster_size: int = 1,
     priority: int = 0,
+    job_priority: int = 0,
     is_preemptible: bool = False,
 ) -> SessionMetadataInfoGQLDTO:
     return SessionMetadataInfoGQLDTO(
@@ -55,6 +58,7 @@ def _make_metadata_gql_dto(
         cluster_mode=cluster_mode,
         cluster_size=cluster_size,
         priority=priority,
+        job_priority=job_priority,
         is_preemptible=is_preemptible,
     )
 
@@ -112,12 +116,14 @@ class TestSessionMetadataInfo:
             cluster_mode="single-node",
             cluster_size=1,
             priority=0,
+            job_priority=0,
             is_preemptible=False,
         )
         assert info.session_type == "interactive"
         assert info.cluster_mode == "single-node"
         assert info.cluster_size == 1
         assert info.priority == 0
+        assert info.job_priority == 0
         assert info.is_preemptible is False
 
     def test_optional_fields_default_none(self) -> None:
@@ -136,6 +142,7 @@ class TestSessionMetadataInfo:
             cluster_mode="multi-node",
             cluster_size=4,
             priority=5,
+            job_priority=-3,
             is_preemptible=True,
             tag="experiment-1",
         )
@@ -145,6 +152,7 @@ class TestSessionMetadataInfo:
         assert info.access_key == "AKIAIOSFODNN7EXAMPLE"
         assert info.cluster_size == 4
         assert info.priority == 5
+        assert info.job_priority == -3
         assert info.is_preemptible is True
         assert info.tag == "experiment-1"
 
