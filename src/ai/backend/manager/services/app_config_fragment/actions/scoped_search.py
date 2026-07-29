@@ -23,7 +23,7 @@ class ScopedSearchAppConfigFragmentAction(AppConfigFragmentScopeAction):
 
     Acts at the RBAC scope named by ``scope``, so the scope RBAC validator authorizes the
     read the same way it authorizes a write at that scope in
-    :class:`CreateAppConfigFragmentAction`.
+    :class:`BulkUpsertAppConfigFragmentsAction`.
     """
 
     scope: AppConfigFragmentSearchScope

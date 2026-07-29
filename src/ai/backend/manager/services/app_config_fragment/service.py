@@ -11,17 +11,9 @@ from ai.backend.manager.services.app_config_fragment.actions.bulk_purge import (
     BulkPurgeAppConfigFragmentAction,
     BulkPurgeAppConfigFragmentActionResult,
 )
-from ai.backend.manager.services.app_config_fragment.actions.bulk_update import (
-    BulkUpdateAppConfigFragmentAction,
-    BulkUpdateAppConfigFragmentActionResult,
-)
 from ai.backend.manager.services.app_config_fragment.actions.bulk_upsert import (
     BulkUpsertAppConfigFragmentsAction,
     BulkUpsertAppConfigFragmentsActionResult,
-)
-from ai.backend.manager.services.app_config_fragment.actions.create import (
-    CreateAppConfigFragmentAction,
-    CreateAppConfigFragmentActionResult,
 )
 from ai.backend.manager.services.app_config_fragment.actions.get import (
     GetAppConfigFragmentAction,
@@ -34,10 +26,6 @@ from ai.backend.manager.services.app_config_fragment.actions.purge import (
 from ai.backend.manager.services.app_config_fragment.actions.scoped_search import (
     ScopedSearchAppConfigFragmentAction,
     ScopedSearchAppConfigFragmentActionResult,
-)
-from ai.backend.manager.services.app_config_fragment.actions.update import (
-    UpdateAppConfigFragmentAction,
-    UpdateAppConfigFragmentActionResult,
 )
 
 __all__ = ("AppConfigFragmentService",)
@@ -57,12 +45,6 @@ class AppConfigFragmentService:
 
     def __init__(self, repository: AppConfigFragmentRepository) -> None:
         self._repository = repository
-
-    async def create(
-        self, action: CreateAppConfigFragmentAction
-    ) -> CreateAppConfigFragmentActionResult:
-        data = await self._repository.create(action.creator_spec)
-        return CreateAppConfigFragmentActionResult(fragment=data)
 
     async def get(self, action: GetAppConfigFragmentAction) -> GetAppConfigFragmentActionResult:
         data = await self._repository.get_by_id(action.fragment_id)
@@ -100,25 +82,11 @@ class AppConfigFragmentService:
             has_previous_page=result.has_previous_page,
         )
 
-    async def update(
-        self, action: UpdateAppConfigFragmentAction
-    ) -> UpdateAppConfigFragmentActionResult:
-        data = await self._repository.update(action.updater)
-        return UpdateAppConfigFragmentActionResult(fragment=data)
-
     async def purge(
         self, action: PurgeAppConfigFragmentAction
     ) -> PurgeAppConfigFragmentActionResult:
         data = await self._repository.purge(action.purger_spec)
         return PurgeAppConfigFragmentActionResult(fragment=data)
-
-    async def bulk_update(
-        self, action: BulkUpdateAppConfigFragmentAction
-    ) -> BulkUpdateAppConfigFragmentActionResult:
-        result = await self._repository.bulk_update(action.updaters)
-        return BulkUpdateAppConfigFragmentActionResult(
-            succeeded=result.succeeded, failed=result.failed
-        )
 
     async def bulk_purge(
         self, action: BulkPurgeAppConfigFragmentAction

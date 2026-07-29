@@ -15,24 +15,18 @@ from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
     AppConfigFragmentScope,
     AppConfigFragmentUpsertItem,
     BulkPurgeAppConfigFragmentInput,
-    BulkUpdateAppConfigFragmentInput,
-    CreateAppConfigFragmentInput,
     MyAppConfigFragmentsByNamesInput,
     MyUpsertAppConfigFragmentsInput,
     ScopedAppConfigFragmentsByNamesInput,
     ScopedSearchAppConfigFragmentInput,
     ScopedUpsertAppConfigFragmentsInput,
-    UpdateAppConfigFragmentInput,
 )
 from ai.backend.common.dto.manager.v2.app_config_fragment.response import (
     AppConfigFragmentBulkErrorInfo,
     AppConfigFragmentNode,
     BulkPurgeAppConfigFragmentPayload,
-    BulkUpdateAppConfigFragmentPayload,
-    CreateAppConfigFragmentPayload,
     PurgeAppConfigFragmentPayload,
     SearchAppConfigFragmentPayload,
-    UpdateAppConfigFragmentPayload,
     UpsertAppConfigFragmentsPayload,
 )
 from ai.backend.common.dto.manager.v2.app_config_fragment.types import (
@@ -52,23 +46,16 @@ from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.models.app_config_fragment.conditions import AppConfigFragmentConditions
 from ai.backend.manager.models.app_config_fragment.orders import AppConfigFragmentOrders
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.repositories.app_config_fragment.creators import (
-    AppConfigFragmentCreatorSpec,
-)
 from ai.backend.manager.repositories.app_config_fragment.purgers import (
     AppConfigFragmentPurgerSpec,
 )
 from ai.backend.manager.repositories.app_config_fragment.types import (
     AppConfigFragmentSearchScope,
 )
-from ai.backend.manager.repositories.app_config_fragment.updaters import (
-    AppConfigFragmentUpdaterSpec,
-)
 from ai.backend.manager.repositories.app_config_fragment.upserters import (
     AppConfigFragmentUpserterSpec,
 )
 from ai.backend.manager.repositories.base import (
-    Updater,
     combine_conditions_or,
     negate_conditions,
 )
@@ -78,14 +65,8 @@ from ai.backend.manager.services.app_config_fragment.actions.admin_search import
 from ai.backend.manager.services.app_config_fragment.actions.bulk_purge import (
     BulkPurgeAppConfigFragmentAction,
 )
-from ai.backend.manager.services.app_config_fragment.actions.bulk_update import (
-    BulkUpdateAppConfigFragmentAction,
-)
 from ai.backend.manager.services.app_config_fragment.actions.bulk_upsert import (
     BulkUpsertAppConfigFragmentsAction,
-)
-from ai.backend.manager.services.app_config_fragment.actions.create import (
-    CreateAppConfigFragmentAction,
 )
 from ai.backend.manager.services.app_config_fragment.actions.get import (
     GetAppConfigFragmentAction,
@@ -96,10 +77,6 @@ from ai.backend.manager.services.app_config_fragment.actions.purge import (
 from ai.backend.manager.services.app_config_fragment.actions.scoped_search import (
     ScopedSearchAppConfigFragmentAction,
 )
-from ai.backend.manager.services.app_config_fragment.actions.update import (
-    UpdateAppConfigFragmentAction,
-)
-from ai.backend.manager.types import OptionalState
 
 
 @lru_cache(maxsize=1)
@@ -116,21 +93,7 @@ def _get_app_config_fragment_pagination_spec() -> PaginationSpec:
 class AppConfigFragmentAdapter(BaseAdapter):
     """Adapter for raw app config fragment write and search operations."""
 
-    # --- fragment CRUD (RBAC-gated at the processor) ---
-
-    async def create(self, input: CreateAppConfigFragmentInput) -> CreateAppConfigFragmentPayload:
-        spec = AppConfigFragmentCreatorSpec(
-            config_name=input.config_name,
-            scope_type=AppConfigScopeType(input.scope_type.value),
-            scope_id=input.scope_id,
-            config=input.config,
-        )
-        action_result = await self._processors.app_config_fragment.create.wait_for_complete(
-            CreateAppConfigFragmentAction(creator_spec=spec)
-        )
-        return CreateAppConfigFragmentPayload(
-            app_config_fragment=self._fragment_to_node(action_result.fragment),
-        )
+    # --- fragment writes and reads (RBAC-gated at the processor) ---
 
     async def scoped_upsert_app_config_fragments(
         self, input: ScopedUpsertAppConfigFragmentsInput
@@ -185,48 +148,12 @@ class AppConfigFragmentAdapter(BaseAdapter):
         )
         return self._fragment_to_node(action_result.fragment)
 
-    async def update(
-        self, fragment_id: AppConfigFragmentID, input: UpdateAppConfigFragmentInput
-    ) -> UpdateAppConfigFragmentPayload:
-        updater = Updater(
-            spec=AppConfigFragmentUpdaterSpec(config=OptionalState.update(input.config)),
-            pk_value=fragment_id,
-        )
-        # No allow-list gate: the entry's FK cascade means an existing fragment is writable.
-        action_result = await self._processors.app_config_fragment.update.wait_for_complete(
-            UpdateAppConfigFragmentAction(updater=updater)
-        )
-        return UpdateAppConfigFragmentPayload(
-            app_config_fragment=self._fragment_to_node(action_result.fragment),
-        )
-
     async def purge(self, fragment_id: AppConfigFragmentID) -> PurgeAppConfigFragmentPayload:
         purger_spec = AppConfigFragmentPurgerSpec(fragment_id=fragment_id)
         action_result = await self._processors.app_config_fragment.purge.wait_for_complete(
             PurgeAppConfigFragmentAction(purger_spec=purger_spec)
         )
         return PurgeAppConfigFragmentPayload(id=action_result.fragment.id)
-
-    async def bulk_update(
-        self, input: BulkUpdateAppConfigFragmentInput
-    ) -> BulkUpdateAppConfigFragmentPayload:
-        updaters = [
-            Updater(
-                spec=AppConfigFragmentUpdaterSpec(config=OptionalState.update(item.config)),
-                pk_value=item.id,
-            )
-            for item in input.items
-        ]
-        action_result = await self._processors.app_config_fragment.bulk_update.wait_for_complete(
-            BulkUpdateAppConfigFragmentAction(updaters=updaters)
-        )
-        return BulkUpdateAppConfigFragmentPayload(
-            items=[self._fragment_to_node(fragment) for fragment in action_result.succeeded],
-            failed=[
-                AppConfigFragmentBulkErrorInfo(id=error.id, message=error.message)
-                for error in action_result.failed
-            ],
-        )
 
     async def bulk_purge(
         self, input: BulkPurgeAppConfigFragmentInput

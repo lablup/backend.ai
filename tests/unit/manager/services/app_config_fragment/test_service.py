@@ -21,9 +21,6 @@ from ai.backend.manager.data.app_config_fragment.types import (
     AppConfigFragmentSearchResult,
 )
 from ai.backend.manager.errors.app_config import AppConfigFragmentNotFound
-from ai.backend.manager.repositories.app_config_fragment.creators import (
-    AppConfigFragmentCreatorSpec,
-)
 from ai.backend.manager.repositories.app_config_fragment.purgers import (
     AppConfigFragmentPurgerSpec,
 )
@@ -33,13 +30,12 @@ from ai.backend.manager.repositories.app_config_fragment.repository import (
 from ai.backend.manager.repositories.app_config_fragment.types import (
     AppConfigFragmentSearchScope,
 )
-from ai.backend.manager.repositories.app_config_fragment.updaters import (
-    AppConfigFragmentUpdaterSpec,
+from ai.backend.manager.repositories.app_config_fragment.upserters import (
+    AppConfigFragmentUpserterSpec,
 )
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     OffsetPagination,
-    Updater,
 )
 from ai.backend.manager.services.app_config_fragment.actions.admin_search import (
     AdminSearchAppConfigFragmentAction,
@@ -47,11 +43,8 @@ from ai.backend.manager.services.app_config_fragment.actions.admin_search import
 from ai.backend.manager.services.app_config_fragment.actions.bulk_purge import (
     BulkPurgeAppConfigFragmentAction,
 )
-from ai.backend.manager.services.app_config_fragment.actions.bulk_update import (
-    BulkUpdateAppConfigFragmentAction,
-)
-from ai.backend.manager.services.app_config_fragment.actions.create import (
-    CreateAppConfigFragmentAction,
+from ai.backend.manager.services.app_config_fragment.actions.bulk_upsert import (
+    BulkUpsertAppConfigFragmentsAction,
 )
 from ai.backend.manager.services.app_config_fragment.actions.get import (
     GetAppConfigFragmentAction,
@@ -62,11 +55,7 @@ from ai.backend.manager.services.app_config_fragment.actions.purge import (
 from ai.backend.manager.services.app_config_fragment.actions.scoped_search import (
     ScopedSearchAppConfigFragmentAction,
 )
-from ai.backend.manager.services.app_config_fragment.actions.update import (
-    UpdateAppConfigFragmentAction,
-)
 from ai.backend.manager.services.app_config_fragment.service import AppConfigFragmentService
-from ai.backend.manager.types import OptionalState
 
 _USER_ID = UserID(uuid.uuid4())
 _DOMAIN_ID = DomainID(uuid.uuid4())
@@ -122,33 +111,6 @@ class TestAppConfigFragmentService:
         # The allow-list write-gate lives in the repository (atomic with the write); the
         # service only delegates. Gate pass/reject is covered by the repository tests.
         return AppConfigFragmentService(repository=mock_repository)
-
-    # --- create ---
-
-    async def test_create_delegates_to_repository(
-        self, service: AppConfigFragmentService, mock_repository: MagicMock
-    ) -> None:
-        fragment = AppConfigFragmentData(
-            id=AppConfigFragmentID(uuid.uuid4()),
-            config_name="theme",
-            scope_type=AppConfigScopeType.USER,
-            scope_id=_USER_SCOPE_ID,
-            config={"k": "v"},
-            created_at=datetime.now(UTC),
-            updated_at=datetime.now(UTC),
-        )
-        mock_repository.create = AsyncMock(return_value=fragment)
-        spec = AppConfigFragmentCreatorSpec(
-            config_name="theme",
-            scope_type=AppConfigScopeType.USER,
-            scope_id=_USER_SCOPE_ID,
-            config={"k": "v"},
-        )
-
-        result = await service.create(CreateAppConfigFragmentAction(creator_spec=spec))
-
-        assert result.fragment == fragment
-        mock_repository.create.assert_called_once_with(spec)
 
     # --- get / search ---
 
@@ -252,31 +214,6 @@ class TestAppConfigFragmentService:
         assert result.scope_id() == case.expected_rbac_scope_id
         mock_repository.scoped_search.assert_called_once_with(querier, [case.scope])
 
-    # --- update ---
-
-    async def test_update_delegates_to_repository(
-        self, service: AppConfigFragmentService, mock_repository: MagicMock
-    ) -> None:
-        updated = AppConfigFragmentData(
-            id=AppConfigFragmentID(uuid.uuid4()),
-            config_name="theme",
-            scope_type=AppConfigScopeType.USER,
-            scope_id=_USER_SCOPE_ID,
-            config={"k": "v"},
-            created_at=datetime.now(UTC),
-            updated_at=datetime.now(UTC),
-        )
-        mock_repository.update = AsyncMock(return_value=updated)
-        updater = Updater(
-            spec=AppConfigFragmentUpdaterSpec(config=OptionalState.update({"b": 2})),
-            pk_value=updated.id,
-        )
-
-        result = await service.update(UpdateAppConfigFragmentAction(updater=updater))
-
-        assert result.fragment == updated
-        mock_repository.update.assert_called_once_with(updater)
-
     # --- purge ---
 
     async def test_purge_delegates_to_repository(
@@ -300,37 +237,6 @@ class TestAppConfigFragmentService:
         mock_repository.purge.assert_called_once_with(purger_spec)
 
     # --- bulk ---
-
-    async def test_bulk_update_delegates_to_repository(
-        self, service: AppConfigFragmentService, mock_repository: MagicMock
-    ) -> None:
-        fragments = [
-            AppConfigFragmentData(
-                id=AppConfigFragmentID(uuid.uuid4()),
-                config_name="theme",
-                scope_type=AppConfigScopeType.USER,
-                scope_id=_USER_SCOPE_ID,
-                config={"k": "v"},
-                created_at=datetime.now(UTC),
-                updated_at=datetime.now(UTC),
-            )
-            for _ in range(2)
-        ]
-        mock_repository.bulk_update = AsyncMock(
-            return_value=AppConfigFragmentBulkResult(succeeded=fragments, failed=[])
-        )
-        updaters = [
-            Updater(
-                spec=AppConfigFragmentUpdaterSpec(config=OptionalState.update({"b": 2})),
-                pk_value=fragments[0].id,
-            )
-        ]
-
-        result = await service.bulk_update(BulkUpdateAppConfigFragmentAction(updaters=updaters))
-
-        assert result.succeeded == fragments
-        assert result.failed == []
-        mock_repository.bulk_update.assert_called_once_with(updaters)
 
     async def test_bulk_purge_delegates_to_repository(
         self, service: AppConfigFragmentService, mock_repository: MagicMock
@@ -364,8 +270,8 @@ class TestAppConfigFragmentService:
         mock_repository.bulk_purge.assert_called_once_with(purger_specs)
 
 
-class TestCreateActionScope:
-    """The create action acts at the fragment's own scope — not admin-only/global."""
+class TestUpsertActionScope:
+    """The upsert action acts at the scope it writes — not admin-only/global."""
 
     @pytest.mark.parametrize(
         "case",
@@ -391,14 +297,17 @@ class TestCreateActionScope:
         ],
         ids=lambda case: case.scope_type.value,
     )
-    def test_scope_follows_fragment_scope(self, case: _RBACScopeCase) -> None:
-        action = CreateAppConfigFragmentAction(
-            creator_spec=AppConfigFragmentCreatorSpec(
-                config_name="theme",
-                scope_type=case.scope_type,
-                scope_id=case.scope_id,
-                config={"k": "v"},
-            ),
+    def test_scope_follows_the_written_scope(self, case: _RBACScopeCase) -> None:
+        action = BulkUpsertAppConfigFragmentsAction(
+            scope=AppConfigFragmentSearchScope(scope_type=case.scope_type, scope_id=case.scope_id),
+            upserter_specs=[
+                AppConfigFragmentUpserterSpec(
+                    config_name="theme",
+                    scope_type=case.scope_type,
+                    scope_id=case.scope_id,
+                    config={"k": "v"},
+                )
+            ],
         )
         assert action.scope_type() == case.expected_scope_type
         assert action.scope_id() == case.expected_scope_id
