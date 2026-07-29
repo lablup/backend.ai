@@ -24,7 +24,38 @@ __all__ = (
     "AppConfigFragmentSearchScope",
     "AppConfigScopeArguments",
     "ResolvedAppConfigScope",
+    "app_config_scope_existence_checks",
 )
+
+
+def app_config_scope_existence_checks(
+    scope_type: AppConfigScopeType,
+    scope_id: AppConfigScopeID | None,
+) -> Sequence[ExistenceCheck[Any]]:
+    """The rows that must exist for a fragment to sit at this scope.
+
+    Shared by the scoped search and by the create, so a scope the search calls missing can
+    never be one the create accepts. ``public`` is global and owns no row.
+    """
+    match scope_type:
+        case AppConfigScopeType.PUBLIC:
+            return ()
+        case AppConfigScopeType.DOMAIN:
+            return [
+                ExistenceCheck(
+                    column=DomainRow.id,
+                    value=scope_id,
+                    error=DomainNotFound(extra_data={"domain_id": str(scope_id)}),
+                ),
+            ]
+        case AppConfigScopeType.USER:
+            return [
+                ExistenceCheck(
+                    column=UserRow.uuid,
+                    value=scope_id,
+                    error=UserNotFound(extra_data={"user_id": str(scope_id)}),
+                ),
+            ]
 
 
 @dataclass(frozen=True)
@@ -80,23 +111,4 @@ class AppConfigFragmentSearchScope(SearchScope):
     @property
     @override
     def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
-        match self.scope_type:
-            case AppConfigScopeType.PUBLIC:
-                # Global scope — no owner row to check.
-                return ()
-            case AppConfigScopeType.DOMAIN:
-                return [
-                    ExistenceCheck(
-                        column=DomainRow.id,
-                        value=self.scope_id,
-                        error=DomainNotFound(extra_data={"domain_id": str(self.scope_id)}),
-                    ),
-                ]
-            case AppConfigScopeType.USER:
-                return [
-                    ExistenceCheck(
-                        column=UserRow.uuid,
-                        value=self.scope_id,
-                        error=UserNotFound(extra_data={"user_id": str(self.scope_id)}),
-                    ),
-                ]
+        return app_config_scope_existence_checks(self.scope_type, self.scope_id)

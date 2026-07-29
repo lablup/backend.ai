@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import TypeVar
+from typing import Any, TypeVar
 
 import sqlalchemy as sa
 from sqlalchemy import inspect
@@ -17,7 +17,9 @@ from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
+from ai.backend.manager.models.scopes import ExistenceCheck
 from ai.backend.manager.repositories.base.creator import BulkCreatorError, CreatorSpec
+from ai.backend.manager.repositories.base.existence import validate_existence_checks
 from ai.backend.manager.repositories.base.integrity import (
     match_integrity_error,
     parse_integrity_error,
@@ -50,6 +52,11 @@ class RBACEntityCreator[TRow: Base]:
         additional_scope_refs: Additional scope references for multi-scope entities.
             Only meaningful alongside a ``scope_ref``.
         relation_type: The relation type for the scope-entity association. Defaults to AUTO.
+        existence_checks: Rows that must exist for the association to mean anything —
+            typically the scope owner named by ``scope_ref``. Checked before the insert, so
+            a create against an owner that is not there fails with that owner's own
+            not-found error instead of leaving a row bound to nothing. Empty by default,
+            and an empty sequence costs no query.
     """
 
     spec: CreatorSpec[TRow]
@@ -57,6 +64,7 @@ class RBACEntityCreator[TRow: Base]:
     scope_ref: RBACElementRef | None
     additional_scope_refs: Sequence[RBACElementRef] = field(default_factory=list)
     relation_type: RelationType = RelationType.AUTO
+    existence_checks: Sequence[ExistenceCheck[Any]] = field(default_factory=tuple)
 
     def all_scope_refs(self) -> list[RBACElementRef]:
         """Every scope this entity binds to; empty for a GLOBAL entity (``scope_ref=None``)."""
@@ -79,10 +87,11 @@ async def execute_rbac_entity_creator[TRow: Base](
     """Create a scope-scoped entity with its scope association.
 
     Operations:
-    1. Insert main entity row
-    2. Flush to get DB-generated ID
-    3. Extract RBAC info from spec
-    4. Insert AssociationScopesEntitiesRow (scope -> entity mapping)
+    1. Validate the creator's existence checks (typically the scope owner)
+    2. Insert main entity row
+    3. Flush to get DB-generated ID
+    4. Extract RBAC info from spec
+    5. Insert AssociationScopesEntitiesRow (scope -> entity mapping)
 
     The AssociationScopesEntitiesRow maps the entity to its owning scope,
     enabling scope-based entity discovery and permission inheritance. A creator that
@@ -96,6 +105,8 @@ async def execute_rbac_entity_creator[TRow: Base](
     Returns:
         RBACEntityCreatorResult containing the created row.
     """
+    await validate_existence_checks(db_sess, creator.existence_checks)
+
     spec = creator.spec
     row = spec.build_row()
     mapper = inspect(type(row))
