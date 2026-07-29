@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import uuid
 from collections.abc import (
+    Collection,
     Iterable,
     Sequence,
 )
@@ -1092,7 +1093,7 @@ class EndpointAutoScalingRuleRow(Base):  # type: ignore[misc]
     async def list(
         cls,
         session: AsyncSession,
-        endpoint_status_filter: Iterable[EndpointLifecycle] = frozenset([
+        endpoint_status_filter: Collection[EndpointLifecycle] = frozenset([
             EndpointLifecycle.CREATED
         ]),
     ) -> Sequence[Self]:

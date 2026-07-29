@@ -532,7 +532,7 @@ async def query_allowed_sgroups(
     result = await db_conn.execute(query)
     from_domain = {row.scaling_group for row in result}
 
-    group_ids: Iterable[uuid.UUID] = []
+    group_ids: Sequence[uuid.UUID] = []
     match group:
         case uuid.UUID() | str():
             if group_id := await resolve_group_name_or_id(db_conn, domain_name, group):

@@ -13,7 +13,7 @@ absent or non-positive:
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Collection
 from decimal import Decimal
 from typing import override
 
@@ -58,7 +58,7 @@ class RequiredResourceSlotRule(DeploymentRevisionValidatorRule):
     def _check_resource_slots(
         self,
         resource_slots: ResourceSlot,
-        required_slot_names: Iterable[SlotName],
+        required_slot_names: Collection[SlotName],
     ) -> None:
         if not required_slot_names:
             return

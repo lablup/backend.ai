@@ -8,7 +8,7 @@ import math
 import operator
 from abc import ABCMeta, abstractmethod
 from collections import defaultdict
-from collections.abc import Iterable, Mapping, MutableMapping, Sequence
+from collections.abc import Collection, Iterable, Mapping, MutableMapping, Sequence
 from decimal import ROUND_DOWN, Decimal
 from typing import (
     TYPE_CHECKING,
@@ -77,7 +77,7 @@ def round_down(from_dec: Decimal, with_dec: Decimal) -> Decimal:
 class AbstractAllocMap(metaclass=ABCMeta):
     device_slots: Mapping[DeviceId, DeviceSlotInfo]
     device_mask: frozenset[DeviceId]
-    exclusive_slot_types: Iterable[SlotName]
+    exclusive_slot_types: Collection[SlotName]
     allocations: MutableMapping[SlotName, MutableMapping[DeviceId, Decimal]]
 
     def __init__(
@@ -85,7 +85,7 @@ class AbstractAllocMap(metaclass=ABCMeta):
         *,
         device_slots: Mapping[DeviceId, DeviceSlotInfo] | None = None,
         device_mask: Iterable[DeviceId] | None = None,
-        exclusive_slot_types: Iterable[SlotName] | None = None,
+        exclusive_slot_types: Collection[SlotName] | None = None,
     ) -> None:
         self.exclusive_slot_types = exclusive_slot_types or {}
         self.device_slots = device_slots or {}
