@@ -65,10 +65,13 @@ class SessionMetadataInfo(BaseResponseModel):
     priority: int = Field(description="Scheduling priority of the session.")
     job_priority: int = Field(
         description=(
-            "Preemption priority ranking the owner's own sessions: victims are "
-            "chosen only among sessions of the same user, so values from "
-            "different users are never compared. Higher preempts lower, and it "
-            "is decoupled from `priority`."
+            "Preemption priority among the owner's own sessions. A pending "
+            "session may reclaim another session's resources only when both "
+            "belong to the same user and the other session's value is strictly "
+            "lower, so equal values never preempt each other; among the "
+            "eligible sessions the lowest value is reclaimed first. Independent "
+            "of `priority`, which orders the pending queue and takes no part in "
+            "this comparison."
         )
     )
     is_preemptible: bool = Field(
@@ -312,10 +315,13 @@ class SessionMetadataInfoGQLDTO(BaseResponseModel):
     priority: int = Field(description="Scheduling priority of the session.")
     job_priority: int = Field(
         description=(
-            "Preemption priority ranking the owner's own sessions: victims are "
-            "chosen only among sessions of the same user, so values from "
-            "different users are never compared. Higher preempts lower, and it "
-            "is decoupled from `priority`."
+            "Preemption priority among the owner's own sessions. A pending "
+            "session may reclaim another session's resources only when both "
+            "belong to the same user and the other session's value is strictly "
+            "lower, so equal values never preempt each other; among the "
+            "eligible sessions the lowest value is reclaimed first. Independent "
+            "of `priority`, which orders the pending queue and takes no part in "
+            "this comparison."
         )
     )
     is_preemptible: bool = Field(
