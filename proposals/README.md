@@ -142,6 +142,7 @@ BEP numbers start from 1000.
 | [1069](BEP-1069-entity-lifecycle-deletion.md) | Entity Lifecycle Deletion Management | HyeokJin Kim | Draft |
 | [1070](BEP-1070-cpu-unit.md) | CPU Unit Resource Specification | HyeokJin Kim | Draft |
 | [1071](BEP-1071-keypair-user-resource-policy.md) | Keypair to User Resource Policy Merge | HyeokJin Kim | Draft |
+| [1072](BEP-1072-release-branching-and-backport.md) | Release Branch Isolation and Backport Automation | HyeokJin Kim | Draft |
 | _next_ | _(reserve your number here)_ | | |
 
 ## File Structure
