@@ -6424,6 +6424,7 @@ type KernelV2SessionInfo {
 """Added in 26.2.0. Status of a kernel in its lifecycle."""
 enum KernelV2Status {
   PENDING
+  RESERVED
   SCHEDULED
   PREPARING
   PREPARED

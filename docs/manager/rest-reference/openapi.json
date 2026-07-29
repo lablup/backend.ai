@@ -29106,6 +29106,7 @@
         "description": "Kernel lifecycle status values for DTO filtering.",
         "enum": [
           "PENDING",
+          "RESERVED",
           "SCHEDULED",
           "PREPARING",
           "PREPARED",
