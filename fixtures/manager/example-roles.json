@@ -6947,6 +6947,105 @@
             "entity_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
             "registered_at": "2025-09-12 09:51:58.265582+00",
             "relation_type": "auto"
+        },
+        {
+            "id": "f52dfecd-c0d2-4927-ac7f-2a78f9721484",
+            "scope_type": "project",
+            "scope_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
+            "entity_type": "role",
+            "entity_id": "e79d7074-076d-4629-953d-55286b26490c",
+            "registered_at": "2025-09-12 09:51:58.265582+00",
+            "relation_type": "auto"
+        },
+        {
+            "id": "5ccf60eb-691f-4aa0-bb2a-efa6741b1be0",
+            "scope_type": "project",
+            "scope_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831",
+            "entity_type": "role",
+            "entity_id": "08001cc1-1b3a-410b-a3a6-b312b8b78a52",
+            "registered_at": "2025-09-12 09:51:58.265582+00",
+            "relation_type": "auto"
+        },
+        {
+            "id": "95344ac2-cb89-4d41-a7fe-c5dc606e2741",
+            "scope_type": "project",
+            "scope_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
+            "entity_type": "role",
+            "entity_id": "d1b9c1af-9b2f-447c-82bc-a5278e01f89e",
+            "registered_at": "2025-09-12 09:51:58.265582+00",
+            "relation_type": "auto"
+        },
+        {
+            "id": "64a83b6c-74f2-4514-9897-1ee8dc715122",
+            "scope_type": "project",
+            "scope_id": "8e32dd28-d319-4e3b-8851-ea37837699a5",
+            "entity_type": "role",
+            "entity_id": "254fef91-2574-46f5-afc6-c9b18cfa340b",
+            "registered_at": "2025-09-12 09:51:58.265582+00",
+            "relation_type": "auto"
+        },
+        {
+            "id": "0acb8b75-c8bb-4227-88a6-f35b784e37ee",
+            "scope_type": "domain",
+            "scope_id": "default",
+            "entity_type": "role",
+            "entity_id": "416fca68-f247-457b-ac83-32a0a45bb7d1",
+            "registered_at": "2025-09-12 09:51:58.265582+00",
+            "relation_type": "auto"
+        },
+        {
+            "id": "40bae437-988a-477e-89ce-d600842a127b",
+            "scope_type": "domain",
+            "scope_id": "default",
+            "entity_type": "role",
+            "entity_id": "bfb69730-1374-4ba4-bc26-0ea0b8dd2708",
+            "registered_at": "2025-09-12 09:51:58.265582+00",
+            "relation_type": "auto"
+        },
+        {
+            "id": "c0756321-6c1e-4755-a8c6-4614b63e1e83",
+            "scope_type": "user",
+            "scope_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4",
+            "entity_type": "role",
+            "entity_id": "72293d83-1849-4bb5-a555-80e561515428",
+            "registered_at": "2025-09-12 09:51:58.265582+00",
+            "relation_type": "auto"
+        },
+        {
+            "id": "2c886907-34cb-458d-81a5-a00ede8185cd",
+            "scope_type": "user",
+            "scope_id": "4f13d193-f646-425a-a340-270c4d2b9860",
+            "entity_type": "role",
+            "entity_id": "cb0768f1-3b35-415d-beef-8916a5c3c88b",
+            "registered_at": "2025-09-12 09:51:58.265582+00",
+            "relation_type": "auto"
+        },
+        {
+            "id": "a6e3e154-f78c-46f2-9d92-b3538751be7d",
+            "scope_type": "user",
+            "scope_id": "dfa9da54-4b28-432f-be29-c0d680c7a412",
+            "entity_type": "role",
+            "entity_id": "fe53e90e-f619-43d8-99c8-574487485bab",
+            "registered_at": "2025-09-12 09:51:58.265582+00",
+            "relation_type": "auto"
+        },
+        {
+            "id": "9d3fd49a-c50c-4254-9b50-54a36f2bf083",
+            "scope_type": "user",
+            "scope_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040",
+            "entity_type": "role",
+            "entity_id": "31f74f6d-04f7-418b-b375-ab0c39fa3058",
+            "registered_at": "2025-09-12 09:51:58.265582+00",
+            "relation_type": "auto"
+        },
+        {
+            "id": "7043125c-6673-40d6-bc4d-eef1e73d7f93",
+            "scope_type": "user",
+            "scope_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6",
+            "entity_type": "role",
+            "entity_id": "5e96b4ee-2296-495b-90b4-0fc845d13c67",
+            "registered_at": "2025-09-12 09:51:58.265582+00",
+            "relation_type": "auto"
         }
     ],
     "role_presets": [
