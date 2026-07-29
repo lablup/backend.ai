@@ -218,8 +218,10 @@ class SessionV2MetadataInfoGQL:
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
             description=(
-                "Scope-local preemption priority among the owner's own sessions "
-                "(higher preempts lower; decoupled from `priority`)."
+                "Preemption priority ranking the owner's own sessions: victims "
+                "are chosen only among sessions of the same user, so values from "
+                "different users are never compared. Higher preempts lower, and "
+                "it is decoupled from `priority`."
             ),
         )
     )

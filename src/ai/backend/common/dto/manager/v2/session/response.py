@@ -65,8 +65,10 @@ class SessionMetadataInfo(BaseResponseModel):
     priority: int = Field(description="Scheduling priority of the session.")
     job_priority: int = Field(
         description=(
-            "Scope-local preemption priority among the owner's own sessions "
-            "(higher preempts lower; decoupled from `priority`)."
+            "Preemption priority ranking the owner's own sessions: victims are "
+            "chosen only among sessions of the same user, so values from "
+            "different users are never compared. Higher preempts lower, and it "
+            "is decoupled from `priority`."
         )
     )
     is_preemptible: bool = Field(
@@ -310,8 +312,10 @@ class SessionMetadataInfoGQLDTO(BaseResponseModel):
     priority: int = Field(description="Scheduling priority of the session.")
     job_priority: int = Field(
         description=(
-            "Scope-local preemption priority among the owner's own sessions "
-            "(higher preempts lower; decoupled from `priority`)."
+            "Preemption priority ranking the owner's own sessions: victims are "
+            "chosen only among sessions of the same user, so values from "
+            "different users are never compared. Higher preempts lower, and it "
+            "is decoupled from `priority`."
         )
     )
     is_preemptible: bool = Field(
