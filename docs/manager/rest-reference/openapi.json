@@ -547,44 +547,6 @@
         "title": "AdminSearchAgentsInput",
         "type": "object"
       },
-      "ResolveAppConfigInput": {
-        "description": "Input for resolving merged AppConfigs for the acting user.\n\nThe scope is never caller-supplied: the adapter takes both the user and the domain from\nthe session, so a resolve is only ever for the acting user in their own domain.",
-        "properties": {
-          "config_names": {
-            "description": "Config names to resolve the merged view for.",
-            "items": {
-              "type": "string"
-            },
-            "minItems": 1,
-            "title": "Config Names",
-            "type": "array"
-          }
-        },
-        "required": [
-          "config_names"
-        ],
-        "title": "ResolveAppConfigInput",
-        "type": "object"
-      },
-      "ResolvePublicAppConfigInput": {
-        "description": "Input for the anonymous, pre-login read, where only public fragments contribute.\n\nA pre-login screen usually needs several configs at once, so this takes the same batch\nas the authenticated resolve — it just names no principal.",
-        "properties": {
-          "config_names": {
-            "description": "Config names to resolve the merged public view for.",
-            "items": {
-              "type": "string"
-            },
-            "minItems": 1,
-            "title": "Config Names",
-            "type": "array"
-          }
-        },
-        "required": [
-          "config_names"
-        ],
-        "title": "ResolvePublicAppConfigInput",
-        "type": "object"
-      },
       "ConflictingSessionCleanupPolicyEnum": {
         "description": "How to clean up sessions that conflict with an agent's resource group change.",
         "enum": [
@@ -626,6 +588,44 @@
           "resource_group_id"
         ],
         "title": "UpdateAgentResourceGroupBody",
+        "type": "object"
+      },
+      "ResolveAppConfigInput": {
+        "description": "Input for resolving merged AppConfigs for the acting user.\n\nThe scope is never caller-supplied: the adapter takes both the user and the domain from\nthe session, so a resolve is only ever for the acting user in their own domain.",
+        "properties": {
+          "config_names": {
+            "description": "Config names to resolve the merged view for.",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Config Names",
+            "type": "array"
+          }
+        },
+        "required": [
+          "config_names"
+        ],
+        "title": "ResolveAppConfigInput",
+        "type": "object"
+      },
+      "ResolvePublicAppConfigInput": {
+        "description": "Input for the anonymous, pre-login read, where only public fragments contribute.\n\nA pre-login screen usually needs several configs at once, so this takes the same batch\nas the authenticated resolve — it just names no principal.",
+        "properties": {
+          "config_names": {
+            "description": "Config names to resolve the merged public view for.",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Config Names",
+            "type": "array"
+          }
+        },
+        "required": [
+          "config_names"
+        ],
+        "title": "ResolvePublicAppConfigInput",
         "type": "object"
       },
       "BulkPurgeAppConfigFragmentInput": {
