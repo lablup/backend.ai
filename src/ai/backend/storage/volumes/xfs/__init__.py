@@ -175,7 +175,7 @@ class XFSProjectQuotaModel(BaseQuotaModel):
                 log.info(
                     "creating project quota (qs:{}, q:{})",
                     quota_scope_id,
-                    (options.limit_bytes if options else None),
+                    options.limit_bytes,
                 )
                 await aiofiles.os.makedirs(qspath)
                 await self.project_registry.read_project_info()

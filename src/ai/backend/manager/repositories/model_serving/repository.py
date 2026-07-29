@@ -641,9 +641,6 @@ class ModelServingRepository:
         async with self._db.begin_readonly_session_read_committed() as session:
             try:
                 rule = await EndpointAutoScalingRuleRow.get(session, rule_id, load_endpoint=True)
-                if not rule:
-                    return None
-
                 return rule.to_data()
             except ObjectNotFound:
                 return None
@@ -711,9 +708,6 @@ class ModelServingRepository:
             try:
                 # Validate lifecycle stage before update
                 rule = await EndpointAutoScalingRuleRow.get(session, rule_id, load_endpoint=True)
-                if not rule:
-                    return None
-
                 if rule.endpoint_row.lifecycle_stage in EndpointLifecycle.inactive_states():
                     return None
 
@@ -738,12 +732,9 @@ class ModelServingRepository:
         async with self._db.begin_session() as session:
             try:
                 rule = await EndpointAutoScalingRuleRow.get(session, rule_id, load_endpoint=True)
-                if not rule:
-                    return False
-
                 await session.delete(rule)
                 return True
-            except NoResultFound:
+            except ObjectNotFound:
                 return False
 
     @model_serving_repository_resilience.apply()

@@ -216,6 +216,9 @@ class RedisConnection(AbstractAsyncContextManager[RedisClient]):
     _socket_connect_timeout: float | None
     _keepalive_options: dict[int, int]
 
+    reader: asyncio.StreamReader | None
+    writer: asyncio.StreamWriter | None
+
     def __init__(
         self,
         redis_target: RedisTarget,
@@ -227,6 +230,8 @@ class RedisConnection(AbstractAsyncContextManager[RedisClient]):
     ) -> None:
         self._redis_target = redis_target
         self._db = db
+        self.reader = None
+        self.writer = None
 
         self._socket_timeout = socket_timeout
         self._socket_connect_timeout = socket_connect_timeout
@@ -279,7 +284,7 @@ class RedisConnection(AbstractAsyncContextManager[RedisClient]):
         return await self.connect()
 
     async def disconnect(self) -> None:
-        if self.writer:
+        if self.writer is not None:
             try:
                 self.writer.close()
             except RuntimeError as e:

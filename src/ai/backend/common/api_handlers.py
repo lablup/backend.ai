@@ -353,11 +353,6 @@ async def _parse_and_execute_handler(
 
         value = await extract_param_value(request=request, input_param_type=param.annotation)
 
-        if not value:
-            raise InvalidAPIParameters(
-                f"Type hint or Annotated must be added in API handler signature: {param.name}"
-            )
-
         handler_params.add(name, value)
 
     response = await handler(**handler_params.get_all())

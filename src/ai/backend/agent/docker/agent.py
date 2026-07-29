@@ -1450,6 +1450,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
 
 
 class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
+    docker: Docker
     docker_info: Mapping[str, Any]
     monitor_docker_task: asyncio.Task[Any]
     agent_sockpath: Path
@@ -1621,7 +1622,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 self.monitor_docker_task.cancel()
                 await self.monitor_docker_task
 
-        if self.docker:
+        if self.docker is not None:
             await self.docker.close()
 
     @override

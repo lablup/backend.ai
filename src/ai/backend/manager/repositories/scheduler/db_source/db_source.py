@@ -1923,7 +1923,7 @@ class ScheduleDBSource:
             if rg_row is None:
                 raise ScalingGroupNotFound(f"Resource group {resource_group_id} not found")
             resource_group = ResourceGroupEnqueueInfo(
-                defaults=rg_row.default_session_options or DefaultSessionOptions(),
+                defaults=rg_row.default_session_options,
                 network=ScalingGroupNetworkInfo(
                     use_host_network=rg_row.use_host_network,
                     wsproxy_addr=rg_row.wsproxy_addr,

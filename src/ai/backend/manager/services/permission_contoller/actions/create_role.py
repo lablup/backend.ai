@@ -38,4 +38,4 @@ class CreateRoleActionResult(BaseActionResult):
 
     @override
     def entity_id(self) -> str | None:
-        return str(self.data.id) if self.data else None
+        return str(self.data.id)

@@ -96,7 +96,7 @@ class DependentSessionTemplate(WrapperTestTemplate):
         test_id = spec_meta.test_id
         client_session = ClientSessionContext.current()
         session_name = f"test_session_{test_id!s}"
-        session_id = None
+        session_id: UUID | None = None
         batch_session_meta = CreatedSessionMetaContext.current()
         try:
             session_id = await self._verify_session_creation(
@@ -110,5 +110,5 @@ class DependentSessionTemplate(WrapperTestTemplate):
             ):
                 yield
         finally:
-            if session_id:
+            if session_id is not None:
                 await self._verify_session_destruction(client_session, session_name)

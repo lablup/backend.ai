@@ -1705,8 +1705,6 @@ class VFolderService:
         vfolder_data = await self._vfolder_repository.get_by_id_validated(
             action.vfolder_id, user.id, user.domain_name
         )
-        if not vfolder_data:
-            raise VFolderNotFound("VFolder not found")
 
         # Host permission check — resolved from user_id
         await self._vfolder_repository.ensure_host_permission_allowed_by_user(
@@ -2017,5 +2015,5 @@ class VFolderService:
 
         return CloneVFolderV2ActionResult(
             new_vfolder_id=target_folder_id,
-            bgtask_id=str(_task_id) if _task_id else None,
+            bgtask_id=str(_task_id),
         )
