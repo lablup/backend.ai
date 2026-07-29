@@ -227,10 +227,7 @@ class AppConfigFragmentDBSource:
 
     @app_config_fragment_db_source_resilience.apply()
     async def get_domain_id_by_name(self, name: DomainName) -> DomainID:
-        """Resolve a domain name to its id — the session names the domain, but a fragment's
-        domain scope keys off the domain id. Not RBAC-scoped: the merged-config read is not
-        RBAC-gated, so the lookup is a plain read of the domain named by the session.
-        """
+        """Resolve a domain name to its id. Not RBAC-scoped, like the merged-config read."""
         async with self._rbac_ops_provider.read_ops() as r:
             # DomainRow's primary key is its name, so a pk query fetches it by name.
             result = await r.query(Querier(row_class=DomainRow, pk_value=name))
