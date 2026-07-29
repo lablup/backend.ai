@@ -20,13 +20,13 @@ def register_v2_app_config_routes(
     """Register all REST v2 merged app config routes.
 
     Layout:
-        POST /resolve          resolve merged configs for a principal   (auth)
-        POST /public/resolve   resolve merged public configs            (anonymous)
+        POST /my/get       get the acting user's merged configs   (auth)
+        POST /public/get   get the merged public configs          (anonymous)
     """
     registry = RouteRegistry.create("app-config", route_deps.cors_options)
 
-    registry.add("POST", "/resolve", handler.resolve, middlewares=[auth_required])
+    registry.add("POST", "/my/get", handler.my_get, middlewares=[auth_required])
     # Anonymous (pre-login) public read: no auth middleware.
-    registry.add("POST", "/public/resolve", handler.resolve_public)
+    registry.add("POST", "/public/get", handler.get_public)
 
     return registry

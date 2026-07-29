@@ -3,17 +3,15 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-from ai.backend.common.identifier.domain import DomainName
 from ai.backend.manager.data.app_config.types import AppConfigData
 from ai.backend.manager.data.app_config_fragment.types import AppConfigFragmentData
 from ai.backend.manager.errors.app_config import AppConfigFragmentNotFound
 from ai.backend.manager.repositories.app_config_fragment.repository import (
     AppConfigFragmentRepository,
 )
-from ai.backend.manager.repositories.app_config_fragment.types import ResolvedAppConfigScope
-from ai.backend.manager.services.app_config.actions.resolve import (
-    ResolveAppConfigsAction,
-    ResolveAppConfigsActionResult,
+from ai.backend.manager.services.app_config.actions.get import (
+    GetAppConfigsAction,
+    GetAppConfigsActionResult,
 )
 
 __all__ = ("AppConfigService",)
@@ -51,27 +49,16 @@ class AppConfigService:
     def __init__(self, fragment_repository: AppConfigFragmentRepository) -> None:
         self._fragment_repository = fragment_repository
 
-    async def resolve_app_configs(
-        self, action: ResolveAppConfigsAction
-    ) -> ResolveAppConfigsActionResult:
-        """Resolve the merged ``AppConfig`` for each of ``config_names`` in a single query.
+    async def get_app_configs(self, action: GetAppConfigsAction) -> GetAppConfigsActionResult:
+        """Get the merged ``AppConfig`` for each of ``config_names`` in a single query.
 
         One entry per requested name, in request order; a repeated name is repeated in the
-        output. Without both ``domain_name`` and ``user_id`` this is the anonymous, pre-login
-        read — only ``public`` fragments contribute. A name nothing contributes to fails the
-        whole call with ``AppConfigFragmentNotFound``.
+        output. Without a ``user_id`` this is the anonymous, pre-login read — only ``public``
+        fragments contribute. A name nothing contributes to fails the whole call with
+        ``AppConfigFragmentNotFound``.
         """
-        if action.domain_name is None or action.user_id is None:
-            # Either half missing is the anonymous, pre-login read.
-            scope = None
-        else:
-            # The session carries the domain name; the fragment scope keys off its id.
-            domain_id = await self._fragment_repository.get_domain_id_by_name(
-                DomainName(action.domain_name)
-            )
-            scope = ResolvedAppConfigScope(domain_id=domain_id, user_id=action.user_id)
         fragments = await self._fragment_repository.list_visible_fragments_bulk(
-            action.config_names, scope
+            action.config_names, action.user_id
         )
         app_configs: list[AppConfigData] = []
         for config_name in action.config_names:
@@ -87,6 +74,4 @@ class AppConfigService:
                     merged_config=_merge_configs(visible),
                 )
             )
-        return ResolveAppConfigsActionResult(
-            app_configs=app_configs, _user_id=scope.user_id if scope is not None else None
-        )
+        return GetAppConfigsActionResult(app_configs=app_configs, _user_id=action.user_id)

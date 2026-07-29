@@ -15,16 +15,14 @@ from ai.backend.manager.services.app_config.actions.base import (
 
 
 @dataclass
-class ResolveAppConfigsAction(AppConfigScopeAction):
-    """Resolve the merged ``AppConfig`` for each of ``config_names``.
+class GetAppConfigsAction(AppConfigScopeAction):
+    """Get the merged ``AppConfig`` for each of ``config_names``.
 
-    Neither ``domain_name`` nor ``user_id`` is caller-supplied — the adapter fills both from
-    the session, so a resolve is only ever for the acting user in their own domain. Either
-    half unset is the anonymous, pre-login read.
+    ``user_id`` is never caller-supplied — the adapter fills it from the session, so a get is
+    only ever for the acting user. Unset is the anonymous, pre-login read.
     """
 
     config_names: list[str]
-    domain_name: str | None = None
     user_id: UserID | None = None
 
     @override
@@ -46,7 +44,7 @@ class ResolveAppConfigsAction(AppConfigScopeAction):
 
 
 @dataclass
-class ResolveAppConfigsActionResult(AppConfigScopeActionResult):
+class GetAppConfigsActionResult(AppConfigScopeActionResult):
     app_configs: list[AppConfigData]
     _user_id: UserID | None
 

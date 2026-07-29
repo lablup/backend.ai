@@ -1,4 +1,4 @@
-"""Unit tests for AppConfigAdapter DTO conversions and the resolve input contract."""
+"""Unit tests for AppConfigAdapter DTO conversions and the get input contract."""
 
 from __future__ import annotations
 
@@ -9,7 +9,10 @@ from uuid import uuid4
 import pytest
 
 from ai.backend.common.data.app_config.types import AppConfigScopeType
-from ai.backend.common.dto.manager.v2.app_config.request import ResolveAppConfigInput
+from ai.backend.common.dto.manager.v2.app_config.request import (
+    GetPublicAppConfigsInput,
+    MyGetAppConfigsInput,
+)
 from ai.backend.common.exception import BackendAISchemaValidationFailed
 from ai.backend.common.identifier.app_config import AppConfigScopeID
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
@@ -107,12 +110,28 @@ class TestAppConfigAdapterConverters:
         assert [fragment.id for fragment in node.fragments] == [first.id, second.id]
 
 
-class TestResolveAppConfigInput:
-    def test_parses_config_names(self) -> None:
-        parsed = ResolveAppConfigInput.model_validate({"config_names": ["theme", "layout"]})
+class TestGetAppConfigsInputs:
+    """Both get inputs take the same batch of names — only the scope they imply differs."""
+
+    @pytest.mark.parametrize(
+        "input_model",
+        [MyGetAppConfigsInput, GetPublicAppConfigsInput],
+        ids=lambda model: model.__name__,
+    )
+    def test_parses_config_names(
+        self, input_model: type[MyGetAppConfigsInput] | type[GetPublicAppConfigsInput]
+    ) -> None:
+        parsed = input_model.model_validate({"config_names": ["theme", "layout"]})
 
         assert parsed.config_names == ["theme", "layout"]
 
-    def test_rejects_empty_config_names(self) -> None:
+    @pytest.mark.parametrize(
+        "input_model",
+        [MyGetAppConfigsInput, GetPublicAppConfigsInput],
+        ids=lambda model: model.__name__,
+    )
+    def test_rejects_empty_config_names(
+        self, input_model: type[MyGetAppConfigsInput] | type[GetPublicAppConfigsInput]
+    ) -> None:
         with pytest.raises(BackendAISchemaValidationFailed):
-            ResolveAppConfigInput.model_validate({"config_names": []})
+            input_model.model_validate({"config_names": []})

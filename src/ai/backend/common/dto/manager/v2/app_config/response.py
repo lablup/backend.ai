@@ -11,7 +11,7 @@ from ai.backend.common.dto.manager.v2.app_config_fragment.response import AppCon
 
 __all__ = (
     "AppConfigNode",
-    "ResolveAppConfigPayload",
+    "GetAppConfigsPayload",
 )
 
 
@@ -29,8 +29,8 @@ class AppConfigNode(BaseResponseModel):
     )
 
 
-class ResolveAppConfigPayload(BaseResponseModel):
-    """Payload for a merged AppConfig resolve."""
+class GetAppConfigsPayload(BaseResponseModel):
+    """Payload for a merged AppConfig get."""
 
     app_configs: list[AppConfigNode] = Field(
         description="One merged view per requested config name, in request order; a repeated "

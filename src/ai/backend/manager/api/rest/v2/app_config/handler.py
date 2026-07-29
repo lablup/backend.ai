@@ -8,8 +8,8 @@ from typing import TYPE_CHECKING, Final
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam
 from ai.backend.common.dto.manager.v2.app_config.request import (
-    ResolveAppConfigInput,
-    ResolvePublicAppConfigInput,
+    GetPublicAppConfigsInput,
+    MyGetAppConfigsInput,
 )
 from ai.backend.logging import BraceStyleAdapter
 
@@ -27,18 +27,18 @@ class V2AppConfigHandler:
     def __init__(self, *, adapter: AppConfigAdapter) -> None:
         self._adapter = adapter
 
-    async def resolve(
+    async def my_get(
         self,
-        body: BodyParam[ResolveAppConfigInput],
+        body: BodyParam[MyGetAppConfigsInput],
     ) -> APIResponse:
-        """Resolve merged AppConfigs for the authenticated caller (auth required)."""
-        result = await self._adapter.resolve(body.parsed)
+        """Get the acting user's merged AppConfigs (auth required)."""
+        result = await self._adapter.my_get_app_configs(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
-    async def resolve_public(
+    async def get_public(
         self,
-        body: BodyParam[ResolvePublicAppConfigInput],
+        body: BodyParam[GetPublicAppConfigsInput],
     ) -> APIResponse:
-        """Resolve merged AppConfigs from public fragments only (anonymous)."""
-        result = await self._adapter.resolve_public(body.parsed)
+        """Get merged AppConfigs from public fragments only (anonymous)."""
+        result = await self._adapter.get_public_app_configs(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)

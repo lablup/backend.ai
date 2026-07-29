@@ -5,12 +5,12 @@ from __future__ import annotations
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.app_config.types import AppConfigScopeType as AppConfigScopeTypeDTO
 from ai.backend.common.dto.manager.v2.app_config.request import (
-    ResolveAppConfigInput,
-    ResolvePublicAppConfigInput,
+    GetPublicAppConfigsInput,
+    MyGetAppConfigsInput,
 )
 from ai.backend.common.dto.manager.v2.app_config.response import (
     AppConfigNode,
-    ResolveAppConfigPayload,
+    GetAppConfigsPayload,
 )
 from ai.backend.common.dto.manager.v2.app_config_fragment.response import AppConfigFragmentNode
 from ai.backend.common.exception import UnreachableError
@@ -20,7 +20,7 @@ from ai.backend.manager.data.app_config.types import AppConfigData
 from ai.backend.manager.data.app_config_fragment.types import (
     AppConfigFragmentData,
 )
-from ai.backend.manager.services.app_config.actions.resolve import ResolveAppConfigsAction
+from ai.backend.manager.services.app_config.actions.get import GetAppConfigsAction
 
 
 class AppConfigAdapter(BaseAdapter):
@@ -28,30 +28,30 @@ class AppConfigAdapter(BaseAdapter):
 
     # --- merged AppConfig read ---
 
-    async def resolve(self, input: ResolveAppConfigInput) -> ResolveAppConfigPayload:
+    async def my_get_app_configs(self, input: MyGetAppConfigsInput) -> GetAppConfigsPayload:
+        """The acting user's merged AppConfigs.
+
+        Calls ``current_user()`` internally — the caller does not pass a scope.
+        """
         me = current_user()
         if me is None:
             # ``auth_required`` guarantees a session on this route, so this is never hit.
             raise UnreachableError("User context is not available")
-        action_result = await self._processors.app_config.resolve_app_configs.wait_for_complete(
-            ResolveAppConfigsAction(
-                config_names=input.config_names,
-                domain_name=me.domain_name,
-                user_id=UserID(me.user_id),
-            )
+        action_result = await self._processors.app_config.get_app_configs.wait_for_complete(
+            GetAppConfigsAction(config_names=input.config_names, user_id=UserID(me.user_id))
         )
-        return ResolveAppConfigPayload(
+        return GetAppConfigsPayload(
             app_configs=[
                 self._app_config_to_node(app_config) for app_config in action_result.app_configs
             ]
         )
 
-    async def resolve_public(self, input: ResolvePublicAppConfigInput) -> ResolveAppConfigPayload:
+    async def get_public_app_configs(self, input: GetPublicAppConfigsInput) -> GetAppConfigsPayload:
         # Naming no principal is what makes this the anonymous read: only public contributes.
-        action_result = await self._processors.app_config.resolve_app_configs.wait_for_complete(
-            ResolveAppConfigsAction(config_names=input.config_names)
+        action_result = await self._processors.app_config.get_app_configs.wait_for_complete(
+            GetAppConfigsAction(config_names=input.config_names)
         )
-        return ResolveAppConfigPayload(
+        return GetAppConfigsPayload(
             app_configs=[
                 self._app_config_to_node(app_config) for app_config in action_result.app_configs
             ]

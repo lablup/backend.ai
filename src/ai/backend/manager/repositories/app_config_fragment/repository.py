@@ -4,7 +4,7 @@ from collections.abc import Sequence
 
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
-from ai.backend.common.identifier.domain import DomainID, DomainName
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
@@ -20,9 +20,6 @@ from ai.backend.manager.repositories.app_config_fragment.db_source import (
 )
 from ai.backend.manager.repositories.app_config_fragment.purgers import (
     AppConfigFragmentPurgerSpec,
-)
-from ai.backend.manager.repositories.app_config_fragment.types import (
-    ResolvedAppConfigScope,
 )
 from ai.backend.manager.repositories.app_config_fragment.upserters import (
     AppConfigFragmentUpserterSpec,
@@ -95,10 +92,6 @@ class AppConfigFragmentRepository:
 
     @app_config_fragment_repository_resilience.apply()
     async def list_visible_fragments_bulk(
-        self, config_names: list[str], scope: ResolvedAppConfigScope | None = None
+        self, config_names: list[str], user_id: UserID | None = None
     ) -> list[AppConfigFragmentData]:
-        return await self._db_source.list_visible_fragments_bulk(config_names, scope)
-
-    @app_config_fragment_repository_resilience.apply()
-    async def get_domain_id_by_name(self, name: DomainName) -> DomainID:
-        return await self._db_source.get_domain_id_by_name(name)
+        return await self._db_source.list_visible_fragments_bulk(config_names, user_id)

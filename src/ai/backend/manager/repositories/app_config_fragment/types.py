@@ -1,4 +1,4 @@
-"""Types for app config fragment repository operations (search scopes, resolve arguments)."""
+"""Types for app config fragment repository operations (search scopes)."""
 
 from __future__ import annotations
 
@@ -11,8 +11,6 @@ import sqlalchemy as sa
 from ai.backend.common.data.app_config.types import AppConfigScopeType
 from ai.backend.common.exception import UserNotFound
 from ai.backend.common.identifier.app_config import AppConfigScopeID
-from ai.backend.common.identifier.domain import DomainID
-from ai.backend.common.identifier.user import UserID
 from ai.backend.manager.errors.resource import DomainNotFound
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
 from ai.backend.manager.models.clauses import QueryCondition
@@ -20,22 +18,7 @@ from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.scopes import ExistenceCheck, SearchScope
 from ai.backend.manager.models.user import UserRow
 
-__all__ = (
-    "AppConfigFragmentSearchScope",
-    "ResolvedAppConfigScope",
-)
-
-
-@dataclass(frozen=True)
-class ResolvedAppConfigScope:
-    """The principal an ``AppConfig`` is resolved for: the resolving user and its domain.
-
-    Both halves come from the session — never caller-supplied. Plain value object — not a
-    :class:`SearchScope`.
-    """
-
-    domain_id: DomainID
-    user_id: UserID
+__all__ = ("AppConfigFragmentSearchScope",)
 
 
 @dataclass(frozen=True)

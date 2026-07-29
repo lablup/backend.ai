@@ -9,7 +9,7 @@ import sqlalchemy as sa
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.identifier.app_config_fragment import AppConfigFragmentID
-from ai.backend.common.identifier.domain import DomainID, DomainName
+from ai.backend.common.identifier.user import UserID
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
@@ -24,17 +24,12 @@ from ai.backend.manager.data.permission.types import RBACElementRef
 from ai.backend.manager.errors.app_config import (
     AppConfigFragmentNotFound,
 )
-from ai.backend.manager.errors.resource import DomainNotFound
 from ai.backend.manager.models.app_config_allow_list.row import AppConfigAllowListRow
 from ai.backend.manager.models.app_config_fragment.conditions import AppConfigFragmentConditions
 from ai.backend.manager.models.app_config_fragment.row import AppConfigFragmentRow
-from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.scopes import SearchScope
 from ai.backend.manager.repositories.app_config_fragment.purgers import (
     AppConfigFragmentPurgerSpec,
-)
-from ai.backend.manager.repositories.app_config_fragment.types import (
-    ResolvedAppConfigScope,
 )
 from ai.backend.manager.repositories.app_config_fragment.upserters import (
     AppConfigFragmentUpserterSpec,
@@ -188,21 +183,22 @@ class AppConfigFragmentDBSource:
 
     @app_config_fragment_db_source_resilience.apply()
     async def list_visible_fragments_bulk(
-        self, config_names: list[str], scope: ResolvedAppConfigScope | None = None
+        self, config_names: list[str], user_id: UserID | None = None
     ) -> list[AppConfigFragmentData]:
         """Visible fragments for several ``config_names`` in one query, ordered by ascending ``rank``.
 
-        ``public`` always contributes; a ``scope`` additionally admits its domain and user
-        overlay, while ``scope=None`` (anonymous) sees only ``public``. Rank-ordered so the
-        caller can group by name and deep-merge each name's fragments in order.
+        ``public`` always contributes; a ``user_id`` additionally admits that user's own
+        overlay and its domain's, while ``user_id=None`` (anonymous) sees only ``public``.
+        Rank-ordered so the caller can group by name and deep-merge each name's fragments in
+        order.
         """
         if not config_names:
             return []
         scope_visibility = [AppConfigFragmentConditions.by_public_visibility()]
-        if scope is not None:
+        if user_id is not None:
             scope_visibility += [
-                AppConfigFragmentConditions.by_domain_visibility(scope.domain_id),
-                AppConfigFragmentConditions.by_user_visibility(scope.user_id),
+                AppConfigFragmentConditions.by_domain_visibility_of_user(user_id),
+                AppConfigFragmentConditions.by_user_visibility(user_id),
             ]
         querier = BatchQuerier(
             pagination=NoPagination(),
@@ -224,13 +220,3 @@ class AppConfigFragmentDBSource:
         async with self._rbac_ops_provider.read_ops() as r:
             result = await r.batch_query_in_global(selector, querier)
             return [row.AppConfigFragmentRow.to_data() for row in result.rows]
-
-    @app_config_fragment_db_source_resilience.apply()
-    async def get_domain_id_by_name(self, name: DomainName) -> DomainID:
-        """Resolve a domain name to its id. Not RBAC-scoped, like the merged-config read."""
-        async with self._rbac_ops_provider.read_ops() as r:
-            # DomainRow's primary key is its name, so a pk query fetches it by name.
-            result = await r.query(Querier(row_class=DomainRow, pk_value=name))
-            if result is None:
-                raise DomainNotFound(f"Domain '{name}' not found")
-            return result.row.id
