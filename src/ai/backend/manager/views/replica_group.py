@@ -104,6 +104,11 @@ class ReplicaGroupLifecycleReconcileView:
     scaling_status: ReplicaGroupScalingStatus
     desired_current_replica_count: int
     desired_target_replica_count: int
+    # Live routes of the current revision. During a rollout the current side is
+    # drain-only (never refilled), so dead replicas free rollout budget: the
+    # rolling step sizes the target side against this live count, not the
+    # desired count.
+    current_live_replica_count: int
     # The rollout goal: the deployment's desired replica count the target revision rolls to.
     deployment_desired_replica_count: int
     rollout: ReplicaGroupRolloutSpec
