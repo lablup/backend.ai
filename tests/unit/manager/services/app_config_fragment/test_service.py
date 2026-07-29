@@ -112,6 +112,60 @@ class TestAppConfigFragmentService:
         # service only delegates. Gate pass/reject is covered by the repository tests.
         return AppConfigFragmentService(repository=mock_repository)
 
+    # --- upsert ---
+
+    @pytest.mark.parametrize(
+        "case",
+        [
+            _RBACScopeCase(
+                scope_type=AppConfigScopeType.PUBLIC,
+                scope_id=None,
+                expected_scope_type=ScopeType.GLOBAL,
+                expected_scope_id="",
+            ),
+            _RBACScopeCase(
+                scope_type=AppConfigScopeType.DOMAIN,
+                scope_id=_DOMAIN_SCOPE_ID,
+                expected_scope_type=ScopeType.DOMAIN,
+                expected_scope_id=str(_DOMAIN_ID),
+            ),
+            _RBACScopeCase(
+                scope_type=AppConfigScopeType.USER,
+                scope_id=_USER_SCOPE_ID,
+                expected_scope_type=ScopeType.USER,
+                expected_scope_id=str(_USER_ID),
+            ),
+        ],
+        ids=lambda case: case.scope_type.value,
+    )
+    async def test_upsert_passes_the_specs_through_and_reports_its_scope(
+        self,
+        service: AppConfigFragmentService,
+        mock_repository: MagicMock,
+        scoped_fragment: AppConfigFragmentData,
+        case: _RBACScopeCase,
+    ) -> None:
+        mock_repository.bulk_upsert = AsyncMock(return_value=[scoped_fragment])
+        specs = [
+            AppConfigFragmentUpserterSpec(
+                config_name="theme",
+                scope_type=case.scope_type,
+                scope_id=case.scope_id,
+                config={"k": "v"},
+            )
+        ]
+        scope = AppConfigFragmentSearchScope(scope_type=case.scope_type, scope_id=case.scope_id)
+
+        result = await service.bulk_upsert(
+            BulkUpsertAppConfigFragmentsAction(scope=scope, upserter_specs=specs)
+        )
+
+        assert result.fragments == [scoped_fragment]
+        # The result reports the RBAC scope the upsert was authorized at.
+        assert result.scope_type() == case.expected_scope_type
+        assert result.scope_id() == case.expected_scope_id
+        mock_repository.bulk_upsert.assert_called_once_with(specs)
+
     # --- get / search ---
 
     async def test_get(self, service: AppConfigFragmentService, mock_repository: MagicMock) -> None:
