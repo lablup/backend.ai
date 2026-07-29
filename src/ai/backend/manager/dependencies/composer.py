@@ -280,6 +280,7 @@ class ManagerDependencyComposer(DependencyComposer[DependencyInput, DependencyRe
                 deployment_repository=domain.repositories.deployment.repository,
                 replica_group_repository=domain.repositories.replica_group.repository,
                 idle_checker_repository=domain.repositories.idle_checker.repository,
+                metric_repository=domain.repositories.metric.repository,
                 fair_share_repository=domain.repositories.fair_share.repository,
                 resource_usage_repository=domain.repositories.resource_usage_history.repository,
                 retention_repository=domain.repositories.retention.repository,
