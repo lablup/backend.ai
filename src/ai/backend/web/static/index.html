@@ -21,6 +21,9 @@
   <link rel="stylesheet" href="resources/fonts/roboto/roboto.css">
   <link rel="stylesheet" href="resources/fonts/ubuntu/ubuntu.css">
   <link rel="stylesheet" href="resources/webui.css">
+  <!-- Theme-family signature effects (glass blur, stained gradient header),
+       keyed on the data-theme-family attribute set by the bootstrap below. -->
+  <link rel="stylesheet" href="resources/theme-families.css">
   <link rel="stylesheet" href="resources/custom.css">
   <script nonce="{{nonce}}" src="manifest/app.js"></script>
   <title>Backend.AI</title>
@@ -45,15 +48,15 @@
     }
     globalThis.enableSW = true;
 
-    globalThis.packageVersion = "26.7.0";
-    globalThis.buildNumber = "8391";
+    globalThis.packageVersion = "26.8.0-rc.0";
+    globalThis.buildNumber = "1";
     globalThis.baiNonce = "{{nonce}}";
 
     // DO NOT CHANGE BELOW LINE
     
   </script>
   <!-- DO NOT CHANGE BELOW LINE -->
-  <script type="module" nonce="{{nonce}}" crossorigin src="/assets/index-DLl5_15D.js"></script>
+  <script type="module" nonce="{{nonce}}" crossorigin src="/assets/index-DB7yUW94.js"></script>
   <link rel="stylesheet" crossorigin href="/assets/index-CDgRDCYd.css">
 </head>
 
@@ -78,6 +81,14 @@
     }
     // Set body background immediately to prevent white flash before CSS loads
     document.body.style.backgroundColor = globalThis.isDarkMode ? '#191919' : 'rgba(247, 247, 246, 1)';
+    // Apply the selected theme family before paint so the data-theme-family
+    // attribute keys resources/theme-families.css (glass/stained header effects)
+    // on the first render. Mirrors the themeMode read above; useCustomThemeConfig owns
+    // this attribute once React mounts.
+    var storedThemeFamily = localStorage.getItem('backendaiwebui.settings.themeFamily');
+    var parsedThemeFamily;
+    try { parsedThemeFamily = storedThemeFamily ? JSON.parse(storedThemeFamily) : null; } catch(e) { parsedThemeFamily = null; }
+    document.body.setAttribute('data-theme-family', parsedThemeFamily || 'default');
   </script>
   <div>
     <div id="react-root"></div>

@@ -61,6 +61,260 @@
       }
     }
   },
+  "families": {
+    "stained": {
+      "label": "Stained",
+      "light": {
+        "token": {
+          "colorPrimary": "#8B5CF6",
+          "colorLink": "#8B5CF6",
+          "colorText": "#141414",
+          "colorInfo": "#0066CC",
+          "colorError": "#C82333",
+          "colorSuccess": "#007A63",
+          "colorWarning": "#9A5D00",
+          "colorBorder": "#D9D9D9",
+          "colorBgContainer": "#FFFFFF",
+          "colorBgLayout": "#F5F5F5",
+          "screenXLMax": 1919,
+          "screenXXLMin": 1920,
+          "screenXXL": 1920,
+          "screenXXLMax": 2559,
+          "screenXXXLMin": 2560,
+          "screenXXXL": 2560
+        },
+        "components": {
+          "Tag": {
+            "borderRadiusSM": 1
+          },
+          "Layout": {
+            "lightSiderBg": "#FFF",
+            "siderBg": "#141414",
+            "headerBg": "#8B5CF6"
+          }
+        }
+      },
+      "dark": {
+        "token": {
+          "colorPrimary": "#A78BFA",
+          "colorLink": "#A78BFA",
+          "colorText": "#FFFFFF",
+          "colorInfo": "#009BDD",
+          "colorError": "#DC4446",
+          "colorSuccess": "#03A487",
+          "colorWarning": "#D89614",
+          "colorBorder": "#424242",
+          "colorBgContainer": "#1F1F1F",
+          "colorBgLayout": "#121212",
+          "screenXLMax": 1919,
+          "screenXXLMin": 1920,
+          "screenXXL": 1920,
+          "screenXXLMax": 2559,
+          "screenXXXLMin": 2560,
+          "screenXXXL": 2560
+        },
+        "components": {
+          "Tag": {
+            "borderRadiusSM": 1
+          },
+          "Layout": {
+            "lightSiderBg": "#FFF",
+            "siderBg": "#141414",
+            "headerBg": "#7C3AED"
+          }
+        }
+      }
+    },
+    "glass": {
+      "label": "Glass",
+      "light": {
+        "token": {
+          "colorPrimary": "#007AFF",
+          "colorLink": "#007AFF",
+          "colorText": "#1D1D1F",
+          "colorInfo": "#005EB8",
+          "colorError": "#C22D26",
+          "colorSuccess": "#1D7D43",
+          "colorWarning": "#9A5700",
+          "colorBorder": "#D9D9D9",
+          "colorBgContainer": "#FFFFFF",
+          "colorBgLayout": "#F2F2F7",
+          "screenXLMax": 1919,
+          "screenXXLMin": 1920,
+          "screenXXL": 1920,
+          "screenXXLMax": 2559,
+          "screenXXXLMin": 2560,
+          "screenXXXL": 2560
+        },
+        "components": {
+          "Tag": {
+            "borderRadiusSM": 1
+          },
+          "Layout": {
+            "lightSiderBg": "#FFF",
+            "siderBg": "#1C1C1E",
+            "headerBg": "rgba(30, 32, 38, 0.15)"
+          }
+        }
+      },
+      "dark": {
+        "token": {
+          "colorPrimary": "#0A84FF",
+          "colorLink": "#0A84FF",
+          "colorText": "#F5F5F7",
+          "colorInfo": "#0A84FF",
+          "colorError": "#FF453A",
+          "colorSuccess": "#32D74B",
+          "colorWarning": "#FF9F0A",
+          "colorBorder": "#424242",
+          "colorBgContainer": "#1F1F1F",
+          "colorBgLayout": "#000000",
+          "screenXLMax": 1919,
+          "screenXXLMin": 1920,
+          "screenXXL": 1920,
+          "screenXXLMax": 2559,
+          "screenXXXLMin": 2560,
+          "screenXXXL": 2560
+        },
+        "components": {
+          "Tag": {
+            "borderRadiusSM": 1
+          },
+          "Layout": {
+            "lightSiderBg": "#FFF",
+            "siderBg": "#1C1C1E",
+            "headerBg": "rgba(255, 255, 255, 0.3)"
+          }
+        }
+      }
+    },
+    "reverie": {
+      "label": "Reverie",
+      "light": {
+        "token": {
+          "colorPrimary": "#F43F5E",
+          "colorLink": "#F43F5E",
+          "colorText": "#141414",
+          "colorInfo": "#0066CC",
+          "colorError": "#C82333",
+          "colorSuccess": "#007A63",
+          "colorWarning": "#9A5D00",
+          "colorBorder": "#D9D9D9",
+          "colorBgContainer": "#FFFFFF",
+          "colorBgLayout": "#F5F5F5",
+          "screenXLMax": 1919,
+          "screenXXLMin": 1920,
+          "screenXXL": 1920,
+          "screenXXLMax": 2559,
+          "screenXXXLMin": 2560,
+          "screenXXXL": 2560
+        },
+        "components": {
+          "Tag": {
+            "borderRadiusSM": 1
+          },
+          "Layout": {
+            "lightSiderBg": "#FFF",
+            "siderBg": "#141414",
+            "headerBg": "#FB7185"
+          }
+        }
+      },
+      "dark": {
+        "token": {
+          "colorPrimary": "#FF97A8",
+          "colorLink": "#FF97A8",
+          "colorText": "#FFFFFF",
+          "colorInfo": "#009BDD",
+          "colorError": "#DC4446",
+          "colorSuccess": "#03A487",
+          "colorWarning": "#D89614",
+          "colorBorder": "#424242",
+          "colorBgContainer": "#1F1F1F",
+          "colorBgLayout": "#121212",
+          "screenXLMax": 1919,
+          "screenXXLMin": 1920,
+          "screenXXL": 1920,
+          "screenXXLMax": 2559,
+          "screenXXXLMin": 2560,
+          "screenXXXL": 2560
+        },
+        "components": {
+          "Tag": {
+            "borderRadiusSM": 1
+          },
+          "Layout": {
+            "lightSiderBg": "#FFF",
+            "siderBg": "#141414",
+            "headerBg": "#FB7185"
+          }
+        }
+      }
+    },
+    "bliss": {
+      "label": "Bliss",
+      "light": {
+        "token": {
+          "colorPrimary": "#0054E3",
+          "colorLink": "#0054E3",
+          "colorText": "#000000",
+          "colorInfo": "#0054E3",
+          "colorError": "#C00000",
+          "colorSuccess": "#2D7A1E",
+          "colorWarning": "#9A5700",
+          "colorBorder": "#ACA899",
+          "colorBgContainer": "#FFFFFF",
+          "colorBgLayout": "#ECE9D8",
+          "screenXLMax": 1919,
+          "screenXXLMin": 1920,
+          "screenXXL": 1920,
+          "screenXXLMax": 2559,
+          "screenXXXLMin": 2560,
+          "screenXXXL": 2560
+        },
+        "components": {
+          "Tag": {
+            "borderRadiusSM": 1
+          },
+          "Layout": {
+            "lightSiderBg": "#FFF",
+            "siderBg": "#1A3F8F",
+            "headerBg": "#245EDC"
+          }
+        }
+      },
+      "dark": {
+        "token": {
+          "colorPrimary": "#0044CC",
+          "colorLink": "#0044CC",
+          "colorText": "#E8E6E0",
+          "colorInfo": "#0044CC",
+          "colorError": "#FF5C5C",
+          "colorSuccess": "#4CAF50",
+          "colorWarning": "#FFB74D",
+          "colorBorder": "#3A3E48",
+          "colorBgContainer": "#22262E",
+          "colorBgLayout": "#1A1D24",
+          "screenXLMax": 1919,
+          "screenXXLMin": 1920,
+          "screenXXL": 1920,
+          "screenXXLMax": 2559,
+          "screenXXXLMin": 2560,
+          "screenXXXL": 2560
+        },
+        "components": {
+          "Tag": {
+            "borderRadiusSM": 1
+          },
+          "Layout": {
+            "lightSiderBg": "#FFF",
+            "siderBg": "#1C1C1E",
+            "headerBg": "#0044CC"
+          }
+        }
+      }
+    }
+  },
   "logo": {
     "src": "/manifest/backend.ai-webui-white.svg",
     "srcCollapsed": "/manifest/backend.ai-brand-simple-white.svg",
