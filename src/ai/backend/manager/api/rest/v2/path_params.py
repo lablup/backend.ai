@@ -128,3 +128,7 @@ class AccessKeyPathParam(BaseRequestModel):
 
 class InvitationIdPathParam(BaseRequestModel):
     invitation_id: UUID = Field(description="Invitation UUID")
+
+
+class IdleCheckerAssignmentIdPathParam(BaseRequestModel):
+    idle_checker_assignment_id: UUID = Field(description="Idle checker assignment UUID")

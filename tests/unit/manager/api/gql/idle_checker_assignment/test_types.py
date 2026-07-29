@@ -1,16 +1,16 @@
 from __future__ import annotations
 
-from ai.backend.common.dto.manager.v2.idle_checker_binding.types import IdleCheckerScopeTypeDTO
-from ai.backend.manager.api.gql.idle_checker_binding.types import (
-    IdleCheckerBindingScopeGQL,
+from ai.backend.common.dto.manager.v2.idle_checker_assignment.types import IdleCheckerScopeTypeDTO
+from ai.backend.manager.api.gql.idle_checker_assignment.types import (
+    IdleCheckerAssignmentScopeGQL,
     IdleCheckerScopeRefGQL,
     IdleCheckerScopeTypeGQL,
 )
 
 
-class TestIdleCheckerBindingInputs:
+class TestIdleCheckerAssignmentInputs:
     def test_scope_converts_to_dto(self) -> None:
-        input_ = IdleCheckerBindingScopeGQL(
+        input_ = IdleCheckerAssignmentScopeGQL(
             items=[
                 IdleCheckerScopeRefGQL(
                     scope_type=IdleCheckerScopeTypeGQL.PROJECT,

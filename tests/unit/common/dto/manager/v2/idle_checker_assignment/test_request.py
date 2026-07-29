@@ -5,12 +5,12 @@ import uuid
 import pytest
 from pydantic import ValidationError
 
-from ai.backend.common.dto.manager.v2.idle_checker_binding.request import (
-    CreateIdleCheckerBindingInput,
-    IdleCheckerBindingScopeDTO,
+from ai.backend.common.dto.manager.v2.idle_checker_assignment.request import (
+    CreateIdleCheckerAssignmentInput,
+    IdleCheckerAssignmentScopeDTO,
     IdleCheckerScopeRefDTO,
 )
-from ai.backend.common.dto.manager.v2.idle_checker_binding.types import IdleCheckerScopeTypeDTO
+from ai.backend.common.dto.manager.v2.idle_checker_assignment.types import IdleCheckerScopeTypeDTO
 from ai.backend.common.exception import BackendAISchemaValidationFailed
 from ai.backend.common.identifier.idle_checker import IdleCheckerID
 
@@ -37,15 +37,15 @@ class TestIdleCheckerScopeRef:
             )
 
 
-class TestIdleCheckerBindingScope:
+class TestIdleCheckerAssignmentScope:
     def test_rejects_empty_items(self) -> None:
         with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
-            IdleCheckerBindingScopeDTO(items=[])
+            IdleCheckerAssignmentScopeDTO(items=[])
 
 
-class TestCreateIdleCheckerBindingInput:
+class TestCreateIdleCheckerAssignmentInput:
     def test_enabled_defaults_to_true(self) -> None:
-        input_ = CreateIdleCheckerBindingInput(
+        input_ = CreateIdleCheckerAssignmentInput(
             scope=_domain_scope_ref(),
             idle_checker_id=IdleCheckerID(uuid.uuid4()),
         )

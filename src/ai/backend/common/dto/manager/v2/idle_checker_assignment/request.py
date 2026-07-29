@@ -11,12 +11,12 @@ from ai.backend.common.dto.manager.query import (
     UUIDFilter,
 )
 from ai.backend.common.dto.manager.v2.common import OrderDirection
-from ai.backend.common.dto.manager.v2.idle_checker_binding.types import (
-    IdleCheckerBindingOrderField,
+from ai.backend.common.dto.manager.v2.idle_checker_assignment.types import (
+    IdleCheckerAssignmentOrderField,
     IdleCheckerScopeTypeDTO,
     ScopeTypeFilter,
 )
-from ai.backend.common.identifier.idle_checker import IdleCheckerBindingID, IdleCheckerID
+from ai.backend.common.identifier.idle_checker import IdleCheckerAssignmentID, IdleCheckerID
 
 
 class IdleCheckerScopeRefDTO(BaseRequestModel):
@@ -29,8 +29,8 @@ class IdleCheckerScopeRefDTO(BaseRequestModel):
     )
 
 
-class IdleCheckerBindingScopeDTO(BaseRequestModel):
-    """Scope for the scoped idle checker binding query.
+class IdleCheckerAssignmentScopeDTO(BaseRequestModel):
+    """Scope for the scoped idle checker assignment query.
 
     All items are OR'd. Raises an error if the item list is empty.
     """
@@ -40,25 +40,25 @@ class IdleCheckerBindingScopeDTO(BaseRequestModel):
     )
 
 
-class CreateIdleCheckerBindingInput(BaseRequestModel):
+class CreateIdleCheckerAssignmentInput(BaseRequestModel):
     scope: IdleCheckerScopeRefDTO = Field(description="Scope the checker is bound to.")
     idle_checker_id: IdleCheckerID = Field(description="Idle checker to bind.")
     enabled: bool = Field(
         default=True,
-        description="Whether the binding participates in idle checking.",
+        description="Whether the assignment participates in idle checking.",
     )
 
 
-class UpdateIdleCheckerBindingInput(BaseRequestModel):
-    id: IdleCheckerBindingID = Field(description="Idle checker binding ID to update.")
+class UpdateIdleCheckerAssignmentInput(BaseRequestModel):
+    id: IdleCheckerAssignmentID = Field(description="Idle checker assignment ID to update.")
     enabled: bool = Field(description="New enabled state.")
 
 
-class PurgeIdleCheckerBindingInput(BaseRequestModel):
-    id: IdleCheckerBindingID = Field(description="Idle checker binding ID to purge.")
+class PurgeIdleCheckerAssignmentInput(BaseRequestModel):
+    id: IdleCheckerAssignmentID = Field(description="Idle checker assignment ID to purge.")
 
 
-class IdleCheckerBindingFilter(BaseRequestModel):
+class IdleCheckerAssignmentFilter(BaseRequestModel):
     scope_type: ScopeTypeFilter | None = Field(default=None)
     scope_id: StringFilter | None = Field(default=None)
     idle_checker_id: UUIDFilter | None = Field(default=None)
@@ -70,17 +70,17 @@ class IdleCheckerBindingFilter(BaseRequestModel):
     NOT: list[Self] | None = Field(default=None)
 
 
-IdleCheckerBindingFilter.model_rebuild()
+IdleCheckerAssignmentFilter.model_rebuild()
 
 
-class IdleCheckerBindingOrder(BaseRequestModel):
-    field: IdleCheckerBindingOrderField
+class IdleCheckerAssignmentOrder(BaseRequestModel):
+    field: IdleCheckerAssignmentOrderField
     direction: OrderDirection = Field(default=OrderDirection.ASC)
 
 
-class SearchIdleCheckerBindingsInput(BaseRequestModel):
-    filter: IdleCheckerBindingFilter | None = Field(default=None)
-    order: list[IdleCheckerBindingOrder] | None = Field(default=None)
+class SearchIdleCheckerAssignmentsInput(BaseRequestModel):
+    filter: IdleCheckerAssignmentFilter | None = Field(default=None)
+    order: list[IdleCheckerAssignmentOrder] | None = Field(default=None)
     first: int | None = Field(default=None, ge=1)
     after: str | None = Field(default=None)
     last: int | None = Field(default=None, ge=1)
@@ -89,10 +89,10 @@ class SearchIdleCheckerBindingsInput(BaseRequestModel):
     offset: int | None = Field(default=None, ge=0)
 
 
-class ScopedSearchIdleCheckerBindingsInput(BaseRequestModel):
-    scope: IdleCheckerBindingScopeDTO = Field(description="Scope (OR across all items).")
-    filter: IdleCheckerBindingFilter | None = Field(default=None)
-    order: list[IdleCheckerBindingOrder] | None = Field(default=None)
+class ScopedSearchIdleCheckerAssignmentsInput(BaseRequestModel):
+    scope: IdleCheckerAssignmentScopeDTO = Field(description="Scope (OR across all items).")
+    filter: IdleCheckerAssignmentFilter | None = Field(default=None)
+    order: list[IdleCheckerAssignmentOrder] | None = Field(default=None)
     first: int | None = Field(default=None, ge=1)
     after: str | None = Field(default=None)
     last: int | None = Field(default=None, ge=1)

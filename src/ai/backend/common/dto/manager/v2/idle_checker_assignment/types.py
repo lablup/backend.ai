@@ -18,7 +18,7 @@ class ScopeTypeFilter(BaseRequestModel):
     in_: list[IdleCheckerScopeTypeDTO] | None = Field(default=None, alias="in")
 
 
-class IdleCheckerBindingOrderField(StrEnum):
+class IdleCheckerAssignmentOrderField(StrEnum):
     SCOPE_TYPE = "scope_type"
     ENABLED = "enabled"
     CREATED_AT = "created_at"
