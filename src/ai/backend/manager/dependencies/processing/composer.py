@@ -32,6 +32,9 @@ from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.monitors.audit_log import AuditLogMonitor
 from ai.backend.manager.actions.monitors.prometheus import PrometheusMonitor
 from ai.backend.manager.actions.monitors.reporter import ReporterMonitor
+from ai.backend.manager.actions.scope.monitor.audit_log import ScopeActionAuditLogMonitor
+from ai.backend.manager.actions.scope.monitor.prometheus import ScopeActionPrometheusMonitor
+from ai.backend.manager.actions.scope.monitor.reporter import ScopeActionReporterMonitor
 from ai.backend.manager.actions.scope.validator.rbac import (
     VirtualScopeScopeActionRBACValidator,
 )
@@ -254,6 +257,11 @@ class ProcessingComposer(DependencyComposer[ProcessingInput, ProcessingResources
                 SingleEntityActionReporterMonitor(reporter_hub),
                 SingleEntityActionPrometheusMonitor(),
                 SingleEntityActionAuditLogMonitor(audit_log_repository),
+            ],
+            scope=[
+                ScopeActionReporterMonitor(reporter_hub),
+                ScopeActionPrometheusMonitor(),
+                ScopeActionAuditLogMonitor(audit_log_repository),
             ],
         )
 
