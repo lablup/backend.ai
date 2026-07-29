@@ -68,6 +68,15 @@ def deployment() -> None:
     """Admin deployment commands."""
 
 
+@admin.group(
+    cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.admin.idle_checker_assignment:idle_checker_assignment",
+    name="idle-checker-assignment",
+)
+def idle_checker_assignment() -> None:
+    """Admin idle checker assignment commands."""
+
+
 @admin.group(cls=LazyGroup, import_name="ai.backend.client.cli.v2.admin.image:image")
 def image() -> None:
     """Admin image commands."""

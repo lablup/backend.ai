@@ -100,6 +100,7 @@ Check options with `--help`.
 
 - **audit-log**: user(search)
 - **fair-share**: sub domain / project / user — each (get, search)
+- **idle-checker-assignment**: user(scoped-search, update, purge) · admin(create, search)
 - **notification**: sub channel(get, search, delete), rule(get, search, delete)
 - **prometheus-query-definition**: user(get, search, execute) · admin(create, update, delete, preview)
 - **prometheus-query-definition-category**: user(get, search) · admin(create, delete)
