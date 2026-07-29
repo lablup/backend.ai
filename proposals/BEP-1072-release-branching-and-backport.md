@@ -25,7 +25,7 @@ This BEP redefines the release procedure as **three actions** — the rc release
 **Non-goals**
 
 - Defining version grades (Edge/LTS) and support periods — that belongs to the support policy document. Here we deal only with the **list of maintained versions**.
-- Automatic conflict resolution for backports, `Fixes:` trailers, and deterministic backport scope inference in CI — see 3.(b) for the advisory split.
+- Automatic conflict resolution for backports and `Fixes:` trailers. Inferring backport scope in CI is rejected outright, not deferred — see 3.(b).
 - Moving **code** backward from a version branch to `main`. Branch-only code commits measured zero, so we state the principle only and build no workflow.
 - Taking the WebUI bundle out of the release artifact. It has to ship inside the artifact for now, so 3.(d) only decouples **when** the bundle is pinned, not where it lives.
 - Alembic backport policy and changes to the version numbering scheme. Milestones stay for release planning; they are dropped only from the backport decision.
@@ -60,8 +60,7 @@ For each area, separate **✅ what already exists** from **➕ what to add**. Me
 | ✅ | `backport.yml` reads the PR **milestone**, keeps only those with a branch of the same name, and fans out to every version at or above it |
 | ✅ | Current milestones are `Backlog/26.5/26.4/25.15` while `main` develops 26.8 — so `26.5` works as an accidental opt-out |
 | ➕ | Drop the milestone. Decide from the **PR title prefix + labels** and check against the version list in `.github/maintained-versions.yml` |
-| ➕ | Silently exclude a target when the PR touched none of its files |
-| ➕ | Keep CI's decision deterministic; put scope *suggestion* in an advisory skill (3.(b)) |
+| ➕ | Attempt every target in the decided set — no pre-filtering, so an inapplicable fix surfaces as a draft PR instead of a silent skip (3.(b)) |
 
 ### 2.4 Backport failure handling
 
@@ -125,12 +124,11 @@ The rc period is nominally **one week** (enough for feature verification and tes
 | # | Action |
 |---|---|
 | 1 | Decide targets — `fix:` → every version in `maintained-versions.yml` / a `backport:<version>` label or `/backport` comment → additional targets / `no-backport` → none / any other prefix → none |
-| 2 | Silently exclude a target when the PR touched none of its files |
-| 3 | Cherry-pick — on success open a PR with auto-merge, on conflict open a **draft PR** + `pending:backport` |
+| 2 | Cherry-pick **every** target — on success open a PR with auto-merge, on conflict open a **draft PR** + `pending:backport` |
 
 A fix that lands in an older version applies to every newer live version as well (so the bug does not come back on upgrade).
 
-**How far back a fix should go is not decided in CI.** Step 1 uses only what CI knows for certain — prefix, labels, changed files. Which releases actually contain the bug can only be inferred (blame the changed hunks → find the introducing commit → `git tag --contains`), and that inference is unreliable across refactors and file moves. So it lives in an advisory skill that comments a suggested target set on the PR; a human confirms with a label. The skill never gates the merge.
+**Every target is attempted; none is pre-filtered.** CI does not try to work out whether a fix belongs in a given version. That can only be inferred (blame the changed hunks → find the introducing commit → `git tag --contains`), the inference is unreliable across refactors and file moves, and dropping a target on its basis would be exactly the silent skip this BEP sets out to remove. A cherry-pick that cannot apply is therefore not a failure to hide but the signal itself: the draft PR is where the skill decides, either resolving the conflict or judging the fix unnecessary for that version and closing it with the reason recorded.
 
 **Failures are recorded as results too.** Left as draft PRs, the per-version outstanding list is visible as a PR list, and the same skill classifies and cleans it up. Put a required-checks ruleset on the version branches so auto-merge cannot skip CI — `ci.yml`'s push filter already carries the release branch patterns, so no workflow change is needed.
 
@@ -196,7 +194,7 @@ rc releases are published to PyPI like any other tag; `make-final-release` alrea
 | Work | Content |
 |---|---|
 | **Version management in CI** | New `cut-release-branch.sh` (the whole cut PR procedure, absorbing freeze/bump out of `release.sh`), a workflow that tags and branches from `merge_commit_sha` on release-PR merge, align `VERSION` on `main` |
-| **Label-based backport + advisory skill** | Introduce `maintained-versions.yml`, replace target decision in `backport.yml` (keep the matrix JSON shape → downstream jobs unchanged), pre-filter, remove `-X theirs`, draft PR on conflict, fix trailers, `backport:<version>` and `no-backport` labels, a Claude skill that suggests target scope on a PR and that lists, classifies, and cleans up `pending:backport` PRs |
+| **Label-based backport + triage skill** | Introduce `maintained-versions.yml`, replace target decision in `backport.yml` (keep the matrix JSON shape → downstream jobs unchanged), remove `-X theirs`, draft PR on conflict, fix trailers, `backport:<version>` and `no-backport` labels, a Claude skill that lists `pending:backport` PRs and disposes of each one — resolve the conflict, or close it with the reason the fix does not apply to that version |
 | **WebUI decoupling** | Drop `webui_version` from `release.sh` so the bundle is pinned by its own PR, add a CI check that rejects `docs/manager/graphql-reference/` changes on version-branch PRs, and optionally warn when `static/version.json` lags the release version |
 | **Changelog split and script cleanup** | Per-version-branch files via a temporary towncrier config (written at the repo root so its relative `directory`/`template` paths resolve), towncrier skip guard, hardcoding and prerelease handling in `extract-release-changelog.py`, new `changelog-sync.yml`, 2 CI bugs (the edge-release regex `[0-9]{2}\.[0-9]{2}` never matches a `YY.S` branch, `X.Y.0rc1` in `check-backport-commits.py`), update `daily-workflows.rst` |
 
@@ -211,7 +209,7 @@ rc releases are published to PyPI like any other tag; `make-final-release` alrea
 | `VERSION` | The version that tree **released last**. Only release commits update it, so it always matches the tag, there is no need to overwrite it at build time, and an rc claiming a final version on PyPI becomes structurally impossible |
 | `NEXT_RELEASE_VERSION` | Frozen and then bumped to the next target in the cut PR. The branch inherits `<next>.0`, but new fields are `feat:` and thus not automated backport targets |
 | Backport targets | Milestone dropped. Prefix + labels + `maintained-versions.yml`. Grades and support periods are outside this BEP |
-| Backport scope | CI decides deterministically; how far back a fix belongs is **suggested by an advisory skill**, confirmed by a human label, and never gates a merge |
+| Backport scope | **Always backport to every target in the decided set**, never pre-filtered. A cherry-pick that cannot apply becomes a draft PR the skill resolves or closes with a recorded reason |
 | Backport failure | Not silently overwritten (`-X theirs` removed); left as a draft PR |
 | Changelog file | **Per version branch**. Splitting per release would leave the `.0` file holding only the post-rc delta, so the final content would never reach `main` |
 | Changelog content | Complete release note from the rc onward, consolidated at the final release; a patch release records only the fixes backported into it |
