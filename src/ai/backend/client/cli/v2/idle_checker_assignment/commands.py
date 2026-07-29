@@ -21,8 +21,8 @@ def idle_checker_assignment() -> None:
     """Idle checker assignment commands."""
 
 
-def _parse_scope_items(scopes: tuple[str, ...]) -> list[tuple[IdleCheckerScopeTypeDTO, str]]:
-    items: list[tuple[IdleCheckerScopeTypeDTO, str]] = []
+def _parse_scope_items(scopes: tuple[str, ...]) -> list[tuple[IdleCheckerScopeTypeDTO, uuid.UUID]]:
+    items: list[tuple[IdleCheckerScopeTypeDTO, uuid.UUID]] = []
     for raw in scopes:
         scope_type_raw, sep, scope_id = raw.partition(":")
         if not sep or not scope_id:
@@ -38,7 +38,14 @@ def _parse_scope_items(scopes: tuple[str, ...]) -> list[tuple[IdleCheckerScopeTy
                 f"Unknown scope type {scope_type_raw!r}; expected one of: {valid}.",
                 param_hint="--scope",
             ) from None
-        items.append((scope_type, scope_id))
+        try:
+            scope_uuid = uuid.UUID(scope_id)
+        except ValueError:
+            raise click.BadParameter(
+                f"Scope identifier {scope_id!r} must be a UUID.",
+                param_hint="--scope",
+            ) from None
+        items.append((scope_type, scope_uuid))
     return items
 
 

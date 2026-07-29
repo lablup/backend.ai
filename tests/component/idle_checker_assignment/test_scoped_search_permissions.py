@@ -37,11 +37,11 @@ class TestScopedIdleCheckerAssignmentSearchPermissions:
                     items=[
                         IdleCheckerScopeRefDTO(
                             scope_type=IdleCheckerScopeTypeDTO.DOMAIN,
-                            scope_id=str(assignment_seed.domain_id),
+                            scope_id=assignment_seed.domain_id,
                         ),
                         IdleCheckerScopeRefDTO(
                             scope_type=IdleCheckerScopeTypeDTO.PROJECT,
-                            scope_id=str(assignment_seed.project_id),
+                            scope_id=assignment_seed.project_id,
                         ),
                     ]
                 )
@@ -66,7 +66,7 @@ class TestScopedIdleCheckerAssignmentSearchPermissions:
                     items=[
                         IdleCheckerScopeRefDTO(
                             scope_type=IdleCheckerScopeTypeDTO.PROJECT,
-                            scope_id=str(assignment_seed.project_id),
+                            scope_id=assignment_seed.project_id,
                         ),
                     ]
                 )
@@ -89,11 +89,11 @@ class TestScopedIdleCheckerAssignmentSearchPermissions:
                         items=[
                             IdleCheckerScopeRefDTO(
                                 scope_type=IdleCheckerScopeTypeDTO.PROJECT,
-                                scope_id=str(assignment_seed.project_id),
+                                scope_id=assignment_seed.project_id,
                             ),
                             IdleCheckerScopeRefDTO(
                                 scope_type=IdleCheckerScopeTypeDTO.DOMAIN,
-                                scope_id=str(assignment_seed.domain_id),
+                                scope_id=assignment_seed.domain_id,
                             ),
                         ]
                     )
@@ -113,7 +113,7 @@ class TestScopedIdleCheckerAssignmentSearchPermissions:
                         items=[
                             IdleCheckerScopeRefDTO(
                                 scope_type=IdleCheckerScopeTypeDTO.DOMAIN,
-                                scope_id=str(assignment_seed.domain_id),
+                                scope_id=assignment_seed.domain_id,
                             ),
                         ]
                     )
@@ -134,7 +134,7 @@ class TestScopedIdleCheckerAssignmentSearchPermissions:
                         items=[
                             IdleCheckerScopeRefDTO(
                                 scope_type=IdleCheckerScopeTypeDTO.PROJECT,
-                                scope_id=str(assignment_seed.other_project_id),
+                                scope_id=assignment_seed.other_project_id,
                             ),
                         ]
                     )

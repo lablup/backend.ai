@@ -31,7 +31,7 @@ def idle_checker_assignment() -> None:
 @click.option(
     "--scope-id",
     required=True,
-    type=str,
+    type=click.UUID,
     help="Scope identifier (UUID), interpreted according to the scope type.",
 )
 @click.option("--idle-checker-id", required=True, type=click.UUID, help="Idle checker to bind.")
@@ -40,7 +40,7 @@ def idle_checker_assignment() -> None:
     default=True,
     help="Whether the assignment participates in idle checking (default: enabled).",
 )
-def create(scope_type: str, scope_id: str, idle_checker_id: uuid.UUID, enabled: bool) -> None:
+def create(scope_type: str, scope_id: uuid.UUID, idle_checker_id: uuid.UUID, enabled: bool) -> None:
     """Bind a global idle checker to a scope."""
     from ai.backend.common.dto.manager.v2.idle_checker_assignment.request import (
         CreateIdleCheckerAssignmentInput,
