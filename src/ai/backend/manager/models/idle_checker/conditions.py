@@ -7,7 +7,6 @@ from uuid import UUID
 import sqlalchemy as sa
 
 from ai.backend.common.data.filter_specs import (
-    StringInMatchSpec,
     StringMatchSpec,
     UUIDEqualMatchSpec,
     UUIDInMatchSpec,
@@ -199,15 +198,9 @@ class IdleCheckerAssignmentConditions:
         return inner
 
     @staticmethod
-    def by_scope_id_equals(spec: StringMatchSpec) -> QueryCondition:
+    def by_scope_id_equals(spec: UUIDEqualMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            if spec.case_insensitive:
-                condition = (
-                    sa.func.lower(sa.cast(IdleCheckerBindingRow.scope_id, sa.String))
-                    == spec.value.lower()
-                )
-            else:
-                condition = sa.cast(IdleCheckerBindingRow.scope_id, sa.String) == spec.value
+            condition = IdleCheckerBindingRow.scope_id == spec.value
             if spec.negated:
                 condition = sa.not_(condition)
             return condition
@@ -215,66 +208,9 @@ class IdleCheckerAssignmentConditions:
         return inner
 
     @staticmethod
-    def by_scope_id_contains(spec: StringMatchSpec) -> QueryCondition:
+    def by_scope_id_in(spec: UUIDInMatchSpec) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            if spec.case_insensitive:
-                condition = sa.cast(IdleCheckerBindingRow.scope_id, sa.String).ilike(
-                    f"%{spec.value}%"
-                )
-            else:
-                condition = sa.cast(IdleCheckerBindingRow.scope_id, sa.String).like(
-                    f"%{spec.value}%"
-                )
-            if spec.negated:
-                condition = sa.not_(condition)
-            return condition
-
-        return inner
-
-    @staticmethod
-    def by_scope_id_starts_with(spec: StringMatchSpec) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            if spec.case_insensitive:
-                condition = sa.cast(IdleCheckerBindingRow.scope_id, sa.String).ilike(
-                    f"{spec.value}%"
-                )
-            else:
-                condition = sa.cast(IdleCheckerBindingRow.scope_id, sa.String).like(
-                    f"{spec.value}%"
-                )
-            if spec.negated:
-                condition = sa.not_(condition)
-            return condition
-
-        return inner
-
-    @staticmethod
-    def by_scope_id_ends_with(spec: StringMatchSpec) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            if spec.case_insensitive:
-                condition = sa.cast(IdleCheckerBindingRow.scope_id, sa.String).ilike(
-                    f"%{spec.value}"
-                )
-            else:
-                condition = sa.cast(IdleCheckerBindingRow.scope_id, sa.String).like(
-                    f"%{spec.value}"
-                )
-            if spec.negated:
-                condition = sa.not_(condition)
-            return condition
-
-        return inner
-
-    @staticmethod
-    def by_scope_id_in(spec: StringInMatchSpec) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            if spec.case_insensitive:
-                values = [value.lower() for value in spec.values]
-                condition = sa.func.lower(sa.cast(IdleCheckerBindingRow.scope_id, sa.String)).in_(
-                    values
-                )
-            else:
-                condition = sa.cast(IdleCheckerBindingRow.scope_id, sa.String).in_(spec.values)
+            condition = IdleCheckerBindingRow.scope_id.in_(spec.values)
             if spec.negated:
                 condition = sa.not_(condition)
             return condition
