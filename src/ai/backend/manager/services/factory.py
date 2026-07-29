@@ -68,6 +68,10 @@ from ai.backend.manager.services.group.processors import GroupProcessors
 from ai.backend.manager.services.group.service import GroupService
 from ai.backend.manager.services.idle_checker.processors import IdleCheckerProcessors
 from ai.backend.manager.services.idle_checker.service import IdleCheckerService
+from ai.backend.manager.services.idle_checker_assignment.processors import (
+    IdleCheckerAssignmentProcessors,
+)
+from ai.backend.manager.services.idle_checker_assignment.service import IdleCheckerAssignmentService
 from ai.backend.manager.services.image.processors import ImageProcessors
 from ai.backend.manager.services.image.service import ImageService
 from ai.backend.manager.services.keypair_resource_policy.processors import (
@@ -433,6 +437,7 @@ def create_services(args: ServiceArgs) -> Services:
         ),
         storage_namespace=StorageNamespaceService(repositories.storage_namespace.repository),
         audit_log=AuditLogService(repositories.audit_log.repository),
+        idle_checker_assignment=IdleCheckerAssignmentService(repositories.idle_checker.repository),
         scheduling_history=SchedulingHistoryService(repositories.scheduling_history.repository),
         service_catalog=ServiceCatalogService(args.db),
         template=TemplateService(
@@ -565,6 +570,9 @@ def create_processors(
             services.storage_namespace, action_monitors, validators
         ),
         audit_log=AuditLogProcessors(services.audit_log, [], validators),
+        idle_checker_assignment=IdleCheckerAssignmentProcessors(
+            services.idle_checker_assignment, action_monitors, validators
+        ),
         scheduling_history=SchedulingHistoryProcessors(
             services.scheduling_history, action_monitors, validators
         ),

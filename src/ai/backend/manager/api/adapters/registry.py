@@ -26,6 +26,9 @@ from ai.backend.manager.api.adapters.domain.adapter import DomainAdapter
 from ai.backend.manager.api.adapters.fair_share.adapter import FairShareAdapter
 from ai.backend.manager.api.adapters.huggingface_registry.adapter import HuggingFaceRegistryAdapter
 from ai.backend.manager.api.adapters.idle_checker.adapter import IdleCheckerAdapter
+from ai.backend.manager.api.adapters.idle_checker_assignment.adapter import (
+    IdleCheckerAssignmentAdapter,
+)
 from ai.backend.manager.api.adapters.image.adapter import ImageAdapter
 from ai.backend.manager.api.adapters.login_client_type.adapter import LoginClientTypeAdapter
 from ai.backend.manager.api.adapters.login_history.adapter import LoginHistoryAdapter
@@ -95,6 +98,7 @@ class Adapters:
         fair_share: FairShareAdapter,
         huggingface_registry: HuggingFaceRegistryAdapter,
         idle_checker: IdleCheckerAdapter,
+        idle_checker_assignment: IdleCheckerAssignmentAdapter,
         image: ImageAdapter,
         login_client_type: LoginClientTypeAdapter,
         login_history: LoginHistoryAdapter,
@@ -141,6 +145,7 @@ class Adapters:
         self.fair_share = fair_share
         self.huggingface_registry = huggingface_registry
         self.idle_checker = idle_checker
+        self.idle_checker_assignment = idle_checker_assignment
         self.image = image
         self.login_client_type = login_client_type
         self.login_history = login_history
@@ -206,6 +211,7 @@ class Adapters:
             fair_share=FairShareAdapter(processors),
             huggingface_registry=HuggingFaceRegistryAdapter(processors),
             idle_checker=IdleCheckerAdapter(processors),
+            idle_checker_assignment=IdleCheckerAssignmentAdapter(processors),
             image=ImageAdapter(processors),
             login_client_type=LoginClientTypeAdapter(processors),
             login_history=LoginHistoryAdapter(processors),

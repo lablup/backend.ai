@@ -4,15 +4,18 @@ from collections.abc import Collection, Sequence
 
 from ai.backend.common.data.idle_checker.types import IdleCheckPhase
 from ai.backend.manager.data.common.types import SearchResult
-from ai.backend.manager.data.idle_checker.types import IdleCheckerData
+from ai.backend.manager.data.idle_checker.types import IdleCheckerAssignmentData, IdleCheckerData
 from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.models.idle_checker.row import IdleCheckerRow
+from ai.backend.manager.models.idle_checker.row import IdleCheckerBindingRow, IdleCheckerRow
+from ai.backend.manager.models.scopes import SearchScope
 from ai.backend.manager.repositories.base import (
     BatchQuerier,
     Creator,
     Purger,
     Updater,
 )
+from ai.backend.manager.repositories.base.rbac.entity_purger import RBACEntityPurger
+from ai.backend.manager.repositories.idle_checker.creators import IdleCheckerAssignmentCreatorSpec
 from ai.backend.manager.repositories.idle_checker.db_source.db_source import IdleCheckerDBSource
 from ai.backend.manager.repositories.idle_checker.types import (
     ExpiredIdleCheckBatchData,
@@ -46,6 +49,34 @@ class IdleCheckerRepository:
 
     async def admin_search(self, querier: BatchQuerier) -> SearchResult[IdleCheckerData]:
         return await self._db_source.admin_search(querier)
+
+    async def create_assignment(
+        self, spec: IdleCheckerAssignmentCreatorSpec
+    ) -> IdleCheckerAssignmentData:
+        return await self._db_source.create_assignment(spec)
+
+    async def update_assignment(
+        self, updater: Updater[IdleCheckerBindingRow]
+    ) -> IdleCheckerAssignmentData:
+        return await self._db_source.update_assignment(updater)
+
+    async def purge_assignment(
+        self, purger: RBACEntityPurger[IdleCheckerBindingRow]
+    ) -> IdleCheckerAssignmentData:
+        return await self._db_source.purge_assignment(purger)
+
+    async def admin_search_assignments(
+        self, querier: BatchQuerier
+    ) -> SearchResult[IdleCheckerAssignmentData]:
+        return await self._db_source.admin_search_assignments(querier)
+
+    async def scoped_search_assignments(
+        self,
+        querier: BatchQuerier,
+        scopes: Sequence[SearchScope],
+    ) -> SearchResult[IdleCheckerAssignmentData]:
+        """Search bindings whose rows match any of ``scopes`` (OR), narrowed by ``querier``."""
+        return await self._db_source.scoped_search_assignments(querier, scopes)
 
     async def fetch_judgment_batch(
         self, session_statuses: Collection[SessionStatus]

@@ -10732,6 +10732,501 @@
         "title": "UpdateIdleCheckerInput",
         "type": "object"
       },
+      "IdleCheckerScopeRefDTO": {
+        "description": "A typed (scope_type, scope_id) pair referencing one scope.",
+        "properties": {
+          "scope_type": {
+            "$ref": "#/components/schemas/IdleCheckerScopeTypeDTO",
+            "description": "Kind of the scope."
+          },
+          "scope_id": {
+            "description": "Scope identifier, interpreted according to the scope type.",
+            "format": "uuid",
+            "title": "Scope Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "scope_type",
+          "scope_id"
+        ],
+        "title": "IdleCheckerScopeRefDTO",
+        "type": "object"
+      },
+      "IdleCheckerScopeTypeDTO": {
+        "enum": [
+          "domain",
+          "project",
+          "resource_group"
+        ],
+        "title": "IdleCheckerScopeTypeDTO",
+        "type": "string"
+      },
+      "CreateIdleCheckerAssignmentInput": {
+        "properties": {
+          "scope": {
+            "$ref": "#/components/schemas/IdleCheckerScopeRefDTO",
+            "description": "Scope the checker is bound to."
+          },
+          "idle_checker_id": {
+            "description": "Idle checker to bind.",
+            "format": "uuid",
+            "title": "Idle Checker Id",
+            "type": "string"
+          },
+          "enabled": {
+            "default": true,
+            "description": "Whether the assignment participates in idle checking.",
+            "title": "Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "scope",
+          "idle_checker_id"
+        ],
+        "title": "CreateIdleCheckerAssignmentInput",
+        "type": "object"
+      },
+      "IdleCheckerAssignmentFilter": {
+        "properties": {
+          "scope_type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ScopeTypeFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "scope_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "idle_checker_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Enabled"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DateTimeFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DateTimeFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "AND": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/IdleCheckerAssignmentFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "And"
+          },
+          "OR": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/IdleCheckerAssignmentFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Or"
+          },
+          "NOT": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/IdleCheckerAssignmentFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Not"
+          }
+        },
+        "title": "IdleCheckerAssignmentFilter",
+        "type": "object"
+      },
+      "IdleCheckerAssignmentOrder": {
+        "properties": {
+          "field": {
+            "$ref": "#/components/schemas/IdleCheckerAssignmentOrderField"
+          },
+          "direction": {
+            "$ref": "#/components/schemas/OrderDirection",
+            "default": "ASC"
+          }
+        },
+        "required": [
+          "field"
+        ],
+        "title": "IdleCheckerAssignmentOrder",
+        "type": "object"
+      },
+      "IdleCheckerAssignmentOrderField": {
+        "enum": [
+          "scope_type",
+          "enabled",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "IdleCheckerAssignmentOrderField",
+        "type": "string"
+      },
+      "ScopeTypeFilter": {
+        "properties": {
+          "equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/IdleCheckerScopeTypeDTO"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/IdleCheckerScopeTypeDTO"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "In"
+          }
+        },
+        "title": "ScopeTypeFilter",
+        "type": "object"
+      },
+      "SearchIdleCheckerAssignmentsInput": {
+        "properties": {
+          "filter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/IdleCheckerAssignmentFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "order": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/IdleCheckerAssignmentOrder"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Order"
+          },
+          "first": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "First"
+          },
+          "after": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "After"
+          },
+          "last": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Last"
+          },
+          "before": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Before"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Limit"
+          },
+          "offset": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Offset"
+          }
+        },
+        "title": "SearchIdleCheckerAssignmentsInput",
+        "type": "object"
+      },
+      "IdleCheckerAssignmentScopeDTO": {
+        "description": "Scope for the scoped idle checker assignment query.\n\nAll items are OR'd. Raises an error if the item list is empty.",
+        "properties": {
+          "items": {
+            "description": "Scope-tagged items (OR across all items).",
+            "items": {
+              "$ref": "#/components/schemas/IdleCheckerScopeRefDTO"
+            },
+            "minItems": 1,
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "IdleCheckerAssignmentScopeDTO",
+        "type": "object"
+      },
+      "ScopedSearchIdleCheckerAssignmentsInput": {
+        "properties": {
+          "scope": {
+            "$ref": "#/components/schemas/IdleCheckerAssignmentScopeDTO",
+            "description": "Scope (OR across all items)."
+          },
+          "filter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/IdleCheckerAssignmentFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
+          },
+          "order": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/IdleCheckerAssignmentOrder"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Order"
+          },
+          "first": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "First"
+          },
+          "after": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "After"
+          },
+          "last": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Last"
+          },
+          "before": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Before"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Limit"
+          },
+          "offset": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Offset"
+          }
+        },
+        "required": [
+          "scope"
+        ],
+        "title": "ScopedSearchIdleCheckerAssignmentsInput",
+        "type": "object"
+      },
+      "UpdateIdleCheckerAssignmentInput": {
+        "properties": {
+          "id": {
+            "description": "Idle checker assignment ID to update.",
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "enabled": {
+            "description": "New enabled state.",
+            "title": "Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "enabled"
+        ],
+        "title": "UpdateIdleCheckerAssignmentInput",
+        "type": "object"
+      },
       "ImageAliasNestedFilterInputDTO": {
         "description": "Nested filter for image aliases within an image.",
         "properties": {
@@ -15932,6 +16427,7 @@
           "keypair",
           "notification_channel",
           "network",
+          "idle_checker_assignment",
           "resource_group",
           "container_registry",
           "storage_host",
@@ -44259,6 +44755,158 @@
           }
         ],
         "description": "\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/idle-checker-assignments/": {
+      "post": {
+        "operationId": "v2/idle-checker-assignments.admin_create",
+        "tags": [
+          "v2/idle-checker-assignments"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateIdleCheckerAssignmentInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Bind a global idle checker to a scope (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/idle-checker-assignments/search": {
+      "post": {
+        "operationId": "v2/idle-checker-assignments.admin_search",
+        "tags": [
+          "v2/idle-checker-assignments"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SearchIdleCheckerAssignmentsInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Search idle checker assignments across all scopes (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/idle-checker-assignments/scoped/search": {
+      "post": {
+        "operationId": "v2/idle-checker-assignments.scoped_search",
+        "tags": [
+          "v2/idle-checker-assignments"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScopedSearchIdleCheckerAssignmentsInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Search idle checker assignments within the given scopes (per-item RBAC).\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/idle-checker-assignments/{idle_checker_assignment_id}": {
+      "patch": {
+        "operationId": "v2/idle-checker-assignments.update",
+        "tags": [
+          "v2/idle-checker-assignments"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateIdleCheckerAssignmentInput"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "idle_checker_assignment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Update an idle checker assignment's enabled state by id.\n\n**Preconditions:**\n* User privilege required.\n"
+      },
+      "delete": {
+        "operationId": "v2/idle-checker-assignments.purge",
+        "tags": [
+          "v2/idle-checker-assignments"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "idle_checker_assignment_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Permanently remove an idle checker assignment by id.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/images/search": {

@@ -7,9 +7,10 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common.data.idle_checker.types import CheckerType, IdleCheckerSpec, IdleCheckPhase
-from ai.backend.common.identifier.idle_checker import IdleCheckerID
+from ai.backend.common.data.permission.types import ScopeType
+from ai.backend.common.identifier.idle_checker import IdleCheckerAssignmentID, IdleCheckerID
 from ai.backend.common.types import SessionId, SessionTypes
-from ai.backend.manager.data.idle_checker.types import IdleCheckerData
+from ai.backend.manager.data.idle_checker.types import IdleCheckerAssignmentData, IdleCheckerData
 from ai.backend.manager.models.base import GUID, Base, PydanticColumn, StrEnumType
 from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin, UpdatedAtMixin
 
@@ -92,6 +93,17 @@ class IdleCheckerBindingRow(LifecycleTimestampsMixin, Base):  # type: ignore[mis
     enabled: Mapped[bool] = mapped_column(
         "enabled", sa.Boolean, nullable=False, server_default=sa.true()
     )
+
+    def to_data(self) -> IdleCheckerAssignmentData:
+        return IdleCheckerAssignmentData(
+            id=IdleCheckerAssignmentID(self.id),
+            scope_type=ScopeType(self.scope_type),
+            scope_id=self.scope_id,
+            idle_checker_id=self.idle_checker_id,
+            enabled=self.enabled,
+            created_at=self.created_at,
+            updated_at=self.updated_at,
+        )
 
 
 class SessionIdleCheckRow(UpdatedAtMixin, Base):  # type: ignore[misc]
