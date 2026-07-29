@@ -47,11 +47,14 @@ For each area, separate **✅ what already exists** from **➕ what to add**.
 | ✅ | `ScalingGroupOpts.preemption = PreemptionConfig(preemptible_priority=5, order, mode)`, `PreemptionMode=terminate\|reschedule`, `PreemptionOrder=oldest\|newest` (BEP-1014's "suspend" is a typo). **No on/off field** |
 | ✅ | `SessionStatus`: PENDING, **DEPRIORITIZING** (on retry give-up, lowers its own priority by 10 and returns to PENDING), ..., TERMINATING, TERMINATED |
 | ➕ | New `PreemptionConfig.enabled: bool` — preemption on/off toggle, **default False (opt-in)** |
-| ➕ | New `SessionStatus.PREEMPTED` — the **single state** for a confirmed victim; after kernel cleanup it branches by mode to **PENDING (reschedule) or TERMINATED (terminate)** (3.(c)) |
+| ➕ | New `SessionStatus.PREEMPTED` — the state of a confirmed victim, branching by mode to **TERMINATING (terminate) or RESCHEDULING (reschedule)** (3.(c)) |
+| ➕ | New `SessionStatus.RESCHEDULING` — the reschedule branch's kernel-cleanup phase, ending at PENDING (3.(c)) |
+| ➕ | New `SessionStatus.RESERVED` and `KernelStatus.RESERVED` — a placement held for a pending session while its victims are torn down (3.(d)) |
 | ➕ | New `preemption_min_runtime` config field (RG opts) |
-| ➕ | New `SessionRow.job_priority` (default 10) — scope-local preemption priority, compared only within the same scope-owner (2.4, 3.b) |
+| ➕ | New `SessionRow.job_priority` (default 0) — scope-local preemption priority, compared only within the same scope-owner (2.4, 3.b) |
 | ➕ | New keypair resource-policy field `max_priority` — per-user cap on the global `priority` (2.4) |
-| ➕ | Remove `PreemptionConfig.preemptible_priority` — the absolute RG threshold is unnecessary once victims are chosen by relative `job_priority` (3.b) |
+| ➕ | New `resource_allocations.prereserved` / `prereserved_at` — the per-(kernel, slot) hold backing a reservation (3.(d)) |
+| ➖ | `PreemptionConfig.preemptible_priority` was to be removed as unnecessary once victims are chosen by relative `job_priority` (3.b). **It still exists (default 5) and still round-trips through the config API, but no scheduler code reads it** — dead config to retire in a follow-up |
 
 ### 2.3 Sokovan (scheduler behavior)
 
@@ -129,18 +132,30 @@ The schedule pass (handler) **only judges and proposes**; it does not mutate vic
 
 Then **a new preemption lifecycle handler targeting `PREEMPTED` cleans up kernels and decides the destination by `preemption.mode`**:
 
-- **terminate**: hand off to the existing termination path → `TERMINATED`. Reason `PREEMPTED_BY_SCHEDULER`.
-- **reschedule**: **re-enqueue the same session as `PENDING`** (session id/config/priority/`job_priority` preserved, Slurm REQUEUE). Suited to batch jobs with checkpointing; **interactive sessions lose in-container state (accepted, documented).**
+- **terminate**: hand off to the existing termination path → `TERMINATING` → `TERMINATED`. Reason `PREEMPTED_BY_SCHEDULER`.
+- **reschedule**: tear the kernels down, then **re-enqueue the same session as `PENDING`** (session id/config/priority/`job_priority` preserved, Slurm REQUEUE). Suited to batch jobs with checkpointing; **interactive sessions lose in-container state (accepted, documented).**
 
 ```
-victim selected -> PREEMPTED (kernel cleanup)
-  ├ [terminate]  -> TERMINATED
-  └ [reschedule] -> PENDING   (priority preserved, re-competes)
+victim selected -> PREEMPTED
+  ├ [terminate]   -> TERMINATING  -> TERMINATED
+  └ [reschedule]  -> RESCHEDULING -> PENDING   (priority preserved, re-competes)
 ```
 
-There is no separate `RESCHEDULING` state. `PREEMPTED` covers the kernel-cleanup phase, and **only the final destination (PENDING/TERMINATED) differs by mode.** This separates "the preemption decision" from "mode-specific execution."
+`PREEMPTED` is the decision point only; each mode's kernel cleanup belongs to its own destination state. The terminate branch marks the session **and its kernels** TERMINATING in one step and hands off to the existing termination path. The reschedule branch moves only the session to `RESCHEDULING`; its handler tears the kernels down across ticks and re-enqueues once they are terminal. This separates "the preemption decision" from "mode-specific execution."
 
-**Multi-tick:** a victim in PREEMPTED (or the following TERMINATING) leaves the candidate set, so it is not re-picked. To keep a still-waiting pending session from preempting *other* sessions, suppress re-triggering with an **in-flight marker** (until resources free or a timeout). Freed resources are not hard-reserved; the pass relies on the sequencer's top-priority-first ordering (soft).
+**Kernels carry no preemption state.** A victim's kernels ride the ordinary `RUNNING -> TERMINATING -> TERMINATED` lifecycle and the preemption context lives in the status reason (`PREEMPTED_BY_SCHEDULER`). A consequence to be aware of: between the controller marking a victim and the next tick picking a branch, the session already reads `PREEMPTED` while its kernels are still `RUNNING`.
+
+**Multi-tick:** a victim in PREEMPTED (or the following TERMINATING) leaves the candidate set, so it is not re-picked. To keep a still-waiting pending session from preempting *other* sessions, suppress re-triggering with an **in-flight marker** (until resources free or a timeout).
+
+### (d) Reservation — the beneficiary holds its placement while victims drain
+
+The original design left freed resources unreserved and relied on the sequencer's top-priority-first ordering (soft). That proved insufficient — a competing session could take the capacity a victim had just been killed for — so the placement is now **held explicitly**.
+
+When the plan reserves a placement, the pending session moves to `RESERVED` and its kernels to `KernelStatus.RESERVED`, and the amounts are written to the `prereserved` bucket of each `(kernel, slot)` allocation row. Agent availability counts `reserved + prereserved`, so nobody else can take the capacity.
+
+Each cycle, `release-reserved-sessions` admits the kernels whose agents can now host them — per agent, in `prereserved_at` order (first reserved, first admitted), moving amounts from `prereserved` into `reserved` under the usual `used + reserved + amount <= capacity` invariant. A kernel that does not fit stops its agent for the cycle so a later reservation never overtakes an earlier one. The session promotes to `SCHEDULED` only once **no kernel still holds an unadmitted reservation**; until then it stays `RESERVED`.
+
+Admission progress therefore lives in the allocation ledger, not in the status: a partially admitted session has no separate state. If the operator opts into a phase timeout or retry limit, the session abandons the reservation and returns to `PENDING`, which releases the holds.
 
 ## Decision Summary
 
@@ -149,10 +164,11 @@ There is no separate `RESCHEDULING` state. `PREEMPTED` covers the kernel-cleanup
 | Enable toggle | New RG `PreemptionConfig.enabled`, default False (opt-in). No preemption when off |
 | Trigger | Preempt when normal allocation fails AND preemption is on AND a fully-satisfying victim set exists |
 | Eviction path | Schedule pass only proposes; **the (injected) controller marks victims `PREEMPTED`**; a new preemption handler branches by mode |
-| State model | Single new state `PREEMPTED` → terminate: TERMINATED / reschedule: PENDING (REQUEUE, id/priority/`job_priority` preserved). No separate RESCHEDULING |
+| State model | `PREEMPTED` is the decision point → terminate: TERMINATING → TERMINATED / reschedule: RESCHEDULING → PENDING (REQUEUE, id/priority/`job_priority` preserved). Kernels carry no preemption state; the reason does |
+| Reservation | The beneficiary holds its placement in `RESERVED` (session and kernels) backed by the `prereserved` allocation bucket, and promotes to SCHEDULED once every kernel is admitted (3.(d)) |
 | Preemption axis | Preempt by the new **`job_priority`** (scope-local), not the global scheduler `priority`; victims chosen by relative comparison within the same owner |
 | Priority scope | v1 = user scope only (`victim.user_uuid == pending.user_uuid`); project scope is future (needs a "project session") |
-| Config change | Drop RG `preemptible_priority` (absolute threshold unneeded); keep `preemption_order`, extended to `oldest\|newest\|fewest-sessions\|smallest-resources` (BA-6748) — the latter two select victims deficit-aware against the pending session |
+| Config change | RG `preemptible_priority` (absolute threshold) is unneeded and no longer read, but was **not** dropped — retiring it is a follow-up; keep `preemption_order`, extended to `oldest\|newest\|fewest-sessions\|smallest-resources` (BA-6748) — the latter two select victims deficit-aware against the pending session |
 | Priority cap | Keypair resource policy `max_priority` caps the global `priority` a user may declare; `job_priority` needs no cap (self-scoped) |
 | Scope | v1 single-node trigger + atomic multi-node victim eviction, no partial preemption |
 | Anti-thrashing | Preempt only on full satisfaction, never preempt equal `job_priority`, `preemption_min_runtime` (default 0). Slurm's `PreemptExemptTime` is likewise no-exemption when unset (-1 equals 0) |
@@ -163,7 +179,8 @@ There is no separate `RESCHEDULING` state. `PREEMPTED` covers the kernel-cleanup
 
 - Cross-tenant (cross-scope) preemption — v1's same-owner rule cannot evict *another* owner's session. Evicting a different tenant's low-priority work belongs to a separate **admin-managed cross-scope (project) axis**, gated on the "project session" concept, and must not be conflated with the user-declared `job_priority`.
 - Multi-node (cross-agent) trigger preemption — out of scope for v1, a follow-up BEP/Epic.
-- Strict reservation of freed resources (soft in v1) — decide the need in a follow-up.
+- ~~Strict reservation of freed resources (soft in v1) — decide the need in a follow-up.~~ **Resolved:** the soft approach let a competitor take the freed capacity, so reservation is now explicit (3.(d)).
+- Retiring `preemptible_priority`, which is still accepted by the config API but read by nothing (2.2).
 
 ## References
 

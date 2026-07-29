@@ -31,12 +31,14 @@ class PreemptSessionsLifecycleHandler(SessionLifecycleHandler):
 
     A victim enters PREEMPTED via ``SchedulingController.mark_sessions_status``.
     This handler only picks the branch the resource group's ``PreemptionMode``
-    asks for; both branches mark the victim's kernels TERMINATING under the same
-    reason, and the follow-up work belongs to the target status' own handler:
+    asks for; the follow-up work belongs to the target status' own handler, and
+    the branches differ in what they write:
 
-    - ``terminate`` -> TERMINATING, finished by the termination path.
-    - ``reschedule`` -> RESCHEDULING, finished by
-      :class:`RescheduleSessionsLifecycleHandler`.
+    - ``terminate`` -> TERMINATING for the session and its kernels alike, under
+      the preemption reason; finished by the termination path.
+    - ``reschedule`` -> RESCHEDULING for the session only. The kernels stand
+      until :class:`RescheduleSessionsLifecycleHandler` tears them down on a
+      later tick and re-enqueues the session.
 
     This handler is self-driven: ``status_transitions()`` declares no transition
     because the target depends on the per-resource-group mode, which a static
