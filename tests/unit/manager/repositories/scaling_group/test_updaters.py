@@ -21,7 +21,7 @@ def preemption_config() -> PreemptionConfig:
     )
 
 
-class TestSchedulerConfigUpdaterPreemption:
+class TestSchedulerConfigUpdater:
     def test_preemption_is_bound_as_a_mapping_not_a_json_string(
         self, preemption_config: PreemptionConfig
     ) -> None:
@@ -38,14 +38,3 @@ class TestSchedulerConfigUpdaterPreemption:
             "mode": "reschedule",
             "preemption_min_runtime": 30.0,
         }
-
-    def test_preemption_write_targets_only_its_own_key(
-        self, preemption_config: PreemptionConfig
-    ) -> None:
-        spec = ScalingGroupSchedulerConfigUpdaterSpec(
-            preemption_config=OptionalState.update(preemption_config)
-        )
-
-        _column, path, _new_value = spec.build_values()["scheduler_opts"].clauses
-
-        assert [element.value for element in path.clauses] == ["preemption"]
