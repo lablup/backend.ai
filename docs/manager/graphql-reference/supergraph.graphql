@@ -20056,6 +20056,7 @@ enum SessionV2Status
   CREATING @join__enumValue(graph: STRAWBERRY)
   RUNNING @join__enumValue(graph: STRAWBERRY)
   DEPRIORITIZING @join__enumValue(graph: STRAWBERRY)
+  RESERVED @join__enumValue(graph: STRAWBERRY)
   PREEMPTED @join__enumValue(graph: STRAWBERRY)
   RESCHEDULING @join__enumValue(graph: STRAWBERRY)
   TERMINATING @join__enumValue(graph: STRAWBERRY)

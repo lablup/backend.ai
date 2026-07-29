@@ -28796,6 +28796,7 @@
           "RESTARTING",
           "RUNNING_DEGRADED",
           "DEPRIORITIZING",
+          "RESERVED",
           "PREEMPTED",
           "RESCHEDULING",
           "TERMINATING",
