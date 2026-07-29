@@ -16,9 +16,11 @@ import sqlalchemy as sa
 from sqlalchemy.engine import CursorResult
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
-from ai.backend.common.data.entity.types import EntityRef, ScopeRef, ScopeType
 from ai.backend.common.data.entity.types import (
-    EntityType as VirtualScopeEntityType,
+    PROJECT_SCOPE_TYPE,
+    USER_ENTITY_TYPE,
+    EntityRef,
+    ScopeRef,
 )
 from ai.backend.common.data.permission.types import RBACElementType
 from ai.backend.common.exception import InvalidAPIParameters
@@ -122,10 +124,6 @@ from ai.backend.manager.repositories.vfolder.deletion import initiate_vfolder_de
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-_PROJECT_SCOPE_TYPE = ScopeType(RBACElementType.PROJECT.value)
-_USER_ENTITY_TYPE = VirtualScopeEntityType(RBACElementType.USER.value)
-
-
 @dataclass
 class ProjectUserMember(ScopeMember):
     """A user joining or leaving a project scope; ``manage_roles`` controls whether the
@@ -136,7 +134,7 @@ class ProjectUserMember(ScopeMember):
 
     @override
     def entity_ref(self) -> EntityRef:
-        return EntityRef(entity_type=_USER_ENTITY_TYPE, entity_id=self.user_id)
+        return EntityRef(entity_type=USER_ENTITY_TYPE, entity_id=self.user_id)
 
     @override
     def assign_role_on(self) -> UserID | None:
@@ -161,7 +159,7 @@ class ProjectScopeCreation(ScopeCreation[GroupRow]):
 
     @override
     def scope_of(self, row: GroupRow) -> ScopeRef:
-        return ScopeRef(scope_type=_PROJECT_SCOPE_TYPE, scope_id=ProjectID(row.id))
+        return ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=ProjectID(row.id))
 
     @override
     def system_roles_of(self, row: GroupRow) -> Collection[ScopeSystemRoleData]:
@@ -210,9 +208,9 @@ class GroupDBSource:
                     await self._add_users_to_project(w, project_id, user_ids)
                 elif user_update_mode == "remove":
                     await w.remove_entity_members(
-                        ScopeRef(scope_type=_PROJECT_SCOPE_TYPE, scope_id=project_id),
+                        ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=project_id),
                         [
-                            EntityRef(entity_type=_USER_ENTITY_TYPE, entity_id=uid)
+                            EntityRef(entity_type=USER_ENTITY_TYPE, entity_id=uid)
                             for uid in user_ids
                         ],
                     )
@@ -269,7 +267,7 @@ class GroupDBSource:
             return
         await w.add_entity_members(
             EntityMembersAddition(
-                scope=ScopeRef(scope_type=_PROJECT_SCOPE_TYPE, scope_id=project_id),
+                scope=ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=project_id),
                 members=[ProjectUserMember(user_id=UserID(row.uuid)) for row in new_user_rows],
             )
         )
@@ -504,7 +502,7 @@ class GroupDBSource:
                     purger=RBACEntityPurger(
                         spec=ProjectPurgerSpec(project_id=project_id),
                     ),
-                    scope=ScopeRef(scope_type=_PROJECT_SCOPE_TYPE, scope_id=project_id),
+                    scope=ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=project_id),
                 )
             )
             if result is None:
@@ -644,7 +642,7 @@ class GroupDBSource:
 
             await w.add_entity_members(
                 EntityMembersAddition(
-                    scope=ScopeRef(scope_type=_PROJECT_SCOPE_TYPE, scope_id=project_id),
+                    scope=ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=project_id),
                     members=[
                         ProjectUserMember(user_id=UserID(row.uuid), manage_roles=False)
                         for row in new_user_rows
@@ -697,9 +695,9 @@ class GroupDBSource:
             unassigned_users = [row.to_data() for row in assigned_rows]
 
             await w.remove_entity_members(
-                ScopeRef(scope_type=_PROJECT_SCOPE_TYPE, scope_id=ProjectID(unbinder.project_id)),
+                ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=ProjectID(unbinder.project_id)),
                 [
-                    EntityRef(entity_type=_USER_ENTITY_TYPE, entity_id=UserID(uid))
+                    EntityRef(entity_type=USER_ENTITY_TYPE, entity_id=UserID(uid))
                     for uid in unbinder.user_uuids
                 ],
             )
@@ -726,7 +724,7 @@ class GroupDBSource:
         async with self._rbac_ops_provider.write_ops() as w:
             await w.add_entity_members(
                 EntityMembersAddition(
-                    scope=ScopeRef(scope_type=_PROJECT_SCOPE_TYPE, scope_id=project_id),
+                    scope=ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=project_id),
                     members=[ProjectUserMember(user_id=user_id, manage_roles=False)],
                 )
             )
@@ -735,8 +733,8 @@ class GroupDBSource:
         """Remove a user from a project (membership writes only)."""
         async with self._rbac_ops_provider.write_ops() as w:
             await w.remove_entity_members(
-                ScopeRef(scope_type=_PROJECT_SCOPE_TYPE, scope_id=project_id),
-                [EntityRef(entity_type=_USER_ENTITY_TYPE, entity_id=user_id)],
+                ScopeRef(scope_type=PROJECT_SCOPE_TYPE, scope_id=project_id),
+                [EntityRef(entity_type=USER_ENTITY_TYPE, entity_id=user_id)],
             )
 
     async def get_project(self, project_id: UUID) -> GroupData:

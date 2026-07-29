@@ -142,12 +142,11 @@ class UserService:
         user_data_result = await self._user_repository.create_user_validated(
             action.creator, action.group_ids
         )
-        # Grant the scope-level auto_assign roles for the user's initial domain
-        # and project memberships (user creation only provisions user-scope roles).
-        # action.scope_id() is the user's domain name (the action's DOMAIN scope).
+        # Grant the scope-level auto_assign roles for the user's initial project
+        # memberships (user creation only provisions user-scope roles). Domain
+        # enrollment resumes once domain RBAC rows are UUID-keyed.
         await self._user_repository.assign_users_to_scope(
             UserID(user_data_result.user.uuid),
-            user_data_result.user.domain_name,
             [ProjectID(UUID(gid)) for gid in action.group_ids] if action.group_ids else [],
         )
         # The user is also a member of its domain's model-store project at
@@ -162,7 +161,7 @@ class UserService:
     async def bulk_create_users(self, action: BulkCreateUserAction) -> BulkCreateUserActionResult:
         result = await self._user_repository.bulk_create_users_validated(action.items)
         # Grant the scope-level auto_assign roles for each created user's initial
-        # domain/project memberships, the same as the single-user create path.
+        # project memberships, the same as the single-user create path.
         # group_ids are not carried in the result, so correlate them by email.
         group_ids_by_email = {
             cast(UserCreatorSpec, item.creator.spec).email: item.group_ids for item in action.items
@@ -171,7 +170,6 @@ class UserService:
             group_ids = group_ids_by_email.get(created.user.email)
             await self._user_repository.assign_users_to_scope(
                 UserID(created.user.uuid),
-                created.user.domain_name,
                 [ProjectID(UUID(gid)) for gid in group_ids] if group_ids else [],
             )
             await self._user_repository.assign_user_to_model_store(

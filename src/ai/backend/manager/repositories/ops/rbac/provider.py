@@ -12,9 +12,12 @@ from typing import override
 
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert as pg_insert
-from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
-from ai.backend.common.data.entity.types import EntityRef, ScopeRef
+from ai.backend.common.data.entity.types import (
+    USER_ENTITY_TYPE,
+    EntityRef,
+    ScopeRef,
+)
 from ai.backend.common.data.permission.types import (
     Permission,
     RBACElementType,
@@ -42,10 +45,12 @@ from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
+from ai.backend.manager.models.rbac_models.role import RoleRow
 from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
     RolePermissionPresetRow,
 )
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
+from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.virtual_scope.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_scope.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_scope.virtual_scope import VirtualScopeRow
@@ -86,9 +91,9 @@ from ai.backend.manager.repositories.ops.base.provider import DBOpsProvider, Wri
 from ai.backend.manager.repositories.permission_controller.creators import (
     PermissionCreatorSpec,
     RoleCreatorSpec,
+    UserRoleCreatorSpec,
 )
 from ai.backend.manager.repositories.permission_controller.role_manager import (
-    RoleManager,
     ScopeSystemRoleData,
 )
 
@@ -130,6 +135,22 @@ class ScopeMember(ABC):
 
 
 @dataclass
+class ScopeUserMember(ScopeMember):
+    """A user joining a scope; membership always grants the scope's ``auto_assign``
+    roles (idempotently), so membership and role state cannot drift apart."""
+
+    user_id: UserID
+
+    @override
+    def entity_ref(self) -> EntityRef:
+        return EntityRef(entity_type=USER_ENTITY_TYPE, entity_id=self.user_id)
+
+    @override
+    def assign_role_on(self) -> UserID:
+        return self.user_id
+
+
+@dataclass
 class EntityMembersAddition:
     scope: ScopeRef
     members: Collection[ScopeMember]
@@ -154,12 +175,6 @@ class ScopeBatchDeletion[TRow: Base]:
 
 class RBACWriteOps(WriteOps):
     """Base write ops plus RBAC scope-associated creation and virtual-scope writes."""
-
-    _role_manager: RoleManager
-
-    def __init__(self, sess: SASession) -> None:
-        super().__init__(sess)
-        self._role_manager = RoleManager()
 
     # -- Virtual-scope helpers ----------------------------------------------------
 
@@ -371,36 +386,6 @@ class RBACWriteOps(WriteOps):
             except Exception as e:
                 errors.append(BulkPurgerError(purger=purger, exception=e, index=index))
         return BulkPurgerResultWithFailures(successes=successes, errors=errors)
-
-    async def add_users_to_scope(
-        self,
-        scope_id: ScopeId,
-        user_ids: Collection[UserID],
-    ) -> None:
-        """Bind users to a scope and grant the scope's ``auto_assign`` roles.
-
-        Inserts the user-scope associations (``association_scopes_entities``,
-        ON CONFLICT DO NOTHING) and maps every user to each active
-        ``auto_assign`` role bound to the scope. Idempotent: re-binding an
-        existing membership is a no-op and already-granted roles are skipped,
-        so it is safe to call even when the scope association already exists.
-        """
-        if not user_ids:
-            return
-        values = [
-            {
-                "scope_type": scope_id.scope_type,
-                "scope_id": scope_id.scope_id,
-                "entity_type": EntityType.USER,
-                "entity_id": str(user_id),
-                "relation_type": RelationType.AUTO,
-                "permission_cap": None,
-            }
-            for user_id in user_ids
-        ]
-        stmt = pg_insert(AssociationScopesEntitiesRow).values(values).on_conflict_do_nothing()
-        await self._sess.execute(stmt)
-        await self._role_manager.assign_auto_assign_roles(self._sess, user_ids, scope_id)
 
     # -- Scope lifecycle: real scope entity + its virtual scope node --------------
 
@@ -637,6 +622,57 @@ class RBACWriteOps(WriteOps):
 
     # -- Virtual scope: outbound edges (entity_memberships) -----------------------
 
+    async def _grant_auto_assign_roles(
+        self,
+        scope_id: ScopeId,
+        user_ids: Collection[UserID],
+    ) -> None:
+        """Map users to every active ``auto_assign`` role bound to ``scope_id``.
+
+        Roles bound to the scope are located via the scope-entity association
+        (``association_scopes_entities`` with ``entity_type == ROLE``); already-granted
+        pairs are skipped.
+        """
+        unique_user_ids = set(user_ids)
+        if not unique_user_ids:
+            return
+        # One query: the scope's auto_assign roles, outer-joined with the target
+        # users' existing grants (user_id is NULL for roles no target user holds).
+        rows = (
+            await self._sess.execute(
+                sa.select(RoleRow.id.label("role_id"), UserRoleRow.user_id.label("user_id"))
+                .join(
+                    AssociationScopesEntitiesRow,
+                    sa.cast(AssociationScopesEntitiesRow.entity_id, sa.String)
+                    == sa.cast(RoleRow.id, sa.String),
+                )
+                .outerjoin(
+                    UserRoleRow,
+                    sa.and_(
+                        UserRoleRow.role_id == RoleRow.id,
+                        UserRoleRow.user_id.in_(unique_user_ids),
+                    ),
+                )
+                .where(
+                    AssociationScopesEntitiesRow.scope_type == scope_id.scope_type,
+                    AssociationScopesEntitiesRow.scope_id == scope_id.scope_id,
+                    AssociationScopesEntitiesRow.entity_type == EntityType.ROLE,
+                    RoleRow.auto_assign.is_(True),
+                    RoleRow.status == RoleStatus.ACTIVE,
+                )
+            )
+        ).all()
+        role_ids = {row.role_id for row in rows}
+        existing_pairs = {(row.user_id, row.role_id) for row in rows if row.user_id is not None}
+        specs = [
+            UserRoleCreatorSpec(user_id=user_id, role_id=role_id)
+            for user_id in unique_user_ids
+            for role_id in role_ids
+            if (user_id, role_id) not in existing_pairs
+        ]
+        if specs:
+            await self.bulk_create(BulkCreator(specs=specs))
+
     async def add_entity_members(
         self,
         addition: EntityMembersAddition,
@@ -681,13 +717,12 @@ class RBACWriteOps(WriteOps):
             user_id for member in members if (user_id := member.assign_role_on()) is not None
         ]
         if role_user_ids:
-            await self._role_manager.assign_auto_assign_roles(
-                self._sess,
-                role_user_ids,
+            await self._grant_auto_assign_roles(
                 ScopeId(
                     scope_type=LegacyScopeType(scope.scope_type),
                     scope_id=str(scope.scope_id),
                 ),
+                role_user_ids,
             )
 
     async def remove_entity_members(
