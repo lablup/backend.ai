@@ -89,7 +89,7 @@ Check options with `--help`.
 
 ### Resource Management
 
-- **resource-group**: user(empty group) · admin(search, get, create, delete, resource-info, default-options, default-session-options, allow-domains, allowed-domains, allow-projects, allowed-projects, allow-for-domain, allowed-for-domain, allow-for-project, allowed-for-project)
+- **resource-group**: user(empty group) · admin(search, get, create, update, delete, resource-info, default-options, default-session-options, allow-domains, allowed-domains, allow-projects, allowed-projects, allow-for-domain, allowed-for-domain, allow-for-project, allowed-for-project)
 - **resource-allocation**: user(project-usage, resource-group-usage) · admin(domain-usage, effective) · my(effective, keypair-usage)
 - **resource-preset**: admin(search, get, create, update, delete, check-availability)
 - **resource-policy**: admin(sub keypair / project / user — each create, get, search, update, delete) · my(keypair, user)

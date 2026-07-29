@@ -8,10 +8,12 @@ import click
 
 from ai.backend.client.cli.v2.helpers import (
     create_v2_registry,
+    load_model,
     load_v2_config,
     parse_order_options,
     print_result,
 )
+from ai.backend.common.dto.manager.v2.resource_group.types import SchedulerTypeDTO
 
 
 @click.group(name="resource-group")
@@ -118,6 +120,99 @@ def create(name: str, domain_name: str, description: str | None) -> None:
                     name=name,
                     domain_name=domain_name,
                     description=description,
+                ),
+            )
+            print_result(result)
+        finally:
+            await registry.close()
+
+    asyncio.run(_run())
+
+
+@resource_group.command()
+@click.argument("name", type=str)
+@click.option(
+    "--is-active/--no-is-active",
+    "is_active",
+    default=None,
+    help="Whether the resource group accepts new sessions.",
+)
+@click.option(
+    "--is-public/--no-is-public",
+    "is_public",
+    default=None,
+    help="Whether the resource group is public.",
+)
+@click.option("--description", default=None, type=str, help="Human-readable description.")
+@click.option("--app-proxy-addr", default=None, type=str, help="App proxy address.")
+@click.option("--appproxy-api-token", default=None, type=str, help="App proxy API token.")
+@click.option(
+    "--use-host-network/--no-use-host-network",
+    "use_host_network",
+    default=None,
+    help="Whether sessions in this resource group use host network mode.",
+)
+@click.option(
+    "--scheduler-type",
+    default=None,
+    type=click.Choice([scheduler_type.value for scheduler_type in SchedulerTypeDTO]),
+    help="Scheduler used to admit sessions.",
+)
+@click.option(
+    "--preemption",
+    "preemption_spec",
+    default=None,
+    type=str,
+    help=(
+        "Preemption configuration as a JSON string or @file, matching how the other "
+        "scheduler options are supplied. Keys: enabled, preemptible_priority, order, "
+        "mode, preemption_min_runtime. Read the current block from `resource-group get`."
+    ),
+)
+def update(
+    name: str,
+    is_active: bool | None,
+    is_public: bool | None,
+    description: str | None,
+    app_proxy_addr: str | None,
+    appproxy_api_token: str | None,
+    use_host_network: bool | None,
+    scheduler_type: str | None,
+    preemption_spec: str | None,
+) -> None:
+    """Update a resource group's configuration (superadmin only).
+
+    Only the given options are changed. The server replaces the preemption block as a
+    whole rather than merging it, so a partial ``--preemption`` payload resets the keys
+    it omits to their defaults; read the current block from ``resource-group get``
+    first and send it back with the edits applied.
+    """
+    from ai.backend.common.dto.manager.v2.resource_group.request import (
+        PreemptionConfigInputDTO,
+        UpdateResourceGroupConfigInput,
+    )
+
+    preemption = (
+        load_model(preemption_spec, PreemptionConfigInputDTO)
+        if preemption_spec is not None
+        else None
+    )
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.resource_group.update_config(
+                name,
+                UpdateResourceGroupConfigInput(
+                    resource_group_name=name,
+                    is_active=is_active,
+                    is_public=is_public,
+                    description=description,
+                    app_proxy_addr=app_proxy_addr,
+                    appproxy_api_token=appproxy_api_token,
+                    use_host_network=use_host_network,
+                    scheduler_type=scheduler_type,
+                    preemption=preemption,
                 ),
             )
             print_result(result)
