@@ -15932,6 +15932,7 @@
           "keypair",
           "notification_channel",
           "network",
+          "idle_checker_assignment",
           "resource_group",
           "container_registry",
           "storage_host",
