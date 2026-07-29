@@ -35,7 +35,7 @@ class V2AppConfigFragmentClient(BaseDomainClient):
     call is RBAC-gated at the scope it acts on.
     """
 
-    async def scoped_by_names(
+    async def scoped_get_app_config_fragments_by_names(
         self,
         request: ScopedAppConfigFragmentsByNamesInput,
     ) -> AppConfigFragmentsByNamesResponse:
@@ -51,7 +51,7 @@ class V2AppConfigFragmentClient(BaseDomainClient):
             response_model=AppConfigFragmentsByNamesResponse,
         )
 
-    async def scoped_bulk_upsert(
+    async def scoped_bulk_upsert_app_config_fragments(
         self,
         request: ScopedUpsertAppConfigFragmentsInput,
     ) -> UpsertAppConfigFragmentsPayload:
@@ -63,7 +63,7 @@ class V2AppConfigFragmentClient(BaseDomainClient):
             response_model=UpsertAppConfigFragmentsPayload,
         )
 
-    async def my_by_names(
+    async def my_get_app_config_fragments_by_names(
         self,
         request: MyAppConfigFragmentsByNamesInput,
     ) -> AppConfigFragmentsByNamesResponse:
@@ -75,7 +75,7 @@ class V2AppConfigFragmentClient(BaseDomainClient):
             response_model=AppConfigFragmentsByNamesResponse,
         )
 
-    async def my_bulk_upsert(
+    async def my_bulk_upsert_app_config_fragments(
         self,
         request: MyUpsertAppConfigFragmentsInput,
     ) -> UpsertAppConfigFragmentsPayload:

@@ -93,7 +93,7 @@ class TestScopedByNames:
             return_value=[node_payload, None],
         )
 
-        result = await client.scoped_by_names(
+        result = await client.scoped_get_app_config_fragments_by_names(
             ScopedAppConfigFragmentsByNamesInput(
                 scope=AppConfigScopeRef(
                     scope_type=AppConfigScopeType.USER,
@@ -125,7 +125,7 @@ class TestScopedBulkUpsert:
             return_value={"items": [node_payload]},
         )
 
-        result = await client.scoped_bulk_upsert(
+        result = await client.scoped_bulk_upsert_app_config_fragments(
             ScopedUpsertAppConfigFragmentsInput(
                 scope=AppConfigScopeRef(
                     scope_type=AppConfigScopeType.USER,
@@ -152,7 +152,9 @@ class TestMyByNames:
     ) -> None:
         mock_response.json = AsyncMock(return_value=[node_payload])
 
-        result = await client.my_by_names(MyAppConfigFragmentsByNamesInput(config_names=["theme"]))
+        result = await client.my_get_app_config_fragments_by_names(
+            MyAppConfigFragmentsByNamesInput(config_names=["theme"])
+        )
 
         call_args = mock_session.request.call_args
         assert call_args[0][0] == "POST"
@@ -173,7 +175,7 @@ class TestMyBulkUpsert:
             return_value={"items": [node_payload]},
         )
 
-        result = await client.my_bulk_upsert(
+        result = await client.my_bulk_upsert_app_config_fragments(
             MyUpsertAppConfigFragmentsInput(
                 items=[AppConfigFragmentUpsertItem(config_name="theme", config={"mode": "dark"})]
             )
